@@ -1,0 +1,1 @@
+A comprehensive Human Resource & Staff Administration platform designed for academic environments. Features role-based access control, time-sensitive feedback cycles, and data-driven performance analytics for students, professors, and department heads.
