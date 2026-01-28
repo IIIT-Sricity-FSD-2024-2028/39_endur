@@ -1,5 +1,104 @@
-yello
+# Domain: Human Resource & Staff Administration (Academic)
+# Problem Statement: Performance Review & Feedback Management System (Endur)
+# Last Updated: 2026-01-28
 
-upstream test
+FeedbackCycle:
+  definition: >
+    The specific, time-bound period during which the system is open for students to submit their evaluations.
+    Once this period expires, submissions are locked to ensure integrity.
+  examples: 
+    - "Mid Semester Feedback Cycle (Aug 20 - Aug 25)"
+    - "End-Term Review"
+  aliases:
+    - Feedback Window
+    - Submission Period
 
-mp
+EvaluationParameter: 
+  definition: >
+    A distinct criterion or category used to quantify a specific aspect of
+    a faculty member's teaching quality.
+  examples:
+    - "Subject Knowledge"
+    - "Punctuality"
+    - "Classroom Control"
+  aliases:
+    - Metric
+    - Teaching Category
+    - KPI (Key Performance Indicator)
+
+PerformanceScore:
+  definition: >
+    The quantitative value (typically on a scale of 1-10) assigned by a student
+    to a specific Evaluation Parameter.
+  examples:
+    - "8.5/10 for Clarity"
+    - "4/5 for Punctuality"
+  aliases:
+    - Rating
+    - Numeric Grade
+
+QualitativeFeedback:
+  definition: >
+    Free-text comments provided by students to explain their numeric scores
+    or provide context that numbers cannot capture.
+  examples:
+    - "The professor explains concepts well but moves too fast."
+  aliases:
+    - Comments
+    - Remarks
+    - Subjective Feedback
+
+AnonymizedReport:
+  definition: >
+    A generated summary viewable by the Faculty Member where student identities
+    are stripped from the data to encourage honest feedback and protect students.
+  examples:
+    - "A list of 50 comments shown without student names."
+  aliases:
+    - Blind Review
+    - Faculty View
+
+DepartmentHead:
+  definition: >
+    The administrative actor responsible for overseeing the performance of all
+    Faculty Members within a specific department and intervening in cases of
+    consistently low Performance Scores.
+  examples:
+    - "Head of CSE Department reviewing semester stats."
+  aliases:
+    - HOD
+    - Reviewer
+    - Administrator
+
+FacultyMember:
+  definition: >
+    The academic staff member who delivers the course and is the subject of the
+    performance review.
+  examples:
+    - "Assistant Professor"
+    - "Lab Instructor"
+  aliases:
+    - Instructor
+    - Professor
+    - Ratee
+
+CourseOffering:
+  definition: >
+    A specific instance of a subject being taught to a specific section by a
+    specific Faculty Member during a semester.
+  examples:
+    - "Operating Systems for CSE-B, Monsoon 2026"
+  aliases:
+    - Class
+    - Subject Section
+
+ComplianceAudit:
+  definition: >
+    The administrative process of checking feedback timestamps and patterns to
+    ensure the integrity of the review process (e.g., checking for spamming).
+  examples:
+    - "Flagging 50 reviews submitted within 1 minute."
+  aliases:
+    - Security Check
+    - Integrity Verification
+
