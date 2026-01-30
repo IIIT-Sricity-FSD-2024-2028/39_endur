@@ -1,3 +1,208 @@
-yello
+# Domain: Human Resource & Staff Administration (Academic)
+# Problem Statement: Performance Review & Feedback Management System (Endur)
+# Last Updated: 2026-01-30
 
-upstream test
+FeedbackCycle:
+  definition: >
+    A defined, time-bound period during which feedback or evaluations are collected.
+    FeedbackCycles may occur multiple times within a semester to support continuous
+    review rather than a single end-term evaluation.
+  examples: 
+    - "Semester-commence Feedback Cycle (Aug 20 - Aug 25)"
+    - "Quarterly teaching check-in"
+    - "End-Term review"
+  aliases:
+    - Feedback Window
+    - Review Cycle
+    - Submission Period
+
+EvaluationParameter: 
+  definition: >
+    A clearly defined criterion used to evaluate a specific aspect of a faculty
+    member's performance, aligned with institutional teaching objectives and
+    student learning outcomes.
+  examples:
+    - "Clarity of Explanation"
+    - "Pace of Delivery"
+    - "Responsiveness to Questions"
+  aliases:
+    - Metric
+    - Teaching Category
+    - Performance Dimension
+
+CourseContentQuality:
+  definition: >
+    An assessment of the relevance, structure, and usefulness of the course material
+    relative to program goals and student progression.
+  examples:
+    - "How courses might be relevant to current job market"
+  aliases:
+    - Content Relevance
+    - Curriculum Quality
+
+PerformanceScore:
+  definition: >
+    A quantitative value assigned to an EvaluationParameter during a FeedbackCycle,
+    used to measure performance trends over time rather than as a one-time judgment.
+  examples:
+    - "7/10 for Delivery Effectiveness"
+    - "Improved from 5 to 8 across cycles"
+  aliases:
+    - Rating
+    - Numeric Grade
+
+QualitativeFeedback:
+  definition: >
+    Free-text input provided to explain scores, highlight strengths, identify
+    improvement areas, or suggest changes related to teaching delivery or content.
+  examples:
+    - "Examples help understanding, but lectures feel rushed."
+  aliases:
+    - Comments
+    - Remarks
+    - Subjective Feedback
+
+AnonymizedReport:
+  definition: >
+    An aggregated summary view available to Faculty Members and reviewers where
+    individual student identities and raw submissions are removed, ensuring
+    psychological safety while enabling meaningful reflection.
+  examples:
+    - "Weekly delivery trend with grouped anonymous comments."
+  aliases:
+    - Faculty Feedback Dashboard
+    - Summary View
+    - Blind Review
+
+DepartmentHead:
+  definition: >
+    The academic leader responsible for overseeing faculty performance within
+    a department, facilitating consistency, coaching discussions, and intervention
+    in cases of sustained underperformance.
+  examples:
+    - "HOD reviewing semester-wide delivery trends."
+  aliases:
+    - HOD
+    - Academic Manager
+
+FacultyMember:
+  definition: >
+    The academic professional responsible for course delivery, whose performance
+    is reviewed through structured feedback cycles focused on growth and improvement.
+  examples:
+    - "Assistant Professor"
+    - "Lab Instructor"
+  aliases:
+    - Instructor
+    - Professor
+    - Ratee
+
+CourseOffering:
+  definition: >
+    A specific instance of a course delivered by a FacultyMember to a defined
+    student cohort during a semester, forming the primary unit of evaluation.
+  examples:
+    - "Operating Systems - CSE-B - Monsoon 2026"
+  aliases:
+    - Class
+    - Subject Section
+
+ComplianceAudit:
+  definition: >
+    A monitoring process that analyzes feedback timing, patterns, and anomalies
+    to protect the integrity of the evaluation process and detect misuse.
+  examples:
+    - "Flagging 30 submissions within 2 minutes."
+  aliases:
+    - Integrity Check
+    - Review Audit
+
+RandomTicking:
+  definition: >
+    A failure pattern where feedback is submitted rapidly without thoughtful
+    consideration, reducing data reliability.
+  examples:
+    - "All parameters rated identically"
+    - "Multiple feedbacks were submitted under 10 seconds"
+  aliases:
+    - Careless Feedback
+    - Low-Intent Submission
+
+FeedbackTrend:
+  definition: >
+    A longitudinal view of PerformanceScores across multiple FeedbackCycles,
+    used to evaluate improvement, stagnation, or decline over time.
+  examples:
+    - "Delivery score improved steadily over the semester"
+  aliases:
+    - Performance Trend
+    - Score Progression
+
+AttendanceWeightedFeedback:
+  definition: >
+    A weighting mechanism that adjusts the influence of feedback based on student
+    attendance, aligning input credibility with course participation.
+  examples:
+    - "50% attendance applies 0.6 weight"
+  aliases:
+    - Weighted Review
+    - Attendance-Based Weightage
+
+SelfReflection:
+  definition: >
+    A reflective input provided to a FacultyMember and Student to assess their own performance,
+    challenges, and improvements during a semester.
+  examples:
+    - "Instructor notes improved engagement after midterm changes"
+  aliases:
+    - Self Evaluation
+    - Faculty Reflection
+
+  GapAnalysis:
+  definition: >
+    A comparative assessment that highlights the difference between a FacultyMember's
+    self-reflected expectations of their teaching performance and the feedback
+    provided by students during a FeedbackCycle. This analysis helps identify
+    blind spots, alignment issues, and areas requiring improvement.
+  examples:
+    - "Faculty expected high clarity scores, but students rated clarity low"
+    - "Self-assessed engagement higher than student feedback indicated"
+  aliases:
+    - Expectation vs Feedback Analysis
+    - Perception Gap
+
+ActionReport:
+  definition: >
+    A structured report prepared by a FacultyMember and submitted to the
+    DepartmentHead, outlining specific actions, adjustments, or strategies
+    the faculty plans to implement in future courses based on received feedback
+    and identified gaps.
+  examples:
+    - "Plan to slow lecture pace and add weekly recap sessions"
+    - "Introduce more problem-solving examples in the next offering"
+  aliases:
+    - Improvement Plan
+    - Faculty Action Plan
+
+  ReviewCheckIn:
+  definition: >
+    A scheduled, lightweight review interaction between a FacultyMember and
+    the DepartmentHead (or academic reviewer) focused on discussing feedback
+    trends, gap analysis, and progress on previously committed action items,
+    rather than re-evaluating raw scores.
+  examples:
+    - "Mid-semester review discussion based on delivery trends"
+    - "Check-in after implementing changes suggested in feedback"
+  aliases:
+    - Performance Check-In
+    - Review Discussion
+
+  ReviewOfReviews:
+  definition: >
+    A meta-evaluation process accessible to both students and faculty members that assesses the effectiveness, 
+    fairness, and usefulness of the feedback system itself, including question design and timing.
+  examples:
+    - "End-of-year review of feedback questions"
+  aliases:
+    - Feedback System Review
+    - Process Evaluation
