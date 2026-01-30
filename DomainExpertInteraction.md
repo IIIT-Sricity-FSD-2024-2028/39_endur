@@ -7,18 +7,20 @@
     Mode of interaction: Video Call
     Duration (in-minutes): 33 minutes
     Publicly accessible Video link: https://drive.google.com/file/d/1q-V_3gdyo2aMbwW8RlCTPU0yLqQjsbtI/view?usp=sharing
+
 ## Domain Expert Details
-    Role/ designation: Dean of Academics
-    Experience in the domain (Brief description of responsibilities and years of experience in domain):
-    Nature of work: Operational/Administrative/Managerial/Teamlead/Developer
+    Domain Expert: Dr. Hrishikesh Venkataraman (Dean of Academics) 
+    Experience in the domain : As served as a professor from IIIT Sri City beginning from 2015, overseeing the collection, analysis, and application of academic feedback to ensure continuous improvement in teaching quality, curriculum effectiveness, and student learning outcomes.
+    Nature of work: Managerial
+
 ## Domain Context and Terminology
 
 - How would you describe the overall purpose of this problem statement in your daily work?
-**Answer:** 
+- **Answer:** 
 The purpose of this problem statement is to design a more effective, timely, and engaging faculty feedback system that helps institutions improve course content and teaching delivery, rather than merely collecting end-semester scores that rarely lead to action.
 
 - What are the primary goals or outcomes of this problem statement?
-**Answer:** 
+- **Answer:** 
 Make feedback enjoyable and engaging for students
 Collect continuous, interval-based feedback instead of one-time semester feedback
 Increase quality and honesty of feedback, not just numeric ratings
@@ -45,7 +47,7 @@ Enable faculty to view trends, summaries, and anonymized comments without access
 
 ## Actors and Responsibilities
 - Identify the different roles involved and what they do in practice.
-**Answer:** 
+- **Answer:** 
 The domain involves students providing feedback, faculty reflecting and improving their teaching, and academic leadership reviewing trends and guiding improvement while maintaining fairness and anonymity.
 
 | Actor / Role              | Responsibilities                                                                                                         |
