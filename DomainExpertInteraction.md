@@ -10,7 +10,7 @@
 
 ## Domain Expert Details
     Domain Expert: Dr. Hrishikesh Venkataraman (Dean of Academics) 
-    Experience in the domain : As served as a professor from IIIT Sri City beginning from 2015, overseeing the collection, analysis, and application of academic feedback to ensure continuous improvement in teaching quality, curriculum effectiveness, and student learning outcomes.
+    Experience in the domain : As served as a professor from IIIT Sri City beginning from 2015, overseeing the collection, analysis, and application of academic feedback to ensure continuous improvement in teaching delivery, curriculum effectiveness, and student engagement.
     Nature of work: Managerial
 
 ## Domain Context and Terminology
