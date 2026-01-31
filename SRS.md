@@ -3,7 +3,7 @@
 > [!info] Document Meta
 > **Project:** Endur (Performance Review & Feedback Management System)
 > **Team:** 39_endur
-> **Version:** 1.0
+> **Version:** 1.01
 
 ---
 
