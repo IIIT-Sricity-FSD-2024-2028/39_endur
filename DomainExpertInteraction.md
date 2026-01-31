@@ -6,7 +6,8 @@
     Date of interaction:29th January 2026
     Mode of interaction: Video Call
     Duration (in-minutes): 33 minutes
-    Publicly accessible Video link: https://drive.google.com/file/d/1q-V_3gdyo2aMbwW8RlCTPU0yLqQjsbtI/view?usp=sharing
+
+#### [Publicly accessible Video link](https://drive.google.com/file/d/1q-V_3gdyo2aMbwW8RlCTPU0yLqQjsbtI/view?usp=sharing)
 
 ## Domain Expert Details
     Domain Expert: Dr. Hrishikesh Venkataraman (Dean of Academics) 
