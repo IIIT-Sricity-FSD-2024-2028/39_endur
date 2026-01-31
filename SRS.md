@@ -318,13 +318,12 @@ The following domain requirements define mandatory constraints that govern syste
 
 ### 7.1 Use Case Diagram
 *Visualizing Student, Faculty, and HOD interactions.*
-![Alt text](assets/Use-Case_Diagram.drawio.svg)
+![Alt text](assets/Use_Case.svg)
 
 ### 7.2 Activity Diagram
 
-_Detailing the "Gap Analysis" workflow._
-
-_(Placeholder: Insert Activity Diagram Mermaid Code Here)_
+*1) Student Activity Diagram*
+![Alt text](assets/Activity_Student.svg)_
 
 ### 7.3 Sequence Diagram
 
