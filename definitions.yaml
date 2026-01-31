@@ -1,6 +1,6 @@
 # Domain: Human Resource & Staff Administration (Academic)
 # Problem Statement: Performance Review & Feedback Management System (Endur)
-# Last Updated: 2026-01-30
+# Last Updated: 2026-01-31
 
 FeedbackCycle:
   definition: >
@@ -73,6 +73,20 @@ AnonymizedReport:
     - Faculty Feedback Dashboard
     - Summary View
     - Blind Review
+
+FeedbackResponse:
+  definition: >
+    A single, immutable submission made by a Student during a FeedbackCycle for a
+    specific CourseOffering, consisting of PerformanceScores mapped to
+    EvaluationParameters.
+    Each FeedbackResponse represents one complete feedback instance and is used
+    as an atomic unit for aggregation, analysis, and auditing.
+  examples:
+    - "End-term feedback response for Operating Systems"
+  aliases:
+    - Feedback Submission
+    - Student Response
+    - Evaluation Response
 
 DepartmentHead:
   definition: >
@@ -150,7 +164,7 @@ AttendanceWeightedFeedback:
 
 SelfReflection:
   definition: >
-    A reflective input provided to a FacultyMember and Student to assess their own performance,
+    A reflective input provided to a FacultyMember to assess their own performance,
     challenges, and improvements during a semester.
   examples:
     - "Instructor notes improved engagement after midterm changes"
@@ -158,7 +172,7 @@ SelfReflection:
     - Self Evaluation
     - Faculty Reflection
 
-  GapAnalysis:
+GapAnalysis:
   definition: >
     A comparative assessment that highlights the difference between a FacultyMember's
     self-reflected expectations of their teaching performance and the feedback
@@ -184,7 +198,7 @@ ActionReport:
     - Improvement Plan
     - Faculty Action Plan
 
-  ReviewCheckIn:
+ReviewCheckIn:
   definition: >
     A scheduled, lightweight review interaction between a FacultyMember and
     the DepartmentHead (or academic reviewer) focused on discussing feedback
@@ -197,7 +211,7 @@ ActionReport:
     - Performance Check-In
     - Review Discussion
 
-  ReviewOfReviews:
+ReviewOfReviews:
   definition: >
     A meta-evaluation process accessible to both students and faculty members that assesses the effectiveness, 
     fairness, and usefulness of the feedback system itself, including question design and timing.
