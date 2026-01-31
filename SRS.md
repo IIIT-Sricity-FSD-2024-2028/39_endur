@@ -20,7 +20,8 @@ This document is intended for:
 | Version | Date | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 1.00 | 2026-01-30 | Initial Draft based on Dean's Interview | Team 39_endur |
-| 1.01 | 2026-01-31 | Refined system requirments| Team 39_endur |
+| 1.01 | 2026-01-31 | Refined system requirements| Team 39_endur |
+| 1.02 | 2026-01-31 | Added User and System Requirements of Dean| Team 39_endur |
 
 ---
 
@@ -80,6 +81,13 @@ The current end-semester feedback model fails on two critical fronts:
 - **UR-08:** The HOD shall be able to conduct ReviewCheckIn with the concerned faculty members.
 - **UR-09:** The HOD is able to define EvaluationParameter for every FeedbackCycle.
 
+### 4.4 Dean Services
+- **UR-10:** The Dean shall be able to view institution-wide performance reports covering all departments, faculty members, and courses.
+- **UR-11:** The Dean shall be able to act as the approving authority when a conflict of interest is identified, such as when a Department Head is reviewing their own performance.
+- **UR-12:** The Dean shall be able to view ReviewCheckIn records and ActionReports from any department for oversight purposes.
+- **UR-13:** The Dean shall be able to track long-term FeedbackTrends across academic years to identify overall strengths, risks, and areas needing improvement at the institutional level.
+- **UR-14:** The Dean shall be able to review ComplianceAudit logs and flagged feedback submissions to ensure fairness, integrity, and adherence to academic policies.
+- **UR-15:** The Dean shall be able to freeze, reopen, or invalidate FeedbackCycles in exceptional academic or administrative situations, with all such actions recorded in the audit log.
 ---
 
 ## 5. System Architecture
@@ -174,6 +182,44 @@ The system shall store ReviewCheckIn records associated with a FacultyMember and
   * Associated GapAnalysis results
   * Related ActionReports
 * ReviewCheckIn records shall be immutable once saved.
+---
+
+**FR-09:** Institutional Performance Aggregation  
+The system shall generate institution-wide analytics for the Dean by aggregating data across all Departments.
+
+- The system shall compute an overall **PerformanceScore** for the entire institution by averaging aggregated scores from all AnonymizedReports.
+- The system shall allow the Dean to filter **FeedbackTrends** by:
+  - Department  
+  - Academic Year  
+  - CourseContentQuality
+- The system shall generate a comparative view identifying the **highest and lowest performing Departments** based on aggregated EvaluationParameters.
+
+---
+
+**FR-10:** Administrative Conflict Resolution Workflow  
+The system shall enforce a specific workflow when a DepartmentHead is the subject of a review.
+
+- If the FacultyMember associated with a CourseOffering is also the current DepartmentHead, the system shall automatically reassign **ReviewCheckIn approval authority** to the Dean.
+- The system shall prevent the DepartmentHead from viewing or interacting with their own **ActionReport** as a reviewer.
+
+---
+
+**FR-11:** Emergency Cycle Management  
+The system shall allow the Dean to manually override the state of a FeedbackCycle in exceptional circumstances.
+
+- The Dean shall be able to **Freeze** an active FeedbackCycle, immediately rejecting new FeedbackResponse submissions regardless of the configured end timestamp.
+- Any manual state change triggered by the Dean shall automatically generate a **ComplianceAudit log entry** requiring a justification note.
+
+---
+
+**FR-12:** Long-Term Trend Analysis  
+The system shall compute multi-year FeedbackTrends to support institutional strategic assessment by the Dean.
+
+- The system shall aggregate **PerformanceScores** across multiple academic years to visualize long-term progression.
+- The system shall highlight trends in **CourseContentQuality** independently from delivery-related EvaluationParameters.
+- Historical trend data shall remain immutable once calculated.
+
+---
 
 ### 6.2 Non-Functional Requirements (NFR)
 
@@ -242,8 +288,31 @@ The following domain requirements define mandatory constraints that govern syste
 **Rationale:**  
 - While continuous feedback is desirable, excessive frequency may lead to survey fautige.
 
+---
+### DR-05: Administrative Override Transparency Constraint
+
+**Constraint:**  
+- Any modification to a FeedbackCycle (Freeze) or invalidation of a FeedbackResponse performed by the Dean must be **permanently recorded and visible** in the system’s audit trail.
+
+**Rationale:**  
+- While the Dean requires emergency authority to handle academic disruptions, these actions must be fully transparent to maintain trust in the system’s integrity and to prevent arbitrary manipulation of feedback data.
 
 ---
+
+### DR-06: Hierarchical Data Isolation Constraint
+
+**Constraint:**  
+- While the Dean has institution-wide **read access** to aggregated analytics, the Dean must **not** be able to:
+  - View raw QualitativeFeedback, or
+  - View individual PerformanceScores linked to a specific Student_ID.
+- The anonymity guarantees defined in **NFR-01** shall apply to the Dean with the **same strictness** as they apply to FacultyMembers.
+
+**Rationale:**  
+- Senior leadership access is intended for **strategic oversight and pattern recognition**, not for investigating individual student grievances.  
+- Enforcing hierarchical data isolation preserves the **psychological safety** of the student body and reinforces trust in the feedback system.
+
+---
+
 
 ## 7. System Models
 
