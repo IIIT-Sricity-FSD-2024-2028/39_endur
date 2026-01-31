@@ -3,7 +3,7 @@
 > [!info] Document Meta
 > **Project:** Endur (Performance Review & Feedback Management System)
 > **Team:** 39_endur
-> **Version:** 1.01
+> **Version:** 1.02
 
 ---
 
@@ -389,6 +389,10 @@ _(Placeholder: Insert Sequence Diagram Mermaid Code Here)_
 ### C
 - ComplianceAudit
 - CourseOffering
+
+### D
+- DepartmentHead
+- Dean
 
 ### F
 - FacultyMember
