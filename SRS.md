@@ -318,29 +318,7 @@ The following domain requirements define mandatory constraints that govern syste
 
 ### 7.1 Use Case Diagram
 *Visualizing Student, Faculty, and HOD interactions.*
-
-```mermaid
-usecaseDiagram
-    actor "Faculty Member" as F
-
-    package "Faculty Performance Module" {
-        usecase "Submit Self-Assessment" as UC_Self
-        usecase "Analyze Performance Dashboard" as UC_Dashboard
-        usecase "Submit Action Taken Report" as UC_Action
-    }
-
-    %% Main Workflows
-    F --> UC_Self
-    F --> UC_Dashboard
-
-    %% The Logic (How the workflow flows)
-    UC_Dashboard ..> UC_Self : <<include>>
-    note right of UC_Dashboard : Includes Gap Analysis,\nStudent Ratings, & Trends.
-
-    %% Closing the Loop
-    UC_Action ..> UC_Dashboard : <<extend>>
-    note bottom of UC_Action : If performance is low,\nfaculty submits an improvement plan.
-````
+![Alt text](assets/Use-Case_Diagram.drawio.svg)
 
 ### 7.2 Activity Diagram
 
