@@ -99,6 +99,18 @@ DepartmentHead:
     - HOD
     - Academic Manager
 
+Dean:
+  definition: >
+    The senior academic authority responsible for institution-wide oversight of
+    academic quality, governance, and policy enforcement, including resolving
+    conflicts of interest and monitoring overall faculty performance trends.
+  examples:
+    - "Dean reviewing institution-wide performance trends across departments."
+  aliases:
+    - Dean of Academics
+    - Academic Head
+
+
 FacultyMember:
   definition: >
     The academic professional responsible for course delivery, whose performance
