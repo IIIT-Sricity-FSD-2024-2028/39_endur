@@ -323,6 +323,7 @@ The following domain requirements define mandatory constraints that govern syste
 ### 7.2 Activity Diagram
 
 *1) Student Activity Diagram*
+
 ![Alt text](assets/Activity_Student.svg)
 
 *2) Faculty Member Activity Diagram*
@@ -331,11 +332,13 @@ The following domain requirements define mandatory constraints that govern syste
 *3) HOD Activity Diagram*
 ![Alt text](assets/Activity_HOD.svg)
 
+*4) HOD Activity Diagram*
+![Alt text](assets/Activity_Admin.svg)
+
 ### 7.3 Sequence Diagram
 
-_Detailing the "Secure Submission" API flow._
+![Alt text](assets/Sequence.svg)
 
-_(Placeholder: Insert Sequence Diagram Mermaid Code Here)_
 
 ---
 
