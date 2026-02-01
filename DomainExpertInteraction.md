@@ -39,6 +39,11 @@ Enable faculty to view trends, summaries, and anonymized comments without access
 | AnonymizedReport           | An aggregated faculty-facing report where student identities and raw submissions are hidden, but trends and grouped comments are visible. |
 | FeedbackTrend              | A time-based view of how a faculty member’s scores change across feedback cycles in a semester.                                           |
 | AttendanceWeightedFeedback | A mechanism where feedback from low-attendance students has reduced influence on final evaluation.                                        |
+| SelfReflection             | A self-assessment provided by faculty (and in some cases students) describing expected performance and perceived effectiveness.           |
+| GapAnalysis                | The difference between what faculty expected based on self-reflection and what students actually reported in feedback.                    |
+| ActionReport               | A report submitted by faculty to the HOD describing concrete steps they will take in future courses based on feedback and gaps.           |
+| ReviewCheckIn              | A structured discussion between faculty and HOD focused on trends, gaps, and progress on action items.                                    |
+| ReviewOfReviews            | A review of the feedback system itself to check if questions, timing, and process are working effectively.                                |
 | RandomTicking              | A failure pattern where students submit feedback without reading questions, leading to unreliable data.                                   |
 
 ## Actors and Responsibilities
