@@ -1,9 +1,9 @@
 # Software Requirements Specification (SRS)
 
-> [!info] Document Meta
+> 
 > **Project:** Endur (Performance Review & Feedback Management System)
 > **Team:** 39_endur
-> **Version:** 1.02
+> **Version:** 1.03
 
 ---
 
@@ -30,10 +30,10 @@ This document is intended for:
 ### 2.1 Need for the System
 The current end-semester feedback model fails on two critical fronts:
 
-> [!failure] Pain Point 1: Timing Latency
+> Pain Point 1: Timing Latency
 > Feedback arrives too late to benefit the current batch and is often skewed by "Revenge Ratings" submitted after grades are released.
 
-> [!failure] Pain Point 2: Engagement Fatigue
+>  Pain Point 2: Engagement Fatigue
 > The Dean reports that **only ~30% of students participate** because the process is viewed as a "chore" rather than a meaningful contribution.
 
 ### 2.2 System Functions
@@ -42,13 +42,11 @@ The current end-semester feedback model fails on two critical fronts:
 - **Gap Analysis:** Automated comparison between Faculty Self-Reflection and Student Perception.
 - **Anonymity Preservation:** Decoupling of student identity from feedback data.
 
-### 2.3 Business & Strategic Objectives
-> [!success] Our aim is to design a performance review and feedback system for an academic institution
 
 ---
 
 ## 3. Glossary
-*Refer to [[definitions]] in the repository for the complete Ubiquitous Language.*
+*Refer to [[definitions.yaml]] in the repository for the complete Ubiquitous Language.*
 
 - **FeedbackCycle:** A defined, time-bound period for data collection.
 - **GapAnalysis:** The quantitative difference between a professor's self-rating and the students' average rating.
@@ -213,19 +211,19 @@ The system shall compute multi-year FeedbackTrends to support institutional stra
 
 ### 5.2 Non-Functional Requirements (NFR)
 
-- **NFR-01** (Anonymity & Privacy):*  
+- **NFR-01** (Anonymity & Privacy):
   The system shall ensure that Student_ID is never retrievable, inferable, or reconstructible from any FeedbackResponse, AnonymizedReport, or downstream analytics store.
 
-- **NFR-02** (Scalability):*  
+- **NFR-02** (Scalability):
   The system shall support a minimum of *500 concurrent write operations* within the final *10 minutes of an active FeedbackCycle* without data loss or degradation of response correctness.
 
-- **NFR-03** (Availability):*  
+- **NFR-03** (Availability): 
   The system shall maintain *99.9% service availability* during institution-defined peak periods, including active exam weeks and FeedbackCycle submission windows.
 
-- **NFR-04** (Immutability & Data Integrity):*  
+- **NFR-04** (Immutability & Data Integrity):
   The system shall enforce immutability for all finalized artifacts, including submitted feedback responses, generated AnonymizedReports, ActionReports, and ReviewCheckIn records, such that no updates or deletions are permitted after persistence.
 
-- **NFR-05** (Auditability):*  
+- **NFR-05** (Auditability): 
   The system shall maintain an append-only audit log capturing all create and state-transition events related to FeedbackCycles, feedback submissions, ActionReports, and administrative actions, with timestamps and actor roles recorded.
 
 ## 5.3 Domain Requirements (DR)
