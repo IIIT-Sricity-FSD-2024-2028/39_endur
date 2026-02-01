@@ -1,4 +1,3 @@
-
 # Software Requirements Specification (SRS)
 
 > [!info] Document Meta
