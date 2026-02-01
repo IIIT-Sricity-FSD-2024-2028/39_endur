@@ -22,7 +22,7 @@ This document is intended for:
 | 1.00 | 2026-01-30 | Initial Draft based on Dean's Interview | Team 39_endur |
 | 1.01 | 2026-01-31 | Refined system requirements| Team 39_endur |
 | 1.02 | 2026-01-31 | Added User and System Requirements of Dean| Team 39_endur |
-
+| 1.03 | 2026-02-01 | Finalized Requirements Specifications| Team 39_endur |
 ---
 
 ## 2. Introduction
@@ -90,20 +90,10 @@ The current end-semester feedback model fails on two critical fronts:
 - **UR-15:** The Dean shall be able to freeze, reopen, or invalidate FeedbackCycles in exceptional academic or administrative situations, with all such actions recorded in the audit log.
 ---
 
-## 5. System Architecture
-*High-level overview of system modules.*
-
-The system follows a **Three-Tier Architecture**:
-1. **Presentation Layer (Frontend)**
-2. **Application Layer (Backend)**
-3. **Data Layer (Database)**
-
----
-
-## 6. System Requirements Specification
+## 5. System Requirements Specification
 *Detailed technical requirements and constraints.*
 
-### 6.1 Functional Requirements (FR)
+### 5.1 Functional Requirements (FR)
 
 **FR-01:** FeedbackCycle Window Enforcement
 The system shall enforce FeedbackCycle submission boundaries based on configured start and end timestamps.
@@ -221,7 +211,7 @@ The system shall compute multi-year FeedbackTrends to support institutional stra
 
 ---
 
-### 6.2 Non-Functional Requirements (NFR)
+### 5.2 Non-Functional Requirements (NFR)
 
 - **NFR-01** (Anonymity & Privacy):*  
   The system shall ensure that Student_ID is never retrievable, inferable, or reconstructible from any FeedbackResponse, AnonymizedReport, or downstream analytics store.
@@ -238,7 +228,7 @@ The system shall compute multi-year FeedbackTrends to support institutional stra
 - **NFR-05** (Auditability):*  
   The system shall maintain an append-only audit log capturing all create and state-transition events related to FeedbackCycles, feedback submissions, ActionReports, and administrative actions, with timestamps and actor roles recorded.
 
-## 6.3 Domain Requirements (DR)
+## 5.3 Domain Requirements (DR)
 
 The following domain requirements define mandatory constraints that govern system behavior to ensure fairness, privacy, and academic integrity.
 
@@ -314,13 +304,13 @@ The following domain requirements define mandatory constraints that govern syste
 ---
 
 
-## 7. System Models
+## 6. System Models
 
-### 7.1 Use Case Diagram
+### 6.1 Use Case Diagram
 *Visualizing Student, Faculty, and HOD interactions.*
 ![Alt text](assets/Use_Case.svg)
 
-### 7.2 Activity Diagram
+### 6.2 Activity Diagram
 
 *1) Student Activity Diagram*
 
@@ -332,40 +322,20 @@ The following domain requirements define mandatory constraints that govern syste
 *3) HOD Activity Diagram*
 ![Alt text](assets/Activity_HOD.svg)
 
-*4) HOD Activity Diagram*
+*4) Dean Activity Diagram*
+![Alt text](assets/Activity_Dean.svg)
+
+*5) Admin Activity Diagram*
+
 ![Alt text](assets/Activity_Admin.svg)
 
-### 7.3 Sequence Diagram
+### 6.3 Sequence Diagram
 
 ![Alt text](assets/Sequence.svg)
 
 
 ---
-
-## 8. System Evolution
-
-### 8.1 Assumptions
-
-- Attendance data will be provided through **manual upload or administrative entry** in the initial version of the system.
-- FeedbackCycles, EvaluationParameters, and thresholds will be **configured manually** by administrative users.
-- All users (Students, FacultyMembers, DepartmentHeads) will authenticate using **institution-provided credentials**, without external identity providers.
-
----
-
-### 8.2 Future Scope
-
-- Integration with an official university attendance system, if and when a stable interface becomes available.
-- Enhanced reporting for long-term FeedbackTrends across academic years.
-- Improved administrative tools for ComplianceAudit analysis and review monitoring.
-
----
-
-## 9. Appendices
-
----
-
-
-## 10. Index
+## 7. Index
 
 ### A
 - ActionReport
