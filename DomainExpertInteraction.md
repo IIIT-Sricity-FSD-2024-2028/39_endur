@@ -39,7 +39,6 @@ Enable faculty to view trends, summaries, and anonymized comments without access
 | AnonymizedReport           | An aggregated faculty-facing report where student identities and raw submissions are hidden, but trends and grouped comments are visible. |
 | FeedbackTrend              | A time-based view of how a faculty member’s scores change across feedback cycles in a semester.                                           |
 | AttendanceWeightedFeedback | A mechanism where feedback from low-attendance students has reduced influence on final evaluation.                                        |
-| ReviewCheckIn              | A structured discussion between faculty and HOD focused on trends, gaps, and progress on action items.                                    |
 | RandomTicking              | A failure pattern where students submit feedback without reading questions, leading to unreliable data.                                   |
 
 ## Actors and Responsibilities
