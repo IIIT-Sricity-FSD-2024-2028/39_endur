@@ -337,9 +337,8 @@ The following domain requirements define mandatory constraints that govern syste
 
 ### 7.3 Sequence Diagram
 
-_Detailing the "Secure Submission" API flow._
+![Alt text](assets/Sequence.svg)
 
-_(Placeholder: Insert Sequence Diagram Mermaid Code Here)_
 
 ---
 
