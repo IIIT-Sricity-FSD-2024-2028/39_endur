@@ -324,8 +324,10 @@ The following domain requirements define mandatory constraints that govern syste
 
 *1) Student Activity Diagram*
 ![Alt text](assets/Activity_Student.svg)
+
 *2) Faculty Member Activity Diagram*
 ![Alt text](assets/Activity_Faculty.svg)
+
 *3) HOD Activity Diagram*
 ![Alt text](assets/Activity_HOD.svg)
 
