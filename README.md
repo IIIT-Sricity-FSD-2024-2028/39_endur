@@ -47,11 +47,15 @@ Existing systems do not support long-term or institution-wide performance analys
 
 - Submit multiple engaging feedbacks during active FeedbackCycles.
 
+- Participate in multiple FeedbackCycles within a semester for continuous improvement.
+
 - Guaranteed anonymity; student identity is never exposed or inferable.
 
 - View history of personal feedback submissions for transparency.
 
 - Submit feedback for Review of Reviews to evaluate the feedback system itself.
+
+- Restricted from submitting feedback outside active FeedbackCycles.
 
 ---
 
@@ -65,6 +69,14 @@ Existing systems do not support long-term or institution-wide performance analys
 
 - View Anonymized Reports after FeedbackCycle closure.
 
+- Submit Action Reports when performance gaps exceed defined thresholds.
+
+- Participate in ReviewCheckIns with the Head of Department.
+
+- Track long-term improvement trends across semesters.
+
+- All submitted reflections, reports, and action plans are immutable once finalized.
+
 **Analyze through:**
 
 - PerformanceScores
@@ -72,12 +84,6 @@ Existing systems do not support long-term or institution-wide performance analys
 - GapAnalysis
 
 - FeedbackTrends across cycles
-
-- Submit Action Reports when performance gaps trigger alerts.
-
-- Participate in ReviewCheckIns with department leadership.
-
-- All reports and submissions are immutable once finalized.
 
 ---
 
@@ -91,7 +97,9 @@ Existing systems do not support long-term or institution-wide performance analys
 
 - Conduct ReviewCheckIns with faculty members.
 
-- Define EvaluationParameters for each FeedbackCycle.
+- Define and manage EvaluationParameters for each FeedbackCycle.
+
+- Monitor department-wide performance trends over time.
 
 - Are automatically restricted from reviewing their own performance if also a faculty member.
 
