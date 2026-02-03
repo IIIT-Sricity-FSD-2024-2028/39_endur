@@ -51,14 +51,13 @@ Enable faculty to view trends, summaries, and anonymized comments without access
 - **Answer:** 
 The domain involves students providing feedback, faculty reflecting and improving their teaching, and academic leadership reviewing trends and guiding improvement while maintaining fairness and anonymity.
 
-| Actor / Role              | Responsibilities                                                                                                         |
+| Actors                    | Responsibilities                                                                                                         |
 |           ---             |                                                ---                                                                       |
 | Student                   | Submits feedback during open feedback cycles, providing scores and optional comments based on classroom experience.      |
 | FacultyMember             | Reviews anonymized feedback trends, performs self-reflection, identifies gaps, and submits action plans for improvement. |
 | DepartmentHead            | Reviews aggregated reports, conducts review check-ins, calibrates interpretations, and supports faculty improvement.     |
-| Academic Reviewer / Admin | Manages feedback cycles, audits integrity, and ensures rules around anonymity and timing are enforced.                   |
-| Institutional Leadership  | Oversees the overall effectiveness of the feedback and review process and approves process-level changes.                |
-
+| Dean                      | Oversees institution-wide performance trends, resolves conflicts of interest, reviews audit records, and intervenes in exceptional feedback cycle situations.                 |
+| Admin                     | Configures FeedbackCycles and evaluation parameters, manages user roles and access permissions, enforces anonymity and audit rules, and ensures system availability and integrity. |
 
 ## Core workflows
 
