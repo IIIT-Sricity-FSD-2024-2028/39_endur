@@ -1,12 +1,12 @@
 # Domain: Human Resource & Staff Administration (Academic)
 # Problem Statement: Performance Review & Feedback Management System (Endur)
-# Last Updated: 2026-01-31
+# Last Updated: 2026-03-11
 
 FeedbackCycle:
   definition: >
-    A defined, time-bound period during which feedback or evaluations are collected.
-    FeedbackCycles may occur multiple times within a semester to support continuous
-    review rather than a single end-term evaluation.
+    A fixed period of time when students are allowed to submit feedback for a
+    course. Multiple feedback cycles can happen during a semester so faculty
+    can see feedback and make improvements before the course ends.
   examples: 
     - "Semester-commence Feedback Cycle (Aug 20 - Aug 25)"
     - "Quarterly teaching check-in"
@@ -18,9 +18,8 @@ FeedbackCycle:
 
 EvaluationParameter: 
   definition: >
-    A clearly defined criterion used to evaluate a specific aspect of a faculty
-    member's performance, aligned with institutional teaching objectives and
-    student learning outcomes.
+    A specific aspect of teaching that students are asked to rate in the feedback form.
+    Each parameter focuses on one part of how a course is taught.
   examples:
     - "Clarity of Explanation"
     - "Pace of Delivery"
@@ -42,8 +41,9 @@ CourseContentQuality:
 
 PerformanceScore:
   definition: >
-    A quantitative value assigned to an EvaluationParameter during a FeedbackCycle,
-    used to measure performance trends over time rather than as a one-time judgment.
+    The number a student gives when rating a teaching aspect in the feedback form.
+    It usually follows a scale (such as 1-10) and helps show how teaching is
+    improving or changing over time.
   examples:
     - "7/10 for Delivery Effectiveness"
     - "Improved from 5 to 8 across cycles"
@@ -64,9 +64,9 @@ QualitativeFeedback:
 
 AnonymizedReport:
   definition: >
-    An aggregated summary view available to Faculty Members and reviewers where
-    individual student identities and raw submissions are removed, ensuring
-    psychological safety while enabling meaningful reflection.
+    A summary of student feedback shown to faculty where student identities are
+    hidden. It includes overall scores, trends, and anonymous comments so faculty
+    can understand how their teaching is received.
   examples:
     - "Weekly delivery trend with grouped anonymous comments."
   aliases:
@@ -76,11 +76,9 @@ AnonymizedReport:
 
 FeedbackResponse:
   definition: >
-    A single, immutable submission made by a Student during a FeedbackCycle for a
-    specific CourseOffering, consisting of PerformanceScores mapped to
-    EvaluationParameters.
-    Each FeedbackResponse represents one complete feedback instance and is used
-    as an atomic unit for aggregation, analysis, and auditing.
+    A single feedback form submitted by a student for a specific course during a
+    feedback cycle. It contains the ratings the student gives for each evaluation
+    parameter and any comments they choose to provide.
   examples:
     - "End-term feedback response for Operating Systems"
   aliases:
@@ -90,9 +88,9 @@ FeedbackResponse:
 
 DepartmentHead:
   definition: >
-    The academic leader responsible for overseeing faculty performance within
-    a department, facilitating consistency, coaching discussions, and intervention
-    in cases of sustained underperformance.
+    The faculty member who leads a department and reviews the teaching
+    performance of instructors within that department. They look at feedback
+    reports and discuss improvements when needed.
   examples:
     - "HOD reviewing semester-wide delivery trends."
   aliases:
@@ -125,8 +123,8 @@ FacultyMember:
 
 CourseOffering:
   definition: >
-    A specific instance of a course delivered by a FacultyMember to a defined
-    student cohort during a semester, forming the primary unit of evaluation.
+    A specific course taught by a faculty member to a particular group of
+    students during a semester.
   examples:
     - "Operating Systems - CSE-B - Monsoon 2026"
   aliases:
@@ -156,7 +154,7 @@ RandomTicking:
 
 FeedbackTrend:
   definition: >
-    A longitudinal view of PerformanceScores across multiple FeedbackCycles,
+    A comparative view of PerformanceScores across multiple FeedbackCycles,
     used to evaluate improvement, stagnation, or decline over time.
   examples:
     - "Delivery score improved steadily over the semester"
