@@ -1,129 +1,131 @@
+DROP DATABASE IF EXISTS endur_db;
 CREATE DATABASE endur_db;
-USE endur_db;
+\c endur_db;
 
 CREATE TABLE Department (
-    department_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
+    department_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE Users (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE FacultyMember (
+    faculty_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    email VARCHAR(120) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL,
-    department_id INT,
-    FOREIGN KEY (department_id) REFERENCES Department(department_id)
+    email VARCHAR(100) UNIQUE NOT NULL,
+    department_id INT REFERENCES Department(department_id)
 );
 
-CREATE TABLE Course (
-    course_id INT AUTO_INCREMENT PRIMARY KEY,
-    course_name VARCHAR(150) NOT NULL,
-    department_id INT,
-    FOREIGN KEY (department_id) REFERENCES Department(department_id)
+ALTER TABLE Department 
+ADD COLUMN hod_faculty_id VARCHAR(50) REFERENCES FacultyMember(faculty_id);
+
+CREATE TABLE Dean (
+    dean_id SERIAL PRIMARY KEY,
+    faculty_id VARCHAR(50) UNIQUE REFERENCES FacultyMember(faculty_id),
+    office_tenure VARCHAR(50)
+);
+
+CREATE TABLE Student (
+    student_id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    batch_year INT NOT NULL
 );
 
 CREATE TABLE CourseOffering (
-    offering_id INT AUTO_INCREMENT PRIMARY KEY,
-    course_id INT,
-    faculty_id INT,
-    semester VARCHAR(20),
-    year INT,
-    FOREIGN KEY (course_id) REFERENCES Course(course_id),
-    FOREIGN KEY (faculty_id) REFERENCES Users(user_id)
+    offering_id SERIAL PRIMARY KEY,
+    course_code VARCHAR(20) NOT NULL,
+    course_name VARCHAR(100) NOT NULL,
+    academic_year VARCHAR(10) NOT NULL,
+    semester VARCHAR(20) NOT NULL,
+    faculty_id VARCHAR(50) REFERENCES FacultyMember(faculty_id)
 );
 
 CREATE TABLE FeedbackCycle (
-    cycle_id INT AUTO_INCREMENT PRIMARY KEY,
-    start_timestamp DATETIME,
-    end_timestamp DATETIME,
-    status VARCHAR(20)
+    cycle_id SERIAL PRIMARY KEY,
+    cycle_name VARCHAR(100) NOT NULL,
+    start_timestamp TIMESTAMP NOT NULL,
+    end_timestamp TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    cycle_type VARCHAR(50)
 );
 
 CREATE TABLE EvaluationParameter (
-    parameter_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100),
+    parameter_id SERIAL PRIMARY KEY,
+    parameter_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
     description TEXT
 );
 
 CREATE TABLE FeedbackResponse (
-    response_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT,
-    offering_id INT,
-    cycle_id INT,
-    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES Users(user_id),
-    FOREIGN KEY (offering_id) REFERENCES CourseOffering(offering_id),
-    FOREIGN KEY (cycle_id) REFERENCES FeedbackCycle(cycle_id)
+    response_id SERIAL PRIMARY KEY,
+    cycle_id INT REFERENCES FeedbackCycle(cycle_id) ON DELETE CASCADE,
+    offering_id INT REFERENCES CourseOffering(offering_id) ON DELETE CASCADE,
+    submission_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_flagged BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE StudentSubmissionLog (
+    log_id SERIAL PRIMARY KEY,
+    student_id VARCHAR(50) REFERENCES Student(student_id),
+    cycle_id INT REFERENCES FeedbackCycle(cycle_id),
+    offering_id INT REFERENCES CourseOffering(offering_id),
+    UNIQUE (student_id, cycle_id, offering_id)
 );
 
 CREATE TABLE PerformanceScore (
-    score_id INT AUTO_INCREMENT PRIMARY KEY,
-    response_id INT,
-    parameter_id INT,
-    score INT,
-    comment TEXT,
-    FOREIGN KEY (response_id) REFERENCES FeedbackResponse(response_id),
-    FOREIGN KEY (parameter_id) REFERENCES EvaluationParameter(parameter_id)
+    score_id SERIAL PRIMARY KEY,
+    response_id INT REFERENCES FeedbackResponse(response_id) ON DELETE CASCADE,
+    parameter_id INT REFERENCES EvaluationParameter(parameter_id),
+    numeric_rating INT NOT NULL CHECK (numeric_rating BETWEEN 1 AND 10),
+    applied_weight DECIMAL(3,2) DEFAULT 1.0
+);
+
+CREATE TABLE QualitativeFeedback (
+    comment_id SERIAL PRIMARY KEY,
+    response_id INT REFERENCES FeedbackResponse(response_id) ON DELETE CASCADE,
+    comment_text TEXT NOT NULL
 );
 
 CREATE TABLE SelfReflection (
-    reflection_id INT AUTO_INCREMENT PRIMARY KEY,
-    faculty_id INT,
-    offering_id INT,
-    cycle_id INT,
-    reflection_text TEXT,
-    expected_score DECIMAL(5,2),
-    FOREIGN KEY (faculty_id) REFERENCES Users(user_id),
-    FOREIGN KEY (offering_id) REFERENCES CourseOffering(offering_id),
-    FOREIGN KEY (cycle_id) REFERENCES FeedbackCycle(cycle_id)
-);
-
-CREATE TABLE GapAnalysis (
-    gap_id INT AUTO_INCREMENT PRIMARY KEY,
-    reflection_id INT,
-    avg_student_score DECIMAL(5,2),
-    gap_value DECIMAL(5,2),
-    FOREIGN KEY (reflection_id) REFERENCES SelfReflection(reflection_id)
+    reflection_id SERIAL PRIMARY KEY,
+    faculty_id VARCHAR(50) REFERENCES FacultyMember(faculty_id),
+    offering_id INT REFERENCES CourseOffering(offering_id),
+    cycle_id INT REFERENCES FeedbackCycle(cycle_id),
+    reflection_notes TEXT NOT NULL,
+    submission_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE ActionReport (
-    report_id INT AUTO_INCREMENT PRIMARY KEY,
-    faculty_id INT,
-    offering_id INT,
-    cycle_id INT,
-    report_text TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (faculty_id) REFERENCES Users(user_id),
-    FOREIGN KEY (offering_id) REFERENCES CourseOffering(offering_id),
-    FOREIGN KEY (cycle_id) REFERENCES FeedbackCycle(cycle_id)
+    report_id SERIAL PRIMARY KEY,
+    faculty_id VARCHAR(50) REFERENCES FacultyMember(faculty_id),
+    offering_id INT REFERENCES CourseOffering(offering_id),
+    cycle_id INT REFERENCES FeedbackCycle(cycle_id),
+    improvement_plan TEXT NOT NULL,
+    submission_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_read_only BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE ReviewCheckIn (
-    checkin_id INT AUTO_INCREMENT PRIMARY KEY,
-    report_id INT,
-    hod_id INT,
-    meeting_date DATE,
-    notes TEXT,
-    FOREIGN KEY (report_id) REFERENCES ActionReport(report_id),
-    FOREIGN KEY (hod_id) REFERENCES Users(user_id)
-);
-
-CREATE TABLE AnonymizedReport (
-    report_id INT AUTO_INCREMENT PRIMARY KEY,
-    offering_id INT,
-    cycle_id INT,
-    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    avg_score DECIMAL(5,2),
-    FOREIGN KEY (offering_id) REFERENCES CourseOffering(offering_id),
-    FOREIGN KEY (cycle_id) REFERENCES FeedbackCycle(cycle_id)
+    checkin_id SERIAL PRIMARY KEY,
+    faculty_id VARCHAR(50) REFERENCES FacultyMember(faculty_id),
+    hod_id VARCHAR(50) REFERENCES FacultyMember(faculty_id),
+    offering_id INT REFERENCES CourseOffering(offering_id),
+    meeting_date TIMESTAMP NOT NULL,
+    discussion_notes TEXT,
+    status VARCHAR(20) DEFAULT 'Scheduled'
 );
 
 CREATE TABLE ComplianceAudit (
-    audit_id INT AUTO_INCREMENT PRIMARY KEY,
-    response_id INT,
-    flag_type VARCHAR(100),
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (response_id) REFERENCES FeedbackResponse(response_id)
+    audit_id SERIAL PRIMARY KEY,
+    response_id INT REFERENCES FeedbackResponse(response_id),
+    violation_type VARCHAR(100) NOT NULL,
+    justification_note TEXT,
+    flagged_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ReviewOfReviews (
+    ror_id SERIAL PRIMARY KEY,
+    cycle_id INT REFERENCES FeedbackCycle(cycle_id),
+    submitter_role VARCHAR(20) NOT NULL,
+    feedback_text TEXT NOT NULL,
+    submission_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
