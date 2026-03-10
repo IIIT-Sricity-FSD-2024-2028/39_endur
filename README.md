@@ -1,8 +1,10 @@
 # 🟦 Endur
 ### Performance Review & Feedback Management System
+#### [Jira Link](https://endur.atlassian.net/jira/software/projects/END/boards/1)
 
 ## 🟥 Problem Statement
 Academic institutions rely on student feedback to evaluate teaching effectiveness and improve learning outcomes. However, traditional performance review systems suffer from structural and behavioral limitations that reduce their impact and credibility.
+
 
 --- 
 
