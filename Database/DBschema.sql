@@ -73,7 +73,7 @@ CREATE TABLE StudentSubmissionLog (
 
 CREATE TABLE PerformanceScore (
     score_id SERIAL PRIMARY KEY,
-    response_id INT REFERENCES FeedbackResponse(response_id) ON DELETE CASCADE,
+    response_id INT REFERENCES FeedbackResponse(response_id) ,
     parameter_id INT REFERENCES EvaluationParameter(parameter_id),
     numeric_rating INT NOT NULL CHECK (numeric_rating BETWEEN 1 AND 10),
     applied_weight DECIMAL(3,2) DEFAULT 1.0
@@ -81,7 +81,7 @@ CREATE TABLE PerformanceScore (
 
 CREATE TABLE QualitativeFeedback (
     comment_id SERIAL PRIMARY KEY,
-    response_id INT REFERENCES FeedbackResponse(response_id) ON DELETE CASCADE,
+    response_id INT REFERENCES FeedbackResponse(response_id) ,
     comment_text TEXT NOT NULL
 );
 
