@@ -115,3 +115,21 @@ CREATE TABLE ReviewOfReviews (
     feedback_on_process TEXT,
     submission_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE AnonymizedReport (
+    report_id SERIAL PRIMARY KEY,
+    cycle_id INT REFERENCES FeedbackCycle(cycle_id),
+    offering_id INT REFERENCES CourseOffering(offering_id),
+    aggregated_scores TEXT,
+    grouped_comments TEXT,
+    generation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ReviewCheckIn (
+    checkin_id SERIAL PRIMARY KEY,
+    faculty_id VARCHAR(50) REFERENCES FacultyMember(faculty_id),
+    hod_id INT REFERENCES DepartmentHead(hod_id),
+    meeting_date DATE,
+    discussion_notes TEXT,
+    action_id INT REFERENCES ActionReport(action_id)
+);
