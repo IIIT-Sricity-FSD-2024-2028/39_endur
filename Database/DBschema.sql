@@ -118,8 +118,7 @@ CREATE TABLE ComplianceAudit (
     audit_id SERIAL PRIMARY KEY,
     response_id INT REFERENCES FeedbackResponse(response_id),
     violation_type VARCHAR(100) NOT NULL,
-    justification_note TEXT,
-    flagged_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    justification_note TEXT
 );
 
 CREATE TABLE ReviewOfReviews (
