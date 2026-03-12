@@ -1,5 +1,3 @@
----
-
 # ENDUR: Database Schema
 
 This document describes the database structure, tables, attributes, constraints, and relationships for the **ENDUR Performance Review & Feedback Management System**.
