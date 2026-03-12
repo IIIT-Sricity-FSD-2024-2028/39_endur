@@ -1,330 +1,247 @@
-# Project ENDUR  
-## Performance Review & Feedback Management System  
-### Entity–Relationship Documentation
+---
+
+# ENDUR: Database Schema
+
+This document describes the database structure, tables, attributes, constraints, and relationships for the **ENDUR Performance Review & Feedback Management System**.
 
 ---
 
-# 1. Strong Entities
+# Student
 
-Strong entities have their own primary key and exist independently.
+Stores student information for individuals who submit course feedback.
 
----
-
-## 1. Department
-**Primary Key:** `department_id`
-
-**Attributes**
-- department_id (PK)
-- name
-- hod_faculty_id (FK → FacultyMember)
-
-**Description**
-Represents academic departments within the institution.
+| Column Name    | Data Type    | Constraints      | Description                        |
+| -------------- | ------------ | ---------------- | ---------------------------------- |
+| **student_id** | VARCHAR(50)  | **PRIMARY KEY**  | Unique identifier for each student |
+| **name**       | VARCHAR(100) | NOT NULL         | Student full name                  |
+| **email**      | VARCHAR(100) | UNIQUE, NOT NULL | Institutional email                |
+| **batch_year** | INT          | NOT NULL         | Year the student joined            |
+| **program**    | VARCHAR(100) |                  | Academic program of the student    |
 
 ---
 
-## 2. FacultyMember
-**Primary Key:** `faculty_id`
+# FacultyMember
 
-**Attributes**
-- faculty_id (PK)
-- name
-- email
-- department_id (FK → Department)
+Stores faculty information for instructors teaching courses.
 
-**Description**
-Stores faculty details who teach courses and receive feedback.
-
----
-
-## 3. Student
-**Primary Key:** `student_id`
-
-**Attributes**
-- student_id (PK)
-- name
-- email
-- batch_year
-
-**Description**
-Represents students who submit feedback.
+| Column Name     | Data Type    | Constraints      | Description                       |
+| --------------- | ------------ | ---------------- | --------------------------------- |
+| **faculty_id**  | VARCHAR(50)  | **PRIMARY KEY**  | Unique identifier for faculty     |
+| **name**        | VARCHAR(100) | NOT NULL         | Faculty full name                 |
+| **email**       | VARCHAR(100) | UNIQUE, NOT NULL | Institutional email               |
+| **department**  | VARCHAR(100) |                  | Department the faculty belongs to |
+| **designation** | VARCHAR(100) |                  | Faculty rank or position          |
 
 ---
 
-## 4. CourseOffering
-**Primary Key:** `offering_id`
+# DepartmentHead
 
-**Attributes**
-- offering_id (PK)
-- course_code
-- course_name
-- academic_year
-- semester
-- faculty_id (FK → FacultyMember)
+Represents faculty members serving as Heads of Department.
 
-**Description**
-Represents a course taught by a faculty member in a specific semester.
+| Column Name            | Data Type    | Constraints                                 | Description                                  |
+| ---------------------- | ------------ | ------------------------------------------- | -------------------------------------------- |
+| **hod_id**             | INT          | **PRIMARY KEY, AUTO_INCREMENT**             | Unique identifier for department head record |
+| **faculty_id**         | VARCHAR(50)  | **FOREIGN KEY → FacultyMember(faculty_id)** | Faculty member acting as HOD                 |
+| **department_managed** | VARCHAR(100) |                                             | Department overseen by this HOD              |
 
 ---
 
-## 5. FeedbackCycle
-**Primary Key:** `cycle_id`
+# Dean
 
-**Attributes**
-- cycle_id (PK)
-- cycle_name
-- start_timestamp
-- end_timestamp
-- is_active
-- cycle_type
+Represents faculty members serving administrative dean roles.
 
-**Description**
-Defines the period during which feedback collection occurs.
+| Column Name    | Data Type   | Constraints                                 | Description                       |
+| -------------- | ----------- | ------------------------------------------- | --------------------------------- |
+| **dean_id**    | INT         | **PRIMARY KEY, AUTO_INCREMENT**             | Unique identifier for dean record |
+| **faculty_id** | VARCHAR(50) | **FOREIGN KEY → FacultyMember(faculty_id)** | Faculty member serving as dean    |
 
 ---
 
-## 6. EvaluationParameter
-**Primary Key:** `parameter_id`
+# CourseOffering
 
-**Attributes**
-- parameter_id (PK)
-- parameter_name
-- category
-- description
+Represents a course taught by a faculty member during a specific semester.
 
-**Description**
-Defines criteria used for evaluating faculty performance.
-
----
-
-# 2. Associative / Transactional Entities
-
-These entities represent interactions between core entities.
+| Column Name     | Data Type    | Constraints                                 | Description                                |
+| --------------- | ------------ | ------------------------------------------- | ------------------------------------------ |
+| **offering_id** | INT          | **PRIMARY KEY, AUTO_INCREMENT**             | Unique identifier for course offering      |
+| **course_name** | VARCHAR(100) |                                             | Name of the course                         |
+| **course_code** | VARCHAR(20)  |                                             | Institutional course code                  |
+| **semester**    | VARCHAR(20)  |                                             | Semester during which the course is taught |
+| **faculty_id**  | VARCHAR(50)  | **FOREIGN KEY → FacultyMember(faculty_id)** | Faculty teaching this offering             |
 
 ---
 
-## 7. FeedbackResponse
-**Primary Key:** `response_id`
+# FeedbackCycle
 
-**Attributes**
-- response_id (PK)
-- cycle_id (FK → FeedbackCycle)
-- offering_id (FK → CourseOffering)
-- submission_timestamp
-- is_flagged
+Defines time periods during which feedback is collected.
 
-**Description**
-Represents a single feedback response submitted during a cycle for a course.
-
----
-
-## 8. StudentSubmissionLog
-**Primary Key:** `log_id`
-
-**Attributes**
-- log_id (PK)
-- student_id (FK → Student)
-- cycle_id (FK → FeedbackCycle)
-- offering_id (FK → CourseOffering)
-
-**Description**
-Tracks which student submitted feedback for which course and cycle.
+| Column Name        | Data Type    | Constraints                     | Description                          |
+| ------------------ | ------------ | ------------------------------- | ------------------------------------ |
+| **cycle_id**       | INT          | **PRIMARY KEY, AUTO_INCREMENT** | Unique identifier for feedback cycle |
+| **cycle_name**     | VARCHAR(100) |                                 | Name of the cycle                    |
+| **start_datetime** | TIMESTAMP    |                                 | Feedback start time                  |
+| **end_datetime**   | TIMESTAMP    |                                 | Feedback end time                    |
+| **status**         | VARCHAR(50)  |                                 | Status of the cycle                  |
 
 ---
 
-## 9. SelfReflection
-**Primary Key:** `reflection_id`
+# EvaluationParameter
 
-**Attributes**
-- reflection_id (PK)
-- faculty_id (FK → FacultyMember)
-- offering_id (FK → CourseOffering)
-- cycle_id (FK → FeedbackCycle)
-- reflection_notes
-- submission_date
+Defines evaluation criteria used to assess faculty performance.
 
-**Description**
-Faculty reflection submitted after reviewing feedback.
+| Column Name        | Data Type    | Constraints                     | Description                               |
+| ------------------ | ------------ | ------------------------------- | ----------------------------------------- |
+| **parameter_id**   | INT          | **PRIMARY KEY, AUTO_INCREMENT** | Unique identifier for parameter           |
+| **parameter_name** | VARCHAR(100) |                                 | Name of evaluation parameter              |
+| **description**    | TEXT         |                                 | Explanation of evaluation criteria        |
+| **is_active**      | BOOLEAN      | DEFAULT TRUE                    | Whether the parameter is currently active |
 
 ---
 
-## 10. ActionReport
-**Primary Key:** `report_id`
+# FeedbackResponse
 
-**Attributes**
-- report_id (PK)
-- faculty_id (FK → FacultyMember)
-- offering_id (FK → CourseOffering)
-- cycle_id (FK → FeedbackCycle)
-- improvement_plan
-- submission_date
-- is_read_only
+Represents a single feedback submission from a student.
 
-**Description**
-Faculty improvement plans based on feedback analysis.
+| Column Name              | Data Type    | Constraints                                   | Description                                        |
+| ------------------------ | ------------ | --------------------------------------------- | -------------------------------------------------- |
+| **response_id**          | INT          | **PRIMARY KEY, AUTO_INCREMENT**               | Unique feedback submission ID                      |
+| **cycle_id**             | INT          | **FOREIGN KEY → FeedbackCycle(cycle_id)**     | Feedback cycle during which response was submitted |
+| **offering_id**          | INT          | **FOREIGN KEY → CourseOffering(offering_id)** | Course offering being evaluated                    |
+| **student_id**           | VARCHAR(50)  | **FOREIGN KEY → Student(student_id)**         | Student submitting the feedback                    |
+| **submission_timestamp** | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                     | Time feedback was submitted                        |
+| **attendance_weight**    | DECIMAL(3,2) |                                               | Weight based on student attendance                 |
 
 ---
 
-## 11. ReviewCheckIn
-**Primary Key:** `checkin_id`
+# PerformanceScore
 
-**Attributes**
-- checkin_id (PK)
-- faculty_id (FK → FacultyMember)
-- hod_id (FK → FacultyMember)
-- offering_id (FK → CourseOffering)
-- meeting_date
-- discussion_notes
-- status
+Stores numerical ratings for evaluation parameters within a feedback response.
 
-**Description**
-Meeting records between faculty and Head of Department.
+| Column Name        | Data Type    | Constraints                                         | Description                      |
+| ------------------ | ------------ | --------------------------------------------------- | -------------------------------- |
+| **score_id**       | INT          | **PRIMARY KEY, AUTO_INCREMENT**                     | Unique identifier for score      |
+| **response_id**    | INT          | **FOREIGN KEY → FeedbackResponse(response_id)**     | Associated feedback response     |
+| **parameter_id**   | INT          | **FOREIGN KEY → EvaluationParameter(parameter_id)** | Evaluation parameter being rated |
+| **numeric_rating** | INT          | CHECK (1–10)                                        | Numeric rating value             |
+| **applied_weight** | DECIMAL(3,2) |                                                     | Weight applied to the score      |
 
 ---
 
-## 12. ReviewOfReviews
-**Primary Key:** `ror_id`
+# QualitativeFeedback
 
-**Attributes**
-- ror_id (PK)
-- cycle_id (FK → FeedbackCycle)
-- submitter_role
-- feedback_text
-- submission_timestamp
+Stores textual feedback comments from students.
 
-**Description**
-Administrative feedback on the entire review process.
+| Column Name           | Data Type | Constraints                                     | Description                   |
+| --------------------- | --------- | ----------------------------------------------- | ----------------------------- |
+| **qualitative_id**    | INT       | **PRIMARY KEY, AUTO_INCREMENT**                 | Unique identifier for comment |
+| **response_id**       | INT       | **FOREIGN KEY → FeedbackResponse(response_id)** | Associated feedback response  |
+| **free_text_comment** | TEXT      |                                                 | Student written feedback      |
 
 ---
 
-# 3. Weak Entities
+# ComplianceAudit
 
-Weak entities depend on a parent entity for existence.
+Tracks flagged feedback submissions for review.
 
----
-
-## 13. PerformanceScore
-**Primary Key:** `score_id`
-
-**Attributes**
-- score_id (PK)
-- response_id (FK → FeedbackResponse)
-- parameter_id (FK → EvaluationParameter)
-- numeric_rating
-- applied_weight
-
-**Description**
-Stores numerical ratings given for each evaluation parameter.
-
-**Owner Entity:** FeedbackResponse
+| Column Name             | Data Type    | Constraints                                     | Description                           |
+| ----------------------- | ------------ | ----------------------------------------------- | ------------------------------------- |
+| **audit_id**            | INT          | **PRIMARY KEY, AUTO_INCREMENT**                 | Unique identifier for audit entry     |
+| **response_id**         | INT          | **FOREIGN KEY → FeedbackResponse(response_id)** | Feedback response being audited       |
+| **flag_reason**         | VARCHAR(200) |                                                 | Reason the feedback was flagged       |
+| **flag_timestamp**      | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP                       | Timestamp of audit flag               |
+| **is_valid_submission** | BOOLEAN      |                                                 | Indicates whether submission is valid |
 
 ---
 
-## 14. QualitativeFeedback
-**Primary Key:** `comment_id`
+# SelfReflection
 
-**Attributes**
-- comment_id (PK)
-- response_id (FK → FeedbackResponse)
-- comment_text
+Faculty reflections after reviewing feedback results.
 
-**Description**
-Stores textual comments associated with a feedback response.
-
-**Owner Entity:** FeedbackResponse
-
----
-
-## 15. ComplianceAudit
-**Primary Key:** `audit_id`
-
-**Attributes**
-- audit_id (PK)
-- response_id (FK → FeedbackResponse)
-- violation_type
-- justification_note
-- flagged_timestamp
-
-**Description**
-Tracks flagged feedback responses and compliance checks.
-
-**Owner Entity:** FeedbackResponse
+| Column Name         | Data Type   | Constraints                                   | Description                   |
+| ------------------- | ----------- | --------------------------------------------- | ----------------------------- |
+| **reflection_id**   | INT         | **PRIMARY KEY, AUTO_INCREMENT**               | Unique reflection identifier  |
+| **faculty_id**      | VARCHAR(50) | **FOREIGN KEY → FacultyMember(faculty_id)**   | Faculty submitting reflection |
+| **offering_id**     | INT         | **FOREIGN KEY → CourseOffering(offering_id)** | Course offering evaluated     |
+| **cycle_id**        | INT         | **FOREIGN KEY → FeedbackCycle(cycle_id)**     | Feedback cycle context        |
+| **notes**           | TEXT        |                                               | Faculty reflection notes      |
+| **submission_date** | TIMESTAMP   | DEFAULT CURRENT_TIMESTAMP                     | Reflection submission date    |
 
 ---
 
-# 4. Entity Relationships
+# ActionReport
+
+Faculty improvement plans created based on feedback.
+
+| Column Name            | Data Type   | Constraints                                   | Description                  |
+| ---------------------- | ----------- | --------------------------------------------- | ---------------------------- |
+| **action_id**          | INT         | **PRIMARY KEY, AUTO_INCREMENT**               | Unique action report ID      |
+| **faculty_id**         | VARCHAR(50) | **FOREIGN KEY → FacultyMember(faculty_id)**   | Faculty preparing the report |
+| **offering_id**        | INT         | **FOREIGN KEY → CourseOffering(offering_id)** | Course offering analyzed     |
+| **planned_strategies** | TEXT        |                                               | Strategies for improvement   |
+| **submission_date**    | TIMESTAMP   | DEFAULT CURRENT_TIMESTAMP                     | Date report was submitted    |
 
 ---
 
-## Department Relationships
+# GapAnalysis
 
-Department **1 — N** FacultyMember  
-One department contains multiple faculty members.
+Stores analysis identifying discrepancies between feedback perception and faculty self-assessment.
 
-Department **1 — 1** FacultyMember (HOD)  
-Each department has one faculty member acting as HOD.
-
----
-
-## Faculty Relationships
-
-FacultyMember **1 — N** CourseOffering  
-One faculty teaches multiple course offerings.
-
-FacultyMember **1 — N** SelfReflection  
-
-FacultyMember **1 — N** ActionReport  
-
-FacultyMember **1 — N** ReviewCheckIn
+| Column Name                     | Data Type | Constraints                                     | Description                         |
+| ------------------------------- | --------- | ----------------------------------------------- | ----------------------------------- |
+| **gap_id**                      | INT       | **PRIMARY KEY, AUTO_INCREMENT**                 | Unique gap analysis ID              |
+| **reflection_id**               | INT       | **FOREIGN KEY → SelfReflection(reflection_id)** | Related faculty reflection          |
+| **action_id**                   | INT       | **FOREIGN KEY → ActionReport(action_id)**       | Associated action report            |
+| **perception_difference_notes** | TEXT      |                                                 | Notes on perception differences     |
+| **identified_blind_spots**      | TEXT      |                                                 | Areas where improvements are needed |
 
 ---
 
-## Student Relationships
+# ReviewOfReviews
 
-Student **1 — N** StudentSubmissionLog  
+Feedback provided about the review process itself.
 
-Students can submit feedback for multiple courses.
-
----
-
-## Course Relationships
-
-CourseOffering **1 — N** FeedbackResponse  
-
-CourseOffering **1 — N** StudentSubmissionLog  
-
-CourseOffering **1 — N** SelfReflection  
-
-CourseOffering **1 — N** ActionReport  
+| Column Name              | Data Type   | Constraints                               | Description                                |
+| ------------------------ | ----------- | ----------------------------------------- | ------------------------------------------ |
+| **ror_id**               | INT         | **PRIMARY KEY, AUTO_INCREMENT**           | Unique review identifier                   |
+| **submitted_by_user_id** | VARCHAR(50) |                                           | Identifier of the user submitting feedback |
+| **cycle_id**             | INT         | **FOREIGN KEY → FeedbackCycle(cycle_id)** | Cycle being evaluated                      |
+| **process_feedback**     | TEXT        |                                           | Feedback about the review process          |
+| **submission_date**      | TIMESTAMP   | DEFAULT CURRENT_TIMESTAMP                 | Submission timestamp                       |
 
 ---
 
-## Feedback Cycle Relationships
+# AnonymizedReport
 
-FeedbackCycle **1 — N** FeedbackResponse  
+Summarized feedback reports provided to faculty.
 
-FeedbackCycle **1 — N** StudentSubmissionLog  
+| Column Name           | Data Type | Constraints                                   | Description                      |
+| --------------------- | --------- | --------------------------------------------- | -------------------------------- |
+| **report_id**         | INT       | **PRIMARY KEY, AUTO_INCREMENT**               | Unique report identifier         |
+| **cycle_id**          | INT       | **FOREIGN KEY → FeedbackCycle(cycle_id)**     | Feedback cycle summarized        |
+| **offering_id**       | INT       | **FOREIGN KEY → CourseOffering(offering_id)** | Course offering being summarized |
+| **aggregated_scores** | TEXT      |                                               | Aggregated evaluation scores     |
+| **grouped_comments**  | TEXT      |                                               | Grouped anonymous comments       |
+| **generation_date**   | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP                     | Report generation date           |
 
-FeedbackCycle **1 — N** ReviewOfReviews  
+**Constraint**
+
+UNIQUE (cycle_id, offering_id)
+
+Ensures only one anonymized report exists per course offering per feedback cycle.
 
 ---
 
-## Feedback Response Relationships
+# ReviewCheckIn
 
-FeedbackResponse **1 — N** PerformanceScore  
+Meetings between faculty and department heads reviewing improvement plans.
 
-FeedbackResponse **1 — N** QualitativeFeedback  
-
-FeedbackResponse **1 — N** ComplianceAudit  
-
----
-
-# 5. Summary of Entity Types
-
-| Type | Entities |
-|-----|------|
-| Strong Entities | Department, FacultyMember, Student, CourseOffering, FeedbackCycle, EvaluationParameter |
-| Associative Entities | FeedbackResponse, StudentSubmissionLog, SelfReflection, ActionReport, ReviewCheckIn, ReviewOfReviews |
-| Weak Entities | PerformanceScore, QualitativeFeedback, ComplianceAudit |
+| Column Name          | Data Type   | Constraints                                 | Description                   |
+| -------------------- | ----------- | ------------------------------------------- | ----------------------------- |
+| **checkin_id**       | INT         | **PRIMARY KEY, AUTO_INCREMENT**             | Unique meeting identifier     |
+| **faculty_id**       | VARCHAR(50) | **FOREIGN KEY → FacultyMember(faculty_id)** | Faculty member involved       |
+| **hod_id**           | INT         | **FOREIGN KEY → DepartmentHead(hod_id)**    | HOD conducting the review     |
+| **meeting_date**     | DATE        |                                             | Date of the meeting           |
+| **discussion_notes** | TEXT        |                                             | Notes recorded during meeting |
+| **action_id**        | INT         | **FOREIGN KEY → ActionReport(action_id)**   | Related action report         |
 
 ---
