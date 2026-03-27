@@ -1,0 +1,27 @@
+body{
+
+margin:0;
+
+font-family: system-ui, -apple-system, Segoe UI, Roboto;
+
+color:#0f172a;
+
+background:#f8fafc;
+
+}
+
+
+h1,h2,h3{
+
+margin:0;
+
+}
+
+
+p{
+
+color:#475569;
+
+line-height:1.6;
+
+}
