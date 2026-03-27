@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Pending Feedbacks</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+
+<div class="dashboard-layout">
+
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+
+<div class="sidebar-logo">
+
+<img src="../../assets/logos/endur-logo.svg">
+
+<div>
+
+<strong>Endur</strong>
+
+<p>Student Portal</p>
+
+</div>
+
+</div>
+
+
+
+<nav class="sidebar-menu">
+
+<a href="dashboard.html">
+
+Dashboard
+
+</a>
+
+<a href="courses.html">
+
+My Courses
+
+</a>
+
+<a class="active">
+
+Pending Feedbacks
+
+</a>
+
+<a href="feedback-history.html">
+
+History
+
+</a>
+
+</nav>
+
+
+
+<div class="sidebar-user">
+
+<div class="avatar"></div>
+
+<div>
+
+<strong id="userName"></strong>
+
+<p id="userDept"></p>
+
+</div>
+
+</div>
+
+
+</aside>
+
+
+
+
+<!-- MAIN CONTENT -->
+
+<main class="dashboard-content">
+
+
+<h1>
+
+Pending Feedbacks
+
+</h1>
+
+
+<p class="subtitle">
+
+You have 3 feedback cycles requiring your input.
+
+</p>
+
+
+
+<div class="feedback-list">
+
+
+<!-- CARD 1 -->
+
+<div class="feedback-card">
+
+
+<div>
+
+<p class="deadline">
+
+Deadline: Oct 25, 2033
+
+</p>
+
+
+<h3>
+
+Subject A
+
+</h3>
+
+
+<p>
+
+Week 8 Check-in • Pulse Check
+
+</p>
+
+
+<button class="btn-primary">
+
+Start Feedback →
+
+</button>
+
+
+</div>
+
+
+
+<div class="color-block red"></div>
+
+
+</div>
+
+
+
+
+<!-- CARD 2 -->
+
+<div class="feedback-card">
+
+
+<div>
+
+<p class="deadline">
+
+Deadline: Oct 28, 2027
+
+</p>
+
+
+<h3>
+
+Subject B
+
+</h3>
+
+
+<p>
+
+Mid-semester Feedback • Standard
+
+</p>
+
+
+<button class="btn-primary">
+
+Start Feedback →
+
+</button>
+
+
+</div>
+
+
+
+<div class="color-block green"></div>
+
+
+</div>
+
+
+
+
+<!-- CARD 3 -->
+
+<div class="feedback-card">
+
+
+<div>
+
+<p class="deadline">
+
+Deadline: Nov 02, 2029
+
+</p>
+
+
+<h3>
+
+Subject C
+
+</h3>
+
+
+<p>
+
+Project Phase 1 Review • Review of Reviews
+
+</p>
+
+
+<button class="btn-primary">
+
+Start Feedback →
+
+</button>
+
+
+</div>
+
+
+
+<div class="color-block yellow"></div>
+
+
+</div>
+
+
+
+</div>
+
+
+</main>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+<script>
+
+const user = requireAuth();
+
+document.getElementById("userName").innerText =
+user.name;
+
+document.getElementById("userDept").innerText =
+user.department;
+
+</script>
+
+
+</body>
+
+</html>

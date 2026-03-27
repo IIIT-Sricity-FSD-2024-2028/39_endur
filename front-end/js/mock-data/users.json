@@ -3,41 +3,47 @@
     "id": "S123",
     "password": "student123",
     "role": "student",
-    "name": "Student User"
+    "name": "Harsh Raj",
+    "department": "Computer Science"
   },
 
   {
     "id": "F123",
     "password": "faculty123",
     "role": "faculty",
-    "name": "Faculty User"
+    "name": "Dr. Alan Turing",
+    "department": "Computer Science"
   },
 
   {
     "id": "H123",
     "password": "hod123",
     "role": "hod",
-    "name": "HOD User"
+    "name": "Dr. Ada Lovelace",
+    "department": "Computer Science"
   },
 
   {
     "id": "D123",
     "password": "dean123",
     "role": "dean",
-    "name": "Dean User"
+    "name": "Dr. John Nash",
+    "department": "Academics"
   },
 
   {
     "id": "A123",
     "password": "admin123",
     "role": "admin",
-    "name": "Admin User"
+    "name": "System Admin",
+    "department": "IT"
   },
 
   {
     "id": "SU123",
     "password": "super123",
     "role": "superuser",
-    "name": "Super User"
+    "name": "Root Controller",
+    "department": "System"
   }
 ]

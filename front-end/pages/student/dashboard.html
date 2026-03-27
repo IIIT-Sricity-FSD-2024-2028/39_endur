@@ -1,11 +1,267 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student</title>
+
+    <title>Student Dashboard</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/components.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
 </head>
+
+
 <body>
-    <h1>Student Dashboard</h1>
+
+
+    <div class="dashboard-layout">
+
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+
+            <div class="sidebar-logo">
+
+                <img src="../../assets/logos/endur-logo.svg">
+
+                <div>
+
+                    <strong>Endur</strong>
+
+                    <p>Student Portal</p>
+
+                </div>
+
+            </div>
+
+
+
+            <nav class="sidebar-menu">
+
+                <a class="active" href="dashboard.html">
+                    Dashboard
+                </a>
+
+                <a href="courses.html">
+                    My Courses
+                </a>
+
+                <a href="pending-feedback.html">
+                    Pending Feedbacks
+                </a>
+
+                <a href="feedback-history.html">
+                    History
+                </a>
+
+            </nav>
+
+
+
+            <div class="sidebar-user">
+
+                <div class="avatar"></div>
+
+                <div>
+
+                    <strong id="userName"></strong>
+
+                    <p id="userDept"></p>
+
+                </div>
+
+            </div>
+
+
+        </aside>
+
+
+
+
+        <!-- MAIN CONTENT -->
+
+        <main class="dashboard-content">
+
+            <h1 id="welcomeText"></h1>
+
+            <p class="subtitle">
+
+                Here is what's happening with your academic feedback today.
+
+            </p>
+
+
+
+            <!-- STATS -->
+
+            <div class="stats-grid">
+
+
+                <div class="stat-card">
+
+                    <p>Feedbacks Completed</p>
+
+                    <h2>1</h2>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <p>Active Cycles</p>
+
+                    <h2>2</h2>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <p>Pending Feedbacks</p>
+
+                    <h2>2</h2>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <p>Courses Evaluated</p>
+
+                    <h2>4</h2>
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- TABLE -->
+
+            <h2 class="section-title">
+
+                Course Progress Overview
+
+            </h2>
+
+
+
+            <table class="data-table">
+
+
+                <thead>
+
+                    <tr>
+
+                        <th>Course Name</th>
+
+                        <th>Status</th>
+
+                        <th>Due Date</th>
+
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+
+
+                <tbody>
+
+                    <tr>
+
+                        <td>Subject A</td>
+
+                        <td><span class="badge pending">Pending</span></td>
+
+                        <td>Oct 25, 2023</td>
+
+                        <td><a>Start</a></td>
+
+                    </tr>
+
+
+                    <tr>
+
+                        <td>Subject B</td>
+
+                        <td><span class="badge complete">Completed</span></td>
+
+                        <td>Oct 20, 2023</td>
+
+                        <td><a>View</a></td>
+
+                    </tr>
+
+
+                    <tr>
+
+                        <td>Subject C</td>
+
+                        <td><span class="badge progress">In Progress</span></td>
+
+                        <td>Oct 28, 2023</td>
+
+                        <td><a>Resume</a></td>
+
+                    </tr>
+
+
+                    <tr>
+
+                        <td>Subject D</td>
+
+                        <td><span class="badge pending">Pending</span></td>
+
+                        <td>Nov 02, 2023</td>
+
+                        <td><a>Start</a></td>
+
+                    </tr>
+
+
+                </tbody>
+
+
+            </table>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        const user = requireAuth();
+
+        /* dynamic text */
+
+        document.getElementById("welcomeText").innerText =
+            `Welcome back, ${user.name.split(" ")[0]}`;
+
+        document.getElementById("userName").innerText =
+            user.name;
+
+        document.getElementById("userDept").innerText =
+            user.department;
+
+    </script>
+
+
 </body>
+
 </html>
