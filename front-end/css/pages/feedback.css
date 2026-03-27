@@ -1,0 +1,143 @@
+/* =========================
+   FEEDBACK PAGE ONLY
+   ========================= */
+
+
+/* page spacing */
+
+.feedback-page{
+
+padding-bottom:60px;
+
+}
+
+
+
+/* subtitle under course name */
+
+.subtitle{
+
+color:#64748b;
+
+margin-bottom:24px;
+
+}
+
+
+
+/* anonymity info box variant */
+
+.info-box{
+
+margin-bottom:20px;
+
+}
+
+
+
+/* grid of feedback questions */
+
+.feedback-grid{
+
+margin-top:20px;
+
+}
+
+
+
+/* textarea spacing */
+
+textarea{
+
+margin-top:10px;
+
+}
+
+
+
+/* submit button placement */
+
+.submit-btn{
+
+margin-top:30px;
+
+float:right;
+
+}
+
+
+
+/* review of reviews visual theme */
+
+.review-form{
+
+border-top:6px solid #7c3aed;
+
+}
+
+
+
+.review-info{
+
+background:#f5f3ff;
+
+border:1px solid #ddd6fe;
+
+}
+
+
+
+.review-btn{
+
+background:#7c3aed;
+
+}
+
+
+
+/* small UX improvements */
+
+.question-card{
+
+transition:0.15s;
+
+}
+
+
+.question-card:hover{
+
+box-shadow:0 6px 18px rgba(0,0,0,0.04);
+
+}
+
+
+
+/* animation polish */
+
+.success-icon{
+
+animation:pop 0.3s ease;
+
+}
+
+
+
+@keyframes pop{
+
+0%{
+
+transform:scale(0.6);
+
+opacity:0;
+
+}
+
+100%{
+
+transform:scale(1);
+
+opacity:1;
+
+}
+
+}

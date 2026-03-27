@@ -1,3 +1,7 @@
+/* ===== GLOBAL LAYOUT STRUCTURES ===== */
+
+/* top navigation layout */
+
 .navbar{
 
 display:flex;
@@ -8,12 +12,11 @@ align-items:center;
 
 padding:18px 40px;
 
-background:white;
-
-border-bottom:1px solid #e2e8f0;
-
 }
 
+
+
+/* logo layout structure */
 
 .logo{
 
@@ -23,31 +26,78 @@ gap:10px;
 
 align-items:center;
 
-font-weight:600;
-
-font-size:20px;
-
 }
 
 
 
-.features{
+/* page section spacing */
+
+.section{
 
 padding:80px;
 
-text-align:center;
+}
+
+
+
+/* grid layout */
+
+.grid-4{
+
+display:grid;
+
+grid-template-columns:repeat(4,1fr);
+
+gap:20px;
 
 }
 
 
-.card-grid{
+
+.grid-2{
 
 display:grid;
 
-grid-template-columns: repeat(4,1fr);
+grid-template-columns:repeat(2,1fr);
 
 gap:20px;
 
-margin-top:40px;
+}
+
+
+
+/* dashboard layout */
+
+.dashboard-layout{
+
+display:flex;
+
+min-height:100vh;
+
+}
+
+
+
+/* content area next to sidebar */
+
+.dashboard-content{
+
+flex:1;
+
+padding:40px;
+
+}
+
+
+
+/* centered form layout */
+
+.form-layout{
+
+max-width:900px;
+
+margin:auto;
+
+padding:40px;
 
 }

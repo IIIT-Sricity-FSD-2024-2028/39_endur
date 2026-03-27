@@ -1,0 +1,64 @@
+/* primary button */
+
+.btn-primary{
+
+background:#1e3a8a;
+
+color:white;
+
+padding:10px 18px;
+
+border:none;
+
+border-radius:8px;
+
+font-weight:600;
+
+cursor:pointer;
+
+transition:0.15s;
+
+}
+
+
+.btn-primary:hover{
+
+opacity:.9;
+
+}
+
+
+/* outline button */
+
+.btn-outline{
+
+background:white;
+
+border:1px solid #cbd5e1;
+
+padding:10px 18px;
+
+border-radius:8px;
+
+cursor:pointer;
+
+}
+
+
+/* small action button */
+
+.btn-small{
+
+padding:4px 10px;
+
+font-size:13px;
+
+border-radius:6px;
+
+border:1px solid #cbd5e1;
+
+background:white;
+
+cursor:pointer;
+
+}

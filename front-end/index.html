@@ -10,7 +10,9 @@
 
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/components/button.css">
+    <link rel="stylesheet" href="css/components/card.css">
+    <link rel="stylesheet" href="css/utilities.css">
     <link rel="stylesheet" href="css/pages/landing.css">
 
 </head>
@@ -35,7 +37,7 @@
 
         <div class="nav-right">
 
-            <button class="btn-primary" onclick="goToLogin()">
+            <button id="getStartedBtn" class="btn-primary">
 
                 Get Started
 
@@ -187,20 +189,15 @@
 
 
     </section>
+    <script type="module">
 
+        import { goToLogin } from "./js/core/router.js";
 
-
-
-    <script>
-
-        function goToLogin() {
-
-            window.location.href = "login.html"
-
-        }
+        document
+            .getElementById("getStartedBtn")
+            .addEventListener("click", goToLogin);
 
     </script>
-
 
 </body>
 

@@ -250,3 +250,15 @@ width:34px;
 height:34px;
 filter: invert(1);
 }
+
+.card-grid{
+
+display:grid;
+
+grid-template-columns:repeat(4,1fr);
+
+gap:20px;
+
+margin-top:40px;
+
+}
