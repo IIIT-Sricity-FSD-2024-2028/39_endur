@@ -3,14 +3,14 @@
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Pending Feedbacks</title>
+    <title>Pending Feedbacks</title>
 
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/components.css">
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/components.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
 
@@ -18,266 +18,325 @@
 <body>
 
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
 
-<!-- SIDEBAR -->
+        <!-- SIDEBAR -->
 
-<aside class="sidebar">
+        <aside class="sidebar">
 
 
-<div class="sidebar-logo">
+            <div class="sidebar-logo">
 
-<img src="../../assets/logos/endur-logo.svg">
+                <img src="../../assets/logos/endur-logo.svg">
 
-<div>
+                <div>
 
-<strong>Endur</strong>
+                    <strong>Endur</strong>
 
-<p>Student Portal</p>
+                    <p>Student Portal</p>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<nav class="sidebar-menu">
+            <nav class="sidebar-menu">
 
-<a href="dashboard.html">
+                <a href="dashboard.html">
 
-Dashboard
+                    Dashboard
 
-</a>
+                </a>
 
-<a href="courses.html">
+                <a href="courses.html">
 
-My Courses
+                    My Courses
 
-</a>
+                </a>
 
-<a class="active">
+                <a class="active">
 
-Pending Feedbacks
+                    Pending Feedbacks
 
-</a>
+                </a>
 
-<a href="feedback-history.html">
+                <a href="feedback-history.html">
 
-History
+                    History
 
-</a>
+                </a>
 
-</nav>
+            </nav>
 
 
 
-<div class="sidebar-user">
+            <a href="profile.html" class="sidebar-user">
 
-<div class="avatar"></div>
+                <div class="avatar"></div>
 
-<div>
+                <div>
 
-<strong id="userName"></strong>
+                    <strong id="userName"></strong>
 
-<p id="userDept"></p>
+                    <p id="userDept"></p>
 
-</div>
+                </div>
 
-</div>
+            </a>
 
 
-</aside>
+        </aside>
 
 
 
 
-<!-- MAIN CONTENT -->
+        <!-- MAIN CONTENT -->
 
-<main class="dashboard-content">
+        <main class="dashboard-content">
 
 
-<h1>
+            <h1>
 
-Pending Feedbacks
+                Pending Feedbacks
 
-</h1>
+            </h1>
 
 
-<p class="subtitle">
+            <p class="subtitle">
 
-You have 3 feedback cycles requiring your input.
+                You have 3 feedback cycles requiring your input.
 
-</p>
+            </p>
 
 
 
-<div class="feedback-list">
+            <div class="feedback-list">
 
 
-<!-- CARD 1 -->
+                <!-- CARD 1 -->
 
-<div class="feedback-card">
+                <div class="feedback-card">
 
 
-<div>
+                    <div>
 
-<p class="deadline">
+                        <p class="deadline">
 
-Deadline: Oct 25, 2033
+                            Deadline: Oct 25, 2033
 
-</p>
+                        </p>
 
 
-<h3>
+                        <h3>
 
-Subject A
+                            Subject A
 
-</h3>
+                        </h3>
 
 
-<p>
+                        <p>
 
-Week 8 Check-in • Pulse Check
+                            Week 8 Check-in • Pulse Check
 
-</p>
+                        </p>
 
 
-<button class="btn-primary">
+                        <button class="btn-primary" onclick="openFeedback('CS101')">
 
-Start Feedback →
+                            Start Feedback →
+                        </button>
 
-</button>
 
+                    </div>
 
-</div>
 
 
+                    <div class="color-block red"></div>
 
-<div class="color-block red"></div>
 
+                </div>
 
-</div>
 
 
 
+                <!-- CARD 2 -->
 
-<!-- CARD 2 -->
+                <div class="feedback-card">
 
-<div class="feedback-card">
 
+                    <div>
 
-<div>
+                        <p class="deadline">
 
-<p class="deadline">
+                            Deadline: Oct 28, 2027
 
-Deadline: Oct 28, 2027
+                        </p>
 
-</p>
 
+                        <h3>
 
-<h3>
+                            Subject B
 
-Subject B
+                        </h3>
 
-</h3>
 
+                        <p>
 
-<p>
+                            Mid-semester Feedback • Standard
 
-Mid-semester Feedback • Standard
+                        </p>
 
-</p>
 
+                        <button class="btn-primary" onclick="openFeedback('CS101')">
 
-<button class="btn-primary">
+                            Start Feedback →
+                        </button>
 
-Start Feedback →
 
-</button>
+                    </div>
 
 
-</div>
 
+                    <div class="color-block green"></div>
 
 
-<div class="color-block green"></div>
+                </div>
 
 
-</div>
 
 
+                <!-- CARD 3 -->
 
+                <div class="feedback-card">
 
-<!-- CARD 3 -->
 
-<div class="feedback-card">
+                    <div>
 
+                        <p class="deadline">
 
-<div>
+                            Deadline: Nov 02, 2029
 
-<p class="deadline">
+                        </p>
 
-Deadline: Nov 02, 2029
 
-</p>
+                        <h3>
 
+                            Subject C
 
-<h3>
+                        </h3>
 
-Subject C
 
-</h3>
+                        <p>
 
+                            Project Phase 1 Review • Review of Reviews
 
-<p>
+                        </p>
 
-Project Phase 1 Review • Review of Reviews
+                        <button class="btn-primary" onclick="openFeedback('CS101')">
 
-</p>
+                            Start Feedback →
+                        </button>
 
 
-<button class="btn-primary">
+                    </div>
 
-Start Feedback →
 
-</button>
 
+                    <div class="color-block yellow"></div>
 
-</div>
 
+                </div>
 
+                <div class="feedback-card">
 
-<div class="color-block yellow"></div>
+                    <div>
 
+                        <p class="deadline">
 
-</div>
+                            Deadline: Nov 10, 2026
 
+                        </p>
 
 
-</div>
+                        <h3>
 
+                            Feedback System Review
 
-</main>
+                        </h3>
 
 
-</div>
+                        <p>
 
+                            Review of Reviews • System Evaluation
 
+                        </p>
 
-<script src="../../js/core/session.js"></script>
 
-<script>
+                        <button class="btn-primary" onclick="openReviewOfReviews()">
 
-const user = requireAuth();
+                            Start Evaluation →
 
-document.getElementById("userName").innerText =
-user.name;
+                        </button>
 
-document.getElementById("userDept").innerText =
-user.department;
 
-</script>
+                    </div>
+
+
+                    <div class="color-block purple"></div>
+
+
+                </div>
+
+
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        const user = requireAuth();
+
+        document.getElementById("userName").innerText =
+            user.name;
+
+        document.getElementById("userDept").innerText =
+            user.department;
+
+
+        function openFeedback(courseId) {
+
+            localStorage.setItem("activeCourse", courseId);
+
+            window.location.href = "feedback-form.html";
+
+        }
+
+
+        function openReviewOfReviews() {
+
+            localStorage.setItem(
+                "activeCourse",
+                "reviewOfReviews"
+            );
+
+            window.location.href =
+                "review-of-reviews.html";
+
+        }
+
+
+    </script>
 
 
 </body>

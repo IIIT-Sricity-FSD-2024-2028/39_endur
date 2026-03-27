@@ -65,7 +65,7 @@
 
 
 
-            <div class="sidebar-user">
+            <a href="profile.html" class="sidebar-user">
 
                 <div class="avatar"></div>
 
@@ -77,7 +77,7 @@
 
                 </div>
 
-            </div>
+            </a>
 
 
         </aside>
@@ -177,54 +177,87 @@
 
                 <tbody>
 
-                    <tr>
+                    <tr data-course="CS101">
 
                         <td>Subject A</td>
 
-                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <span class="badge"></span>
+                        </td>
 
                         <td>Oct 25, 2023</td>
 
-                        <td><a>Start</a></td>
+                        <td>
+                            <a class="action-link"></a>
+                        </td>
 
                     </tr>
 
 
-                    <tr>
+                    <tr data-course="CS102">
 
                         <td>Subject B</td>
 
-                        <td><span class="badge complete">Completed</span></td>
+                        <td>
+                            <span class="badge"></span>
+                        </td>
 
                         <td>Oct 20, 2023</td>
 
-                        <td><a>View</a></td>
+                        <td>
+                            <a class="action-link"></a>
+                        </td>
 
                     </tr>
 
 
-                    <tr>
 
-                        <td>Subject C</td>
+                    <tr data-course="CS103">
 
-                        <td><span class="badge progress">In Progress</span></td>
+                        <td>Subject B</td>
+
+                        <td>
+                            <span class="badge"></span>
+                        </td>
 
                         <td>Oct 28, 2023</td>
 
-                        <td><a>Resume</a></td>
+                        <td>
+                            <a class="action-link"></a>
+                        </td>
 
                     </tr>
 
 
-                    <tr>
+                    <tr data-course="CS104">
 
                         <td>Subject D</td>
 
-                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <span class="badge"></span>
+                        </td>
 
-                        <td>Nov 02, 2023</td>
+                        <td>Oct 20, 2023</td>
 
-                        <td><a>Start</a></td>
+                        <td>
+                            <a class="action-link"></a>
+                        </td>
+
+                    </tr>
+
+                    <tr data-course="reviewOfReviews">
+
+                        <td>Feedback System Review</td>
+
+                        <td>
+                            <span class="badge"></span>
+                        </td>
+
+                        <td>Nov 10, 2026</td>
+
+                        <td>
+                            <a class="action-link"></a>
+                        </td>
 
                     </tr>
 
@@ -259,8 +292,45 @@
         document.getElementById("userDept").innerText =
             user.department;
 
-    </script>
 
+
+        function openFeedback(courseId) {
+
+            localStorage.setItem(
+                "activeCourse",
+                courseId
+            );
+
+            if (courseId === "reviewOfReviews") {
+
+                window.location.href =
+                    "review-of-reviews.html";
+
+                return;
+
+            }
+
+            window.location.href =
+                "feedback-form.html";
+
+        }
+
+
+        function openReviewOfReviews() {
+
+            localStorage.setItem(
+                "activeCourse",
+                "reviewOfReviews"
+            );
+
+            window.location.href =
+                "review-of-reviews.html";
+
+        }
+
+
+    </script>
+    <script src="../../js/features/dashboard.js"></script>
 
 </body>
 
