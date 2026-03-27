@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Feedback History</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+<div class="dashboard-layout">
+
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+
+<div class="sidebar-logo">
+
+<img src="../../assets/logos/endur-logo.svg">
+
+<div>
+
+<strong>Endur</strong>
+
+<p>Student Portal</p>
+
+</div>
+
+</div>
+
+
+
+<nav class="sidebar-menu">
+
+<a href="dashboard.html">
+
+Dashboard
+
+</a>
+
+<a href="courses.html">
+
+My Courses
+
+</a>
+
+<a href="pending-feedback.html">
+
+Pending Feedbacks
+
+</a>
+
+<a class="active">
+
+History
+
+</a>
+
+</nav>
+
+
+
+<div class="sidebar-user">
+
+<div class="avatar"></div>
+
+<div>
+
+<strong id="userName"></strong>
+
+<p id="userDept"></p>
+
+</div>
+
+</div>
+
+
+</aside>
+
+
+
+
+<!-- MAIN -->
+
+<main class="dashboard-content">
+
+
+<h1>
+
+Feedback History
+
+</h1>
+
+
+
+<input
+class="search-bar"
+placeholder="Search course or cycle..."
+>
+
+
+
+<table class="data-table">
+
+
+<thead>
+
+<tr>
+
+<th>Course Name</th>
+
+<th>Submission Date</th>
+
+<th>Cycle Type</th>
+
+<th>Status</th>
+
+</tr>
+
+</thead>
+
+
+
+<tbody>
+
+
+<tr>
+
+<td>
+
+<strong>Subject A</strong>
+
+<br>
+
+<span class="sub-text">
+
+MATH-402 • Dr. Tesla Stein
+
+</span>
+
+</td>
+
+
+<td>
+
+Oct 12, 2024
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+Standard
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge progress">
+
+Processed
+
+</span>
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+
+<strong>Subject B</strong>
+
+<br>
+
+<span class="sub-text">
+
+PHYS-305 • Dr. Marshall Speaker
+
+</span>
+
+</td>
+
+
+<td>
+
+Nov 05, 2025
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+Pulse Check
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge progress">
+
+Processed
+
+</span>
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+
+<strong>Subject C</strong>
+
+<br>
+
+<span class="sub-text">
+
+CS-201 • Mr. Realtor
+
+</span>
+
+</td>
+
+
+<td>
+
+Dec 15, 2026
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+Review Of Reviews
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge progress">
+
+Processed
+
+</span>
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+
+<strong>Subject D</strong>
+
+<br>
+
+<span class="sub-text">
+
+PHIL-110 • Dr. Party
+
+</span>
+
+</td>
+
+
+<td>
+
+Jan 20, 2021
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+Standard
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge progress">
+
+Processed
+
+</span>
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+
+<strong>Subject E</strong>
+
+<br>
+
+<span class="sub-text">
+
+CS-350 • Prof. Steve Jobs
+
+</span>
+
+</td>
+
+
+<td>
+
+Mar 10, 2025
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+Pulse Check
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge pending">
+
+Pending Audit
+
+</span>
+
+</td>
+
+
+</tr>
+
+
+
+</tbody>
+
+
+</table>
+
+
+
+
+<div class="info-box">
+
+
+<strong>
+
+Privacy & Anonymity Note
+
+</strong>
+
+
+<p>
+
+All feedback submissions are anonymized before being shared with faculty.
+Once a cycle is processed, it is archived and cannot be modified.
+
+</p>
+
+
+</div>
+
+
+</main>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+<script>
+
+const user = requireAuth();
+
+document.getElementById("userName").innerText =
+user.name;
+
+document.getElementById("userDept").innerText =
+user.department;
+
+</script>
+
+
+</body>
+
+</html>

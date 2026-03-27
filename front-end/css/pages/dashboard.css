@@ -388,3 +388,53 @@ background:linear-gradient(135deg,#166534,#052e16);
 background:linear-gradient(135deg,#eab308,#854d0e);
 
 }
+
+.search-bar{
+
+width:420px;
+
+padding:10px;
+
+border-radius:8px;
+
+border:1px solid #cbd5e1;
+
+margin:20px 0;
+
+}
+
+
+
+.sub-text{
+
+font-size:13px;
+
+color:#64748b;
+
+}
+
+
+
+.neutral{
+
+background:#e2e8f0;
+
+}
+
+
+
+.info-box{
+
+margin-top:30px;
+
+padding:16px;
+
+border-radius:10px;
+
+background:#f1f5f9;
+
+border:1px solid #e2e8f0;
+
+max-width:720px;
+
+}
