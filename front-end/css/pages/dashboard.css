@@ -768,3 +768,82 @@ border:1px solid #ddd6fe;
 background:#7c3aed;
 
 }
+
+.sidebar-menu a.active{
+
+background:#e0ecff;
+
+color:#1d4ed8;
+
+font-weight:600;
+
+border-left:4px solid #2563eb;
+
+padding-left:10px;
+
+}
+
+.sidebar-menu a{
+
+transition:0.15s;
+
+}
+
+.sidebar-menu a:hover{
+
+background:#f1f5f9;
+
+}
+
+.rating span{
+
+font-size:24px;
+
+cursor:pointer;
+
+color:#cbd5e1;
+
+transition:0.15s;
+
+}
+
+.rating span.active{
+
+color:#2563eb;
+
+}
+
+.rating span:hover{
+
+transform:scale(1.1);
+
+}
+
+.success-icon{
+
+animation:pop 0.3s ease;
+
+}
+
+@keyframes pop{
+
+0%{transform:scale(0.6)}
+100%{transform:scale(1)}
+
+}
+
+.feedback-card{
+
+transition:0.15s;
+
+cursor:pointer;
+
+}
+
+.feedback-card:hover{
+
+box-shadow:0 8px 24px rgba(0,0,0,0.05);
+
+transform:translateY(-2px);
+
+}

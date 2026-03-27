@@ -124,6 +124,15 @@ action.onclick =
 
 }
 
+const rows =
+document.querySelectorAll("[data-course]");
 
+if(rows.length === 0){
+
+document.getElementById(
+"emptyDashboard"
+).style.display = "block";
+
+}
 
 updateDashboard();

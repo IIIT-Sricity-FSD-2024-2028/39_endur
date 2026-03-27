@@ -5,56 +5,56 @@ const ratings = {};
 
 /* star click */
 
-function setRating(field,value){
+function setRating(field, value) {
 
-ratings[field] = value;
-
-
-/* highlight stars */
-
-const stars =
-document.querySelectorAll(
-
-`[onclick*="${field}"]`
-
-);
+    ratings[field] = value;
 
 
-stars.forEach((star,index)=>{
+    /* highlight stars */
 
-star.classList.toggle(
+    const stars =
+        document.querySelectorAll(
 
-"active",
+            `[onclick*="${field}"]`
 
-index < value
-
-);
-
-});
+        );
 
 
-/* save draft */
+    stars.forEach((star, index) => {
 
-const course =
-localStorage.getItem("activeCourse");
+        star.classList.toggle(
 
+            "active",
 
-let drafts =
-JSON.parse(
-localStorage.getItem("feedbackDraft")
-) || {};
+            index < value
 
+        );
 
-drafts[course] = ratings;
+    });
 
 
-localStorage.setItem(
+    /* save draft */
 
-"feedbackDraft",
+    const course =
+        localStorage.getItem("activeCourse");
 
-JSON.stringify(drafts)
 
-);
+    let drafts =
+        JSON.parse(
+            localStorage.getItem("feedbackDraft")
+        ) || {};
+
+
+    drafts[course] = ratings;
+
+
+    localStorage.setItem(
+
+        "feedbackDraft",
+
+        JSON.stringify(drafts)
+
+    );
 
 }
 
@@ -92,7 +92,15 @@ function submitFeedback() {
         JSON.stringify(submitted)
     );
 
+    if (Object.keys(ratings).length < 4) {
 
+        alert(
+            "Please answer all questions before submitting."
+        );
+
+        return;
+
+    }
     /* clear draft */
 
     localStorage.removeItem("feedbackDraft");
