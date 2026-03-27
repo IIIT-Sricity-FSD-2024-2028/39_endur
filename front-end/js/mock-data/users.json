@@ -1,41 +1,41 @@
 [
   {
-    "id": "S12345",
+    "id": "S123",
     "password": "student123",
     "role": "student",
     "name": "Student User"
   },
 
   {
-    "id": "F56789",
+    "id": "F123",
     "password": "faculty123",
     "role": "faculty",
     "name": "Faculty User"
   },
 
   {
-    "id": "H10001",
+    "id": "H123",
     "password": "hod123",
     "role": "hod",
     "name": "HOD User"
   },
 
   {
-    "id": "D99999",
+    "id": "D123",
     "password": "dean123",
     "role": "dean",
     "name": "Dean User"
   },
 
   {
-    "id": "A00001",
+    "id": "A123",
     "password": "admin123",
     "role": "admin",
     "name": "Admin User"
   },
 
   {
-    "id": "SU001",
+    "id": "SU123",
     "password": "super123",
     "role": "superuser",
     "name": "Super User"
