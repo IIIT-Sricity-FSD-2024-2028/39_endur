@@ -1,0 +1,22 @@
+{
+  "facultyId": "F101",
+
+  "current": {
+    "avgRating": 4.8,
+    "responseRate": 92,
+    "totalResponses": 86
+  },
+
+  "history": [
+    { "semester": "Spring 2023", "rating": 4.1 },
+    { "semester": "Fall 2023", "rating": 4.3 },
+    { "semester": "Spring 2024", "rating": 4.5 },
+    { "semester": "Fall 2024", "rating": 4.6 },
+    { "semester": "Spring 2025", "rating": 4.8 }
+  ],
+
+  "actionRequired": {
+    "course": "CS202",
+    "deadline": "2026-04-05"
+  }
+}
