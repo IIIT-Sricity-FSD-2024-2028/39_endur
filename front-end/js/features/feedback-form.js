@@ -1,5 +1,5 @@
 /* =========================
-   GLOBAL STATE
+GLOBAL STATE
 ========================= */
 
 const ratings = {};
@@ -8,32 +8,28 @@ window.ratings = ratings;
 
 
 /* =========================
-   STAR CLICK
+STAR CLICK
 ========================= */
 
-window.setRating = function(field,value){
+window.setRating =
+function(field,value){
 
-ratings[field] = value;
+ratings[field]=value;
 
 
 /* highlight stars */
 
 const stars =
 document.querySelectorAll(
-
 `[onclick*="${field}"]`
-
 );
 
 
 stars.forEach((star,index)=>{
 
 star.classList.toggle(
-
 "active",
-
-index < value
-
+index<value
 );
 
 });
@@ -46,7 +42,7 @@ saveDraft();
 
 
 /* =========================
-   SAVE DRAFT
+SAVE DRAFT
 ========================= */
 
 function saveDraft(){
@@ -61,15 +57,25 @@ localStorage.getItem("feedbackDraft")
 ) || {};
 
 
-drafts[course] = ratings;
+const user =
+JSON.parse(
+localStorage.getItem("endurSession")
+);
+
+
+if(!drafts[user.id]){
+
+drafts[user.id]={};
+
+}
+
+
+drafts[user.id][course]=ratings;
 
 
 localStorage.setItem(
-
 "feedbackDraft",
-
 JSON.stringify(drafts)
-
 );
 
 }
@@ -77,7 +83,7 @@ JSON.stringify(drafts)
 
 
 /* =========================
-   LOAD DRAFT
+LOAD DRAFT
 ========================= */
 
 function loadDraft(){
@@ -92,39 +98,40 @@ localStorage.getItem("feedbackDraft")
 ) || {};
 
 
-if(!drafts[course]) return;
-
-
-Object.assign(
-
-ratings,
-
-drafts[course]
-
+const user =
+JSON.parse(
+localStorage.getItem("endurSession")
 );
 
 
-/* re-highlight stars */
+if(
+!drafts[user.id] ||
+!drafts[user.id][course]
+) return;
+
+
+Object.assign(
+ratings,
+drafts[user.id][course]
+);
+
+
+/* highlight stars */
 
 Object.entries(ratings)
 .forEach(([field,value])=>{
 
 const stars =
 document.querySelectorAll(
-
 `[onclick*="${field}"]`
-
 );
 
 
 stars.forEach((star,index)=>{
 
 star.classList.toggle(
-
 "active",
-
-index < value
-
+index<value
 );
 
 });
@@ -139,12 +146,15 @@ loadDraft();
 
 
 /* =========================
-   SUBMIT
+SUBMIT
 ========================= */
 
-window.submitFeedback = function(){
+window.submitFeedback =
+function(){
 
-if(Object.keys(ratings).length < 4){
+if(
+Object.keys(ratings).length<4
+){
 
 alert(
 "Please answer all questions before submitting."
@@ -165,7 +175,15 @@ localStorage.getItem("submittedFeedback")
 ) || [];
 
 
+const user =
+JSON.parse(
+localStorage.getItem("endurSession")
+);
+
+
 submitted.push({
+
+userId:user.id,
 
 course,
 
@@ -179,11 +197,8 @@ status:"processed"
 
 
 localStorage.setItem(
-
 "submittedFeedback",
-
 JSON.stringify(submitted)
-
 );
 
 
@@ -195,19 +210,22 @@ localStorage.getItem("feedbackDraft")
 ) || {};
 
 
-delete drafts[course];
+if(
+drafts[user.id]
+){
+
+delete drafts[user.id][course];
+
+}
 
 
 localStorage.setItem(
-
 "feedbackDraft",
-
 JSON.stringify(drafts)
-
 );
 
 
-window.location.href =
+window.location.href=
 "feedback-success.html";
 
 };
@@ -215,10 +233,11 @@ window.location.href =
 
 
 /* =========================
-   CLOSE BUTTON
+CLOSE BUTTON
 ========================= */
 
-window.goBack = function(){
+window.goBack =
+function(){
 
 window.history.back();
 

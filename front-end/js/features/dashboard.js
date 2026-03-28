@@ -4,37 +4,57 @@ const submitted =
 get("submittedFeedback") || [];
 
 const draft =
-get("feedbackDraft") || [];
+get("feedbackDraft") || {};
 
 
 /* status logic */
 
 function getStatus(course){
 
-if(course === "reviewOfReviews"){
+if(course==="reviewOfReviews"){
 
 const stored =
 get("reviewOfReviews") || [];
 
-return stored.length > 0
+return stored.length>0
 ? "completed"
 : "pending";
 
 }
 
 
-if(submitted.find(f=>f.course===course)){
+const user =
+JSON.parse(
+localStorage.getItem("endurSession")
+);
+
+
+/* completed */
+
+if(
+submitted.find(
+f =>
+f.course===course &&
+f.userId===user.id
+)
+){
 
 return "completed";
 
 }
 
 
-if(draft[course]){
+/* in progress */
+
+if(
+draft[user.id] &&
+draft[user.id][course]
+){
 
 return "progress";
 
 }
+
 
 return "pending";
 
@@ -42,7 +62,7 @@ return "pending";
 
 
 
-/* render table */
+/* render */
 
 export function updateDashboard(){
 
@@ -52,9 +72,9 @@ document.querySelectorAll("[data-course]");
 
 if(rows.length===0){
 
-document.getElementById(
-"emptyDashboard"
-).style.display="block";
+document
+.getElementById("emptyDashboard")
+.style.display="block";
 
 return;
 
@@ -83,15 +103,15 @@ if(status==="completed"){
 
 badge.innerText="Completed";
 
-badge.className=
-"badge complete";
+badge.className="badge complete";
 
 
 action.innerText="View";
 
 
-action.onclick=
-()=>window.location.href=
+action.onclick =
+() =>
+window.location.href =
 "feedback-history.html";
 
 }
@@ -101,15 +121,14 @@ else if(status==="progress"){
 
 badge.innerText="In Progress";
 
-badge.className=
-"badge progress";
+badge.className="badge progress";
 
 
 action.innerText="Resume";
 
 
-action.onclick=
-()=>openFeedback(course);
+action.onclick =
+() => openFeedback(course);
 
 }
 
@@ -118,15 +137,14 @@ else{
 
 badge.innerText="Pending";
 
-badge.className=
-"badge pending";
+badge.className="badge pending";
 
 
 action.innerText="Start";
 
 
-action.onclick=
-()=>openFeedback(course);
+action.onclick =
+() => openFeedback(course);
 
 }
 

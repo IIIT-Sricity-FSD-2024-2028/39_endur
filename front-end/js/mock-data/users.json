@@ -6,7 +6,6 @@
     "name": "Harsh Raj",
     "department": "Computer Science"
   },
-
   {
     "id": "F123",
     "password": "faculty123",
@@ -14,7 +13,6 @@
     "name": "Dr. Alan Turing",
     "department": "Computer Science"
   },
-
   {
     "id": "H123",
     "password": "hod123",
@@ -22,7 +20,6 @@
     "name": "Dr. Ada Lovelace",
     "department": "Computer Science"
   },
-
   {
     "id": "D123",
     "password": "dean123",
@@ -30,7 +27,6 @@
     "name": "Dr. John Nash",
     "department": "Academics"
   },
-
   {
     "id": "A123",
     "password": "admin123",
@@ -38,12 +34,25 @@
     "name": "System Admin",
     "department": "IT"
   },
-
   {
     "id": "SU123",
     "password": "super123",
     "role": "superuser",
     "name": "Root Controller",
     "department": "System"
+  },
+  {
+    "id": "S456",
+    "password": "student456",
+    "role": "student",
+    "name": "Aarav Mehta",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S789",
+    "password": "student789",
+    "role": "student",
+    "name": "Riya Sharma",
+    "department": "Mathematics"
   }
 ]
