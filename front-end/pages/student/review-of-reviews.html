@@ -3,13 +3,34 @@
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Review of Reviews</title>
+    <title>Review of Reviews</title>
+    <link rel="stylesheet" href="../../css/base.css">
 
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/components.css">
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+    <link rel="stylesheet" href="../../css/components/rating.css">
+
+
+    <!-- page hub -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
 
 </head>
 
@@ -17,254 +38,260 @@
 <body>
 
 
-<div class="form-layout review-form">
+    <div class="form-layout review-form">
 
 
-<div class="form-header">
+        <div class="form-header">
 
-<h2>
+            <h2>
 
-Review of Reviews
+                Review of Reviews
 
-</h2>
+            </h2>
 
 
-<button onclick="goBack()" class="close-btn">
+            <button onclick="goBack()" class="close-btn">
 
-✕
+                ✕
 
-</button>
+            </button>
 
-</div>
+        </div>
 
 
 
 
-<div class="info-box review-info">
+        <div class="info-box review-info">
 
-<strong>
+            <strong>
 
-Help Improve the Feedback System
+                Help Improve the Feedback System
 
-</strong>
+            </strong>
 
-<p>
+            <p>
 
-Your responses help refine how feedback is collected and used.
+                Your responses help refine how feedback is collected and used.
 
-</p>
+            </p>
 
-</div>
+        </div>
 
 
 
 
-<h1>
+        <h1>
 
-Feedback System Evaluation
+            Feedback System Evaluation
 
-</h1>
+        </h1>
 
 
-<p class="subtitle">
+        <p class="subtitle">
 
-Evaluate the usefulness and fairness of the feedback process.
+            Evaluate the usefulness and fairness of the feedback process.
 
-</p>
+        </p>
 
 
 
 
-<div class="feedback-grid">
+        <div class="feedback-grid">
 
 
-<div class="question-card">
+            <div class="question-card">
 
-<h3>Clarity of Questions</h3>
+                <h3>Clarity of Questions</h3>
 
-<p>
+                <p>
 
-Were feedback questions easy to understand?
+                    Were feedback questions easy to understand?
 
-</p>
+                </p>
 
-<div class="rating">
+                <div class="rating">
 
-<span onclick="setRating('questionClarity',1)">★</span>
-<span onclick="setRating('questionClarity',2)">★</span>
-<span onclick="setRating('questionClarity',3)">★</span>
-<span onclick="setRating('questionClarity',4)">★</span>
-<span onclick="setRating('questionClarity',5)">★</span>
+                    <span onclick="setRating('questionClarity',1)">★</span>
+                    <span onclick="setRating('questionClarity',2)">★</span>
+                    <span onclick="setRating('questionClarity',3)">★</span>
+                    <span onclick="setRating('questionClarity',4)">★</span>
+                    <span onclick="setRating('questionClarity',5)">★</span>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<div class="question-card">
+            <div class="question-card">
 
-<h3>Time Required</h3>
+                <h3>Time Required</h3>
 
-<p>
+                <p>
 
-Was feedback quick and convenient to complete?
+                    Was feedback quick and convenient to complete?
 
-</p>
+                </p>
 
-<div class="rating">
+                <div class="rating">
 
-<span onclick="setRating('timeEffort',1)">★</span>
-<span onclick="setRating('timeEffort',2)">★</span>
-<span onclick="setRating('timeEffort',3)">★</span>
-<span onclick="setRating('timeEffort',4)">★</span>
-<span onclick="setRating('timeEffort',5)">★</span>
+                    <span onclick="setRating('timeEffort',1)">★</span>
+                    <span onclick="setRating('timeEffort',2)">★</span>
+                    <span onclick="setRating('timeEffort',3)">★</span>
+                    <span onclick="setRating('timeEffort',4)">★</span>
+                    <span onclick="setRating('timeEffort',5)">★</span>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<div class="question-card">
+            <div class="question-card">
 
-<h3>Fairness</h3>
+                <h3>Fairness</h3>
 
-<p>
+                <p>
 
-Did the feedback process feel fair and unbiased?
+                    Did the feedback process feel fair and unbiased?
 
-</p>
+                </p>
 
-<div class="rating">
+                <div class="rating">
 
-<span onclick="setRating('fairness',1)">★</span>
-<span onclick="setRating('fairness',2)">★</span>
-<span onclick="setRating('fairness',3)">★</span>
-<span onclick="setRating('fairness',4)">★</span>
-<span onclick="setRating('fairness',5)">★</span>
+                    <span onclick="setRating('fairness',1)">★</span>
+                    <span onclick="setRating('fairness',2)">★</span>
+                    <span onclick="setRating('fairness',3)">★</span>
+                    <span onclick="setRating('fairness',4)">★</span>
+                    <span onclick="setRating('fairness',5)">★</span>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<div class="question-card">
+            <div class="question-card">
 
-<h3>Usefulness</h3>
+                <h3>Usefulness</h3>
 
-<p>
+                <p>
 
-Do you believe feedback leads to real improvements?
+                    Do you believe feedback leads to real improvements?
 
-</p>
+                </p>
 
-<div class="rating">
+                <div class="rating">
 
-<span onclick="setRating('usefulness',1)">★</span>
-<span onclick="setRating('usefulness',2)">★</span>
-<span onclick="setRating('usefulness',3)">★</span>
-<span onclick="setRating('usefulness',4)">★</span>
-<span onclick="setRating('usefulness',5)">★</span>
+                    <span onclick="setRating('usefulness',1)">★</span>
+                    <span onclick="setRating('usefulness',2)">★</span>
+                    <span onclick="setRating('usefulness',3)">★</span>
+                    <span onclick="setRating('usefulness',4)">★</span>
+                    <span onclick="setRating('usefulness',5)">★</span>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
-</div>
+        </div>
 
 
 
 
-<div class="profile-card">
+        <div class="profile-card">
 
-<h3>
+            <h3>
 
-Additional Suggestions
+                Additional Suggestions
 
-</h3>
+            </h3>
 
 
-<textarea
-placeholder="Suggestions to improve the feedback system..."
-></textarea>
+            <textarea placeholder="Suggestions to improve the feedback system..."></textarea>
 
 
-</div>
+        </div>
 
 
 
 
-<button
-class="btn-primary submit-btn review-btn"
-onclick="submitReviewOfReviews()"
->
+        <button class="btn-primary submit-btn review-btn" onclick="submitReviewOfReviews()">
 
-Submit Evaluation
+            Submit Evaluation
 
-</button>
+        </button>
 
 
 
-</div>
+    </div>
 
 
 
-<script src="../../js/core/session.js"></script>
+    <script src="../../js/core/session.js"></script>
 
-<script src="../../js/features/feedback-form.js"></script>
+    <script src="../../js/features/feedback-form.js"></script>
 
+    <script>
 
-<script>
+        requireAuth();
 
-requireAuth();
 
+        function submitReviewOfReviews() {
 
+            if (Object.keys(ratings).length < 4) {
 
-function submitReviewOfReviews(){
+                alert(
+                    "Please answer all questions before submitting."
+                );
 
-const data = {
+                return;
 
-type: "reviewOfReviews",
+            }
 
-ratings,
 
-date: new Date().toISOString()
+            const data = {
 
-};
+                type: "reviewOfReviews",
 
+                ratings,
 
-let stored =
-JSON.parse(
-localStorage.getItem("reviewOfReviews")
-) || [];
+                date: new Date().toISOString()
 
+            };
 
-stored.push(data);
 
+            let stored =
+                JSON.parse(
+                    localStorage.getItem("reviewOfReviews")
+                ) || [];
 
-localStorage.setItem(
-"reviewOfReviews",
-JSON.stringify(stored)
-);
 
+            stored.push(data);
 
-window.location.href =
-"feedback-success.html";
 
-}
+            localStorage.setItem(
 
+                "reviewOfReviews",
 
+                JSON.stringify(stored)
 
-function goBack(){
+            );
 
-window.history.back();
 
-}
+            window.location.href =
+                "feedback-success.html";
 
-</script>
+        }
+
+
+        function goBack() {
+
+            window.history.back();
+
+        }
+
+    </script>
 
 
 </body>

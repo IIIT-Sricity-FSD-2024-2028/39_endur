@@ -6,10 +6,33 @@
     <meta charset="UTF-8">
 
     <title>Course Feedback</title>
-
     <link rel="stylesheet" href="../../css/base.css">
-    <link rel="stylesheet" href="../../css/components.css">
+
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+    <link rel="stylesheet" href="../../css/components/rating.css">
+
+    <link rel="stylesheet" href="../../css/components/success.css">
+
+
+    <!-- page -->
+
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
 
 </head>
 
@@ -213,9 +236,6 @@
 
 
     </div>
-
-
-
     <script src="../../js/core/session.js"></script>
 
     <script>
@@ -223,39 +243,40 @@
         requireAuth();
 
 
-        /* load selected course */
+        async function loadCourseTitle() {
 
-        const course = localStorage.getItem("activeCourse");
+            const courseId =
+                localStorage.getItem("activeCourse");
 
-        if (course) {
+
+            const response =
+                await fetch("../../js/mock-data/courses.json");
+
+
+            const courses =
+                await response.json();
+
+
+            const course =
+                courses.find(c => c.id === courseId);
+
+
+            if (!course) return;
+
 
             document.getElementById("courseTitle").innerText =
-                course + ": Subject A";
+                course.id + ": " + course.name;
 
         }
 
 
-
-        /* submit */
-
-        function submitFeedback() {
-
-            window.location.href = "feedback-success.html";
-
-        }
-
-
-
-        /* close */
-
-        function goBack() {
-
-            window.history.back();
-
-        }
+        loadCourseTitle();
 
     </script>
+
+
     <script src="../../js/features/feedback-form.js"></script>
+
 
 </body>
 

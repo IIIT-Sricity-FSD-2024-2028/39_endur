@@ -3,441 +3,460 @@
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Feedback History</title>
+    <title>Feedback History</title>
 
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/components.css">
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/base.css">
 
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+
+    <link rel="stylesheet" href="../../css/components/table.css">
+
+    <link rel="stylesheet" href="../../css/components/badge.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+
+    <!-- page hub -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
 
 
 <body>
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
 
-<!-- SIDEBAR -->
+        <!-- SIDEBAR -->
 
-<aside class="sidebar">
+        <aside class="sidebar">
 
 
-<div class="sidebar-logo">
+            <div class="sidebar-logo">
 
-<img src="../../assets/logos/endur-logo.svg">
+                <img src="../../assets/logos/endur-logo.svg">
 
-<div>
+                <div>
 
-<strong>Endur</strong>
+                    <strong>Endur</strong>
 
-<p>Student Portal</p>
+                    <p>Student Portal</p>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<nav class="sidebar-menu">
+            <nav class="sidebar-menu">
 
-<a href="dashboard.html">
+                <a href="dashboard.html">
 
-Dashboard
+                    Dashboard
 
-</a>
+                </a>
 
-<a href="courses.html">
+                <a href="courses.html">
 
-My Courses
+                    My Courses
 
-</a>
+                </a>
 
-<a href="pending-feedback.html">
+                <a href="pending-feedback.html">
 
-Pending Feedbacks
+                    Pending Feedbacks
 
-</a>
+                </a>
 
-<a class="active">
+                <a class="active">
 
-History
+                    History
 
-</a>
+                </a>
 
-</nav>
+            </nav>
 
 
 
-<a href="profile.html" class="sidebar-user">
+            <a href="profile.html" class="sidebar-user">
 
-<div class="avatar"></div>
+                <div class="avatar"></div>
 
-<div>
+                <div>
 
-<strong id="userName"></strong>
+                    <strong id="userName"></strong>
 
-<p id="userDept"></p>
+                    <p id="userDept"></p>
 
-</div>
+                </div>
 
-</a>
+            </a>
 
 
-</aside>
+        </aside>
 
 
 
 
-<!-- MAIN -->
+        <!-- MAIN -->
 
-<main class="dashboard-content">
+        <main class="dashboard-content">
 
 
-<h1>
+            <h1>
 
-Feedback History
+                Feedback History
 
-</h1>
+            </h1>
 
 
 
-<input
-class="search-bar"
-placeholder="Search course or cycle..."
->
+            <input class="search-bar" placeholder="Search course or cycle...">
 
 
 
-<table class="data-table">
+            <table class="data-table">
 
 
-<thead>
+                <thead>
 
-<tr>
+                    <tr>
 
-<th>Course Name</th>
+                        <th>Course Name</th>
 
-<th>Submission Date</th>
+                        <th>Submission Date</th>
 
-<th>Cycle Type</th>
+                        <th>Cycle Type</th>
 
-<th>Status</th>
+                        <th>Status</th>
 
-</tr>
+                    </tr>
 
-</thead>
+                </thead>
 
 
 
-<tbody>
+                <tbody>
 
 
-<tr>
+                    <tr>
 
-<td>
+                        <td>
 
-<strong>Subject A</strong>
+                            <strong>Subject A</strong>
 
-<br>
+                            <br>
 
-<span class="sub-text">
+                            <span class="sub-text">
 
-MATH-402 • Dr. Tesla Stein
+                                MATH-402 • Dr. Tesla Stein
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-Oct 12, 2024
+                            Oct 12, 2024
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge neutral">
+                            <span class="badge neutral">
 
-Standard
+                                Standard
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge progress">
+                            <span class="badge progress">
 
-Processed
+                                Processed
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-</tr>
+                    </tr>
 
 
 
 
-<tr>
+                    <tr>
 
-<td>
+                        <td>
 
-<strong>Subject B</strong>
+                            <strong>Subject B</strong>
 
-<br>
+                            <br>
 
-<span class="sub-text">
+                            <span class="sub-text">
 
-PHYS-305 • Dr. Marshall Speaker
+                                PHYS-305 • Dr. Marshall Speaker
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-Nov 05, 2025
+                            Nov 05, 2025
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge neutral">
+                            <span class="badge neutral">
 
-Pulse Check
+                                Pulse Check
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge progress">
+                            <span class="badge progress">
 
-Processed
+                                Processed
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-</tr>
+                    </tr>
 
 
 
 
-<tr>
+                    <tr>
 
-<td>
+                        <td>
 
-<strong>Subject C</strong>
+                            <strong>Subject C</strong>
 
-<br>
+                            <br>
 
-<span class="sub-text">
+                            <span class="sub-text">
 
-CS-201 • Mr. Realtor
+                                CS-201 • Mr. Realtor
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-Dec 15, 2026
+                            Dec 15, 2026
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge neutral">
+                            <span class="badge neutral">
 
-Review Of Reviews
+                                Review Of Reviews
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge progress">
+                            <span class="badge progress">
 
-Processed
+                                Processed
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-</tr>
+                    </tr>
 
 
 
 
-<tr>
+                    <tr>
 
-<td>
+                        <td>
 
-<strong>Subject D</strong>
+                            <strong>Subject D</strong>
 
-<br>
+                            <br>
 
-<span class="sub-text">
+                            <span class="sub-text">
 
-PHIL-110 • Dr. Party
+                                PHIL-110 • Dr. Party
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-Jan 20, 2021
+                            Jan 20, 2021
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge neutral">
+                            <span class="badge neutral">
 
-Standard
+                                Standard
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge progress">
+                            <span class="badge progress">
 
-Processed
+                                Processed
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-</tr>
+                    </tr>
 
 
 
 
-<tr>
+                    <tr>
 
-<td>
+                        <td>
 
-<strong>Subject E</strong>
+                            <strong>Subject E</strong>
 
-<br>
+                            <br>
 
-<span class="sub-text">
+                            <span class="sub-text">
 
-CS-350 • Prof. Steve Jobs
+                                CS-350 • Prof. Steve Jobs
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-Mar 10, 2025
+                            Mar 10, 2025
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge neutral">
+                            <span class="badge neutral">
 
-Pulse Check
+                                Pulse Check
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-<td>
+                        <td>
 
-<span class="badge pending">
+                            <span class="badge pending">
 
-Pending Audit
+                                Pending Audit
 
-</span>
+                            </span>
 
-</td>
+                        </td>
 
 
-</tr>
+                    </tr>
 
 
 
-</tbody>
+                </tbody>
 
 
-</table>
+            </table>
 
 
 
 
-<div class="info-box">
+            <div class="info-box">
 
 
-<strong>
+                <strong>
 
-Privacy & Anonymity Note
+                    Privacy & Anonymity Note
 
-</strong>
+                </strong>
 
 
-<p>
+                <p>
 
-All feedback submissions are anonymized before being shared with faculty.
-Once a cycle is processed, it is archived and cannot be modified.
+                    All feedback submissions are anonymized before being shared with faculty.
+                    Once a cycle is processed, it is archived and cannot be modified.
 
-</p>
+                </p>
 
 
-</div>
+            </div>
 
 
-</main>
+        </main>
 
 
-</div>
+    </div>
 
 
 
-<script src="../../js/core/session.js"></script>
+    <script src="../../js/core/session.js"></script>
 
-<script>
+    <script>
 
-const user = requireAuth();
+        const user = requireAuth();
 
-document.getElementById("userName").innerText =
-user.name;
+        document.getElementById("userName").innerText =
+            user.name;
 
-document.getElementById("userDept").innerText =
-user.department;
+        document.getElementById("userDept").innerText =
+            user.department;
 
-</script>
+    </script>
 
 
 </body>

@@ -3,283 +3,303 @@
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Profile</title>
+    <title>Profile</title>
 
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/components.css">
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/base.css">
 
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+
+    <link rel="stylesheet" href="../../css/components/profile.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+
+    <!-- page hub -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
 
 
 <body>
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
 
-<!-- SIDEBAR -->
+        <!-- SIDEBAR -->
 
-<aside class="sidebar">
+        <aside class="sidebar">
 
-<div class="sidebar-logo">
+            <div class="sidebar-logo">
 
-<img src="../../assets/logos/endur-logo.svg">
+                <img src="../../assets/logos/endur-logo.svg">
 
-<div>
+                <div>
 
-<strong>Endur</strong>
-<p>Student Portal</p>
+                    <strong>Endur</strong>
+                    <p>Student Portal</p>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
-<nav class="sidebar-menu">
+            <nav class="sidebar-menu">
 
-<a href="dashboard.html">
-Dashboard
-</a>
+                <a href="dashboard.html">
+                    Dashboard
+                </a>
 
-<a href="courses.html">
-My Courses
-</a>
+                <a href="courses.html">
+                    My Courses
+                </a>
 
-<a href="pending-feedback.html">
-Pending Feedbacks
-</a>
+                <a href="pending-feedback.html">
+                    Pending Feedbacks
+                </a>
 
-<a href="feedback-history.html">
-History
-</a>
+                <a href="feedback-history.html">
+                    History
+                </a>
 
 
-</nav>
+            </nav>
 
 
-<a href="profile.html" class="sidebar-user">
+            <a href="profile.html" class="sidebar-user">
 
-<div class="avatar"></div>
+                <div class="avatar"></div>
 
-<div>
+                <div>
 
-<strong id="userName"></strong>
+                    <strong id="userName"></strong>
 
-<p id="userDept"></p>
+                    <p id="userDept"></p>
 
-</div>
+                </div>
 
-</a>
+            </a>
 
-</aside>
+        </aside>
 
 
 
 
-<!-- MAIN -->
+        <!-- MAIN -->
 
-<main class="dashboard-content">
+        <main class="dashboard-content">
 
 
-<h1>
+            <h1>
 
-Profile & Settings
+                Profile & Settings
 
-</h1>
+            </h1>
 
 
-<p class="subtitle">
+            <p class="subtitle">
 
-Manage your personal information and portal preferences.
+                Manage your personal information and portal preferences.
 
-</p>
+            </p>
 
 
 
-<!-- PERSONAL INFO -->
+            <!-- PERSONAL INFO -->
 
-<div class="profile-card">
+            <div class="profile-card">
 
-<h3>
+                <h3>
 
-Personal Information
+                    Personal Information
 
-</h3>
+                </h3>
 
 
-<div class="profile-grid">
+                <div class="profile-grid">
 
 
-<div>
+                    <div>
 
-<label>Full Name</label>
+                        <label>Full Name</label>
 
-<p id="profileName"></p>
+                        <p id="profileName"></p>
 
-</div>
+                    </div>
 
 
-<div>
+                    <div>
 
-<label>Student ID</label>
+                        <label>Student ID</label>
 
-<p id="profileId"></p>
+                        <p id="profileId"></p>
 
-</div>
+                    </div>
 
 
-<div>
+                    <div>
 
-<label>Email Address</label>
+                        <label>Email Address</label>
 
-<p id="profileEmail"></p>
+                        <p id="profileEmail"></p>
 
-</div>
+                    </div>
 
 
-<div>
+                    <div>
 
-<label>Department</label>
+                        <label>Department</label>
 
-<p id="profileDept"></p>
+                        <p id="profileDept"></p>
 
-</div>
+                    </div>
 
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
 
-<!-- NOTIFICATION SETTINGS -->
+            <!-- NOTIFICATION SETTINGS -->
 
-<div class="profile-card">
+            <div class="profile-card">
 
-<h3>
+                <h3>
 
-Notification Preferences
+                    Notification Preferences
 
-</h3>
+                </h3>
 
 
-<div class="toggle-row">
+                <div class="toggle-row">
 
-<span>Email Notifications</span>
+                    <span>Email Notifications</span>
 
-<input type="checkbox" checked>
+                    <input type="checkbox" checked>
 
-</div>
+                </div>
 
 
-<div class="toggle-row">
+                <div class="toggle-row">
 
-<span>Push Notifications</span>
+                    <span>Push Notifications</span>
 
-<input type="checkbox" checked>
+                    <input type="checkbox" checked>
 
-</div>
+                </div>
 
 
-</div>
+            </div>
 
 
 
 
-<!-- ACCOUNT -->
+            <!-- ACCOUNT -->
 
-<div class="profile-card">
+            <div class="profile-card">
 
-<h3>
+                <h3>
 
-Account Settings
+                    Account Settings
 
-</h3>
+                </h3>
 
 
-<div class="logout-row">
+                <div class="logout-row">
 
 
-<div>
+                    <div>
 
-<strong>Log Out</strong>
+                        <strong>Log Out</strong>
 
-<p>
+                        <p>
 
-Will log you out of the current session.
+                            Will log you out of the current session.
 
-</p>
+                        </p>
 
-</div>
+                    </div>
 
 
-<button class="btn-danger" onclick="logout()">
+                    <button class="btn-danger" onclick="logout()">
 
-Log Out
+                        Log Out
 
-</button>
+                    </button>
 
 
-</div>
+                </div>
 
 
-</div>
+            </div>
 
 
-</main>
+        </main>
 
 
-</div>
+    </div>
 
 
 
-<script src="../../js/core/session.js"></script>
+    <script src="../../js/core/session.js"></script>
 
-<script>
+    <script>
 
-const user = requireAuth();
+        const user = requireAuth();
 
 
-document.getElementById("userName").innerText =
-user.name;
+        document.getElementById("userName").innerText =
+            user.name;
 
-document.getElementById("userDept").innerText =
-user.department;
+        document.getElementById("userDept").innerText =
+            user.department;
 
 
-/* profile info */
+        /* profile info */
 
-document.getElementById("profileName").innerText =
-user.name;
+        document.getElementById("profileName").innerText =
+            user.name;
 
-document.getElementById("profileId").innerText =
-user.id;
+        document.getElementById("profileId").innerText =
+            user.id;
 
 
-/* simple generated email */
+        /* simple generated email */
 
-document.getElementById("profileEmail").innerText =
-user.id.toLowerCase()+"@endur.edu";
+        document.getElementById("profileEmail").innerText =
+            user.id.toLowerCase() + "@endur.edu";
 
 
-document.getElementById("profileDept").innerText =
-user.department;
+        document.getElementById("profileDept").innerText =
+            user.department;
 
 
 
-function logout(){
+        function logout() {
 
-localStorage.removeItem("endurSession");
+            localStorage.removeItem("endurSession");
 
-window.location.href="../../login.html";
+            window.location.href = "../../login.html";
 
-}
+        }
 
-</script>
+    </script>
 
 
 </body>

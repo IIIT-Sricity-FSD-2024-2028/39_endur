@@ -1,43 +1,59 @@
-import { getSession } from "../../js/core/session.js";
+import { getSession } from "../core/session.js";
 
-export function loadSidebar(activePage) {
+export function loadSidebar(activePage){
 
-    const user = getSession();
+const user = getSession();
 
-    document.getElementById("userName").innerText =
-        user.name;
+document.getElementById("userName").innerText =
+user.name;
 
-    document.getElementById("userDept").innerText =
-        user.department;
-
-    document.getElementById("roleLabel").innerText =
-        `${user.role} portal`;
+document.getElementById("userDept").innerText =
+user.department;
 
 
-    /* avatar initials */
+/* optional role label */
 
-    const initials =
-        user.name
-            .split(" ")
-            .map(n => n[0])
-            .join("");
+const roleLabel =
+document.getElementById("roleLabel");
 
-    document.getElementById("avatar").innerText =
-        initials;
+if(roleLabel){
+
+roleLabel.innerText =
+`${user.role} portal`;
+
+}
 
 
-    /* active menu highlight */
+/* avatar initials */
 
-    document
-        .querySelectorAll("[data-link]")
-        .forEach(link => {
+const avatar =
+document.getElementById("avatar");
 
-            if (link.dataset.link === activePage) {
+if(avatar){
 
-                link.classList.add("active");
+const initials =
+user.name
+.split(" ")
+.map(n=>n[0])
+.join("");
 
-            }
+avatar.innerText = initials;
 
-        });
+}
+
+
+/* active link */
+
+document
+.querySelectorAll("[data-link]")
+.forEach(link=>{
+
+if(link.dataset.link === activePage){
+
+link.classList.add("active");
+
+}
+
+});
 
 }

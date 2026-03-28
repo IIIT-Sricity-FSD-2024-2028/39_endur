@@ -8,8 +8,29 @@
     <title>Pending Feedbacks</title>
 
     <link rel="stylesheet" href="../../css/base.css">
+
     <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/components.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+
+    <link rel="stylesheet" href="../../css/components/feedback-card.css">
+
+    <link rel="stylesheet" href="../../css/components/badge.css">
+
+
+    <!-- page -->
+
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
@@ -117,7 +138,7 @@
 
                 <!-- CARD 1 -->
 
-                <div class="feedback-card" onclick="openFeedback('CS101')">
+                <div class="feedback-card" data-course="CS101">
 
 
                     <div>
@@ -143,7 +164,7 @@
                         </p>
 
 
-                        <button class="btn-primary" onclick="openFeedback('CS101')">
+                        <button class="btn-primary">
 
                             Start Feedback →
                         </button>
@@ -163,7 +184,7 @@
 
                 <!-- CARD 2 -->
 
-                <div class="feedback-card" onclick="openFeedback('CS101')">
+                <div class="feedback-card" data-course="CS102">
 
 
                     <div>
@@ -189,7 +210,7 @@
                         </p>
 
 
-                        <button class="btn-primary" onclick="openFeedback('CS101')">
+                        <button class="btn-primary">
 
                             Start Feedback →
                         </button>
@@ -209,7 +230,7 @@
 
                 <!-- CARD 3 -->
 
-                <div class="feedback-card" onclick="openFeedback('CS101')">
+                <div class="feedback-card" data-course="CS103">
 
 
                     <div>
@@ -234,7 +255,7 @@
 
                         </p>
 
-                        <button class="btn-primary" onclick="openFeedback('CS101')">
+                        <button class="btn-primary">
 
                             Start Feedback →
                         </button>
@@ -249,7 +270,7 @@
 
                 </div>
 
-                <div class="feedback-card" onclick="openFeedback('CS101')">
+                <div class="feedback-card" data-course="reviewOfReviews">
 
                     <div>
 
@@ -274,7 +295,7 @@
                         </p>
 
 
-                        <button class="btn-primary" onclick="openReviewOfReviews()">
+                        <button class="btn-primary">
 
                             Start Evaluation →
 
@@ -320,30 +341,51 @@
             user.department;
 
 
-        function openFeedback(courseId) {
+        /* attach click handler to every card */
 
-            localStorage.setItem("activeCourse", courseId);
+        document
+            .querySelectorAll(".feedback-card")
+            .forEach(card => {
 
-            window.location.href = "feedback-form.html";
+                card.addEventListener("click", () => {
 
-        }
+                    const course =
+                        card.dataset.course;
 
 
-        function openReviewOfReviews() {
+                    /* special route */
 
-            localStorage.setItem(
-                "activeCourse",
-                "reviewOfReviews"
-            );
+                    if (course === "reviewOfReviews" || course === "CS104") {
 
-            window.location.href =
-                "review-of-reviews.html";
+                        localStorage.setItem(
+                            "activeCourse",
+                            "reviewOfReviews"
+                        );
 
-        }
+                        window.location.href =
+                            "review-of-reviews.html";
 
+                        return;
+
+                    }
+
+
+                    /* normal feedback */
+
+                    localStorage.setItem(
+                        "activeCourse",
+                        course
+                    );
+
+                    window.location.href =
+                        "feedback-form.html";
+
+                });
+
+            });
 
     </script>
-
+    
 
 </body>
 

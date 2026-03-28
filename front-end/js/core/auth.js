@@ -7,7 +7,7 @@ const id = document.getElementById("userId").value;
 const password = document.getElementById("password").value;
 
 
-const response = await fetch("js/mock-data/users.json");
+const response = await fetch("./js/mock-data/users.json");
 
 const users = await response.json();
 

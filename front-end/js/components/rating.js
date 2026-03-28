@@ -1,4 +1,4 @@
-export function createRating(containerId, field){
+export function createRating(containerId,field,onChange){
 
 const container =
 document.getElementById(containerId);
@@ -12,7 +12,7 @@ star.innerText="★";
 
 star.addEventListener("click",()=>{
 
-setRating(field,i);
+onChange(field,i);
 
 highlight(container,i);
 
@@ -24,6 +24,7 @@ container.appendChild(star);
 
 }
 
+
 function highlight(container,value){
 
 const stars =
@@ -32,8 +33,11 @@ container.querySelectorAll("span");
 stars.forEach((s,index)=>{
 
 s.classList.toggle(
+
 "active",
-index<value
+
+index < value
+
 );
 
 });

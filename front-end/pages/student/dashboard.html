@@ -9,8 +9,31 @@
     <title>Student Dashboard</title>
 
     <link rel="stylesheet" href="../../css/base.css">
+
     <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/components.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+
+    <link rel="stylesheet" href="../../css/components/table.css">
+
+    <link rel="stylesheet" href="../../css/components/badge.css">
+
+    <link rel="stylesheet" href="../../css/components/stats.css">
+
+
+    <!-- page hub -->
+
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
@@ -334,7 +357,14 @@
 
 
     </script>
-    <script src="../../js/features/dashboard.js"></script>
+    <script type="module">
+
+        import { updateDashboard }
+            from "../../js/features/dashboard.js";
+
+        updateDashboard();
+
+    </script>
 
 </body>
 

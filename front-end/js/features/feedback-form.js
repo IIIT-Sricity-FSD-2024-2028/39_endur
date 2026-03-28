@@ -1,132 +1,225 @@
-/* store rating selections */
+/* =========================
+   GLOBAL STATE
+========================= */
 
 const ratings = {};
 
-
-/* star click */
-
-function setRating(field, value) {
-
-    ratings[field] = value;
+window.ratings = ratings;
 
 
-    /* highlight stars */
+/* =========================
+   STAR CLICK
+========================= */
 
-    const stars =
-        document.querySelectorAll(
+window.setRating = function(field,value){
 
-            `[onclick*="${field}"]`
-
-        );
-
-
-    stars.forEach((star, index) => {
-
-        star.classList.toggle(
-
-            "active",
-
-            index < value
-
-        );
-
-    });
+ratings[field] = value;
 
 
-    /* save draft */
+/* highlight stars */
 
-    const course =
-        localStorage.getItem("activeCourse");
+const stars =
+document.querySelectorAll(
 
+`[onclick*="${field}"]`
 
-    let drafts =
-        JSON.parse(
-            localStorage.getItem("feedbackDraft")
-        ) || {};
+);
 
 
-    drafts[course] = ratings;
+stars.forEach((star,index)=>{
+
+star.classList.toggle(
+
+"active",
+
+index < value
+
+);
+
+});
 
 
-    localStorage.setItem(
+saveDraft();
 
-        "feedbackDraft",
-
-        JSON.stringify(drafts)
-
-    );
-
-}
+};
 
 
 
-/* submit */
+/* =========================
+   SAVE DRAFT
+========================= */
 
-function submitFeedback() {
+function saveDraft(){
 
-    const course = localStorage.getItem("activeCourse");
-
-    /* load previous submissions */
-
-    let submitted =
-        JSON.parse(
-            localStorage.getItem("submittedFeedback")
-        ) || [];
+const course =
+localStorage.getItem("activeCourse");
 
 
-    /* simulate CRUD create */
-
-    submitted.push({
-
-        course,
-        ratings,
-        date: new Date().toISOString(),
-
-        status: "processed"
-
-    });
+let drafts =
+JSON.parse(
+localStorage.getItem("feedbackDraft")
+) || {};
 
 
-    localStorage.setItem(
-        "submittedFeedback",
-        JSON.stringify(submitted)
-    );
-
-    if (Object.keys(ratings).length < 4) {
-
-        alert(
-            "Please answer all questions before submitting."
-        );
-
-        return;
-
-    }
-    /* clear draft */
-
-    localStorage.removeItem("feedbackDraft");
+drafts[course] = ratings;
 
 
-    window.location.href =
-        "feedback-success.html";
+localStorage.setItem(
+
+"feedbackDraft",
+
+JSON.stringify(drafts)
+
+);
 
 }
 
 
 
-/* load draft if resume */
+/* =========================
+   LOAD DRAFT
+========================= */
 
-function loadDraft() {
+function loadDraft(){
 
-    const draft =
-        JSON.parse(
-            localStorage.getItem("feedbackDraft")
-        );
+const course =
+localStorage.getItem("activeCourse");
 
-    if (!draft) return;
 
-    Object.assign(ratings, draft);
+let drafts =
+JSON.parse(
+localStorage.getItem("feedbackDraft")
+) || {};
+
+
+if(!drafts[course]) return;
+
+
+Object.assign(
+
+ratings,
+
+drafts[course]
+
+);
+
+
+/* re-highlight stars */
+
+Object.entries(ratings)
+.forEach(([field,value])=>{
+
+const stars =
+document.querySelectorAll(
+
+`[onclick*="${field}"]`
+
+);
+
+
+stars.forEach((star,index)=>{
+
+star.classList.toggle(
+
+"active",
+
+index < value
+
+);
+
+});
+
+});
 
 }
 
 
 loadDraft();
+
+
+
+/* =========================
+   SUBMIT
+========================= */
+
+window.submitFeedback = function(){
+
+if(Object.keys(ratings).length < 4){
+
+alert(
+"Please answer all questions before submitting."
+);
+
+return;
+
+}
+
+
+const course =
+localStorage.getItem("activeCourse");
+
+
+let submitted =
+JSON.parse(
+localStorage.getItem("submittedFeedback")
+) || [];
+
+
+submitted.push({
+
+course,
+
+ratings,
+
+date:new Date().toISOString(),
+
+status:"processed"
+
+});
+
+
+localStorage.setItem(
+
+"submittedFeedback",
+
+JSON.stringify(submitted)
+
+);
+
+
+/* remove draft */
+
+let drafts =
+JSON.parse(
+localStorage.getItem("feedbackDraft")
+) || {};
+
+
+delete drafts[course];
+
+
+localStorage.setItem(
+
+"feedbackDraft",
+
+JSON.stringify(drafts)
+
+);
+
+
+window.location.href =
+"feedback-success.html";
+
+};
+
+
+
+/* =========================
+   CLOSE BUTTON
+========================= */
+
+window.goBack = function(){
+
+window.history.back();
+
+};
