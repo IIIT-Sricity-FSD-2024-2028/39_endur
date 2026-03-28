@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Faculty Self Reflection</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/forms.css">
+
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/rating.css">
+
+<link rel="stylesheet" href="../../css/pages/feedback.css">
+
+</head>
+
+
+<body>
+
+
+<div class="form-layout">
+
+
+<div class="form-header">
+
+<h2>
+
+Faculty Self-Reflection
+
+</h2>
+
+
+<button
+class="close-btn"
+onclick="goBack()"
+>
+
+✕
+
+</button>
+
+</div>
+
+
+
+<h1>
+
+End-of-Term Self-Reflection
+
+</h1>
+
+
+<p class="subtitle">
+
+Evaluate your teaching effectiveness for this cycle.
+
+</p>
+
+
+
+<!-- quantitative -->
+
+<div class="profile-card">
+
+<h3>
+
+Quantitative Assessment
+
+</h3>
+
+
+<div class="feedback-grid">
+
+
+<div class="question-card">
+
+<h4>Clarity of Teaching</h4>
+
+<p>How clearly were concepts delivered?</p>
+
+<div
+class="rating"
+data-field="clarity"
+id="clarityRating"
+></div>
+
+</div>
+
+
+
+<div class="question-card">
+
+<h4>Student Engagement</h4>
+
+<p>How actively were students involved?</p>
+
+<div
+class="rating"
+data-field="engagement"
+id="engagementRating"
+></div>
+
+</div>
+
+
+
+<div class="question-card">
+
+<h4>Assessment Quality</h4>
+
+<p>How effective were assignments/exams?</p>
+
+<div
+class="rating"
+data-field="assessment"
+id="assessmentRating"
+></div>
+
+</div>
+
+
+</div>
+
+
+</div>
+
+
+
+<!-- qualitative -->
+
+<div class="profile-card">
+
+<h3>
+
+Qualitative Assessment
+
+</h3>
+
+
+<label>
+
+Key achievements & areas for improvement
+
+</label>
+
+
+<textarea
+id="reflectionText"
+placeholder="Reflect on teaching approach, improvements, and challenges..."
+></textarea>
+
+
+<p class="sub-text">
+
+Visible only to academic leadership.
+
+</p>
+
+
+</div>
+
+
+
+<!-- actions -->
+
+<div class="form-actions">
+
+
+<button
+class="btn-outline"
+onclick="goBack()"
+>
+
+Go Back
+
+</button>
+
+
+<button
+class="btn-primary"
+onclick="submitSelfReflection()"
+>
+
+Submit Reflection →
+
+</button>
+
+
+</div>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+
+<script type="module">
+
+import {
+initSelfReflection
+}
+from "../../js/features/self-reflection.js";
+
+
+requireAuth();
+
+initSelfReflection();
+
+
+window.goBack = function(){
+
+window.history.back();
+
+};
+
+</script>
+
+
+</body>
+
+</html>
