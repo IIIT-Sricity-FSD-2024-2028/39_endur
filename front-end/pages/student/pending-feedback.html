@@ -8,26 +8,17 @@
     <title>Pending Feedbacks</title>
 
     <link rel="stylesheet" href="../../css/base.css">
-
     <link rel="stylesheet" href="../../css/layout.css">
-
     <link rel="stylesheet" href="../../css/utilities.css">
-
     <link rel="stylesheet" href="../../css/forms.css">
-
 
     <!-- components -->
 
     <link rel="stylesheet" href="../../css/components/button.css">
-
     <link rel="stylesheet" href="../../css/components/card.css">
-
     <link rel="stylesheet" href="../../css/components/sidebar.css">
-
     <link rel="stylesheet" href="../../css/components/feedback-card.css">
-
     <link rel="stylesheet" href="../../css/components/badge.css">
-
 
     <!-- page -->
 
@@ -38,14 +29,12 @@
 
 <body>
 
-
     <div class="dashboard-layout">
 
 
         <!-- SIDEBAR -->
 
         <aside class="sidebar">
-
 
             <div class="sidebar-logo">
 
@@ -66,27 +55,19 @@
             <nav class="sidebar-menu">
 
                 <a href="dashboard.html">
-
                     Dashboard
-
                 </a>
 
                 <a href="courses.html">
-
                     My Courses
-
                 </a>
 
                 <a class="active">
-
                     Pending Feedbacks
-
                 </a>
 
                 <a href="feedback-history.html">
-
                     History
-
                 </a>
 
             </nav>
@@ -113,7 +94,7 @@
 
 
 
-        <!-- MAIN CONTENT -->
+        <!-- MAIN -->
 
         <main class="dashboard-content">
 
@@ -127,196 +108,21 @@
 
             <p class="subtitle">
 
-                You have 3 feedback cycles requiring your input.
+                Complete feedback cycles assigned to you.
 
             </p>
 
 
 
-            <div class="feedback-list">
+            <div id="pendingContainer" class="feedback-list"></div>
 
 
-                <!-- CARD 1 -->
 
-                <div class="feedback-card" data-course="CS101">
+            <div id="emptyPending" class="empty-state" style="display:none">
 
+                <p>No feedback required right now 🎉</p>
 
-                    <div>
-
-                        <p class="deadline">
-
-                            Deadline: Oct 25, 2033
-
-                        </p>
-
-
-                        <h3>
-
-                            Subject A
-
-                        </h3>
-
-
-                        <p>
-
-                            Week 8 Check-in • Pulse Check
-
-                        </p>
-
-
-                        <button class="btn-primary">
-
-                            Start Feedback →
-                        </button>
-
-
-                    </div>
-
-
-
-                    <div class="color-block red"></div>
-
-
-                </div>
-
-
-
-
-                <!-- CARD 2 -->
-
-                <div class="feedback-card" data-course="CS102">
-
-
-                    <div>
-
-                        <p class="deadline">
-
-                            Deadline: Oct 28, 2027
-
-                        </p>
-
-
-                        <h3>
-
-                            Subject B
-
-                        </h3>
-
-
-                        <p>
-
-                            Mid-semester Feedback • Standard
-
-                        </p>
-
-
-                        <button class="btn-primary">
-
-                            Start Feedback →
-                        </button>
-
-
-                    </div>
-
-
-
-                    <div class="color-block green"></div>
-
-
-                </div>
-
-
-
-
-                <!-- CARD 3 -->
-
-                <div class="feedback-card" data-course="CS103">
-
-
-                    <div>
-
-                        <p class="deadline">
-
-                            Deadline: Nov 02, 2029
-
-                        </p>
-
-
-                        <h3>
-
-                            Subject C
-
-                        </h3>
-
-
-                        <p>
-
-                            Project Phase 1 Review • Review of Reviews
-
-                        </p>
-
-                        <button class="btn-primary">
-
-                            Start Feedback →
-                        </button>
-
-
-                    </div>
-
-
-
-                    <div class="color-block yellow"></div>
-
-
-                </div>
-
-                <div class="feedback-card" data-course="reviewOfReviews">
-
-                    <div>
-
-                        <p class="deadline">
-
-                            Deadline: Nov 10, 2026
-
-                        </p>
-
-
-                        <h3>
-
-                            Feedback System Review
-
-                        </h3>
-
-
-                        <p>
-
-                            Review of Reviews • System Evaluation
-
-                        </p>
-
-
-                        <button class="btn-primary">
-
-                            Start Evaluation →
-
-                        </button>
-
-
-                    </div>
-
-
-                    <div class="color-block purple"></div>
-
-
-                </div>
-                <div id="emptyPending" class="empty-state" style="display:none">
-
-                    <p>No feedback required right now 🎉</p>
-
-                    <p>You are all caught up.</p>
-
-                </div>
-
+                <p>You are all caught up.</p>
 
             </div>
 
@@ -341,26 +147,69 @@
             user.department;
 
 
-        /* attach click handler to every card */
+        /* load pending feedback dynamically */
 
-        document
-            .querySelectorAll(".feedback-card")
-            .forEach(card => {
+        async function loadPending() {
 
-                card.addEventListener("click", () => {
+            const res =
+                await fetch("../../js/mock-data/courses.json");
 
-                    const course =
-                        card.dataset.course;
+            const courses =
+                await res.json();
 
 
-                    /* special route */
+            const submitted =
+                JSON.parse(
+                    localStorage.getItem("submittedFeedback")
+                ) || [];
 
-                    if (course === "reviewOfReviews" || course === "CS104") {
 
-                        localStorage.setItem(
-                            "activeCourse",
-                            "reviewOfReviews"
-                        );
+            const container =
+                document.getElementById("pendingContainer");
+
+            container.innerHTML = "";
+
+
+            courses.forEach(course => {
+
+
+                /* skip if already completed */
+
+                const done =
+                    submitted.find(
+                        f =>
+                            f.course === course.id &&
+                            f.userId === user.id
+                    );
+
+
+                if (done) return;
+
+
+                /* create card */
+
+                const card =
+                    document.createElement("div");
+
+                card.className =
+                    "feedback-card";
+
+
+                card.dataset.course =
+                    course.id;
+
+
+                /* click navigation */
+
+                card.onclick = () => {
+
+                    localStorage.setItem(
+                        "activeCourse",
+                        course.id
+                    );
+
+
+                    if (course.type === "review") {
 
                         window.location.href =
                             "review-of-reviews.html";
@@ -370,22 +219,81 @@
                     }
 
 
-                    /* normal feedback */
-
-                    localStorage.setItem(
-                        "activeCourse",
-                        course
-                    );
-
                     window.location.href =
                         "feedback-form.html";
 
-                });
+                };
+
+
+                /* card content */
+
+                card.innerHTML = `
+
+<div>
+
+<p class="deadline">
+
+Deadline: ${course.deadline || "Oct 30, 2026"}
+
+</p>
+
+
+<h3>
+
+${course.name}
+
+</h3>
+
+
+<p>
+
+${course.type === "review"
+                        ? "Review of Reviews • System Evaluation"
+                        : "Standard Feedback Cycle"}
+
+</p>
+
+
+<button class="btn-primary">
+
+Start →
+
+</button>
+
+
+</div>
+
+
+<div class="color-block
+${course.color || "blue"}">
+
+</div>
+
+`;
+
+
+                container.appendChild(card);
 
             });
 
+
+            /* empty state */
+
+            if (container.innerHTML === "") {
+
+                document
+                    .getElementById("emptyPending")
+                    .style.display = "block";
+
+            }
+
+        }
+
+
+        loadPending();
+
     </script>
-    
+
 
 </body>
 

@@ -1,31 +1,29 @@
 [
-  {
-    "id": "CS101",
-    "name": "Subject A",
-    "faculty": "Dr. Alan Turing",
-    "type": "Pulse Check"
-  },
-  {
-    "id": "CS102",
-    "name": "Subject B",
-    "faculty": "Dr. Euler",
-    "type": "Standard"
-  },
-  {
-    "id": "CS103",
-    "name": "Subject C",
-    "faculty": "Mr. Historian",
-    "type": "Review of Reviews"
-  },
-  {
-    "id": "CS104",
-    "name": "Subject D",
-    "faculty": "Prof. Einstein",
-    "type": "Final Review"
-  },
-  {
-    "id": "reviewOfReviews",
-    "name": "Feedback System Evaluation",
-    "type": "System Review"
-  }
+ {
+  "id":"CS101",
+  "name":"Subject A",
+  "faculty":"Dr. Alan Turing",
+  "type":"standard",
+  "color":"red"
+ },
+ {
+  "id":"CS102",
+  "name":"Subject B",
+  "faculty":"Dr. Euler",
+  "type":"standard",
+  "color":"green"
+ },
+ {
+  "id":"CS103",
+  "name":"Subject C",
+  "faculty":"Dr. Einstein",
+  "type":"standard",
+  "color":"yellow"
+ },
+ {
+  "id":"reviewOfReviews",
+  "name":"Feedback System Review",
+  "type":"review",
+  "color":"purple"
+ }
 ]
