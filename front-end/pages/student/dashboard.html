@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Student Dashboard</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+
+    <!-- page -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+    <div class="dashboard-layout">
+
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+            <div class="sidebar-logo">
+
+                <img src="../../assets/logos/endur-logo.svg">
+
+                <div>
+
+                    <strong>Endur</strong>
+                    <p>Student Portal</p>
+
+                </div>
+
+            </div>
+
+
+
+            <nav class="sidebar-menu">
+
+                <a class="active" href="dashboard.html">
+                    Dashboard
+                </a>
+
+                <a href="courses.html">
+                    My Courses
+                </a>
+
+                <a href="pending-feedback.html">
+                    Pending Feedbacks
+                </a>
+
+                <a href="feedback-history.html">
+                    History
+                </a>
+
+            </nav>
+
+
+
+            <a href="profile.html" class="sidebar-user">
+
+                <div class="avatar"></div>
+
+                <div>
+
+                    <strong id="userName"></strong>
+                    <p id="userDept"></p>
+
+                </div>
+
+            </a>
+
+        </aside>
+
+
+
+
+        <!-- MAIN -->
+
+        <main class="dashboard-content">
+
+
+            <h1 id="welcomeText"></h1>
+
+            <p class="subtitle">
+
+                Here is what's happening with your academic feedback today.
+
+            </p>
+
+
+
+            <!-- STATS -->
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+                    <p>Completed</p>
+                    <h2 id="statCompleted">0</h2>
+                </div>
+
+                <div class="stat-card">
+                    <p>In Progress</p>
+                    <h2 id="statProgress">0</h2>
+                </div>
+
+                <div class="stat-card">
+                    <p>Pending</p>
+                    <h2 id="statPending">0</h2>
+                </div>
+
+                <div class="stat-card">
+                    <p>Total Cycles</p>
+                    <h2 id="statTotal">0</h2>
+                </div>
+
+            </div>
+
+
+
+            <h2 class="section-title">
+
+                Course Progress Overview
+
+            </h2>
+
+
+
+            <table class="data-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Course</th>
+                        <th>Status</th>
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="dashboardTable">
+
+                </tbody>
+
+            </table>
+
+
+
+            <div id="emptyDashboard" class="empty-state" style="display:none">
+
+                <p>No feedback cycles assigned 🎉</p>
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        const user = requireAuth();
+
+
+        document.getElementById("welcomeText").innerText =
+            `Welcome back, ${user.name.split(" ")[0]}`;
+
+
+        document.getElementById("userName").innerText =
+            user.name;
+
+
+        document.getElementById("userDept").innerText =
+            user.department;
+
+
+        /* navigation */
+
+        function openFeedback(courseId) {
+
+            localStorage.setItem(
+                "activeCourse",
+                courseId
+            );
+
+
+            if (courseId === "reviewOfReviews") {
+
+                window.location.href =
+                    "review-of-reviews.html";
+
+                return;
+
+            }
+
+
+            window.location.href =
+                "feedback-form.html";
+
+        }
+
+    </script>
+
+
+
+    <script type="module">
+
+        import {
+            updateDashboard,
+            updateStats
+        }
+            from "../../js/features/dashboard.js";
+
+
+        updateDashboard();
+        updateStats();
+
+    </script>
+
+
+</body>
+
+</html>

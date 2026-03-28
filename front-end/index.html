@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Endur</title>
+
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components/button.css">
+    <link rel="stylesheet" href="css/components/card.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/pages/landing.css">
+
+</head>
+
+
+<body>
+
+
+    <header class="navbar">
+
+        <div class="nav-left">
+
+            <div class="logo">
+
+                <img src="assets/logos/endur-logo.svg" class="logo-img">
+                <span class="logo-text"><strong>Endur</strong></span>
+
+            </div>
+
+        </div>
+
+
+        <div class="nav-right">
+
+            <button id="getStartedBtn" class="btn-primary">
+
+                Get Started
+
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+
+
+    <section class="hero">
+
+        <video autoplay muted loop playsinline class="hero-video">
+
+            <source src="assets/video/hero-video.mp4" type="video/mp4">
+
+        </video>
+
+        <div class="hero-overlay"></div>
+
+        <div class="hero-content">
+
+            <p class="hero-tag">
+
+                ACADEMIC EXCELLENCE PLATFORM
+
+            </p>
+
+            <h1>
+
+                Continuous Academic <br>
+
+                <span class="highlight">
+
+                    Improvement
+
+                </span>
+
+            </h1>
+
+
+            <p class="hero-subtext">
+
+                Endur empowers colleges with a high-performance review
+                and feedback management system designed for institutional
+                excellence and faculty growth.
+
+            </p>
+
+
+        </div>
+
+    </section>
+
+
+
+
+    <!-- FEATURES -->
+
+    <section class="features">
+
+        <h2>
+
+            Engineered for Excellence
+
+        </h2>
+
+
+
+        <div class="card-grid">
+
+
+            <div class="card">
+                <img src="assets/icons/anonymity.svg" class="card-icon">
+                <h3>
+
+                    Anonymity Guaranteed
+
+                </h3>
+
+                <p>
+
+                    Students can give honest feedback without their names being shown.
+
+                </p>
+
+            </div>
+
+
+
+            <div class="card">
+                <img src="assets/icons/gap-analysis.svg" class="card-icon">
+                <h3>
+
+                    Gap Analysis
+
+                </h3>
+
+                <p>
+
+                    Shows the difference between faculty expectations and student feedback.
+
+                </p>
+
+            </div>
+
+
+
+            <div class="card">
+                <img src="assets/icons/insights.svg" class="card-icon">
+                <h3>
+
+                    Institutional Insights
+
+                </h3>
+
+                <p>
+
+                    Simple summaries that help departments understand teaching trends.
+
+                </p>
+
+            </div>
+
+
+
+            <div class="card">
+                <img src="assets/icons/improvement.svg" class="card-icon">
+                <h3>
+
+                    Continuous Improvement
+
+                </h3>
+
+                <p>
+
+                    Feedback collected during the semester so changes can happen early.
+
+                </p>
+
+            </div>
+
+
+
+        </div>
+
+
+    </section>
+    <script type="module">
+
+        import { goToLogin } from "./js/core/router.js";
+
+        document
+            .getElementById("getStartedBtn")
+            .addEventListener("click", goToLogin);
+
+    </script>
+
+</body>
+
+</html>

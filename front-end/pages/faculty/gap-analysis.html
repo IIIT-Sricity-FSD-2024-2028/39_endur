@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Gap Analysis</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+
+    <div class="dashboard-layout">
+
+
+        <main class="dashboard-content">
+
+
+            <div class="form-header">
+
+                <h2>
+
+                    Gap Analysis
+
+                </h2>
+
+
+                <button class="btn-outline" onclick="goBack()">
+
+                    Return Back
+
+                </button>
+
+
+            </div>
+
+
+
+            <h1 id="courseTitle">
+
+                Course Gap Analysis
+
+            </h1>
+
+
+            <p class="subtitle">
+
+                Faculty Self-Reflection vs Student Feedback
+
+            </p>
+
+
+
+            <!-- summary cards -->
+
+            <div class="stats-grid">
+
+
+                <div class="stat-card">
+
+                    <p>Avg Self Reflection</p>
+
+                    <h2 id="selfScore">
+
+                        0%
+
+                    </h2>
+
+                </div>
+
+
+
+                <div class="stat-card">
+
+                    <p>Avg Student Score</p>
+
+                    <h2 id="studentScore">
+
+                        0%
+
+                    </h2>
+
+                </div>
+
+
+
+                <div class="stat-card">
+
+                    <p>Identified Gap</p>
+
+                    <h2 id="gapScore">
+
+                        0%
+
+                    </h2>
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- comparison table -->
+
+            <div class="card">
+
+
+                <h3>
+
+                    Module Performance Comparison
+
+                </h3>
+
+
+                <table class="data-table">
+
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Category</th>
+
+                            <th>Self Score</th>
+
+                            <th>Student Score</th>
+
+                            <th>Gap</th>
+
+                        </tr>
+
+                    </thead>
+
+
+
+                    <tbody id="gapTable">
+
+                    </tbody>
+
+
+                </table>
+
+
+            </div>
+
+
+
+            <!-- comments -->
+
+            <div class="card">
+
+
+                <h3>
+
+                    Anonymous Student Comments
+
+                </h3>
+
+
+                <div id="commentList">
+
+                </div>
+
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+
+    <script type="module">
+
+        import {
+            renderGapAnalysis
+        }
+            from "../../js/features/gap-analysis.js";
+
+
+        requireAuth();
+
+
+        renderGapAnalysis();
+
+        window.goBack = function () {
+
+            window.location.href = "reports.html";
+
+        };
+
+    </script>
+
+
+</body>
+
+</html>

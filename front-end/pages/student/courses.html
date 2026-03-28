@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>My Courses</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+
+    <link rel="stylesheet" href="../../css/components/course-card.css">
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+    <div class="dashboard-layout">
+
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+
+            <div class="sidebar-logo">
+
+                <img src="../../assets/logos/endur-logo.svg">
+
+                <div>
+
+                    <strong>Endur</strong>
+
+                    <p>Student Portal</p>
+
+                </div>
+
+            </div>
+
+
+
+            <nav class="sidebar-menu">
+
+                <a href="dashboard.html">
+
+                    Dashboard
+
+                </a>
+
+                <a class="active">
+
+                    My Courses
+
+                </a>
+
+                <a href="pending-feedback.html">
+
+                    Pending Feedbacks
+
+                </a>
+
+                <a href="feedback-history.html">
+
+                    History
+
+                </a>
+
+            </nav>
+
+
+
+            <a href="profile.html" class="sidebar-user">
+
+                <div class="avatar"></div>
+
+                <div>
+
+                    <strong id="userName"></strong>
+
+                    <p id="userDept"></p>
+
+                </div>
+
+            </a>
+
+
+        </aside>
+
+
+
+
+        <!-- MAIN CONTENT -->
+
+        <main class="dashboard-content">
+
+
+            <h1>
+
+                My Courses
+
+            </h1>
+
+
+            <p class="subtitle">
+
+                Manage your current semester enrollment and track progress.
+
+            </p>
+
+
+
+            <div class="course-grid">
+
+
+                <div class="course-card red">
+
+                    <span class="tag navy">
+
+                        SCIENCE & TECH
+
+                    </span>
+
+                    <h3>
+
+                        CS101: Subject A
+
+                    </h3>
+
+                    <p>
+
+                        Dr. Alan Turing
+
+                    </p>
+
+                </div>
+
+
+
+                <div class="course-card green">
+
+                    <span class="tag green">
+
+                        MATHEMATICS
+
+                    </span>
+
+                    <h3>
+
+                        MDS202: Subject B
+
+                    </h3>
+
+                    <p>
+
+                        Dr. Euler
+
+                    </p>
+
+                </div>
+
+
+
+                <div class="course-card yellow">
+
+                    <span class="tag yellow">
+
+                        HUMANITIES
+
+                    </span>
+
+                    <h3>
+
+                        HIS110: Subject C
+
+                    </h3>
+
+                    <p>
+
+                        Mr. Historian
+
+                    </p>
+
+                </div>
+
+
+
+                <div class="course-card navy">
+
+                    <span class="tag blue">
+
+                        SCIENCE & TECH
+
+                    </span>
+
+                    <h3>
+
+                        PHY105: Subject D
+
+                    </h3>
+
+                    <p>
+
+                        Prof. Albert Einstein
+
+                    </p>
+
+                </div>
+
+
+
+                <div class="course-card grey">
+
+                    <span class="tag red">
+
+                        ARTS & LITERATURE
+
+                    </span>
+
+                    <h3>
+
+                        LIT301: Subject E
+
+                    </h3>
+
+                    <p>
+
+                        Mr. Shakespeare</p>
+
+                </div>
+
+
+
+                <div class="course-card purple">
+
+                    <span class="tag purple">
+
+                        SOCIAL SCIENCES
+
+                    </span>
+
+                    <h3>
+
+                        PSY200: Subject F
+
+                    </h3>
+
+                    <p>
+
+                        Dr. Diogenes
+
+                    </p>
+
+                </div>
+
+
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        requireAuth();
+
+
+        async function loadCourseTitle() {
+
+            const courseId =
+                localStorage.getItem("activeCourse");
+
+
+            const response =
+                await fetch("../../js/mock-data/courses.json");
+
+
+            const courses =
+                await response.json();
+
+
+            const course =
+                courses.find(c => c.id === courseId);
+
+
+            if (!course) return;
+
+
+            document.getElementById("courseTitle").innerText =
+                course.id + ": " + course.name;
+
+        }
+
+
+        loadCourseTitle();
+
+    </script>
+
+
+    <script src="../../js/features/feedback-form.js"></script>
+
+</body>
+
+</html>

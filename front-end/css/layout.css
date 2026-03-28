@@ -1,0 +1,103 @@
+/* ===== GLOBAL LAYOUT STRUCTURES ===== */
+
+/* top navigation layout */
+
+.navbar{
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+padding:18px 40px;
+
+}
+
+
+
+/* logo layout structure */
+
+.logo{
+
+display:flex;
+
+gap:10px;
+
+align-items:center;
+
+}
+
+
+
+/* page section spacing */
+
+.section{
+
+padding:80px;
+
+}
+
+
+
+/* grid layout */
+
+.grid-4{
+
+display:grid;
+
+grid-template-columns:repeat(4,1fr);
+
+gap:20px;
+
+}
+
+
+
+.grid-2{
+
+display:grid;
+
+grid-template-columns:repeat(2,1fr);
+
+gap:20px;
+
+}
+
+
+
+/* dashboard layout */
+
+.dashboard-layout{
+
+display:flex;
+
+min-height:100vh;
+
+}
+
+
+
+/* content area next to sidebar */
+
+.dashboard-content{
+
+flex:1;
+
+padding:40px;
+
+}
+
+
+
+/* centered form layout */
+
+.form-layout{
+
+max-width:900px;
+
+margin:auto;
+
+padding:40px;
+
+}

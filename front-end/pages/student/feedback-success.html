@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Feedback Submitted</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+
+<div class="success-layout">
+
+
+<div class="success-card">
+
+
+<div class="success-icon">
+
+✔
+
+</div>
+
+
+
+<h1>
+
+Feedback Recorded Successfully
+
+</h1>
+
+
+
+<p>
+
+Thank you for your input. Your responses help improve the academic experience for everyone.
+
+</p>
+<p>
+
+Your submission is anonymous and securely stored.
+
+</p>
+
+
+
+<button
+class="btn-primary"
+onclick="goDashboard()"
+>
+
+Head Back to Dashboard →
+
+</button>
+
+
+</div>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+<script>
+
+requireAuth();
+
+
+function goDashboard(){
+
+window.location.href = "dashboard.html";
+
+}
+
+</script>
+
+
+</body>
+
+</html>

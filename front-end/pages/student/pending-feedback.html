@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Pending Feedbacks</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/feedback-card.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+
+    <!-- page -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+    <div class="dashboard-layout">
+
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+            <div class="sidebar-logo">
+
+                <img src="../../assets/logos/endur-logo.svg">
+
+                <div>
+
+                    <strong>Endur</strong>
+
+                    <p>Student Portal</p>
+
+                </div>
+
+            </div>
+
+
+
+            <nav class="sidebar-menu">
+
+                <a href="dashboard.html">
+                    Dashboard
+                </a>
+
+                <a href="courses.html">
+                    My Courses
+                </a>
+
+                <a class="active">
+                    Pending Feedbacks
+                </a>
+
+                <a href="feedback-history.html">
+                    History
+                </a>
+
+            </nav>
+
+
+
+            <a href="profile.html" class="sidebar-user">
+
+                <div class="avatar"></div>
+
+                <div>
+
+                    <strong id="userName"></strong>
+
+                    <p id="userDept"></p>
+
+                </div>
+
+            </a>
+
+
+        </aside>
+
+
+
+
+        <!-- MAIN -->
+
+        <main class="dashboard-content">
+
+
+            <h1>
+
+                Pending Feedbacks
+
+            </h1>
+
+
+            <p class="subtitle">
+
+                Complete feedback cycles assigned to you.
+
+            </p>
+
+
+
+            <div id="pendingContainer" class="feedback-list"></div>
+
+
+
+            <div id="emptyPending" class="empty-state" style="display:none">
+
+                <p>No feedback required right now 🎉</p>
+
+                <p>You are all caught up.</p>
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        const user = requireAuth();
+
+        document.getElementById("userName").innerText =
+            user.name;
+
+        document.getElementById("userDept").innerText =
+            user.department;
+
+
+        /* load pending feedback dynamically */
+
+        async function loadPending() {
+
+            const res =
+                await fetch("../../js/mock-data/courses.json");
+
+            const courses =
+                await res.json();
+
+
+            const submitted =
+                JSON.parse(
+                    localStorage.getItem("submittedFeedback")
+                ) || [];
+
+
+            const container =
+                document.getElementById("pendingContainer");
+
+            container.innerHTML = "";
+
+
+            courses.forEach(course => {
+
+
+                /* skip if already completed */
+
+                const done =
+                    submitted.find(
+                        f =>
+                            f.course === course.id &&
+                            f.userId === user.id
+                    );
+
+
+                if (done) return;
+
+
+                /* create card */
+
+                const card =
+                    document.createElement("div");
+
+                card.className =
+                    "feedback-card";
+
+
+                card.dataset.course =
+                    course.id;
+
+
+                /* click navigation */
+
+                card.onclick = () => {
+
+                    localStorage.setItem(
+                        "activeCourse",
+                        course.id
+                    );
+
+
+                    if (course.type === "review") {
+
+                        window.location.href =
+                            "review-of-reviews.html";
+
+                        return;
+
+                    }
+
+
+                    window.location.href =
+                        "feedback-form.html";
+
+                };
+
+
+                /* card content */
+
+                card.innerHTML = `
+
+<div>
+
+<p class="deadline">
+
+Deadline: ${course.deadline || "Oct 30, 2026"}
+
+</p>
+
+
+<h3>
+
+${course.name}
+
+</h3>
+
+
+<p>
+
+${course.type === "review"
+                        ? "Review of Reviews • System Evaluation"
+                        : "Standard Feedback Cycle"}
+
+</p>
+
+
+<button class="btn-primary">
+
+Start →
+
+</button>
+
+
+</div>
+
+
+<div class="color-block
+${course.color || "blue"}">
+
+</div>
+
+`;
+
+
+                container.appendChild(card);
+
+            });
+
+
+            /* empty state */
+
+            if (container.innerHTML === "") {
+
+                document
+                    .getElementById("emptyPending")
+                    .style.display = "block";
+
+            }
+
+        }
+
+
+        loadPending();
+
+    </script>
+
+
+</body>
+
+</html>

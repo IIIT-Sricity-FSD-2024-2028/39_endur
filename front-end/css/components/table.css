@@ -1,0 +1,35 @@
+.data-table{
+
+width:100%;
+
+border-collapse:collapse;
+
+background:white;
+
+border-radius:12px;
+
+overflow:hidden;
+
+}
+
+
+.data-table th{
+
+text-align:left;
+
+padding:14px;
+
+font-size:14px;
+
+color:#64748b;
+
+}
+
+
+.data-table td{
+
+padding:16px;
+
+border-top:1px solid #e2e8f0;
+
+}

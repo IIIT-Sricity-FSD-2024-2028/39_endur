@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Faculty Dashboard</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/utilities.css">
+
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/sidebar.css">
+<link rel="stylesheet" href="../../css/components/table.css">
+<link rel="stylesheet" href="../../css/components/badge.css">
+<link rel="stylesheet" href="../../css/components/stats.css">
+
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+
+<div class="dashboard-layout">
+
+
+<!-- sidebar -->
+
+<aside class="sidebar">
+
+
+<div class="sidebar-logo">
+
+<img src="../../assets/logos/endur-logo.svg">
+
+<div>
+
+<strong>Endur</strong>
+
+<p>Faculty Portal</p>
+
+</div>
+
+</div>
+
+
+
+<nav class="sidebar-menu">
+
+<a class="active">
+Dashboard
+</a>
+
+<a href="reports.html">
+Feedback Reports
+</a>
+
+</nav>
+
+
+
+<a href="../student/profile.html" class="sidebar-user">
+
+<div class="avatar"></div>
+
+<div>
+
+<strong id="userName"></strong>
+
+<p id="userDept"></p>
+
+</div>
+
+</a>
+
+
+</aside>
+
+
+
+
+<!-- main -->
+
+<main class="dashboard-content">
+
+
+<h1>
+
+Faculty Dashboard
+
+<span class="badge neutral">
+
+SPRING SEMESTER 2026
+
+</span>
+
+</h1>
+
+
+
+<!-- stats -->
+
+<div class="stats-grid">
+
+
+<div class="stat-card">
+
+<p>Student Satisfaction</p>
+
+<h2 id="statSatisfaction">
+
+0
+
+</h2>
+
+</div>
+
+
+
+<div class="stat-card">
+
+<p>Response Rate</p>
+
+<h2 id="statResponse">
+
+0%
+
+</h2>
+
+</div>
+
+
+
+<div class="stat-card">
+
+<p>Pending Reflection</p>
+
+<h2 id="statPending">
+
+0
+
+</h2>
+
+</div>
+
+
+
+<div class="stat-card">
+
+<p>Performance Gap</p>
+
+<h2 id="statGap">
+
+0
+
+</h2>
+
+</div>
+
+
+</div>
+
+
+
+<h2 class="section-title">
+
+Current Courses
+
+</h2>
+
+
+
+<table class="data-table">
+
+
+<thead>
+
+<tr>
+
+<th>Course Code</th>
+
+<th>Course Name</th>
+
+<th>Enrolled</th>
+
+<th>Status</th>
+
+<th>Avg Rating</th>
+
+</tr>
+
+</thead>
+
+
+
+<tbody id="facultyCourses">
+
+</tbody>
+
+
+</table>
+
+
+</main>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+<script>
+
+const user = requireAuth();
+
+
+document.getElementById("userName").innerText =
+user.name;
+
+
+document.getElementById("userDept").innerText =
+user.department;
+
+</script>
+
+
+
+<script type="module">
+
+import {
+renderFacultyDashboard
+}
+from "../../js/features/faculty-dashboard.js";
+
+
+renderFacultyDashboard();
+
+</script>
+
+
+</body>
+
+</html>

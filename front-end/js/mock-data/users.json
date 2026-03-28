@@ -1,0 +1,65 @@
+[
+  {
+    "id": "S123",
+    "password": "123",
+    "name": "Harsh Raj",
+    "role": "student",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S456",
+    "password": "123",
+    "name": "Mithil Patidar",
+    "role": "student",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S789",
+    "password": "123",
+    "name": "Vishv Kanoongo",
+    "role": "student",
+    "department": "Computer Science"
+  },
+  {
+    "id": "F101",
+    "password": "123",
+    "name": "Dr. Alan Turing",
+    "role": "faculty",
+    "department": "Computer Science"
+  },
+  {
+    "id": "F102",
+    "password": "123",
+    "name": "Dr. Andrew Ng",
+    "role": "faculty",
+    "department": "AI"
+  },
+  {
+    "id": "H201",
+    "password": "123",
+    "name": "Dr. Grace Hopper",
+    "role": "hod",
+    "department": "Computer Science"
+  },
+  {
+    "id": "D301",
+    "password": "123",
+    "name": "Dr. Elon Musk",
+    "role": "dean",
+    "department": "Engineering"
+  },
+  {
+    "id": "A401",
+    "password": "123",
+    "name": "System Admin",
+    "role": "admin",
+    "department": "IT"
+  },
+  {
+    "id": "SU001",
+    "password": "123",
+    "name": "Super User",
+    "role": "superuser",
+    "department": "System"
+  }
+]

@@ -1,0 +1,85 @@
+[
+  {
+    "id": "CS101",
+    "name": "Data Structures",
+    "faculty": "Dr. Alan Turing",
+    "type": "standard",
+    "color": "red"
+  },
+  {
+    "id": "CS102",
+    "name": "Operating Systems",
+    "faculty": "Dr. Linus Torvalds",
+    "type": "standard",
+    "color": "green"
+  },
+  {
+    "id": "CS103",
+    "name": "Database Systems",
+    "faculty": "Dr. Edgar Codd",
+    "type": "standard",
+    "color": "yellow"
+  },
+  {
+    "id": "CS104",
+    "name": "Computer Networks",
+    "faculty": "Dr. Vint Cerf",
+    "type": "standard",
+    "color": "blue"
+  },
+  {
+    "id": "CS105",
+    "name": "Machine Learning",
+    "faculty": "Dr. Andrew Ng",
+    "type": "standard",
+    "color": "purple"
+  },
+  {
+    "id": "MA201",
+    "name": "Linear Algebra",
+    "faculty": "Dr. Gilbert Strang",
+    "type": "standard",
+    "color": "green"
+  },
+  {
+    "id": "MA202",
+    "name": "Probability & Statistics",
+    "faculty": "Dr. Bayes",
+    "type": "standard",
+    "color": "yellow"
+  },
+  {
+    "id": "HS101",
+    "name": "Psychology",
+    "faculty": "Dr. Carl Jung",
+    "type": "standard",
+    "color": "red"
+  },
+  {
+    "id": "HS102",
+    "name": "Economics",
+    "faculty": "Dr. Adam Smith",
+    "type": "standard",
+    "color": "blue"
+  },
+  {
+    "id": "EC201",
+    "name": "Digital Logic",
+    "faculty": "Dr. Claude Shannon",
+    "type": "standard",
+    "color": "purple"
+  },
+
+  {
+    "id": "reviewOfReviews1",
+    "name": "Feedback System Evaluation (Mid-Sem)",
+    "type": "review",
+    "color": "purple"
+  },
+  {
+    "id": "reviewOfReviews2",
+    "name": "Feedback System Evaluation (End-Sem)",
+    "type": "review",
+    "color": "purple"
+  }
+]

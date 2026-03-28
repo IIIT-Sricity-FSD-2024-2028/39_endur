@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Login | Endur</title>
+
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/pages/login.css">
+
+</head>
+
+
+<body>
+
+
+<header class="navbar">
+
+<div class="logo">
+
+<img src="assets/logos/endur-logo.svg" class="logo-img">
+
+<span>Endur</span>
+
+</div>
+
+<button id="homeBtn" class="btn-outline">
+
+Return to Home
+
+</button>
+
+</header>
+
+
+
+<section class="login-wrapper">
+
+
+<div class="login-card">
+
+
+<h1>
+
+Welcome to Endur
+
+</h1>
+
+
+<p class="login-subtext">
+
+Secure access for the academic and professional workforce.
+
+</p>
+
+
+
+<form id="loginForm">
+
+
+<label>
+
+Institutional ID
+
+</label>
+
+
+<input
+type="text"
+id="userId"
+placeholder="e.g. S12345 or F56789"
+required
+>
+
+
+
+<label>
+
+Password
+
+</label>
+
+
+<input
+type="password"
+id="password"
+placeholder="••••••••"
+required
+>
+
+
+
+<div class="remember">
+
+<input type="checkbox" id="remember">
+
+<label for="remember">
+
+Keep me logged in
+
+</label>
+
+</div>
+
+
+
+<button type="submit" class="btn-primary full-width">
+
+Sign In →
+
+</button>
+
+
+
+<p id="errorMsg" class="error-text"></p>
+
+
+</form>
+
+
+</div>
+
+
+</section>
+
+<script type="module">
+
+import { goHome } from "./js/core/router.js";
+
+document
+.getElementById("homeBtn")
+.addEventListener("click", goHome);
+
+</script>
+<script src="js/core/auth.js"></script>
+
+</body>
+
+</html>

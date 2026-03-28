@@ -1,0 +1,264 @@
+.hero-tag{
+
+font-size:12px;
+
+letter-spacing:1px;
+
+color:#2563eb;
+
+margin-bottom:16px;
+
+}
+
+
+.hero h1{
+
+font-size:56px;
+
+font-weight:800;
+
+max-width:600px;
+
+}
+
+
+.hero-subtext{
+
+margin-top:20px;
+
+max-width:500px;
+
+}
+
+
+.features h2{
+
+font-size:32px;
+
+}
+
+.logo-img{
+
+width:34px;
+
+height:34px;
+
+object-fit:contain;
+
+}
+
+/* HERO SECTION */
+
+.hero{
+
+position:relative;
+
+/* make hero large like figma */
+min-height: calc(100vh - 72px);
+
+/* vertically center text */
+display:flex;
+align-items:center;
+
+padding-left:90px;
+padding-right:40px;
+
+overflow:hidden;
+
+}
+
+
+/* VIDEO BACKGROUND */
+
+.hero-video{
+
+position:absolute;
+
+top:0;
+left:0;
+
+width:100%;
+height:100%;
+
+object-fit:cover;
+
+z-index:-2;
+
+}
+
+
+/* REMOVE visual opacity layer */
+
+.hero-overlay{
+display:none;
+}
+
+
+/* TEXT CONTAINER */
+
+.hero-content{
+
+max-width:720px;
+
+margin-top:-40px; /* slightly higher like figma */
+
+}
+
+
+/* SMALL TAG */
+
+.hero-tag{
+
+font-size:13px;
+
+letter-spacing:1.6px;
+
+font-weight:600;
+
+color:#2563eb;
+
+margin-bottom:22px;
+
+text-transform:uppercase;
+
+opacity:0.9;
+
+}
+
+
+/* MAIN HEADING */
+
+.hero h1{
+
+font-size:84px;
+
+font-weight:800;
+
+line-height:0.95;
+
+letter-spacing:-1.5px;
+
+color:#0f172a;
+
+margin-bottom:26px;
+
+}
+
+
+/* BLUE WORD */
+
+.highlight{
+
+color:#2563eb;
+
+}
+
+
+/* SUBTEXT */
+
+.hero-subtext{
+
+font-size:18px;
+
+line-height:1.7;
+
+color:#475569;
+
+max-width:540px;
+
+}
+
+
+/* LOGO */
+
+.logo-img{
+
+width:38px;
+height:38px;
+
+object-fit:contain;
+
+}
+
+
+/* FEATURE SECTION */
+
+.features{
+
+padding:110px 80px;
+
+text-align:center;
+
+}
+
+
+/* FEATURE TITLE */
+
+.features h2{
+
+font-size:42px;
+
+font-weight:800;
+
+margin-bottom:50px;
+
+}
+
+
+/* CARD ICON */
+
+.card-icon{
+
+width:42px;
+
+height:42px;
+
+margin-bottom:18px;
+
+}
+
+
+/* CARD */
+
+.card{
+
+background:white;
+
+padding:34px;
+
+border-radius:16px;
+
+border:1px solid #e2e8f0;
+
+text-align:left;
+
+transition:0.25s;
+
+}
+
+
+.card:hover{
+
+transform:translateY(-6px);
+
+box-shadow:0 14px 34px rgba(0,0,0,0.08);
+
+}
+
+.logo-img{
+width:34px;
+height:34px;
+filter: invert(1);
+}
+
+.card-grid{
+
+display:grid;
+
+grid-template-columns:repeat(4,1fr);
+
+gap:20px;
+
+margin-top:40px;
+
+}

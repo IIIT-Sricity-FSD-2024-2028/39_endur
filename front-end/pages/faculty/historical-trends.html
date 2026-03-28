@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Historical Performance Trends</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/sidebar.css">
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/stats.css">
+
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+
+<div class="dashboard-layout">
+
+
+<!-- sidebar -->
+
+<aside class="sidebar">
+
+
+<div class="sidebar-logo">
+
+<img src="../../assets/logos/endur-logo.svg">
+
+<div>
+
+<strong>Endur</strong>
+
+<p>Faculty Portal</p>
+
+</div>
+
+</div>
+
+
+
+<nav class="sidebar-menu">
+
+<a href="dashboard.html">
+
+Dashboard
+
+</a>
+
+<a class="active">
+
+Feedback Reports
+
+</a>
+
+</nav>
+
+
+
+<a href="../student/profile.html" class="sidebar-user">
+
+<div class="avatar"></div>
+
+<div>
+
+<strong id="userName"></strong>
+
+<p id="userDept"></p>
+
+</div>
+
+</a>
+
+
+</aside>
+
+
+
+
+<!-- main -->
+
+<main class="dashboard-content">
+
+
+<div class="form-header">
+
+<h2>
+
+Historical Performance Trends
+
+</h2>
+
+
+<button
+class="btn-primary"
+onclick="goBack()"
+>
+
+Back To Reports
+
+</button>
+
+
+</div>
+
+
+
+<!-- overall chart -->
+
+<div class="card">
+
+
+<p>
+
+Overall Performance Score
+
+</p>
+
+
+<h1 id="overallScore">
+
+0%
+
+</h1>
+
+
+<div id="trendLine" class="trend-line">
+
+</div>
+
+
+</div>
+
+
+
+<!-- module trends -->
+
+<div class="stats-grid">
+
+
+<div class="card mini-chart">
+
+<h3>
+
+Clarity
+
+</h3>
+
+<div class="bar-group" id="clarityBars"></div>
+
+</div>
+
+
+
+<div class="card mini-chart">
+
+<h3>
+
+Engagement
+
+</h3>
+
+<div class="bar-group" id="engagementBars"></div>
+
+</div>
+
+
+
+<div class="card mini-chart">
+
+<h3>
+
+Assessment
+
+</h3>
+
+<div class="bar-group" id="assessmentBars"></div>
+
+</div>
+
+
+</div>
+
+
+</main>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+
+<script type="module">
+
+import {
+renderHistoricalTrends
+}
+from "../../js/features/historical-trends.js";
+
+
+requireAuth();
+
+
+renderHistoricalTrends();
+
+
+window.goBack=function(){
+
+window.location.href="reports.html";
+
+};
+
+</script>
+
+
+</body>
+
+</html>

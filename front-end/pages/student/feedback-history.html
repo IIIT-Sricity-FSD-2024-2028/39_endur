@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Feedback History</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+
+    <!-- page -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+
+    <div class="dashboard-layout">
+
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+
+            <div class="sidebar-logo">
+
+                <img src="../../assets/logos/endur-logo.svg">
+
+                <div>
+
+                    <strong>Endur</strong>
+
+                    <p>Student Portal</p>
+
+                </div>
+
+            </div>
+
+
+
+            <nav class="sidebar-menu">
+
+                <a href="dashboard.html">
+                    Dashboard
+                </a>
+
+                <a href="courses.html">
+                    My Courses
+                </a>
+
+                <a href="pending-feedback.html">
+                    Pending Feedbacks
+                </a>
+
+                <a class="active">
+                    History
+                </a>
+
+            </nav>
+
+
+
+            <a href="profile.html" class="sidebar-user">
+
+                <div class="avatar"></div>
+
+                <div>
+
+                    <strong id="userName"></strong>
+
+                    <p id="userDept"></p>
+
+                </div>
+
+            </a>
+
+
+        </aside>
+
+
+
+
+        <!-- MAIN -->
+
+        <main class="dashboard-content">
+
+
+            <h1>
+
+                Feedback History
+
+            </h1>
+
+
+            <input class="search-bar" placeholder="Search course..." id="searchInput">
+
+
+
+            <table class="data-table">
+
+
+                <thead>
+
+                    <tr>
+
+                        <th>Course</th>
+
+                        <th>Submission Date</th>
+
+                        <th>Type</th>
+
+                        <th>Status</th>
+
+                    </tr>
+
+                </thead>
+
+
+
+                <tbody id="historyTable">
+
+                </tbody>
+
+
+            </table>
+
+
+
+            <div id="emptyHistory" class="empty-state" style="display:none">
+
+                <p>No feedback submitted yet</p>
+
+                <p>Your completed feedback will appear here.</p>
+
+            </div>
+
+
+
+            <div class="info-box">
+
+                <strong>
+
+                    Privacy & Anonymity Note
+
+                </strong>
+
+                <p>
+
+                    All feedback submissions are anonymized before being shared with faculty.
+                    Once submitted, responses cannot be modified.
+
+                </p>
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        const user = requireAuth();
+
+        document.getElementById("userName").innerText =
+            user.name;
+
+        document.getElementById("userDept").innerText =
+            user.department;
+
+
+
+        async function loadHistory() {
+
+            const res =
+                await fetch("../../js/mock-data/courses.json");
+
+            const courses =
+                await res.json();
+
+
+            const submitted =
+                JSON.parse(
+                    localStorage.getItem("submittedFeedback")
+                ) || [];
+
+
+            const table =
+                document.getElementById("historyTable");
+
+
+            table.innerHTML = "";
+
+
+            /* filter by logged-in user */
+
+            const userSubmissions =
+                submitted.filter(
+                    f => f.userId === user.id
+                );
+
+
+            userSubmissions.forEach(item => {
+
+
+                const course =
+                    courses.find(
+                        c => c.id === item.course
+                    );
+
+
+                const row =
+                    document.createElement("tr");
+
+
+                row.innerHTML = `
+
+<td>
+
+<strong>
+
+${course?.name || item.course}
+
+</strong>
+
+<br>
+
+<span class="sub-text">
+
+${course?.faculty || ""}
+
+</span>
+
+</td>
+
+
+<td>
+
+${new Date(item.date)
+                        .toLocaleDateString()}
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+${course?.type === "review"
+                        ? "Review"
+                        : "Standard"}
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge progress">
+
+Processed
+
+</span>
+
+</td>
+
+`;
+
+
+                table.appendChild(row);
+
+            });
+
+
+            /* empty state */
+
+            if (userSubmissions.length === 0) {
+
+                document
+                    .getElementById("emptyHistory")
+                    .style.display = "block";
+
+            }
+
+        }
+
+
+        loadHistory();
+
+
+
+        /* search filter */
+
+        document
+            .getElementById("searchInput")
+            .addEventListener("input", function () {
+
+                const value =
+                    this.value.toLowerCase();
+
+
+                document
+                    .querySelectorAll("#historyTable tr")
+                    .forEach(row => {
+
+                        row.style.display =
+                            row.innerText
+                                .toLowerCase()
+                                .includes(value)
+                                ? ""
+                                : "none";
+
+                    });
+
+            });
+
+    </script>
+
+
+</body>
+
+</html>

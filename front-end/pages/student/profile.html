@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Profile</title>
+
+    <link rel="stylesheet" href="../../css/base.css">
+
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+
+    <link rel="stylesheet" href="../../css/components/profile.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+
+    <!-- page hub -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+</head>
+
+
+<body>
+
+    <div class="dashboard-layout">
+
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+            <div class="sidebar-logo">
+
+                <img src="../../assets/logos/endur-logo.svg">
+
+                <div>
+
+                    <strong>Endur</strong>
+                    <p>Student Portal</p>
+
+                </div>
+
+            </div>
+
+
+            <nav class="sidebar-menu">
+
+                <a href="dashboard.html">
+                    Dashboard
+                </a>
+
+                <a href="courses.html">
+                    My Courses
+                </a>
+
+                <a href="pending-feedback.html">
+                    Pending Feedbacks
+                </a>
+
+                <a href="feedback-history.html">
+                    History
+                </a>
+
+
+            </nav>
+
+
+            <a href="profile.html" class="sidebar-user">
+
+                <div class="avatar"></div>
+
+                <div>
+
+                    <strong id="userName"></strong>
+
+                    <p id="userDept"></p>
+
+                </div>
+
+            </a>
+
+        </aside>
+
+
+
+
+        <!-- MAIN -->
+
+        <main class="dashboard-content">
+
+
+            <h1>
+
+                Profile & Settings
+
+            </h1>
+
+
+            <p class="subtitle">
+
+                Manage your personal information and portal preferences.
+
+            </p>
+
+
+
+            <!-- PERSONAL INFO -->
+
+            <div class="profile-card">
+
+                <h3>
+
+                    Personal Information
+
+                </h3>
+
+
+                <div class="profile-grid">
+
+
+                    <div>
+
+                        <label>Full Name</label>
+
+                        <p id="profileName"></p>
+
+                    </div>
+
+
+                    <div>
+
+                        <label>Student ID</label>
+
+                        <p id="profileId"></p>
+
+                    </div>
+
+
+                    <div>
+
+                        <label>Email Address</label>
+
+                        <p id="profileEmail"></p>
+
+                    </div>
+
+
+                    <div>
+
+                        <label>Department</label>
+
+                        <p id="profileDept"></p>
+
+                    </div>
+
+
+                </div>
+
+            </div>
+
+
+
+
+            <!-- NOTIFICATION SETTINGS -->
+
+            <div class="profile-card">
+
+                <h3>
+
+                    Notification Preferences
+
+                </h3>
+
+
+                <div class="toggle-row">
+
+                    <span>Email Notifications</span>
+
+                    <input type="checkbox" checked>
+
+                </div>
+
+
+                <div class="toggle-row">
+
+                    <span>Push Notifications</span>
+
+                    <input type="checkbox" checked>
+
+                </div>
+
+
+            </div>
+
+
+
+
+            <!-- ACCOUNT -->
+
+            <div class="profile-card">
+
+                <h3>
+
+                    Account Settings
+
+                </h3>
+
+
+                <div class="logout-row">
+
+
+                    <div>
+
+                        <strong>Log Out</strong>
+
+                        <p>
+
+                            Will log you out of the current session.
+
+                        </p>
+
+                    </div>
+
+
+                    <button class="btn-danger" onclick="logout()">
+
+                        Log Out
+
+                    </button>
+
+
+                </div>
+
+
+            </div>
+
+
+        </main>
+
+
+    </div>
+
+
+
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        const user = requireAuth();
+
+
+        document.getElementById("userName").innerText =
+            user.name;
+
+        document.getElementById("userDept").innerText =
+            user.department;
+
+
+        /* profile info */
+
+        document.getElementById("profileName").innerText =
+            user.name;
+
+        document.getElementById("profileId").innerText =
+            user.id;
+
+
+        /* simple generated email */
+
+        document.getElementById("profileEmail").innerText =
+            user.id.toLowerCase() + "@endur.edu";
+
+
+        document.getElementById("profileDept").innerText =
+            user.department;
+
+
+
+        function logout() {
+
+            localStorage.removeItem("endurSession");
+
+            window.location.href = "../../login.html";
+
+        }
+
+    </script>
+
+
+</body>
+
+</html>

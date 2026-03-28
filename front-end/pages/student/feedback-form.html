@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Course Feedback</title>
+    <link rel="stylesheet" href="../../css/base.css">
+
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+    <link rel="stylesheet" href="../../css/components/rating.css">
+
+    <link rel="stylesheet" href="../../css/components/success.css">
+
+
+    <!-- page -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
+
+</head>
+
+
+<body>
+
+
+    <div class="form-layout">
+
+
+        <!-- HEADER -->
+
+        <div class="form-header">
+
+            <h2>
+
+                Course Feedback
+
+            </h2>
+
+
+            <button onclick="goBack()" class="close-btn">
+
+                ✕
+
+            </button>
+
+        </div>
+
+
+
+
+        <!-- ANONYMITY NOTE -->
+
+        <div class="info-box">
+
+            <strong>
+
+                Anonymity Guaranteed
+
+            </strong>
+
+            <p>
+
+                Your responses are encrypted and identity is hidden from instructors.
+
+            </p>
+
+        </div>
+
+
+
+
+        <h1 id="courseTitle">
+
+            CS101: Subject A
+
+        </h1>
+
+
+        <p class="subtitle">
+
+            End of Semester Feedback Form • Fall 2038
+
+        </p>
+
+
+
+
+        <!-- QUESTIONS -->
+
+        <div class="feedback-grid">
+
+
+            <div class="question-card">
+
+                <h3>Clarity of Explanation</h3>
+
+                <p>
+
+                    How clearly concepts were explained?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('clarity',1)">★</span>
+                    <span onclick="setRating('clarity',2)">★</span>
+                    <span onclick="setRating('clarity',3)">★</span>
+                    <span onclick="setRating('clarity',4)">★</span>
+                    <span onclick="setRating('clarity',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="question-card">
+
+                <h3>Course Structure</h3>
+
+                <p>
+
+                    Was the course well organized?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('structure',1)">★</span>
+                    <span onclick="setRating('structure',2)">★</span>
+                    <span onclick="setRating('structure',3)">★</span>
+                    <span onclick="setRating('structure',4)">★</span>
+                    <span onclick="setRating('structure',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="question-card">
+
+                <h3>Engagement</h3>
+
+                <p>
+
+                    Did instructor encourage participation?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('engagement',1)">★</span>
+                    <span onclick="setRating('engagement',2)">★</span>
+                    <span onclick="setRating('engagement',3)">★</span>
+                    <span onclick="setRating('engagement',4)">★</span>
+                    <span onclick="setRating('engagement',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="question-card">
+
+                <h3>Difficulty Balance</h3>
+
+                <p>
+
+                    Was workload appropriate?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('difficulty',1)">★</span>
+                    <span onclick="setRating('difficulty',2)">★</span>
+                    <span onclick="setRating('difficulty',3)">★</span>
+                    <span onclick="setRating('difficulty',4)">★</span>
+                    <span onclick="setRating('difficulty',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+
+        <!-- COMMENTS -->
+
+        <div class="profile-card">
+
+
+            <h3>
+
+                Additional Comments
+
+            </h3>
+
+
+            <textarea id="commentBox"
+                placeholder="Any other thoughts on the course, instructor, or content..."></textarea>
+
+
+        </div>
+
+
+
+
+        <button class="btn-primary submit-btn" onclick="submitFeedback()">
+
+            Submit Feedback
+
+        </button>
+
+
+
+    </div>
+    <script src="../../js/core/session.js"></script>
+
+    <script>
+
+        requireAuth();
+
+
+        async function loadCourseTitle() {
+
+            const courseId =
+                localStorage.getItem("activeCourse");
+
+
+            const response =
+                await fetch("../../js/mock-data/courses.json");
+
+
+            const courses =
+                await response.json();
+
+
+            const course =
+                courses.find(c => c.id === courseId);
+
+
+            if (!course) return;
+
+
+            document.getElementById("courseTitle").innerText =
+                course.id + ": " + course.name;
+
+        }
+
+
+        loadCourseTitle();
+
+    </script>
+
+
+    <script src="../../js/features/feedback-form.js"></script>
+
+
+</body>
+
+</html>
