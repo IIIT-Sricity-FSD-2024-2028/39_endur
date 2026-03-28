@@ -1,153 +1,315 @@
 import { get } from "../core/storage.js";
 
-const submitted =
-get("submittedFeedback") || [];
 
-const draft =
-get("feedbackDraft") || {};
+/* =========================
+HELPERS
+========================= */
 
+function getUser() {
 
-/* status logic */
-
-function getStatus(course){
-
-if(course==="reviewOfReviews"){
-
-const stored =
-get("reviewOfReviews") || [];
-
-return stored.length>0
-? "completed"
-: "pending";
-
-}
-
-
-const user =
-JSON.parse(
-localStorage.getItem("endurSession")
-);
-
-
-/* completed */
-
-if(
-submitted.find(
-f =>
-f.course===course &&
-f.userId===user.id
-)
-){
-
-return "completed";
-
-}
-
-
-/* in progress */
-
-if(
-draft[user.id] &&
-draft[user.id][course]
-){
-
-return "progress";
-
-}
-
-
-return "pending";
+    return JSON.parse(
+        localStorage.getItem("endurSession")
+    );
 
 }
 
 
 
-/* render */
+/* =========================
+STATUS LOGIC
+========================= */
 
-export function updateDashboard(){
+function getStatus(course) {
 
-const rows =
-document.querySelectorAll("[data-course]");
+    const submitted =
+        get("submittedFeedback") || [];
 
+    const drafts =
+        get("feedbackDraft") || {};
 
-if(rows.length===0){
-
-document
-.getElementById("emptyDashboard")
-.style.display="block";
-
-return;
-
-}
+    const user = getUser();
 
 
-rows.forEach(row=>{
+    /* reviewOfReviews special case */
 
-const course =
-row.dataset.course;
+    if (course === "reviewOfReviews") {
 
+        const stored =
+            get("reviewOfReviews") || [];
 
-const status =
-getStatus(course);
+        return stored.find(
+            r => r.userId === user.id
+        )
+            ? "completed"
+            : "pending";
 
-
-const badge =
-row.querySelector(".badge");
-
-
-const action =
-row.querySelector(".action-link");
+    }
 
 
-if(status==="completed"){
+    /* completed */
 
-badge.innerText="Completed";
+    if (
+        submitted.find(
+            f =>
+                f.course === course &&
+                f.userId === user.id
+        )
+    ) {
 
-badge.className="badge complete";
+        return "completed";
 
-
-action.innerText="View";
-
-
-action.onclick =
-() =>
-window.location.href =
-"feedback-history.html";
-
-}
+    }
 
 
-else if(status==="progress"){
+    /* progress */
 
-badge.innerText="In Progress";
+    if (
+        drafts[user.id] &&
+        drafts[user.id][course]
+    ) {
 
-badge.className="badge progress";
+        return "progress";
+
+    }
 
 
-action.innerText="Resume";
-
-
-action.onclick =
-() => openFeedback(course);
+    return "pending";
 
 }
 
 
-else{
 
-badge.innerText="Pending";
+/* =========================
+TABLE RENDER
+========================= */
 
-badge.className="badge pending";
+export async function updateDashboard() {
+
+    const res =
+        await fetch("../../js/mock-data/courses.json");
+
+    const courses =
+        await res.json();
 
 
-action.innerText="Start";
+    const table =
+        document.getElementById("dashboardTable");
 
 
-action.onclick =
-() => openFeedback(course);
+    table.innerHTML = "";
+
+
+    courses.forEach(course => {
+
+
+        const status =
+            getStatus(course.id);
+
+
+        const row =
+            document.createElement("tr");
+
+
+        row.innerHTML = `
+
+<td>
+
+${course.name}
+
+</td>
+
+
+<td>
+
+<span class="badge ${status}">
+
+${status}
+
+</span>
+
+</td>
+
+
+<td>
+
+<a class="action-link">
+
+${status === "completed"
+                ? "View"
+                : status === "progress"
+                    ? "Resume"
+                    : "Start"}
+
+</a>
+
+</td>
+
+`;
+
+
+        /* action behaviour */
+
+        const action =
+            row.querySelector(".action-link");
+
+
+        action.onclick = () => {
+
+            localStorage.setItem(
+                "activeCourse",
+                course.id
+            );
+
+
+            if (status === "completed") {
+
+                window.location.href =
+                    "feedback-history.html";
+
+                return;
+
+            }
+
+
+            if (course.type === "review") {
+
+                window.location.href =
+                    "review-of-reviews.html";
+
+                return;
+
+            }
+
+
+            window.location.href =
+                "feedback-form.html";
+
+        };
+
+
+        table.appendChild(row);
+
+    });
+
+
+    if (courses.length === 0) {
+
+        document
+            .getElementById("emptyDashboard")
+            .style.display = "block";
+
+    }
 
 }
 
-});
+
+
+/* =========================
+STATS
+========================= */
+
+export async function updateStats() {
+
+    const res =
+        await fetch("../../js/mock-data/courses.json");
+
+    const courses =
+        await res.json();
+
+
+    const submitted =
+        get("submittedFeedback") || [];
+
+    const drafts =
+        get("feedbackDraft") || {};
+
+    const review =
+        get("reviewOfReviews") || [];
+
+
+    const user = getUser();
+
+
+    let completed = 0;
+    let progress = 0;
+    let pending = 0;
+
+
+    courses.forEach(course => {
+
+
+        /* reviewOfReviews */
+
+        if (course.id === "reviewOfReviews") {
+
+            const done =
+                review.find(
+                    r => r.userId === user.id
+                );
+
+            if (done) {
+
+                completed++;
+
+                return;
+
+            }
+
+            pending++;
+
+            return;
+
+        }
+
+
+        /* completed */
+
+        if (
+            submitted.find(
+                f =>
+                    f.course === course.id &&
+                    f.userId === user.id
+            )
+        ) {
+
+            completed++;
+
+            return;
+
+        }
+
+
+        /* progress */
+
+        if (
+            drafts[user.id] &&
+            drafts[user.id][course.id]
+        ) {
+
+            progress++;
+
+            return;
+
+        }
+
+
+        /* pending */
+
+        pending++;
+
+    });
+
+
+    document.getElementById("statCompleted").innerText =
+        completed;
+
+    document.getElementById("statProgress").innerText =
+        progress;
+
+    document.getElementById("statPending").innerText =
+        pending;
+
+    document.getElementById("statTotal").innerText =
+        courses.length;
 
 }

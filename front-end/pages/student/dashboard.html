@@ -9,30 +9,20 @@
     <title>Student Dashboard</title>
 
     <link rel="stylesheet" href="../../css/base.css">
-
     <link rel="stylesheet" href="../../css/layout.css">
-
     <link rel="stylesheet" href="../../css/utilities.css">
-
     <link rel="stylesheet" href="../../css/forms.css">
-
 
     <!-- components -->
 
     <link rel="stylesheet" href="../../css/components/button.css">
-
     <link rel="stylesheet" href="../../css/components/card.css">
-
     <link rel="stylesheet" href="../../css/components/sidebar.css">
-
     <link rel="stylesheet" href="../../css/components/table.css">
-
     <link rel="stylesheet" href="../../css/components/badge.css">
-
     <link rel="stylesheet" href="../../css/components/stats.css">
 
-
-    <!-- page hub -->
+    <!-- page -->
 
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
@@ -41,14 +31,12 @@
 
 <body>
 
-
     <div class="dashboard-layout">
 
 
         <!-- SIDEBAR -->
 
         <aside class="sidebar">
-
 
             <div class="sidebar-logo">
 
@@ -57,7 +45,6 @@
                 <div>
 
                     <strong>Endur</strong>
-
                     <p>Student Portal</p>
 
                 </div>
@@ -95,22 +82,21 @@
                 <div>
 
                     <strong id="userName"></strong>
-
                     <p id="userDept"></p>
 
                 </div>
 
             </a>
 
-
         </aside>
 
 
 
 
-        <!-- MAIN CONTENT -->
+        <!-- MAIN -->
 
         <main class="dashboard-content">
+
 
             <h1 id="welcomeText"></h1>
 
@@ -126,48 +112,29 @@
 
             <div class="stats-grid">
 
-
                 <div class="stat-card">
-
-                    <p>Feedbacks Completed</p>
-
-                    <h2>1</h2>
-
+                    <p>Completed</p>
+                    <h2 id="statCompleted">0</h2>
                 </div>
 
-
                 <div class="stat-card">
-
-                    <p>Active Cycles</p>
-
-                    <h2>2</h2>
-
+                    <p>In Progress</p>
+                    <h2 id="statProgress">0</h2>
                 </div>
 
-
                 <div class="stat-card">
-
-                    <p>Pending Feedbacks</p>
-
-                    <h2>2</h2>
-
+                    <p>Pending</p>
+                    <h2 id="statPending">0</h2>
                 </div>
 
-
                 <div class="stat-card">
-
-                    <p>Courses Evaluated</p>
-
-                    <h2>4</h2>
-
+                    <p>Total Cycles</p>
+                    <h2 id="statTotal">0</h2>
                 </div>
-
 
             </div>
 
 
-
-            <!-- TABLE -->
 
             <h2 class="section-title">
 
@@ -179,17 +146,12 @@
 
             <table class="data-table">
 
-
                 <thead>
 
                     <tr>
 
-                        <th>Course Name</th>
-
+                        <th>Course</th>
                         <th>Status</th>
-
-                        <th>Due Date</th>
-
                         <th>Action</th>
 
                     </tr>
@@ -197,98 +159,19 @@
                 </thead>
 
 
-
-                <tbody>
-
-                    <tr data-course="CS101">
-
-                        <td>Subject A</td>
-
-                        <td>
-                            <span class="badge"></span>
-                        </td>
-
-                        <td>Oct 25, 2023</td>
-
-                        <td>
-                            <a class="action-link"></a>
-                        </td>
-
-                    </tr>
-
-
-                    <tr data-course="CS102">
-
-                        <td>Subject B</td>
-
-                        <td>
-                            <span class="badge"></span>
-                        </td>
-
-                        <td>Oct 20, 2023</td>
-
-                        <td>
-                            <a class="action-link"></a>
-                        </td>
-
-                    </tr>
-
-
-
-                    <tr data-course="CS103">
-
-                        <td>Subject B</td>
-
-                        <td>
-                            <span class="badge"></span>
-                        </td>
-
-                        <td>Oct 28, 2023</td>
-
-                        <td>
-                            <a class="action-link"></a>
-                        </td>
-
-                    </tr>
-
-
-                    <tr data-course="CS104">
-
-                        <td>Subject D</td>
-
-                        <td>
-                            <span class="badge"></span>
-                        </td>
-
-                        <td>Oct 20, 2023</td>
-
-                        <td>
-                            <a class="action-link"></a>
-                        </td>
-
-                    </tr>
-
-                    <tr data-course="reviewOfReviews">
-
-                        <td>Feedback System Review</td>
-
-                        <td>
-                            <span class="badge"></span>
-                        </td>
-
-                        <td>Nov 10, 2026</td>
-
-                        <td>
-                            <a class="action-link"></a>
-                        </td>
-
-                    </tr>
-
+                <tbody id="dashboardTable">
 
                 </tbody>
 
-
             </table>
+
+
+
+            <div id="emptyDashboard" class="empty-state" style="display:none">
+
+                <p>No feedback cycles assigned 🎉</p>
+
+            </div>
 
 
         </main>
@@ -296,11 +179,7 @@
 
     </div>
 
-    <div id="emptyDashboard" class="empty-state" style="display:none">
 
-        <p>No pending feedback cycles 🎉</p>
-
-    </div>
 
     <script src="../../js/core/session.js"></script>
 
@@ -308,18 +187,20 @@
 
         const user = requireAuth();
 
-        /* dynamic text */
 
         document.getElementById("welcomeText").innerText =
             `Welcome back, ${user.name.split(" ")[0]}`;
 
+
         document.getElementById("userName").innerText =
             user.name;
+
 
         document.getElementById("userDept").innerText =
             user.department;
 
 
+        /* navigation */
 
         function openFeedback(courseId) {
 
@@ -327,6 +208,7 @@
                 "activeCourse",
                 courseId
             );
+
 
             if (courseId === "reviewOfReviews") {
 
@@ -337,34 +219,30 @@
 
             }
 
+
             window.location.href =
                 "feedback-form.html";
 
         }
 
-
-        function openReviewOfReviews() {
-
-            localStorage.setItem(
-                "activeCourse",
-                "reviewOfReviews"
-            );
-
-            window.location.href =
-                "review-of-reviews.html";
-
-        }
-
-
     </script>
+
+
+
     <script type="module">
 
-        import { updateDashboard }
+        import {
+            updateDashboard,
+            updateStats
+        }
             from "../../js/features/dashboard.js";
 
+
         updateDashboard();
+        updateStats();
 
     </script>
+
 
 </body>
 

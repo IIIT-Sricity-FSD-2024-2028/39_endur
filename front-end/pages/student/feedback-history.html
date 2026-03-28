@@ -8,36 +8,27 @@
     <title>Feedback History</title>
 
     <link rel="stylesheet" href="../../css/base.css">
-
     <link rel="stylesheet" href="../../css/layout.css">
-
     <link rel="stylesheet" href="../../css/utilities.css">
-
     <link rel="stylesheet" href="../../css/forms.css">
-
 
     <!-- components -->
 
     <link rel="stylesheet" href="../../css/components/button.css">
-
     <link rel="stylesheet" href="../../css/components/card.css">
-
     <link rel="stylesheet" href="../../css/components/sidebar.css">
-
+    <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/components/table.css">
 
-    <link rel="stylesheet" href="../../css/components/badge.css">
-
-    <link rel="stylesheet" href="../../css/components/form.css">
-
-
-    <!-- page hub -->
+    <!-- page -->
 
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
 </head>
 
 
 <body>
+
 
     <div class="dashboard-layout">
 
@@ -66,27 +57,19 @@
             <nav class="sidebar-menu">
 
                 <a href="dashboard.html">
-
                     Dashboard
-
                 </a>
 
                 <a href="courses.html">
-
                     My Courses
-
                 </a>
 
                 <a href="pending-feedback.html">
-
                     Pending Feedbacks
-
                 </a>
 
                 <a class="active">
-
                     History
-
                 </a>
 
             </nav>
@@ -125,8 +108,7 @@
             </h1>
 
 
-
-            <input class="search-bar" placeholder="Search course or cycle...">
+            <input class="search-bar" placeholder="Search course..." id="searchInput">
 
 
 
@@ -137,11 +119,11 @@
 
                     <tr>
 
-                        <th>Course Name</th>
+                        <th>Course</th>
 
                         <th>Submission Date</th>
 
-                        <th>Cycle Type</th>
+                        <th>Type</th>
 
                         <th>Status</th>
 
@@ -151,262 +133,7 @@
 
 
 
-                <tbody>
-
-
-                    <tr>
-
-                        <td>
-
-                            <strong>Subject A</strong>
-
-                            <br>
-
-                            <span class="sub-text">
-
-                                MATH-402 • Dr. Tesla Stein
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            Oct 12, 2024
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge neutral">
-
-                                Standard
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge progress">
-
-                                Processed
-
-                            </span>
-
-                        </td>
-
-
-                    </tr>
-
-
-
-
-                    <tr>
-
-                        <td>
-
-                            <strong>Subject B</strong>
-
-                            <br>
-
-                            <span class="sub-text">
-
-                                PHYS-305 • Dr. Marshall Speaker
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            Nov 05, 2025
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge neutral">
-
-                                Pulse Check
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge progress">
-
-                                Processed
-
-                            </span>
-
-                        </td>
-
-
-                    </tr>
-
-
-
-
-                    <tr>
-
-                        <td>
-
-                            <strong>Subject C</strong>
-
-                            <br>
-
-                            <span class="sub-text">
-
-                                CS-201 • Mr. Realtor
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            Dec 15, 2026
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge neutral">
-
-                                Review Of Reviews
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge progress">
-
-                                Processed
-
-                            </span>
-
-                        </td>
-
-
-                    </tr>
-
-
-
-
-                    <tr>
-
-                        <td>
-
-                            <strong>Subject D</strong>
-
-                            <br>
-
-                            <span class="sub-text">
-
-                                PHIL-110 • Dr. Party
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            Jan 20, 2021
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge neutral">
-
-                                Standard
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge progress">
-
-                                Processed
-
-                            </span>
-
-                        </td>
-
-
-                    </tr>
-
-
-
-
-                    <tr>
-
-                        <td>
-
-                            <strong>Subject E</strong>
-
-                            <br>
-
-                            <span class="sub-text">
-
-                                CS-350 • Prof. Steve Jobs
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            Mar 10, 2025
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge neutral">
-
-                                Pulse Check
-
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="badge pending">
-
-                                Pending Audit
-
-                            </span>
-
-                        </td>
-
-
-                    </tr>
-
-
+                <tbody id="historyTable">
 
                 </tbody>
 
@@ -415,9 +142,17 @@
 
 
 
+            <div id="emptyHistory" class="empty-state" style="display:none">
+
+                <p>No feedback submitted yet</p>
+
+                <p>Your completed feedback will appear here.</p>
+
+            </div>
+
+
 
             <div class="info-box">
-
 
                 <strong>
 
@@ -425,14 +160,12 @@
 
                 </strong>
 
-
                 <p>
 
                     All feedback submissions are anonymized before being shared with faculty.
-                    Once a cycle is processed, it is archived and cannot be modified.
+                    Once submitted, responses cannot be modified.
 
                 </p>
-
 
             </div>
 
@@ -455,6 +188,153 @@
 
         document.getElementById("userDept").innerText =
             user.department;
+
+
+
+        async function loadHistory() {
+
+            const res =
+                await fetch("../../js/mock-data/courses.json");
+
+            const courses =
+                await res.json();
+
+
+            const submitted =
+                JSON.parse(
+                    localStorage.getItem("submittedFeedback")
+                ) || [];
+
+
+            const table =
+                document.getElementById("historyTable");
+
+
+            table.innerHTML = "";
+
+
+            /* filter by logged-in user */
+
+            const userSubmissions =
+                submitted.filter(
+                    f => f.userId === user.id
+                );
+
+
+            userSubmissions.forEach(item => {
+
+
+                const course =
+                    courses.find(
+                        c => c.id === item.course
+                    );
+
+
+                const row =
+                    document.createElement("tr");
+
+
+                row.innerHTML = `
+
+<td>
+
+<strong>
+
+${course?.name || item.course}
+
+</strong>
+
+<br>
+
+<span class="sub-text">
+
+${course?.faculty || ""}
+
+</span>
+
+</td>
+
+
+<td>
+
+${new Date(item.date)
+                        .toLocaleDateString()}
+
+</td>
+
+
+<td>
+
+<span class="badge neutral">
+
+${course?.type === "review"
+                        ? "Review"
+                        : "Standard"}
+
+</span>
+
+</td>
+
+
+<td>
+
+<span class="badge progress">
+
+Processed
+
+</span>
+
+</td>
+
+`;
+
+
+                table.appendChild(row);
+
+            });
+
+
+            /* empty state */
+
+            if (userSubmissions.length === 0) {
+
+                document
+                    .getElementById("emptyHistory")
+                    .style.display = "block";
+
+            }
+
+        }
+
+
+        loadHistory();
+
+
+
+        /* search filter */
+
+        document
+            .getElementById("searchInput")
+            .addEventListener("input", function () {
+
+                const value =
+                    this.value.toLowerCase();
+
+
+                document
+                    .querySelectorAll("#historyTable tr")
+                    .forEach(row => {
+
+                        row.style.display =
+                            row.innerText
+                                .toLowerCase()
+                                .includes(value)
+                                ? ""
+                                : "none";
+
+                    });
+
+            });
 
     </script>
 
