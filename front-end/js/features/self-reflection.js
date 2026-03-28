@@ -223,12 +223,6 @@ drafts
 );
 
 
-alert(
-"Self reflection submitted"
-);
 
-
-window.location.href=
-"dashboard.html";
-
+window.location.href="gap-analysis.html";
 };
