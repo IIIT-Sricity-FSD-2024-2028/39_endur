@@ -12,32 +12,32 @@ STAR CLICK
 ========================= */
 
 window.setRating =
-function(field,value){
+   function (field, value) {
 
-ratings[field]=value;
-
-
-/* highlight stars */
-
-const stars =
-document.querySelectorAll(
-`[onclick*="${field}"]`
-);
+      ratings[field] = value;
 
 
-stars.forEach((star,index)=>{
+      /* highlight stars */
 
-star.classList.toggle(
-"active",
-index<value
-);
-
-});
+      const stars =
+         document.querySelectorAll(
+            `[onclick*="${field}"]`
+         );
 
 
-saveDraft();
+      stars.forEach((star, index) => {
 
-};
+         star.classList.toggle(
+            "active",
+            index < value
+         );
+
+      });
+
+
+      saveDraft();
+
+   };
 
 
 
@@ -45,38 +45,47 @@ saveDraft();
 SAVE DRAFT
 ========================= */
 
-function saveDraft(){
+function saveDraft() {
 
-const course =
-localStorage.getItem("activeCourse");
-
-
-let drafts =
-JSON.parse(
-localStorage.getItem("feedbackDraft")
-) || {};
+   const course =
+      localStorage.getItem("activeCourse");
 
 
-const user =
-JSON.parse(
-localStorage.getItem("endurSession")
-);
+   let drafts =
+      JSON.parse(
+         localStorage.getItem("feedbackDraft")
+      ) || {};
 
 
-if(!drafts[user.id]){
-
-drafts[user.id]={};
-
-}
-
-
-drafts[user.id][course]=ratings;
+   const user =
+      JSON.parse(
+         localStorage.getItem("endurSession")
+      );
 
 
-localStorage.setItem(
-"feedbackDraft",
-JSON.stringify(drafts)
-);
+   if (!drafts[user.id]) {
+
+      drafts[user.id] = {};
+
+   }
+
+
+   drafts[user.id][course] = {
+
+      ratings,
+
+      comment:
+         document.getElementById(
+            "commentBox"
+         ).value
+
+   };
+
+
+   localStorage.setItem(
+      "feedbackDraft",
+      JSON.stringify(drafts)
+   );
 
 }
 
@@ -86,57 +95,67 @@ JSON.stringify(drafts)
 LOAD DRAFT
 ========================= */
 
-function loadDraft(){
+function loadDraft() {
 
-const course =
-localStorage.getItem("activeCourse");
-
-
-let drafts =
-JSON.parse(
-localStorage.getItem("feedbackDraft")
-) || {};
+   const course =
+      localStorage.getItem("activeCourse");
 
 
-const user =
-JSON.parse(
-localStorage.getItem("endurSession")
-);
+   let drafts =
+      JSON.parse(
+         localStorage.getItem("feedbackDraft")
+      ) || {};
 
 
-if(
-!drafts[user.id] ||
-!drafts[user.id][course]
-) return;
+   const user =
+      JSON.parse(
+         localStorage.getItem("endurSession")
+      );
 
 
-Object.assign(
-ratings,
-drafts[user.id][course]
-);
+   if (
+      !drafts[user.id] ||
+      !drafts[user.id][course]
+   ) return;
 
 
-/* highlight stars */
+   const saved =
+      drafts[user.id][course];
 
-Object.entries(ratings)
-.forEach(([field,value])=>{
+   Object.assign(
+      ratings,
+      saved.ratings || {}
+   );
 
-const stars =
-document.querySelectorAll(
-`[onclick*="${field}"]`
-);
+   /* restore comment */
+
+   document.getElementById(
+      "commentBox"
+   ).value =
+      saved.comment || "";
 
 
-stars.forEach((star,index)=>{
+   /* highlight stars */
 
-star.classList.toggle(
-"active",
-index<value
-);
+   Object.entries(ratings)
+      .forEach(([field, value]) => {
 
-});
+         const stars =
+            document.querySelectorAll(
+               `[onclick*="${field}"]`
+            );
 
-});
+
+         stars.forEach((star, index) => {
+
+            star.classList.toggle(
+               "active",
+               index < value
+            );
+
+         });
+
+      });
 
 }
 
@@ -150,85 +169,90 @@ SUBMIT
 ========================= */
 
 window.submitFeedback =
-function(){
+   function () {
 
-if(
-Object.keys(ratings).length<4
-){
+      if (
+         Object.keys(ratings).length < 4
+      ) {
 
-alert(
-"Please answer all questions before submitting."
-);
+         alert(
+            "Please answer all questions before submitting."
+         );
 
-return;
+         return;
 
-}
-
-
-const course =
-localStorage.getItem("activeCourse");
+      }
 
 
-let submitted =
-JSON.parse(
-localStorage.getItem("submittedFeedback")
-) || [];
+      const course =
+         localStorage.getItem("activeCourse");
 
 
-const user =
-JSON.parse(
-localStorage.getItem("endurSession")
-);
+      let submitted =
+         JSON.parse(
+            localStorage.getItem("submittedFeedback")
+         ) || [];
 
 
-submitted.push({
-
-userId:user.id,
-
-course,
-
-ratings,
-
-date:new Date().toISOString(),
-
-status:"processed"
-
-});
+      const user =
+         JSON.parse(
+            localStorage.getItem("endurSession")
+         );
 
 
-localStorage.setItem(
-"submittedFeedback",
-JSON.stringify(submitted)
-);
+      submitted.push({
+
+         userId: user.id,
+
+         course,
+
+         ratings,
+
+         comment:
+            document.getElementById(
+               "commentBox"
+            ).value,
+
+         date: new Date().toISOString(),
+
+         status: "processed"
+
+      });
 
 
-/* remove draft */
-
-let drafts =
-JSON.parse(
-localStorage.getItem("feedbackDraft")
-) || {};
+      localStorage.setItem(
+         "submittedFeedback",
+         JSON.stringify(submitted)
+      );
 
 
-if(
-drafts[user.id]
-){
+      /* remove draft */
 
-delete drafts[user.id][course];
-
-}
-
-
-localStorage.setItem(
-"feedbackDraft",
-JSON.stringify(drafts)
-);
+      let drafts =
+         JSON.parse(
+            localStorage.getItem("feedbackDraft")
+         ) || {};
 
 
-window.location.href=
-"feedback-success.html";
+      if (
+         drafts[user.id]
+      ) {
 
-};
+         delete drafts[user.id][course];
+
+      }
+
+
+      localStorage.setItem(
+         "feedbackDraft",
+         JSON.stringify(drafts)
+      );
+
+
+      window.location.href =
+         "feedback-success.html";
+
+   };
 
 
 
@@ -237,8 +261,18 @@ CLOSE BUTTON
 ========================= */
 
 window.goBack =
-function(){
+   function () {
 
-window.history.back();
+      window.history.back();
 
-};
+   };
+
+document
+   .getElementById("commentBox")
+   .addEventListener(
+
+      "input",
+
+      saveDraft
+
+   );
