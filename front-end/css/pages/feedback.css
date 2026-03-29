@@ -5,9 +5,9 @@
 
 /* page spacing */
 
-.feedback-page{
+.feedback-page {
 
-padding-bottom:60px;
+   padding-bottom: 60px;
 
 }
 
@@ -15,11 +15,11 @@ padding-bottom:60px;
 
 /* subtitle under course name */
 
-.subtitle{
+.subtitle {
 
-color:#64748b;
+   color: #64748b;
 
-margin-bottom:24px;
+   margin-bottom: 24px;
 
 }
 
@@ -27,9 +27,9 @@ margin-bottom:24px;
 
 /* anonymity info box variant */
 
-.info-box{
+.info-box {
 
-margin-bottom:20px;
+   margin-bottom: 20px;
 
 }
 
@@ -37,9 +37,9 @@ margin-bottom:20px;
 
 /* grid of feedback questions */
 
-.feedback-grid{
+.feedback-grid {
 
-margin-top:20px;
+   margin-top: 20px;
 
 }
 
@@ -47,9 +47,9 @@ margin-top:20px;
 
 /* textarea spacing */
 
-textarea{
+textarea {
 
-margin-top:10px;
+   margin-top: 10px;
 
 }
 
@@ -57,11 +57,11 @@ margin-top:10px;
 
 /* submit button placement */
 
-.submit-btn{
+.submit-btn {
 
-margin-top:30px;
+   margin-top: 30px;
 
-float:right;
+   float: right;
 
 }
 
@@ -69,27 +69,27 @@ float:right;
 
 /* review of reviews visual theme */
 
-.review-form{
+.review-form {
 
-border-top:6px solid #7c3aed;
-
-}
-
-
-
-.review-info{
-
-background:#f5f3ff;
-
-border:1px solid #ddd6fe;
+   border-top: 6px solid #7c3aed;
 
 }
 
 
 
-.review-btn{
+.review-info {
 
-background:#7c3aed;
+   background: #f5f3ff;
+
+   border: 1px solid #ddd6fe;
+
+}
+
+
+
+.review-btn {
+
+   background: #7c3aed;
 
 }
 
@@ -97,16 +97,16 @@ background:#7c3aed;
 
 /* small UX improvements */
 
-.question-card{
+.question-card {
 
-transition:0.15s;
+   transition: 0.15s;
 
 }
 
 
-.question-card:hover{
+.question-card:hover {
 
-box-shadow:0 6px 18px rgba(0,0,0,0.04);
+   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
 
 }
 
@@ -114,30 +114,88 @@ box-shadow:0 6px 18px rgba(0,0,0,0.04);
 
 /* animation polish */
 
-.success-icon{
+.success-icon {
 
-animation:pop 0.3s ease;
+   animation: pop 0.3s ease;
+
+}
+
+
+
+@keyframes pop {
+
+   0% {
+
+      transform: scale(0.6);
+
+      opacity: 0;
+
+   }
+
+   100% {
+
+      transform: scale(1);
+
+      opacity: 1;
+
+   }
+
+}
+
+.center-layout {
+
+   height: 100vh;
+
+   display: flex;
+
+   align-items: center;
+
+   justify-content: center;
+
+   background: #f8fafc;
 
 }
 
 
+.success-card {
 
-@keyframes pop{
+   width: 420px;
 
-0%{
+   background: white;
 
-transform:scale(0.6);
+   padding: 50px 40px;
 
-opacity:0;
+   border-radius: 16px;
 
-}
+   text-align: center;
 
-100%{
-
-transform:scale(1);
-
-opacity:1;
+   border: 1px solid #e2e8f0;
 
 }
+
+
+.success-icon {
+
+   width: 70px;
+
+   height: 70px;
+
+   margin: auto;
+
+   margin-bottom: 20px;
+
+   border-radius: 50%;
+
+   background: #dcfce7;
+
+   display: flex;
+
+   align-items: center;
+
+   justify-content: center;
+
+   font-size: 28px;
+
+   color: #166534;
 
 }

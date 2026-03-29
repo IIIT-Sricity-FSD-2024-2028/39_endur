@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Faculty Profile</title>
+
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+
+<link rel="stylesheet" href="../../css/components/sidebar.css">
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/forms.css">
+
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+</head>
+
+
+<body>
+
+<div class="dashboard-layout">
+
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+<div class="sidebar-logo">
+
+<img src="../../assets/logos/endur-logo.svg">
+
+<div>
+
+<strong>Endur</strong>
+<p>Faculty Portal</p>
+
+</div>
+
+</div>
+
+
+
+<nav class="sidebar-menu">
+
+<a href="dashboard.html">
+Dashboard
+</a>
+
+<a href="reports.html">
+Feedback Reports
+</a>
+
+<a class="active">
+Profile
+</a>
+
+</nav>
+
+
+
+<a class="sidebar-user">
+
+<div id="avatar" class="avatar"></div>
+
+<div>
+
+<strong id="userName"></strong>
+
+<p id="userDept"></p>
+
+</div>
+
+</a>
+
+</aside>
+
+
+
+
+<!-- MAIN -->
+
+<main class="dashboard-content">
+
+
+<h1>
+
+Profile & Settings
+
+</h1>
+
+
+<p class="subtitle">
+
+Manage your personal information and preferences.
+
+</p>
+
+
+
+<!-- PERSONAL -->
+
+<div class="profile-card">
+
+<h3>
+
+Personal Information
+
+</h3>
+
+
+<div class="profile-grid">
+
+
+<div>
+
+<label>Full Name</label>
+
+<p id="profileName"></p>
+
+</div>
+
+
+
+<div>
+
+<label>Faculty ID</label>
+
+<p id="profileId"></p>
+
+</div>
+
+
+
+<div>
+
+<label>Email Address</label>
+
+<p id="profileEmail"></p>
+
+</div>
+
+
+
+<div>
+
+<label>Department</label>
+
+<p id="profileDept"></p>
+
+</div>
+
+
+</div>
+
+
+</div>
+
+
+
+
+<!-- NOTIFICATIONS -->
+
+<div class="profile-card">
+
+<h3>
+
+Notification Preferences
+
+</h3>
+
+
+
+<div class="toggle-row">
+
+<span>Email Notifications</span>
+
+<input type="checkbox" checked>
+
+</div>
+
+
+
+<div class="toggle-row">
+
+<span>Push Notifications</span>
+
+<input type="checkbox" checked>
+
+</div>
+
+
+</div>
+
+
+
+
+<!-- ACCOUNT -->
+
+<div class="profile-card">
+
+<h3>
+
+Account Settings
+
+</h3>
+
+
+
+<div class="settings-row">
+
+<div>
+
+<strong>
+
+Switch to your HOD Profile
+
+</strong>
+
+<p>
+
+Visible if assigned as HOD
+
+</p>
+
+</div>
+
+
+<button
+class="btn-outline"
+onclick="switchRole('hod')"
+>
+
+Switch to HOD
+
+</button>
+
+
+</div>
+
+
+
+<div class="settings-row">
+
+<div>
+
+<strong>
+
+Switch to your Dean Profile
+
+</strong>
+
+<p>
+
+Visible if assigned as Dean
+
+</p>
+
+</div>
+
+
+<button
+class="btn-outline"
+onclick="switchRole('dean')"
+>
+
+Switch to Dean
+
+</button>
+
+
+</div>
+
+
+
+<div class="settings-row">
+
+<div>
+
+<strong>
+
+Log Out
+
+</strong>
+
+<p>
+
+Ends your current session
+
+</p>
+
+</div>
+
+
+<button
+class="btn-danger"
+onclick="logout()"
+>
+
+Log Out
+
+</button>
+
+
+</div>
+
+
+</div>
+
+
+</main>
+
+
+</div>
+
+
+
+<script src="../../js/core/session.js"></script>
+
+
+<script type="module">
+
+import {
+initProfile
+}
+from "../../js/features/profile.js";
+
+
+initProfile();
+
+
+</script>
+
+
+</body>
+
+</html>

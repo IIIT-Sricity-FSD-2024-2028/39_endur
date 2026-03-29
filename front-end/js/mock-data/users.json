@@ -61,5 +61,26 @@
     "name": "Super User",
     "role": "superuser",
     "department": "System"
+  },
+ 
+  {
+    "id": "F104",
+    "name": "Dr Ada Lovelace",
+    "password": "123",
+    "role": "faculty",
+    "department": "Computer Science",
+    "secondaryRoles": [
+      "hod"
+    ]
+  },
+  {
+    "id": "F103",
+    "name": "Dr Claude Shannon",
+    "password": "123",
+    "role": "faculty",
+    "department": "AI",
+    "secondaryRoles": [
+      "dean"
+    ]
   }
 ]
