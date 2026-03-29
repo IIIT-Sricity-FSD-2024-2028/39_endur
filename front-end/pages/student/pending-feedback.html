@@ -134,20 +134,22 @@
 
 
 
-    <script src="../../js/core/session.js"></script>
+    <script type="module">
 
-    <script>
+        import { requireAuth }
+            from "../../js/core/session.js";
+
 
         const user = requireAuth();
+
 
         document.getElementById("userName").innerText =
             user.name;
 
+
         document.getElementById("userDept").innerText =
             user.department;
 
-
-        /* load pending feedback dynamically */
 
         async function loadPending() {
 
@@ -167,13 +169,12 @@
             const container =
                 document.getElementById("pendingContainer");
 
+
             container.innerHTML = "";
 
 
             courses.forEach(course => {
 
-
-                /* skip if already completed */
 
                 const done =
                     submitted.find(
@@ -186,22 +187,18 @@
                 if (done) return;
 
 
-                /* create card */
+                /* card */
 
                 const card =
                     document.createElement("div");
+
 
                 card.className =
                     "feedback-card";
 
 
-                card.dataset.course =
-                    course.id;
-
-
-                /* click navigation */
-
                 card.onclick = () => {
+
 
                     localStorage.setItem(
                         "activeCourse",
@@ -209,7 +206,7 @@
                     );
 
 
-                    if (course.type === "review") {
+                    if (course.id.includes("reviewOfReviews")) {
 
                         window.location.href =
                             "review-of-reviews.html";
@@ -225,15 +222,13 @@
                 };
 
 
-                /* card content */
-
                 card.innerHTML = `
 
 <div>
 
 <p class="deadline">
 
-Deadline: ${course.deadline || "Oct 30, 2026"}
+Deadline: Oct 30 2026
 
 </p>
 
@@ -248,8 +243,8 @@ ${course.name}
 <p>
 
 ${course.type === "review"
-                        ? "Review of Reviews • System Evaluation"
-                        : "Standard Feedback Cycle"}
+                        ? "Review of Reviews"
+                        : "Course Feedback"}
 
 </p>
 
@@ -260,12 +255,10 @@ Start →
 
 </button>
 
-
 </div>
 
 
-<div class="color-block
-${course.color || "blue"}">
+<div class="color-block ${course.color}">
 
 </div>
 
@@ -276,8 +269,6 @@ ${course.color || "blue"}">
 
             });
 
-
-            /* empty state */
 
             if (container.innerHTML === "") {
 

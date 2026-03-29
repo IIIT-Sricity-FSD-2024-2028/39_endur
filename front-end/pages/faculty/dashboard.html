@@ -3,22 +3,22 @@
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Faculty Dashboard</title>
+    <title>Faculty Dashboard</title>
 
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
 
-<link rel="stylesheet" href="../../css/components/button.css">
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/sidebar.css">
-<link rel="stylesheet" href="../../css/components/table.css">
-<link rel="stylesheet" href="../../css/components/badge.css">
-<link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
 
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
 
@@ -26,222 +26,265 @@
 <body>
 
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
 
-<!-- sidebar -->
+        <!-- SIDEBAR -->
 
-<aside class="sidebar">
+        <aside class="sidebar">
 
 
-<div class="sidebar-logo">
+            <div class="sidebar-logo">
 
-<img src="../../assets/logos/endur-logo.svg">
+                <img src="../../assets/logos/endur-logo.svg">
 
-<div>
+                <div>
 
-<strong>Endur</strong>
+                    <strong>Endur</strong>
 
-<p>Faculty Portal</p>
+                    <p>Faculty Portal</p>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<nav class="sidebar-menu">
+            <nav class="sidebar-menu">
 
-<a class="active">
-Dashboard
-</a>
+                <a class="active">
+                    Dashboard
+                </a>
 
-<a href="reports.html">
-Feedback Reports
-</a>
+                <a href="reports.html">
+                    Feedback Reports
+                </a>
 
-</nav>
+            </nav>
 
 
 
-<a href="profile.html" class="sidebar-user">
+            <a href="profile.html" class="sidebar-user">
 
-<div class="avatar"></div>
+                <div id="avatar" class="avatar"></div>
 
-<div>
+                <div>
 
-<strong id="userName"></strong>
+                    <strong id="userName"></strong>
 
-<p id="userDept"></p>
+                    <p id="userDept"></p>
 
-</div>
+                </div>
 
-</a>
+            </a>
 
 
-</aside>
+        </aside>
 
 
 
 
-<!-- main -->
+        <!-- MAIN -->
 
-<main class="dashboard-content">
+        <main class="dashboard-content">
 
 
-<h1>
+            <h1>
 
-Faculty Dashboard
+                Faculty Dashboard
 
-<span class="badge neutral">
+                <span class="badge neutral">
 
-SPRING SEMESTER 2026
+                    SPRING SEMESTER 2026
 
-</span>
+                </span>
 
-</h1>
+            </h1>
 
 
 
-<!-- stats -->
+            <!-- STATS -->
 
-<div class="stats-grid">
+            <div class="stats-grid">
 
 
-<div class="stat-card">
+                <div class="stat-card">
 
-<p>Student Satisfaction</p>
+                    <p>Student Satisfaction</p>
 
-<h2 id="statSatisfaction">
+                    <h2 id="avgScore">
 
-0
+                        0
 
-</h2>
+                    </h2>
 
-</div>
+                </div>
 
 
 
-<div class="stat-card">
+                <div class="stat-card">
 
-<p>Response Rate</p>
+                    <p>Response Rate</p>
 
-<h2 id="statResponse">
+                    <h2 id="responseRate">
 
-0%
+                        0%
 
-</h2>
+                    </h2>
 
-</div>
+                </div>
 
 
 
-<div class="stat-card">
+                <div class="stat-card">
 
-<p>Pending Reflection</p>
+                    <p>Pending Reflection</p>
 
-<h2 id="statPending">
+                    <h2 id="pendingReflection">
 
-0
+                        0
 
-</h2>
+                    </h2>
 
-</div>
+                </div>
 
 
 
-<div class="stat-card">
+                <div class="stat-card">
 
-<p>Performance Gap</p>
+                    <p>Performance Gap</p>
 
-<h2 id="statGap">
+                    <h2 id="gapScore">
 
-0
+                        0
 
-</h2>
+                    </h2>
 
-</div>
+                </div>
 
 
-</div>
+            </div>
 
 
 
-<h2 class="section-title">
+            <h2 class="section-title">
 
-Current Courses
+                Current Courses
 
-</h2>
+            </h2>
 
 
 
-<table class="data-table">
+            <table class="data-table">
 
 
-<thead>
+                <thead>
 
-<tr>
+                    <tr>
 
-<th>Course Code</th>
+                        <th>Course Code</th>
 
-<th>Course Name</th>
+                        <th>Course Name</th>
 
-<th>Enrolled</th>
+                        <th>Enrolled</th>
 
-<th>Status</th>
+                        <th>Status</th>
 
-<th>Avg Rating</th>
+                        <th>Avg Rating</th>
 
-</tr>
+                    </tr>
 
-</thead>
+                </thead>
 
 
 
-<tbody id="facultyCourses">
+                <tbody id="courseTable">
 
-</tbody>
+                </tbody>
 
 
-</table>
+            </table>
 
 
-</main>
 
+            <div id="emptyState" class="empty-state" style="display:none">
 
-</div>
+                <p>
 
+                    No courses assigned yet.
 
+                </p>
 
-<script src="../../js/core/session.js"></script>
+            </div>
 
-<script>
 
-const user = requireAuth();
+        </main>
 
 
-document.getElementById("userName").innerText =
-user.name;
+    </div>
 
 
-document.getElementById("userDept").innerText =
-user.department;
 
-</script>
+    <script type="module">
 
+        import { requireAuth } from "../../js/core/session.js";
 
+        import {
+            renderFacultyDashboard
+        } from "../../js/features/faculty-dashboard.js";
 
-<script type="module">
 
-import {
-renderFacultyDashboard
-}
-from "../../js/features/faculty-dashboard.js";
+        document.addEventListener("DOMContentLoaded", () => {
 
+            const user = requireAuth();
 
-renderFacultyDashboard();
 
-</script>
+            /* sidebar name */
+
+            const nameEl =
+                document.getElementById("userName");
+
+            const deptEl =
+                document.getElementById("userDept");
+
+            const avatarEl =
+                document.getElementById("avatar");
+
+
+            if (nameEl) {
+
+                nameEl.innerText = user.name;
+
+            }
+
+
+            if (deptEl) {
+
+                deptEl.innerText = user.department;
+
+            }
+
+
+            /* avatar initials */
+
+            if (avatarEl) {
+
+                avatarEl.innerText =
+                    user.name
+                        .split(" ")
+                        .map(n => n[0])
+                        .join("");
+
+            }
+
+
+            /* render dashboard data */
+
+            renderFacultyDashboard();
+
+        });
+
+    </script>
 
 
 </body>

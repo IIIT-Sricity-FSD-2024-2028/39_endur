@@ -3,318 +3,224 @@
 
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <title>My Courses</title>
+<title>My Courses</title>
 
-    <link rel="stylesheet" href="../../css/base.css">
-    <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/utilities.css">
-    <link rel="stylesheet" href="../../css/forms.css">
-    <link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/utilities.css">
 
-    <link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/sidebar.css">
+<link rel="stylesheet" href="../../css/components/course-card.css">
 
-    <link rel="stylesheet" href="../../css/components/sidebar.css">
-
-    <link rel="stylesheet" href="../../css/components/course-card.css">
-
-    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
 
 
 <body>
 
-    <div class="dashboard-layout">
 
+<div class="dashboard-layout">
 
-        <!-- SIDEBAR -->
 
-        <aside class="sidebar">
+<!-- sidebar -->
 
+<aside class="sidebar">
 
-            <div class="sidebar-logo">
 
-                <img src="../../assets/logos/endur-logo.svg">
+<div class="sidebar-logo">
 
-                <div>
+<img src="../../assets/logos/endur-logo.svg">
 
-                    <strong>Endur</strong>
+<div>
 
-                    <p>Student Portal</p>
+<strong>Endur</strong>
 
-                </div>
+<p>Student Portal</p>
 
-            </div>
+</div>
 
+</div>
 
 
-            <nav class="sidebar-menu">
 
-                <a href="dashboard.html">
+<nav class="sidebar-menu">
 
-                    Dashboard
+<a href="dashboard.html">
 
-                </a>
+Dashboard
 
-                <a class="active">
+</a>
 
-                    My Courses
 
-                </a>
+<a class="active">
 
-                <a href="pending-feedback.html">
+My Courses
 
-                    Pending Feedbacks
+</a>
 
-                </a>
 
-                <a href="feedback-history.html">
+<a href="pending-feedback.html">
 
-                    History
+Pending Feedbacks
 
-                </a>
+</a>
 
-            </nav>
 
+<a href="feedback-history.html">
 
+History
 
-            <a href="profile.html" class="sidebar-user">
+</a>
 
-                <div class="avatar"></div>
 
-                <div>
+</nav>
 
-                    <strong id="userName"></strong>
 
-                    <p id="userDept"></p>
 
-                </div>
+<a href="profile.html" class="sidebar-user">
 
-            </a>
+<div id="avatar" class="avatar"></div>
 
+<div>
 
-        </aside>
+<strong id="userName"></strong>
 
+<p id="userDept"></p>
 
+</div>
 
+</a>
 
-        <!-- MAIN CONTENT -->
 
-        <main class="dashboard-content">
+</aside>
 
 
-            <h1>
 
-                My Courses
 
-            </h1>
+<!-- main -->
 
+<main class="dashboard-content">
 
-            <p class="subtitle">
 
-                Manage your current semester enrollment and track progress.
+<h1>
 
-            </p>
+My Courses
 
+</h1>
 
 
-            <div class="course-grid">
+<p class="subtitle">
 
+Courses assigned this semester
 
-                <div class="course-card red">
+</p>
 
-                    <span class="tag navy">
 
-                        SCIENCE & TECH
 
-                    </span>
+<div
+id="courseGrid"
+class="course-grid"
+>
 
-                    <h3>
+</div>
 
-                        CS101: Subject A
 
-                    </h3>
 
-                    <p>
+</main>
 
-                        Dr. Alan Turing
 
-                    </p>
+</div>
 
-                </div>
 
 
+<script type="module">
 
-                <div class="course-card green">
+import { requireAuth }
+from "../../js/core/session.js";
 
-                    <span class="tag green">
 
-                        MATHEMATICS
+const user =
+requireAuth();
 
-                    </span>
 
-                    <h3>
+document.getElementById("userName").innerText =
+user.name;
 
-                        MDS202: Subject B
 
-                    </h3>
+document.getElementById("userDept").innerText =
+user.department;
 
-                    <p>
 
-                        Dr. Euler
+/* avatar */
 
-                    </p>
+document.getElementById("avatar").innerText =
+user.name
+.split(" ")
+.map(n=>n[0])
+.join("");
 
-                </div>
 
 
+/* load courses */
 
-                <div class="course-card yellow">
+const res =
+await fetch("../../js/mock-data/courses.json");
 
-                    <span class="tag yellow">
 
-                        HUMANITIES
+const courses =
+await res.json();
 
-                    </span>
 
-                    <h3>
 
-                        HIS110: Subject C
+const grid =
+document.getElementById("courseGrid");
 
-                    </h3>
 
-                    <p>
 
-                        Mr. Historian
+courses
+.filter(
+c => c.type === "standard"
+)
+.forEach(course=>{
 
-                    </p>
 
-                </div>
+grid.innerHTML +=
 
+`
+<div class="course-card ${course.color}">
 
+<span class="tag">
 
-                <div class="course-card navy">
+${course.department || "COURSE"}
 
-                    <span class="tag blue">
+</span>
 
-                        SCIENCE & TECH
 
-                    </span>
+<h3>
 
-                    <h3>
+${course.id}: ${course.name}
 
-                        PHY105: Subject D
+</h3>
 
-                    </h3>
 
-                    <p>
+<p>
 
-                        Prof. Albert Einstein
+${course.faculty}
 
-                    </p>
+</p>
 
-                </div>
+</div>
+`;
 
+});
 
 
-                <div class="course-card grey">
+</script>
 
-                    <span class="tag red">
-
-                        ARTS & LITERATURE
-
-                    </span>
-
-                    <h3>
-
-                        LIT301: Subject E
-
-                    </h3>
-
-                    <p>
-
-                        Mr. Shakespeare</p>
-
-                </div>
-
-
-
-                <div class="course-card purple">
-
-                    <span class="tag purple">
-
-                        SOCIAL SCIENCES
-
-                    </span>
-
-                    <h3>
-
-                        PSY200: Subject F
-
-                    </h3>
-
-                    <p>
-
-                        Dr. Diogenes
-
-                    </p>
-
-                </div>
-
-
-
-            </div>
-
-
-        </main>
-
-
-    </div>
-
-
-
-    <script src="../../js/core/session.js"></script>
-
-    <script>
-
-        requireAuth();
-
-
-        async function loadCourseTitle() {
-
-            const courseId =
-                localStorage.getItem("activeCourse");
-
-
-            const response =
-                await fetch("../../js/mock-data/courses.json");
-
-
-            const courses =
-                await response.json();
-
-
-            const course =
-                courses.find(c => c.id === courseId);
-
-
-            if (!course) return;
-
-
-            document.getElementById("courseTitle").innerText =
-                course.id + ": " + course.name;
-
-        }
-
-
-        loadCourseTitle();
-
-    </script>
-
-
-    <script src="../../js/features/feedback-form.js"></script>
 
 </body>
 

@@ -1,129 +1,135 @@
 import { get } from "../core/storage.js";
 
 
-/* =========================
-HELPERS
-========================= */
+/* =============================
+LOAD COURSES
+============================= */
 
-function getUser() {
+async function getCourses(){
 
-    return JSON.parse(
-        localStorage.getItem("endurSession")
-    );
+const res =
+await fetch("../../js/mock-data/courses.json");
+
+return await res.json();
 
 }
 
 
-
-/* =========================
+/* =============================
 STATUS LOGIC
-========================= */
+============================= */
 
-function getStatus(course) {
+function getStatus(courseId,userId){
 
-    const submitted =
-        get("submittedFeedback") || [];
+const submitted =
+get("submittedFeedback") || [];
 
-    const drafts =
-        get("feedbackDraft") || {};
-
-    const user = getUser();
+const drafts =
+get("feedbackDraft") || {};
 
 
-    /* reviewOfReviews special case */
+/* completed */
 
-    if (course === "reviewOfReviews") {
+if(
+submitted.find(
+f =>
+f.course === courseId &&
+f.userId === userId
+)
+){
 
-        const stored =
-            get("reviewOfReviews") || [];
+return "completed";
 
-        return stored.find(
-            r => r.userId === user.id
-        )
-            ? "completed"
-            : "pending";
-
-    }
-
-
-    /* completed */
-
-    if (
-        submitted.find(
-            f =>
-                f.course === course &&
-                f.userId === user.id
-        )
-    ) {
-
-        return "completed";
-
-    }
+}
 
 
-    /* progress */
+/* in progress */
 
-    if (
-        drafts[user.id] &&
-        drafts[user.id][course]
-    ) {
+if(
+drafts[userId] &&
+drafts[userId][courseId]
+){
 
-        return "progress";
+return "progress";
 
-    }
+}
 
 
-    return "pending";
+return "pending";
 
 }
 
 
 
-/* =========================
-TABLE RENDER
-========================= */
+/* =============================
+DASHBOARD TABLE
+============================= */
 
-export async function updateDashboard() {
+export async function updateDashboard(){
 
-    const res =
-        await fetch("../../js/mock-data/courses.json");
-
-    const courses =
-        await res.json();
+const courses =
+await getCourses();
 
 
-    const table =
-        document.getElementById("dashboardTable");
+const user =
+get("endurSession");
 
 
-    table.innerHTML = "";
+const table =
+document.getElementById("dashboardTable");
 
 
-    courses.forEach(course => {
+table.innerHTML = "";
 
 
-        const status =
-            getStatus(course.id);
+courses
+.filter(
+c =>
+c.type === "standard" ||
+c.type === "review"
+)
+.forEach(course=>{
 
 
-        const row =
-            document.createElement("tr");
+const status =
+getStatus(course.id,user.id);
 
 
-        row.innerHTML = `
+/* routing logic */
+
+let actionClick =
+"";
+
+
+if(status==="completed"){
+
+actionClick =
+"window.location.href='feedback-history.html'";
+
+}
+
+else{
+
+actionClick =
+`openFeedback('${course.id}')`;
+
+}
+
+
+table.innerHTML +=
+
+`
+<tr data-course="${course.id}">
 
 <td>
 
-${course.name}
+<strong>${course.name}</strong>
 
-</td>
+<br>
 
+<span class="sub-text">
 
-<td>
-
-<span class="badge ${status}">
-
-${status}
+${course.id}
 
 </span>
 
@@ -132,184 +138,129 @@ ${status}
 
 <td>
 
-<a class="action-link">
+<span class="badge ${status}">
 
-${status === "completed"
-                ? "View"
-                : status === "progress"
-                    ? "Resume"
-                    : "Start"}
+${statusLabel(status)}
 
-</a>
+</span>
 
 </td>
 
+
+<td>
+
+<span
+class="action-link"
+onclick="${actionClick}"
+>
+
+${statusAction(status)}
+
+</span>
+
+</td>
+
+</tr>
+
 `;
 
-
-        /* action behaviour */
-
-        const action =
-            row.querySelector(".action-link");
+});
 
 
-        action.onclick = () => {
+if(table.innerHTML===""){
 
-            localStorage.setItem(
-                "activeCourse",
-                course.id
-            );
+document
+.getElementById("emptyDashboard")
+.style.display="block";
 
-
-            if (status === "completed") {
-
-                window.location.href =
-                    "feedback-history.html";
-
-                return;
-
-            }
-
-
-            if (course.type === "review") {
-
-                window.location.href =
-                    "review-of-reviews.html";
-
-                return;
-
-            }
-
-
-            window.location.href =
-                "feedback-form.html";
-
-        };
-
-
-        table.appendChild(row);
-
-    });
-
-
-    if (courses.length === 0) {
-
-        document
-            .getElementById("emptyDashboard")
-            .style.display = "block";
-
-    }
+}
 
 }
 
 
 
-/* =========================
+/* =============================
 STATS
-========================= */
+============================= */
 
-export async function updateStats() {
+export async function updateStats(){
 
-    const res =
-        await fetch("../../js/mock-data/courses.json");
-
-    const courses =
-        await res.json();
+const courses =
+await getCourses();
 
 
-    const submitted =
-        get("submittedFeedback") || [];
-
-    const drafts =
-        get("feedbackDraft") || {};
-
-    const review =
-        get("reviewOfReviews") || [];
+const user =
+get("endurSession");
 
 
-    const user = getUser();
+let completed = 0;
+let progress = 0;
+let pending = 0;
 
 
-    let completed = 0;
-    let progress = 0;
-    let pending = 0;
+courses.forEach(course=>{
+
+const status =
+getStatus(course.id,user.id);
+
+if(status==="completed") completed++;
+
+else if(status==="progress") progress++;
+
+else pending++;
+
+});
 
 
-    courses.forEach(course => {
+document.getElementById("statCompleted").innerText =
+completed;
 
 
-        /* reviewOfReviews */
-
-        if (course.id === "reviewOfReviews") {
-
-            const done =
-                review.find(
-                    r => r.userId === user.id
-                );
-
-            if (done) {
-
-                completed++;
-
-                return;
-
-            }
-
-            pending++;
-
-            return;
-
-        }
+document.getElementById("statProgress").innerText =
+progress;
 
 
-        /* completed */
-
-        if (
-            submitted.find(
-                f =>
-                    f.course === course.id &&
-                    f.userId === user.id
-            )
-        ) {
-
-            completed++;
-
-            return;
-
-        }
+document.getElementById("statPending").innerText =
+pending;
 
 
-        /* progress */
+document.getElementById("statTotal").innerText =
+courses.length;
 
-        if (
-            drafts[user.id] &&
-            drafts[user.id][course.id]
-        ) {
-
-            progress++;
-
-            return;
-
-        }
+}
 
 
-        /* pending */
 
-        pending++;
+/* =============================
+HELPERS
+============================= */
 
-    });
+function statusLabel(status){
+
+return{
+
+pending:"Pending",
+
+progress:"In Progress",
+
+completed:"Completed"
+
+}[status];
+
+}
 
 
-    document.getElementById("statCompleted").innerText =
-        completed;
 
-    document.getElementById("statProgress").innerText =
-        progress;
+function statusAction(status){
 
-    document.getElementById("statPending").innerText =
-        pending;
+return{
 
-    document.getElementById("statTotal").innerText =
-        courses.length;
+pending:"Start",
+
+progress:"Resume",
+
+completed:"View"
+
+}[status];
 
 }
