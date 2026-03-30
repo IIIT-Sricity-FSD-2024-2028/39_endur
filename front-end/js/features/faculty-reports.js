@@ -21,14 +21,12 @@ export async function renderFacultyReports() {
     const cycles = get("feedbackCycles") || [{ cycleId: "CYCLE_W4", endTimestamp: "2026-03-30T23:59:59Z", status: "active" }];
     const activeCycle = cycles.find(c => c.status === "active") || cycles[0];
 
-    // Grab both dot containers
     const dotsContainer = document.getElementById("courseDots");
     const actionDotsContainer = document.getElementById("actionDots");
 
     if (dotsContainer) dotsContainer.innerHTML = "";
     if (actionDotsContainer) actionDotsContainer.innerHTML = "";
 
-    // Generate dots for both cards
     myCourses.forEach((course, index) => {
         // Feedback Card Dots
         const dot = document.createElement("span");
@@ -47,7 +45,7 @@ export async function renderFacultyReports() {
         const course = myCourses[index];
         localStorage.setItem("activeFacultyCourse", course.id);
 
-        // Sync visual highlights across BOTH sets of dots
+        // Sync visual highlights
         if (dotsContainer) {
             Array.from(dotsContainer.children).forEach((dot, i) => {
                 dot.style.backgroundColor = i === index ? "var(--primary)" : "#ccc";
@@ -86,9 +84,6 @@ export async function renderFacultyReports() {
         const realAverage = metricCount > 0 ? (totalScore / metricCount).toFixed(1) : 0;
         const avgEl = document.getElementById("avgRating");
         
-        // ==========================================
-        // BLIND SELF-REFLECTION LOGIC (Hide Score)
-        // ==========================================
         if (avgEl) {
             if (responseCount === 0) {
                 avgEl.innerText = "0/5";
@@ -104,9 +99,6 @@ export async function renderFacultyReports() {
             }
         }
 
-        // ==========================================
-        // DYNAMIC BUTTON STATES
-        // ==========================================
         const feedbackBtn = document.getElementById("feedbackActionBtn");
         if (feedbackBtn) {
             if (hasReflection) {
@@ -134,6 +126,9 @@ export async function renderFacultyReports() {
             }
         }
 
+        // ==========================================
+        // ACTION REPORT BUTTON & NOTIFICATION STATUS
+        // ==========================================
         const arBtn = document.getElementById("actionReportBtn");
         const arMsg = document.getElementById("actionReportMsg");
 
@@ -145,14 +140,38 @@ export async function renderFacultyReports() {
                 arBtn.className = "btn-outline";
                 arBtn.style.opacity = "0.6";
                 arBtn.onclick = () => {
-                    arMsg.innerText = "⚠️ Please submit your Self-Reflection first.";
+                    arMsg.innerHTML = "⚠️ Please submit your Self-Reflection first.";
+                    arMsg.style.color = "#ffcccc";
                     arMsg.style.display = "block";
                 };
             } else if (hasActionReport) {
-                arBtn.innerText = "View Action Report →";
-                arBtn.className = "btn-primary";
-                arBtn.style.opacity = "1";
+                
+                // Check specific status to notify faculty
+                if (hasActionReport.status === "REVISION_REQUESTED") {
+                    arBtn.innerText = "Revise Action Report →";
+                    arBtn.className = "btn-danger"; // Turns the button Red!
+                    arBtn.style.opacity = "1";
+                    arMsg.innerHTML = "<strong>⚠️ HOD requested a revision.</strong> Please update your report.";
+                    arMsg.style.color = "#f87171"; // Light red text
+                    arMsg.style.display = "block";
+                } else if (hasActionReport.status === "FINALIZED") {
+                    arBtn.innerText = "View Finalized Report →";
+                    arBtn.className = "btn-outline";
+                    arBtn.style.opacity = "1";
+                    arMsg.innerHTML = "✅ <strong>Check-in Finalized</strong> by HOD.";
+                    arMsg.style.color = "#4ade80"; // Light green text
+                    arMsg.style.display = "block";
+                } else {
+                    arBtn.innerText = "View Action Report →";
+                    arBtn.className = "btn-primary";
+                    arBtn.style.opacity = "1";
+                    arMsg.innerHTML = "⏳ Submitted - Pending HOD Review";
+                    arMsg.style.color = "#94a3b8"; // Slate text
+                    arMsg.style.display = "block";
+                }
+
                 arBtn.onclick = () => window.location.href = "action-report.html";
+
             } else {
                 arBtn.innerText = "Start Action Report →";
                 arBtn.className = "btn-primary";

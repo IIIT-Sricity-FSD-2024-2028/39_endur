@@ -5,12 +5,23 @@
     <title>Action Report</title>
     <link rel="stylesheet" href="../../css/base.css">
     <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/forms.css">
     <link rel="stylesheet" href="../../css/components/button.css">
     <link rel="stylesheet" href="../../css/components/card.css">
     <link rel="stylesheet" href="../../css/components/sidebar.css">
     <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: inherit;
+            resize: vertical;
+        }
+    </style>
 </head>
 <body>
 
@@ -28,11 +39,12 @@
 
         <nav class="sidebar-menu">
             <a href="dashboard.html">Dashboard</a>
-            <a class="active">Feedback Reports</a>
+            <a class="active" href="reports.html">Feedback Reports</a>
+            <a href="profile.html">Profile</a>
         </nav>
 
-        <a href="../student/profile.html" class="sidebar-user">
-            <div class="avatar"></div>
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
             <div>
                 <strong id="userName"></strong>
                 <p id="userDept"></p>
@@ -44,63 +56,91 @@
     <main class="dashboard-content">
 
         <div class="form-header">
-            <h2>Action Report & Review Check-in</h2>
-            <button id="submitArBtn" class="btn-primary" onclick="window.submitActionReport()">Submit</button>
-        </div>
-
-        <p class="subtitle">Faculty Performance Improvement Plan</p>
-
-        <!-- GAP SUMMARY -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <p>Self Reflection</p>
-                <h2 id="selfScore">0%</h2>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h2>Action Report</h2>
+                <span id="courseIdLabel" class="badge primary"></span>
             </div>
-            <div class="stat-card">
-                <p>Student Average</p>
-                <h2 id="studentScore">0%</h2>
-            </div>
-            <div class="stat-card">
-                <p>Identified Gap</p>
-                <h2 id="gapScore">0%</h2>
-            </div>
+            <button class="btn-outline" onclick="window.location.href='reports.html'">← Back to Reports</button>
         </div>
 
-        <!-- ROOT CAUSE -->
-        <div class="profile-card">
-            <h3>Root Cause Analysis</h3>
-            <p>Identify reasons for the performance gap.</p>
-            <textarea id="rootCause" placeholder="Enter analysis..."></textarea>
+        <p class="subtitle" style="margin-bottom: 24px;">Faculty Performance Improvement Plan</p>
+
+        <!-- HOD FEEDBACK BANNERS (Hidden by default, controlled by JS) -->
+        <div id="revisionBanner" class="card" style="display: none; background: #fef2f2; border: 1px solid #f87171; margin-bottom: 24px;">
+            <h3 style="color: #dc2626; font-size: 16px; margin-bottom: 12px;">⚠️ Revision Requested by HOD</h3>
+            <div style="margin-bottom: 12px;">
+                <strong style="color: #991b1b; font-size: 13px;">HOD Notes:</strong>
+                <p id="revHodNotes" style="color: #7f1d1d; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <div>
+                <strong style="color: #991b1b; font-size: 13px;">Suggested Outcomes:</strong>
+                <p id="revHodOutcomes" style="color: #7f1d1d; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <p style="font-size: 13px; color: #dc2626; margin-top: 16px; font-weight: bold;">Please update your Action Report below and resubmit.</p>
         </div>
 
-        <!-- IMPROVEMENT PLAN -->
-        <div class="profile-card">
-            <h3>Specific Improvement Steps</h3>
-            <p>Outline actionable steps for improvement.</p>
-            <textarea id="improvementPlan" placeholder="Example: Introduce weekly revision sessions..."></textarea>
+        <div id="finalizedBanner" class="card" style="display: none; background: #f0fdf4; border: 1px solid #4ade80; margin-bottom: 24px;">
+            <h3 style="color: #16a34a; font-size: 16px; margin-bottom: 12px;">✅ Check-in Finalized</h3>
+            <div style="margin-bottom: 12px;">
+                <strong style="color: #14532d; font-size: 13px;">HOD Notes:</strong>
+                <p id="finHodNotes" style="color: #166534; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <div>
+                <strong style="color: #14532d; font-size: 13px;">Agreed Outcomes:</strong>
+                <p id="finHodOutcomes" style="color: #166534; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <p style="font-size: 13px; color: #16a34a; margin-top: 16px; font-style: italic;">This report is now locked and stored in your administrative records.</p>
         </div>
+
+        <!-- FORM WRAPPER -->
+        <form id="actionReportForm">
+            <!-- ROOT CAUSE -->
+            <div class="card">
+                <h3 style="margin-bottom: 8px;">Root Cause Analysis</h3>
+                <p style="color: #64748b; font-size: 14px;">Identify the core reasons for the performance gap based on your Gap Analysis.</p>
+                <textarea id="rootCause" rows="4" placeholder="Enter analysis..." required></textarea>
+            </div>
+
+            <!-- IMPROVEMENT PLAN -->
+            <div class="card">
+                <h3 style="margin-bottom: 8px;">Planned Strategies</h3>
+                <p style="color: #64748b; font-size: 14px;">Outline specific, actionable steps you will take to address the root cause.</p>
+                <textarea id="plannedStrategies" rows="4" placeholder="Example: Introduce weekly interactive Q&A sessions..." required></textarea>
+            </div>
+
+            <!-- TIMELINE -->
+            <div class="card">
+                <h3 style="margin-bottom: 8px;">Implementation Timeline</h3>
+                <p style="color: #64748b; font-size: 14px;">When will these changes be applied in your course delivery?</p>
+                <textarea id="timeline" rows="2" placeholder="Example: Changes will take effect starting Week 5." required></textarea>
+            </div>
+
+            <!-- SUBMIT BUTTON -->
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                <button type="submit" class="btn-primary" style="padding: 12px 24px;">Submit Action Report</button>
+            </div>
+        </form>
 
     </main>
-
 </div>
 
-<!-- Fixed Script Block -->
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initActionReport, submitActionReport } from "../../js/features/action-report.js";
+    import { initActionReport } from "../../js/features/action-report.js";
 
-    const user = requireAuth();
+    document.addEventListener("DOMContentLoaded", () => {
+        const user = requireAuth();
+        if(!user) return;
 
-    if (user) {
         document.getElementById("userName").innerText = user.name;
         document.getElementById("userDept").innerText = user.department;
         
+        const avatarEl = document.getElementById("avatar");
+        if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+
         // Initialize the page logic
         initActionReport();
-
-        // Bind the submit function to the window so the HTML button can trigger it
-        window.submitActionReport = submitActionReport;
-    }
+    });
 </script>
 
 </body>
