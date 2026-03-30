@@ -14,7 +14,7 @@ export async function renderReviewCheckins() {
     ]);
     const allUsers = await usersRes.json();
     const allCourses = await coursesRes.json();
-    
+
     const submissions = get("submittedFeedback") || [];
     const reflections = get("selfReflection") || [];
     const actionReports = get("actionReports") || [];
@@ -27,7 +27,8 @@ export async function renderReviewCheckins() {
 
     myFaculty.forEach(faculty => {
         const facultyCourses = allCourses.filter(c => c.facultyId === faculty.id);
-        
+
+        // DYNAMIC MATH FIX inside hod-review-checkin.js
         facultyCourses.forEach(course => {
             const courseFeedback = submissions.filter(f => f.course === course.id);
             let avgScore = 0;
@@ -36,15 +37,15 @@ export async function renderReviewCheckins() {
                 courseFeedback.forEach(f => {
                     let metricSum = 0, metricCount = 0;
                     if (f.ratings) {
-                        if (typeof f.ratings.clarity === 'number') { metricSum += f.ratings.clarity; metricCount++; }
-                        if (typeof f.ratings.structure === 'number') { metricSum += f.ratings.structure; metricCount++; }
-                        if (typeof f.ratings.engagement === 'number') { metricSum += f.ratings.engagement; metricCount++; }
-                        if (typeof f.ratings.difficulty === 'number') { metricSum += f.ratings.difficulty; metricCount++; }
+                        Object.values(f.ratings).forEach(val => {
+                            if (typeof val === 'number') { metricSum += val; metricCount++; }
+                        });
                     }
                     sumAverages += (metricCount > 0 ? (metricSum / metricCount) : 0);
                 });
                 avgScore = sumAverages / courseFeedback.length;
             }
+            // ... rest of the code continues as normal ...
 
             const reflection = reflections.find(r => r.courseId === course.id && r.facultyId === faculty.id);
             const actionReport = actionReports.find(a => a.courseId === course.id && a.facultyId === faculty.id);
@@ -127,13 +128,13 @@ function openDetailView(data) {
     const notesEl = document.getElementById("hodNotes");
     const outcomesEl = document.getElementById("hodOutcomes");
     const actionBar = document.getElementById("hodActionBar");
-    
+
     // Load Action Report Data if it exists
     if (data.actionReport) {
         rootCauseEl.innerText = data.actionReport.rootCause || "No root cause provided.";
         const strategies = (data.actionReport.plannedStrategies || "No strategies provided.").split('\n').filter(s => s.trim() !== '');
         strategiesEl.innerHTML = strategies.map(s => `<div class="snippet-item">${s}</div>`).join('');
-        
+
         notesEl.value = data.actionReport.hodNotes || "";
         outcomesEl.value = data.actionReport.hodOutcomes || "";
     } else {
@@ -170,7 +171,7 @@ function openDetailView(data) {
                 <button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed; background: #1e3a8a;">Finalize Check-in</button>
             `;
         }
-        
+
     } else if (!data.actionReport) {
         // STATE 3: Pending Arrival (Disabled + Warning)
         notesEl.disabled = true;
@@ -224,7 +225,7 @@ function processCheckinAction(newStatus) {
         actionReports[reportIndex].hodOutcomes = outcomes;
         actionReports[reportIndex].status = newStatus;
         set("actionReports", actionReports);
-        
+
         renderReviewCheckins();
         document.getElementById("checkinDetail").style.display = "none";
         document.getElementById("emptyDetail").style.display = "flex";

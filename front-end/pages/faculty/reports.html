@@ -30,19 +30,23 @@
             <nav class="sidebar-menu">
                 <a href="dashboard.html">Dashboard</a>
                 <a class="active">Feedback Reports</a>
+                <a href="profile.html">Profile</a>
             </nav>
 
             <a href="profile.html" class="sidebar-user">
-                <div class="avatar"></div>
+                <div id="avatar" class="avatar"></div>
                 <div>
                     <strong id="userName"></strong>
                     <p id="userDept"></p>
                 </div>
             </a>
         </aside>
-
+        
         <!-- main -->
         <main class="dashboard-content">
+
+            <!-- GLOBAL ALERT CONTAINER -->
+            <div id="globalAlertContainer"></div>
 
             <h1>Faculty Feedback Reports</h1>
             <p class="subtitle">Detailed evaluation insights and performance diagnostics.</p>
@@ -61,7 +65,6 @@
                 <div>
                     <h3>View Current Feedback</h3>
                     <p>Access student ratings and comments from this semester.</p>
-                    <!-- BUTTON ID ADDED -->
                     <button id="feedbackActionBtn" class="btn-primary">
                         Open Feedback →
                     </button>
@@ -103,7 +106,7 @@
                     Start Action Report
                 </button>
 
-                <!-- NEW: Synchronized dots for the Action Report Card -->
+                <!-- Synchronized dots for the Action Report Card -->
                 <div id="actionDots" style="display:flex; gap:8px; justify-content:center; margin-top:20px;"></div>
             </div>
 
@@ -120,6 +123,10 @@
         if (user) {
             document.getElementById("userName").innerText = user.name;
             document.getElementById("userDept").innerText = user.department;
+            
+            const avatarEl = document.getElementById("avatar");
+            if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+
             renderFacultyReports();
         }
     </script>

@@ -12,102 +12,36 @@
     <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
     <style>
-        .header-meta {
-            font-size: 13px;
-            color: #64748b;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .param-row {
-            display: grid;
-            grid-template-columns: 3fr 1fr 100px;
-            padding: 24px 0;
-            border-bottom: 1px solid #e2e8f0;
-            align-items: center;
-        }
+        .header-meta { font-size: 13px; color: #64748b; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        .param-row { display: grid; grid-template-columns: 3fr 1fr 100px; padding: 24px 0; border-bottom: 1px solid #e2e8f0; align-items: center; }
         .param-row:last-child { border-bottom: none; }
-        
         .param-desc { color: #64748b; font-size: 13px; margin-top: 4px; max-width: 90%; }
-        
-        .weight-display {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 600;
-        }
-        .mini-bar {
-            height: 4px; width: 40px; background: #e2e8f0; border-radius: 2px;
-        }
-        .mini-bar-fill {
-            height: 100%; background: #1e3a8a; border-radius: 2px;
-        }
-
-        .action-btn {
-            background: none; border: none; color: #94a3b8; cursor: pointer; transition: 0.2s;
-        }
-        .action-btn:hover { color: #dc2626; }
-
-        .bottom-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-top: 24px;
-        }
-
-        /* Stacked Progress Bar */
-        .stacked-bar-container {
-            height: 16px; width: 100%; background: #f1f5f9; border-radius: 8px;
-            display: flex; overflow: hidden; margin: 20px 0;
-        }
-        
-        .legend-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
-        }
-        .legend-item {
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; color: #475569;
-        }
-        .legend-dot {
-            height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;
-        }
-
-        .info-card {
-            background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 16px;
-        }
+        .weight-display { display: flex; align-items: center; gap: 12px; font-weight: 600; }
+        .mini-bar { height: 4px; width: 40px; background: #e2e8f0; border-radius: 2px; }
+        .mini-bar-fill { height: 100%; background: #1e3a8a; border-radius: 2px; }
+        .action-btn { background: none; border: none; color: #94a3b8; cursor: pointer; transition: 0.2s; padding: 4px; }
+        .action-btn:hover { color: #1e3a8a; }
+        .action-btn.delete:hover { color: #dc2626; }
+        .bottom-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 24px; }
+        .stacked-bar-container { height: 16px; width: 100%; background: #f1f5f9; border-radius: 8px; display: flex; overflow: hidden; margin: 20px 0; }
+        .legend-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #475569; }
+        .legend-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .info-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 16px; }
         .info-card h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
         .info-card p { font-size: 13px; color: #475569; }
-
-        /* Modal Styles */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100;
-        }
-        .modal {
-            background: white; padding: 30px; border-radius: 12px; width: 400px;
-        }
-        .modal input, .modal textarea {
-            width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 16px;
-            border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit;
-        }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
+        .modal { background: white; padding: 30px; border-radius: 12px; width: 400px; }
+        .modal input, .modal textarea { width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 16px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; }
     </style>
 </head>
 <body>
 
 <div class="dashboard-layout">
-
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
-            <div>
-                <strong>Endur</strong>
-                <p>Institutional Portal</p>
-            </div>
+            <div><strong>Endur</strong><p>Institutional Portal</p></div>
         </div>
         <nav class="sidebar-menu">
             <a href="dashboard.html">Dashboard</a>
@@ -117,14 +51,10 @@
         </nav>
         <a href="profile.html" class="sidebar-user">
             <div id="avatar" class="avatar"></div>
-            <div>
-                <strong id="userName"></strong>
-                <p id="userDept"></p>
-            </div>
+            <div><strong id="userName"></strong><p id="userDept"></p></div>
         </a>
     </aside>
 
-    <!-- MAIN -->
     <main class="dashboard-content">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px;">
             <div>
@@ -133,69 +63,69 @@
                     <span>• Next Cycle: May 15</span>
                 </div>
                 <h1>Evaluation Parameters</h1>
-                <p class="subtitle" style="margin-bottom: 0;">Define and manage feedback criteria for the upcoming Feedback Cycle. Ensure parameters align with pedagogical standards.</p>
+                <p class="subtitle" style="margin-bottom: 0;">Define and manage feedback criteria for the upcoming Feedback Cycle.</p>
             </div>
-            <button class="btn-primary" onclick="openParamModal()" style="background: #1e3a8a;">
-                + Create New Parameter
-            </button>
+            <div style="display: flex; gap: 12px;">
+                <button id="createParamBtn" class="btn-outline" onclick="openParamModal()">+ Create Parameter</button>
+                <button id="finalizeConfigBtn" class="btn-primary" onclick="finalizeConfig()" disabled style="opacity: 0.5; cursor: not-allowed;">Submit Configuration</button>
+            </div>
         </div>
 
-        <!-- PARAMETERS LIST -->
+        <!-- STATUS BANNERS -->
+        <div id="statusBannerPending" class="card" style="display: none; background: #fffbeb; border: 1px solid #fcd34d; margin-bottom: 24px;">
+            <h3 style="color: #d97706; font-size: 16px;">⏳ Pending Dean Approval</h3>
+            <p style="font-size: 13px; color: #b45309; margin-top: 4px;">Your parameters have been submitted and are locked while under review.</p>
+        </div>
+        <div id="statusBannerApproved" class="card" style="display: none; background: #f0fdf4; border: 1px solid #4ade80; margin-bottom: 24px;">
+            <h3 style="color: #16a34a; font-size: 16px;">✅ Approved for Next Cycle</h3>
+            <p style="font-size: 13px; color: #14532d; margin-top: 4px;">The Dean has approved these parameters. They are locked and ready for the next cycle.</p>
+        </div>
+        <div id="statusBannerRevision" class="card" style="display: none; background: #fef2f2; border: 1px solid #f87171; margin-bottom: 24px;">
+            <h3 style="color: #dc2626; font-size: 16px;">⚠️ Revision Requested by Dean</h3>
+            <p style="font-size: 13px; color: #991b1b; margin-top: 4px;"><strong>Dean's Note:</strong> <span id="deanNotesText"></span></p>
+            <p style="font-size: 13px; color: #dc2626; margin-top: 8px; font-weight: bold;">Please adjust the parameters and resubmit.</p>
+        </div>
+
         <div class="card" style="padding: 0 30px;">
             <div style="display: grid; grid-template-columns: 3fr 1fr 100px; padding: 20px 0; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">
                 <div>PARAMETER DETAILS</div>
                 <div>WEIGHTAGE</div>
                 <div style="text-align: right;">ACTIONS</div>
             </div>
-            <div id="paramListContainer">
-                <!-- Rendered via JS -->
-            </div>
+            <div id="paramListContainer"></div>
         </div>
 
-        <!-- BOTTOM GRID -->
         <div class="bottom-grid">
-            
-            <!-- Weightage Balance Card -->
             <div class="card">
                 <h3 style="margin-bottom: 20px;">Weightage Balance</h3>
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                     <span style="color: #64748b; font-weight: 600; font-size: 14px;">Total Assigned</span>
                     <h1 id="totalAssignedText" style="color: #1e3a8a;">0%</h1>
                 </div>
-                
-                <div class="stacked-bar-container" id="stackedBar">
-                    <!-- Rendered via JS -->
-                </div>
-
-                <div class="legend-grid" id="legendContainer">
-                    <!-- Rendered via JS -->
-                </div>
-                
+                <div class="stacked-bar-container" id="stackedBar"></div>
+                <div class="legend-grid" id="legendContainer"></div>
                 <p id="weightWarning" style="color: #dc2626; font-size: 13px; margin-top: 15px; display: none;">
-                    ⚠️ Total weightage must equal exactly 100% before the cycle locks.
+                    ⚠️ Total weightage must equal exactly 100% to submit configuration.
                 </p>
             </div>
-
-            <!-- Info Column -->
             <div>
                 <div class="info-card">
                     <h4 style="color: #1e3a8a;">ℹ️ Configuration Lock</h4>
-                    <p>Parameters will be locked for the Spring 2026 cycle in <strong>4 days</strong>. Once locked, weightage cannot be modified until the next cycle.</p>
+                    <p>Parameters will be locked for the Spring 2026 cycle in <strong>4 days</strong>. Ensure your total equals 100% before submitting.</p>
                 </div>
                 <div class="info-card">
-                    <h4 style="color: #1e3a8a;">ℹ️ Parameter Review Status</h4>
-                    <p>Ensure all evaluation parameters align with departmental standards before the next Feedback Cycle begins.</p>
+                    <h4 style="color: #1e3a8a;">ℹ️ Departmental Standards</h4>
+                    <p>These parameters will exclusively affect feedback forms generated for the <strong><span id="displayDeptName"></span></strong> department.</p>
                 </div>
             </div>
-
         </div>
     </main>
 </div>
 
-<!-- Add Parameter Modal -->
+<!-- Add/Edit Parameter Modal -->
 <div class="modal-overlay" id="paramModal">
     <div class="modal">
-        <h3 style="margin-bottom: 20px;">Add New Parameter</h3>
+        <h3 id="modalTitle" style="margin-bottom: 20px;">Add New Parameter</h3>
         
         <label style="font-size: 13px; font-weight: bold; color: #475569;">Parameter Name</label>
         <input type="text" id="newParamName" placeholder="e.g., Practical Application">
@@ -208,14 +138,14 @@
         
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
             <button class="btn-outline" onclick="closeParamModal()">Cancel</button>
-            <button class="btn-primary" onclick="saveNewParameter()">Save Parameter</button>
+            <button class="btn-primary" onclick="saveParameter()">Save Parameter</button>
         </div>
     </div>
 </div>
 
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initParameters, deleteParameter, saveParameter } from "../../js/features/hod-parameters.js";
+    import { initParameters, openParamModal, closeParamModal, deleteParameter, saveParameter, finalizeConfig } from "../../js/features/hod-parameters.js";
 
     document.addEventListener("DOMContentLoaded", () => {
         const user = requireAuth();
@@ -223,26 +153,18 @@
 
         document.getElementById("userName").innerText = `HOD`;
         document.getElementById("userDept").innerText = user.department;
+        document.getElementById("displayDeptName").innerText = user.department;
         const avatarEl = document.getElementById("avatar");
         if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
 
         initParameters();
 
-        // Expose modal functions to window
-        window.openParamModal = () => document.getElementById("paramModal").style.display = "flex";
-        window.closeParamModal = () => {
-            document.getElementById("paramModal").style.display = "none";
-            document.getElementById("newParamName").value = "";
-            document.getElementById("newParamDesc").value = "";
-            document.getElementById("newParamWeight").value = "";
-        };
+        // Expose functions to global scope for onclick handlers
+        window.openParamModal = openParamModal;
+        window.closeParamModal = closeParamModal;
         window.deleteParameter = deleteParameter;
-        window.saveNewParameter = () => {
-            const name = document.getElementById("newParamName").value;
-            const desc = document.getElementById("newParamDesc").value;
-            const weight = document.getElementById("newParamWeight").value;
-            saveParameter(name, desc, weight);
-        };
+        window.saveParameter = saveParameter;
+        window.finalizeConfig = finalizeConfig;
     });
 </script>
 

@@ -59,6 +59,20 @@ export function initActionReport() {
 
     form.onsubmit = (e) => {
         e.preventDefault();
+
+        // ==========================================
+        // SYSTEM CHECK: Prevent Exact Duplicate Resubmission
+        // ==========================================
+        if (existingReport && existingReport.status === "REVISION_REQUESTED") {
+            if (
+                rootCauseInput.value.trim() === existingReport.rootCause.trim() &&
+                strategiesInput.value.trim() === existingReport.plannedStrategies.trim() &&
+                timelineInput.value.trim() === existingReport.timeline.trim()
+            ) {
+                alert("⚠️ Action Required: You must make changes to your Action Report before resubmitting. The current text is identical to your previous submission.");
+                return; // HALT SUBMISSION
+            }
+        }
         
         const updatedReport = {
             facultyId: user.id,
@@ -79,8 +93,6 @@ export function initActionReport() {
         }
 
         set("actionReports", actionReports);
-        
-        // FIX: Redirect to the success page instead of reports dashboard
         window.location.href = "action-report-success.html";
     };
 }
