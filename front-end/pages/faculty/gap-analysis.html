@@ -186,28 +186,21 @@
 
 
 
-    <script src="../../js/core/session.js"></script>
-
-
+    <!-- Replace the script section at the bottom of gap-analysis.html with this -->
     <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        import { renderGapAnalysis } from "../../js/features/gap-analysis.js";
 
-        import {
-            renderGapAnalysis
-        }
-            from "../../js/features/gap-analysis.js";
-
-
+        // 1. Ensure the user is authenticated
         requireAuth();
 
-
+        // 2. Render the dynamic math and gap calculations
         renderGapAnalysis();
 
+        // 3. Bind the back button globally so the HTML onclick can access it
         window.goBack = function () {
-
             window.location.href = "reports.html";
-
         };
-
     </script>
 
 
