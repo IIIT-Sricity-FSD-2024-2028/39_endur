@@ -1,266 +1,124 @@
 import { get } from "../core/storage.js";
 
-
 /* =============================
 LOAD COURSES
 ============================= */
-
-async function getCourses(){
-
-const res =
-await fetch("../../js/mock-data/courses.json");
-
-return await res.json();
-
+async function getCourses() {
+    const res = await fetch("../../js/mock-data/courses.json");
+    return await res.json();
 }
-
 
 /* =============================
 STATUS LOGIC
 ============================= */
+function getStatus(courseId, userId) {
+    const submitted = get("submittedFeedback") || [];
+    const drafts = get("feedbackDraft") || {};
 
-function getStatus(courseId,userId){
+    if (submitted.find(f => f.course === courseId && f.userId === userId)) {
+        return "completed";
+    }
 
-const submitted =
-get("submittedFeedback") || [];
+    if (drafts[userId] && drafts[userId][courseId]) {
+        return "progress";
+    }
 
-const drafts =
-get("feedbackDraft") || {};
-
-
-/* completed */
-
-if(
-submitted.find(
-f =>
-f.course === courseId &&
-f.userId === userId
-)
-){
-
-return "completed";
-
+    return "pending";
 }
-
-
-/* in progress */
-
-if(
-drafts[userId] &&
-drafts[userId][courseId]
-){
-
-return "progress";
-
-}
-
-
-return "pending";
-
-}
-
-
 
 /* =============================
 DASHBOARD TABLE
 ============================= */
+export async function updateDashboard() {
+    const allCourses = await getCourses();
+    const user = get("endurSession");
+    const table = document.getElementById("dashboardTable");
 
-export async function updateDashboard(){
+    if (table) table.innerHTML = "";
 
-const courses =
-await getCourses();
+    // 1. Filter to ONLY show courses the student is actually enrolled in
+    const myCourses = allCourses.filter(c => 
+        user.enrolledCourses && user.enrolledCourses.includes(c.id)
+    );
 
+    myCourses.forEach(course => {
+        const status = getStatus(course.id, user.id);
+        let actionClick = "";
 
-const user =
-get("endurSession");
+        if (status === "completed") {
+            actionClick = "window.location.href='feedback-history.html'";
+        } else {
+            actionClick = `openFeedback('${course.id}')`;
+        }
 
+        if (table) {
+            table.innerHTML += `
+            <tr data-course="${course.id}">
+                <td>
+                    <strong>${course.name}</strong><br>
+                    <span class="sub-text">${course.id}</span>
+                </td>
+                <td>
+                    <span class="badge ${status}">${statusLabel(status)}</span>
+                </td>
+                <td>
+                    <span class="action-link" onclick="${actionClick}">
+                        ${statusAction(status)}
+                    </span>
+                </td>
+            </tr>
+            `;
+        }
+    });
 
-const table =
-document.getElementById("dashboardTable");
-
-
-table.innerHTML = "";
-
-
-courses
-.filter(
-c =>
-c.type === "standard" ||
-c.type === "review"
-)
-.forEach(course=>{
-
-
-const status =
-getStatus(course.id,user.id);
-
-
-/* routing logic */
-
-let actionClick =
-"";
-
-
-if(status==="completed"){
-
-actionClick =
-"window.location.href='feedback-history.html'";
-
+    if (table && table.innerHTML === "") {
+        document.getElementById("emptyDashboard").style.display = "block";
+    }
 }
-
-else{
-
-actionClick =
-`openFeedback('${course.id}')`;
-
-}
-
-
-table.innerHTML +=
-
-`
-<tr data-course="${course.id}">
-
-<td>
-
-<strong>${course.name}</strong>
-
-<br>
-
-<span class="sub-text">
-
-${course.id}
-
-</span>
-
-</td>
-
-
-<td>
-
-<span class="badge ${status}">
-
-${statusLabel(status)}
-
-</span>
-
-</td>
-
-
-<td>
-
-<span
-class="action-link"
-onclick="${actionClick}"
->
-
-${statusAction(status)}
-
-</span>
-
-</td>
-
-</tr>
-
-`;
-
-});
-
-
-if(table.innerHTML===""){
-
-document
-.getElementById("emptyDashboard")
-.style.display="block";
-
-}
-
-}
-
-
 
 /* =============================
 STATS
 ============================= */
+export async function updateStats() {
+    const allCourses = await getCourses();
+    const user = get("endurSession");
 
-export async function updateStats(){
+    // 1. Filter to ONLY show courses the student is actually enrolled in
+    const myCourses = allCourses.filter(c => 
+        user.enrolledCourses && user.enrolledCourses.includes(c.id)
+    );
 
-const courses =
-await getCourses();
+    let completed = 0;
+    let progress = 0;
+    let pending = 0;
 
+    myCourses.forEach(course => {
+        const status = getStatus(course.id, user.id);
+        if (status === "completed") completed++;
+        else if (status === "progress") progress++;
+        else pending++;
+    });
 
-const user =
-get("endurSession");
+    const statComp = document.getElementById("statCompleted");
+    if (statComp) statComp.innerText = completed;
 
+    const statProg = document.getElementById("statProgress");
+    if (statProg) statProg.innerText = progress;
 
-let completed = 0;
-let progress = 0;
-let pending = 0;
+    const statPend = document.getElementById("statPending");
+    if (statPend) statPend.innerText = pending;
 
-
-courses.forEach(course=>{
-
-const status =
-getStatus(course.id,user.id);
-
-if(status==="completed") completed++;
-
-else if(status==="progress") progress++;
-
-else pending++;
-
-});
-
-
-document.getElementById("statCompleted").innerText =
-completed;
-
-
-document.getElementById("statProgress").innerText =
-progress;
-
-
-document.getElementById("statPending").innerText =
-pending;
-
-
-document.getElementById("statTotal").innerText =
-courses.length;
-
+    const statTot = document.getElementById("statTotal");
+    if (statTot) statTot.innerText = myCourses.length;
 }
-
-
 
 /* =============================
 HELPERS
 ============================= */
-
-function statusLabel(status){
-
-return{
-
-pending:"Pending",
-
-progress:"In Progress",
-
-completed:"Completed"
-
-}[status];
-
+function statusLabel(status) {
+    return { pending: "Pending", progress: "In Progress", completed: "Completed" }[status];
 }
 
-
-
-function statusAction(status){
-
-return{
-
-pending:"Start",
-
-progress:"Resume",
-
-completed:"View"
-
-}[status];
-
+function statusAction(status) {
+    return { pending: "Start", progress: "Resume", completed: "View" }[status];
 }
