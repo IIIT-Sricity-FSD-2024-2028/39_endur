@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Review Parameters | Dean</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .param-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dean-notes {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            resize: vertical;
+            font-family: inherit;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-layout">
+    <main class="dashboard-content" style="max-width: 900px; margin: 0 auto; padding-top: 40px;">
+        
+        <div class="form-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div>
+                <h1 id="deptTitle">Review Parameters</h1>
+                <p class="subtitle" style="margin-bottom: 0;">Proposed Evaluation Criteria for the upcoming cycle.</p>
+            </div>
+            <button class="btn-outline" onclick="window.location.href='cycle-management.html'">← Back to Cycle Management</button>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+                <h3 style="margin: 0;">Proposed Configuration</h3>
+                <span style="color: #64748b; font-size: 14px;">Total Weight: <strong id="totalWeight" style="color: #1e3a8a;">100%</strong></span>
+            </div>
+
+            <div id="paramListContainer">
+                </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 8px;">Dean's Feedback</h3>
+            <p style="color: #64748b; font-size: 13px;">If you request a revision, the HOD will see these notes.</p>
+            <textarea id="deanNotesInput" class="dean-notes" placeholder="Enter instructions or feedback for the HOD..."></textarea>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn-outline" onclick="requestRevision()" style="color: #dc2626; border-color: #fecaca; background: #fef2f2;">Request Revision</button>
+                <button class="btn-primary" onclick="approveConfig()" style="background: #16a34a; border-color: #16a34a;">Approve Parameters</button>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { initReview, approveConfig, requestRevision } from "../../js/features/dean-review-parameters.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+        requireAuth();
+        initReview();
+        
+        window.approveConfig = approveConfig;
+        window.requestRevision = requestRevision;
+    });
+</script>
+
+</body>
+</html>

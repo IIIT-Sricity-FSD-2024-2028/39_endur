@@ -14,13 +14,20 @@ export async function renderFacultyReports() {
 
     if (myCourses.length === 0) return; 
 
-    const allFeedback = get("submittedFeedback") || [];
-    const reflections = get("selfReflection") || [];
-    const actionReports = get("actionReports") || []; 
+    const cycleState = get("systemCycleState") || { id: "SETUP", phase: "PREPARATION" };
+    const currentPhase = cycleState.phase;
+    const activeCycleId = cycleState.id;
+
+    // CYCLE FIX: Fetch only data belonging to THIS cycle
+    const allFeedbackRaw = get("submittedFeedback") || [];
+    const reflectionsRaw = get("selfReflection") || [];
+    const actionReportsRaw = get("actionReports") || []; 
+
+    const allFeedback = allFeedbackRaw.filter(f => f.cycleId === activeCycleId);
+    const reflections = reflectionsRaw.filter(r => r.cycleId === activeCycleId);
+    const actionReports = actionReportsRaw.filter(a => a.cycleId === activeCycleId);
     
-    // ==========================================
     // GLOBAL ALERT: Check for Pending Revisions
-    // ==========================================
     const globalAlertContainer = document.getElementById("globalAlertContainer");
     if (globalAlertContainer) {
         const needsRevision = actionReports.filter(a => a.facultyId === user.id && a.status === "REVISION_REQUESTED");
@@ -39,10 +46,6 @@ export async function renderFacultyReports() {
             globalAlertContainer.innerHTML = "";
         }
     }
-    // ==========================================
-
-    const cycles = get("feedbackCycles") || [{ cycleId: "CYCLE_W4", endTimestamp: "2026-03-30T23:59:59Z", status: "active" }];
-    const activeCycle = cycles.find(c => c.status === "active") || cycles[0];
 
     const dotsContainer = document.getElementById("courseDots");
     const actionDotsContainer = document.getElementById("actionDots");
@@ -91,14 +94,10 @@ export async function renderFacultyReports() {
         let totalScore = 0;
         let metricCount = 0;
 
-        // DYNAMIC MATH FIX
         courseFeedback.forEach(feedback => {
             if (feedback.ratings) {
                 Object.values(feedback.ratings).forEach(val => {
-                    if (typeof val === 'number') {
-                        totalScore += val;
-                        metricCount++;
-                    }
+                    if (typeof val === 'number') { totalScore += val; metricCount++; }
                 });
             }
         });
@@ -110,7 +109,7 @@ export async function renderFacultyReports() {
             if (responseCount === 0) {
                 avgEl.innerText = "0/5";
                 avgEl.style.opacity = "0.5";
-            } else if (!hasReflection) {
+            } else if (!hasReflection && currentPhase !== "ACTION_REPORT" && currentPhase !== "COMPLETED") {
                 avgEl.innerText = "?/5";
                 avgEl.style.opacity = "0.5";
                 avgEl.title = "Submit your self-reflection to reveal the student average.";
@@ -122,6 +121,7 @@ export async function renderFacultyReports() {
         }
 
         const feedbackBtn = document.getElementById("feedbackActionBtn");
+        
         if (feedbackBtn) {
             if (hasReflection) {
                 feedbackBtn.innerText = "View Gap Analysis →";
@@ -129,17 +129,25 @@ export async function renderFacultyReports() {
                 feedbackBtn.style.opacity = "1";
                 feedbackBtn.disabled = false;
                 feedbackBtn.onclick = () => window.location.href = "gap-analysis.html";
-            } else if (responseCount < 3) {
-                feedbackBtn.innerText = `Locked (${responseCount}/3 Responses)`;
+            } 
+            else if (currentPhase === "PREPARATION" || currentPhase === "STUDENT_FEEDBACK") {
+                feedbackBtn.innerText = `Locked (Waiting for Student Phase to close)`;
                 feedbackBtn.className = "btn-outline";
                 feedbackBtn.style.opacity = "0.6";
-                feedbackBtn.disabled = true; 
-            } else {
-                feedbackBtn.innerText = "Open Feedback →";
+                feedbackBtn.disabled = true;
+            }
+            else if (currentPhase === "FACULTY_REFLECTION") {
+                feedbackBtn.innerText = "Start Self-Reflection →";
                 feedbackBtn.className = "btn-primary";
                 feedbackBtn.style.opacity = "1";
                 feedbackBtn.disabled = false;
                 feedbackBtn.onclick = () => window.location.href = "self-reflection.html";
+            }
+            else { 
+                feedbackBtn.innerText = "Reflection Period Ended";
+                feedbackBtn.className = "btn-outline";
+                feedbackBtn.style.opacity = "0.6";
+                feedbackBtn.disabled = true;
             }
         }
 
@@ -148,25 +156,10 @@ export async function renderFacultyReports() {
 
         if (arBtn && arMsg) {
             arMsg.style.display = "none";
+            arBtn.disabled = false; 
 
-            if (!hasReflection) {
-                arBtn.innerText = "Start Action Report";
-                arBtn.className = "btn-outline";
-                arBtn.style.opacity = "0.6";
-                arBtn.onclick = () => {
-                    arMsg.innerHTML = "⚠️ Please submit your Self-Reflection first.";
-                    arMsg.style.color = "#ffcccc";
-                    arMsg.style.display = "block";
-                };
-            } else if (hasActionReport) {
-                if (hasActionReport.status === "REVISION_REQUESTED") {
-                    arBtn.innerText = "Revise Action Report →";
-                    arBtn.className = "btn-danger"; 
-                    arBtn.style.opacity = "1";
-                    arMsg.innerHTML = "<strong>⚠️ HOD requested a revision.</strong> Please update your report.";
-                    arMsg.style.color = "#f87171"; 
-                    arMsg.style.display = "block";
-                } else if (hasActionReport.status === "FINALIZED") {
+            if (hasActionReport && (hasActionReport.status === "FINALIZED" || hasActionReport.status === "SUBMITTED")) {
+                if (hasActionReport.status === "FINALIZED") {
                     arBtn.innerText = "View Finalized Report →";
                     arBtn.className = "btn-outline";
                     arBtn.style.opacity = "1";
@@ -182,11 +175,38 @@ export async function renderFacultyReports() {
                     arMsg.style.display = "block";
                 }
                 arBtn.onclick = () => window.location.href = "action-report.html";
-            } else {
-                arBtn.innerText = "Start Action Report →";
-                arBtn.className = "btn-primary";
+            } 
+            else if (hasActionReport && hasActionReport.status === "REVISION_REQUESTED") {
+                arBtn.innerText = "Revise Action Report →";
+                arBtn.className = "btn-danger"; 
                 arBtn.style.opacity = "1";
+                arMsg.innerHTML = "<strong>⚠️ HOD requested a revision.</strong> Please update your report.";
+                arMsg.style.color = "#f87171"; 
+                arMsg.style.display = "block";
                 arBtn.onclick = () => window.location.href = "action-report.html";
+            }
+            else {
+                if (currentPhase === "COMPLETED") {
+                    arBtn.innerText = "Action Report Period Ended";
+                    arBtn.className = "btn-outline";
+                    arBtn.style.opacity = "0.6";
+                    arBtn.disabled = true;
+                } 
+                else if (!hasReflection) {
+                    arBtn.innerText = "Locked";
+                    arBtn.className = "btn-outline";
+                    arBtn.style.opacity = "0.6";
+                    arBtn.disabled = true;
+                    arMsg.innerHTML = "⚠️ Please submit your Self-Reflection to unlock.";
+                    arMsg.style.color = "#cbd5e1";
+                    arMsg.style.display = "block";
+                } 
+                else {
+                    arBtn.innerText = "Start Action Report →";
+                    arBtn.className = "btn-primary";
+                    arBtn.style.opacity = "1";
+                    arBtn.onclick = () => window.location.href = "action-report.html";
+                }
             }
         }
 
@@ -196,10 +216,20 @@ export async function renderFacultyReports() {
 
     selectCourse(0);
 
-    const deadlineDate = new Date(activeCycle.endTimestamp);
-    deadlineDate.setHours(deadlineDate.getHours() + 72);
     const deadlineEl = document.getElementById("actionDeadline");
-    if (deadlineEl) deadlineEl.innerText = deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (deadlineEl) {
+        if (cycleState.actionDeadline) {
+            // Read the explicitly stamped deadline
+            deadlineEl.innerText = new Date(cycleState.actionDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else if (cycleState.reflectionDeadline) {
+            // Failsafe: Dynamically calculate 72 hours after the reflection deadline
+            const fallbackDate = new Date(cycleState.reflectionDeadline);
+            fallbackDate.setHours(fallbackDate.getHours() + 72);
+            deadlineEl.innerText = fallbackDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else {
+            deadlineEl.innerText = "TBD";
+        }
+    }
 
     const chart = document.getElementById("trendChart");
     if (chart) {
@@ -212,3 +242,4 @@ export async function renderFacultyReports() {
         });
     }
 }
+

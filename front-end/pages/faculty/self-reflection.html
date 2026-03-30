@@ -14,49 +14,22 @@
 <body>
 
 <div class="form-layout">
-
     <div class="form-header">
         <h2>Faculty Self-Reflection</h2>
         <button class="close-btn" onclick="goBack()">✕</button>
     </div>
 
     <h1>End-of-Term Self-Reflection</h1>
-    <p class="subtitle">Evaluate your teaching effectiveness for this cycle.</p>
+    <p class="subtitle">Evaluate your teaching effectiveness based on the cycle's parameters.</p>
 
-    <!-- quantitative -->
     <div class="profile-card">
         <h3>Quantitative Assessment</h3>
         
-        <div class="feedback-grid">
-
-            <div class="question-card">
-                <h4>Clarity of Explanation</h4>
-                <p>How clearly were concepts delivered?</p>
-                <div class="rating" data-field="clarity" id="clarityRating"></div>
-            </div>
-
-            <div class="question-card">
-                <h4>Structure of Course</h4>
-                <p>How well was the course organized?</p>
-                <div class="rating" data-field="structure" id="structureRating"></div>
-            </div>
-
-            <div class="question-card">
-                <h4>Student Engagement</h4>
-                <p>How actively were students involved?</p>
-                <div class="rating" data-field="engagement" id="engagementRating"></div>
-            </div>
-
-            <div class="question-card">
-                <h4>Difficulty Level</h4>
-                <p>How appropriate was the difficulty?</p>
-                <div class="rating" data-field="difficulty" id="difficultyRating"></div>
-            </div>
-
+        <div class="feedback-grid" id="dynamicQuestionsContainer">
+            <p style="color: #64748b; font-style: italic; padding: 20px;">Loading evaluation parameters...</p>
         </div>
     </div>
 
-    <!-- qualitative -->
     <div class="profile-card">
         <h3>Qualitative Assessment</h3>
         <label>Key achievements & areas for improvement</label>
@@ -64,25 +37,23 @@
         <p class="sub-text">Visible only to academic leadership.</p>
     </div>
 
-    <!-- actions -->
     <div class="form-actions">
         <button class="btn-outline" onclick="goBack()">Go Back</button>
         <button class="btn-primary" onclick="submitSelfReflection()">Submit Reflection →</button>
     </div>
-
 </div>
 
-<!-- Fixed Script Block -->
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initSelfReflection } from "../../js/features/self-reflection.js";
+    import { initSelfReflection, submitSelfReflection } from "../../js/features/self-reflection.js";
 
-    requireAuth();
-    initSelfReflection();
+    const user = requireAuth();
+    if(user) {
+        initSelfReflection();
+    }
 
-    window.goBack = function(){
-        window.history.back();
-    };
+    window.submitSelfReflection = submitSelfReflection;
+    window.goBack = () => window.location.href = "reports.html";
 </script>
 
 </body>

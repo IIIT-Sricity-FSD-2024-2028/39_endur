@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
     <style>
-        /* Specific layout for the Split Pane */
         .checkin-layout {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -20,8 +19,6 @@
             align-items: start;
             height: calc(100vh - 140px);
         }
-
-        /* Left List Styles */
         .checkin-list {
             background: white;
             border-radius: 12px;
@@ -40,8 +37,6 @@
             background: #f1f5f9;
             border-left: 4px solid var(--primary);
         }
-        
-        /* Right Detail Styles */
         .checkin-detail {
             height: 100%;
             overflow-y: auto;
@@ -63,8 +58,6 @@
             grid-template-columns: 1fr 1fr;
             gap: 20px;
         }
-        
-        /* Custom Gap & Snippet Boxes */
         .gap-box {
             background: #fef2f2;
             border: 1px solid #fee2e2;
@@ -74,7 +67,6 @@
         }
         .gap-box h4 { color: #dc2626; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; }
         .gap-box p { color: #991b1b; font-size: 14px; }
-        
         .snippet-item {
             display: flex;
             gap: 12px;
@@ -87,8 +79,6 @@
             color: #10b981;
             font-weight: bold;
         }
-
-        /* Form Areas */
         textarea.hod-notes {
             width: 100%;
             min-height: 100px;
@@ -98,7 +88,6 @@
             resize: vertical;
             font-family: inherit;
         }
-        
         .action-bar {
             display: flex;
             justify-content: flex-end;
@@ -113,8 +102,6 @@
 <body>
 
 <div class="dashboard-layout">
-
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
@@ -127,7 +114,6 @@
             <a href="dashboard.html">Dashboard</a>
             <a href="faculty-management.html">Faculty Management</a>
             <a class="active" href="review-checkin.html">Review Check In</a>
-            <!-- FIXED: Link to evaluation parameters -->
             <a href="evaluation-parameters.html">Evaluation Parameters</a>
         </nav>
         <a href="profile.html" class="sidebar-user">
@@ -139,22 +125,19 @@
         </a>
     </aside>
 
-    <!-- MAIN -->
     <main class="dashboard-content">
+        <!-- DOMAIN PHASE BANNER -->
+        <div id="cyclePhaseBanner" style="padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px; display: none;"></div>
+
         <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
             <h1>Review Check-ins</h1>
-            <span class="badge neutral" style="font-size: 12px;">ACTIVE CYCLE</span>
+            <span id="activeCycleBadge" class="badge neutral" style="font-size: 12px; text-transform: uppercase;">LOADING...</span>
         </div>
 
         <div class="checkin-layout">
-            <!-- LEFT PANE: List -->
-            <div class="checkin-list" id="checkinList">
-                <!-- Populated via JS -->
-            </div>
+            <div class="checkin-list" id="checkinList"></div>
 
-            <!-- RIGHT PANE: Detail -->
             <div class="checkin-detail" id="checkinDetail" style="display: none;">
-                <!-- Header -->
                 <div class="detail-header">
                     <div>
                         <h2 id="detailName">Faculty Name</h2>
@@ -169,9 +152,7 @@
                     </div>
                 </div>
 
-                <!-- Split Content -->
                 <div class="info-grid">
-                    <!-- Left Column: Gaps -->
                     <div class="card" style="margin: 0;">
                         <h3 style="margin-bottom: 16px; font-size: 16px;">📊 Gap Analysis Summary</h3>
                         <div class="gap-box" id="criticalGapBox">
@@ -180,16 +161,12 @@
                         </div>
                     </div>
 
-                    <!-- Right Column: Snippets -->
                     <div class="card" style="margin: 0;">
                         <h3 style="margin-bottom: 16px; font-size: 16px;">✅ Action Report Strategies</h3>
-                        <div id="detailStrategies" style="margin-top: 10px;">
-                            <!-- Populated via JS -->
-                        </div>
+                        <div id="detailStrategies" style="margin-top: 10px;"></div>
                     </div>
                 </div>
 
-                <!-- Form Areas -->
                 <div class="card" style="margin: 0;">
                     <div style="margin-bottom: 20px;">
                         <h3 style="font-size: 16px; margin-bottom: 8px;">📝 HOD Meeting Notes</h3>
@@ -201,14 +178,12 @@
                     </div>
                 </div>
 
-                <!-- NEW: Added id="hodActionBar" -->
                 <div class="action-bar" id="hodActionBar">
                     <button class="btn-outline" onclick="requestRevision()">Request Revision</button>
                     <button class="btn-primary" onclick="finalizeCheckin()" style="background: #1e3a8a;">Finalize Check-in</button>
                 </div>
             </div>
             
-            <!-- Empty State for Right Pane -->
             <div id="emptyDetail" class="card" style="display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; color: #64748b;">
                 <div>
                     <h2 style="margin-bottom: 8px; color: #0f172a;">Select a Review Check-in</h2>

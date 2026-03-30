@@ -1,14 +1,47 @@
-import { get, set, remove } from "../core/storage.js";
+import { get, set } from "../core/storage.js";
 import { getSession } from "../core/session.js";
 import { createRating } from "../components/rating.js";
 
 const ratings = {};
+let activeParamsForDept = [];
 
 export function initSelfReflection() {
-    createRating("clarityRating", "clarity", handleRatingChange);
-    createRating("structureRating", "structure", handleRatingChange);
-    createRating("engagementRating", "engagement", handleRatingChange);
-    createRating("difficultyRating", "difficulty", handleRatingChange);
+    const user = getSession();
+    if (!user) return;
+
+    // 1. Get the source of truth: Active Parameters finalized by HOD/Dean
+    const allActiveParams = get("activeParameters") || {};
+    activeParamsForDept = allActiveParams[user.department] || [];
+
+    // Fallback logic if no parameters are found for the department
+    if (activeParamsForDept.length === 0) {
+        console.warn("No active parameters found for department. Using defaults.");
+        activeParamsForDept = [
+            { id: "clarity", name: "Clarity of Explanation", desc: "Effectiveness of teaching methods." },
+            { id: "structure", name: "Structure of Course", desc: "Organization of materials." },
+            { id: "engagement", name: "Student Engagement", desc: "Fostering an interactive environment." },
+            { id: "difficulty", name: "Difficulty Level", desc: "Appropriateness of the coursework." }
+        ];
+    }
+
+    const container = document.getElementById("dynamicQuestionsContainer");
+    if (container) {
+        container.innerHTML = ""; // Clear loader
+
+        activeParamsForDept.forEach(p => {
+            const card = document.createElement("div");
+            card.className = "question-card";
+            card.innerHTML = `
+                <h4>${p.name}</h4>
+                <p>${p.desc}</p>
+                <div class="rating" data-field="${p.id}" id="${p.id}Rating"></div>
+            `;
+            container.appendChild(card);
+
+            // Initialize rating component for this dynamic ID
+            createRating(`${p.id}Rating`, p.id, handleRatingChange);
+        });
+    }
 
     loadDraft();
 
@@ -16,8 +49,6 @@ export function initSelfReflection() {
     if (textArea) {
         textArea.addEventListener("input", saveDraft);
     }
-
-    window.submitSelfReflection = submitSelfReflection;
 }
 
 function handleRatingChange(field, value) {
@@ -46,6 +77,7 @@ function loadDraft() {
     Object.assign(ratings, drafts[user.id].ratings);
     document.getElementById("reflectionText").value = drafts[user.id].text || "";
 
+    // Set star visual states
     Object.entries(ratings).forEach(([field, value]) => {
         const container = document.getElementById(field + "Rating");
         if (container) {
@@ -57,9 +89,10 @@ function loadDraft() {
     });
 }
 
-function submitSelfReflection() {
-    if (Object.keys(ratings).length < 4) {
-        alert("Please complete all 4 quantitative ratings before submitting.");
+export function submitSelfReflection() {
+    // Validate that ALL dynamic parameters have been rated
+    if (Object.keys(ratings).length < activeParamsForDept.length) {
+        alert(`Please complete all ${activeParamsForDept.length} quantitative ratings before submitting.`);
         return;
     }
 
@@ -70,40 +103,23 @@ function submitSelfReflection() {
     }
 
     const user = getSession();
-    
-    // READ THE DYNAMIC COURSE
     const activeCourse = localStorage.getItem("activeFacultyCourse");
-    if (!activeCourse) {
-        alert("Error: No active course selected. Returning to dashboard.");
-        window.location.href = "reports.html";
-        return;
-    }
-
-    const cycles = get("feedbackCycles") || [];
-    const activeCycleObj = cycles.find(c => c.status === "active") || { cycleId: "CYCLE_W4" };
-    const activeCycle = activeCycleObj.cycleId;
+    const cycleState = get("systemCycleState") || { id: "CYCLE_ERROR" };
 
     let stored = get("selfReflection") || [];
 
-    // Defensive check: Prevent double submission
-    const alreadySubmitted = stored.find(r => r.courseId === activeCourse && r.facultyId === user.id && r.cycleId === activeCycle);
-    if (alreadySubmitted) {
-        alert(`Self-reflection already submitted for ${activeCourse}. Routing to Gap Analysis.`);
-        window.location.href = "gap-analysis.html";
-        return;
-    }
+    // Map ratings specifically to the IDs of the active parameters
+    const expectedRatings = {};
+    activeParamsForDept.forEach(p => {
+        expectedRatings[p.id] = ratings[p.id];
+    });
 
     const newReflection = {
         reflectionId: "REFL_" + new Date().getTime(),
         facultyId: user.id,
         courseId: activeCourse,
-        cycleId: activeCycle,
-        expectedRatings: {
-            clarity: ratings.clarity,
-            structure: ratings.structure,
-            engagement: ratings.engagement,
-            difficulty: ratings.difficulty
-        },
+        cycleId: cycleState.id,
+        expectedRatings: expectedRatings,
         reflectionText: textValue,
         submissionDate: new Date().toISOString()
     };
@@ -111,6 +127,7 @@ function submitSelfReflection() {
     stored.push(newReflection);
     set("selfReflection", stored);
 
+    // Clear draft
     let drafts = get("selfReflectionDraft") || {};
     delete drafts[user.id];
     set("selfReflectionDraft", drafts);
