@@ -8,6 +8,46 @@ export async function renderReviewCheckins() {
     const user = getSession();
     if (!user) return;
 
+    const listContainer = document.getElementById("checkinList");
+    const banner = document.getElementById("cyclePhaseBanner");
+    const emptyDetail = document.getElementById("emptyDetail");
+    const checkinDetail = document.getElementById("checkinDetail");
+    
+    const cycleState = get("systemCycleState") || { id: "SETUP", phase: "PREPARATION" };
+    const activeCycleId = cycleState.id;
+    const badgeEl = document.getElementById("activeCycleBadge");
+    if(badgeEl) badgeEl.innerText = activeCycleId;
+
+    if (cycleState.phase !== "FACULTY_REFLECTION") {
+        listContainer.innerHTML = `<div style="padding: 30px; text-align: center; color: #64748b; font-size: 14px;">No active check-ins for the current cycle.</div>`;
+        checkinDetail.style.display = "none";
+        emptyDetail.style.display = "flex";
+        
+        let reason = "The feedback cycle has been completed and archived.";
+        if (cycleState.phase === "PREPARATION") reason = "The next cycle is still in the preparation phase.";
+        if (cycleState.phase === "STUDENT_FEEDBACK") reason = "Students are currently providing feedback.";
+
+        emptyDetail.innerHTML = `
+            <div>
+                <h2 style="margin-bottom: 8px; color: #0f172a;">Check-ins Closed</h2>
+                <p>${reason}</p>
+            </div>
+        `;
+
+        if (banner) {
+            banner.style.display = "block";
+            banner.style.background = "#f8fafc"; banner.style.border = "1px solid #cbd5e1"; banner.style.color = "#475569";
+            banner.innerHTML = "<strong>🔒 Module Locked:</strong> Review check-ins are only active during the Faculty Reflection phase.";
+        }
+        return; 
+    }
+
+    if (banner) {
+        banner.style.display = "block";
+        banner.style.background = "#f0fdf4"; banner.style.border = "1px solid #bbf7d0"; banner.style.color = "#166534";
+        banner.innerHTML = "<strong>📝 Check-ins Open:</strong> You may now review Action Reports and finalize Check-ins.";
+    }
+
     const [usersRes, coursesRes] = await Promise.all([
         fetch("../../js/mock-data/users.json"),
         fetch("../../js/mock-data/courses.json")
@@ -15,12 +55,16 @@ export async function renderReviewCheckins() {
     const allUsers = await usersRes.json();
     const allCourses = await coursesRes.json();
 
-    const submissions = get("submittedFeedback") || [];
-    const reflections = get("selfReflection") || [];
-    const actionReports = get("actionReports") || [];
+    // CYCLE FIX: Filter all records by the current active cycle
+    const allSubmissions = get("submittedFeedback") || [];
+    const allReflections = get("selfReflection") || [];
+    const allActionReports = get("actionReports") || [];
+
+    const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+    const reflections = allReflections.filter(r => r.cycleId === activeCycleId);
+    const actionReports = allActionReports.filter(a => a.cycleId === activeCycleId);
 
     const myFaculty = allUsers.filter(u => u.role === "faculty" && u.department === user.department);
-    const listContainer = document.getElementById("checkinList");
     listContainer.innerHTML = "";
 
     const viewDataList = [];
@@ -28,7 +72,6 @@ export async function renderReviewCheckins() {
     myFaculty.forEach(faculty => {
         const facultyCourses = allCourses.filter(c => c.facultyId === faculty.id);
 
-        // DYNAMIC MATH FIX inside hod-review-checkin.js
         facultyCourses.forEach(course => {
             const courseFeedback = submissions.filter(f => f.course === course.id);
             let avgScore = 0;
@@ -45,7 +88,6 @@ export async function renderReviewCheckins() {
                 });
                 avgScore = sumAverages / courseFeedback.length;
             }
-            // ... rest of the code continues as normal ...
 
             const reflection = reflections.find(r => r.courseId === course.id && r.facultyId === faculty.id);
             const actionReport = actionReports.find(a => a.courseId === course.id && a.facultyId === faculty.id);
@@ -129,7 +171,6 @@ function openDetailView(data) {
     const outcomesEl = document.getElementById("hodOutcomes");
     const actionBar = document.getElementById("hodActionBar");
 
-    // Load Action Report Data if it exists
     if (data.actionReport) {
         rootCauseEl.innerText = data.actionReport.rootCause || "No root cause provided.";
         const strategies = (data.actionReport.plannedStrategies || "No strategies provided.").split('\n').filter(s => s.trim() !== '');
@@ -144,19 +185,21 @@ function openDetailView(data) {
         outcomesEl.value = "";
     }
 
-    // ==========================================
-    // DYNAMIC STATE MANAGEMENT (Locked vs Waiting vs Disabled vs Active)
-    // ==========================================
+    // STATE LOGIC
     if (data.status === "FINALIZED") {
-        // STATE 1: Fully Locked (History View)
         notesEl.disabled = true;
         outcomesEl.disabled = true;
         notesEl.style.backgroundColor = "#f8fafc";
         outcomesEl.style.backgroundColor = "#f8fafc";
-        if (actionBar) actionBar.style.display = "none";
-
+        if (actionBar) {
+            actionBar.style.display = "flex";
+            actionBar.innerHTML = `
+                <div style="flex: 1; display: flex; align-items: center;">
+                    <span style="color: #16a34a; font-size: 14px; font-weight: 600;">✅ Check-in Finalized</span>
+                </div>
+            `;
+        }
     } else if (data.actionReport && data.actionReport.status === "REVISION_REQUESTED") {
-        // STATE 2: Revision Pending (Disabled + Waiting Warning)
         notesEl.disabled = true;
         outcomesEl.disabled = true;
         notesEl.style.backgroundColor = "#f8fafc";
@@ -171,9 +214,7 @@ function openDetailView(data) {
                 <button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed; background: #1e3a8a;">Finalize Check-in</button>
             `;
         }
-
     } else if (!data.actionReport) {
-        // STATE 3: Pending Arrival (Disabled + Warning)
         notesEl.disabled = true;
         outcomesEl.disabled = true;
         notesEl.style.backgroundColor = "#f8fafc";
@@ -188,9 +229,7 @@ function openDetailView(data) {
                 <button class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed; background: #1e3a8a;">Finalize Check-in</button>
             `;
         }
-
     } else {
-        // STATE 4: Ready for Review (Active)
         notesEl.disabled = false;
         outcomesEl.disabled = false;
         notesEl.style.backgroundColor = "#fff";
@@ -205,7 +244,6 @@ function openDetailView(data) {
     }
 }
 
-// SHARED LOGIC for HOD Actions
 function processCheckinAction(newStatus) {
     if (!currentActiveFacultyId || !currentActiveCourseId) return;
 
@@ -218,7 +256,10 @@ function processCheckinAction(newStatus) {
     }
 
     const actionReports = get("actionReports") || [];
-    const reportIndex = actionReports.findIndex(a => a.facultyId === currentActiveFacultyId && a.courseId === currentActiveCourseId);
+    const cycleState = get("systemCycleState") || { id: "SETUP" };
+    
+    // Make sure we update the specific report for THIS cycle
+    const reportIndex = actionReports.findIndex(a => a.facultyId === currentActiveFacultyId && a.courseId === currentActiveCourseId && a.cycleId === cycleState.id);
 
     if (reportIndex >= 0) {
         actionReports[reportIndex].hodNotes = notes;

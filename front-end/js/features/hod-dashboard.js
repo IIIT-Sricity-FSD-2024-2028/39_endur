@@ -12,8 +12,15 @@ export async function renderHodDashboard() {
     const allUsers = await usersRes.json();
     const allCourses = await coursesRes.json();
     
-    const submissions = get("submittedFeedback") || [];
-    const actionReports = get("actionReports") || [];
+    // CYCLE FIX: Filter data for the active cycle
+    const cycleState = get("systemCycleState") || { id: "SETUP" };
+    const activeCycleId = cycleState.id;
+
+    const allSubmissions = get("submittedFeedback") || [];
+    const allActionReports = get("actionReports") || [];
+    
+    const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+    const actionReports = allActionReports.filter(a => a.cycleId === activeCycleId);
     
     const myFaculty = allUsers.filter(u => u.role === "faculty" && u.department === user.department);
     const facultyIds = myFaculty.map(f => f.id);
@@ -33,7 +40,7 @@ export async function renderHodDashboard() {
     });
 
     const deptAverage = deptMetricCount > 0 ? (totalDeptScore / deptMetricCount) : 0;
-    const deptSatisfaction = (deptAverage / 5) * 100;
+    const deptSatisfaction = deptAverage > 0 ? (deptAverage / 5) * 100 : 0;
 
     // Response Rate (Mock calculation based on total courses)
     const deptCourses = allCourses.filter(c => facultyIds.includes(c.facultyId));

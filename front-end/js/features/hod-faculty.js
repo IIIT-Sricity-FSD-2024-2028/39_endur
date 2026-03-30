@@ -12,7 +12,13 @@ export async function renderFacultyManagement() {
     
     const allUsers = await usersRes.json();
     const allCourses = await coursesRes.json();
-    const submissions = get("submittedFeedback") || [];
+    
+    // CYCLE FIX: Filter for current cycle
+    const cycleState = get("systemCycleState") || { id: "SETUP" };
+    const activeCycleId = cycleState.id;
+    const allSubmissions = get("submittedFeedback") || [];
+    const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+    
     const myFaculty = allUsers.filter(u => u.role === "faculty" && u.department === user.department);
     const tableBody = document.getElementById("managementTableBody");
     if (tableBody) tableBody.innerHTML = "";

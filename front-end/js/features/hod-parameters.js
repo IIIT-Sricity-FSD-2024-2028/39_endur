@@ -11,18 +11,46 @@ export const DEFAULT_PARAMETERS = [
 ];
 
 let editingParamId = null;
+let isDragEventsAttached = false;
+let isDragging = false;
+let dragStartX = 0;
+let dragLeftIndex = -1;
+let initialLeftWeight = 0;
+let initialRightWeight = 0;
+
+// Security check to prevent backend manipulation when closed
+function checkPhaseLock() {
+    const cycleState = get("systemCycleState") || { phase: "COMPLETED" };
+    return cycleState.phase !== "PREPARATION";
+}
 
 export function initParameters() {
     const user = getSession();
     if (!user) return;
 
     let allDrafts = get("draftParameters") || {};
+    let activeParams = get("activeParameters") || {};
     let statuses = get("departmentConfigStatus") || {};
-    let currentStatus = statuses[user.department] || "DRAFT";
     
+    // Inherit from active parameters first, fallback to default if completely new
     if (!allDrafts[user.department] || allDrafts[user.department].length === 0) {
-        allDrafts[user.department] = DEFAULT_PARAMETERS;
+        if (activeParams[user.department] && activeParams[user.department].length > 0) {
+            allDrafts[user.department] = activeParams[user.department];
+            statuses[user.department] = "APPROVED"; 
+        } else {
+            allDrafts[user.department] = DEFAULT_PARAMETERS;
+            statuses[user.department] = "DRAFT";
+        }
         set("draftParameters", allDrafts);
+        set("departmentConfigStatus", statuses);
+    }
+    
+    let currentStatus = statuses[user.department] || "DRAFT";
+
+    if (!isDragEventsAttached) {
+        document.addEventListener("mousemove", handleDragMove);
+        document.addEventListener("mouseup", handleDragEnd);
+        isDragEventsAttached = true;
     }
     
     renderAll(allDrafts[user.department], currentStatus);
@@ -30,6 +58,21 @@ export function initParameters() {
 
 function renderAll(params, status = "DRAFT") {
     const user = getSession();
+    const cycleState = get("systemCycleState") || { id: "SETUP", phase: "COMPLETED" };
+    
+    const badgeEl = document.getElementById("cycleNameBadge");
+    if(badgeEl) badgeEl.innerText = cycleState.id;
+
+    const isCycleActive = cycleState.phase === "STUDENT_FEEDBACK" || cycleState.phase === "FACULTY_REFLECTION" || cycleState.phase === "ACTION_REPORT";
+    const isCycleCompleted = cycleState.phase === "COMPLETED";
+    
+    let isLocked = false;
+    if (isCycleActive || isCycleCompleted) {
+        isLocked = true;
+    } else if (cycleState.phase === "PREPARATION") {
+        isLocked = (status === "SUBMITTED" || status === "APPROVED");
+    }
+
     const listContainer = document.getElementById("paramListContainer");
     const stackedBar = document.getElementById("stackedBar");
     const legendContainer = document.getElementById("legendContainer");
@@ -38,14 +81,13 @@ function renderAll(params, status = "DRAFT") {
     stackedBar.innerHTML = "";
     legendContainer.innerHTML = "";
 
-    const isLocked = (status === "SUBMITTED" || status === "APPROVED");
-
-    // Manage Banners
-    document.getElementById("statusBannerPending").style.display = status === "SUBMITTED" ? "block" : "none";
-    document.getElementById("statusBannerApproved").style.display = status === "APPROVED" ? "block" : "none";
+    document.getElementById("statusBannerCycleActive").style.display = isCycleActive ? "block" : "none";
+    document.getElementById("statusBannerCompleted").style.display = isCycleCompleted ? "block" : "none"; 
+    document.getElementById("statusBannerPending").style.display = (status === "SUBMITTED" && cycleState.phase === "PREPARATION") ? "block" : "none";
+    document.getElementById("statusBannerApproved").style.display = (status === "APPROVED" && cycleState.phase === "PREPARATION") ? "block" : "none";
     
     const revBanner = document.getElementById("statusBannerRevision");
-    if (status === "REVISION_REQUESTED") {
+    if (status === "REVISION_REQUESTED" && cycleState.phase === "PREPARATION") {
         revBanner.style.display = "block";
         const notesObj = get("departmentConfigNotes") || {};
         document.getElementById("deanNotesText").innerText = notesObj[user.department] || "Please revise your configuration.";
@@ -53,7 +95,6 @@ function renderAll(params, status = "DRAFT") {
         revBanner.style.display = "none";
     }
 
-    // Manage Add Button State
     const createBtn = document.getElementById("createParamBtn");
     if (createBtn) {
         createBtn.disabled = isLocked;
@@ -100,7 +141,22 @@ function renderAll(params, status = "DRAFT") {
         listContainer.appendChild(row);
 
         const segment = document.createElement("div");
-        segment.style.cssText = `height: 100%; width: ${weightNum}%; background-color: ${color};`;
+        segment.style.cssText = `position: relative; height: 100%; width: ${weightNum}%; background-color: ${color};`;
+        
+        if (index < params.length - 1 && !isLocked) {
+            const handle = document.createElement("div");
+            handle.className = "drag-handle";
+            handle.addEventListener("mousedown", (e) => {
+                isDragging = true;
+                dragStartX = e.clientX;
+                dragLeftIndex = index;
+                initialLeftWeight = parseInt(params[index].weight);
+                initialRightWeight = parseInt(params[index+1].weight);
+                handle.classList.add("active");
+                document.body.classList.add("dragging-bar");
+            });
+            segment.appendChild(handle);
+        }
         stackedBar.appendChild(segment);
 
         const legend = document.createElement("div");
@@ -115,24 +171,29 @@ function renderAll(params, status = "DRAFT") {
     const totalEl = document.getElementById("totalAssignedText");
     const warningEl = document.getElementById("weightWarning");
     const finalizeBtn = document.getElementById("finalizeConfigBtn");
+    
+    const magicWandBtn = warningEl ? warningEl.querySelector("button") : null;
+    if (magicWandBtn) {
+        magicWandBtn.style.display = isLocked ? "none" : "block";
+    }
 
     totalEl.innerText = `${totalWeight}%`;
     
-    // Manage Submit Button State
     if (isLocked) {
         totalEl.style.color = "#1e3a8a";
-        warningEl.style.display = "none";
+        if(warningEl) warningEl.style.display = "none";
         if (finalizeBtn) {
             finalizeBtn.disabled = true;
             finalizeBtn.style.opacity = "0.5";
             finalizeBtn.style.cursor = "not-allowed";
-            finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "Submitted";
+            if(isCycleActive || isCycleCompleted) finalizeBtn.innerText = "Locked";
+            else finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "Submitted";
         }
     } else {
         if (finalizeBtn) finalizeBtn.innerText = "Submit Configuration";
         if (totalWeight !== 100) {
             totalEl.style.color = "#dc2626";
-            warningEl.style.display = "block";
+            if(warningEl) warningEl.style.display = "flex"; 
             if (finalizeBtn) {
                 finalizeBtn.disabled = true;
                 finalizeBtn.style.opacity = "0.5";
@@ -140,7 +201,7 @@ function renderAll(params, status = "DRAFT") {
             }
         } else {
             totalEl.style.color = "#1e3a8a";
-            warningEl.style.display = "none";
+            if(warningEl) warningEl.style.display = "none";
             if (finalizeBtn) {
                 finalizeBtn.disabled = false;
                 finalizeBtn.style.opacity = "1";
@@ -152,6 +213,95 @@ function renderAll(params, status = "DRAFT") {
     if (params.length === 0) {
         listContainer.innerHTML = `<p style="padding: 20px 0; color: #64748b; text-align: center;">No parameters defined.</p>`;
     }
+}
+
+function handleDragMove(e) {
+    if (!isDragging) return;
+    const stackedBar = document.getElementById("stackedBar");
+    const containerWidth = stackedBar.getBoundingClientRect().width;
+    const deltaX = e.clientX - dragStartX;
+    const deltaPercent = Math.round((deltaX / containerWidth) * 100);
+
+    let newLeft = initialLeftWeight + deltaPercent;
+    let newRight = initialRightWeight - deltaPercent;
+
+    if (newLeft < 1) { newLeft = 1; newRight = initialLeftWeight + initialRightWeight - 1; }
+    if (newRight < 1) { newRight = 1; newLeft = initialLeftWeight + initialRightWeight - 1; }
+
+    stackedBar.children[dragLeftIndex].style.width = newLeft + "%";
+    stackedBar.children[dragLeftIndex+1].style.width = newRight + "%";
+}
+
+function handleDragEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    document.body.classList.remove("dragging-bar");
+    document.querySelectorAll('.drag-handle').forEach(h => h.classList.remove('active'));
+
+    if (checkPhaseLock()) return;
+
+    const user = getSession();
+    let allDrafts = get("draftParameters") || {};
+    let params = allDrafts[user.department] || [];
+    let statuses = get("departmentConfigStatus") || {};
+
+    const stackedBar = document.getElementById("stackedBar");
+    const containerWidth = stackedBar.getBoundingClientRect().width;
+    const deltaX = e.clientX - dragStartX;
+    const deltaPercent = Math.round((deltaX / containerWidth) * 100);
+
+    let newLeft = initialLeftWeight + deltaPercent;
+    let newRight = initialRightWeight - deltaPercent;
+
+    if (newLeft < 1) { newLeft = 1; newRight = initialLeftWeight + initialRightWeight - 1; }
+    if (newRight < 1) { newRight = 1; newLeft = initialLeftWeight + initialRightWeight - 1; }
+
+    if (newLeft !== initialLeftWeight) {
+        params[dragLeftIndex].weight = newLeft;
+        params[dragLeftIndex+1].weight = newRight;
+        
+        statuses[user.department] = "DRAFT";
+        set("departmentConfigStatus", statuses);
+
+        allDrafts[user.department] = params;
+        set("draftParameters", allDrafts);
+        renderAll(params, "DRAFT");
+    } else {
+        renderAll(params, statuses[user.department]);
+    }
+}
+
+export function autoBalance() {
+    if (checkPhaseLock()) return;
+    const user = getSession();
+    let allDrafts = get("draftParameters") || {};
+    let params = allDrafts[user.department] || [];
+    if (params.length === 0) return;
+
+    let total = params.reduce((sum, p) => sum + parseInt(p.weight), 0);
+    if (total === 100 || total === 0) return;
+
+    let newTotal = 0;
+    
+    params.forEach((p, i) => {
+        if (i === params.length - 1) {
+            p.weight = 100 - newTotal;
+            if(p.weight <= 0) p.weight = 1; 
+        } else {
+            let scaled = Math.round(parseInt(p.weight) * (100 / total));
+            if (scaled < 1) scaled = 1; 
+            p.weight = scaled;
+            newTotal += scaled;
+        }
+    });
+
+    let statuses = get("departmentConfigStatus") || {};
+    statuses[user.department] = "DRAFT";
+    set("departmentConfigStatus", statuses);
+
+    allDrafts[user.department] = params;
+    set("draftParameters", allDrafts);
+    renderAll(params, "DRAFT");
 }
 
 export function openParamModal(id = null) {
@@ -190,16 +340,21 @@ export function closeParamModal() {
 }
 
 export function deleteParameter(id) {
+    if (checkPhaseLock()) return;
     const user = getSession();
     let allDrafts = get("draftParameters") || {};
     let statuses = get("departmentConfigStatus") || {};
     
+    statuses[user.department] = "DRAFT";
+    set("departmentConfigStatus", statuses);
+
     allDrafts[user.department] = allDrafts[user.department].filter(p => p.id !== id);
     set("draftParameters", allDrafts);
-    renderAll(allDrafts[user.department], statuses[user.department]);
+    renderAll(allDrafts[user.department], "DRAFT");
 }
 
 export function saveParameter() {
+    if (checkPhaseLock()) return;
     const name = document.getElementById("newParamName").value.trim();
     const desc = document.getElementById("newParamDesc").value.trim();
     const weight = parseInt(document.getElementById("newParamWeight").value);
@@ -214,6 +369,9 @@ export function saveParameter() {
     let statuses = get("departmentConfigStatus") || {};
     let deptParams = allDrafts[user.department] || [];
     
+    statuses[user.department] = "DRAFT";
+    set("departmentConfigStatus", statuses);
+
     if (editingParamId) {
         const index = deptParams.findIndex(p => p.id === editingParamId);
         if (index > -1) {
@@ -234,10 +392,11 @@ export function saveParameter() {
     set("draftParameters", allDrafts);
     
     closeParamModal();
-    renderAll(deptParams, statuses[user.department]);
+    renderAll(deptParams, "DRAFT");
 }
 
 export function finalizeConfig() {
+    if (checkPhaseLock()) return;
     const user = getSession();
     let allDrafts = get("draftParameters") || {};
     let deptParams = allDrafts[user.department] || [];

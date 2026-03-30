@@ -14,7 +14,28 @@ export function initActionReport() {
     document.getElementById("courseIdLabel").innerText = activeCourseId;
 
     const actionReports = get("actionReports") || [];
-    const existingReport = actionReports.find(r => r.courseId === activeCourseId && r.facultyId === user.id);
+    const cycleState = get("systemCycleState") || { id: "SETUP", phase: "PREPARATION" };
+    const activeCycleId = cycleState.id;
+
+    // CYCLE FIX: Look specifically for a report from THIS cycle
+    const existingReport = actionReports.find(r => r.courseId === activeCourseId && r.facultyId === user.id && r.cycleId === activeCycleId);
+
+    // SECURITY CHECK
+    const reflections = get("selfReflection") || [];
+    const hasReflection = reflections.find(r => r.courseId === activeCourseId && r.facultyId === user.id && r.cycleId === activeCycleId);
+    
+    if (!existingReport) {
+        if (cycleState.phase === "COMPLETED") {
+            alert("Access Denied: The evaluation cycle has been closed and archived.");
+            window.location.href = "reports.html";
+            return;
+        }
+        if (!hasReflection) {
+            alert("Access Denied: You must complete your Self-Reflection and view the Gap Analysis before creating an Action Report.");
+            window.location.href = "reports.html";
+            return;
+        }
+    }
 
     const form = document.getElementById("actionReportForm");
     const rootCauseInput = document.getElementById("rootCause");
@@ -23,20 +44,17 @@ export function initActionReport() {
     const submitBtn = form.querySelector("button[type='submit']");
 
     if (existingReport) {
-        // Pre-fill data
         rootCauseInput.value = existingReport.rootCause;
         strategiesInput.value = existingReport.plannedStrategies;
         timelineInput.value = existingReport.timeline;
 
         if (existingReport.status === "REVISION_REQUESTED") {
-            // STATE: Revision Needed
             document.getElementById("revisionBanner").style.display = "block";
             document.getElementById("revHodNotes").innerText = existingReport.hodNotes;
             document.getElementById("revHodOutcomes").innerText = existingReport.hodOutcomes;
             submitBtn.innerText = "Resubmit Action Report";
             
         } else if (existingReport.status === "FINALIZED") {
-            // STATE: Approved and Locked
             document.getElementById("finalizedBanner").style.display = "block";
             document.getElementById("finHodNotes").innerText = existingReport.hodNotes;
             document.getElementById("finHodOutcomes").innerText = existingReport.hodOutcomes;
@@ -47,7 +65,6 @@ export function initActionReport() {
             submitBtn.style.display = "none";
             
         } else {
-            // STATE: Submitted (Pending HOD Review)
             rootCauseInput.disabled = true;
             strategiesInput.disabled = true;
             timelineInput.disabled = true;
@@ -60,33 +77,32 @@ export function initActionReport() {
     form.onsubmit = (e) => {
         e.preventDefault();
 
-        // ==========================================
-        // SYSTEM CHECK: Prevent Exact Duplicate Resubmission
-        // ==========================================
         if (existingReport && existingReport.status === "REVISION_REQUESTED") {
             if (
                 rootCauseInput.value.trim() === existingReport.rootCause.trim() &&
                 strategiesInput.value.trim() === existingReport.plannedStrategies.trim() &&
                 timelineInput.value.trim() === existingReport.timeline.trim()
             ) {
-                alert("⚠️ Action Required: You must make changes to your Action Report before resubmitting. The current text is identical to your previous submission.");
-                return; // HALT SUBMISSION
+                alert("⚠️ Action Required: You must make changes to your Action Report before resubmitting.");
+                return; 
             }
         }
         
+        // CYCLE FIX: Attach activeCycleId
         const updatedReport = {
             facultyId: user.id,
             courseId: activeCourseId,
+            cycleId: activeCycleId,
             rootCause: rootCauseInput.value,
             plannedStrategies: strategiesInput.value,
             timeline: timelineInput.value,
-            status: "SUBMITTED", // Reverts back to submitted on save
+            status: "SUBMITTED", 
             hodNotes: existingReport ? existingReport.hodNotes : "",
             hodOutcomes: existingReport ? existingReport.hodOutcomes : ""
         };
 
         if (existingReport) {
-            const index = actionReports.findIndex(r => r.courseId === activeCourseId && r.facultyId === user.id);
+            const index = actionReports.findIndex(r => r.courseId === activeCourseId && r.facultyId === user.id && r.cycleId === activeCycleId);
             actionReports[index] = updatedReport;
         } else {
             actionReports.push(updatedReport);

@@ -7,19 +7,16 @@
     <link rel="stylesheet" href="../../css/layout.css">
     <link rel="stylesheet" href="../../css/utilities.css">
     <link rel="stylesheet" href="../../css/forms.css">
-    <!-- components -->
     <link rel="stylesheet" href="../../css/components/button.css">
     <link rel="stylesheet" href="../../css/components/card.css">
     <link rel="stylesheet" href="../../css/components/sidebar.css">
     <link rel="stylesheet" href="../../css/components/feedback-card.css">
     <link rel="stylesheet" href="../../css/components/badge.css">
-    <!-- page -->
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
 <body>
     <div class="dashboard-layout">
 
-        <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="sidebar-logo">
                 <img src="../../assets/logos/endur-logo.svg">
@@ -45,15 +42,20 @@
             </a>
         </aside>
 
-        <!-- MAIN -->
         <main class="dashboard-content">
-            <h1>Pending Feedbacks</h1>
-            <p class="subtitle">Complete feedback cycles assigned to you.</p>
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+                <h1>Pending Feedbacks</h1>
+                <span id="cycleBadge" class="badge neutral" style="font-size: 11px; text-transform: uppercase;">LOADING...</span>
+            </div>
+            
+            <p id="pageSubtitle" class="subtitle">Complete feedback cycles assigned to you.</p>
             <div id="pendingContainer" class="feedback-list"></div>
 
-            <div id="emptyPending" class="empty-state" style="display:none">
-                <p>No feedback required right now 🎉</p>
-                <p>You are all caught up.</p>
+            <!-- Context-Aware Empty State -->
+            <div id="emptyPending" class="empty-state" style="display:none; padding: 60px 20px;">
+                <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+                <h2 id="emptyTitle" style="color: #0f172a; margin-bottom: 8px;">All Caught Up!</h2>
+                <p id="emptyDesc" style="color: #64748b;">No feedback is required from you at this time.</p>
             </div>
         </main>
     </div>
@@ -66,46 +68,61 @@
         if (user) {
             document.getElementById("userName").innerText = user.name;
             document.getElementById("userDept").innerText = user.department;
+            
+            const avatarEl = document.querySelector(".avatar");
+            if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+
             loadPending();
         }
 
         async function loadPending() {
-            // Fetch courses
             const res = await fetch("../../js/mock-data/courses.json");
             const allCourses = await res.json();
-
-            // Get user's enrolled courses array
             const myCourseIds = user.enrolledCourses || [];
-
-            // Get submitted feedback
             const submitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
 
-            // Get active cycle to display a real deadline
-            const cycles = JSON.parse(localStorage.getItem("feedbackCycles")) || [];
-            const activeCycle = cycles.find(c => c.status === "active") || cycles[0];
-            let deadlineText = "No active cycle";
-            if (activeCycle && activeCycle.endTimestamp) {
-                const deadlineDate = new Date(activeCycle.endTimestamp);
+            // Get active cycle from Dean's master state
+            const cycleState = JSON.parse(localStorage.getItem("systemCycleState")) || { id: "NO ACTIVE CYCLE", phase: "COMPLETED" };
+            const currentCycleId = cycleState.id;
+            const isFeedbackOpen = cycleState.phase === "STUDENT_FEEDBACK";
+
+            const badgeEl = document.getElementById("cycleBadge");
+            if(badgeEl) badgeEl.innerText = currentCycleId;
+
+            const container = document.getElementById("pendingContainer");
+            const emptyState = document.getElementById("emptyPending");
+            const emptyTitle = document.getElementById("emptyTitle");
+            const emptyDesc = document.getElementById("emptyDesc");
+            
+            container.innerHTML = "";
+
+            // UX FIX: If feedback phase is NOT active, show empty state immediately
+            if (!isFeedbackOpen) {
+                emptyState.style.display = "block";
+                emptyTitle.innerText = "Feedback Window Closed";
+                emptyDesc.innerText = "There are no active feedback sessions available for submission right now.";
+                document.getElementById("pageSubtitle").style.display = "none";
+                return;
+            }
+
+            let deadlineText = "TBD";
+            if (cycleState.studentDeadline) {
+                const deadlineDate = new Date(cycleState.studentDeadline);
                 deadlineText = deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             }
 
-            const container = document.getElementById("pendingContainer");
-            container.innerHTML = "";
-
-            // Filter to ONLY courses this student is enrolled in
             const myCourses = allCourses.filter(c => myCourseIds.includes(c.id));
 
             myCourses.forEach(course => {
-                // Check if already submitted
                 const done = submitted.find(
-                    f => f.course === course.id && f.userId === user.id
+                    f => f.course === course.id && f.userId === user.id && f.cycleId === currentCycleId
                 );
 
-                if (done) return; // Skip if completed
+                if (done) return; 
 
-                /* card */
                 const card = document.createElement("div");
                 card.className = "feedback-card";
+                
                 card.onclick = () => {
                     localStorage.setItem("activeCourse", course.id);
                     if (course.id.includes("reviewOfReviews")) {
@@ -122,14 +139,16 @@
                         <p>${course.type === "review" ? "Review of Reviews" : "Course Feedback"}</p>
                         <button class="btn-primary">Start →</button>
                     </div>
-                    <div class="color-block ${course.color}"></div>
+                    <div class="color-block ${course.color || 'blue'}"></div>
                 `;
 
                 container.appendChild(card);
             });
 
             if (container.innerHTML === "") {
-                document.getElementById("emptyPending").style.display = "block";
+                emptyState.style.display = "block";
+                emptyTitle.innerText = "All Caught Up!";
+                emptyDesc.innerText = `You have completed all feedback for the ${currentCycleId} cycle.`;
             }
         }
     </script>

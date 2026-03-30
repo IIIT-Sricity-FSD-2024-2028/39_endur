@@ -5,7 +5,6 @@ let ratings = {};
 let currentQuestions = [];
 window.ratings = ratings;
 
-// Default parameters used if Dean hasn't published active ones yet
 const DEFAULT_PARAMETERS = [
     { id: "clarity", name: "Clarity of Explanation", desc: "Effectiveness of teaching methods." },
     { id: "structure", name: "Structure of Course", desc: "Organization of materials." },
@@ -14,10 +13,17 @@ const DEFAULT_PARAMETERS = [
 ];
 
 document.addEventListener("DOMContentLoaded", async () => {
+    // SECURITY CHECK: Is the cycle actually open?
+    const cycleState = JSON.parse(localStorage.getItem("systemCycleState"));
+    if (!cycleState || cycleState.phase !== "STUDENT_FEEDBACK") {
+        alert("Access Denied: The feedback submission window is currently closed.");
+        window.location.href = "dashboard.html";
+        return;
+    }
+
     const courseId = localStorage.getItem("activeCourse");
     if (!courseId) return;
 
-    // 1. Fetch data to determine Department
     const [coursesRes, usersRes] = await Promise.all([
         fetch("../../js/mock-data/courses.json"),
         fetch("../../js/mock-data/users.json")
@@ -28,13 +34,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const course = courses.find(c => c.id === courseId);
     document.getElementById("courseTitle").innerText = `${course.id} — ${course.name}`;
 
-    let targetDept = "System"; // Fallback
+    let targetDept = "System"; 
     if (course.facultyId) {
         const faculty = allUsers.find(u => u.id === course.facultyId);
         if (faculty) targetDept = faculty.department;
     }
 
-    // 2. Load ACTIVE parameters for that department
     const activeParams = JSON.parse(localStorage.getItem("activeParameters")) || {};
     currentQuestions = activeParams[targetDept];
     
@@ -42,7 +47,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         currentQuestions = DEFAULT_PARAMETERS;
     }
 
-    // 3. Render HTML dynamically
     const container = document.getElementById("dynamicQuestionsContainer");
     container.innerHTML = "";
 
@@ -119,7 +123,6 @@ function loadDraft() {
 SUBMIT
 ========================= */
 window.submitFeedback = async function () {
-    // Dynamic Validation Check!
     if (Object.keys(ratings).length < currentQuestions.length) {
         alert(`Please answer all ${currentQuestions.length} questions before submitting.`);
         return;
@@ -138,8 +141,7 @@ window.submitFeedback = async function () {
         }
     } catch (e) { console.error(e); }
 
-    const cycles = JSON.parse(localStorage.getItem("feedbackCycles")) || [];
-    const activeCycle = cycles.find(c => c.status === "active") || { cycleId: "CYCLE_W4" };
+    const cycleState = JSON.parse(localStorage.getItem("systemCycleState"));
 
     let submitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
 
@@ -148,8 +150,8 @@ window.submitFeedback = async function () {
         userId: user.id,
         course: courseId,
         facultyId: assignedFacultyId,
-        cycleId: activeCycle.cycleId, 
-        ratings, // Dynamic ratings object! e.g., { "p1": 5, "p2": 4 }
+        cycleId: cycleState ? cycleState.id : "FALLBACK_CYCLE", 
+        ratings, 
         comment: document.getElementById("commentBox").value,
         date: new Date().toISOString(),
         status: "processed",
@@ -165,7 +167,6 @@ window.submitFeedback = async function () {
     window.location.href = "feedback-success.html";
 };
 
-// Event Listener for comment box
 document.addEventListener("DOMContentLoaded", () => {
     const commentBox = document.getElementById("commentBox");
     if (commentBox) commentBox.addEventListener("input", saveDraft);

@@ -1,54 +1,76 @@
 import { get } from "../core/storage.js";
 
-/* =============================
-LOAD COURSES
-============================= */
 async function getCourses() {
     const res = await fetch("../../js/mock-data/courses.json");
     return await res.json();
 }
 
-/* =============================
-STATUS LOGIC
-============================= */
-function getStatus(courseId, userId) {
+// FIX: Now requires currentCycleId to differentiate between semesters
+function getStatus(courseId, userId, currentCycleId) {
     const submitted = get("submittedFeedback") || [];
     const drafts = get("feedbackDraft") || {};
 
-    if (submitted.find(f => f.course === courseId && f.userId === userId)) {
-        return "completed";
-    }
-
-    if (drafts[userId] && drafts[userId][courseId]) {
-        return "progress";
-    }
-
+    // Check if submitted specifically during THIS cycle
+    if (submitted.find(f => f.course === courseId && f.userId === userId && f.cycleId === currentCycleId)) return "completed";
+    
+    if (drafts[userId] && drafts[userId][courseId]) return "progress";
     return "pending";
 }
 
-/* =============================
-DASHBOARD TABLE
-============================= */
 export async function updateDashboard() {
     const allCourses = await getCourses();
     const user = get("endurSession");
     const table = document.getElementById("dashboardTable");
+    
+    const cycleState = get("systemCycleState") || { id: "FALLBACK_CYCLE", phase: "COMPLETED" };
+    const currentCycleId = cycleState.id;
+    const isFeedbackOpen = cycleState.phase === "STUDENT_FEEDBACK";
+    
+    // Manage Global Banner
+    const banner = document.getElementById("cycleStatusBanner");
+    if (banner) {
+        banner.style.display = "block";
+        if (!cycleState || cycleState.phase === "COMPLETED") {
+            banner.style.background = "#f1f5f9";
+            banner.style.border = "1px solid #cbd5e1";
+            banner.style.color = "#475569";
+            banner.innerHTML = "<strong>ℹ️ Feedback Closed:</strong> There is no active feedback cycle currently running.";
+        } else if (cycleState.phase === "PREPARATION") {
+            banner.style.background = "#eff6ff";
+            banner.style.border = "1px solid #bfdbfe";
+            banner.style.color = "#1e40af";
+            banner.innerHTML = "<strong>⏳ Coming Soon:</strong> A new feedback cycle is being prepared and will open shortly.";
+        } else if (cycleState.phase === "STUDENT_FEEDBACK") {
+            banner.style.background = "#f0fdf4";
+            banner.style.border = "1px solid #bbf7d0";
+            banner.style.color = "#166534";
+            let deadlineStr = cycleState.studentDeadline ? ` Closes: ${new Date(cycleState.studentDeadline).toLocaleString()}` : '';
+            banner.innerHTML = `<strong>✅ Feedback is Open!</strong> Please submit your course evaluations.${deadlineStr}`;
+        } else {
+            banner.style.background = "#fef2f2";
+            banner.style.border = "1px solid #fecaca";
+            banner.style.color = "#991b1b";
+            banner.innerHTML = "<strong>🔒 Feedback Closed:</strong> The evaluation window for this cycle has ended. Faculty are now reviewing the results.";
+        }
+    }
 
     if (table) table.innerHTML = "";
 
-    // 1. Filter to ONLY show courses the student is actually enrolled in
-    const myCourses = allCourses.filter(c => 
-        user.enrolledCourses && user.enrolledCourses.includes(c.id)
-    );
+    const myCourses = allCourses.filter(c => user.enrolledCourses && user.enrolledCourses.includes(c.id));
 
     myCourses.forEach(course => {
-        const status = getStatus(course.id, user.id);
-        let actionClick = "";
+        // Pass currentCycleId to check status
+        const status = getStatus(course.id, user.id, currentCycleId);
+        let actionHtml = "";
 
         if (status === "completed") {
-            actionClick = "window.location.href='feedback-history.html'";
+            actionHtml = `<span class="action-link" onclick="window.location.href='feedback-history.html'">View</span>`;
         } else {
-            actionClick = `openFeedback('${course.id}')`;
+            if (isFeedbackOpen) {
+                actionHtml = `<span class="action-link" onclick="openFeedback('${course.id}')">${statusAction(status)}</span>`;
+            } else {
+                actionHtml = `<span style="color: #cbd5e1; cursor: not-allowed; font-size: 13px;">Locked</span>`;
+            }
         }
 
         if (table) {
@@ -61,11 +83,7 @@ export async function updateDashboard() {
                 <td>
                     <span class="badge ${status}">${statusLabel(status)}</span>
                 </td>
-                <td>
-                    <span class="action-link" onclick="${actionClick}">
-                        ${statusAction(status)}
-                    </span>
-                </td>
+                <td>${actionHtml}</td>
             </tr>
             `;
         }
@@ -76,24 +94,17 @@ export async function updateDashboard() {
     }
 }
 
-/* =============================
-STATS
-============================= */
 export async function updateStats() {
     const allCourses = await getCourses();
     const user = get("endurSession");
+    const cycleState = get("systemCycleState") || { id: "FALLBACK_CYCLE" };
 
-    // 1. Filter to ONLY show courses the student is actually enrolled in
-    const myCourses = allCourses.filter(c => 
-        user.enrolledCourses && user.enrolledCourses.includes(c.id)
-    );
+    const myCourses = allCourses.filter(c => user.enrolledCourses && user.enrolledCourses.includes(c.id));
 
-    let completed = 0;
-    let progress = 0;
-    let pending = 0;
+    let completed = 0, progress = 0, pending = 0;
 
     myCourses.forEach(course => {
-        const status = getStatus(course.id, user.id);
+        const status = getStatus(course.id, user.id, cycleState.id);
         if (status === "completed") completed++;
         else if (status === "progress") progress++;
         else pending++;
@@ -112,13 +123,9 @@ export async function updateStats() {
     if (statTot) statTot.innerText = myCourses.length;
 }
 
-/* =============================
-HELPERS
-============================= */
 function statusLabel(status) {
     return { pending: "Pending", progress: "In Progress", completed: "Completed" }[status];
 }
-
 function statusAction(status) {
     return { pending: "Start", progress: "Resume", completed: "View" }[status];
 }

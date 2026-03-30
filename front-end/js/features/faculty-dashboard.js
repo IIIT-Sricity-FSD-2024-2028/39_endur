@@ -18,29 +18,53 @@ export async function renderFacultyDashboard() {
     const allCourses = await getCourses();
     const myCourses = allCourses.filter(c => c.facultyId === user.id);
 
-    const submissions = get("submittedFeedback") || [];
-    const reflections = get("selfReflection") || [];
+    const allSubmissions = get("submittedFeedback") || [];
+    const allReflections = get("selfReflection") || [];
+    const cycleState = get("systemCycleState") || { id: "SYSTEM SETUP", phase: "PREPARATION" };
+    
+    // CYCLE FIX: Only grab data for the active cycle
+    const activeCycleId = cycleState.id;
+    const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+    const reflections = allReflections.filter(r => r.cycleId === activeCycleId);
+
+    const cycleBadge = document.getElementById("dashboardCycleName");
+    if (cycleBadge) cycleBadge.innerText = activeCycleId;
+
+    const banner = document.getElementById("phaseBanner");
+    if (banner) {
+        banner.style.display = "block";
+        if (cycleState.phase === "PREPARATION") {
+            banner.style.background = "#f8fafc"; banner.style.border = "1px solid #cbd5e1"; banner.style.color = "#475569";
+            banner.innerHTML = "<strong>⏳ Cycle Preparation:</strong> The next evaluation cycle is being configured by the Dean and HODs.";
+        } else if (cycleState.phase === "STUDENT_FEEDBACK") {
+            banner.style.background = "#eff6ff"; banner.style.border = "1px solid #bfdbfe"; banner.style.color = "#1e40af";
+            banner.innerHTML = "<strong>📝 Feedback Cycle Active:</strong> Students are currently submitting evaluations. Your dashboard will update once this cycle closes.";
+        } else if (cycleState.phase === "FACULTY_REFLECTION") {
+            banner.style.background = "#fffbeb"; banner.style.border = "1px solid #fde68a"; banner.style.color = "#b45309";
+            banner.innerHTML = "<strong>🔍 Self-Reflection Window:</strong> The student cycle has closed. Please complete your Self-Reflections in the Reports tab.";
+        } else if (cycleState.phase === "ACTION_REPORT") {
+            banner.style.background = "#fef2f2"; banner.style.border = "1px solid #fecaca"; banner.style.color = "#991b1b";
+            banner.innerHTML = "<strong>📋 Action Plan Check-In:</strong> Please submit your Action Reports and review them with your HOD.";
+        } else {
+            banner.style.background = "#f0fdf4"; banner.style.border = "1px solid #bbf7d0"; banner.style.color = "#166534";
+            banner.innerHTML = "<strong>✅ Cycle Archived:</strong> All evaluations and reports for this cycle are finalized.";
+        }
+    }
 
     const table = document.getElementById("courseTable");
     if (table) table.innerHTML = "";
 
-    // Metrics for the top cards
     let totalStudentScorePercentage = 0;
     let coursesWithFeedbackCount = 0;
-    
     let totalResponses = 0;
     let totalStudentsEnrolled = 0;
-    
     let pendingReflectionCount = 0;
-    
     let totalGapAccumulator = 0;
     let gapCalculatedCourses = 0;
 
     myCourses.forEach(course => {
-        // 1. Get Feedback for this specific course
         const courseFeedback = submissions.filter(f => f.course === course.id);
         const responses = courseFeedback.length;
-        
         let courseAvgPercentage = 0;
 
         if (responses > 0) {
@@ -49,46 +73,35 @@ export async function renderFacultyDashboard() {
             courseFeedback.forEach(f => {
                 let metricSum = 0;
                 let metricCount = 0;
-                
-                // Safely grab only actual numbers
                 if (f.ratings) {
-                    if (typeof f.ratings.clarity === 'number') { metricSum += f.ratings.clarity; metricCount++; }
-                    if (typeof f.ratings.structure === 'number') { metricSum += f.ratings.structure; metricCount++; }
-                    if (typeof f.ratings.engagement === 'number') { metricSum += f.ratings.engagement; metricCount++; }
-                    if (typeof f.ratings.difficulty === 'number') { metricSum += f.ratings.difficulty; metricCount++; }
+                    Object.values(f.ratings).forEach(val => {
+                        if (typeof val === 'number') { metricSum += val; metricCount++; }
+                    });
                 }
-
-                // Average score for this specific student's form (out of 5)
                 const studentFormAvg = metricCount > 0 ? (metricSum / metricCount) : 0;
                 sumOfAverages += studentFormAvg;
             });
 
-            // Convert to percentage (out of 100%)
             courseAvgPercentage = (sumOfAverages / responses) * 20; 
-            
             totalStudentScorePercentage += courseAvgPercentage;
             coursesWithFeedbackCount++;
         }
 
         totalResponses += responses;
-        totalStudentsEnrolled += course.enrolled || 50; // Fallback to 50 if enrolled is missing
+        totalStudentsEnrolled += course.enrolled || 50; 
 
-        // 2. Check Self-Reflection Status (Using correct schema keys: courseId and facultyId)
-        const hasReflection = reflections.find(
-            r => r.courseId === course.id && r.facultyId === user.id
-        );
+        // Uses the pre-filtered 'reflections' array
+        const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id);
 
         if (!hasReflection) {
             pendingReflectionCount++;
         } else {
-            // 3. Calculate Gap for this course if reflection exists
             let selfMetricSum = 0;
             let selfMetricCount = 0;
             const expected = hasReflection.expectedRatings || {};
             
             Object.values(expected).forEach(val => {
-                selfMetricSum += val;
-                selfMetricCount++;
+                if(typeof val === 'number') { selfMetricSum += val; selfMetricCount++; }
             });
 
             const selfAvgPercentage = selfMetricCount > 0 ? (selfMetricSum / selfMetricCount) * 20 : 0;
@@ -98,7 +111,13 @@ export async function renderFacultyDashboard() {
             gapCalculatedCourses++;
         }
 
-        // 4. Render Table Row
+        let displayAvg = `${courseAvgPercentage.toFixed(0)}%`;
+        if (responses === 0) {
+            displayAvg = `<span style="color:#94a3b8;">N/A</span>`;
+        } else if (!hasReflection && cycleState.phase !== "ACTION_REPORT" && cycleState.phase !== "COMPLETED") {
+            displayAvg = `<span title="Complete Self-Reflection to unlock" style="color:#94a3b8; font-size: 13px;">Locked 🔒</span>`;
+        }
+
         if (table) {
             const tr = document.createElement("tr");
             tr.innerHTML = `
@@ -110,40 +129,36 @@ export async function renderFacultyDashboard() {
                         ${responses > 0 ? "Active" : "Waiting"}
                     </span>
                 </td>
-                <td>${courseAvgPercentage.toFixed(0)}%</td>
+                <td style="font-weight: 600;">${displayAvg}</td>
             `;
             table.appendChild(tr);
         }
     });
 
-    // 5. Update Top Stats Cards
+    const finalAvgScore = coursesWithFeedbackCount > 0 ? (totalStudentScorePercentage / coursesWithFeedbackCount).toFixed(0) : 0;
+    const finalGapScore = gapCalculatedCourses > 0 ? (totalGapAccumulator / gapCalculatedCourses).toFixed(0) : 0;
     
-    // Overall Student Satisfaction
-    const finalAvgScore = coursesWithFeedbackCount > 0 
-        ? (totalStudentScorePercentage / coursesWithFeedbackCount).toFixed(0) 
-        : 0;
     const avgScoreEl = document.getElementById("avgScore");
-    if (avgScoreEl) avgScoreEl.innerText = `${finalAvgScore}%`;
+    const gapScoreEl = document.getElementById("gapScore");
+    
+    if (pendingReflectionCount > 0 && ["PREPARATION", "STUDENT_FEEDBACK", "FACULTY_REFLECTION"].includes(cycleState.phase)) {
+        if (avgScoreEl) { avgScoreEl.innerHTML = `<span style="font-size: 18px; color: #94a3b8;">Locked 🔒</span>`; }
+        if (gapScoreEl) { gapScoreEl.innerHTML = `<span style="font-size: 18px; color: #94a3b8;">Locked 🔒</span>`; }
+    } else {
+        if (avgScoreEl) avgScoreEl.innerText = `${finalAvgScore}%`;
+        if (gapScoreEl) gapScoreEl.innerText = `${finalGapScore}%`;
+    }
 
-    // Response Rate
-    const finalResponseRate = totalStudentsEnrolled > 0 
-        ? Math.round((totalResponses / totalStudentsEnrolled) * 100) 
-        : 0;
+    const finalResponseRate = totalStudentsEnrolled > 0 ? Math.round((totalResponses / totalStudentsEnrolled) * 100) : 0;
     const responseRateEl = document.getElementById("responseRate");
     if (responseRateEl) responseRateEl.innerText = `${finalResponseRate}%`;
 
-    // Pending Reflections
     const pendingRefEl = document.getElementById("pendingReflection");
-    if (pendingRefEl) pendingRefEl.innerText = pendingReflectionCount;
+    if (pendingRefEl) {
+        pendingRefEl.innerText = pendingReflectionCount;
+        if (pendingReflectionCount > 0) pendingRefEl.style.color = "#d97706";
+    }
 
-    // Overall Performance Gap
-    const finalGapScore = gapCalculatedCourses > 0 
-        ? (totalGapAccumulator / gapCalculatedCourses).toFixed(0) 
-        : 0;
-    const gapScoreEl = document.getElementById("gapScore");
-    if (gapScoreEl) gapScoreEl.innerText = `${finalGapScore}%`;
-
-    // Empty State Handling
     const emptyState = document.getElementById("emptyState");
     if (emptyState) {
         emptyState.style.display = myCourses.length === 0 ? "block" : "none";
