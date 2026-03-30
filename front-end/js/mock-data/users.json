@@ -9,8 +9,8 @@
       "CS101",
       "CS102",
       "CS103",
-      "MA201",
-      "HS101",
+      "CS104",
+      "CS105",
       "reviewOfReviews1"
     ]
   },
@@ -21,11 +21,11 @@
     "role": "student",
     "department": "Computer Science",
     "enrolledCourses": [
-      "CS101",
-      "CS104",
-      "CS105",
-      "EC201",
-      "HS102",
+      "CS106",
+      "CS107",
+      "CS108",
+      "MA201",
+      "MA202",
       "reviewOfReviews1"
     ]
   },
@@ -36,11 +36,11 @@
     "role": "student",
     "department": "Computer Science",
     "enrolledCourses": [
-      "CS102",
-      "CS106",
-      "CS107",
-      "MA202",
+      "EC201",
       "EC202",
+      "HS101",
+      "HS102",
+      "CS101",
       "reviewOfReviews1"
     ]
   },
@@ -51,11 +51,11 @@
     "role": "student",
     "department": "AI",
     "enrolledCourses": [
+      "CS102",
       "CS103",
-      "CS108",
-      "MA201",
-      "EC201",
-      "HS101",
+      "CS104",
+      "CS105",
+      "CS106",
       "reviewOfReviews1"
     ]
   },
@@ -66,11 +66,11 @@
     "role": "student",
     "department": "Electronics",
     "enrolledCourses": [
-      "CS104",
-      "CS105",
+      "CS107",
+      "CS108",
+      "MA201",
       "MA202",
-      "EC202",
-      "HS102",
+      "EC201",
       "reviewOfReviews1"
     ]
   },
@@ -81,11 +81,11 @@
     "role": "student",
     "department": "Mathematics",
     "enrolledCourses": [
-      "CS106",
-      "CS107",
-      "MA201",
-      "EC201",
+      "EC202",
       "HS101",
+      "HS102",
+      "CS101",
+      "CS102",
       "reviewOfReviews1"
     ]
   },
@@ -96,11 +96,131 @@
     "role": "student",
     "department": "Humanities",
     "enrolledCourses": [
+      "CS103",
+      "CS104",
+      "CS105",
+      "CS106",
+      "CS107",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S105",
+    "password": "123",
+    "name": "Eve Davis",
+    "role": "student",
+    "department": "Computer Science",
+    "enrolledCourses": [
       "CS108",
-      "CS101",
+      "MA201",
       "MA202",
+      "EC201",
       "EC202",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S106",
+    "password": "123",
+    "name": "Frank Miller",
+    "role": "student",
+    "department": "AI",
+    "enrolledCourses": [
+      "HS101",
       "HS102",
+      "CS101",
+      "CS102",
+      "CS103",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S107",
+    "password": "123",
+    "name": "Grace Taylor",
+    "role": "student",
+    "department": "Electronics",
+    "enrolledCourses": [
+      "CS104",
+      "CS105",
+      "CS106",
+      "CS107",
+      "CS108",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S108",
+    "password": "123",
+    "name": "Hank Moore",
+    "role": "student",
+    "department": "Mathematics",
+    "enrolledCourses": [
+      "MA201",
+      "MA202",
+      "EC201",
+      "EC202",
+      "HS101",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S109",
+    "password": "123",
+    "name": "Ivy Clark",
+    "role": "student",
+    "department": "Humanities",
+    "enrolledCourses": [
+      "HS102",
+      "CS101",
+      "CS102",
+      "CS103",
+      "CS104",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S110",
+    "password": "123",
+    "name": "Jack White",
+    "role": "student",
+    "department": "Computer Science",
+    "enrolledCourses": [
+      "CS105",
+      "CS106",
+      "CS107",
+      "CS108",
+      "MA201",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S111",
+    "password": "123",
+    "name": "Karen Hall",
+    "role": "student",
+    "department": "AI",
+    "enrolledCourses": [
+      "MA202",
+      "EC201",
+      "EC202",
+      "HS101",
+      "HS102",
+      "reviewOfReviews1"
+    ]
+  },
+  {
+    "id": "S112",
+    "password": "123",
+    "name": "Leo King",
+    "role": "student",
+    "department": "Electronics",
+    "enrolledCourses": [
+      "CS101",
+      "CS103",
+      "CS105",
+      "CS107",
+      "MA201",
       "reviewOfReviews1"
     ]
   },
