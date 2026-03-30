@@ -7,57 +7,7 @@
     "department": "Computer Science",
     "type": "standard",
     "color": "red",
-    "enrolled": 120
-  },
-  {
-    "id": "CS102",
-    "name": "Operating Systems",
-    "faculty": "Dr. Linus Torvalds",
-    "facultyId": "F102",
-    "department": "Computer Science",
-    "type": "standard",
-    "color": "green",
-    "enrolled": 95
-  },
-  {
-    "id": "CS103",
-    "name": "Database Systems",
-    "faculty": "Dr. Edgar Codd",
-    "facultyId": "F104",
-    "department": "Computer Science",
-    "type": "standard",
-    "color": "yellow",
-    "enrolled": 88
-  },
-  {
-    "id": "CS104",
-    "name": "Computer Networks",
-    "faculty": "Dr. Vint Cerf",
-    "facultyId": "F104",
-    "department": "Computer Science",
-    "type": "standard",
-    "color": "blue",
-    "enrolled": 110
-  },
-  {
-    "id": "CS105",
-    "name": "Machine Learning",
-    "faculty": "Dr. Andrew Ng",
-    "facultyId": "F105",
-    "department": "AI",
-    "type": "standard",
-    "color": "purple",
-    "enrolled": 140
-  },
-  {
-    "id": "CS106",
-    "name": "Artificial Intelligence",
-    "faculty": "Dr. Stuart Russell",
-    "facultyId": "F105",
-    "department": "AI",
-    "type": "standard",
-    "color": "purple",
-    "enrolled": 100
+    "enrolled": 5
   },
   {
     "id": "CS107",
@@ -67,7 +17,17 @@
     "department": "Computer Science",
     "type": "standard",
     "color": "red",
-    "enrolled": 70
+    "enrolled": 5
+  },
+  {
+    "id": "CS102",
+    "name": "Operating Systems",
+    "faculty": "Dr. Linus Torvalds",
+    "facultyId": "F102",
+    "department": "Computer Science",
+    "type": "standard",
+    "color": "green",
+    "enrolled": 5
   },
   {
     "id": "CS108",
@@ -77,7 +37,47 @@
     "department": "Computer Science",
     "type": "standard",
     "color": "blue",
-    "enrolled": 60
+    "enrolled": 5
+  },
+  {
+    "id": "CS103",
+    "name": "Database Systems",
+    "faculty": "Dr. Ada Lovelace",
+    "facultyId": "F104",
+    "department": "Computer Science",
+    "type": "standard",
+    "color": "yellow",
+    "enrolled": 5
+  },
+  {
+    "id": "CS104",
+    "name": "Computer Networks",
+    "faculty": "Dr. Ada Lovelace",
+    "facultyId": "F104",
+    "department": "Computer Science",
+    "type": "standard",
+    "color": "blue",
+    "enrolled": 5
+  },
+  {
+    "id": "CS105",
+    "name": "Machine Learning",
+    "faculty": "Dr. Andrew Ng",
+    "facultyId": "F105",
+    "department": "AI",
+    "type": "standard",
+    "color": "purple",
+    "enrolled": 5
+  },
+  {
+    "id": "CS106",
+    "name": "Artificial Intelligence",
+    "faculty": "Dr. Andrew Ng",
+    "facultyId": "F105",
+    "department": "AI",
+    "type": "standard",
+    "color": "purple",
+    "enrolled": 5
   },
   {
     "id": "MA201",
@@ -87,17 +87,17 @@
     "department": "Mathematics",
     "type": "standard",
     "color": "green",
-    "enrolled": 130
+    "enrolled": 5
   },
   {
     "id": "MA202",
     "name": "Probability & Statistics",
-    "faculty": "Dr. Thomas Bayes",
+    "faculty": "Dr. Gilbert Strang",
     "facultyId": "F201",
     "department": "Mathematics",
     "type": "standard",
     "color": "yellow",
-    "enrolled": 125
+    "enrolled": 5
   },
   {
     "id": "EC201",
@@ -107,7 +107,17 @@
     "department": "Electronics",
     "type": "standard",
     "color": "purple",
-    "enrolled": 105
+    "enrolled": 5
+  },
+  {
+    "id": "EC202",
+    "name": "Microprocessors",
+    "faculty": "Dr. Claude Shannon",
+    "facultyId": "F103",
+    "department": "Electronics",
+    "type": "standard",
+    "color": "blue",
+    "enrolled": 5
   },
   {
     "id": "HS101",
@@ -117,12 +127,23 @@
     "department": "Humanities",
     "type": "standard",
     "color": "red",
-    "enrolled": 150
+    "enrolled": 5
+  },
+  {
+    "id": "HS102",
+    "name": "Economics",
+    "faculty": "Dr. Carl Jung",
+    "facultyId": "F401",
+    "department": "Humanities",
+    "type": "standard",
+    "color": "blue",
+    "enrolled": 5
   },
   {
     "id": "reviewOfReviews1",
     "name": "Feedback System Evaluation (Mid-Sem)",
     "type": "review",
-    "color": "purple"
+    "color": "purple",
+    "enrolled": 7
   }
 ]

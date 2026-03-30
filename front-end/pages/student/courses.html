@@ -2,226 +2,100 @@
 <html lang="en">
 
 <head>
-
-<meta charset="UTF-8">
-
-<title>My Courses</title>
-
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/utilities.css">
-
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/sidebar.css">
-<link rel="stylesheet" href="../../css/components/course-card.css">
-
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
-
+    <meta charset="UTF-8">
+    <title>My Courses</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/course-card.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
 
-
 <body>
-
-
-<div class="dashboard-layout">
-
-
-<!-- sidebar -->
-
-<aside class="sidebar">
-
-
-<div class="sidebar-logo">
-
-<img src="../../assets/logos/endur-logo.svg">
-
-<div>
-
-<strong>Endur</strong>
-
-<p>Student Portal</p>
-
-</div>
-
-</div>
-
-
-
-<nav class="sidebar-menu">
-
-<a href="dashboard.html">
-
-Dashboard
-
-</a>
-
-
-<a class="active">
-
-My Courses
-
-</a>
-
-
-<a href="pending-feedback.html">
-
-Pending Feedbacks
-
-</a>
-
-
-<a href="feedback-history.html">
-
-History
-
-</a>
-
-
-</nav>
-
-
-
-<a href="profile.html" class="sidebar-user">
-
-<div id="avatar" class="avatar"></div>
-
-<div>
-
-<strong id="userName"></strong>
-
-<p id="userDept"></p>
-
-</div>
-
-</a>
-
-
-</aside>
-
-
-
-
-<!-- main -->
-
-<main class="dashboard-content">
-
-
-<h1>
-
-My Courses
-
-</h1>
-
-
-<p class="subtitle">
-
-Courses assigned this semester
-
-</p>
-
-
-
-<div
-id="courseGrid"
-class="course-grid"
->
-
-</div>
-
-
-
-</main>
-
-
-</div>
-
-
-
-<script type="module">
-
-import { requireAuth }
-from "../../js/core/session.js";
-
-
-const user =
-requireAuth();
-
-
-document.getElementById("userName").innerText =
-user.name;
-
-
-document.getElementById("userDept").innerText =
-user.department;
-
-
-/* avatar */
-
-document.getElementById("avatar").innerText =
-user.name
-.split(" ")
-.map(n=>n[0])
-.join("");
-
-
-
-/* load courses */
-
-const res =
-await fetch("../../js/mock-data/courses.json");
-
-
-const courses =
-await res.json();
-
-
-
-const grid =
-document.getElementById("courseGrid");
-
-
-
-courses
-.filter(
-c => c.type === "standard"
-)
-.forEach(course=>{
-
-
-grid.innerHTML +=
-
-`
-<div class="course-card ${course.color}">
-
-<span class="tag">
-
-${course.department || "COURSE"}
-
-</span>
-
-
-<h3>
-
-${course.id}: ${course.name}
-
-</h3>
-
-
-<p>
-
-${course.faculty}
-
-</p>
-
-</div>
-`;
-
-});
-
-
-</script>
-
-
+    <div class="dashboard-layout">
+
+        <!-- sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="../../assets/logos/endur-logo.svg">
+                <div>
+                    <strong>Endur</strong>
+                    <p>Student Portal</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a class="active">My Courses</a>
+                <a href="pending-feedback.html">Pending Feedbacks</a>
+                <a href="feedback-history.html">History</a>
+            </nav>
+
+            <a href="profile.html" class="sidebar-user">
+                <div id="avatar" class="avatar"></div>
+                <div>
+                    <strong id="userName"></strong>
+                    <p id="userDept"></p>
+                </div>
+            </a>
+        </aside>
+
+        <!-- main -->
+        <main class="dashboard-content">
+            <h1>My Courses</h1>
+            <p class="subtitle">Courses assigned this semester</p>
+
+            <div id="courseGrid" class="course-grid"></div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+
+        const user = requireAuth();
+
+        if (user) {
+            document.getElementById("userName").innerText = user.name;
+            document.getElementById("userDept").innerText = user.department;
+
+            /* avatar */
+            document.getElementById("avatar").innerText = user.name
+                .split(" ")
+                .map(n => n[0])
+                .join("");
+
+            loadMyCourses();
+        }
+
+        async function loadMyCourses() {
+            /* load courses */
+            const res = await fetch("../../js/mock-data/courses.json");
+            const allCourses = await res.json();
+            const grid = document.getElementById("courseGrid");
+
+            // Get user's enrolled courses array
+            const myCourseIds = user.enrolledCourses || [];
+
+            // Filter by "standard" AND check if the student is actually enrolled
+            allCourses
+                .filter(c => c.type === "standard" && myCourseIds.includes(c.id))
+                .forEach(course => {
+                    grid.innerHTML += `
+                        <div class="course-card ${course.color}">
+                            <span class="tag">${course.department || "COURSE"}</span>
+                            <h3>${course.id}: ${course.name}</h3>
+                            <p>${course.faculty}</p>
+                        </div>
+                    `;
+                });
+
+            if (grid.innerHTML === "") {
+                grid.innerHTML = "<p>You are not enrolled in any standard courses.</p>";
+            }
+        }
+    </script>
 </body>
 
 </html>

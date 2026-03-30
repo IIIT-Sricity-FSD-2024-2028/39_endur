@@ -8,6 +8,8 @@
     "enrolledCourses": [
       "CS101",
       "CS102",
+      "CS103",
+      "MA201",
       "HS101",
       "reviewOfReviews1"
     ]
@@ -21,7 +23,9 @@
     "enrolledCourses": [
       "CS101",
       "CS104",
-      "MA201",
+      "CS105",
+      "EC201",
+      "HS102",
       "reviewOfReviews1"
     ]
   },
@@ -33,8 +37,10 @@
     "department": "Computer Science",
     "enrolledCourses": [
       "CS102",
+      "CS106",
       "CS107",
-      "EC201",
+      "MA202",
+      "EC202",
       "reviewOfReviews1"
     ]
   },
@@ -45,9 +51,11 @@
     "role": "student",
     "department": "AI",
     "enrolledCourses": [
-      "CS105",
-      "CS106",
-      "MA202",
+      "CS103",
+      "CS108",
+      "MA201",
+      "EC201",
+      "HS101",
       "reviewOfReviews1"
     ]
   },
@@ -58,9 +66,11 @@
     "role": "student",
     "department": "Electronics",
     "enrolledCourses": [
-      "EC201",
+      "CS104",
+      "CS105",
+      "MA202",
       "EC202",
-      "CS101",
+      "HS102",
       "reviewOfReviews1"
     ]
   },
@@ -71,9 +81,11 @@
     "role": "student",
     "department": "Mathematics",
     "enrolledCourses": [
+      "CS106",
+      "CS107",
       "MA201",
-      "MA203",
-      "CS101",
+      "EC201",
+      "HS101",
       "reviewOfReviews1"
     ]
   },
@@ -84,9 +96,11 @@
     "role": "student",
     "department": "Humanities",
     "enrolledCourses": [
-      "HS101",
+      "CS108",
+      "CS101",
+      "MA202",
+      "EC202",
       "HS102",
-      "HS103",
       "reviewOfReviews1"
     ]
   },
