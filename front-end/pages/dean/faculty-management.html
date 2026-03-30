@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Faculty Management | Dean</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .dept-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .dept-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .dept-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        .dept-card.active {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        .dept-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .search-container {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .search-container input {
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: 14px;
+            color: #334155;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .perf-bar-bg { width: 60px; height: 6px; background: #e2e8f0; border-radius: 3px; display: inline-block; margin-left: 10px; overflow: hidden; vertical-align: middle; }
+        .perf-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .designation-badge { background: #eff6ff; color: #1e40af; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-layout">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div>
+                <strong>Endur</strong>
+                <p>Institutional Portal</p>
+            </div>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active" href="faculty-management.html">Faculty Management</a>
+            <a href="cycle-management.html">Cycle Management</a>
+            <a href="audit-logs.html">Audit Logs</a>
+        </nav>
+
+        <a href="#" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept">Academics</p>
+            </div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        
+        <div class="form-header" style="margin-bottom: 30px;">
+            <div>
+                <h1>Faculty Management</h1>
+                <p class="subtitle" style="margin-bottom: 0;">Oversee faculty performance and assignments across all departments.</p>
+            </div>
+        </div>
+
+        <!-- DYNAMIC DEPARTMENT CARDS -->
+        <div class="dept-cards-grid" id="deptCardsContainer">
+            <!-- Populated via JS -->
+        </div>
+
+        <div class="card" style="padding: 0;">
+            <!-- SEARCH BAR -->
+            <div style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
+                <div class="search-container" style="margin-bottom: 0;">
+                    <span style="color: #94a3b8;">🔍</span>
+                    <input type="text" id="facultySearch" placeholder="Search by name or ID..." oninput="filterFacultyTable()">
+                </div>
+            </div>
+
+            <!-- DATA TABLE -->
+            <table class="data-table" style="margin: 0; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="padding-left: 30px;">FACULTY MEMBER</th>
+                        <th>FACULTY ID</th>
+                        <th>DESIGNATION</th>
+                        <th>ASSIGNED COURSES</th>
+                        <th>PERFORMANCE</th>
+                        <th>STATUS</th>
+                    </tr>
+                </thead>
+                <tbody id="deanFacultyTableBody">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { initDeanFaculty, filterFacultyTable } from "../../js/features/dean-faculty.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const user = requireAuth();
+        if(!user) return;
+
+        document.getElementById("userName").innerText = user.name;
+        const avatarEl = document.getElementById("avatar");
+        if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+
+        initDeanFaculty();
+        window.filterFacultyTable = filterFacultyTable;
+    });
+</script>
+
+</body>
+</html>
