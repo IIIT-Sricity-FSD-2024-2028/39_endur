@@ -245,7 +245,8 @@
     "role": "faculty",
     "department": "Electronics",
     "secondaryRoles": [
-      "dean"
+      "dean",
+      "hod"
     ]
   },
   {
@@ -263,31 +264,68 @@
     "password": "123",
     "name": "Dr. Andrew Ng",
     "role": "faculty",
-    "department": "AI"
+    "department": "AI",
+    "secondaryRoles": [
+      "hod"
+    ]
   },
   {
     "id": "F201",
     "password": "123",
     "name": "Dr. Gilbert Strang",
     "role": "faculty",
-    "department": "Mathematics"
+    "department": "Mathematics",
+    "secondaryRoles": [
+      "hod"
+    ]
   },
   {
     "id": "F401",
     "password": "123",
     "name": "Dr. Carl Jung",
     "role": "faculty",
-    "department": "Humanities"
+    "department": "Humanities",
+    "secondaryRoles": [
+      "hod"
+    ]
   },
   {
-    "id": "H201",
+    "id": "H101",
     "password": "123",
-    "name": "Dr. Grace Hopper",
+    "name": "Dr. Ada Lovelace",
     "role": "hod",
     "department": "Computer Science"
   },
   {
-    "id": "D301",
+    "id": "H102",
+    "password": "123",
+    "name": "Dr. Claude Shannon",
+    "role": "hod",
+    "department": "Electronics"
+  },
+  {
+    "id": "H103",
+    "password": "123",
+    "name": "Dr. Andrew Ng",
+    "role": "hod",
+    "department": "AI"
+  },
+  {
+    "id": "H104",
+    "password": "123",
+    "name": "Dr. Gilbert Strang",
+    "role": "hod",
+    "department": "Mathematics"
+  },
+  {
+    "id": "H105",
+    "password": "123",
+    "name": "Dr. Carl Jung",
+    "role": "hod",
+    "department": "Humanities"
+  },
+  {
+    "id": "D101",
     "password": "123",
     "name": "Dr. Elon Musk",
     "role": "dean",

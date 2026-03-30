@@ -1,93 +1,61 @@
-async function loginUser(event){
+async function loginUser(event) {
+    event.preventDefault();
 
-event.preventDefault();
+    const id = document.getElementById("userId").value.trim();
+    const password = document.getElementById("password").value;
 
-const id = document.getElementById("userId").value;
+    try {
+        // Fetch from root directory path
+        const response = await fetch("./js/mock-data/users.json");
+        const users = await response.json();
 
-const password = document.getElementById("password").value;
+        // Find user by ID and Password
+        const user = users.find(u => u.id === id && u.password === password);
 
+        if (!user) {
+            showError("Invalid Institutional ID or password.");
+            return;
+        }
 
-const response = await fetch("./js/mock-data/users.json");
+        // Save session to Local Storage
+        localStorage.setItem("endurSession", JSON.stringify(user));
 
-const users = await response.json();
+        // Redirect based on role
+        redirectUser(user.role);
 
-
-const user = users.find(
-
-u => u.id === id && u.password === password
-
-);
-
-
-if(!user){
-
-showError("Invalid ID or password");
-
-return;
-
+    } catch (error) {
+        console.error("Login Error:", error);
+        showError("System error connecting to user database.");
+    }
 }
 
+function redirectUser(role) {
+    const routes = {
+        student: "pages/student/dashboard.html",
+        faculty: "pages/faculty/dashboard.html",
+        hod: "pages/hod/dashboard.html",
+        dean: "pages/dean/dashboard.html",
+        admin: "pages/admin/dashboard.html",
+        superuser: "pages/superuser/dashboard.html"
+    };
 
-/* save session */
-
-localStorage.setItem(
-
-"endurSession",
-
-JSON.stringify(user)
-
-);
-
-
-/* redirect based on role */
-
-redirectUser(user.role);
-
+    if (routes[role]) {
+        window.location.href = routes[role];
+    } else {
+        showError("Invalid role assignment. Contact Admin.");
+    }
 }
 
-
-
-function redirectUser(role){
-
-const routes = {
-
-student: "pages/student/dashboard.html",
-
-faculty: "pages/faculty/dashboard.html",
-
-hod: "pages/hod/dashboard.html",
-
-dean: "pages/dean/dashboard.html",
-
-admin: "pages/admin/dashboard.html",
-
-superuser: "pages/superuser/dashboard.html"
-
-};
-
-
-window.location.href = routes[role];
-
+function showError(msg) {
+    const errorEl = document.getElementById("errorMsg");
+    if (errorEl) {
+        errorEl.innerText = msg;
+        errorEl.style.display = "block";
+    }
 }
 
-
-
-function showError(msg){
-
-document.getElementById("errorMsg").innerText = msg;
-
-}
-
-
-
-document
-.getElementById("loginForm")
-.addEventListener("submit", loginUser);
-
-
-
-function goHome(){
-
-window.location.href = "index.html";
-
+// Bind the form submission
+const loginForm = document.getElementById("loginForm");
+if (loginForm) {
+    loginForm.addEventListener("submit", loginUser);
 }
