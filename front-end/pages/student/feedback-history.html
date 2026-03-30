@@ -3,26 +3,20 @@
 
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <title>Feedback History</title>
+<title>Feedback History</title>
 
-    <link rel="stylesheet" href="../../css/base.css">
-    <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/utilities.css">
-    <link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/utilities.css">
 
-    <!-- components -->
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/sidebar.css">
+<link rel="stylesheet" href="../../css/components/table.css">
+<link rel="stylesheet" href="../../css/components/badge.css">
 
-    <link rel="stylesheet" href="../../css/components/button.css">
-    <link rel="stylesheet" href="../../css/components/card.css">
-    <link rel="stylesheet" href="../../css/components/sidebar.css">
-    <link rel="stylesheet" href="../../css/components/badge.css">
-    <link rel="stylesheet" href="../../css/components/table.css">
-
-    <!-- page -->
-
-    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
 
@@ -30,217 +24,218 @@
 <body>
 
 
-    <div class="dashboard-layout">
+<div class="dashboard-layout">
 
 
-        <!-- SIDEBAR -->
+<!-- SIDEBAR -->
 
-        <aside class="sidebar">
+<aside class="sidebar">
 
 
-            <div class="sidebar-logo">
+<div class="sidebar-logo">
 
-                <img src="../../assets/logos/endur-logo.svg">
+<img src="../../assets/logos/endur-logo.svg">
 
-                <div>
+<div>
 
-                    <strong>Endur</strong>
+<strong>Endur</strong>
 
-                    <p>Student Portal</p>
+<p>Student Portal</p>
 
-                </div>
+</div>
 
-            </div>
+</div>
 
 
 
-            <nav class="sidebar-menu">
+<nav class="sidebar-menu">
 
-                <a href="dashboard.html">
-                    Dashboard
-                </a>
+<a href="dashboard.html">
 
-                <a href="courses.html">
-                    My Courses
-                </a>
+Dashboard
 
-                <a href="pending-feedback.html">
-                    Pending Feedbacks
-                </a>
+</a>
 
-                <a class="active">
-                    History
-                </a>
 
-            </nav>
+<a href="courses.html">
 
+My Courses
 
+</a>
 
-            <a href="profile.html" class="sidebar-user">
 
-                <div class="avatar"></div>
+<a href="pending-feedback.html">
 
-                <div>
+Pending Feedbacks
 
-                    <strong id="userName"></strong>
+</a>
 
-                    <p id="userDept"></p>
 
-                </div>
+<a class="active">
 
-            </a>
+History
 
+</a>
 
-        </aside>
+</nav>
 
 
 
+<a href="profile.html" class="sidebar-user">
 
-        <!-- MAIN -->
+<div id="avatar" class="avatar"></div>
 
-        <main class="dashboard-content">
+<div>
 
+<strong id="userName"></strong>
 
-            <h1>
+<p id="userDept"></p>
 
-                Feedback History
+</div>
 
-            </h1>
+</a>
 
 
-            <input class="search-bar" placeholder="Search course..." id="searchInput">
+</aside>
 
 
 
-            <table class="data-table">
 
+<!-- MAIN -->
 
-                <thead>
+<main class="dashboard-content">
 
-                    <tr>
 
-                        <th>Course</th>
+<h1>
 
-                        <th>Submission Date</th>
+Feedback History
 
-                        <th>Type</th>
+</h1>
 
-                        <th>Status</th>
 
-                    </tr>
 
-                </thead>
+<table class="data-table">
 
+<thead>
 
+<tr>
 
-                <tbody id="historyTable">
+<th>
 
-                </tbody>
+Course
 
+</th>
 
-            </table>
 
+<th>
 
+Date
 
-            <div id="emptyHistory" class="empty-state" style="display:none">
+</th>
 
-                <p>No feedback submitted yet</p>
 
-                <p>Your completed feedback will appear here.</p>
+<th>
 
-            </div>
+Status
 
+</th>
 
+</tr>
 
-            <div class="info-box">
+</thead>
 
-                <strong>
 
-                    Privacy & Anonymity Note
 
-                </strong>
+<tbody id="historyTable">
 
-                <p>
+</tbody>
 
-                    All feedback submissions are anonymized before being shared with faculty.
-                    Once submitted, responses cannot be modified.
+</table>
 
-                </p>
 
-            </div>
 
+</main>
 
-        </main>
 
+</div>
 
-    </div>
 
 
+<script type="module">
 
-    <script src="../../js/core/session.js"></script>
+import { requireAuth }
+from "../../js/core/session.js";
 
-    <script>
+import { get }
+from "../../js/core/storage.js";
 
-        const user = requireAuth();
 
-        document.getElementById("userName").innerText =
-            user.name;
+const user =
+requireAuth();
 
-        document.getElementById("userDept").innerText =
-            user.department;
 
+/* sidebar */
 
+document.getElementById("userName").innerText =
+user.name;
 
-        async function loadHistory() {
+document.getElementById("userDept").innerText =
+user.department;
 
-            const res =
-                await fetch("../../js/mock-data/courses.json");
+document.getElementById("avatar").innerText =
+user.name
+.split(" ")
+.map(n=>n[0])
+.join("");
 
-            const courses =
-                await res.json();
 
 
-            const submitted =
-                JSON.parse(
-                    localStorage.getItem("submittedFeedback")
-                ) || [];
+/* history data */
 
+const submissions =
+get("submittedFeedback") || [];
 
-            const table =
-                document.getElementById("historyTable");
 
+const mySubmissions =
+submissions.filter(
+s => s.userId === user.id
+);
 
-            table.innerHTML = "";
 
 
-            /* filter by logged-in user */
+const res =
+await fetch("../../js/mock-data/courses.json");
 
-            const userSubmissions =
-                submitted.filter(
-                    f => f.userId === user.id
-                );
+const courses =
+await res.json();
 
 
-            userSubmissions.forEach(item => {
 
+const table =
+document.getElementById("historyTable");
 
-                const course =
-                    courses.find(
-                        c => c.id === item.course
-                    );
 
+table.innerHTML = "";
 
-                const row =
-                    document.createElement("tr");
 
+mySubmissions.forEach(s=>{
 
-                row.innerHTML = `
+const course =
+courses.find(
+c => c.id === s.course
+);
+
+
+table.innerHTML +=
+
+`
+<tr>
 
 <td>
 
 <strong>
 
-${course?.name || item.course}
+${course?.name || s.course}
 
 </strong>
 
@@ -248,7 +243,7 @@ ${course?.name || item.course}
 
 <span class="sub-text">
 
-${course?.faculty || ""}
+${s.course}
 
 </span>
 
@@ -257,86 +252,48 @@ ${course?.faculty || ""}
 
 <td>
 
-${new Date(item.date)
-                        .toLocaleDateString()}
+${new Date(s.date).toLocaleDateString()}
 
 </td>
 
 
 <td>
 
-<span class="badge neutral">
+<span class="badge complete">
 
-${course?.type === "review"
-                        ? "Review"
-                        : "Standard"}
+Completed
 
 </span>
 
 </td>
 
-
-<td>
-
-<span class="badge progress">
-
-Processed
-
-</span>
-
-</td>
+</tr>
 
 `;
 
-
-                table.appendChild(row);
-
-            });
+});
 
 
-            /* empty state */
+if(mySubmissions.length===0){
 
-            if (userSubmissions.length === 0) {
+table.innerHTML =
 
-                document
-                    .getElementById("emptyHistory")
-                    .style.display = "block";
+`
+<tr>
 
-            }
+<td colspan="3">
 
-        }
+No feedback submitted yet
 
+</td>
 
-        loadHistory();
+</tr>
 
+`;
 
+}
 
-        /* search filter */
-
-        document
-            .getElementById("searchInput")
-            .addEventListener("input", function () {
-
-                const value =
-                    this.value.toLowerCase();
-
-
-                document
-                    .querySelectorAll("#historyTable tr")
-                    .forEach(row => {
-
-                        row.style.display =
-                            row.innerText
-                                .toLowerCase()
-                                .includes(value)
-                                ? ""
-                                : "none";
-
-                    });
-
-            });
-
-    </script>
+</script>
 
 
 </body>

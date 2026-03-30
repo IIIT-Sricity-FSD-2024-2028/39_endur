@@ -3,36 +3,22 @@
 
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <title>Course Feedback</title>
-    <link rel="stylesheet" href="../../css/base.css">
+<title>Course Feedback</title>
 
-    <link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/utilities.css">
+<link rel="stylesheet" href="../../css/forms.css">
 
-    <link rel="stylesheet" href="../../css/utilities.css">
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/form.css">
+<link rel="stylesheet" href="../../css/components/rating.css">
 
-    <link rel="stylesheet" href="../../css/forms.css">
-
-
-    <!-- components -->
-
-    <link rel="stylesheet" href="../../css/components/button.css">
-
-    <link rel="stylesheet" href="../../css/components/card.css">
-
-    <link rel="stylesheet" href="../../css/components/form.css">
-
-    <link rel="stylesheet" href="../../css/components/rating.css">
-
-    <link rel="stylesheet" href="../../css/components/success.css">
-
-
-    <!-- page -->
-
-    <link rel="stylesheet" href="../../css/pages/dashboard.css">
-
-    <link rel="stylesheet" href="../../css/pages/feedback.css">
+<link rel="stylesheet" href="../../css/pages/dashboard.css">
+<link rel="stylesheet" href="../../css/pages/feedback.css">
 
 </head>
 
@@ -40,243 +26,216 @@
 <body>
 
 
-    <div class="form-layout">
+<div class="form-layout">
 
 
-        <!-- HEADER -->
+<!-- header -->
 
-        <div class="form-header">
+<div class="form-header">
 
-            <h2>
+<h2>
 
-                Course Feedback
+Course Feedback
 
-            </h2>
+</h2>
 
 
-            <button onclick="goBack()" class="close-btn">
+<button
+onclick="goBack()"
+class="close-btn"
+>
 
-                ✕
+✕
 
-            </button>
+</button>
 
-        </div>
+</div>
 
 
 
+<div class="info-box">
 
-        <!-- ANONYMITY NOTE -->
+<strong>
 
-        <div class="info-box">
+Anonymity Guaranteed
 
-            <strong>
+</strong>
 
-                Anonymity Guaranteed
+<p>
 
-            </strong>
+Your responses are anonymous.
 
-            <p>
+</p>
 
-                Your responses are encrypted and identity is hidden from instructors.
+</div>
 
-            </p>
 
-        </div>
 
+<h1 id="courseTitle"></h1>
 
+<p class="subtitle">
 
+Feedback Form
 
-        <h1 id="courseTitle">
+</p>
 
-            CS101: Subject A
 
-        </h1>
 
+<div class="feedback-grid">
 
-        <p class="subtitle">
 
-            End of Semester Feedback Form • Fall 2038
+<!-- clarity -->
 
-        </p>
+<div class="question-card">
 
+<h3>
 
+Clarity of Explanation
 
+</h3>
 
-        <!-- QUESTIONS -->
+<div class="rating">
 
-        <div class="feedback-grid">
+<span onclick="setRating('clarity',1)">★</span>
+<span onclick="setRating('clarity',2)">★</span>
+<span onclick="setRating('clarity',3)">★</span>
+<span onclick="setRating('clarity',4)">★</span>
+<span onclick="setRating('clarity',5)">★</span>
 
+</div>
 
-            <div class="question-card">
+</div>
 
-                <h3>Clarity of Explanation</h3>
 
-                <p>
 
-                    How clearly concepts were explained?
+<!-- structure -->
 
-                </p>
+<div class="question-card">
 
-                <div class="rating">
+<h3>
 
-                    <span onclick="setRating('clarity',1)">★</span>
-                    <span onclick="setRating('clarity',2)">★</span>
-                    <span onclick="setRating('clarity',3)">★</span>
-                    <span onclick="setRating('clarity',4)">★</span>
-                    <span onclick="setRating('clarity',5)">★</span>
+Structure of Course
 
-                </div>
+</h3>
 
-            </div>
+<div class="rating">
 
+<span onclick="setRating('structure',1)">★</span>
+<span onclick="setRating('structure',2)">★</span>
+<span onclick="setRating('structure',3)">★</span>
+<span onclick="setRating('structure',4)">★</span>
+<span onclick="setRating('structure',5)">★</span>
 
+</div>
 
-            <div class="question-card">
+</div>
 
-                <h3>Course Structure</h3>
 
-                <p>
 
-                    Was the course well organized?
+<!-- engagement -->
 
-                </p>
+<div class="question-card">
 
-                <div class="rating">
+<h3>
 
-                    <span onclick="setRating('structure',1)">★</span>
-                    <span onclick="setRating('structure',2)">★</span>
-                    <span onclick="setRating('structure',3)">★</span>
-                    <span onclick="setRating('structure',4)">★</span>
-                    <span onclick="setRating('structure',5)">★</span>
+Student Engagement
 
-                </div>
+</h3>
 
-            </div>
+<div class="rating">
 
+<span onclick="setRating('engagement',1)">★</span>
+<span onclick="setRating('engagement',2)">★</span>
+<span onclick="setRating('engagement',3)">★</span>
+<span onclick="setRating('engagement',4)">★</span>
+<span onclick="setRating('engagement',5)">★</span>
 
+</div>
 
-            <div class="question-card">
+</div>
 
-                <h3>Engagement</h3>
 
-                <p>
 
-                    Did instructor encourage participation?
+<!-- difficulty -->
 
-                </p>
+<div class="question-card">
 
-                <div class="rating">
+<h3>
 
-                    <span onclick="setRating('engagement',1)">★</span>
-                    <span onclick="setRating('engagement',2)">★</span>
-                    <span onclick="setRating('engagement',3)">★</span>
-                    <span onclick="setRating('engagement',4)">★</span>
-                    <span onclick="setRating('engagement',5)">★</span>
+Difficulty Level
 
-                </div>
+</h3>
 
-            </div>
+<div class="rating">
 
+<span onclick="setRating('difficulty',1)">★</span>
+<span onclick="setRating('difficulty',2)">★</span>
+<span onclick="setRating('difficulty',3)">★</span>
+<span onclick="setRating('difficulty',4)">★</span>
+<span onclick="setRating('difficulty',5)">★</span>
 
+</div>
 
-            <div class="question-card">
+</div>
 
-                <h3>Difficulty Balance</h3>
 
-                <p>
+</div>
 
-                    Was workload appropriate?
 
-                </p>
 
-                <div class="rating">
+<textarea
 
-                    <span onclick="setRating('difficulty',1)">★</span>
-                    <span onclick="setRating('difficulty',2)">★</span>
-                    <span onclick="setRating('difficulty',3)">★</span>
-                    <span onclick="setRating('difficulty',4)">★</span>
-                    <span onclick="setRating('difficulty',5)">★</span>
+id="commentBox"
 
-                </div>
+placeholder="Optional comment"
 
-            </div>
+></textarea>
 
 
-        </div>
 
+<button
+onclick="submitFeedback()"
+class="btn-primary"
+>
 
+Submit Feedback
 
+</button>
 
-        <!-- COMMENTS -->
 
-        <div class="profile-card">
 
+</div>
 
-            <h3>
 
-                Additional Comments
 
-            </h3>
+<script type="module">
 
+const courseId =
+localStorage.getItem("activeCourse");
 
-            <textarea id="commentBox"
-                placeholder="Any other thoughts on the course, instructor, or content..."></textarea>
 
+const res =
+await fetch("../../js/mock-data/courses.json");
 
-        </div>
 
+const courses =
+await res.json();
 
 
+const course =
+courses.find(
+c => c.id === courseId
+);
 
-        <button class="btn-primary submit-btn" onclick="submitFeedback()">
 
-            Submit Feedback
+document.getElementById("courseTitle").innerText =
+`${course.id} — ${course.name}`;
 
-        </button>
+</script>
 
 
 
-    </div>
-    <script src="../../js/core/session.js"></script>
-
-    <script>
-
-        requireAuth();
-
-
-        async function loadCourseTitle() {
-
-            const courseId =
-                localStorage.getItem("activeCourse");
-
-
-            const response =
-                await fetch("../../js/mock-data/courses.json");
-
-
-            const courses =
-                await response.json();
-
-
-            const course =
-                courses.find(c => c.id === courseId);
-
-
-            if (!course) return;
-
-
-            document.getElementById("courseTitle").innerText =
-                course.id + ": " + course.name;
-
-        }
-
-
-        loadCourseTitle();
-
-    </script>
-
-
-    <script src="../../js/features/feedback-form.js"></script>
+<script src="../../js/features/feedback-form.js"></script>
 
 
 </body>

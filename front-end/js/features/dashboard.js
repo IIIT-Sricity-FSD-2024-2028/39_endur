@@ -1,315 +1,124 @@
 import { get } from "../core/storage.js";
 
-
-/* =========================
-HELPERS
-========================= */
-
-function getUser() {
-
-    return JSON.parse(
-        localStorage.getItem("endurSession")
-    );
-
+/* =============================
+LOAD COURSES
+============================= */
+async function getCourses() {
+    const res = await fetch("../../js/mock-data/courses.json");
+    return await res.json();
 }
 
-
-
-/* =========================
+/* =============================
 STATUS LOGIC
-========================= */
+============================= */
+function getStatus(courseId, userId) {
+    const submitted = get("submittedFeedback") || [];
+    const drafts = get("feedbackDraft") || {};
 
-function getStatus(course) {
-
-    const submitted =
-        get("submittedFeedback") || [];
-
-    const drafts =
-        get("feedbackDraft") || {};
-
-    const user = getUser();
-
-
-    /* reviewOfReviews special case */
-
-    if (course === "reviewOfReviews") {
-
-        const stored =
-            get("reviewOfReviews") || [];
-
-        return stored.find(
-            r => r.userId === user.id
-        )
-            ? "completed"
-            : "pending";
-
-    }
-
-
-    /* completed */
-
-    if (
-        submitted.find(
-            f =>
-                f.course === course &&
-                f.userId === user.id
-        )
-    ) {
-
+    if (submitted.find(f => f.course === courseId && f.userId === userId)) {
         return "completed";
-
     }
 
-
-    /* progress */
-
-    if (
-        drafts[user.id] &&
-        drafts[user.id][course]
-    ) {
-
+    if (drafts[userId] && drafts[userId][courseId]) {
         return "progress";
-
     }
-
 
     return "pending";
-
 }
 
-
-
-/* =========================
-TABLE RENDER
-========================= */
-
+/* =============================
+DASHBOARD TABLE
+============================= */
 export async function updateDashboard() {
+    const allCourses = await getCourses();
+    const user = get("endurSession");
+    const table = document.getElementById("dashboardTable");
 
-    const res =
-        await fetch("../../js/mock-data/courses.json");
+    if (table) table.innerHTML = "";
 
-    const courses =
-        await res.json();
+    // 1. Filter to ONLY show courses the student is actually enrolled in
+    const myCourses = allCourses.filter(c => 
+        user.enrolledCourses && user.enrolledCourses.includes(c.id)
+    );
 
+    myCourses.forEach(course => {
+        const status = getStatus(course.id, user.id);
+        let actionClick = "";
 
-    const table =
-        document.getElementById("dashboardTable");
+        if (status === "completed") {
+            actionClick = "window.location.href='feedback-history.html'";
+        } else {
+            actionClick = `openFeedback('${course.id}')`;
+        }
 
-
-    table.innerHTML = "";
-
-
-    courses.forEach(course => {
-
-
-        const status =
-            getStatus(course.id);
-
-
-        const row =
-            document.createElement("tr");
-
-
-        row.innerHTML = `
-
-<td>
-
-${course.name}
-
-</td>
-
-
-<td>
-
-<span class="badge ${status}">
-
-${status}
-
-</span>
-
-</td>
-
-
-<td>
-
-<a class="action-link">
-
-${status === "completed"
-                ? "View"
-                : status === "progress"
-                    ? "Resume"
-                    : "Start"}
-
-</a>
-
-</td>
-
-`;
-
-
-        /* action behaviour */
-
-        const action =
-            row.querySelector(".action-link");
-
-
-        action.onclick = () => {
-
-            localStorage.setItem(
-                "activeCourse",
-                course.id
-            );
-
-
-            if (status === "completed") {
-
-                window.location.href =
-                    "feedback-history.html";
-
-                return;
-
-            }
-
-
-            if (course.type === "review") {
-
-                window.location.href =
-                    "review-of-reviews.html";
-
-                return;
-
-            }
-
-
-            window.location.href =
-                "feedback-form.html";
-
-        };
-
-
-        table.appendChild(row);
-
+        if (table) {
+            table.innerHTML += `
+            <tr data-course="${course.id}">
+                <td>
+                    <strong>${course.name}</strong><br>
+                    <span class="sub-text">${course.id}</span>
+                </td>
+                <td>
+                    <span class="badge ${status}">${statusLabel(status)}</span>
+                </td>
+                <td>
+                    <span class="action-link" onclick="${actionClick}">
+                        ${statusAction(status)}
+                    </span>
+                </td>
+            </tr>
+            `;
+        }
     });
 
-
-    if (courses.length === 0) {
-
-        document
-            .getElementById("emptyDashboard")
-            .style.display = "block";
-
+    if (table && table.innerHTML === "") {
+        document.getElementById("emptyDashboard").style.display = "block";
     }
-
 }
 
-
-
-/* =========================
+/* =============================
 STATS
-========================= */
-
+============================= */
 export async function updateStats() {
+    const allCourses = await getCourses();
+    const user = get("endurSession");
 
-    const res =
-        await fetch("../../js/mock-data/courses.json");
-
-    const courses =
-        await res.json();
-
-
-    const submitted =
-        get("submittedFeedback") || [];
-
-    const drafts =
-        get("feedbackDraft") || {};
-
-    const review =
-        get("reviewOfReviews") || [];
-
-
-    const user = getUser();
-
+    // 1. Filter to ONLY show courses the student is actually enrolled in
+    const myCourses = allCourses.filter(c => 
+        user.enrolledCourses && user.enrolledCourses.includes(c.id)
+    );
 
     let completed = 0;
     let progress = 0;
     let pending = 0;
 
-
-    courses.forEach(course => {
-
-
-        /* reviewOfReviews */
-
-        if (course.id === "reviewOfReviews") {
-
-            const done =
-                review.find(
-                    r => r.userId === user.id
-                );
-
-            if (done) {
-
-                completed++;
-
-                return;
-
-            }
-
-            pending++;
-
-            return;
-
-        }
-
-
-        /* completed */
-
-        if (
-            submitted.find(
-                f =>
-                    f.course === course.id &&
-                    f.userId === user.id
-            )
-        ) {
-
-            completed++;
-
-            return;
-
-        }
-
-
-        /* progress */
-
-        if (
-            drafts[user.id] &&
-            drafts[user.id][course.id]
-        ) {
-
-            progress++;
-
-            return;
-
-        }
-
-
-        /* pending */
-
-        pending++;
-
+    myCourses.forEach(course => {
+        const status = getStatus(course.id, user.id);
+        if (status === "completed") completed++;
+        else if (status === "progress") progress++;
+        else pending++;
     });
 
+    const statComp = document.getElementById("statCompleted");
+    if (statComp) statComp.innerText = completed;
 
-    document.getElementById("statCompleted").innerText =
-        completed;
+    const statProg = document.getElementById("statProgress");
+    if (statProg) statProg.innerText = progress;
 
-    document.getElementById("statProgress").innerText =
-        progress;
+    const statPend = document.getElementById("statPending");
+    if (statPend) statPend.innerText = pending;
 
-    document.getElementById("statPending").innerText =
-        pending;
+    const statTot = document.getElementById("statTotal");
+    if (statTot) statTot.innerText = myCourses.length;
+}
 
-    document.getElementById("statTotal").innerText =
-        courses.length;
+/* =============================
+HELPERS
+============================= */
+function statusLabel(status) {
+    return { pending: "Pending", progress: "In Progress", completed: "Completed" }[status];
+}
 
+function statusAction(status) {
+    return { pending: "Start", progress: "Resume", completed: "View" }[status];
 }

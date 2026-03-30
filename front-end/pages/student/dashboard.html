@@ -181,9 +181,17 @@
 
 
 
-    <script src="../../js/core/session.js"></script>
+    <script type="module">
 
-    <script>
+        import { requireAuth }
+            from "../../js/core/session.js";
+
+        import {
+            updateDashboard,
+            updateStats
+        }
+            from "../../js/features/dashboard.js";
+
 
         const user = requireAuth();
 
@@ -202,7 +210,7 @@
 
         /* navigation */
 
-        function openFeedback(courseId) {
+        window.openFeedback = function (courseId) {
 
             localStorage.setItem(
                 "activeCourse",
@@ -210,7 +218,7 @@
             );
 
 
-            if (courseId === "reviewOfReviews") {
+            if (courseId.includes("reviewOfReviews")) {
 
                 window.location.href =
                     "review-of-reviews.html";
@@ -223,22 +231,13 @@
             window.location.href =
                 "feedback-form.html";
 
-        }
-
-    </script>
+        };
 
 
-
-    <script type="module">
-
-        import {
-            updateDashboard,
-            updateStats
-        }
-            from "../../js/features/dashboard.js";
-
+        /* render */
 
         updateDashboard();
+
         updateStats();
 
     </script>

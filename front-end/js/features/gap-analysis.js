@@ -1,227 +1,122 @@
 import { get } from "../core/storage.js";
-
+import { getSession } from "../core/session.js";
 
 export function renderGapAnalysis() {
+    const studentData = get("submittedFeedback") || [];
+    const reflectionData = get("selfReflection") || [];
+    const user = getSession();
 
-    const studentData =
-        get("submittedFeedback") || [];
+    if (!user) return;
 
-
-    const reflectionData =
-        get("selfReflection") || [];
-
-
-    const user =
-        get("endurSession");
-
-
-    /* latest reflection */
-
-    const reflection =
-        reflectionData
-            .filter(
-                r => r.userId === user.id
-            )
-            .pop();
-
-
-    if (!reflection) {
-
-        alert("No reflection found");
-
+    // READ THE DYNAMIC COURSE
+    const activeCourse = localStorage.getItem("activeFacultyCourse");
+    
+    if (!activeCourse) {
+        alert("No active course selected.");
+        window.location.href = "reports.html";
         return;
-
     }
 
+    // 1. Get the reflection specifically for this faculty member AND this course
+    const reflection = reflectionData
+        .filter(r => r.facultyId === user.id && r.courseId === activeCourse)
+        .pop(); // Gets latest if somehow there are multiples from old test data
 
-    /* simulate student averages */
+    if (!reflection) {
+        alert(`No reflection found for ${activeCourse}. Please submit one first.`);
+        window.location.href = "self-reflection.html";
+        return;
+    }
+
+    const courseTitleEl = document.getElementById("courseTitle");
+    if (courseTitleEl) {
+        courseTitleEl.innerText = `${activeCourse} Gap Analysis`;
+    }
+
+    // 2. Dynamically calculate student averages for THIS course
+    const courseFeedback = studentData.filter(f => f.course === activeCourse);
+    
+    let totals = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+    let counts = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+    let comments = [];
+
+    courseFeedback.forEach(f => {
+        if (f.ratings) {
+            if (typeof f.ratings.clarity === 'number') { totals.clarity += f.ratings.clarity; counts.clarity++; }
+            if (typeof f.ratings.structure === 'number') { totals.structure += f.ratings.structure; counts.structure++; }
+            if (typeof f.ratings.engagement === 'number') { totals.engagement += f.ratings.engagement; counts.engagement++; }
+            if (typeof f.ratings.difficulty === 'number') { totals.difficulty += f.ratings.difficulty; counts.difficulty++; }
+        }
+        if (f.comment && f.comment.trim() !== "") {
+            comments.push(f.comment);
+        }
+    });
 
     const studentAvg = {
-
-        clarity: 4.2,
-
-        engagement: 3.8,
-
-        assessment: 3.0
-
+        clarity: counts.clarity > 0 ? totals.clarity / counts.clarity : 0,
+        structure: counts.structure > 0 ? totals.structure / counts.structure : 0,
+        engagement: counts.engagement > 0 ? totals.engagement / counts.engagement : 0,
+        difficulty: counts.difficulty > 0 ? totals.difficulty / counts.difficulty : 0
     };
 
-
-    /* calculate */
-
+    // 3. Calculate the Gaps
     const rows = [];
-
-
     let totalSelf = 0;
-
     let totalStudent = 0;
+    let validMetricsCount = 0;
 
+    const expected = reflection.expectedRatings || {};
 
-    Object.keys(reflection.ratings)
-        .forEach(field => {
+    Object.keys(expected).forEach(field => {
+        const selfScore = expected[field];
+        const studentScore = studentAvg[field];
+        
+        const gap = selfScore - studentScore; 
 
+        rows.push({ field, selfScore, studentScore, gap });
 
-            const selfScore =
-                reflection.ratings[field];
+        totalSelf += selfScore;
+        totalStudent += studentScore;
+        validMetricsCount++;
+    });
 
+    // 4. Calculate Overall Aggregates
+    const avgSelf = validMetricsCount > 0 ? (totalSelf / validMetricsCount) : 0;
+    const avgStudent = validMetricsCount > 0 ? (totalStudent / validMetricsCount) : 0;
+    
+    const absoluteGapScore = Math.abs(avgSelf - avgStudent);
 
-            const studentScore =
-                studentAvg[field];
+    document.getElementById("selfScore").innerText = (avgSelf * 20).toFixed(0) + "%";
+    document.getElementById("studentScore").innerText = (avgStudent * 20).toFixed(0) + "%";
+    document.getElementById("gapScore").innerText = (absoluteGapScore * 20).toFixed(0) + "%";
 
-
-            const gap =
-                selfScore - studentScore;
-
-
-            rows.push({
-
-                field,
-
-                selfScore,
-
-                studentScore,
-
-                gap
-
-            });
-
-
-            totalSelf += selfScore;
-
-            totalStudent += studentScore;
-
-        });
-
-
-    /* averages */
-
-    const avgSelf =
-        (
-            totalSelf /
-            rows.length *
-            20
-        ).toFixed(0);
-
-
-    const avgStudent =
-        (
-            totalStudent /
-            rows.length *
-            20
-        ).toFixed(0);
-
-
-    const gapScore =
-        (avgSelf - avgStudent)
-            .toFixed(0);
-
-
-
-    document.getElementById(
-        "selfScore"
-    ).innerText =
-        avgSelf + "%";
-
-
-    document.getElementById(
-        "studentScore"
-    ).innerText =
-        avgStudent + "%";
-
-
-    document.getElementById(
-        "gapScore"
-    ).innerText =
-        gapScore + "%";
-
-
-
-    /* table */
-
-    const table =
-        document.getElementById("gapTable");
-
+    // 5. Populate the Comparison Table
+    const table = document.getElementById("gapTable");
+    table.innerHTML = ""; 
 
     rows.forEach(r => {
-
-
-        const tr =
-            document.createElement("tr");
-
-
+        const tr = document.createElement("tr");
         tr.innerHTML = `
-
-<td>
-
-${r.field}
-
-</td>
-
-
-<td>
-
-${(r.selfScore * 20).toFixed(0)}%
-
-</td>
-
-
-<td>
-
-${(r.studentScore * 20).toFixed(0)}%
-
-</td>
-
-
-<td>
-
-${(r.gap * 20).toFixed(0)}%
-
-</td>
-
-`;
-
-
+            <td style="text-transform: capitalize;">${r.field}</td>
+            <td>${(r.selfScore * 20).toFixed(0)}%</td>
+            <td>${(r.studentScore * 20).toFixed(0)}%</td>
+            <td>${(r.gap * 20).toFixed(0)}%</td>
+        `;
         table.appendChild(tr);
-
     });
 
-
-
-    /* mock comments */
-
-    const comments = [
-
-        "Concept explanations were sometimes rushed",
-
-        "Assignments were very helpful",
-
-        "Would appreciate more examples",
-
-        "Good engagement in lectures"
-
-    ];
-
-
-    const container =
-        document.getElementById("commentList");
-
-
-    comments.forEach(text => {
-
-
-        const div =
-            document.createElement("div");
-
-
-        div.className = "card";
-
-
-        div.innerText = text;
-
-
-        container.appendChild(div);
-
-    });
-
-
+    // 6. Populate Comments
+    const container = document.getElementById("commentList");
+    container.innerHTML = ""; 
+    
+    if (comments.length === 0) {
+        container.innerHTML = "<p>No written comments provided by students.</p>";
+    } else {
+        comments.slice(-5).forEach(text => {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.innerText = text;
+            container.appendChild(div);
+        });
+    }
 }
