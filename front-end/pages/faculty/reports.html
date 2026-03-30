@@ -2,275 +2,127 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
     <title>Faculty Feedback Reports</title>
-
     <link rel="stylesheet" href="../../css/base.css">
     <link rel="stylesheet" href="../../css/layout.css">
     <link rel="stylesheet" href="../../css/utilities.css">
-
     <link rel="stylesheet" href="../../css/components/button.css">
     <link rel="stylesheet" href="../../css/components/card.css">
     <link rel="stylesheet" href="../../css/components/sidebar.css">
     <link rel="stylesheet" href="../../css/components/badge.css">
-
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
-
 </head>
-
 
 <body>
 
-
     <div class="dashboard-layout">
-
-
         <!-- sidebar -->
-
         <aside class="sidebar">
-
-
             <div class="sidebar-logo">
-
                 <img src="../../assets/logos/endur-logo.svg">
-
                 <div>
-
                     <strong>Endur</strong>
                     <p>Faculty Portal</p>
-
                 </div>
-
             </div>
-
-
 
             <nav class="sidebar-menu">
-
-                <a href="dashboard.html">
-
-                    Dashboard
-
-                </a>
-
-                <a class="active">
-
-                    Feedback Reports
-
-                </a>
-
+                <a href="dashboard.html">Dashboard</a>
+                <a class="active">Feedback Reports</a>
             </nav>
 
-
-
             <a href="profile.html" class="sidebar-user">
-
                 <div class="avatar"></div>
-
                 <div>
-
                     <strong id="userName"></strong>
-
                     <p id="userDept"></p>
-
                 </div>
-
             </a>
-
-
         </aside>
 
-
-
-
         <!-- main -->
-
         <main class="dashboard-content">
 
-
-            <h1>
-
-                Faculty Feedback Reports
-
-            </h1>
-
-            <p class="subtitle">
-
-                Detailed evaluation insights and performance diagnostics.
-
-            </p>
-
-
+            <h1>Faculty Feedback Reports</h1>
+            <p class="subtitle">Detailed evaluation insights and performance diagnostics.</p>
 
             <!-- CURRENT FEEDBACK -->
-
             <div class="card split-card">
-
 
                 <div class="metric-box">
-
+                    <h4 id="currentCourseName" style="margin-bottom: 5px; color: var(--primary);">Course</h4>
                     <p>Avg Rating</p>
-
-                    <h2 id="avgRating">
-
-                        0
-
-                    </h2>
-
+                    <h2 id="avgRating">0</h2>
+                    <!-- DOT NAVIGATION CONTAINER -->
+                    <div id="courseDots" style="display:flex; gap:8px; justify-content:center; margin-top:15px;"></div>
                 </div>
-
 
                 <div>
-
-                    <h3>
-
-                        View Current Feedback
-
-                    </h3>
-
-                    <p>
-
-                        Access student ratings and comments from this semester.
-
-                    </p>
-
-
-                    <button class="btn-primary" onclick="window.location.href='self-reflection.html'">
-
+                    <h3>View Current Feedback</h3>
+                    <p>Access student ratings and comments from this semester.</p>
+                    <!-- BUTTON ID ADDED -->
+                    <button id="feedbackActionBtn" class="btn-primary">
                         Open Feedback →
-
                     </button>
-
                 </div>
 
-
             </div>
-
-
 
             <!-- HISTORICAL -->
-
             <div class="card split-card">
-
-
                 <div>
-
-                    <h3>
-
-                        Historical Trends
-
-                    </h3>
-
-                    <p>
-
-                        Track teaching performance over semesters.
-
-                    </p>
-
-
+                    <h3>Historical Trends</h3>
+                    <p>Track teaching performance over semesters.</p>
                     <button class="btn-outline" onclick="window.location.href='historical-trends.html'">
-
                         View Archive
-
                     </button>
-
                 </div>
-
-
-                <div class="chart-placeholder" id="trendChart">
-
-                </div>
-
-
+                <div class="chart-placeholder" id="trendChart"></div>
             </div>
-
-
 
             <!-- ACTION REPORT -->
-
+            <!-- ACTION REPORT -->
             <div class="card dark-card">
-
-
-                <h3>
-
-                    Submit Action Report
-
-                </h3>
-
-
-                <p>
-
-                    Provide reflection on feedback and planned improvements.
-
-                </p>
-
-
+                <h3>Submit Action Report</h3>
+                <p>Provide reflection on feedback and planned improvements.</p>
                 <div class="action-meta">
-
                     <div>
-
                         <p>Focus Area</p>
-
                         <strong id="actionCourse"></strong>
-
                     </div>
-
-
                     <div>
-
                         <p>Deadline</p>
-
                         <strong id="actionDeadline"></strong>
-
                     </div>
-
                 </div>
 
+                <!-- NEW: Message placeholder for the locked state -->
+                <p id="actionReportMsg" style="color: #ffcccc; margin-bottom: 10px; font-size: 0.9em; display: none;">
+                </p>
 
-                <button class="btn-primary" onclick="startActionReport()">
-
+                <!-- NEW: ID added to button -->
+                <button id="actionReportBtn" class="btn-primary">
                     Start Action Report
-
                 </button>
-
-
             </div>
 
-
-
-            <div class="info-box">
-
-                All student feedback is anonymized.
-
-            </div>
-
-
+            <div class="info-box">All student feedback is anonymized.</div>
         </main>
-
-
     </div>
-
-
 
     <script type="module">
         import { requireAuth } from "../../js/core/session.js";
         import { renderFacultyReports } from "../../js/features/faculty-reports.js";
 
-        // 1. Authenticate and retrieve user session
         const user = requireAuth();
 
-        // 2. If valid session, populate DOM and render reports
         if (user) {
             document.getElementById("userName").innerText = user.name;
             document.getElementById("userDept").innerText = user.department;
-
-            // 3. Render page specific data
             renderFacultyReports();
         }
     </script>
-
 
 </body>
 

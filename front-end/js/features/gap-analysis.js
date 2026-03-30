@@ -8,24 +8,32 @@ export function renderGapAnalysis() {
 
     if (!user) return;
 
-    // 1. Get the latest reflection specifically for this faculty member
+    // READ THE DYNAMIC COURSE
+    const activeCourse = localStorage.getItem("activeFacultyCourse");
+    
+    if (!activeCourse) {
+        alert("No active course selected.");
+        window.location.href = "reports.html";
+        return;
+    }
+
+    // 1. Get the reflection specifically for this faculty member AND this course
     const reflection = reflectionData
-        .filter(r => r.facultyId === user.id) // Fixed from userId to facultyId
-        .pop();
+        .filter(r => r.facultyId === user.id && r.courseId === activeCourse)
+        .pop(); // Gets latest if somehow there are multiples from old test data
 
     if (!reflection) {
-        alert("No reflection found. Please submit a self-reflection first.");
+        alert(`No reflection found for ${activeCourse}. Please submit one first.`);
         window.location.href = "self-reflection.html";
         return;
     }
 
-    const activeCourse = reflection.courseId;
     const courseTitleEl = document.getElementById("courseTitle");
     if (courseTitleEl) {
         courseTitleEl.innerText = `${activeCourse} Gap Analysis`;
     }
 
-    // 2. Dynamically calculate student averages for this specific course
+    // 2. Dynamically calculate student averages for THIS course
     const courseFeedback = studentData.filter(f => f.course === activeCourse);
     
     let totals = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
@@ -39,7 +47,6 @@ export function renderGapAnalysis() {
             if (typeof f.ratings.engagement === 'number') { totals.engagement += f.ratings.engagement; counts.engagement++; }
             if (typeof f.ratings.difficulty === 'number') { totals.difficulty += f.ratings.difficulty; counts.difficulty++; }
         }
-        // Collect actual student comments
         if (f.comment && f.comment.trim() !== "") {
             comments.push(f.comment);
         }
@@ -77,17 +84,15 @@ export function renderGapAnalysis() {
     const avgSelf = validMetricsCount > 0 ? (totalSelf / validMetricsCount) : 0;
     const avgStudent = validMetricsCount > 0 ? (totalStudent / validMetricsCount) : 0;
     
-    // Applying the exact math formula from your SRS: |Self Reflection - Student Avg|
     const absoluteGapScore = Math.abs(avgSelf - avgStudent);
 
-    // Convert everything to percentages (score out of 5 * 20 = percentage out of 100)
     document.getElementById("selfScore").innerText = (avgSelf * 20).toFixed(0) + "%";
     document.getElementById("studentScore").innerText = (avgStudent * 20).toFixed(0) + "%";
     document.getElementById("gapScore").innerText = (absoluteGapScore * 20).toFixed(0) + "%";
 
     // 5. Populate the Comparison Table
     const table = document.getElementById("gapTable");
-    table.innerHTML = ""; // Clear existing rows
+    table.innerHTML = ""; 
 
     rows.forEach(r => {
         const tr = document.createElement("tr");
@@ -100,14 +105,13 @@ export function renderGapAnalysis() {
         table.appendChild(tr);
     });
 
-    // 6. Populate Real Student Comments
+    // 6. Populate Comments
     const container = document.getElementById("commentList");
     container.innerHTML = ""; 
     
     if (comments.length === 0) {
         container.innerHTML = "<p>No written comments provided by students.</p>";
     } else {
-        // Show up to the 5 most recent comments so the UI doesn't break if a class has 100 students
         comments.slice(-5).forEach(text => {
             const div = document.createElement("div");
             div.className = "card";

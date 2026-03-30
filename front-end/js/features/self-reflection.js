@@ -5,22 +5,18 @@ import { createRating } from "../components/rating.js";
 const ratings = {};
 
 export function initSelfReflection() {
-    // 1. Initialize rating components for the 4 updated metrics
     createRating("clarityRating", "clarity", handleRatingChange);
     createRating("structureRating", "structure", handleRatingChange);
     createRating("engagementRating", "engagement", handleRatingChange);
     createRating("difficultyRating", "difficulty", handleRatingChange);
 
-    // 2. Load existing draft if any
     loadDraft();
 
-    // 3. Bind text area input to save draft automatically
     const textArea = document.getElementById("reflectionText");
     if (textArea) {
         textArea.addEventListener("input", saveDraft);
     }
 
-    // 4. Expose submit function globally
     window.submitSelfReflection = submitSelfReflection;
 }
 
@@ -62,7 +58,6 @@ function loadDraft() {
 }
 
 function submitSelfReflection() {
-    // 1. Validation (checking for 4 metrics now)
     if (Object.keys(ratings).length < 4) {
         alert("Please complete all 4 quantitative ratings before submitting.");
         return;
@@ -75,12 +70,29 @@ function submitSelfReflection() {
     }
 
     const user = getSession();
+    
+    // READ THE DYNAMIC COURSE
+    const activeCourse = localStorage.getItem("activeFacultyCourse");
+    if (!activeCourse) {
+        alert("Error: No active course selected. Returning to dashboard.");
+        window.location.href = "reports.html";
+        return;
+    }
+
+    const cycles = get("feedbackCycles") || [];
+    const activeCycleObj = cycles.find(c => c.status === "active") || { cycleId: "CYCLE_W4" };
+    const activeCycle = activeCycleObj.cycleId;
+
     let stored = get("selfReflection") || [];
 
-    const activeCourse = "CS101"; 
-    const activeCycle = "CYCLE_1";
+    // Defensive check: Prevent double submission
+    const alreadySubmitted = stored.find(r => r.courseId === activeCourse && r.facultyId === user.id && r.cycleId === activeCycle);
+    if (alreadySubmitted) {
+        alert(`Self-reflection already submitted for ${activeCourse}. Routing to Gap Analysis.`);
+        window.location.href = "gap-analysis.html";
+        return;
+    }
 
-    // 2. Construct the record with the 4 matched metrics
     const newReflection = {
         reflectionId: "REFL_" + new Date().getTime(),
         facultyId: user.id,
@@ -96,11 +108,9 @@ function submitSelfReflection() {
         submissionDate: new Date().toISOString()
     };
 
-    // 3. Save to Mock DB
     stored.push(newReflection);
     set("selfReflection", stored);
 
-    // 4. Clear the draft
     let drafts = get("selfReflectionDraft") || {};
     delete drafts[user.id];
     set("selfReflectionDraft", drafts);
