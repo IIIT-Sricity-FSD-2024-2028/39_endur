@@ -289,6 +289,16 @@
       "hod"
     ]
   },
+   {
+    "id": "F402",
+    "password": "123",
+    "name": "Dr. Elon Musk",
+    "role": "faculty",
+    "department": "Computer Science",
+    "secondaryRoles": [
+      "dean"
+    ]
+  },
   {
     "id": "H101",
     "password": "123",

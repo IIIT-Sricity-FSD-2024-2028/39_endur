@@ -80,6 +80,26 @@
     "enrolled": 5
   },
   {
+    "id": "CS420",
+    "name": "Interplanetary Operating Systems",
+    "faculty": "Dr. Elon Musk",
+    "facultyId": "F402",
+    "department": "Computer Science",
+    "type": "standard",
+    "color": "blue",
+    "enrolled": 3
+  },
+  {
+    "id": "CS421",
+    "name": "Neural Interface Programming",
+    "faculty": "Dr. Elon Musk",
+    "facultyId": "F402",
+    "department": "Computer Science",
+    "type": "standard",
+    "color": "purple",
+    "enrolled": 3
+  },
+  {
     "id": "MA201",
     "name": "Linear Algebra",
     "faculty": "Dr. Gilbert Strang",

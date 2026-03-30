@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Profile & Settings | Dean</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/forms.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        /* Toggle Switch Styles for Notification Prefs */
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #16a34a; }
+        input:checked + .slider:before { transform: translateX(20px); }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
+            <div><strong>Endur</strong><p>Institutional Portal</p></div>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="faculty-management.html">Faculty Management</a>
+            <a href="cycle-management.html">Cycle Management</a>
+            <a href="audit-logs.html">Audit Logs</a>
+        </nav>
+
+        <a class="sidebar-user active">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName">Loading...</strong>
+                <p id="userDept">---</p>
+            </div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+        <h1>Profile & Settings</h1>
+        <p class="subtitle">Manage your personal information and portal preferences.</p>
+
+        <!-- Personal Info Card -->
+        <div class="profile-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <h3 style="margin:0">Personal Information</h3>
+            </div>
+            
+            <div class="profile-grid">
+                <div>
+                    <label>Full Name</label>
+                    <p id="profileName" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
+                </div>
+                <div>
+                    <label>Institutional ID</label>
+                    <p id="profileId" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
+                </div>
+                <div>
+                    <label>Email Address</label>
+                    <p id="profileEmail" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
+                </div>
+                <div>
+                    <label>Department</label>
+                    <p id="profileDept" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Card -->
+        <div class="profile-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <h3 style="margin:0">Notification Preferences</h3>
+            </div>
+
+            <div class="settings-row">
+                <strong>Email Notifications</strong>
+                <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <strong>Push Notifications</strong>
+                <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Account Settings Card -->
+        <div class="profile-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <h3 style="margin:0">Account Settings</h3>
+            </div>
+
+            <div class="settings-row">
+                <div>
+                    <strong>Change To Faculty</strong>
+                    <p>Change to your faculty profile to view your performance.</p>
+                </div>
+                <button class="btn-primary" style="background: #1e3a8a;" onclick="switchRole('faculty')">Change To Faculty</button>
+            </div>
+
+            <div class="settings-row">
+                <div>
+                    <strong>Log Out</strong>
+                    <p>Will log you out of the current session.</p>
+                </div>
+                <button class="btn-danger" onclick="logout()">Log Out</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { initProfile } from "../../js/features/profile.js";
+    
+    requireAuth();
+    initProfile();
+</script>
+
+</body>
+</html>
