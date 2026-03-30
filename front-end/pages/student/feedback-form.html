@@ -1,243 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<title>Course Feedback</title>
-
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/utilities.css">
-<link rel="stylesheet" href="../../css/forms.css">
-
-<link rel="stylesheet" href="../../css/components/button.css">
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/form.css">
-<link rel="stylesheet" href="../../css/components/rating.css">
-
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
-<link rel="stylesheet" href="../../css/pages/feedback.css">
-
+    <meta charset="UTF-8">
+    <title>Course Feedback</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/form.css">
+    <link rel="stylesheet" href="../../css/components/rating.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
 </head>
-
-
 <body>
-
 
 <div class="form-layout">
 
+    <div class="form-header">
+        <h2>Course Feedback</h2>
+        <button onclick="window.history.back()" class="close-btn">✕</button>
+    </div>
 
-<!-- header -->
+    <div class="info-box">
+        <strong>Anonymity Guaranteed</strong>
+        <p>Your responses are anonymous.</p>
+    </div>
 
-<div class="form-header">
+    <h1 id="courseTitle">Loading...</h1>
+    <p class="subtitle">Feedback Form</p>
 
-<h2>
+    <!-- DYNAMIC CONTAINER -->
+    <div class="feedback-grid" id="dynamicQuestionsContainer">
+        <!-- Rendered via JS -->
+    </div>
 
-Course Feedback
+    <textarea id="commentBox" placeholder="Optional comment"></textarea>
 
-</h2>
-
-
-<button
-onclick="goBack()"
-class="close-btn"
->
-
-✕
-
-</button>
-
-</div>
-
-
-
-<div class="info-box">
-
-<strong>
-
-Anonymity Guaranteed
-
-</strong>
-
-<p>
-
-Your responses are anonymous.
-
-</p>
+    <button onclick="window.submitFeedback()" class="btn-primary">Submit Feedback</button>
 
 </div>
 
-
-
-<h1 id="courseTitle"></h1>
-
-<p class="subtitle">
-
-Feedback Form
-
-</p>
-
-
-
-<div class="feedback-grid">
-
-
-<!-- clarity -->
-
-<div class="question-card">
-
-<h3>
-
-Clarity of Explanation
-
-</h3>
-
-<div class="rating">
-
-<span onclick="setRating('clarity',1)">★</span>
-<span onclick="setRating('clarity',2)">★</span>
-<span onclick="setRating('clarity',3)">★</span>
-<span onclick="setRating('clarity',4)">★</span>
-<span onclick="setRating('clarity',5)">★</span>
-
-</div>
-
-</div>
-
-
-
-<!-- structure -->
-
-<div class="question-card">
-
-<h3>
-
-Structure of Course
-
-</h3>
-
-<div class="rating">
-
-<span onclick="setRating('structure',1)">★</span>
-<span onclick="setRating('structure',2)">★</span>
-<span onclick="setRating('structure',3)">★</span>
-<span onclick="setRating('structure',4)">★</span>
-<span onclick="setRating('structure',5)">★</span>
-
-</div>
-
-</div>
-
-
-
-<!-- engagement -->
-
-<div class="question-card">
-
-<h3>
-
-Student Engagement
-
-</h3>
-
-<div class="rating">
-
-<span onclick="setRating('engagement',1)">★</span>
-<span onclick="setRating('engagement',2)">★</span>
-<span onclick="setRating('engagement',3)">★</span>
-<span onclick="setRating('engagement',4)">★</span>
-<span onclick="setRating('engagement',5)">★</span>
-
-</div>
-
-</div>
-
-
-
-<!-- difficulty -->
-
-<div class="question-card">
-
-<h3>
-
-Difficulty Level
-
-</h3>
-
-<div class="rating">
-
-<span onclick="setRating('difficulty',1)">★</span>
-<span onclick="setRating('difficulty',2)">★</span>
-<span onclick="setRating('difficulty',3)">★</span>
-<span onclick="setRating('difficulty',4)">★</span>
-<span onclick="setRating('difficulty',5)">★</span>
-
-</div>
-
-</div>
-
-
-</div>
-
-
-
-<textarea
-
-id="commentBox"
-
-placeholder="Optional comment"
-
-></textarea>
-
-
-
-<button
-onclick="submitFeedback()"
-class="btn-primary"
->
-
-Submit Feedback
-
-</button>
-
-
-
-</div>
-
-
-
-<script type="module">
-
-const courseId =
-localStorage.getItem("activeCourse");
-
-
-const res =
-await fetch("../../js/mock-data/courses.json");
-
-
-const courses =
-await res.json();
-
-
-const course =
-courses.find(
-c => c.id === courseId
-);
-
-
-document.getElementById("courseTitle").innerText =
-`${course.id} — ${course.name}`;
-
-</script>
-
-
-
-<script src="../../js/features/feedback-form.js"></script>
-
+<script type="module" src="../../js/features/feedback-form.js"></script>
 
 </body>
-
 </html>

@@ -1,83 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<title>Action Report Submitted</title>
-
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/button.css">
-
-<link rel="stylesheet" href="../../css/pages/feedback.css">
-
+    <meta charset="UTF-8">
+    <title>Action Report Submitted</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
 </head>
-
-
 <body>
 
-
 <div class="center-layout">
+    <div class="success-card">
+        <div class="success-icon">
+            ✓
+        </div>
+        
+        <h1>Action Report Recorded Successfully</h1>
+        <p style="margin-bottom: 24px; color: #64748b;">
+            Your action report has been submitted to the HOD for review.
+        </p>
 
-
-<div class="success-card">
-
-
-<div class="success-icon">
-
-✓
-
+        <button class="btn-primary" onclick="goReports()">
+            Back to Feedback Reports →
+        </button>
+    </div>
 </div>
-
-
-<h1>
-
-Action Report recorded Successfully
-
-</h1>
-
-
-<p>
-
-Thank you for your input.
-
-</p>
-
-
-
-<button
-class="btn-primary"
-onclick="goDashboard()"
->
-
-Head Back to Dashboard →
-
-</button>
-
-
-</div>
-
-
-</div>
-
-
 
 <script>
-
-function goDashboard(){
-
-window.location.href =
-"dashboard.html";
-
-}
-
+    function goReports() {
+        window.location.href = "reports.html";
+    }
 </script>
 
-
 </body>
-
 </html>

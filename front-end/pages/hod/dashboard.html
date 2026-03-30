@@ -2,10 +2,144 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HOD Dashboard</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
 <body>
-    <h1>HOD Dashboard</h1>
+
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
+            <div>
+                <strong>Endur</strong>
+                <p>Institutional Portal</p>
+            </div>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a class="active" href="dashboard.html">Dashboard</a>
+            <!-- FIXED: Added actual file links -->
+            <a href="faculty-management.html">Faculty Management</a>
+            <a href="review-checkin.html">Review Check In</a>
+            <a href="evaluation-parameters.html">Evaluation Parameters</a>
+        </nav>
+
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <h1>Department Dashboard</h1>
+        <p class="subtitle" style="margin-bottom: 30px;"></p>
+
+        <!-- STATS GRID -->
+        <div class="stats-grid" style="margin-bottom: 40px;">
+            
+            <div class="stat-card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <p>Overall Dept Satisfaction</p>
+                    <span class="badge success">+2.4%</span>
+                </div>
+                <h2 id="deptSatisfaction">0%</h2>
+                <div style="height: 6px; width: 100%; background: #e2e8f0; border-radius: 4px; margin-top: 15px;">
+                    <div id="satProgressBar" style="height: 100%; width: 0%; background: #22c55e; border-radius: 4px;"></div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <p>Avg Response Rate</p>
+                    <span class="badge success">+1.5%</span>
+                </div>
+                <h2 id="deptResponseRate">0%</h2>
+                <div style="height: 6px; width: 100%; background: #e2e8f0; border-radius: 4px; margin-top: 15px;">
+                    <div id="respProgressBar" style="height: 100%; width: 0%; background: #1e40af; border-radius: 4px;"></div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <p>Flagged Reports</p>
+                    <span class="badge danger">-5%</span>
+                </div>
+                <h2 id="flaggedCount">0</h2>
+                <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-top: 10px;">Requires Attention</p>
+            </div>
+
+            <div class="stat-card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <p>Pending Check-ins</p>
+                    <span class="badge warning">-12%</span>
+                </div>
+                <h2 id="pendingCheckins">0</h2>
+                <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-top: 10px;">Active Cycle</p>
+            </div>
+
+        </div>
+
+        <!-- FACULTY TABLE -->
+        <div class="card" style="padding: 0;">
+            <div style="padding: 24px;">
+                <h3 style="margin: 0;">Faculty Performance Overview</h3>
+            </div>
+            
+            <table class="data-table" style="margin: 0; border-top: 1px solid #e2e8f0;">
+                <thead>
+                    <tr>
+                        <th style="padding-left: 24px;">FACULTY MEMBER</th>
+                        <th>COURSES</th>
+                        <th>SCORE</th>
+                        <th>STATUS</th>
+                    </tr>
+                </thead>
+                <tbody id="facultyTableBody">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { renderHodDashboard } from "../../js/features/hod-dashboard.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const user = requireAuth();
+        if(!user) return;
+
+        // Populate Sidebar
+        document.getElementById("userName").innerText = `HOD`; // Matches Figma style
+        document.getElementById("userDept").innerText = user.department;
+        
+        const avatarEl = document.getElementById("avatar");
+        if(avatarEl) {
+            avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+        }
+
+        // Render Data
+        renderHodDashboard();
+    });
+</script>
+
 </body>
 </html>
