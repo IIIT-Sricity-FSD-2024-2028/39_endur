@@ -1,259 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<title>Profile</title>
-
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/utilities.css">
-
-<link rel="stylesheet" href="../../css/components/button.css">
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/sidebar.css">
-<link rel="stylesheet" href="../../css/components/profile.css">
-
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
-
+    <meta charset="UTF-8">
+    <title>Profile</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/profile.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
-
-
 <body>
-
 
 <div class="dashboard-layout">
 
+    <!-- sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div>
+                <strong>Endur</strong>
+                <p>Student Portal</p>
+            </div>
+        </div>
 
-<!-- sidebar -->
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="courses.html">My Courses</a>
+            <a href="pending-feedback.html">Pending Feedbacks</a>
+            <a href="feedback-history.html">History</a>
+        </nav>
 
-<aside class="sidebar">
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
 
+    <!-- main -->
+    <main class="dashboard-content">
 
-<div class="sidebar-logo">
+        <h1>Profile & Settings</h1>
 
-<img src="../../assets/logos/endur-logo.svg">
+        <div class="profile-card">
+            <h3>Personal Information</h3>
+            <div class="profile-grid">
+                <div>
+                    <label>Name</label>
+                    <p id="profileName"></p>
+                </div>
+                <div>
+                    <label>ID</label>
+                    <p id="profileId"></p>
+                </div>
+                <div>
+                    <label>Email</label>
+                    <p id="profileEmail"></p>
+                </div>
+                <div>
+                    <label>Department</label>
+                    <p id="profileDept"></p>
+                </div>
+            </div>
+        </div>
 
-<div>
+        <div class="profile-card">
+            <button class="btn-danger" onclick="logout()">Log out</button>
+        </div>
 
-<strong>Endur</strong>
-
-<p>Student Portal</p>
-
-</div>
-
-</div>
-
-
-
-<nav class="sidebar-menu">
-
-<a href="dashboard.html">
-
-Dashboard
-
-</a>
-
-
-<a href="courses.html">
-
-My Courses
-
-</a>
-
-
-<a href="pending-feedback.html">
-
-Pending Feedbacks
-
-</a>
-
-
-<a href="feedback-history.html">
-
-History
-
-</a>
-
-
-</nav>
-
-
-
-<a href="profile.html" class="sidebar-user">
-
-<div id="avatar" class="avatar"></div>
-
-<div>
-
-<strong id="userName"></strong>
-
-<p id="userDept"></p>
+    </main>
 
 </div>
-
-</a>
-
-
-</aside>
-
-
-
-
-<!-- main -->
-
-<main class="dashboard-content">
-
-
-<h1>
-
-Profile & Settings
-
-</h1>
-
-
-<div class="profile-card">
-
-
-<h3>
-
-Personal Information
-
-</h3>
-
-
-
-<div class="profile-grid">
-
-
-<div>
-
-<label>Name</label>
-
-<p id="profileName"></p>
-
-</div>
-
-
-<div>
-
-<label>ID</label>
-
-<p id="profileId"></p>
-
-</div>
-
-
-<div>
-
-<label>Email</label>
-
-<p id="profileEmail"></p>
-
-</div>
-
-
-<div>
-
-<label>Department</label>
-
-<p id="profileDept"></p>
-
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-<div class="profile-card">
-
-
-<button
-class="btn-danger"
-onclick="logout()"
->
-
-Log out
-
-</button>
-
-
-</div>
-
-
-
-</main>
-
-
-</div>
-
-
 
 <script type="module">
-
-import { requireAuth }
-from "../../js/core/session.js";
-
-
-const user =
-requireAuth();
-
-
-document.getElementById("userName").innerText =
-user.name;
-
-
-document.getElementById("userDept").innerText =
-user.department;
-
-
-/* avatar */
-
-document.getElementById("avatar").innerText =
-user.name
-.split(" ")
-.map(n=>n[0])
-.join("");
-
-
-
-/* profile */
-
-document.getElementById("profileName").innerText =
-user.name;
-
-
-document.getElementById("profileId").innerText =
-user.id;
-
-
-document.getElementById("profileDept").innerText =
-user.department;
-
-
-document.getElementById("profileEmail").innerText =
-user.id.toLowerCase() + "@endur.edu";
-
-
-
-window.logout = function(){
-
-localStorage.removeItem("endurSession");
-
-window.location.href =
-"../../login.html";
-
-}
-
+    import { requireAuth } from "../../js/core/session.js";
+    import { initProfile } from "../../js/features/profile.js";
+    
+    requireAuth();
+    initProfile();
 </script>
 
-
 </body>
-
 </html>
