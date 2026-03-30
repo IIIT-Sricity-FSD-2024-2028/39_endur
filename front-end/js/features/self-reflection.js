@@ -1,228 +1,109 @@
-import { get,set } from "../core/storage.js";
+import { get, set, remove } from "../core/storage.js";
+import { getSession } from "../core/session.js";
+import { createRating } from "../components/rating.js";
 
 const ratings = {};
 
+export function initSelfReflection() {
+    // 1. Initialize rating components for the 4 updated metrics
+    createRating("clarityRating", "clarity", handleRatingChange);
+    createRating("structureRating", "structure", handleRatingChange);
+    createRating("engagementRating", "engagement", handleRatingChange);
+    createRating("difficultyRating", "difficulty", handleRatingChange);
 
-export function initSelfReflection(){
+    // 2. Load existing draft if any
+    loadDraft();
 
-createStars("clarityRating","clarity");
+    // 3. Bind text area input to save draft automatically
+    const textArea = document.getElementById("reflectionText");
+    if (textArea) {
+        textArea.addEventListener("input", saveDraft);
+    }
 
-createStars("engagementRating","engagement");
-
-createStars("assessmentRating","assessment");
-
-loadDraft();
-
-bindTextDraft();
-
+    // 4. Expose submit function globally
+    window.submitSelfReflection = submitSelfReflection;
 }
 
-
-
-function createStars(containerId,field){
-
-const container =
-document.getElementById(containerId);
-
-
-for(let i=1;i<=5;i++){
-
-const star =
-document.createElement("span");
-
-star.innerText="★";
-
-
-star.onclick=()=>{
-
-ratings[field]=i;
-
-highlight(container,i);
-
-saveDraft();
-
-};
-
-
-container.appendChild(star);
-
+function handleRatingChange(field, value) {
+    ratings[field] = value;
+    saveDraft();
 }
 
+function saveDraft() {
+    const user = getSession();
+    let drafts = get("selfReflectionDraft") || {};
+
+    drafts[user.id] = {
+        ratings: ratings,
+        text: document.getElementById("reflectionText").value
+    };
+
+    set("selfReflectionDraft", drafts);
 }
 
+function loadDraft() {
+    const user = getSession();
+    let drafts = get("selfReflectionDraft") || {};
 
+    if (!drafts[user.id]) return;
 
-function highlight(container,value){
+    Object.assign(ratings, drafts[user.id].ratings);
+    document.getElementById("reflectionText").value = drafts[user.id].text || "";
 
-const stars =
-container.querySelectorAll("span");
-
-
-stars.forEach((s,index)=>{
-
-s.classList.toggle(
-
-"active",
-
-index<value
-
-);
-
-});
-
+    Object.entries(ratings).forEach(([field, value]) => {
+        const container = document.getElementById(field + "Rating");
+        if (container) {
+            const stars = container.querySelectorAll("span");
+            stars.forEach((s, index) => {
+                s.classList.toggle("active", index < value);
+            });
+        }
+    });
 }
 
+function submitSelfReflection() {
+    // 1. Validation (checking for 4 metrics now)
+    if (Object.keys(ratings).length < 4) {
+        alert("Please complete all 4 quantitative ratings before submitting.");
+        return;
+    }
 
+    const textValue = document.getElementById("reflectionText").value.trim();
+    if (!textValue) {
+        alert("Please provide qualitative feedback in the text area.");
+        return;
+    }
 
-function saveDraft(){
+    const user = getSession();
+    let stored = get("selfReflection") || [];
 
-const user =
-get("endurSession");
+    const activeCourse = "CS101"; 
+    const activeCycle = "CYCLE_1";
 
+    // 2. Construct the record with the 4 matched metrics
+    const newReflection = {
+        reflectionId: "REFL_" + new Date().getTime(),
+        facultyId: user.id,
+        courseId: activeCourse,
+        cycleId: activeCycle,
+        expectedRatings: {
+            clarity: ratings.clarity,
+            structure: ratings.structure,
+            engagement: ratings.engagement,
+            difficulty: ratings.difficulty
+        },
+        reflectionText: textValue,
+        submissionDate: new Date().toISOString()
+    };
 
-let drafts =
-get("selfReflectionDraft") || {};
+    // 3. Save to Mock DB
+    stored.push(newReflection);
+    set("selfReflection", stored);
 
+    // 4. Clear the draft
+    let drafts = get("selfReflectionDraft") || {};
+    delete drafts[user.id];
+    set("selfReflectionDraft", drafts);
 
-drafts[user.id]={
-
-ratings,
-
-text:
-document.getElementById(
-"reflectionText"
-).value
-
-};
-
-
-set(
-"selfReflectionDraft",
-drafts
-);
-
+    window.location.href = "gap-analysis.html";
 }
-
-
-
-function loadDraft(){
-
-const user =
-get("endurSession");
-
-
-let drafts =
-get("selfReflectionDraft") || {};
-
-
-if(!drafts[user.id]) return;
-
-
-Object.assign(
-ratings,
-drafts[user.id].ratings
-);
-
-
-document.getElementById(
-"reflectionText"
-).value =
-drafts[user.id].text || "";
-
-
-/* re-highlight */
-
-Object.entries(ratings)
-.forEach(([field,value])=>{
-
-highlight(
-
-document.getElementById(
-field+"Rating"
-),
-
-value
-
-);
-
-});
-
-}
-
-
-
-function bindTextDraft(){
-
-document
-.getElementById("reflectionText")
-.addEventListener(
-
-"input",
-
-saveDraft
-
-);
-
-}
-
-
-
-window.submitSelfReflection=function(){
-
-if(Object.keys(ratings).length<3){
-
-alert(
-"Please complete all ratings"
-);
-
-return;
-
-}
-
-
-const user =
-get("endurSession");
-
-
-let stored =
-get("selfReflection") || [];
-
-
-stored.push({
-
-userId:user.id,
-
-ratings,
-
-text:
-document.getElementById(
-"reflectionText"
-).value,
-
-date:new Date().toISOString()
-
-});
-
-
-set(
-"selfReflection",
-stored
-);
-
-
-let drafts =
-get("selfReflectionDraft") || {};
-
-
-delete drafts[user.id];
-
-
-set(
-"selfReflectionDraft",
-drafts
-);
-
-
-
-window.location.href="gap-analysis.html";
-};

@@ -21,6 +21,34 @@
     "department": "Computer Science"
   },
   {
+    "id": "S101",
+    "password": "123",
+    "name": "Alice Smith",
+    "role": "student",
+    "department": "AI"
+  },
+  {
+    "id": "S102",
+    "password": "123",
+    "name": "Bob Johnson",
+    "role": "student",
+    "department": "Electronics"
+  },
+  {
+    "id": "S103",
+    "password": "123",
+    "name": "Charlie Brown",
+    "role": "student",
+    "department": "Mathematics"
+  },
+  {
+    "id": "S104",
+    "password": "123",
+    "name": "Diana Prince",
+    "role": "student",
+    "department": "Humanities"
+  },
+  {
     "id": "F101",
     "password": "123",
     "name": "Dr. Alan Turing",
@@ -30,9 +58,50 @@
   {
     "id": "F102",
     "password": "123",
+    "name": "Dr. Linus Torvalds",
+    "role": "faculty",
+    "department": "Computer Science"
+  },
+  {
+    "id": "F103",
+    "password": "123",
+    "name": "Dr. Claude Shannon",
+    "role": "faculty",
+    "department": "Electronics",
+    "secondaryRoles": [
+      "dean"
+    ]
+  },
+  {
+    "id": "F104",
+    "password": "123",
+    "name": "Dr. Ada Lovelace",
+    "role": "faculty",
+    "department": "Computer Science",
+    "secondaryRoles": [
+      "hod"
+    ]
+  },
+  {
+    "id": "F105",
+    "password": "123",
     "name": "Dr. Andrew Ng",
     "role": "faculty",
     "department": "AI"
+  },
+  {
+    "id": "F201",
+    "password": "123",
+    "name": "Dr. Gilbert Strang",
+    "role": "faculty",
+    "department": "Mathematics"
+  },
+  {
+    "id": "F401",
+    "password": "123",
+    "name": "Dr. Carl Jung",
+    "role": "faculty",
+    "department": "Humanities"
   },
   {
     "id": "H201",
@@ -61,26 +130,5 @@
     "name": "Super User",
     "role": "superuser",
     "department": "System"
-  },
- 
-  {
-    "id": "F104",
-    "name": "Dr Ada Lovelace",
-    "password": "123",
-    "role": "faculty",
-    "department": "Computer Science",
-    "secondaryRoles": [
-      "hod"
-    ]
-  },
-  {
-    "id": "F103",
-    "name": "Dr Claude Shannon",
-    "password": "123",
-    "role": "faculty",
-    "department": "AI",
-    "secondaryRoles": [
-      "dean"
-    ]
   }
 ]

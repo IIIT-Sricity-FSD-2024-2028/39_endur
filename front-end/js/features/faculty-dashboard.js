@@ -1,48 +1,138 @@
-export async function renderFacultyDashboard(){
+import { get } from "../core/storage.js";
+
+
+async function getCourses(){
 
 const res =
-await fetch("../../js/mock-data/faculty-courses.json");
+await fetch("../../js/mock-data/courses.json");
+
+return await res.json();
+
+}
+
+
+
+export async function renderFacultyDashboard(){
+
+const user =
+get("endurSession");
+
 
 const courses =
-await res.json();
+await getCourses();
+
+
+const myCourses =
+courses.filter(
+c => c.facultyId === user.id
+);
+
+
+
+const submissions =
+get("submittedFeedback") || [];
+
+
+/* metrics */
+
+let totalScore = 0;
+let totalResponses = 0;
+let totalStudents = 0;
+
+let pendingReflection = 0;
+
 
 
 const table =
-document.getElementById("facultyCourses");
+document.getElementById("courseTable");
 
 
-let totalRating = 0;
-
-let activeCourses = 0;
-
-let completedCourses = 0;
+table.innerHTML = "";
 
 
-courses.forEach(course=>{
+
+myCourses.forEach(course=>{
 
 
-if(course.status==="active"){
+const courseFeedback =
+submissions.filter(
+f => f.course === course.id
+);
 
-activeCourses++;
+
+/* responses */
+
+const responses =
+courseFeedback.length;
+
+
+/* avg rating */
+
+let avgRating = 0;
+
+
+if(responses>0){
+
+let sum = 0;
+
+courseFeedback.forEach(f=>{
+
+const avg =
+Object.values(f.ratings)
+.reduce((a,b)=>a+b,0)
+
+/
+
+Object.keys(f.ratings).length;
+
+
+sum += avg;
+
+});
+
+
+avgRating =
+(sum / responses) * 20;
+
+
+totalScore += avgRating;
 
 }
 
 
-if(course.status==="completed"){
+totalResponses += responses;
 
-completedCourses++;
+totalStudents += course.enrolled || 50;
+
+
+/* reflection placeholder */
+
+const reflections =
+get("selfReflection") || [];
+
+
+const hasReflection =
+reflections.find(
+r =>
+r.course === course.id &&
+r.userId === user.id
+);
+
+
+if(!hasReflection){
+
+pendingReflection++;
 
 }
 
 
-totalRating += course.avgRating;
 
+/* table row */
 
-const row =
-document.createElement("tr");
+table.innerHTML +=
 
-
-row.innerHTML = `
+`
+<tr>
 
 <td>
 
@@ -60,16 +150,18 @@ ${course.name}
 
 <td>
 
-${course.enrolled}
+${course.enrolled || 0}
 
 </td>
 
 
 <td>
 
-<span class="badge ${course.status}">
+<span class="badge">
 
-${course.status}
+${responses>0
+? "Active"
+: "Waiting"}
 
 </span>
 
@@ -78,48 +170,44 @@ ${course.status}
 
 <td>
 
-${course.avgRating.toFixed(1)}
+${avgRating.toFixed(0)}%
 
 </td>
 
+</tr>
+
 `;
-
-
-table.appendChild(row);
 
 });
 
 
+
 /* stats */
 
-const avgRating =
-(totalRating / courses.length)
-.toFixed(1);
+document.getElementById("avgScore").innerText =
+
+myCourses.length
+? (totalScore / myCourses.length).toFixed(0)
+: 0;
 
 
-document.getElementById(
-"statSatisfaction"
-).innerText =
-avgRating * 20;
+
+document.getElementById("responseRate").innerText =
+
+totalStudents
+? Math.round(
+(totalResponses / totalStudents) * 100
+) + "%"
+: "0%";
 
 
-document.getElementById(
-"statResponse"
-).innerText =
-Math.round(
-85 + Math.random()*10
-) + "%";
+
+document.getElementById("pendingReflection").innerText =
+pendingReflection;
 
 
-document.getElementById(
-"statPending"
-).innerText =
-activeCourses;
 
-
-document.getElementById(
-"statGap"
-).innerText =
-"-0.2%";
+document.getElementById("gapScore").innerText =
+"0";
 
 }

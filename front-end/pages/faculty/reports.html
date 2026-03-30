@@ -3,20 +3,20 @@
 
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<title>Faculty Feedback Reports</title>
+    <title>Faculty Feedback Reports</title>
 
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
 
-<link rel="stylesheet" href="../../css/components/button.css">
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/sidebar.css">
-<link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
 
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
 
@@ -24,277 +24,252 @@
 <body>
 
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
 
-<!-- sidebar -->
+        <!-- sidebar -->
 
-<aside class="sidebar">
+        <aside class="sidebar">
 
 
-<div class="sidebar-logo">
+            <div class="sidebar-logo">
 
-<img src="../../assets/logos/endur-logo.svg">
+                <img src="../../assets/logos/endur-logo.svg">
 
-<div>
+                <div>
 
-<strong>Endur</strong>
-<p>Faculty Portal</p>
+                    <strong>Endur</strong>
+                    <p>Faculty Portal</p>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
 
 
-<nav class="sidebar-menu">
+            <nav class="sidebar-menu">
 
-<a href="dashboard.html">
+                <a href="dashboard.html">
 
-Dashboard
+                    Dashboard
 
-</a>
+                </a>
 
-<a class="active">
+                <a class="active">
 
-Feedback Reports
+                    Feedback Reports
 
-</a>
+                </a>
 
-</nav>
+            </nav>
 
 
 
-<a href="profile.html" class="sidebar-user">
+            <a href="profile.html" class="sidebar-user">
 
-<div class="avatar"></div>
+                <div class="avatar"></div>
 
-<div>
+                <div>
 
-<strong id="userName"></strong>
+                    <strong id="userName"></strong>
 
-<p id="userDept"></p>
+                    <p id="userDept"></p>
 
-</div>
+                </div>
 
-</a>
+            </a>
 
 
-</aside>
+        </aside>
 
 
 
 
-<!-- main -->
+        <!-- main -->
 
-<main class="dashboard-content">
+        <main class="dashboard-content">
 
 
-<h1>
+            <h1>
 
-Faculty Feedback Reports
+                Faculty Feedback Reports
 
-</h1>
+            </h1>
 
-<p class="subtitle">
+            <p class="subtitle">
 
-Detailed evaluation insights and performance diagnostics.
+                Detailed evaluation insights and performance diagnostics.
 
-</p>
+            </p>
 
 
 
-<!-- CURRENT FEEDBACK -->
+            <!-- CURRENT FEEDBACK -->
 
-<div class="card split-card">
+            <div class="card split-card">
 
 
-<div class="metric-box">
+                <div class="metric-box">
 
-<p>Avg Rating</p>
+                    <p>Avg Rating</p>
 
-<h2 id="avgRating">
+                    <h2 id="avgRating">
 
-0
+                        0
 
-</h2>
+                    </h2>
 
-</div>
+                </div>
 
 
-<div>
+                <div>
 
-<h3>
+                    <h3>
 
-View Current Feedback
+                        View Current Feedback
 
-</h3>
+                    </h3>
 
-<p>
+                    <p>
 
-Access student ratings and comments from this semester.
+                        Access student ratings and comments from this semester.
 
-</p>
+                    </p>
 
 
-<button
-class="btn-primary"
-onclick="window.location.href='self-reflection.html'"
->
+                    <button class="btn-primary" onclick="window.location.href='self-reflection.html'">
 
-Open Feedback →
+                        Open Feedback →
 
-</button>
+                    </button>
 
-</div>
+                </div>
 
 
-</div>
+            </div>
 
 
 
-<!-- HISTORICAL -->
+            <!-- HISTORICAL -->
 
-<div class="card split-card">
+            <div class="card split-card">
 
 
-<div>
+                <div>
 
-<h3>
+                    <h3>
 
-Historical Trends
+                        Historical Trends
 
-</h3>
+                    </h3>
 
-<p>
+                    <p>
 
-Track teaching performance over semesters.
+                        Track teaching performance over semesters.
 
-</p>
+                    </p>
 
 
-<button
-class="btn-outline"
-onclick="window.location.href='historical-trends.html'"
->
+                    <button class="btn-outline" onclick="window.location.href='historical-trends.html'">
 
-View Archive
+                        View Archive
 
-</button>
+                    </button>
 
-</div>
+                </div>
 
 
-<div
-class="chart-placeholder"
-id="trendChart"
->
+                <div class="chart-placeholder" id="trendChart">
 
-</div>
+                </div>
 
 
-</div>
+            </div>
 
 
 
-<!-- ACTION REPORT -->
+            <!-- ACTION REPORT -->
 
-<div class="card dark-card">
+            <div class="card dark-card">
 
 
-<h3>
+                <h3>
 
-Submit Action Report
+                    Submit Action Report
 
-</h3>
+                </h3>
 
 
-<p>
+                <p>
 
-Provide reflection on feedback and planned improvements.
+                    Provide reflection on feedback and planned improvements.
 
-</p>
+                </p>
 
 
-<div class="action-meta">
+                <div class="action-meta">
 
-<div>
+                    <div>
 
-<p>Focus Area</p>
+                        <p>Focus Area</p>
 
-<strong id="actionCourse"></strong>
+                        <strong id="actionCourse"></strong>
 
-</div>
+                    </div>
 
 
-<div>
+                    <div>
 
-<p>Deadline</p>
+                        <p>Deadline</p>
 
-<strong id="actionDeadline"></strong>
+                        <strong id="actionDeadline"></strong>
 
-</div>
+                    </div>
 
-</div>
+                </div>
 
 
-<button
-class="btn-primary"
-onclick="startActionReport()"
->
+                <button class="btn-primary" onclick="startActionReport()">
 
-Start Action Report
+                    Start Action Report
 
-</button>
+                </button>
 
 
-</div>
+            </div>
 
 
 
-<div class="info-box">
+            <div class="info-box">
 
-All student feedback is anonymized.
+                All student feedback is anonymized.
 
-</div>
+            </div>
 
 
-</main>
+        </main>
 
 
-</div>
+    </div>
 
 
 
-<script src="../../js/core/session.js"></script>
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        import { renderFacultyReports } from "../../js/features/faculty-reports.js";
 
-<script>
+        // 1. Authenticate and retrieve user session
+        const user = requireAuth();
 
-const user = requireAuth();
+        // 2. If valid session, populate DOM and render reports
+        if (user) {
+            document.getElementById("userName").innerText = user.name;
+            document.getElementById("userDept").innerText = user.department;
 
-
-document.getElementById("userName").innerText =
-user.name;
-
-
-document.getElementById("userDept").innerText =
-user.department;
-
-</script>
-
-
-
-<script type="module">
-
-import {
-renderFacultyReports
-}
-from "../../js/features/faculty-reports.js";
-
-
-renderFacultyReports();
-
-</script>
+            // 3. Render page specific data
+            renderFacultyReports();
+        }
+    </script>
 
 
 </body>
