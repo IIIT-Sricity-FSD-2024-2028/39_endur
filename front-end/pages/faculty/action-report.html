@@ -1,264 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<title>Action Report</title>
-
-<link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/layout.css">
-<link rel="stylesheet" href="../../css/forms.css">
-
-<link rel="stylesheet" href="../../css/components/button.css">
-<link rel="stylesheet" href="../../css/components/card.css">
-<link rel="stylesheet" href="../../css/components/sidebar.css">
-<link rel="stylesheet" href="../../css/components/stats.css">
-
-<link rel="stylesheet" href="../../css/pages/dashboard.css">
-
+    <meta charset="UTF-8">
+    <title>Action Report</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
-
-
 <body>
-
 
 <div class="dashboard-layout">
 
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div>
+                <strong>Endur</strong>
+                <p>Faculty Portal</p>
+            </div>
+        </div>
 
-<!-- SIDEBAR -->
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active">Feedback Reports</a>
+        </nav>
 
-<aside class="sidebar">
+        <a href="../student/profile.html" class="sidebar-user">
+            <div class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
 
-<div class="sidebar-logo">
+    <!-- MAIN -->
+    <main class="dashboard-content">
 
-<img src="../../assets/logos/endur-logo.svg">
+        <div class="form-header">
+            <h2>Action Report & Review Check-in</h2>
+            <button class="btn-primary" onclick="window.submitActionReport()">Submit</button>
+        </div>
 
-<div>
+        <p class="subtitle">Faculty Performance Improvement Plan</p>
 
-<strong>Endur</strong>
-<p>Faculty Portal</p>
+        <!-- GAP SUMMARY -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <p>Self Reflection</p>
+                <h2 id="selfScore">0%</h2>
+            </div>
+            <div class="stat-card">
+                <p>Student Average</p>
+                <h2 id="studentScore">0%</h2>
+            </div>
+            <div class="stat-card">
+                <p>Identified Gap</p>
+                <h2 id="gapScore">0%</h2>
+            </div>
+        </div>
 
-</div>
+        <!-- ROOT CAUSE -->
+        <div class="profile-card">
+            <h3>Root Cause Analysis</h3>
+            <p>Identify reasons for the performance gap.</p>
+            <textarea id="rootCause" placeholder="Enter analysis..."></textarea>
+        </div>
 
-</div>
+        <!-- IMPROVEMENT PLAN -->
+        <div class="profile-card">
+            <h3>Specific Improvement Steps</h3>
+            <p>Outline actionable steps for improvement.</p>
+            <textarea id="improvementPlan" placeholder="Example: Introduce weekly revision sessions..."></textarea>
+        </div>
 
-
-
-<nav class="sidebar-menu">
-
-<a href="dashboard.html">
-Dashboard
-</a>
-
-<a class="active">
-Feedback Reports
-</a>
-
-</nav>
-
-
-
-<a href="../student/profile.html" class="sidebar-user">
-
-<div class="avatar"></div>
-
-<div>
-
-<strong id="userName"></strong>
-
-<p id="userDept"></p>
-
-</div>
-
-</a>
-
-</aside>
-
-
-
-
-<!-- MAIN -->
-
-<main class="dashboard-content">
-
-
-<div class="form-header">
-
-<h2>
-
-Action Report & Review Check-in
-
-</h2>
-
-
-<button
-class="btn-primary"
-onclick="submitActionReport()"
->
-
-Submit
-
-</button>
-
+    </main>
 
 </div>
 
-
-
-<p class="subtitle">
-
-Faculty Performance Improvement Plan
-
-</p>
-
-
-
-<!-- GAP SUMMARY -->
-
-<div class="stats-grid">
-
-
-<div class="stat-card">
-
-<p>Self Reflection</p>
-
-<h2 id="selfScore">
-
-0
-
-</h2>
-
-</div>
-
-
-
-<div class="stat-card">
-
-<p>Student Average</p>
-
-<h2 id="studentScore">
-
-0
-
-</h2>
-
-</div>
-
-
-
-<div class="stat-card">
-
-<p>Gap</p>
-
-<h2 id="gapScore">
-
-0
-
-</h2>
-
-</div>
-
-
-</div>
-
-
-
-<!-- ROOT CAUSE -->
-
-<div class="profile-card">
-
-<h3>
-
-Root Cause Analysis
-
-</h3>
-
-
-<p>
-
-Identify reasons for the performance gap.
-
-</p>
-
-
-<textarea
-id="rootCause"
-placeholder="Enter analysis..."
-></textarea>
-
-
-</div>
-
-
-
-<!-- IMPROVEMENT PLAN -->
-
-<div class="profile-card">
-
-<h3>
-
-Specific Improvement Steps
-
-</h3>
-
-
-<p>
-
-Outline actionable steps for improvement.
-
-</p>
-
-
-<textarea
-id="improvementPlan"
-placeholder="Example: Introduce weekly revision sessions..."
-></textarea>
-
-
-</div>
-
-
-</main>
-
-
-</div>
-
-
-
-<script src="../../js/core/session.js"></script>
-
-
+<!-- Fixed Script Block -->
 <script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { initActionReport, submitActionReport } from "../../js/features/action-report.js";
 
-import {
-initActionReport
-}
-from "../../js/features/action-report.js";
+    const user = requireAuth();
 
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userDept").innerText = user.department;
+        
+        // Initialize the page logic
+        initActionReport();
 
-const user =
-requireAuth();
-
-
-document.getElementById("userName").innerText =
-user.name;
-
-
-document.getElementById("userDept").innerText =
-user.department;
-
-
-initActionReport();
-
-
-window.submitActionReport =
-submitActionReport;
-
+        // Bind the submit function to the window so the HTML button can trigger it
+        window.submitActionReport = submitActionReport;
+    }
 </script>
 
-
 </body>
-
 </html>
