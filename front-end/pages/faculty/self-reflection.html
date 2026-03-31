@@ -2,45 +2,178 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Faculty Self Reflection</title>
+    <title>Self-Reflection | Faculty — Endur</title>
     <link rel="stylesheet" href="../../css/base.css">
     <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
     <link rel="stylesheet" href="../../css/forms.css">
     <link rel="stylesheet" href="../../css/components/button.css">
     <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/components/rating.css">
-    <link rel="stylesheet" href="../../css/pages/feedback.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sr-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 28px 32px;
+            box-shadow: var(--shadow-glass);
+        }
+        .sr-card h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .question-card {
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        .question-card:last-child { border-bottom: none; padding-bottom: 0; }
+        .question-card:first-child { padding-top: 0; }
+        .question-card h4 {
+            font-size: 0.97rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0 0 4px 0;
+        }
+        .question-card p {
+            font-size: 0.83rem;
+            color: var(--text-muted);
+            margin: 0 0 12px 0;
+        }
+        .rating {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .rating span {
+            font-size: 28px;
+            cursor: pointer;
+            color: #d1d5db;
+            transition: all 0.15s;
+            line-height: 1;
+        }
+        .rating span.active { color: var(--warning); text-shadow: 0 2px 8px rgba(245,158,11,0.35); }
+        .rating span:hover { transform: scale(1.2) translateY(-2px); color: var(--warning); }
+
+        .qualitative-area {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            font-family: inherit;
+            font-size: 0.92rem;
+            background: var(--bg);
+            color: var(--text-main);
+            resize: vertical;
+            min-height: 120px;
+            margin-top: 12px;
+            transition: border-color 0.2s;
+        }
+        .qualitative-area:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .qual-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .qual-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .course-label-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            background: var(--primary-light);
+            border: 1px solid rgba(59,130,246,0.2);
+            border-radius: var(--radius-lg);
+            font-size: 0.9rem;
+            color: var(--primary-active);
+            font-weight: 500;
+        }
+        .course-label-banner strong { font-weight: 700; }
+        .form-actions-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+    </style>
 </head>
 <body>
+<div class="dashboard-layout">
 
-<div class="form-layout">
-    <div class="form-header">
-        <h2>Faculty Self-Reflection</h2>
-        <button class="close-btn" onclick="goBack()">✕</button>
-    </div>
-
-    <h1>End-of-Term Self-Reflection</h1>
-    <p class="subtitle">Evaluate your teaching effectiveness based on the cycle's parameters.</p>
-
-    <div class="profile-card">
-        <h3>Quantitative Assessment</h3>
-        
-        <div class="feedback-grid" id="dynamicQuestionsContainer">
-            <p style="color: #64748b; font-style: italic; padding: 20px;">Loading evaluation parameters...</p>
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div><strong>Endur</strong><p>Faculty Portal</p></div>
         </div>
-    </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active" href="reports.html">Feedback Reports</a>
+            <a href="action-report.html">Action Reports</a>
+            <a href="historical-trends.html">Historical Trends</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
 
-    <div class="profile-card">
-        <h3>Qualitative Assessment</h3>
-        <label>Key achievements & areas for improvement</label>
-        <textarea id="reflectionText" placeholder="Reflect on teaching approach, improvements, and challenges..."></textarea>
-        <p class="sub-text">Visible only to academic leadership.</p>
-    </div>
+    <main class="dashboard-content">
 
-    <div class="form-actions">
-        <button class="btn-outline" onclick="goBack()">Go Back</button>
-        <button class="btn-primary" onclick="submitSelfReflection()">Submit Reflection →</button>
-    </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:4px;">
+            <div>
+                <h1>Self-Reflection</h1>
+                <p class="subtitle">Evaluate your teaching effectiveness based on the cycle's parameters.</p>
+            </div>
+            <a href="reports.html" class="btn-outline">← Back to Reports</a>
+        </div>
+
+        <!-- Active course info -->
+        <div class="course-label-banner">
+            <span>📘</span>
+            <span>Reflecting on: <strong id="activeCourseLabel">Loading…</strong></span>
+        </div>
+
+        <!-- Quantitative Assessment -->
+        <div class="sr-card">
+            <h3>Quantitative Assessment</h3>
+            <div id="dynamicQuestionsContainer">
+                <p style="color:var(--text-muted);font-style:italic;padding:12px 0;">Loading evaluation parameters…</p>
+            </div>
+        </div>
+
+        <!-- Qualitative Assessment -->
+        <div class="sr-card">
+            <h3>Qualitative Assessment</h3>
+            <label class="qual-label">Key achievements &amp; areas for improvement</label>
+            <p class="qual-hint">Your reflections are visible only to academic leadership.</p>
+            <textarea id="reflectionText" class="qualitative-area" placeholder="Reflect on your teaching approach, areas of improvement, student engagement observations, and what you plan to do differently…"></textarea>
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions-row">
+            <a href="reports.html" class="btn-outline">← Go Back</a>
+            <button class="btn-primary" onclick="window.submitSelfReflection()">Submit Reflection →</button>
+        </div>
+
+    </main>
 </div>
 
 <script type="module">
@@ -48,13 +181,19 @@
     import { initSelfReflection, submitSelfReflection } from "../../js/features/self-reflection.js";
 
     const user = requireAuth();
-    if(user) {
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userDept").innerText = user.department;
+        const av = document.getElementById("avatar");
+        if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
+
+        const activeCourse = localStorage.getItem("activeFacultyCourse");
+        document.getElementById("activeCourseLabel").textContent = activeCourse || "No course selected";
+
         initSelfReflection();
     }
 
     window.submitSelfReflection = submitSelfReflection;
-    window.goBack = () => window.location.href = "reports.html";
 </script>
-
 </body>
 </html>

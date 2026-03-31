@@ -138,10 +138,7 @@ function renderTable() {
         const fakeEmail = `${nameParts[0][0].toLowerCase()}.${nameParts[nameParts.length-1].toLowerCase()}@endur.edu`;
         const designation = getDesignation(faculty.id, faculty.role);
         
-        const isActive = (parseInt(faculty.id.slice(-1)) || 0) !== 3; 
-        const statusHtml = isActive 
-            ? `<span style="color: #16a34a; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;"><span class="status-dot" style="background: #16a34a;"></span>ACTIVE</span>`
-            : `<span style="color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;"><span class="status-dot" style="background: #cbd5e1;"></span>ON LEAVE</span>`;
+
 
         // ==========================================
         // VISUAL HIGHLIGHT FOR HOD
@@ -167,12 +164,12 @@ function renderTable() {
                 <strong style="color: #0f172a; font-size: 14px;">${facultyAvgScore > 0 ? facultyAvgScore.toFixed(1) : "N/A"}</strong>
                 ${facultyAvgScore > 0 ? `<div class="perf-bar-bg"><div class="perf-bar-fill" style="width: ${barWidth}%; background-color: ${barColor};"></div></div>` : ''}
             </td>
-            <td>${statusHtml}</td>
+
         `;
         tableBody.appendChild(tr);
     });
 
     if (filteredFaculty.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8;">No faculty members found.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 40px; color: #94a3b8;">No faculty members found.</td></tr>`;
     }
 }

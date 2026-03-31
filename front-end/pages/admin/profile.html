@@ -2,56 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile & Settings — Admin — Endur</title>
+    <title>Profile &amp; Settings — Admin — Endur</title>
     <link rel="stylesheet" href="../../css/base.css">
     <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/components/sidebar.css">
-    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
     <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
     <link rel="stylesheet" href="../../css/components/profile.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
-    <style>
-        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
-        .sidebar-user.active { background:var(--primary-light); border-color:var(--primary); }
-        /* removed admin-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
-
-        .settings-row {
-            display:flex; justify-content:space-between; align-items:center;
-            padding:16px 0; border-bottom:1px solid rgba(255,255,255,0.3);
-        }
-        .settings-row:last-child { border-bottom:none; }
-        .settings-row strong { font-weight:600; color:var(--text-main); }
-        .settings-row p { color:var(--text-muted); font-size:0.875rem; margin-top:2px; }
-
-        .switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
-        .switch input { opacity:0; width:0; height:0; }
-        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#e2e8f0; transition:.4s; border-radius:24px; }
-        .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; transition:.4s; border-radius:50%; }
-        input:checked + .slider { background:#16a34a; }
-        input:checked + .slider:before { transform:translateX(20px); }
-
-        .profile-avatar-section {
-            display:flex; align-items:center; gap:var(--space-4); margin-bottom:var(--space-5);
-            padding:var(--space-4); background:var(--surface); backdrop-filter:var(--glass-blur);
-            border:1px solid var(--glass-border); border-radius:var(--radius-xl); box-shadow:var(--shadow-glass);
-        }
-        .profile-avatar-large {
-            width:80px; height:80px; border-radius:50%;
-            background:var(--primary);
-            display:flex; align-items:center; justify-content:center;
-            color:white; font-size:1.75rem; font-weight:800;
-            box-shadow:0 8px 24px rgba(30,58,138,0.35); flex-shrink:0;
-        }
-    </style>
 </head>
 <body>
 <div class="dashboard-layout">
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
-            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <img src="../../assets/logos/endur-logo.svg">
             <div><strong>Endur</strong><p>Admin Portal</p></div>
         </div>
         <nav class="sidebar-menu">
@@ -62,21 +28,23 @@
         </nav>
         <a href="profile.html" class="sidebar-user active">
             <div id="avatar" class="avatar"></div>
-            <div><strong id="userName"></strong><p id="userDept"></p></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
         </a>
     </aside>
 
-    <!-- MAIN -->
     <main class="dashboard-content">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:var(--space-3)">
             <div>
-                <h1>Profile & Settings</h1>
+                <h1>Profile &amp; Settings</h1>
                 <p class="subtitle">Manage your Admin account and operational preferences.</p>
             </div>
             <span class="badge primary">ADMIN</span>
         </div>
 
-        <!-- HERO AVATAR CARD -->
+        <!-- Hero Avatar -->
         <div class="profile-avatar-section">
             <div class="profile-avatar-large" id="avatarLarge"></div>
             <div>
@@ -86,57 +54,42 @@
             </div>
         </div>
 
-        <!-- PERSONAL INFO -->
+        <!-- Personal Info -->
         <div class="profile-card">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#1e3a8a">
+            <div class="card-section-header">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <h3 style="margin:0">Personal Information</h3>
+                <h3>Personal Information</h3>
             </div>
             <div class="profile-grid">
-                <div>
-                    <label>Full Name</label>
-                    <p id="profileName" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
-                </div>
-                <div>
-                    <label>Admin ID</label>
-                    <p id="profileId" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
-                </div>
-                <div>
-                    <label>Email Address</label>
-                    <p id="profileEmail" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
-                </div>
-                <div>
-                    <label>Department</label>
-                    <p id="profileDept2" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
-                </div>
+                <div><label>Full Name</label><p id="profileName">—</p></div>
+                <div><label>Admin ID</label><p id="profileId">—</p></div>
+                <div><label>Email Address</label><p id="profileEmail">—</p></div>
+                <div><label>Department</label><p id="profileDept">—</p></div>
             </div>
         </div>
 
-        <!-- NOTIFICATIONS -->
+        <!-- Change Password -->
         <div class="profile-card">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#1e3a8a">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                <h3 style="margin:0">Notification Preferences</h3>
-            </div>
-            <div class="settings-row">
-                <strong>Email Notifications</strong>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-            </div>
-            <div class="settings-row">
-                <strong>Cycle Deadline Alerts</strong>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-            </div>
-            <div class="settings-row">
-                <strong>Role Change Notifications</strong>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-            </div>
-        </div>
-
-        <!-- ACCOUNT ACTIONS -->
-        <div class="profile-card">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#1e3a8a">
+            <div class="card-section-header">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <h3 style="margin:0">Account Actions</h3>
+                <h3>Change Password</h3>
+            </div>
+            <div class="change-password-form">
+                <input type="password" id="pwCurrent" placeholder="Current password">
+                <input type="password" id="pwNew" placeholder="New password">
+                <input type="password" id="pwConfirm" placeholder="Confirm new password">
+                <div id="pwMsg" class="pw-msg"></div>
+                <div style="display:flex;justify-content:flex-end">
+                    <button class="btn-primary" onclick="changePassword()">Update Password</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Actions -->
+        <div class="profile-card">
+            <div class="card-section-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <h3>Account Actions</h3>
             </div>
 
             <div class="settings-row">
@@ -174,23 +127,37 @@
         const user = requireAuth();
         if (!user || user.role !== 'admin') { window.location.href = '../../login.html'; return; }
 
-        // Sidebar
         document.getElementById('userName').textContent = user.name;
         document.getElementById('userDept').textContent = user.department || 'Admin';
         const av = document.getElementById('avatar');
         if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
 
-        // Hero
         const initials = user.name.split(' ').map(n => n[0]).join('');
         document.getElementById('avatarLarge').textContent = initials;
         document.getElementById('heroName').textContent = user.name;
         document.getElementById('heroRole').textContent = `${user.department || 'IT'} · System Admin`;
-
-        // Info grid
         document.getElementById('profileName').textContent = user.name;
         document.getElementById('profileId').textContent = user.id;
-        document.getElementById('profileDept2').textContent = user.department || '—';
+        document.getElementById('profileDept').textContent = user.department || '—';
         document.getElementById('profileEmail').textContent = user.email || `${user.id.toLowerCase()}@endur.edu`;
+
+        window.changePassword = function() {
+            const cur  = document.getElementById("pwCurrent").value.trim();
+            const nw   = document.getElementById("pwNew").value.trim();
+            const conf = document.getElementById("pwConfirm").value.trim();
+            const msg  = document.getElementById("pwMsg");
+            msg.className = "pw-msg"; msg.textContent = "";
+            if (cur !== user.password) { msg.textContent = "Current password is incorrect."; msg.className = "pw-msg error"; return; }
+            if (nw.length < 3) { msg.textContent = "New password must be at least 3 characters."; msg.className = "pw-msg error"; return; }
+            if (nw !== conf) { msg.textContent = "Passwords do not match."; msg.className = "pw-msg error"; return; }
+            user.password = nw;
+            localStorage.setItem("endurSession", JSON.stringify(user));
+            const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
+            const idx = users.findIndex(u => u.id === user.id);
+            if (idx !== -1) { users[idx].password = nw; localStorage.setItem("systemUsers", JSON.stringify(users)); }
+            msg.textContent = "Password updated successfully!"; msg.className = "pw-msg success";
+            ["pwCurrent","pwNew","pwConfirm"].forEach(id => document.getElementById(id).value = "");
+        };
 
         window.logout = () => {
             localStorage.removeItem('endurSession');

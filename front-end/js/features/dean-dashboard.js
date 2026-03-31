@@ -3,7 +3,9 @@ import { getSession } from "../core/session.js";
 
 export async function renderDeanDashboard() {
     const user = getSession();
-    if (!user || user.role !== "dean") return;
+    // Accept dean role, or faculty/hod users who have switched to dean view
+    if (!user) return;
+
 
     // 1. Fetch Master Data
     const [usersRes, coursesRes] = await Promise.all([
@@ -14,8 +16,9 @@ export async function renderDeanDashboard() {
     const allCourses = await coursesRes.json();
     
     const submittedFeedback = get("submittedFeedback") || [];
-    const cycles = get("feedbackCycles") || [{ cycleId: "CYCLE_W4", status: "active" }];
+    const cycles = get("systemFeedbackCycles") || [];
     const configStatuses = get("departmentConfigStatus") || {};
+    const allStudents = (JSON.parse(localStorage.getItem("systemUsers")) || allUsers).filter(u => u.role === "student");
 
     // 2. Identify Departments dynamically from users
     const departments = {};
@@ -38,7 +41,6 @@ export async function renderDeanDashboard() {
     // 3. Process Feedback (Dynamic Math)
     let instTotalScore = 0;
     let instMetricCount = 0;
-    let flaggedCoursesCount = 0;
 
     // Track course averages to find flags
     const courseAverages = {};
@@ -69,21 +71,17 @@ export async function renderDeanDashboard() {
         }
     });
 
-    // Calculate Flagged Courses (Avg < 3.5)
-    Object.keys(courseAverages).forEach(courseId => {
-        const avg = courseAverages[courseId].sum / courseAverages[courseId].count;
-        if (avg < 3.5) flaggedCoursesCount++;
-    });
+    // No flagged courses stat
 
     // 4. Update Top Stats
     const instAvg = instMetricCount > 0 ? (instTotalScore / instMetricCount).toFixed(1) : "0.0";
     document.getElementById("instOverallScore").innerText = instAvg;
     document.getElementById("instActiveCycles").innerText = cycles.filter(c => c.status === "active").length;
-    document.getElementById("instFlagged").innerText = flaggedCoursesCount;
-    
-    // Mock Participation based on submissions vs total expected (assuming 40 students per active course)
-    const expectedResponses = allCourses.length * 40;
-    const participationRate = expectedResponses > 0 ? ((submittedFeedback.length / expectedResponses) * 100).toFixed(0) : 0;
+
+    // Real participation: unique students who submitted at least one feedback / total enrolled students
+    const uniqueStudentsWhoSubmitted = new Set(submittedFeedback.map(f => f.userId)).size;
+    const totalStudents = allStudents.length;
+    const participationRate = totalStudents > 0 ? Math.round((uniqueStudentsWhoSubmitted / totalStudents) * 100) : 0;
     document.getElementById("instParticipation").innerText = `${Math.min(participationRate, 100)}%`;
 
     // 5. Render Departmental Performance Bars

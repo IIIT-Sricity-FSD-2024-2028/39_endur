@@ -7,7 +7,11 @@ export function initActionReport() {
 
     const activeCourseId = localStorage.getItem("activeFacultyCourse");
     if (!activeCourseId) {
-        window.location.href = "reports.html";
+        // Show the inline empty state rather than redirecting
+        const noState = document.getElementById("noCourseState");
+        const form = document.getElementById("actionReportForm");
+        if (noState) noState.style.display = "block";
+        if (form) form.style.display = "none";
         return;
     }
 

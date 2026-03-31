@@ -26,6 +26,126 @@
   margin-bottom: 8px;
 }
 
+.profile-grid p {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* Hero avatar section */
+.profile-avatar-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: 0;
+  padding: var(--space-4);
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glass);
+  margin-top: var(--space-4);
+}
+
+.profile-avatar-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.75rem;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(59,130,246,0.35);
+  flex-shrink: 0;
+}
+
+/* Settings rows inside cards */
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.3);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row strong { font-weight: 600; color: var(--text-main); }
+.settings-row p { color: var(--text-muted); font-size: 0.875rem; margin-top: 2px; }
+
+/* Card section headings */
+.card-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  color: #1e3a8a;
+}
+.card-section-header h3 { margin: 0; }
+.card-section-header svg { flex-shrink: 0; }
+
+/* Stats grid for student profile */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.stat-box {
+  background: rgba(255,255,255,0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+.stat-box .stat-num {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  display: block;
+}
+.stat-box .stat-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+/* Change password form inside card */
+.change-password-form {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.change-password-form input {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.6);
+  font-size: 0.95rem;
+  color: var(--text-main);
+  transition: all var(--transition-fast);
+}
+.change-password-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  background: rgba(255,255,255,0.9);
+}
+.pw-msg {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  display: none;
+}
+.pw-msg.success { background: var(--accent-light); color: #065f46; display: block; }
+.pw-msg.error   { background: rgba(239,68,68,0.1); color: #991b1b; display: block; }
+
 .profile-grid .value {
   font-size: 1rem;
   font-weight: 500;

@@ -128,7 +128,7 @@
         if(!user) return;
 
         // Populate Sidebar
-        document.getElementById("userName").innerText = `HOD`; // Matches Figma style
+        document.getElementById("userName").innerText = user.name;
         document.getElementById("userDept").innerText = user.department;
         
         const avatarEl = document.getElementById("avatar");

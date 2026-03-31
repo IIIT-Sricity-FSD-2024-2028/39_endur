@@ -13,22 +13,142 @@
     <link rel="stylesheet" href="../../css/components/modal.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
     <style>
-        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
-        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
-        .settings-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:var(--space-4); }
-        .settings-card { background:var(--surface); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-border); border-radius:var(--radius-lg); padding:var(--space-4); box-shadow:var(--shadow-glass); }
-        .settings-card h3 { font-size:1rem; margin-bottom:var(--space-3); padding-bottom:12px; border-bottom:1px solid var(--glass-border); }
-        .setting-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.2); }
-        .setting-row:last-child { border-bottom:none; }
-        .setting-label { font-size:0.9rem; font-weight:500; }
-        .setting-value { font-size:0.875rem; color:var(--text-muted); }
-        .toggle { width:44px; height:24px; background:#e2e8f0; border-radius:12px; position:relative; cursor:pointer; transition:background 0.2s; border:none; }
-        .toggle.on { background:var(--accent); }
-        .toggle::after { content:''; position:absolute; width:18px; height:18px; background:white; border-radius:50%; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
-        .toggle.on::after { transform:translateX(20px); }
-        .settings-input { padding:8px 12px; border:1.5px solid var(--glass-border); border-radius:var(--radius-md); background:rgba(255,255,255,0.4); font-size:0.9rem; color:var(--text-main); transition:all var(--transition-fast); min-width:160px; }
-        .settings-input:focus { outline:none; border-color:var(--primary); background:rgba(255,255,255,0.8); }
-        .save-section { margin-top:var(--space-4); text-align:right; }
+        .settings-section {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-glass);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .section-header {
+            padding: 22px 28px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255,255,255,0.35);
+        }
+        .section-header h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0;
+        }
+        .section-header p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+        .section-icon {
+            font-size: 1.5rem;
+            width: 44px;
+            height: 44px;
+            background: var(--primary-light);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .settings-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        .settings-grid-2 > * {
+            border-right: 1px solid var(--glass-border);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .settings-grid-2 > *:nth-child(even) {
+            border-right: none;
+        }
+        .settings-grid-2 > *:nth-last-child(-n+2) {
+            border-bottom: none;
+        }
+        .setting-field {
+            padding: 20px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .setting-field label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .setting-field .hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .settings-input {
+            padding: 10px 14px;
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: var(--bg);
+            font-size: 0.92rem;
+            color: var(--text-main);
+            transition: border-color 0.2s;
+            width: 100%;
+            font-family: inherit;
+        }
+        .settings-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .toggle-row {
+            padding: 18px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            gap: 16px;
+        }
+        .toggle-row:last-of-type { border-bottom: none; }
+        .toggle-info strong { font-size: 0.92rem; font-weight: 600; color: var(--text-main); display: block; }
+        .toggle-info span { font-size: 0.8rem; color: var(--text-muted); }
+        .toggle {
+            width: 48px; height: 26px;
+            background: #e2e8f0;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: none;
+            flex-shrink: 0;
+        }
+        .toggle.on { background: var(--accent); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px; height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px; left: 3px;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle.on::after { transform: translateX(22px); }
+        .section-actions {
+            padding: 20px 28px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: rgba(255,255,255,0.2);
+        }
+        .save-indicator {
+            display: none;
+            font-size: 0.85rem;
+            color: #16a34a;
+            font-weight: 500;
+            align-items: center;
+            gap: 6px;
+        }
+        .save-indicator.visible { display: flex; }
     </style>
 </head>
 <body>
@@ -56,133 +176,85 @@
 
     <!-- MAIN -->
     <main class="dashboard-content">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:8px;">
             <div>
                 <h1>System Settings</h1>
-                <p class="subtitle">Platform-wide configuration and institutional settings.</p>
+                <p class="subtitle">Institution-wide configuration for the Endur platform.</p>
             </div>
             <span class="badge primary">SUPER USER</span>
         </div>
 
-        <div class="settings-grid">
+        <!-- ═══════════════════════════════ INSTITUTION IDENTITY ═══════════════════════════════ -->
+        <div class="settings-section">
+            <div class="section-header">
+                <div class="section-icon">🏛️</div>
+                <div>
+                    <h3>Institution Configuration</h3>
+                    <p>Core identity and academic calendar settings for your institution.</p>
+                </div>
+            </div>
 
-            <!-- INSTITUTION -->
-            <div class="settings-card">
-                <h3>🏛️ Institution Configuration</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Institution Name</span>
+            <div class="settings-grid-2">
+                <div class="setting-field">
+                    <label>Institution Name</label>
                     <input id="settingInstName" class="settings-input" type="text" value="IIIT Sricity">
+                    <span class="hint">Displayed across all portals and reports.</span>
                 </div>
-                <div class="setting-row">
-                    <span class="setting-label">Academic Year</span>
+                <div class="setting-field">
+                    <label>Institution Short Code</label>
+                    <input id="settingInstCode" class="settings-input" type="text" value="IIITS">
+                    <span class="hint">Used in IDs, exports, and integrations.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Academic Year</label>
                     <input id="settingAcadYear" class="settings-input" type="text" value="2025–2026">
+                    <span class="hint">e.g. 2025–2026</span>
                 </div>
-                <div class="setting-row">
-                    <span class="setting-label">Current Semester</span>
+                <div class="setting-field">
+                    <label>Current Semester</label>
                     <select id="settingSemester" class="settings-input">
                         <option selected>Odd Semester</option>
                         <option>Even Semester</option>
                     </select>
+                    <span class="hint">Determines which courses are active this cycle.</span>
                 </div>
-                <div class="setting-row">
-                    <span class="setting-label">Timezone</span>
+                <div class="setting-field">
+                    <label>Allowed Email Domain</label>
+                    <input id="settingDomain" class="settings-input" type="text" value="@iiits.in">
+                    <span class="hint">Only accounts with this domain can register.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Timezone</label>
                     <select id="settingTimezone" class="settings-input">
                         <option selected>Asia/Kolkata (IST)</option>
                         <option>UTC</option>
-                        <option>America/New_York</option>
+                        <option>America/New_York (EST)</option>
                     </select>
+                    <span class="hint">Used for cycle deadlines and scheduling.</span>
                 </div>
-                <div class="save-section">
-                    <button class="btn-primary" onclick="saveSettings('institution')">Save Changes</button>
+                <div class="setting-field">
+                    <label>Minimum Responses to Reveal</label>
+                    <input id="settingMinResp" class="settings-input" type="number" value="5" min="1" max="50">
+                    <span class="hint">Faculty see results only after this many submissions.</span>
                 </div>
-            </div>
-
-            <!-- FEEDBACK CONFIG -->
-            <div class="settings-card">
-                <h3>📝 Feedback Configuration</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Anonymous Feedback</span>
-                    <button class="toggle on" id="toggleAnon" onclick="toggleSetting(this)" aria-label="Toggle anonymous feedback"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Allow Late Submissions</span>
-                    <button class="toggle" id="toggleLate" onclick="toggleSetting(this)" aria-label="Toggle late submissions"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Auto-close Cycles</span>
-                    <button class="toggle on" id="toggleAutoClose" onclick="toggleSetting(this)" aria-label="Toggle auto-close cycles"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Min. Responses to Reveal</span>
-                    <input id="settingMinResp" class="settings-input" type="number" value="5" min="1" max="50" style="width:80px">
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Rating Scale</span>
+                <div class="setting-field">
+                    <label>Rating Scale</label>
                     <select id="settingScale" class="settings-input">
                         <option selected>1 – 5</option>
                         <option>1 – 10</option>
                         <option>1 – 4</option>
                     </select>
-                </div>
-                <div class="save-section">
-                    <button class="btn-primary" onclick="saveSettings('feedback')">Save Changes</button>
+                    <span class="hint">Scale used for all quantitative feedback questions.</span>
                 </div>
             </div>
 
-            <!-- ACCESS & SECURITY -->
-            <div class="settings-card">
-                <h3>🔐 Access & Security</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Session Timeout</span>
-                    <select id="settingTimeout" class="settings-input">
-                        <option>30 minutes</option>
-                        <option selected>1 hour</option>
-                        <option>4 hours</option>
-                        <option>24 hours</option>
-                    </select>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Two-Factor Auth</span>
-                    <button class="toggle" id="toggle2FA" onclick="toggleSetting(this)" aria-label="Toggle 2FA"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Allowed Email Domain</span>
-                    <input id="settingDomain" class="settings-input" type="text" value="@iiits.in">
-                </div>
-                <div class="save-section">
-                    <button class="btn-primary" onclick="saveSettings('security')">Save Changes</button>
-                </div>
+            <div class="section-actions">
+                <span class="save-indicator" id="saveIndicator">✓ Saved successfully</span>
+                <button class="btn-outline" onclick="resetSettings()">Reset to Defaults</button>
+                <button class="btn-primary" onclick="saveSettings()">Save Changes</button>
             </div>
-
-            <!-- NOTIFICATIONS -->
-            <div class="settings-card">
-                <h3>🔔 Notifications & Reports</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Email Reports to Dean</span>
-                    <button class="toggle on" id="toggleDeanEmail" onclick="toggleSetting(this)" aria-label="Toggle dean email"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Email Reports to HOD</span>
-                    <button class="toggle on" id="toggleHodEmail" onclick="toggleSetting(this)" aria-label="Toggle HOD email"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Cycle Deadline Reminders</span>
-                    <button class="toggle on" id="toggleReminders" onclick="toggleSetting(this)" aria-label="Toggle reminders"></button>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Reminder Lead Time</span>
-                    <select id="settingLeadTime" class="settings-input">
-                        <option>24 hours</option>
-                        <option selected>48 hours</option>
-                        <option>72 hours</option>
-                    </select>
-                </div>
-                <div class="save-section">
-                    <button class="btn-primary" onclick="saveSettings('notifications')">Save Changes</button>
-                </div>
-            </div>
-
         </div>
+
     </main>
 </div>
 
@@ -192,26 +264,70 @@
     import { requireAuth } from '../../js/core/session.js';
     import { showToast } from '../../js/features/admin-utils.js';
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function() {
         const user = requireAuth();
-        if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+        if (!user || user.role !== 'superuser') {
+            window.location.href = '../../login.html';
+            return;
+        }
         document.getElementById('userName').textContent = user.name;
         const av = document.getElementById('avatar');
-        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+        if (av) av.textContent = user.name.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase();
+
+        // Load saved settings from localStorage if any
+        const saved = JSON.parse(localStorage.getItem('systemSettingsConfig') || '{}');
+        if (saved.instName)    document.getElementById('settingInstName').value  = saved.instName;
+        if (saved.instCode)    document.getElementById('settingInstCode').value  = saved.instCode;
+        if (saved.acadYear)    document.getElementById('settingAcadYear').value  = saved.acadYear;
+        if (saved.semester)    document.getElementById('settingSemester').value  = saved.semester;
+        if (saved.domain)      document.getElementById('settingDomain').value    = saved.domain;
+        if (saved.minResp)     document.getElementById('settingMinResp').value   = saved.minResp;
+        if (saved.anon  === false) document.getElementById('toggleAnon').classList.remove('on');
+        if (saved.late  === true)  document.getElementById('toggleLate').classList.add('on');
+        if (saved.autoClose === false) document.getElementById('toggleAutoClose').classList.remove('on');
+        if (saved.hodApproval === false) document.getElementById('toggleHodApproval').classList.remove('on');
     });
 
     window.toggleSetting = function(btn) {
         btn.classList.toggle('on');
     };
 
-    window.saveSettings = function(section) {
-        const labels = {
-            institution: 'Institution settings',
-            feedback: 'Feedback configuration',
-            security: 'Security settings',
-            notifications: 'Notification preferences'
+    window.saveSettings = function() {
+        const config = {
+            instName:    document.getElementById('settingInstName').value,
+            instCode:    document.getElementById('settingInstCode').value,
+            acadYear:    document.getElementById('settingAcadYear').value,
+            semester:    document.getElementById('settingSemester').value,
+            domain:      document.getElementById('settingDomain').value,
+            timezone:    document.getElementById('settingTimezone').value,
+            minResp:     document.getElementById('settingMinResp').value,
+            scale:       document.getElementById('settingScale').value,
+            anon:        document.getElementById('toggleAnon').classList.contains('on'),
+            late:        document.getElementById('toggleLate').classList.contains('on'),
+            autoClose:   document.getElementById('toggleAutoClose').classList.contains('on'),
+            hodApproval: document.getElementById('toggleHodApproval').classList.contains('on'),
         };
-        showToast(`${labels[section] || 'Settings'} saved successfully.`, 'success');
+        localStorage.setItem('systemSettingsConfig', JSON.stringify(config));
+
+        const ind = document.getElementById('saveIndicator');
+        ind.classList.add('visible');
+        setTimeout(function(){ ind.classList.remove('visible'); }, 3000);
+
+        showToast('Institution settings saved successfully.', 'success');
+    };
+
+    window.resetSettings = function() {
+        localStorage.removeItem('systemSettingsConfig');
+        document.getElementById('settingInstName').value = 'IIIT Sricity';
+        document.getElementById('settingInstCode').value = 'IIITS';
+        document.getElementById('settingAcadYear').value = '2025–2026';
+        document.getElementById('settingDomain').value   = '@iiits.in';
+        document.getElementById('settingMinResp').value  = '5';
+        document.getElementById('toggleAnon').classList.add('on');
+        document.getElementById('toggleLate').classList.remove('on');
+        document.getElementById('toggleAutoClose').classList.add('on');
+        document.getElementById('toggleHodApproval').classList.add('on');
+        showToast('Settings reset to defaults.', 'info');
     };
 </script>
 </body>

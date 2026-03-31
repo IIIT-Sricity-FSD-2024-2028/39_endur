@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Profile</title>
+    <title>Profile | Student — Endur</title>
     <link rel="stylesheet" href="../../css/base.css">
     <link rel="stylesheet" href="../../css/layout.css">
     <link rel="stylesheet" href="../../css/utilities.css">
@@ -13,107 +12,184 @@
     <link rel="stylesheet" href="../../css/components/profile.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
-
 <body>
+<div class="dashboard-layout">
 
-    <div class="dashboard-layout">
-
-        <!-- sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-logo">
-                <img src="../../assets/logos/endur-logo.svg">
-                <div>
-                    <strong>Endur</strong>
-                    <p>Student Portal</p>
-                </div>
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div><strong>Endur</strong><p>Student Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="courses.html">My Courses</a>
+            <a href="pending-feedback.html">Pending Feedbacks</a>
+            <a href="feedback-history.html">History</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user active">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
             </div>
+        </a>
+    </aside>
 
-            <nav class="sidebar-menu">
-                <a href="dashboard.html">Dashboard</a>
-                <a href="courses.html">My Courses</a>
-                <a href="pending-feedback.html">Pending Feedbacks</a>
-                <a href="feedback-history.html">History</a>
-            </nav>
+    <main class="dashboard-content">
+        <h1>Profile &amp; Settings</h1>
 
-            <a href="profile.html" class="sidebar-user">
-                <div id="avatar" class="avatar"></div>
-                <div>
-                    <strong id="userName"></strong>
-                    <p id="userDept"></p>
-                </div>
-            </a>
-        </aside>
+        <!-- Hero Avatar -->
+        <div class="profile-avatar-section">
+            <div class="profile-avatar-large" id="avatarLarge"></div>
+            <div>
+                <h2 id="heroName" style="font-size:1.4rem"></h2>
+                <p id="heroRole" style="color:var(--text-muted);font-size:0.9rem;margin-top:4px"></p>
+                <span class="badge neutral" style="margin-top:8px;display:inline-block">STUDENT</span>
+            </div>
+        </div>
 
-        <!-- main -->
-        <main class="dashboard-content">
-
-            <h1>Profile & Settings</h1>
-
-            <div class="profile-card">
+        <!-- Personal Information -->
+        <div class="profile-card">
+            <div class="card-section-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <h3>Personal Information</h3>
-                <div class="profile-grid">
-                    <div>
-                        <label>Name</label>
-                        <p id="profileName"></p>
-                    </div>
-                    <div>
-                        <label>ID</label>
-                        <p id="profileId"></p>
-                    </div>
-                    <div>
-                        <label>Email</label>
-                        <p id="profileEmail"></p>
-                    </div>
-                    <div>
-                        <label>Department</label>
-                        <p id="profileDept"></p>
-                    </div>
+            </div>
+            <div class="profile-grid">
+                <div><label>Full Name</label><p id="profileName">—</p></div>
+                <div><label>Student ID</label><p id="profileId">—</p></div>
+                <div><label>Email Address</label><p id="profileEmail">—</p></div>
+                <div><label>Department</label><p id="profileDept">—</p></div>
+            </div>
+        </div>
+
+        <!-- Academic Stats -->
+        <div class="profile-card">
+            <div class="card-section-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <h3>Academic Activity</h3>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-num" id="statCourses">0</span>
+                    <span class="stat-label">Enrolled Courses</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="statSubmitted">0</span>
+                    <span class="stat-label">Feedbacks Submitted</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="statPending">0</span>
+                    <span class="stat-label">Pending</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="statCycles">0</span>
+                    <span class="stat-label">Cycles Participated</span>
                 </div>
             </div>
+        </div>
 
-            <!-- Notifications Card -->
-            <div class="profile-card">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.5">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                    </svg>
-                    <h3 style="margin:0">Notification Preferences</h3>
-                </div>
-
-                <div class="settings-row">
-                    <strong>Email Notifications</strong>
-                    <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="settings-row">
-                    <strong>Push Notifications</strong>
-                    <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </label>
+        <!-- Change Password -->
+        <div class="profile-card">
+            <div class="card-section-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <h3>Change Password</h3>
+            </div>
+            <div class="change-password-form">
+                <input type="password" id="pwCurrent" placeholder="Current password">
+                <input type="password" id="pwNew" placeholder="New password">
+                <input type="password" id="pwConfirm" placeholder="Confirm new password">
+                <div id="pwMsg" class="pw-msg"></div>
+                <div style="display:flex;justify-content:flex-end">
+                    <button class="btn-primary" onclick="changePassword()">Update Password</button>
                 </div>
             </div>
+        </div>
 
-            <div class="profile-card">
-                <button class="btn-danger" onclick="logout()">Log out</button>
+        <!-- Account Actions -->
+        <div class="profile-card">
+            <div class="card-section-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <h3>Account Actions</h3>
             </div>
+            <div class="settings-row">
+                <div>
+                    <strong>Log Out</strong>
+                    <p>Ends your current session.</p>
+                </div>
+                <button class="btn-danger" onclick="logout()">Log Out</button>
+            </div>
+        </div>
 
-        </main>
+    </main>
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
 
-    </div>
+    const user = requireAuth();
+    if (!user) { /* redirected by requireAuth */ }
+    else {
+        // Sidebar
+        document.getElementById("userName").textContent = user.name;
+        document.getElementById("userDept").textContent = user.department;
+        const av = document.getElementById("avatar");
+        if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
 
-    <script type="module">
-        import { requireAuth } from "../../js/core/session.js";
-        import { initProfile } from "../../js/features/profile.js";
+        // Hero
+        const initials = user.name.split(" ").map(n => n[0]).join("");
+        document.getElementById("avatarLarge").textContent = initials;
+        document.getElementById("heroName").textContent = user.name;
+        document.getElementById("heroRole").textContent = `${user.department} · Student`;
 
-        requireAuth();
-        initProfile();
-    </script>
+        // Profile grid
+        document.getElementById("profileName").textContent = user.name;
+        document.getElementById("profileId").textContent = user.id;
+        document.getElementById("profileDept").textContent = user.department;
+        document.getElementById("profileEmail").textContent = user.email || `${user.id.toLowerCase()}@endur.edu`;
 
+        // Stats
+        const allSubmitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
+        const mySubmissions = allSubmitted.filter(s => s.userId === user.id);
+        const enrolled = (user.enrolledCourses || []).length;
+        const submitted = mySubmissions.length;
+        const cycleIds = [...new Set(mySubmissions.map(s => s.cycleId))].length;
+        const pending = Math.max(0, enrolled + 1 - submitted);
+        document.getElementById("statCourses").textContent = enrolled;
+        document.getElementById("statSubmitted").textContent = submitted;
+        document.getElementById("statPending").textContent = pending;
+        document.getElementById("statCycles").textContent = cycleIds;
+    }
+
+    window.changePassword = function() {
+        const cur  = document.getElementById("pwCurrent").value.trim();
+        const nw   = document.getElementById("pwNew").value.trim();
+        const conf = document.getElementById("pwConfirm").value.trim();
+        const msg  = document.getElementById("pwMsg");
+        msg.className = "pw-msg";
+        msg.textContent = "";
+
+        const session = JSON.parse(localStorage.getItem("endurSession"));
+        if (!session) { msg.textContent = "Session expired. Please log in again."; msg.className = "pw-msg error"; return; }
+        if (cur !== session.password) { msg.textContent = "Current password is incorrect."; msg.className = "pw-msg error"; return; }
+        if (nw.length < 3) { msg.textContent = "New password must be at least 3 characters."; msg.className = "pw-msg error"; return; }
+        if (nw !== conf) { msg.textContent = "Passwords do not match."; msg.className = "pw-msg error"; return; }
+
+        // Update session
+        session.password = nw;
+        localStorage.setItem("endurSession", JSON.stringify(session));
+
+        // Also update systemUsers so login still works
+        const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
+        const idx = users.findIndex(u => u.id === session.id);
+        if (idx !== -1) { users[idx].password = nw; localStorage.setItem("systemUsers", JSON.stringify(users)); }
+
+        msg.textContent = "Password updated successfully!";
+        msg.className = "pw-msg success";
+        ["pwCurrent","pwNew","pwConfirm"].forEach(id => document.getElementById(id).value = "");
+    };
+
+    window.logout = function() {
+        localStorage.removeItem("endurSession");
+        window.location.href = "../../login.html";
+    };
+</script>
 </body>
-
 </html>

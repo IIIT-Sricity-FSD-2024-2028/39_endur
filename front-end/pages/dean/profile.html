@@ -2,137 +2,161 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Profile & Settings | Dean</title>
+    <title>Profile &amp; Settings | Dean — Endur</title>
     <link rel="stylesheet" href="../../css/base.css">
     <link rel="stylesheet" href="../../css/layout.css">
-    <link rel="stylesheet" href="../../css/components/sidebar.css">
-    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
     <link rel="stylesheet" href="../../css/components/button.css">
-    <link rel="stylesheet" href="../../css/components/forms.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/profile.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
-    <style>
-        /* Toggle Switch Styles for Notification Prefs */
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #16a34a; }
-        input:checked + .slider:before { transform: translateX(20px); }
-    </style>
 </head>
 <body>
-
 <div class="dashboard-layout">
 
     <aside class="sidebar">
         <div class="sidebar-logo">
-            <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
+            <img src="../../assets/logos/endur-logo.svg">
             <div><strong>Endur</strong><p>Institutional Portal</p></div>
         </div>
-
         <nav class="sidebar-menu">
             <a href="dashboard.html">Dashboard</a>
             <a href="faculty-management.html">Faculty Management</a>
             <a href="cycle-management.html">Cycle Management</a>
-            <a href="audit-logs.html">Audit Logs</a>
         </nav>
-
         <a class="sidebar-user active">
             <div id="avatar" class="avatar"></div>
             <div>
-                <strong id="userName">Loading...</strong>
-                <p id="userDept">---</p>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
             </div>
         </a>
     </aside>
 
     <main class="dashboard-content">
-        <h1>Profile & Settings</h1>
-        <p class="subtitle">Manage your personal information and portal preferences.</p>
+        <h1>Profile &amp; Settings</h1>
 
-        <!-- Personal Info Card -->
+        <!-- Hero Avatar -->
+        <div class="profile-avatar-section">
+            <div class="profile-avatar-large" id="avatarLarge" style="background:linear-gradient(135deg,#1e3a8a,#3b82f6)"></div>
+            <div>
+                <h2 id="heroName" style="font-size:1.4rem"></h2>
+                <p id="heroRole" style="color:var(--text-muted);font-size:0.9rem;margin-top:4px"></p>
+                <span class="badge primary" style="margin-top:8px;display:inline-block">DEAN</span>
+            </div>
+        </div>
+
+        <!-- Personal Info -->
         <div class="profile-card">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+            <div class="card-section-header">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <h3 style="margin:0">Personal Information</h3>
+                <h3>Personal Information</h3>
             </div>
-            
             <div class="profile-grid">
-                <div>
-                    <label>Full Name</label>
-                    <p id="profileName" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
-                </div>
-                <div>
-                    <label>Institutional ID</label>
-                    <p id="profileId" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
-                </div>
-                <div>
-                    <label>Email Address</label>
-                    <p id="profileEmail" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
-                </div>
-                <div>
-                    <label>Department</label>
-                    <p id="profileDept" style="font-size: 16px; font-weight: 600; color: #0f172a;">---</p>
-                </div>
+                <div><label>Full Name</label><p id="profileName">—</p></div>
+                <div><label>Institutional ID</label><p id="profileId">—</p></div>
+                <div><label>Email Address</label><p id="profileEmail">—</p></div>
+                <div><label>Department</label><p id="profileDept">—</p></div>
             </div>
         </div>
 
-        <!-- Notifications Card -->
+        <!-- Change Password -->
         <div class="profile-card">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                <h3 style="margin:0">Notification Preferences</h3>
-            </div>
-
-            <div class="settings-row">
-                <strong>Email Notifications</strong>
-                <label class="switch">
-                    <input type="checkbox" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="settings-row">
-                <strong>Push Notifications</strong>
-                <label class="switch">
-                    <input type="checkbox" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <!-- Account Settings Card -->
-        <div class="profile-card">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+            <div class="card-section-header">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <h3 style="margin:0">Account Settings</h3>
+                <h3>Change Password</h3>
+            </div>
+            <div class="change-password-form">
+                <input type="password" id="pwCurrent" placeholder="Current password">
+                <input type="password" id="pwNew" placeholder="New password">
+                <input type="password" id="pwConfirm" placeholder="Confirm new password">
+                <div id="pwMsg" class="pw-msg"></div>
+                <div style="display:flex;justify-content:flex-end">
+                    <button class="btn-primary" onclick="changePassword()">Update Password</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Actions -->
+        <div class="profile-card">
+            <div class="card-section-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <h3>Account Actions</h3>
             </div>
 
             <div class="settings-row">
                 <div>
-                    <strong>Change To Faculty</strong>
-                    <p>Change to your faculty profile to view your performance.</p>
+                    <strong>Switch to Faculty View</strong>
+                    <p>View your personal course feedback and performance.</p>
                 </div>
-                <button class="btn-primary" style="background: #1e3a8a;" onclick="switchRole('faculty')">Change To Faculty</button>
+                <button class="btn-outline" onclick="switchRole('faculty')">Switch to Faculty</button>
             </div>
 
             <div class="settings-row">
                 <div>
                     <strong>Log Out</strong>
-                    <p>Will log you out of the current session.</p>
+                    <p>Ends your current session.</p>
                 </div>
                 <button class="btn-danger" onclick="logout()">Log Out</button>
             </div>
         </div>
+
     </main>
 </div>
 
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initProfile } from "../../js/features/profile.js";
-    
-    requireAuth();
-    initProfile();
-</script>
 
+    const user = requireAuth();
+    if (user) {
+        document.getElementById("userName").textContent = user.name;
+        document.getElementById("userDept").textContent = user.department;
+        const av = document.getElementById("avatar");
+        if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
+
+        const initials = user.name.split(" ").map(n => n[0]).join("");
+        document.getElementById("avatarLarge").textContent = initials;
+        document.getElementById("heroName").textContent = user.name;
+        document.getElementById("heroRole").textContent = "Academics · Dean";
+        document.getElementById("profileName").textContent = user.name;
+        document.getElementById("profileId").textContent = user.id;
+        document.getElementById("profileDept").textContent = user.department;
+        document.getElementById("profileEmail").textContent = user.email || `${user.id.toLowerCase()}@endur.edu`;
+    }
+
+    window.changePassword = function() {
+        const cur  = document.getElementById("pwCurrent").value;
+        const nw   = document.getElementById("pwNew").value;
+        const conf = document.getElementById("pwConfirm").value;
+        const msg  = document.getElementById("pwMsg");
+        msg.className = "pw-msg";
+        const user = JSON.parse(localStorage.getItem("endurSession"));
+        if (cur !== user.password) { msg.textContent = "Current password is incorrect."; msg.className = "pw-msg error"; return; }
+        if (nw.length < 3) { msg.textContent = "New password must be at least 3 characters."; msg.className = "pw-msg error"; return; }
+        if (nw !== conf) { msg.textContent = "Passwords do not match."; msg.className = "pw-msg error"; return; }
+        user.password = nw;
+        localStorage.setItem("endurSession", JSON.stringify(user));
+        msg.textContent = "Password updated successfully!";
+        msg.className = "pw-msg success";
+        ["pwCurrent","pwNew","pwConfirm"].forEach(id => document.getElementById(id).value = "");
+    };
+
+    window.switchRole = function(targetRole) {
+        const currentUser = JSON.parse(localStorage.getItem("endurSession"));
+        const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
+        let target = users.find(u => u.name === currentUser.name && u.role === targetRole);
+        if (!target) {
+            target = { ...currentUser, role: targetRole };
+        }
+        localStorage.setItem("endurSession", JSON.stringify(target));
+        window.location.href = `../${targetRole}/dashboard.html`;
+    };
+
+    window.logout = function() {
+        localStorage.removeItem("endurSession");
+        window.location.href = "../../login.html";
+    };
+</script>
 </body>
 </html>

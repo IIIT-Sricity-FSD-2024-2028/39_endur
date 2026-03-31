@@ -6,11 +6,8 @@ export function renderHistoricalTrends() {
     if (!user) return;
 
     const activeCourse = localStorage.getItem("activeFacultyCourse");
-    if (!activeCourse) {
-        alert("No active course selected. Returning to Reports.");
-        window.location.href = "reports.html";
-        return;
-    }
+    // If no course selected, the new HTML page shows the graceful empty state.
+    if (!activeCourse) return;
 
     const courseLabel = document.getElementById("trendCourseLabel");
     if (courseLabel) courseLabel.innerText = `(${activeCourse})`;
