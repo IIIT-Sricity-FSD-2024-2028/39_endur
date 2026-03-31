@@ -12,7 +12,7 @@ export async function renderFacultyReports() {
     const allCourses = await coursesRes.json();
     const myCourses = allCourses.filter(course => course.facultyId === user.id);
 
-    if (myCourses.length === 0) return; 
+    if (myCourses.length === 0) return;
 
     const cycleState = get("systemCycleState") || { id: "SETUP", phase: "PREPARATION" };
     const currentPhase = cycleState.phase;
@@ -21,12 +21,12 @@ export async function renderFacultyReports() {
     // CYCLE FIX: Fetch only data belonging to THIS cycle
     const allFeedbackRaw = get("submittedFeedback") || [];
     const reflectionsRaw = get("selfReflection") || [];
-    const actionReportsRaw = get("actionReports") || []; 
+    const actionReportsRaw = get("actionReports") || [];
 
     const allFeedback = allFeedbackRaw.filter(f => f.cycleId === activeCycleId);
     const reflections = reflectionsRaw.filter(r => r.cycleId === activeCycleId);
     const actionReports = actionReportsRaw.filter(a => a.cycleId === activeCycleId);
-    
+
     // GLOBAL ALERT: Check for Pending Revisions
     const globalAlertContainer = document.getElementById("globalAlertContainer");
     if (globalAlertContainer) {
@@ -86,8 +86,8 @@ export async function renderFacultyReports() {
         if (nameEl) nameEl.innerText = `${course.id}`;
 
         const courseFeedback = allFeedback.filter(f => f.course === course.id);
-        const responseCount = courseFeedback.length; 
-        
+        const responseCount = courseFeedback.length;
+
         const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id);
         const hasActionReport = actionReports.find(a => a.courseId === course.id && a.facultyId === user.id);
 
@@ -104,7 +104,7 @@ export async function renderFacultyReports() {
 
         const realAverage = metricCount > 0 ? (totalScore / metricCount).toFixed(1) : 0;
         const avgEl = document.getElementById("avgRating");
-        
+
         if (avgEl) {
             if (responseCount === 0) {
                 avgEl.innerText = "0/5";
@@ -121,15 +121,15 @@ export async function renderFacultyReports() {
         }
 
         const feedbackBtn = document.getElementById("feedbackActionBtn");
-        
+
         if (feedbackBtn) {
             if (hasReflection) {
                 feedbackBtn.innerText = "View Gap Analysis →";
-                feedbackBtn.className = "btn-outline"; 
+                feedbackBtn.className = "btn-outline";
                 feedbackBtn.style.opacity = "1";
                 feedbackBtn.disabled = false;
                 feedbackBtn.onclick = () => window.location.href = "gap-analysis.html";
-            } 
+            }
             else if (currentPhase === "PREPARATION" || currentPhase === "STUDENT_FEEDBACK") {
                 feedbackBtn.innerText = `Locked (Waiting for Student Phase to close)`;
                 feedbackBtn.className = "btn-outline";
@@ -143,7 +143,7 @@ export async function renderFacultyReports() {
                 feedbackBtn.disabled = false;
                 feedbackBtn.onclick = () => window.location.href = "self-reflection.html";
             }
-            else { 
+            else {
                 feedbackBtn.innerText = "Reflection Period Ended";
                 feedbackBtn.className = "btn-outline";
                 feedbackBtn.style.opacity = "0.6";
@@ -156,7 +156,7 @@ export async function renderFacultyReports() {
 
         if (arBtn && arMsg) {
             arMsg.style.display = "none";
-            arBtn.disabled = false; 
+            arBtn.disabled = false;
 
             if (hasActionReport && (hasActionReport.status === "FINALIZED" || hasActionReport.status === "SUBMITTED")) {
                 if (hasActionReport.status === "FINALIZED") {
@@ -164,24 +164,24 @@ export async function renderFacultyReports() {
                     arBtn.className = "btn-outline";
                     arBtn.style.opacity = "1";
                     arMsg.innerHTML = "✅ <strong>Check-in Finalized</strong> by HOD.";
-                    arMsg.style.color = "#4ade80"; 
+                    arMsg.style.color = "#4ade80";
                     arMsg.style.display = "block";
                 } else {
                     arBtn.innerText = "View Action Report →";
                     arBtn.className = "btn-primary";
                     arBtn.style.opacity = "1";
                     arMsg.innerHTML = "⏳ Submitted - Pending HOD Review";
-                    arMsg.style.color = "#94a3b8"; 
+                    arMsg.style.color = "#94a3b8";
                     arMsg.style.display = "block";
                 }
                 arBtn.onclick = () => window.location.href = "action-report.html";
-            } 
+            }
             else if (hasActionReport && hasActionReport.status === "REVISION_REQUESTED") {
                 arBtn.innerText = "Revise Action Report →";
-                arBtn.className = "btn-danger"; 
+                arBtn.className = "btn-danger";
                 arBtn.style.opacity = "1";
                 arMsg.innerHTML = "<strong>⚠️ HOD requested a revision.</strong> Please update your report.";
-                arMsg.style.color = "#f87171"; 
+                arMsg.style.color = "#f87171";
                 arMsg.style.display = "block";
                 arBtn.onclick = () => window.location.href = "action-report.html";
             }
@@ -191,7 +191,7 @@ export async function renderFacultyReports() {
                     arBtn.className = "btn-outline";
                     arBtn.style.opacity = "0.6";
                     arBtn.disabled = true;
-                } 
+                }
                 else if (!hasReflection) {
                     arBtn.innerText = "Locked";
                     arBtn.className = "btn-outline";
@@ -200,7 +200,7 @@ export async function renderFacultyReports() {
                     arMsg.innerHTML = "⚠️ Please submit your Self-Reflection to unlock.";
                     arMsg.style.color = "#cbd5e1";
                     arMsg.style.display = "block";
-                } 
+                }
                 else {
                     arBtn.innerText = "Start Action Report →";
                     arBtn.className = "btn-primary";
@@ -233,7 +233,7 @@ export async function renderFacultyReports() {
 
     const chart = document.getElementById("trendChart");
     if (chart) {
-        chart.innerHTML = ""; 
+        chart.innerHTML = "";
         summaryData.history.forEach(item => {
             const bar = document.createElement("div");
             bar.className = "chart-bar";

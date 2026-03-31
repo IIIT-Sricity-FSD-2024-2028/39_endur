@@ -1,11 +1,16 @@
-.card{
+.card {
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+  transition: all var(--transition-normal);
+}
 
-background:white;
-
-border-radius:12px;
-
-padding:20px;
-
-border:1px solid #e2e8f0;
-
+.card:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }

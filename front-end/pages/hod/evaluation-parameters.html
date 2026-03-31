@@ -195,7 +195,7 @@
 
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initParameters, openParamModal, closeParamModal, deleteParameter, saveParameter, finalizeConfig, autoBalance } from "../../js/features/hod-parameters.js";
+    import { initParameters, openParamModal, closeParamModal, deleteParameter, saveParameter, finalizeConfig, autoBalance, revertToDraft } from "../../js/features/hod-parameters.js";
 
     document.addEventListener("DOMContentLoaded", () => {
         const user = requireAuth();
@@ -215,6 +215,7 @@
         window.saveParameter = saveParameter;
         window.finalizeConfig = finalizeConfig;
         window.autoBalance = autoBalance;
+        window.revertToDraft = revertToDraft;
     });
 </script>
 

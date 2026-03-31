@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>HOD Profile | Endur</title>
@@ -11,98 +12,127 @@
     <link rel="stylesheet" href="../../css/components/forms.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
+
 <body>
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
-            <div>
-                <strong>Endur</strong>
-                <p>Institutional Portal</p>
-            </div>
-        </div>
-
-        <nav class="sidebar-menu">
-            <a href="dashboard.html">Dashboard</a>
-            <a href="faculty-management.html">Faculty Management</a>
-            <a href="review-checkin.html">Review Check In</a>
-            <a href="evaluation-parameters.html">Evaluation Parameters</a>
-        </nav>
-
-        <a class="sidebar-user active">
-            <div id="avatar" class="avatar"></div>
-            <div>
-                <strong id="userName"></strong>
-                <p id="userDept"></p>
-            </div>
-        </a>
-    </aside>
-
-    <main class="dashboard-content">
-        <h1>Profile & Settings</h1>
-        <p class="subtitle">Manage your HOD administrative account and preferences.</p>
-
-        <div class="profile-card">
-            <h3>Administrative Information</h3>
-            <div class="profile-grid">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
                 <div>
-                    <label>Full Name</label>
-                    <p id="profileName"></p>
-                </div>
-                <div>
-                    <label>HOD ID</label>
-                    <p id="profileId"></p>
-                </div>
-                <div>
-                    <label>Email Address</label>
-                    <p id="profileEmail"></p>
-                </div>
-                <div>
-                    <label>Department</label>
-                    <p id="profileDept"></p>
+                    <strong>Endur</strong>
+                    <p>Institutional Portal</p>
                 </div>
             </div>
-        </div>
 
-        <div class="profile-card">
-            <h3>Account Actions</h3>
+            <nav class="sidebar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="faculty-management.html">Faculty Management</a>
+                <a href="review-checkin.html">Review Check In</a>
+                <a href="evaluation-parameters.html">Evaluation Parameters</a>
+            </nav>
 
-            <div class="settings-row">
+            <a class="sidebar-user active">
+                <div id="avatar" class="avatar"></div>
                 <div>
-                    <strong>Switch to Faculty View</strong>
-                    <p>Access your personal course feedback and self-reflections.</p>
+                    <strong id="userName"></strong>
+                    <p id="userDept"></p>
                 </div>
-                <button class="btn-outline" onclick="switchRole('faculty')">Switch to Faculty</button>
+            </a>
+        </aside>
+
+        <main class="dashboard-content">
+            <h1>Profile & Settings</h1>
+            <p class="subtitle">Manage your HOD administrative account and preferences.</p>
+
+            <div class="profile-card">
+                <h3>Administrative Information</h3>
+                <div class="profile-grid">
+                    <div>
+                        <label>Full Name</label>
+                        <p id="profileName"></p>
+                    </div>
+                    <div>
+                        <label>HOD ID</label>
+                        <p id="profileId"></p>
+                    </div>
+                    <div>
+                        <label>Email Address</label>
+                        <p id="profileEmail"></p>
+                    </div>
+                    <div>
+                        <label>Department</label>
+                        <p id="profileDept"></p>
+                    </div>
+                </div>
             </div>
 
-            <div class="settings-row" id="deanSwitchRow" style="display: none;">
-                <div>
-                    <strong>Switch to Dean Profile</strong>
-                    <p>Access college-wide reports and cycle management.</p>
+            <!-- Notifications Card -->
+            <div class="profile-card">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <h3 style="margin:0">Notification Preferences</h3>
                 </div>
-                <button class="btn-primary" onclick="switchRole('dean')">Switch to Dean</button>
+
+                <div class="settings-row">
+                    <strong>Email Notifications</strong>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <strong>Push Notifications</strong>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
 
-            <div class="settings-row">
-                <div>
-                    <strong>Log Out</strong>
-                    <p>Ends your administrative session.</p>
-                </div>
-                <button class="btn-danger" onclick="logout()">Log Out</button>
-            </div>
-        </div>
-    </main>
-</div>
+            <div class="profile-card">
+                <h3>Account Actions</h3>
 
-<script type="module">
-    import { requireAuth } from "../../js/core/session.js";
-    import { initProfile } from "../../js/features/profile.js";
-    
-    requireAuth();
-    initProfile();
-</script>
+                <div class="settings-row">
+                    <div>
+                        <strong>Switch to Faculty View</strong>
+                        <p>Access your personal course feedback and self-reflections.</p>
+                    </div>
+                    <button class="btn-outline" onclick="switchRole('faculty')">Switch to Faculty</button>
+                </div>
+
+                <div class="settings-row" id="deanSwitchRow" style="display: none;">
+                    <div>
+                        <strong>Switch to Dean Profile</strong>
+                        <p>Access college-wide reports and cycle management.</p>
+                    </div>
+                    <button class="btn-primary" onclick="switchRole('dean')">Switch to Dean</button>
+                </div>
+
+                <div class="settings-row">
+                    <div>
+                        <strong>Log Out</strong>
+                        <p>Ends your administrative session.</p>
+                    </div>
+                    <button class="btn-danger" onclick="logout()">Log Out</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        import { initProfile } from "../../js/features/profile.js";
+
+        requireAuth();
+        initProfile();
+    </script>
 
 </body>
+
 </html>

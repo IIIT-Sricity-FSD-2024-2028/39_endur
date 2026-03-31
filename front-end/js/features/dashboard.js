@@ -12,7 +12,7 @@ function getStatus(courseId, userId, currentCycleId) {
 
     // Check if submitted specifically during THIS cycle
     if (submitted.find(f => f.course === courseId && f.userId === userId && f.cycleId === currentCycleId)) return "completed";
-    
+
     if (drafts[userId] && drafts[userId][courseId]) return "progress";
     return "pending";
 }
@@ -21,11 +21,11 @@ export async function updateDashboard() {
     const allCourses = await getCourses();
     const user = get("endurSession");
     const table = document.getElementById("dashboardTable");
-    
+
     const cycleState = get("systemCycleState") || { id: "FALLBACK_CYCLE", phase: "COMPLETED" };
     const currentCycleId = cycleState.id;
     const isFeedbackOpen = cycleState.phase === "STUDENT_FEEDBACK";
-    
+
     // Manage Global Banner
     const banner = document.getElementById("cycleStatusBanner");
     if (banner) {
@@ -64,12 +64,12 @@ export async function updateDashboard() {
         let actionHtml = "";
 
         if (status === "completed") {
-            actionHtml = `<span class="action-link" onclick="window.location.href='feedback-history.html'">View</span>`;
+            actionHtml = `<button class="btn-small btn-outline" onclick="window.location.href='feedback-history.html'">View</button>`;
         } else {
             if (isFeedbackOpen) {
-                actionHtml = `<span class="action-link" onclick="openFeedback('${course.id}')">${statusAction(status)}</span>`;
+                actionHtml = `<button class="btn-small btn-primary" onclick="openFeedback('${course.id}')">${statusAction(status)}</button>`;
             } else {
-                actionHtml = `<span style="color: #cbd5e1; cursor: not-allowed; font-size: 13px;">Locked</span>`;
+                actionHtml = `<span style="color: var(--text-muted); cursor: not-allowed; font-size: 13px;">Locked</span>`;
             }
         }
 

@@ -9,7 +9,7 @@ export function initCycleManagement() {
 
 function renderCycleTracker() {
     let cycleObj = get("systemCycleState");
-    
+
     const createSection = document.getElementById("createCycleSection");
     const activeCard = document.getElementById("activeCycleCard");
     const approvalCard = document.getElementById("approvalQueueCard");
@@ -18,11 +18,11 @@ function renderCycleTracker() {
     if (!cycleObj || cycleObj.phase === "COMPLETED") {
         createSection.style.display = "block";
         btn.style.display = "none";
-        
+
         if (!cycleObj) {
             activeCard.style.display = "none";
             approvalCard.style.display = "none";
-            return; 
+            return;
         }
     } else {
         createSection.style.display = "none";
@@ -38,7 +38,7 @@ function renderCycleTracker() {
     PHASES.forEach((phase, index) => {
         const stepEl = document.getElementById(`step_${phase}`);
         if (!stepEl) return;
-        
+
         stepEl.classList.remove("active", "completed");
         if (index < currentPhaseIndex) {
             stepEl.classList.add("completed");
@@ -59,20 +59,20 @@ function renderCycleTracker() {
         desc.innerText = "Review HOD parameters below before launching.";
         btn.innerText = "Launch Student Feedback Phase";
         approvalCard.style.display = "block";
-    } 
+    }
     else if (cycleObj.phase === "STUDENT_FEEDBACK") {
         badge.className = "badge primary";
         desc.innerText = "Students are currently submitting feedback. Faculty forms are locked.";
         btn.innerText = "Close Student Phase & Open Faculty Reflection";
         approvalCard.style.display = "none";
-        if(cycleObj.studentDeadline) deadlineText.innerText = `Closes: ${new Date(cycleObj.studentDeadline).toLocaleString()}`;
+        if (cycleObj.studentDeadline) deadlineText.innerText = `Closes: ${new Date(cycleObj.studentDeadline).toLocaleString()}`;
     }
     else if (cycleObj.phase === "FACULTY_REFLECTION") {
         badge.className = "badge warning";
         desc.innerText = "Students locked. Faculty are submitting Self-Reflections and Action Reports.";
         btn.innerText = "Complete & Archive Cycle";
         approvalCard.style.display = "none";
-        if(cycleObj.reflectionDeadline) deadlineText.innerText = `Deadline: ${new Date(cycleObj.reflectionDeadline).toLocaleString()}`;
+        if (cycleObj.reflectionDeadline) deadlineText.innerText = `Deadline: ${new Date(cycleObj.reflectionDeadline).toLocaleString()}`;
     }
     else if (cycleObj.phase === "COMPLETED") {
         badge.className = "badge success";
@@ -100,15 +100,15 @@ export function createNewCycle() {
     // ==========================================
     // Grab the parameters that were active in the previous cycle
     const previousActiveParams = get("activeParameters") || {};
-    
+
     // Copy them over to be the new drafts, and pre-approve them
     set("draftParameters", previousActiveParams);
-    
+
     let newStatuses = {};
     Object.keys(previousActiveParams).forEach(dept => {
-        newStatuses[dept] = "APPROVED"; // Seamless rollover
+        newStatuses[dept] = "DRAFT"; // Seamless rollover
     });
-    
+
     set("departmentConfigStatus", newStatuses);
     set("departmentConfigNotes", {});
 
@@ -117,7 +117,7 @@ export function createNewCycle() {
     cyclesArray.push({
         cycleId: nameInput,
         status: "active",
-        endTimestamp: new Date(new Date().getTime() + 7*24*60*60*1000).toISOString() 
+        endTimestamp: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
     });
     set("feedbackCycles", cyclesArray);
 
@@ -130,7 +130,7 @@ export function createNewCycle() {
     set("systemCycleState", cycleObj);
 
     document.getElementById("newCycleName").value = "";
-    
+
     renderCycleTracker();
     renderApprovalQueue();
 }
@@ -138,7 +138,9 @@ export function createNewCycle() {
 function renderApprovalQueue() {
     const listContainer = document.getElementById("approvalListContainer");
     let statuses = get("departmentConfigStatus") || {};
-    
+    let cycleObj = get("systemCycleState") || {};
+
+
     fetch("../../js/mock-data/users.json").then(res => res.json()).then(users => {
         const hods = users.filter(u => u.role === "hod");
         const depts = [...new Set(hods.map(h => h.department))];
@@ -149,7 +151,7 @@ function renderApprovalQueue() {
         }
 
         listContainer.innerHTML = "";
-        
+
         depts.forEach(dept => {
             const status = statuses[dept] || "DRAFT";
             let statusBadge = "";
@@ -165,8 +167,8 @@ function renderApprovalQueue() {
                 statusBadge = `<span class="badge danger" style="font-size: 10px;">REVISION PENDING</span>`;
                 actionButtons = `<span style="color: #d97706; font-size: 12px;">⏳ Waiting on HOD</span>`;
             } else {
-                statusBadge = `<span class="badge neutral" style="font-size: 10px;">DRAFTING</span>`;
-                actionButtons = `<span style="color: #94a3b8; font-size: 12px;">Not Submitted</span>`;
+                statusBadge = `<span class="badge neutral" style="font-size: 10px;">NO ACTION YET</span>`;
+                actionButtons = `<span style="color: #94a3b8; font-size: 12px;">Waiting for HOD</span>`;
             }
 
             const row = document.createElement("div");
@@ -189,11 +191,11 @@ export function viewRequest(dept) {
 export function advanceCyclePhase() {
     let cycleObj = get("systemCycleState") || { phase: "PREPARATION" };
     const currentIndex = PHASES.indexOf(cycleObj.phase);
-    
+
     if (currentIndex === 0) {
         let statuses = get("departmentConfigStatus") || {};
         const pending = Object.values(statuses).some(s => s === "SUBMITTED" || s === "REVISION_REQUESTED");
-        
+
         if (pending) {
             const force = confirm("Warning: Some departments have unapproved parameters. Launching now will force them to use default parameters. Continue?");
             if (!force) return;
@@ -201,7 +203,7 @@ export function advanceCyclePhase() {
 
         let allDrafts = get("draftParameters") || {};
         let activeParams = {};
-        
+
         Object.keys(allDrafts).forEach(dept => {
             if (statuses[dept] === "APPROVED") {
                 activeParams[dept] = allDrafts[dept];
@@ -217,7 +219,7 @@ export function advanceCyclePhase() {
         const d = new Date();
         d.setHours(d.getHours() + 24);
         cycleObj.reflectionDeadline = d.toISOString();
-        
+
         const actionD = new Date(d);
         actionD.setHours(actionD.getHours() + 72);
         cycleObj.actionDeadline = actionD.toISOString();

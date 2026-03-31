@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Profile</title>
@@ -12,78 +13,107 @@
     <link rel="stylesheet" href="../../css/components/profile.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
+
 <body>
 
-<div class="dashboard-layout">
+    <div class="dashboard-layout">
 
-    <!-- sidebar -->
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <img src="../../assets/logos/endur-logo.svg">
-            <div>
-                <strong>Endur</strong>
-                <p>Student Portal</p>
-            </div>
-        </div>
-
-        <nav class="sidebar-menu">
-            <a href="dashboard.html">Dashboard</a>
-            <a href="courses.html">My Courses</a>
-            <a href="pending-feedback.html">Pending Feedbacks</a>
-            <a href="feedback-history.html">History</a>
-        </nav>
-
-        <a href="profile.html" class="sidebar-user">
-            <div id="avatar" class="avatar"></div>
-            <div>
-                <strong id="userName"></strong>
-                <p id="userDept"></p>
-            </div>
-        </a>
-    </aside>
-
-    <!-- main -->
-    <main class="dashboard-content">
-
-        <h1>Profile & Settings</h1>
-
-        <div class="profile-card">
-            <h3>Personal Information</h3>
-            <div class="profile-grid">
+        <!-- sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="../../assets/logos/endur-logo.svg">
                 <div>
-                    <label>Name</label>
-                    <p id="profileName"></p>
-                </div>
-                <div>
-                    <label>ID</label>
-                    <p id="profileId"></p>
-                </div>
-                <div>
-                    <label>Email</label>
-                    <p id="profileEmail"></p>
-                </div>
-                <div>
-                    <label>Department</label>
-                    <p id="profileDept"></p>
+                    <strong>Endur</strong>
+                    <p>Student Portal</p>
                 </div>
             </div>
-        </div>
 
-        <div class="profile-card">
-            <button class="btn-danger" onclick="logout()">Log out</button>
-        </div>
+            <nav class="sidebar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="courses.html">My Courses</a>
+                <a href="pending-feedback.html">Pending Feedbacks</a>
+                <a href="feedback-history.html">History</a>
+            </nav>
 
-    </main>
+            <a href="profile.html" class="sidebar-user">
+                <div id="avatar" class="avatar"></div>
+                <div>
+                    <strong id="userName"></strong>
+                    <p id="userDept"></p>
+                </div>
+            </a>
+        </aside>
 
-</div>
+        <!-- main -->
+        <main class="dashboard-content">
 
-<script type="module">
-    import { requireAuth } from "../../js/core/session.js";
-    import { initProfile } from "../../js/features/profile.js";
-    
-    requireAuth();
-    initProfile();
-</script>
+            <h1>Profile & Settings</h1>
+
+            <div class="profile-card">
+                <h3>Personal Information</h3>
+                <div class="profile-grid">
+                    <div>
+                        <label>Name</label>
+                        <p id="profileName"></p>
+                    </div>
+                    <div>
+                        <label>ID</label>
+                        <p id="profileId"></p>
+                    </div>
+                    <div>
+                        <label>Email</label>
+                        <p id="profileEmail"></p>
+                    </div>
+                    <div>
+                        <label>Department</label>
+                        <p id="profileDept"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Card -->
+            <div class="profile-card">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #1e3a8a;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <h3 style="margin:0">Notification Preferences</h3>
+                </div>
+
+                <div class="settings-row">
+                    <strong>Email Notifications</strong>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <strong>Push Notifications</strong>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="profile-card">
+                <button class="btn-danger" onclick="logout()">Log out</button>
+            </div>
+
+        </main>
+
+    </div>
+
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        import { initProfile } from "../../js/features/profile.js";
+
+        requireAuth();
+        initProfile();
+    </script>
 
 </body>
+
 </html>

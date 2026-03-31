@@ -21,7 +21,7 @@ export async function renderFacultyDashboard() {
     const allSubmissions = get("submittedFeedback") || [];
     const allReflections = get("selfReflection") || [];
     const cycleState = get("systemCycleState") || { id: "SYSTEM SETUP", phase: "PREPARATION" };
-    
+
     // CYCLE FIX: Only grab data for the active cycle
     const activeCycleId = cycleState.id;
     const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
@@ -82,13 +82,13 @@ export async function renderFacultyDashboard() {
                 sumOfAverages += studentFormAvg;
             });
 
-            courseAvgPercentage = (sumOfAverages / responses) * 20; 
+            courseAvgPercentage = (sumOfAverages / responses) * 20;
             totalStudentScorePercentage += courseAvgPercentage;
             coursesWithFeedbackCount++;
         }
 
         totalResponses += responses;
-        totalStudentsEnrolled += course.enrolled || 50; 
+        totalStudentsEnrolled += course.enrolled || 50;
 
         // Uses the pre-filtered 'reflections' array
         const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id);
@@ -99,14 +99,14 @@ export async function renderFacultyDashboard() {
             let selfMetricSum = 0;
             let selfMetricCount = 0;
             const expected = hasReflection.expectedRatings || {};
-            
+
             Object.values(expected).forEach(val => {
-                if(typeof val === 'number') { selfMetricSum += val; selfMetricCount++; }
+                if (typeof val === 'number') { selfMetricSum += val; selfMetricCount++; }
             });
 
             const selfAvgPercentage = selfMetricCount > 0 ? (selfMetricSum / selfMetricCount) * 20 : 0;
             const absoluteGap = Math.abs(selfAvgPercentage - courseAvgPercentage);
-            
+
             totalGapAccumulator += absoluteGap;
             gapCalculatedCourses++;
         }
@@ -137,10 +137,10 @@ export async function renderFacultyDashboard() {
 
     const finalAvgScore = coursesWithFeedbackCount > 0 ? (totalStudentScorePercentage / coursesWithFeedbackCount).toFixed(0) : 0;
     const finalGapScore = gapCalculatedCourses > 0 ? (totalGapAccumulator / gapCalculatedCourses).toFixed(0) : 0;
-    
+
     const avgScoreEl = document.getElementById("avgScore");
     const gapScoreEl = document.getElementById("gapScore");
-    
+
     if (pendingReflectionCount > 0 && ["PREPARATION", "STUDENT_FEEDBACK", "FACULTY_REFLECTION"].includes(cycleState.phase)) {
         if (avgScoreEl) { avgScoreEl.innerHTML = `<span style="font-size: 18px; color: #94a3b8;">Locked 🔒</span>`; }
         if (gapScoreEl) { gapScoreEl.innerHTML = `<span style="font-size: 18px; color: #94a3b8;">Locked 🔒</span>`; }

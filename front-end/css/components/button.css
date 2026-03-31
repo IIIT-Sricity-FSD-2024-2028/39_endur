@@ -1,64 +1,78 @@
 /* primary button */
-
-.btn-primary{
-
-background:#1e3a8a;
-
-color:white;
-
-padding:10px 18px;
-
-border:none;
-
-border-radius:8px;
-
-font-weight:600;
-
-cursor:pointer;
-
-transition:0.15s;
-
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-active));
+  color: #ffffff;
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
 }
 
-
-.btn-primary:hover{
-
-opacity:.9;
-
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow);
+  opacity: 0.95;
 }
 
+.btn-primary:active {
+  transform: translateY(0);
+}
 
 /* outline button */
-
-.btn-outline{
-
-background:white;
-
-border:1px solid #cbd5e1;
-
-padding:10px 18px;
-
-border-radius:8px;
-
-cursor:pointer;
-
+.btn-outline {
+  background: transparent;
+  color: var(--text-main);
+  border: 1.5px solid var(--border);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
+.btn-outline:hover {
+  background: var(--surface);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
 
 /* small action button */
+.btn-small {
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
 
-.btn-small{
+.btn-small:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
 
-padding:4px 10px;
+/* danger button */
+.btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
 
-font-size:13px;
-
-border-radius:6px;
-
-border:1px solid #cbd5e1;
-
-background:white;
-
-cursor:pointer;
-
+.btn-danger:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
 }

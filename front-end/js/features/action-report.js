@@ -23,7 +23,7 @@ export function initActionReport() {
     // SECURITY CHECK
     const reflections = get("selfReflection") || [];
     const hasReflection = reflections.find(r => r.courseId === activeCourseId && r.facultyId === user.id && r.cycleId === activeCycleId);
-    
+
     if (!existingReport) {
         if (cycleState.phase === "COMPLETED") {
             alert("Access Denied: The evaluation cycle has been closed and archived.");
@@ -53,17 +53,17 @@ export function initActionReport() {
             document.getElementById("revHodNotes").innerText = existingReport.hodNotes;
             document.getElementById("revHodOutcomes").innerText = existingReport.hodOutcomes;
             submitBtn.innerText = "Resubmit Action Report";
-            
+
         } else if (existingReport.status === "FINALIZED") {
             document.getElementById("finalizedBanner").style.display = "block";
             document.getElementById("finHodNotes").innerText = existingReport.hodNotes;
             document.getElementById("finHodOutcomes").innerText = existingReport.hodOutcomes;
-            
+
             rootCauseInput.disabled = true;
             strategiesInput.disabled = true;
             timelineInput.disabled = true;
             submitBtn.style.display = "none";
-            
+
         } else {
             rootCauseInput.disabled = true;
             strategiesInput.disabled = true;
@@ -84,10 +84,10 @@ export function initActionReport() {
                 timelineInput.value.trim() === existingReport.timeline.trim()
             ) {
                 alert("⚠️ Action Required: You must make changes to your Action Report before resubmitting.");
-                return; 
+                return;
             }
         }
-        
+
         // CYCLE FIX: Attach activeCycleId
         const updatedReport = {
             facultyId: user.id,
@@ -96,7 +96,7 @@ export function initActionReport() {
             rootCause: rootCauseInput.value,
             plannedStrategies: strategiesInput.value,
             timeline: timelineInput.value,
-            status: "SUBMITTED", 
+            status: "SUBMITTED",
             hodNotes: existingReport ? existingReport.hodNotes : "",
             hodOutcomes: existingReport ? existingReport.hodOutcomes : ""
         };

@@ -2,200 +2,77 @@
    FEEDBACK PAGE ONLY
    ========================= */
 
-
-/* page spacing */
-
 .feedback-page {
-
-   padding-bottom: 60px;
-
+   padding-bottom: var(--space-7);
 }
-
-
-
-/* subtitle under course name */
 
 .subtitle {
-
-   color: #64748b;
-
-   margin-bottom: 24px;
-
+   color: var(--text-muted);
+   margin-bottom: var(--space-4);
+   font-size: 1.1rem;
 }
-
-
-
-/* anonymity info box variant */
 
 .info-box {
-
-   margin-bottom: 20px;
-
+   margin-bottom: var(--space-4);
+   background: var(--primary-light);
+   color: var(--primary-active);
+   border: 1px solid rgba(59, 130, 246, 0.2);
+   padding: var(--space-4);
+   border-radius: var(--radius-lg);
 }
-
-
-
-/* grid of feedback questions */
 
 .feedback-grid {
-
-   margin-top: 20px;
-
+   margin-top: var(--space-4);
+   display: grid;
+   grid-template-columns: 1fr;
+   gap: var(--space-4);
 }
-
-
-
-/* textarea spacing */
 
 textarea {
-
-   margin-top: 10px;
-
+   margin-top: var(--space-2);
 }
-
-
-
-/* submit button placement */
 
 .submit-btn {
-
-   margin-top: 30px;
-
+   margin-top: var(--space-5);
    float: right;
-
 }
-
-
 
 /* review of reviews visual theme */
-
 .review-form {
-
-   border-top: 6px solid #7c3aed;
-
+   border-top: 6px solid var(--secondary);
+   box-shadow: var(--shadow-md);
 }
-
-
 
 .review-info {
-
-   background: #f5f3ff;
-
-   border: 1px solid #ddd6fe;
-
+   background: rgba(139, 92, 246, 0.05);
+   border: 1px solid rgba(139, 92, 246, 0.2);
 }
-
-
 
 .review-btn {
-
-   background: #7c3aed;
-
+   background: var(--secondary);
 }
 
-
+.review-btn:hover {
+   background: #7c3aed;
+   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
 
 /* small UX improvements */
-
 .question-card {
-
-   transition: 0.15s;
-
+   transition: all var(--transition-normal);
 }
-
 
 .question-card:hover {
-
-   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
-
+   box-shadow: var(--shadow-md);
+   border-color: var(--border-focus);
 }
 
-
-
-/* animation polish */
-
-.success-icon {
-
-   animation: pop 0.3s ease;
-
-}
-
-
-
-@keyframes pop {
-
-   0% {
-
-      transform: scale(0.6);
-
-      opacity: 0;
-
-   }
-
-   100% {
-
-      transform: scale(1);
-
-      opacity: 1;
-
-   }
-
-}
-
+/* Center Layout */
 .center-layout {
-
-   height: 100vh;
-
+   min-height: 100vh;
    display: flex;
-
    align-items: center;
-
    justify-content: center;
-
-   background: #f8fafc;
-
-}
-
-
-.success-card {
-
-   width: 420px;
-
-   background: white;
-
-   padding: 50px 40px;
-
-   border-radius: 16px;
-
-   text-align: center;
-
-   border: 1px solid #e2e8f0;
-
-}
-
-
-.success-icon {
-
-   width: 70px;
-
-   height: 70px;
-
-   margin: auto;
-
-   margin-bottom: 20px;
-
-   border-radius: 50%;
-
-   background: #dcfce7;
-
-   display: flex;
-
-   align-items: center;
-
-   justify-content: center;
-
-   font-size: 28px;
-
-   color: #166534;
-
+   background: var(--bg);
+   padding: var(--space-4);
 }

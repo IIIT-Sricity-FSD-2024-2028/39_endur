@@ -189,6 +189,50 @@
 
 
     </section>
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="logo">
+                    <img src="assets/logos/endur-logo.svg" class="logo-img" alt="Endur Hat">
+                    <span class="logo-text"><strong>Endur</strong></span>
+                </div>
+                <p class="brand-desc">Empowering educational excellence through actionable feedback.</p>
+            </div>
+            <div class="footer-links">
+                <div class="link-column">
+                    <h4>Platform</h4>
+                    <a href="#" data-modal="features">Features</a>
+                    <a href="#" data-modal="casestudies">Case Studies</a>
+                    <a href="#" data-modal="pricing">Pricing</a>
+                </div>
+                <div class="link-column">
+                    <h4>Legal & Misc.</h4>
+                    <a href="#" data-modal="privacy">Privacy Policy</a>
+                    <a href="#" data-modal="terms">Terms of Service</a>
+                    <a href="#" data-modal="contact">Contact Support</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Endur Academic Excellence Platform. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- DYNAMIC GLASS MODAL -->
+    <div id="landingModal" class="glass-modal-overlay">
+        <div class="glass-modal-card">
+            <div class="modal-header">
+                <h3 id="modalTitle">Title</h3>
+                <button id="closeModalBtn" class="close-btn">✕</button>
+            </div>
+            <div id="modalBody" class="modal-body">
+                <!-- Content injected here -->
+            </div>
+        </div>
+    </div>
+
     <script type="module">
 
         import { goToLogin } from "./js/core/router.js";
@@ -196,6 +240,56 @@
         document
             .getElementById("getStartedBtn")
             .addEventListener("click", goToLogin);
+
+        // MODAL LOGIC
+        const modalData = {
+            features: {
+                title: "Platform Features",
+                body: "<p><strong>Anonymized Feedback:</strong> Collect honest student evaluations securely.</p><p><strong>Advanced Gap Analysis:</strong> Compare student outcomes against faculty self-evaluations.</p><p><strong>Actionable Reports:</strong> Automate insights for Deans and HODs.</p>"
+            },
+            casestudies: {
+                title: "Case Studies",
+                body: "<p><strong>University of Tech:</strong> Increased student satisfaction tracking by 40% after adopting Endur.</p><br><p><strong>Global Arts College:</strong> Reduced feedback processing time from 3 weeks to instant real-time dashboards.</p>"
+            },
+            pricing: {
+                title: "Pricing",
+                body: "<p>We offer flexible enterprise pricing models tailored to the size of your institution.</p><br><p>Contact our sales team for a custom quote featuring unlimited faculty accounts and priority support.</p>"
+            },
+            privacy: {
+                title: "Privacy Policy",
+                body: "<p>Your data is strictly encrypted. Endur does not share institutional data with third parties.</p><br><p>Student identities are permanently decoupled from feedback submissions to ensure zero bias.</p>"
+            },
+            terms: {
+                title: "Terms of Service",
+                body: "<p>By using Endur, your institution agrees to ethical data collection principles.</p><br><p>System access is restricted to verified academic domains, and usage must comply with local educational privacy laws.</p>"
+            },
+            contact: {
+                title: "Contact Support",
+                body: "<p>Need help? Our academic support team is available 24/7.</p><br><p>Email: <strong>support@endur.edu</strong></p><p>Phone: <strong>1-800-555-0199</strong></p>"
+            }
+        };
+
+        const modal = document.getElementById("landingModal");
+        const titleEl = document.getElementById("modalTitle");
+        const bodyEl = document.getElementById("modalBody");
+        const closeBtn = document.getElementById("closeModalBtn");
+
+        document.querySelectorAll("[data-modal]").forEach(link => {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                const key = link.getAttribute("data-modal");
+                if(modalData[key]) {
+                    titleEl.innerText = modalData[key].title;
+                    bodyEl.innerHTML = modalData[key].body;
+                    modal.classList.add("active");
+                }
+            });
+        });
+
+        closeBtn.addEventListener("click", () => modal.classList.remove("active"));
+        modal.addEventListener("click", (e) => {
+            if(e.target === modal) modal.classList.remove("active");
+        });
 
     </script>
 

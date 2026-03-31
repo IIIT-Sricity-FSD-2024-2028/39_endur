@@ -13,13 +13,13 @@
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
     <style>
         .phase-tracker { display: flex; justify-content: space-between; position: relative; margin: 40px 0; }
-        .phase-tracker::before { content: ''; position: absolute; top: 15px; left: 0; width: 100%; height: 4px; background: #e2e8f0; z-index: 1; }
+        .phase-tracker::before { content: ''; position: absolute; top: 15px; left: 0; width: 100%; height: 4px; background: rgba(0,0,0,0.15); z-index: 1; border-radius: 2px; }
         .phase-step { position: relative; z-index: 2; text-align: center; width: 140px; }
-        .phase-dot { width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0; border: 4px solid #fff; margin: 0 auto 10px; transition: 0.3s; }
-        .phase-step.active .phase-dot { background: #3b82f6; box-shadow: 0 0 0 4px #bfdbfe; }
-        .phase-step.completed .phase-dot { background: #10b981; }
-        .phase-label { font-size: 12px; font-weight: 600; color: #64748b; }
-        .phase-step.active .phase-label { color: #1e3a8a; }
+        .phase-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--surface); backdrop-filter: blur(8px); border: 2px solid var(--glass-border); margin: 0 auto 10px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .phase-step.active .phase-dot { background: var(--primary); border-color: rgba(255,255,255,0.8); box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2); }
+        .phase-step.completed .phase-dot { background: var(--accent); border-color: rgba(255,255,255,0.8); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2); }
+        .phase-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+        .phase-step.active .phase-label { color: var(--primary-active); }
         .approval-row { display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 16px 0; border-bottom: 1px solid #e2e8f0; align-items: center; }
         .approval-row:last-child { border-bottom: none; }
     </style>
