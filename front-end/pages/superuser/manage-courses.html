@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Courses — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active { background: rgba(139,92,246,0.15); color: #6d28d9; }
+        .course-form .form-group { margin-bottom: 24px; }
+        .student-list { max-height: 350px; overflow-y: auto; padding-right: 15px; }
+        
+        .modal { 
+            width: 520px; 
+            padding: 40px; 
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .modal h2 { font-size: 2rem; margin-bottom: 30px; font-weight: 800; color: #0f172a; }
+        .form-group label { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 8px; }
+        
+        /* Remove dropdown arrow for disabled select */
+        select:disabled {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: none !important;
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a class="active" href="manage-courses.html">📚 Manage Courses</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+            <a href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+            <div>
+                <h1>Course Management</h1>
+                <p class="subtitle">Assign faculty, enroll students, and manage course catalog.</p>
+            </div>
+            <button class="btn-primary" onclick="openAddCourse()">+ New Course</button>
+        </div>
+
+        <div class="page-actions" style="margin-top: 30px;">
+            <div class="search-wrap">
+                <span class="search-icon">🔍</span>
+                <input id="courseSearch" class="search-bar" type="search" placeholder="Search by name, ID, or faculty…" style="margin:0">
+            </div>
+        </div>
+
+        <div class="card-panel">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>COURSE NAME / ID</th>
+                        <th>ASSIGNED FACULTY</th>
+                        <th>DEPARTMENT</th>
+                        <th>ENROLLMENT</th>
+                        <th>ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody id="courseTableBody">
+                    <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- COURSE MODAL -->
+<div class="modal-overlay" id="courseModal">
+    <div class="modal">
+        <h2 id="courseModalTitle">Add Course</h2>
+        <form id="courseForm" onsubmit="event.preventDefault(); saveCourse();">
+            <div class="form-group" style="margin-top: 20px; display: flex; align-items: center; gap: 20px; background: rgba(0,0,0,0.02); padding: 20px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);">
+                <img id="modalThumbPreview" src="" style="width: 100px; height: 100px; border-radius: 12px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                <div>
+                    <label style="margin: 0;">Course Artwork</label>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">Each course is assigned unique artwork upon creation.</p>
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="margin-top: 10px; display: block;">Course ID</label>
+                <input type="text" id="courseId" placeholder="e.g. CS101">
+            </div>
+            <div class="form-group">
+                <label>Course Name</label>
+                <input type="text" id="courseName" placeholder="e.g. Data Structures">
+            </div>
+            <div class="form-group">
+                <label>Department</label>
+                <select id="courseDeptSelect">
+                    <option value="">Select Department</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Assign Faculty</label>
+                <select id="courseFaculty">
+                    <option value="">Select Faculty</option>
+                </select>
+            </div>
+            <div id="deptEnrollmentOption" class="form-group" style="display: flex; align-items: center; gap: 10px; background: rgba(139, 92, 246, 0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.1);">
+                <input type="checkbox" id="autoEnrollDept" style="width: auto; margin: 0; cursor: pointer;">
+                <label for="autoEnrollDept" style="margin: 0; cursor: pointer; color: #4c1d95; text-transform: none; font-weight: 600;">Auto-enroll all students in this department</label>
+            </div>
+            <div class="modal-footer" style="padding-top: 20px;">
+                <button type="button" class="btn-outline" onclick="closeCourseModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Course</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ASSIGNMENT MODAL -->
+<div class="modal-overlay" id="assignModal">
+    <div class="modal" style="width: 500px;">
+        <h2 id="assignCourseTitle">Assign Students</h2>
+        <input type="hidden" id="assignCourseId">
+        <p class="subtitle" style="margin-bottom: 20px;">Select students to enroll in this course.</p>
+        
+        <div class="student-list" id="studentSelectContainer">
+            <!-- Populated via JS -->
+        </div>
+
+        <div class="modal-footer" style="padding-top:20px; border-top:1px solid #e2e8f0; margin-top:20px;">
+            <button type="button" class="btn-outline" onclick="closeAssignModal()">Cancel</button>
+            <button type="button" class="btn-primary" onclick="saveAssignments()">Save Enrollments</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { initSuperuserCourses, saveCourse, openAddCourse, openEditCourse, openAssignStudents, saveAssignments, closeCourseModal, closeAssignModal } from '../../js/features/superuser-courses.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = requireAuth();
+        if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+        
+        document.getElementById('userName').textContent = user.name;
+        const roleEl = document.getElementById('userRole');
+        if (roleEl) roleEl.textContent = 'Super User';
+        
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+
+        await initSuperuserCourses();
+
+        window.openAddCourse = openAddCourse;
+        window.openEditCourse = openEditCourse;
+        window.openAssignStudents = openAssignStudents;
+        window.saveCourse = saveCourse;
+        window.saveAssignments = saveAssignments;
+        window.closeCourseModal = closeCourseModal;
+        window.closeAssignModal = closeAssignModal;
+    });
+</script>
+</body>
+</html>

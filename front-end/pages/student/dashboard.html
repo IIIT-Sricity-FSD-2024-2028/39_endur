@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,6 +30,7 @@
             position: relative;
             overflow: hidden;
         }
+
         .progress-hero::before {
             content: '';
             position: absolute;
@@ -36,16 +38,53 @@
             right: -50px;
             width: 200px;
             height: 200px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 50%;
         }
-        .hero-content h2 { font-size: 1.8rem; margin-bottom: 8px; font-weight: 800; }
-        .hero-content p { opacity: 0.9; font-size: 1rem; }
-        .hero-visual { text-align: right; min-width: 200px; }
-        .progress-circle-container { position: relative; width: 100px; height: 100px; margin-left: auto; }
-        .progress-svg { transform: rotate(-90deg); width: 100px; height: 100px; }
-        .progress-bg { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 8; }
-        .progress-bar { fill: none; stroke: white; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
+
+        .hero-content h2 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+
+        .hero-content p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .hero-visual {
+            text-align: right;
+            min-width: 200px;
+        }
+
+        .progress-circle-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin-left: auto;
+        }
+
+        .progress-svg {
+            transform: rotate(-90deg);
+            width: 100px;
+            height: 100px;
+        }
+
+        .progress-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.2);
+            stroke-width: 8;
+        }
+
+        .progress-bar {
+            fill: none;
+            stroke: white;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease-out;
+        }
+
         .progress-text {
             position: absolute;
             top: 50%;
@@ -56,6 +95,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="dashboard-layout">
 
@@ -87,9 +127,10 @@
 
         <!-- MAIN -->
         <main class="dashboard-content">
-            
+
             <!-- GLOBAL CYCLE BANNER -->
-            <div id="cycleStatusBanner" style="display: none; padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px;"></div>
+            <div id="cycleStatusBanner"
+                style="display: none; padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px;"></div>
 
             <h1 id="welcomeText" class="animate-in"></h1>
             <p class="subtitle animate-in delay-1">Here is what's happening with your academic feedback today.</p>
@@ -104,7 +145,8 @@
                     <div class="progress-circle-container">
                         <svg class="progress-svg">
                             <circle class="progress-bg" cx="50" cy="50" r="40"></circle>
-                            <circle class="progress-bar" id="heroProgressBar" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+                            <circle class="progress-bar" id="heroProgressBar" cx="50" cy="50" r="40"
+                                stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
                         </svg>
                         <div class="progress-text" id="heroProgressPercent">0%</div>
                     </div>
@@ -146,7 +188,7 @@
             </table>
 
             <div id="emptyDashboard" class="empty-state" style="display:none">
-                <p>No courses found 🎉</p>
+                <p>No active courses or feedback history available right now.</p>
             </div>
         </main>
     </div>
@@ -174,4 +216,5 @@
         updateStats();
     </script>
 </body>
+
 </html>

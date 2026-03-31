@@ -10,6 +10,7 @@ export async function renderSuperuserUsers() {
     users = JSON.parse(localStorage.getItem("systemUsers")) || [];
 
     renderUsersTable();
+    populateDeptSelect();
     bindSearch();
     bindUserForm();
     updateUserCount();
@@ -46,6 +47,15 @@ function renderUsersTable(filter = '') {
                 </div>
             </td>
         </tr>
+    `).join('');
+}
+
+function populateDeptSelect() {
+    const select = document.getElementById('userDept');
+    if (!select) return;
+    const depts = [...new Set(users.map(u => u.department || u.dept).filter(Boolean))].sort();
+    select.innerHTML = '<option value="">Select department…</option>' + depts.map(d => `
+        <option value="${d}">${d}</option>
     `).join('');
 }
 

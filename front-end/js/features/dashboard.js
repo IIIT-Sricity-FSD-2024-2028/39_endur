@@ -1,8 +1,12 @@
 import { get } from "../core/storage.js";
 
 async function getCourses() {
+    const stored = localStorage.getItem("systemCourses");
+    if (stored) return JSON.parse(stored);
+
     const res = await fetch("../../js/mock-data/courses.json");
-    return await res.json();
+    const courses = await res.json();
+    return courses;
 }
 
 // FIX: Now requires currentCycleId to differentiate between semesters
@@ -57,7 +61,7 @@ export async function updateDashboard() {
     if (table) table.innerHTML = "";
 
     const myCourses = allCourses.filter(c => user.enrolledCourses && user.enrolledCourses.includes(c.id));
-    
+
     // Always append the Endur Meta-Review as a mandatory feedback object for the active cycle
     myCourses.push({
         id: "reviewOfReviews",
@@ -65,10 +69,12 @@ export async function updateDashboard() {
     });
 
     myCourses.forEach(course => {
-        // Pass currentCycleId to check status
         const status = getStatus(course.id, user.id, currentCycleId);
-        let actionHtml = "";
 
+        // CYCLE-AWARE FILTER: If feedback closed, only show completed items in history
+        if (!isFeedbackOpen && (status === "pending" || status === "progress")) return;
+
+        let actionHtml = "";
         if (status === "completed") {
             actionHtml = `<button class="btn-small btn-outline" onclick="window.location.href='feedback-history.html'">View</button>`;
         } else {
@@ -80,11 +86,17 @@ export async function updateDashboard() {
         }
 
         if (table) {
+            // Priority: systemCourses > course.thumbnail > fallback
+            const thumb = course.id === "reviewOfReviews" ? 'img_bookclub.jpg' : (course.thumbnail || 'img_read.jpg');
+
             table.innerHTML += `
             <tr data-course="${course.id}">
-                <td>
-                    <strong>${course.name}</strong><br>
-                    <span class="sub-text">${course.id}</span>
+                <td style="display:flex; align-items:center; gap:12px;">
+                    <img src="../../assets/images/${thumb}" style="width:36px; height:36px; border-radius:6px; object-fit:cover;">
+                    <div>
+                        <strong>${course.name}</strong><br>
+                        <span class="sub-text">${course.id}</span>
+                    </div>
                 </td>
                 <td>
                     <span class="badge ${status}">${statusLabel(status)}</span>
@@ -130,7 +142,7 @@ export async function updateStats() {
         if (cycleState.phase === "STUDENT_FEEDBACK" && myCourses.length > 0) {
             hero.style.display = "flex";
             const percent = Math.round((completed / myCourses.length) * 100);
-            
+
             const titleEl = document.getElementById("heroProgressTitle");
             const subEl = document.getElementById("heroProgressSub");
             const percentEl = document.getElementById("heroProgressPercent");
@@ -148,7 +160,7 @@ export async function updateStats() {
             }
 
             if (percentEl) percentEl.innerText = `${percent}%`;
-            
+
             if (barEl) {
                 const radius = 40;
                 const circumference = 2 * Math.PI * radius;

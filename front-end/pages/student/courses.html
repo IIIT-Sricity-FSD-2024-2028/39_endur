@@ -78,21 +78,34 @@
             // Get user's enrolled courses array
             const myCourseIds = user.enrolledCourses || [];
 
+            // Unified Data Fix: Fetch course details from global systemCourses for the thumbnail
+            const systemCourses = JSON.parse(localStorage.getItem("systemCourses")) || [];
+            
             // Filter by "standard" AND check if the student is actually enrolled
-            allCourses
-                .filter(c => c.type === "standard" && myCourseIds.includes(c.id))
+            const enrollmentList = systemCourses.length > 0 ? systemCourses : allCourses;
+
+            enrollmentList
+                .filter(c => myCourseIds.includes(c.id))
                 .forEach(course => {
+                    // Constant: Sync icons with dashboard.js
+                    const thumb = course.id === "reviewOfReviews" ? 'img_bookclub.jpg' : (course.thumbnail || 'img_read.jpg');
+                    
                     grid.innerHTML += `
-                        <div class="course-card ${course.color}">
-                            <span class="tag">${course.department || "COURSE"}</span>
-                            <h3>${course.id}: ${course.name}</h3>
-                            <p>${course.faculty}</p>
+                        <div class="course-card" style="padding:0; overflow:hidden; border:1px solid var(--glass-border); background:var(--surface);">
+                            <div class="card-image" style="height:140px; width:100%; position:relative;">
+                                <img src="../../assets/images/${thumb}" style="width:100%; height:100%; object-fit:cover;">
+                                <span class="tag" style="position:absolute; top:12px; left:12px; margin:0;">${course.department || "COURSE"}</span>
+                            </div>
+                            <div style="padding:20px;">
+                                <h3 style="margin-bottom:8px; font-size:1.1rem;">${course.id}: ${course.name}</h3>
+                                <p style="color:var(--text-muted); font-size:0.9rem;">${course.faculty}</p>
+                            </div>
                         </div>
                     `;
                 });
 
             if (grid.innerHTML === "") {
-                grid.innerHTML = "<p>You are not enrolled in any standard courses.</p>";
+                grid.innerHTML = "<p style='color:var(--text-muted); padding: 20px;'>No enrolled courses found for this semester.</p>";
             }
         }
     </script>

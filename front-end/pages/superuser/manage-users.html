@@ -33,6 +33,7 @@
         <nav class="sidebar-menu">
             <a href="dashboard.html">📊 Dashboard</a>
             <a class="active" href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-courses.html">📚 Manage Courses</a>
             <a href="manage-cycles.html">🔄 Feedback Cycles</a>
             <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
             <a href="audit-logs.html">📋 Audit Logs</a>
@@ -135,7 +136,9 @@
                 </div>
                 <div class="form-group">
                     <label for="userDept">Department</label>
-                    <input type="text" id="userDept" name="userDept" placeholder="e.g. Computer Science">
+                    <select id="userDept" name="userDept">
+                        <option value="">Select department…</option>
+                    </select>
                     <span class="field-error"></span>
                 </div>
             </div>
