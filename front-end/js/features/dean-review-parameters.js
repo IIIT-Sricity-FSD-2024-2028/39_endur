@@ -42,6 +42,28 @@ export function initReview() {
     }
 
     document.getElementById("totalWeight").innerText = `${total}%`;
+    const approveBtn = document.querySelector('button[onclick="approveConfig()"]');
+    const warningEl = document.getElementById("weightWarning");
+
+    if (total !== 100) {
+        document.getElementById("totalWeight").style.color = "var(--danger)";
+        if (approveBtn) {
+            approveBtn.disabled = true;
+            approveBtn.style.opacity = "0.5";
+            approveBtn.title = `Total weightage must be 100% (currently ${total}%)`;
+        }
+        if (warningEl) {
+            warningEl.style.display = "block";
+            warningEl.innerText = `⚠️ Total weightage is ${total}%. It must be exactly 100% before approval.`;
+        }
+    } else {
+        document.getElementById("totalWeight").style.color = "var(--primary)";
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.style.opacity = "1";
+        }
+        if (warningEl) warningEl.style.display = "none";
+    }
 }
 
 export function approveConfig() {

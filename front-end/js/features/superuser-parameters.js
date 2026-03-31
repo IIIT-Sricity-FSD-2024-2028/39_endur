@@ -14,9 +14,12 @@ export async function renderSuperuserParameters() {
     const finals = get("activeParameters") || {};
     statuses = get("departmentConfigStatus") || {};
 
-    // Merge for SU view (favor draft if submitted)
+    // Get all unique departments from system users
+    const users = get("systemUsers") || [];
+    const allDepts = [...new Set(users.map(u => u.department || u.dept).filter(Boolean))].sort();
+
+    // Merge for SU view
     deptConfigs = {};
-    const allDepts = new Set([...Object.keys(drafts), ...Object.keys(finals)]);
     allDepts.forEach(d => {
         deptConfigs[d] = drafts[d] || finals[d] || [];
     });
@@ -53,12 +56,18 @@ function renderParamsTable(filter = '') {
         const displayStatus = p.status === 'SUBMITTED' ? 'IN REVIEW' : (p.status === 'APPROVED' ? 'APPROVED' : 'DRAFT');
         const badgeClass = p.status === 'APPROVED' ? 'success' : (p.status === 'SUBMITTED' ? 'warning' : 'neutral');
 
+        const deptParams = p.department ? (deptConfigs[p.department] || []) : [];
+        const totalWeight = deptParams.reduce((sum, item) => sum + (item.weight || 0), 0);
+        const weightStatus = totalWeight === 100 ? '✅ 100%' : `⚠️ ${totalWeight}%`;
+        const weightColor = totalWeight === 100 ? 'var(--success)' : 'var(--danger)';
+
         return `
         <tr>
             <td>
                 <strong>${p.name}</strong><br>
                 <small style="color:var(--text-muted);font-size:0.8rem">${p.desc || p.description || ''}</small><br>
                 <span style="font-size:0.7rem; color:var(--primary); font-weight:600;">${p.department}</span>
+                <span style="font-size:0.7rem; color:${weightColor}; font-weight:700; margin-left:8px;">(${weightStatus})</span>
             </td>
             <td>${p.weight > 0 ? `<strong>${p.weight}%</strong>` : '—'}</td>
             <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
@@ -153,7 +162,15 @@ window.approveDeptParams = (dept) => {
     let allDrafts = get("draftParameters") || {};
     let allActive = get("activeParameters") || {};
 
-    allActive[dept] = allDrafts[dept];
+    const deptParams = allDrafts[dept] || [];
+    const totalWeight = deptParams.reduce((sum, p) => sum + (p.weight || 0), 0);
+
+    if (totalWeight !== 100) {
+        showToast(`Cannot approve ${dept}. Total weightage is ${totalWeight}% but must be 100%.`, "error");
+        return;
+    }
+
+    allActive[dept] = deptParams;
     allStatuses[dept] = 'APPROVED';
 
     set("activeParameters", allActive);

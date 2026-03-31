@@ -3,6 +3,12 @@ import { getSession } from "../core/session.js";
 import { appendAuditLog } from "./admin-utils.js";
 
 const PHASES = ["PREPARATION", "STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"];
+const DEFAULT_PARAMETERS = [
+    { id: "clarity", name: "Clarity of Explanation", desc: "Effectiveness of teaching methods and clear delivery.", weight: 25 },
+    { id: "structure", name: "Structure of Course", desc: "Organization of materials and syllabus adherence.", weight: 25 },
+    { id: "engagement", name: "Student Engagement", desc: "Fostering an interactive and responsive environment.", weight: 25 },
+    { id: "difficulty", name: "Difficulty Level", desc: "Appropriateness of the coursework difficulty.", weight: 25 }
+];
 
 export function initCycleManagement() {
     renderCycleTracker();
@@ -146,17 +152,28 @@ export function createNewCycle() {
     // ==========================================
     // CYCLE INHERITANCE FIX
     // ==========================================
-    // Grab the parameters that were active in the previous cycle
+    // Grab current parameters and statuses
     const previousActiveParams = get("activeParameters") || {};
-
-    // Copy them over to be the new drafts, and pre-approve them
-    set("draftParameters", previousActiveParams);
-
+    const users = get("systemUsers") || [];
+    const allDepts = [...new Set(users.map(u => u.department || u.dept).filter(Boolean))];
+    
+    let newDrafts = {};
     let newStatuses = {};
-    Object.keys(previousActiveParams).forEach(dept => {
-        newStatuses[dept] = "DRAFT"; // Seamless rollover
+
+    allDepts.forEach(dept => {
+        const existing = previousActiveParams[dept] || [];
+        const sum = existing.reduce((s, p) => s + (p.weight || 0), 0);
+        
+        if (existing.length > 0 && sum === 100) {
+            newDrafts[dept] = existing;
+            newStatuses[dept] = "APPROVED"; // Carry over if valid
+        } else {
+            newDrafts[dept] = JSON.parse(JSON.stringify(DEFAULT_PARAMETERS));
+            newStatuses[dept] = "DRAFT"; // Force HODs to review defaults
+        }
     });
 
+    set("draftParameters", newDrafts);
     set("departmentConfigStatus", newStatuses);
     set("departmentConfigNotes", {});
 
@@ -254,22 +271,35 @@ export function advanceCyclePhase() {
 
     if (currentIndex === 0) {
         let statuses = get("departmentConfigStatus") || {};
-        const pending = Object.values(statuses).some(s => s === "SUBMITTED" || s === "REVISION_REQUESTED");
+        let drafts = get("draftParameters") || {};
+        const users = get("systemUsers") || [];
+        const allDepts = [...new Set(users.map(u => u.department || u.dept).filter(Boolean))];
 
-        if (pending) {
-            const force = confirm("Warning: Some departments have unapproved parameters. Launching now will force them to use default parameters. Continue?");
-            if (!force) return;
+        const failingDepts = [];
+        allDepts.forEach(dept => {
+            const params = drafts[dept] || [];
+            const sum = params.reduce((s, p) => s + (p.weight || 0), 0);
+            if (sum !== 100) failingDepts.push(`${dept} (${sum}%)`);
+        });
+
+        if (failingDepts.length > 0) {
+            alert(`⚠️ LAUNCH ABORTED: The following departments do not have exactly 100% total weightage:\n\n${failingDepts.join('\n')}\n\nPlease fix these configurations in the Evaluation Parameters review section first.`);
+            return;
         }
 
-        let allDrafts = get("draftParameters") || {};
-        let activeParams = {};
+        const pendingReview = Object.values(statuses).some(s => s === "SUBMITTED" || s === "REVISION_REQUESTED");
+        if (pendingReview) {
+            const confirmLaunch = confirm("Note: Some departments are'Pending Review'. Launching now will finalize their current 100% configurations. Continue?");
+            if (!confirmLaunch) return;
+        }
 
-        Object.keys(allDrafts).forEach(dept => {
-            if (statuses[dept] === "APPROVED") {
-                activeParams[dept] = allDrafts[dept];
-            }
-        });
+        let activeParams = {};
+        allDepts.forEach(dept => { activeParams[dept] = drafts[dept]; });
         set("activeParameters", activeParams);
+        
+        let newStatuses = {};
+        allDepts.forEach(dept => { newStatuses[dept] = "APPROVED"; });
+        set("departmentConfigStatus", newStatuses);
 
         const d = new Date();
         d.setDate(d.getDate() + 7);

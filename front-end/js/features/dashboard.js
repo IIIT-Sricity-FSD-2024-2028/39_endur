@@ -126,9 +126,20 @@ export async function updateStats() {
     myCourses.forEach(course => {
         const status = getStatus(course.id, user.id, cycleState.id);
         if (status === "completed") completed++;
-        else if (status === "progress") progress++;
-        else pending++;
+        else if (status === "progress") {
+            if (cycleState.phase === "STUDENT_FEEDBACK") progress++;
+            else completed++; // If it was in progress but cycle ended, it's effectively 'not done' but not actionable
+        }
+        else {
+            if (cycleState.phase === "STUDENT_FEEDBACK") pending++;
+        }
     });
+
+    // If cycle not open, pending/progress should be 0 from a task perspective
+    if (cycleState.phase !== "STUDENT_FEEDBACK") {
+        pending = 0;
+        progress = 0;
+    }
 
     // Render Stats
     if (document.getElementById("statCompleted")) document.getElementById("statCompleted").innerText = completed;
