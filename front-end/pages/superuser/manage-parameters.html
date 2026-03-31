@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluation Parameters — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
+        .btn-danger-soft { color:var(--danger); border-color:rgba(239,68,68,0.3); }
+        .btn-danger-soft:hover { background:rgba(239,68,68,0.08); border-color:var(--danger); }
+        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a class="active" href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+            <a href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+            <div>
+                <h1>Evaluation Parameters</h1>
+                <p class="subtitle">Define, activate, and manage feedback evaluation criteria across all departments.</p>
+            </div>
+            <span class="badge primary">SUPER USER</span>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+            <div class="stat-card"><p>Total Parameters</p><h2 id="statTotalParams">—</h2></div>
+            <div class="stat-card"><p>Active Parameters</p><h2 id="statActiveParams">—</h2></div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="page-actions">
+            <input id="paramSearch" class="search-bar" type="search" placeholder="Search parameters…" style="margin:0">
+            <button class="btn-primary" onclick="openAddParam()">+ Add Parameter</button>
+        </div>
+
+        <!-- TABLE -->
+        <div class="card-panel">
+            <table class="data-table" style="border:none;border-radius:0">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Weight</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="paramsTableBody">
+                    <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Loading parameters…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- ADD/EDIT PARAM MODAL -->
+<div class="modal-overlay" id="paramModal">
+    <div class="modal-card">
+        <h3>
+            <span id="paramModalTitle">Add Evaluation Parameter</span>
+            <button class="modal-close" onclick="closeParamModal()">✕</button>
+        </h3>
+        <form id="paramForm" novalidate>
+            <div class="form-group">
+                <label for="paramName">Parameter Name</label>
+                <input type="text" id="paramName" name="paramName" placeholder="e.g. Teaching Clarity">
+                <span class="field-error"></span>
+            </div>
+            <div class="form-group">
+                <label for="paramDesc">Description</label>
+                <textarea id="paramDesc" name="paramDesc" rows="2" style="height:70px" placeholder="Brief description of what this measures…"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="paramType">Type</label>
+                    <select id="paramType" name="paramType">
+                        <option value="rating">Rating (1–5)</option>
+                        <option value="text">Open-Ended Text</option>
+                        <option value="yesno">Yes / No</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="paramWeight">Weight (%)</label>
+                    <input type="number" id="paramWeight" name="paramWeight" min="0" max="100" value="0" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="paramStatus">Status</label>
+                    <select id="paramStatus" name="paramStatus">
+                        <option value="active">Active</option>
+                        <option value="draft">Draft</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="paramDepts">Departments (comma-separated)</label>
+                <input type="text" id="paramDepts" name="paramDepts" placeholder="e.g. Computer Science, AI, Mathematics">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeParamModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Parameter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-card confirm-dialog">
+        <h3>Delete Parameter <button class="modal-close" onclick="closeDeleteModal()">✕</button></h3>
+        <p>Permanently delete <strong id="deleteItemName"></strong>? This cannot be undone.</p>
+        <div class="modal-footer">
+            <button class="btn-outline" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-danger" id="confirmDeleteBtn">Delete Permanently</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { renderSuperuserParameters } from '../../js/features/superuser-parameters.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = requireAuth();
+        if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+        document.getElementById('userName').textContent = user.name;
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+        await renderSuperuserParameters();
+    });
+
+    document.querySelectorAll('.modal-overlay').forEach(o => {
+        o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); });
+    });
+</script>
+</body>
+</html>

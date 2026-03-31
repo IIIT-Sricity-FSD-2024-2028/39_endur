@@ -5,9 +5,23 @@ async function loginUser(event) {
     const password = document.getElementById("password").value;
 
     try {
-        // Fetch from root directory path
-        const response = await fetch("./js/mock-data/users.json");
-        const users = await response.json();
+        // Initialize simulated database in local storage if missing
+        if (!localStorage.getItem("systemUsers")) {
+            const [usersRes, cyclesRes, paramsRes, logsRes] = await Promise.all([
+                fetch("./js/mock-data/users.json"),
+                fetch("./js/mock-data/feedbackCycles.json"),
+                fetch("./js/mock-data/evaluationParameters.json"),
+                fetch("./js/mock-data/auditLogs.json")
+            ]);
+            
+            localStorage.setItem("systemUsers", JSON.stringify(await usersRes.json()));
+            localStorage.setItem("systemFeedbackCycles", JSON.stringify(await cyclesRes.json()));
+            localStorage.setItem("systemEvalParams", JSON.stringify(await paramsRes.json()));
+            localStorage.setItem("systemLogs", JSON.stringify(await logsRes.json()));
+        }
+
+        // Fetch users from our simulated database
+        const users = JSON.parse(localStorage.getItem("systemUsers"));
 
         // Find user by ID and Password
         const user = users.find(u => u.id === id && u.password === password);

@@ -10,7 +10,8 @@
 
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/layout.css">
-<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/components/button.css">
+<link rel="stylesheet" href="css/components/card.css">
 <link rel="stylesheet" href="css/pages/login.css">
 
 </head>
@@ -38,10 +39,12 @@ Return to Home
 </header>
 
 
-
-<section class="login-wrapper">
-
-
+<section class="login-wrapper" style="position:relative;background:transparent;min-height:calc(100vh - 80px);overflow:hidden;">
+    <div class="video-background" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:-2;overflow:hidden;background:#0f172a;">
+        <video autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;opacity:0.4;">
+            <source src="assets/video/hero-video.mp4" type="video/mp4">
+        </video>
+    </div>
 <div class="login-card">
 
 

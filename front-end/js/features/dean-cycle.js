@@ -1,14 +1,33 @@
 import { get, set } from "../core/storage.js";
+import { getSession } from "../core/session.js";
+import { appendAuditLog } from "./admin-utils.js";
 
 const PHASES = ["PREPARATION", "STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"];
 
 export function initCycleManagement() {
     renderCycleTracker();
     renderApprovalQueue();
+    renderHistory();
 }
 
 function renderCycleTracker() {
-    let cycleObj = get("systemCycleState");
+    let rawCycles = get("systemFeedbackCycles") || [];
+    let cycles = rawCycles.map(c => ({
+        ...c,
+        phase: c.phase || (c.status === "active" ? "STUDENT_FEEDBACK" : "COMPLETED")
+    }));
+
+    // Save enriched objects back so everyone is in sync
+    set("systemFeedbackCycles", cycles);
+
+    let cycleObj = cycles.find(c => c.status === "active");
+
+    // Sync legacy systemCycleState for compatibility with other roles
+    if (cycleObj) {
+        set("systemCycleState", { id: cycleObj.cycleName, phase: cycleObj.phase });
+    } else {
+        set("systemCycleState", { phase: "COMPLETED" });
+    }
 
     const createSection = document.getElementById("createCycleSection");
     const activeCard = document.getElementById("activeCycleCard");
@@ -33,7 +52,7 @@ function renderCycleTracker() {
     activeCard.style.display = "block";
     const currentPhaseIndex = PHASES.indexOf(cycleObj.phase);
 
-    document.getElementById("currentCycleName").innerText = cycleObj.id;
+    document.getElementById("currentCycleName").innerText = cycleObj.cycleName || cycleObj.id;
 
     PHASES.forEach((phase, index) => {
         const stepEl = document.getElementById(`step_${phase}`);
@@ -51,8 +70,27 @@ function renderCycleTracker() {
     const desc = document.getElementById("currentCycleDesc");
     const deadlineText = document.getElementById("deadlineText");
 
-    badge.innerText = cycleObj.phase.replace("_", " ");
+    const phaseString = cycleObj.phase ? cycleObj.phase.replace(/_/g, " ") : "UNKNOWN";
+    badge.innerText = phaseString;
     deadlineText.innerText = "";
+
+    // Fill specific phase dates if available
+    function formatDateShort(iso) {
+        if (!iso) return '';
+        return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    const dPrep = document.getElementById("date_PREPARATION");
+    if (dPrep) dPrep.innerText = cycleObj.prepDeadline ? `Ends: ${formatDateShort(cycleObj.prepDeadline)}` : '';
+
+    const dStud = document.getElementById("date_STUDENT_FEEDBACK");
+    if (dStud) dStud.innerText = cycleObj.studentDeadline ? `Ends: ${formatDateShort(cycleObj.studentDeadline)}` : '';
+
+    const dRef = document.getElementById("date_FACULTY_REFLECTION");
+    if (dRef) dRef.innerText = cycleObj.reflectionDeadline ? `Ends: ${formatDateShort(cycleObj.reflectionDeadline)}` : '';
+
+    const dComp = document.getElementById("date_COMPLETED");
+    if (dComp) dComp.innerText = cycleObj.endTimestamp && cycleObj.phase === 'COMPLETED' ? `Ended: ${formatDateShort(cycleObj.endTimestamp)}` : '';
 
     if (cycleObj.phase === "PREPARATION") {
         badge.className = "badge neutral";
@@ -84,8 +122,18 @@ function renderCycleTracker() {
 
 export function createNewCycle() {
     const nameInput = document.getElementById("newCycleName").value.trim();
-    if (!nameInput) {
-        alert("Please enter a name for the new feedback cycle.");
+    const prep = document.getElementById("dlPrep").value;
+    const student = document.getElementById("dlStudent").value;
+    const ref = document.getElementById("dlReflection").value;
+
+    if (!nameInput || !prep || !student || !ref) {
+        alert("Please enter a name and select all deadlines for the new feedback cycle.");
+        return;
+    }
+
+    const dPrep = new Date(prep), dStudent = new Date(student), dRef = new Date(ref);
+    if (dPrep >= dStudent || dStudent >= dRef) {
+        alert('Deadlines must be chronological (Prep -> Student -> Reflection).');
         return;
     }
 
@@ -112,27 +160,39 @@ export function createNewCycle() {
     set("departmentConfigStatus", newStatuses);
     set("departmentConfigNotes", {});
 
-    let cyclesArray = get("feedbackCycles") || [];
-    cyclesArray.forEach(c => c.status = "completed");
-    cyclesArray.push({
-        cycleId: nameInput,
+    let cyclesArray = get("systemFeedbackCycles") || [];
+    cyclesArray.forEach(c => c.status = "closed");
+    cyclesArray.unshift({
+        cycleId: 'CYCLE' + Date.now().toString(36).toUpperCase(),
+        cycleName: nameInput,
+        type: 'weekly',
         status: "active",
-        endTimestamp: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        phase: "PREPARATION",
+        startTimestamp: new Date().toISOString(),
+        endTimestamp: dRef.toISOString(),
+        prepDeadline: dPrep.toISOString(),
+        studentDeadline: dStudent.toISOString(),
+        reflectionDeadline: dRef.toISOString()
     });
-    set("feedbackCycles", cyclesArray);
+    set("systemFeedbackCycles", cyclesArray);
 
-    cycleObj = {
+    const session = getSession();
+    if (session) appendAuditLog(session, 'dean', 'CREATE', 'Feedback Cycles', nameInput, 'Dean initialized new feedback cycle.');
+
+    set("systemCycleState", {
         id: nameInput,
         phase: "PREPARATION",
-        studentDeadline: null,
-        reflectionDeadline: null
-    };
-    set("systemCycleState", cycleObj);
+        prepDeadline: dPrep.toISOString(),
+        studentDeadline: dStudent.toISOString(),
+        reflectionDeadline: dRef.toISOString()
+    });
 
-    document.getElementById("newCycleName").value = "";
+    document.getElementById("createCycleForm").reset();
+    document.getElementById('createCycleSection').style.display = 'none';
 
     renderCycleTracker();
     renderApprovalQueue();
+    renderHistory();
 }
 
 function renderApprovalQueue() {
@@ -228,6 +288,53 @@ export function advanceCyclePhase() {
     if (currentIndex < PHASES.length - 1) {
         cycleObj.phase = PHASES[currentIndex + 1];
         set("systemCycleState", cycleObj);
+
+        let rawCycles = get("systemFeedbackCycles") || [];
+        let cycles = rawCycles.map(c => ({
+            ...c,
+            phase: c.phase || (c.status === "active" ? "STUDENT_FEEDBACK" : "COMPLETED")
+        }));
+
+        let active = cycles.find(c => c.status === "active");
+        if (active) {
+            active.phase = cycleObj.phase;
+            if (active.phase === "COMPLETED") active.status = "closed";
+            set("systemFeedbackCycles", cycles);
+        }
+
+        const session = getSession();
+        if (session) {
+            let logMsg = active && active.phase === "COMPLETED" ? "Cycle successfully completed and archived." : `Phase advanced to ${cycleObj.phase.replace(/_/g, " ")}.`;
+            appendAuditLog(session, 'dean', 'UPDATE', 'Feedback Cycles', cycleObj.id || 'Active Cycle', logMsg);
+        }
+
         renderCycleTracker();
+        renderHistory();
     }
+}
+
+function renderHistory() {
+    const listContainer = document.getElementById("cycleHistoryContainer");
+    if (!listContainer) return; // if div is missing, skip
+
+    let cyclesArray = get("systemFeedbackCycles") || [];
+    if (!cyclesArray.length) {
+        listContainer.innerHTML = '<p style="padding: 20px 0; color: #64748b; font-style: italic;">No cycle history found.</p>';
+        return;
+    }
+
+    listContainer.innerHTML = cyclesArray.map(c => {
+        return `
+        <div class="approval-row">
+            <div>
+                <strong style="color: #0f172a; font-size: 14px;">${c.cycleName || c.cycleId}</strong>
+            </div>
+            <div>
+                <span class="badge ${c.status === 'active' ? 'success' : 'neutral'}" style="font-size: 10px;">${(c.status || '').toUpperCase()}</span>
+            </div>
+            <div style="text-align: right;">
+                <span style="color: #64748b; font-size: 12px;">${c.status === 'active' ? 'IN PROGRESS' : 'ARCHIVED'}</span>
+            </div>
+        </div>`;
+    }).join('');
 }

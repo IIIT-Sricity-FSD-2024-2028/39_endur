@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Pending Feedbacks</title>
@@ -14,6 +15,7 @@
     <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
+
 <body>
     <div class="dashboard-layout">
 
@@ -45,9 +47,10 @@
         <main class="dashboard-content">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
                 <h1>Pending Feedbacks</h1>
-                <span id="cycleBadge" class="badge neutral" style="font-size: 11px; text-transform: uppercase;">LOADING...</span>
+                <span id="cycleBadge" class="badge neutral"
+                    style="font-size: 11px; text-transform: uppercase;">LOADING...</span>
             </div>
-            
+
             <p id="pageSubtitle" class="subtitle">Complete feedback cycles assigned to you.</p>
             <div id="pendingContainer" class="feedback-list"></div>
 
@@ -112,6 +115,13 @@
             }
 
             const myCourses = allCourses.filter(c => myCourseIds.includes(c.id));
+            
+            myCourses.push({
+                id: "reviewOfReviews",
+                name: "Platform System Review",
+                type: "review",
+                color: "green"
+            });
 
             myCourses.forEach(course => {
                 const done = submitted.find(
@@ -153,4 +163,5 @@
         }
     </script>
 </body>
+
 </html>

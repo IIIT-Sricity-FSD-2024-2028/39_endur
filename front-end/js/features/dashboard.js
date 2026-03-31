@@ -57,6 +57,12 @@ export async function updateDashboard() {
     if (table) table.innerHTML = "";
 
     const myCourses = allCourses.filter(c => user.enrolledCourses && user.enrolledCourses.includes(c.id));
+    
+    // Always append the Endur Meta-Review as a mandatory feedback object for the active cycle
+    myCourses.push({
+        id: "reviewOfReviews",
+        name: "Platform System Review (Review of Reviews)"
+    });
 
     myCourses.forEach(course => {
         // Pass currentCycleId to check status
@@ -100,6 +106,7 @@ export async function updateStats() {
     const cycleState = get("systemCycleState") || { id: "FALLBACK_CYCLE" };
 
     const myCourses = allCourses.filter(c => user.enrolledCourses && user.enrolledCourses.includes(c.id));
+    myCourses.push({ id: "reviewOfReviews", name: "Platform System Review (Review of Reviews)" });
 
     let completed = 0, progress = 0, pending = 0;
 

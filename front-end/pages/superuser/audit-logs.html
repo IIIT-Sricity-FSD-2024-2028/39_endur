@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
+        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+        .filter-row { display:flex; gap:var(--space-2); flex-wrap:wrap; margin-bottom:var(--space-3); align-items:center; }
+        .filter-row select { padding:10px 14px; border-radius:var(--radius-md); border:1.5px solid var(--glass-border); background:var(--surface); backdrop-filter:var(--glass-blur); color:var(--text-main); font-size:0.9rem; cursor:pointer; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a class="active" href="audit-logs.html">📋 Audit Logs</a>
+            <a href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+            <div>
+                <h1>Audit Logs</h1>
+                <p class="subtitle">Full system audit trail — all actions across all roles and modules.</p>
+            </div>
+            <span class="badge primary">SUPER USER</span>
+        </div>
+
+        <!-- FILTERS -->
+        <div class="filter-row">
+            <select id="filterRole">
+                <option value="">All Roles</option>
+                <option value="superuser">Super User</option>
+                <option value="admin">Admin</option>
+                <option value="dean">Dean</option>
+                <option value="hod">HOD</option>
+                <option value="faculty">Faculty</option>
+            </select>
+            <select id="filterAction">
+                <option value="">All Actions</option>
+                <option value="CREATE">CREATE</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+                <option value="APPROVE">APPROVE</option>
+            </select>
+        </div>
+
+        <!-- TABLE -->
+        <div class="card-panel">
+            <table class="data-table" style="border:none;border-radius:0">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Actor</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                        <th>Module</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                    <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">Loading audit logs…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { renderAuditView } from '../../js/features/audit-viewer.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = requireAuth();
+        if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+        document.getElementById('userName').textContent = user.name;
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+        await renderAuditView();
+    });
+</script>
+</body>
+</html>

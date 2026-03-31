@@ -199,24 +199,12 @@
 
 
 
-        <div class="profile-card">
-
-            <h3>
-
-                Additional Suggestions
-
-            </h3>
-
-
-            <textarea placeholder="Suggestions to improve the feedback system..."></textarea>
-
-
-        </div>
+        <textarea id="commentBox" placeholder="Suggestions to improve the feedback system..."></textarea>
 
 
 
 
-        <button class="btn-primary submit-btn review-btn" onclick="submitReviewOfReviews()">
+        <button class="btn-primary" onclick="submitReviewOfReviews()">
 
             Submit Evaluation
 
@@ -228,68 +216,57 @@
 
 
 
-    <script src="../../js/core/session.js"></script>
-
-    <script src="../../js/features/feedback-form.js"></script>
-
-    <script>
-
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        
         requireAuth();
 
+        window.ratings = {};
 
-        function submitReviewOfReviews() {
+        window.setRating = function(field, value) {
+            window.ratings[field] = value;
+            const stars = document.querySelectorAll(`[onclick*="'${field}'"]`);
+            stars.forEach((star, index) => {
+                star.classList.toggle("active", index < value);
+            });
+        };
 
-            if (Object.keys(ratings).length < 4) {
-
-                alert(
-                    "Please answer all questions before submitting."
-                );
-
+        window.submitReviewOfReviews = function() {
+            if (Object.keys(window.ratings).length < 4) {
+                alert("Please answer all questions before submitting.");
                 return;
-
             }
 
-
             const data = {
-
                 type: "reviewOfReviews",
-
-                ratings,
-
+                ratings: window.ratings,
                 date: new Date().toISOString()
-
             };
 
-
-            let stored =
-                JSON.parse(
-                    localStorage.getItem("reviewOfReviews")
-                ) || [];
-
-
+            // 1. Store the actual review blob
+            let stored = JSON.parse(localStorage.getItem("reviewOfReviews")) || [];
             stored.push(data);
+            localStorage.setItem("reviewOfReviews", JSON.stringify(stored));
 
+            // 2. Register it as completed feedback in the current cycle so dashboard updates
+            const user = JSON.parse(localStorage.getItem("endurSession"));
+            const cycleState = JSON.parse(localStorage.getItem("systemCycleState")) || { id: "FALLBACK" };
+            let submitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
+            
+            submitted.push({
+                course: "reviewOfReviews",
+                userId: user ? user.id : "UNKNOWN",
+                cycleId: cycleState.id,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem("submittedFeedback", JSON.stringify(submitted));
 
-            localStorage.setItem(
+            window.location.href = "feedback-success.html";
+        };
 
-                "reviewOfReviews",
-
-                JSON.stringify(stored)
-
-            );
-
-
-            window.location.href =
-                "feedback-success.html";
-
-        }
-
-
-        function goBack() {
-
+        window.goBack = function() {
             window.history.back();
-
-        }
+        };
 
     </script>
 

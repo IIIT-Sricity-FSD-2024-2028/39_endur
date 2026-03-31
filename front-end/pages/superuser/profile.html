@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile & Settings — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/profile.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
+        .sidebar-user.active { background:var(--primary-light); border-color:var(--primary); }
+        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+
+        /* Settings row — same pattern as dean/HOD/faculty */
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-row strong { font-weight: 600; color: var(--text-main); }
+        .settings-row p { color: var(--text-muted); font-size: 0.875rem; margin-top: 2px; }
+
+        /* Toggle switch */
+        .switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+        .switch input { opacity:0; width:0; height:0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#e2e8f0; transition:.4s; border-radius:24px; }
+        .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; transition:.4s; border-radius:50%; }
+        input:checked + .slider { background:#16a34a; }
+        input:checked + .slider:before { transform:translateX(20px); }
+
+        /* Big avatar on profile */
+        .profile-avatar-section {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            margin-bottom: var(--space-5);
+            padding: var(--space-4);
+            background: var(--surface);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-glass);
+        }
+        .profile-avatar-large {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.75rem;
+            font-weight: 800;
+            box-shadow: 0 8px 24px rgba(30,58,138,0.35);
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+            <a href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user active">
+            <div id="avatar" class="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:var(--space-3)">
+            <div>
+                <h1>Profile & Settings</h1>
+                <p class="subtitle">Manage your Super User account and preferences.</p>
+            </div>
+            <span class="badge primary">SUPER USER</span>
+        </div>
+
+        <!-- HERO AVATAR CARD -->
+        <div class="profile-avatar-section">
+            <div class="profile-avatar-large" id="avatarLarge"></div>
+            <div>
+                <h2 id="heroName" style="font-size:1.4rem"></h2>
+                <p id="heroRole" style="color:var(--text-muted);font-size:0.9rem;margin-top:4px"></p>
+                <span class="badge primary" style="margin-top:8px;display:inline-block">SUPER USER</span>
+            </div>
+        </div>
+
+        <!-- PERSONAL INFO -->
+        <div class="profile-card">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#1e3a8a">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <h3 style="margin:0">Personal Information</h3>
+            </div>
+            <div class="profile-grid">
+                <div>
+                    <label>Full Name</label>
+                    <p id="profileName" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
+                </div>
+                <div>
+                    <label>User ID</label>
+                    <p id="profileId" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
+                </div>
+                <div>
+                    <label>Email Address</label>
+                    <p id="profileEmail" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
+                </div>
+                <div>
+                    <label>Department</label>
+                    <p id="profileDept" style="font-size:1rem;font-weight:600;color:var(--text-main)">—</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div class="profile-card">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#1e3a8a">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <h3 style="margin:0">Notification Preferences</h3>
+            </div>
+            <div class="settings-row">
+                <strong>Email Notifications</strong>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+            </div>
+            <div class="settings-row">
+                <strong>System Alert Emails</strong>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+            </div>
+            <div class="settings-row">
+                <strong>Audit Summary Reports</strong>
+                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+            </div>
+        </div>
+
+        <!-- ACCOUNT ACTIONS -->
+        <div class="profile-card">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#1e3a8a">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <h3 style="margin:0">Account Actions</h3>
+            </div>
+
+            <div class="settings-row">
+                <div>
+                    <strong>System Settings</strong>
+                    <p>Configure global platform behaviour and institutional settings.</p>
+                </div>
+                <a href="system-settings.html" class="btn-outline">Open Settings</a>
+            </div>
+
+            <div class="settings-row">
+                <div>
+                    <strong>View Audit Logs</strong>
+                    <p>Full system-wide audit trail of all actions.</p>
+                </div>
+                <a href="audit-logs.html" class="btn-outline">View Logs</a>
+            </div>
+
+            <div class="settings-row">
+                <div>
+                    <strong>Log Out</strong>
+                    <p>Ends your Super User session.</p>
+                </div>
+                <button class="btn-danger" onclick="logout()">Log Out</button>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { initProfile } from '../../js/features/profile.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const user = requireAuth();
+        if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+
+        // Sidebar
+        document.getElementById('userName').textContent = user.name;
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+
+        // Hero
+        const initials = user.name.split(' ').map(n => n[0]).join('');
+        document.getElementById('avatarLarge').textContent = initials;
+        document.getElementById('heroName').textContent = user.name;
+        document.getElementById('heroRole').textContent = `${user.department} · Super User`;
+
+        // Info grid
+        document.getElementById('profileName').textContent = user.name;
+        document.getElementById('profileId').textContent = user.id;
+        document.getElementById('profileDept').textContent = user.department || '—';
+        document.getElementById('profileEmail').textContent = user.email || `${user.id.toLowerCase()}@endur.edu`;
+
+        window.logout = () => {
+            localStorage.removeItem('endurSession');
+            window.location.href = '../../login.html';
+        };
+    });
+</script>
+</body>
+</html>

@@ -158,12 +158,5 @@
     "type": "standard",
     "color": "blue",
     "enrolled": 5
-  },
-  {
-    "id": "reviewOfReviews1",
-    "name": "Feedback System Evaluation (Mid-Sem)",
-    "type": "review",
-    "color": "purple",
-    "enrolled": 7
   }
 ]

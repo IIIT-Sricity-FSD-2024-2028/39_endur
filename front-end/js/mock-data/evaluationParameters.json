@@ -1,0 +1,98 @@
+[
+  {
+    "id": "EP001",
+    "name": "Teaching Clarity",
+    "description": "Measures how clearly the faculty explains concepts and course material.",
+    "category": "Pedagogy",
+    "weight": 25,
+    "type": "rating",
+    "status": "active",
+    "departments": ["Computer Science", "Mathematics", "Electronics", "AI", "Humanities"],
+    "createdBy": "SU001",
+    "createdAt": "2025-08-01T00:00:00Z"
+  },
+  {
+    "id": "EP002",
+    "name": "Student Engagement",
+    "description": "Evaluates whether faculty actively engages students during lectures.",
+    "category": "Interaction",
+    "weight": 20,
+    "type": "rating",
+    "status": "active",
+    "departments": ["Computer Science", "Mathematics", "Electronics", "AI", "Humanities"],
+    "createdBy": "SU001",
+    "createdAt": "2025-08-01T00:00:00Z"
+  },
+  {
+    "id": "EP003",
+    "name": "Course Material Quality",
+    "description": "Quality and relevance of course materials, slides, and resources.",
+    "category": "Content",
+    "weight": 20,
+    "type": "rating",
+    "status": "active",
+    "departments": ["Computer Science", "Mathematics", "Electronics", "AI"],
+    "createdBy": "A401",
+    "createdAt": "2025-08-10T00:00:00Z"
+  },
+  {
+    "id": "EP004",
+    "name": "Assessment Fairness",
+    "description": "Whether exams and assignments are fair and aligned with taught content.",
+    "category": "Assessment",
+    "weight": 20,
+    "type": "rating",
+    "status": "active",
+    "departments": ["Computer Science", "Mathematics", "Electronics", "AI", "Humanities"],
+    "createdBy": "A401",
+    "createdAt": "2025-08-10T00:00:00Z"
+  },
+  {
+    "id": "EP005",
+    "name": "Availability & Responsiveness",
+    "description": "Accessibility of faculty outside class for doubts and guidance.",
+    "category": "Support",
+    "weight": 15,
+    "type": "rating",
+    "status": "active",
+    "departments": ["Computer Science", "Mathematics", "Electronics", "AI", "Humanities"],
+    "createdBy": "SU001",
+    "createdAt": "2025-08-01T00:00:00Z"
+  },
+  {
+    "id": "EP006",
+    "name": "Open-Ended Feedback",
+    "description": "Free-form student comments on overall experience with the course.",
+    "category": "Qualitative",
+    "weight": 0,
+    "type": "text",
+    "status": "active",
+    "departments": ["Computer Science", "Mathematics", "Electronics", "AI", "Humanities"],
+    "createdBy": "SU001",
+    "createdAt": "2025-08-01T00:00:00Z"
+  },
+  {
+    "id": "EP007",
+    "name": "Practical Application",
+    "description": "Degree to which the faculty connects theory to real-world applications.",
+    "category": "Pedagogy",
+    "weight": 10,
+    "type": "rating",
+    "status": "draft",
+    "departments": ["Computer Science", "AI"],
+    "createdBy": "A401",
+    "createdAt": "2026-02-15T00:00:00Z"
+  },
+  {
+    "id": "EP008",
+    "name": "Lab & Practicum Quality",
+    "description": "Effectiveness of lab sessions and hands-on components.",
+    "category": "Content",
+    "weight": 15,
+    "type": "rating",
+    "status": "draft",
+    "departments": ["Electronics"],
+    "createdBy": "A401",
+    "createdAt": "2026-02-20T00:00:00Z"
+  }
+]

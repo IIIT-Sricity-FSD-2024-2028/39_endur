@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
+        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+        .settings-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:var(--space-4); }
+        .settings-card { background:var(--surface); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-border); border-radius:var(--radius-lg); padding:var(--space-4); box-shadow:var(--shadow-glass); }
+        .settings-card h3 { font-size:1rem; margin-bottom:var(--space-3); padding-bottom:12px; border-bottom:1px solid var(--glass-border); }
+        .setting-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.2); }
+        .setting-row:last-child { border-bottom:none; }
+        .setting-label { font-size:0.9rem; font-weight:500; }
+        .setting-value { font-size:0.875rem; color:var(--text-muted); }
+        .toggle { width:44px; height:24px; background:#e2e8f0; border-radius:12px; position:relative; cursor:pointer; transition:background 0.2s; border:none; }
+        .toggle.on { background:var(--accent); }
+        .toggle::after { content:''; position:absolute; width:18px; height:18px; background:white; border-radius:50%; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+        .toggle.on::after { transform:translateX(20px); }
+        .settings-input { padding:8px 12px; border:1.5px solid var(--glass-border); border-radius:var(--radius-md); background:rgba(255,255,255,0.4); font-size:0.9rem; color:var(--text-main); transition:all var(--transition-fast); min-width:160px; }
+        .settings-input:focus { outline:none; border-color:var(--primary); background:rgba(255,255,255,0.8); }
+        .save-section { margin-top:var(--space-4); text-align:right; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+            <a class="active" href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+            <div>
+                <h1>System Settings</h1>
+                <p class="subtitle">Platform-wide configuration and institutional settings.</p>
+            </div>
+            <span class="badge primary">SUPER USER</span>
+        </div>
+
+        <div class="settings-grid">
+
+            <!-- INSTITUTION -->
+            <div class="settings-card">
+                <h3>🏛️ Institution Configuration</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Institution Name</span>
+                    <input id="settingInstName" class="settings-input" type="text" value="IIIT Sricity">
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Academic Year</span>
+                    <input id="settingAcadYear" class="settings-input" type="text" value="2025–2026">
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Current Semester</span>
+                    <select id="settingSemester" class="settings-input">
+                        <option selected>Odd Semester</option>
+                        <option>Even Semester</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Timezone</span>
+                    <select id="settingTimezone" class="settings-input">
+                        <option selected>Asia/Kolkata (IST)</option>
+                        <option>UTC</option>
+                        <option>America/New_York</option>
+                    </select>
+                </div>
+                <div class="save-section">
+                    <button class="btn-primary" onclick="saveSettings('institution')">Save Changes</button>
+                </div>
+            </div>
+
+            <!-- FEEDBACK CONFIG -->
+            <div class="settings-card">
+                <h3>📝 Feedback Configuration</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Anonymous Feedback</span>
+                    <button class="toggle on" id="toggleAnon" onclick="toggleSetting(this)" aria-label="Toggle anonymous feedback"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Allow Late Submissions</span>
+                    <button class="toggle" id="toggleLate" onclick="toggleSetting(this)" aria-label="Toggle late submissions"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Auto-close Cycles</span>
+                    <button class="toggle on" id="toggleAutoClose" onclick="toggleSetting(this)" aria-label="Toggle auto-close cycles"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Min. Responses to Reveal</span>
+                    <input id="settingMinResp" class="settings-input" type="number" value="5" min="1" max="50" style="width:80px">
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Rating Scale</span>
+                    <select id="settingScale" class="settings-input">
+                        <option selected>1 – 5</option>
+                        <option>1 – 10</option>
+                        <option>1 – 4</option>
+                    </select>
+                </div>
+                <div class="save-section">
+                    <button class="btn-primary" onclick="saveSettings('feedback')">Save Changes</button>
+                </div>
+            </div>
+
+            <!-- ACCESS & SECURITY -->
+            <div class="settings-card">
+                <h3>🔐 Access & Security</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Session Timeout</span>
+                    <select id="settingTimeout" class="settings-input">
+                        <option>30 minutes</option>
+                        <option selected>1 hour</option>
+                        <option>4 hours</option>
+                        <option>24 hours</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Two-Factor Auth</span>
+                    <button class="toggle" id="toggle2FA" onclick="toggleSetting(this)" aria-label="Toggle 2FA"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Allowed Email Domain</span>
+                    <input id="settingDomain" class="settings-input" type="text" value="@iiits.in">
+                </div>
+                <div class="save-section">
+                    <button class="btn-primary" onclick="saveSettings('security')">Save Changes</button>
+                </div>
+            </div>
+
+            <!-- NOTIFICATIONS -->
+            <div class="settings-card">
+                <h3>🔔 Notifications & Reports</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Email Reports to Dean</span>
+                    <button class="toggle on" id="toggleDeanEmail" onclick="toggleSetting(this)" aria-label="Toggle dean email"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Email Reports to HOD</span>
+                    <button class="toggle on" id="toggleHodEmail" onclick="toggleSetting(this)" aria-label="Toggle HOD email"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Cycle Deadline Reminders</span>
+                    <button class="toggle on" id="toggleReminders" onclick="toggleSetting(this)" aria-label="Toggle reminders"></button>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Reminder Lead Time</span>
+                    <select id="settingLeadTime" class="settings-input">
+                        <option>24 hours</option>
+                        <option selected>48 hours</option>
+                        <option>72 hours</option>
+                    </select>
+                </div>
+                <div class="save-section">
+                    <button class="btn-primary" onclick="saveSettings('notifications')">Save Changes</button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<div id="toastContainer"></div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { showToast } from '../../js/features/admin-utils.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const user = requireAuth();
+        if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+        document.getElementById('userName').textContent = user.name;
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+    });
+
+    window.toggleSetting = function(btn) {
+        btn.classList.toggle('on');
+    };
+
+    window.saveSettings = function(section) {
+        const labels = {
+            institution: 'Institution settings',
+            feedback: 'Feedback configuration',
+            security: 'Security settings',
+            notifications: 'Notification preferences'
+        };
+        showToast(`${labels[section] || 'Settings'} saved successfully.`, 'success');
+    };
+</script>
+</body>
+</html>
