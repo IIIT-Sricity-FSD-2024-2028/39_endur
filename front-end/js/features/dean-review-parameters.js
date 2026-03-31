@@ -1,4 +1,6 @@
 import { get, set } from "../core/storage.js";
+import { getSession } from "../core/session.js";
+import { appendAuditLog } from "../features/admin-utils.js";
 
 let targetDept = null;
 
@@ -49,6 +51,10 @@ export function approveConfig() {
     statuses[targetDept] = "APPROVED";
     set("departmentConfigStatus", statuses);
     
+    // Audit Log
+    const session = getSession();
+    appendAuditLog(session, 'dean', 'APPROVE', 'Parameters', `${targetDept} Config`, `Parameter configuration approved by Dean.`);
+
     alert(`Configuration for ${targetDept} has been approved.`);
     window.location.href = "cycle-management.html";
 }
@@ -71,6 +77,10 @@ export function requestRevision() {
     set("departmentConfigStatus", statuses);
     set("departmentConfigNotes", notes);
     
+    // Audit Log
+    const session = getSession();
+    appendAuditLog(session, 'dean', 'REVISE', 'Parameters', `${targetDept} Config`, `Revision requested for ${targetDept} parameters.`);
+
     alert(`Revision requested. Notes sent to ${targetDept} HOD.`);
     window.location.href = "cycle-management.html";
 }

@@ -201,7 +201,7 @@
         const user = requireAuth();
         if(!user) return;
 
-        document.getElementById("userName").innerText = `HOD`;
+        document.getElementById("userName").innerText = user.name;
         document.getElementById("userDept").innerText = user.department;
         document.getElementById("displayDeptName").innerText = user.department;
         const avatarEl = document.getElementById("avatar");

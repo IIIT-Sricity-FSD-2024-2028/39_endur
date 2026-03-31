@@ -203,7 +203,7 @@
         const user = requireAuth();
         if(!user) return;
 
-        document.getElementById("userName").innerText = `HOD`;
+        document.getElementById("userName").innerText = user.name;
         document.getElementById("userDept").innerText = user.department;
         const avatarEl = document.getElementById("avatar");
         if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");

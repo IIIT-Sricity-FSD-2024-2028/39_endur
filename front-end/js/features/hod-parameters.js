@@ -189,10 +189,10 @@ function renderAll(params, status = "DRAFT") {
             if(isCycleActive || isCycleCompleted) {
                 finalizeBtn.innerText = "Locked";
             } else {
-                finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "Submitted";
+                finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "In Review";
                 
-                // Add Edit Again button for stuck states during PREPARATION
-                if(status === "APPROVED" || status === "SUBMITTED") {
+                // Only allow "Edit Again" if REVISION_REQUESTED or if APPROVED (not while SUBMITTED/IN REVIEW)
+                if(status === "APPROVED" || status === "REVISION_REQUESTED") {
                     let unlockBtn = document.getElementById("unlockDraftBtn");
                     if(!unlockBtn) {
                         unlockBtn = document.createElement("button");
@@ -203,6 +203,10 @@ function renderAll(params, status = "DRAFT") {
                         unlockBtn.onclick = () => window.revertToDraft();
                         finalizeBtn.parentNode.insertBefore(unlockBtn, finalizeBtn.nextSibling);
                     }
+                } else if (status === "SUBMITTED") {
+                    // Force remove Edit Again if it existed
+                    const ex = document.getElementById("unlockDraftBtn");
+                    if(ex) ex.remove();
                 }
             }
         }
@@ -408,6 +412,12 @@ export function saveParameter() {
     allDrafts[user.department] = deptParams;
     set("draftParameters", allDrafts);
     
+    // Audit Log
+    const session = getSession();
+    import('./admin-utils.js').then(utils => {
+        utils.appendAuditLog(session, 'hod', editingParamId ? 'UPDATE' : 'CREATE', 'Parameters', name, `Parameter ${editingParamId ? 'updated' : 'created'} by HOD.`);
+    });
+
     closeParamModal();
     renderAll(deptParams, "DRAFT");
 }
@@ -428,6 +438,12 @@ export function finalizeConfig() {
     let statuses = get("departmentConfigStatus") || {};
     statuses[user.department] = "SUBMITTED";
     set("departmentConfigStatus", statuses);
+
+    // Audit Log
+    const session = getSession();
+    import('./admin-utils.js').then(utils => {
+        utils.appendAuditLog(session, 'hod', 'SUBMIT', 'Parameters', `${user.department} Config`, 'Parameter configuration submitted for review.');
+    });
 
     renderAll(deptParams, "SUBMITTED");
     alert("✅ Success! Your department's Evaluation Parameters have been submitted to the Dean for review.");

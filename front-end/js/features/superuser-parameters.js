@@ -1,14 +1,25 @@
-import { showToast, formatDate, genId, appendAuditLog } from './admin-utils.js';
+import { showToast, genId, appendAuditLog } from './admin-utils.js';
+import { get, set } from '../core/storage.js';
 
-let params = [];
+let deptConfigs = {}; // { deptName: [params] }
+let statuses = {};    // { deptName: 'DRAFT'|'SUBMITTED'|'APPROVED' }
 let session = null;
 
 export async function renderSuperuserParameters() {
     const sessionRaw = localStorage.getItem('endurSession');
     session = sessionRaw ? JSON.parse(sessionRaw) : null;
 
-    const res = await fetch('../../js/mock-data/evaluationParameters.json');
-    params = await res.json();
+    // Load from HOD source of truth
+    const drafts = get("draftParameters") || {};
+    const finals = get("activeParameters") || {};
+    statuses = get("departmentConfigStatus") || {};
+
+    // Merge for SU view (favor draft if submitted)
+    deptConfigs = {};
+    const allDepts = new Set([...Object.keys(drafts), ...Object.keys(finals)]);
+    allDepts.forEach(d => {
+        deptConfigs[d] = drafts[d] || finals[d] || [];
+    });
 
     renderParamsTable();
     bindParamForm();
@@ -20,31 +31,45 @@ function renderParamsTable(filter = '') {
     const tbody = document.getElementById('paramsTableBody');
     if (!tbody) return;
 
+    let flatList = [];
+    Object.entries(deptConfigs).forEach(([dept, params]) => {
+        params.forEach(p => {
+            flatList.push({ ...p, department: dept, status: statuses[dept] || 'DRAFT' });
+        });
+    });
+
     const list = filter
-        ? params.filter(p =>
+        ? flatList.filter(p =>
             p.name.toLowerCase().includes(filter) ||
-            p.status.toLowerCase().includes(filter))
-        : params;
+            p.department.toLowerCase().includes(filter))
+        : flatList;
 
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">No parameters found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">No parameters found.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = list.map(p => `
+    tbody.innerHTML = list.map(p => {
+        const displayStatus = p.status === 'SUBMITTED' ? 'IN REVIEW' : (p.status === 'APPROVED' ? 'APPROVED' : 'DRAFT');
+        const badgeClass = p.status === 'APPROVED' ? 'success' : (p.status === 'SUBMITTED' ? 'warning' : 'neutral');
+
+        return `
         <tr>
-            <td><strong>${p.name}</strong><br><small style="color:var(--text-muted);font-size:0.8rem">${p.description}</small></td>
-            <td><span class="badge neutral">${p.type}</span></td>
+            <td>
+                <strong>${p.name}</strong><br>
+                <small style="color:var(--text-muted);font-size:0.8rem">${p.desc || p.description || ''}</small><br>
+                <span style="font-size:0.7rem; color:var(--primary); font-weight:600;">${p.department}</span>
+            </td>
             <td>${p.weight > 0 ? `<strong>${p.weight}%</strong>` : '—'}</td>
-            <td><span class="badge ${p.status === 'active' ? 'success' : 'warning'}">${p.status}</span></td>
+            <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
             <td>
                 <div style="display:flex;gap:8px;">
-                    <button class="btn-small" onclick="openEditParam('${p.id}')">Edit</button>
-                    <button class="btn-small btn-danger-soft" onclick="confirmDeleteParam('${p.id}')">Delete</button>
+                    <button class="btn-small" onclick="openEditParam('${p.id}', '${p.department}')">Edit</button>
+                    ${p.status === 'SUBMITTED' ? `<button class="btn-small btn-primary" style="padding:4px 8px; font-size:11px;" onclick="approveDeptParams('${p.department}')">Approve Dept</button>` : ''}
                 </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function bindSearch() {
@@ -60,97 +85,86 @@ function bindParamForm() {
         e.preventDefault();
 
         const name = form.paramName.value.trim();
-        const description = form.paramDesc.value.trim();
-        const type = form.paramType.value;
+        const desc = form.paramDesc.value.trim();
         const weight = parseInt(form.paramWeight.value) || 0;
-        const status = form.paramStatus.value;
-        const depts = form.paramDepts.value.split(',').map(d => d.trim()).filter(Boolean);
+        const deptStr = form.paramDepts.value.trim();
         const editId = form.dataset.editId;
+        const editDept = form.dataset.editDept;
 
-        const errs = [];
-        if (!name) errs.push('Parameter name is required.');
-
-        if (errs.length) { showToast(errs[0], 'error'); return; }
+        if (!name || !deptStr) { showToast('Name and Department are required.', 'error'); return; }
 
         const entry = {
-            id: editId || genId('EP'),
-            name, description, type, weight, status,
-            departments: depts,
-            createdBy: session?.id || 'SU001',
-            createdAt: editId ? (params.find(p => p.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString()
+            id: editId || genId('p'),
+            name, desc, weight
         };
 
-        if (editId) {
-            const idx = params.findIndex(p => p.id === editId);
-            if (idx > -1) params[idx] = entry;
-            appendAuditLog(session, 'superuser', 'UPDATE', 'Evaluation Parameters', `${entry.id} — ${name}`, 'Parameter details updated.');
-            showToast('Parameter updated.', 'success');
-        } else {
-            params.unshift(entry);
-            appendAuditLog(session, 'superuser', 'CREATE', 'Evaluation Parameters', `${entry.id} — ${name}`, `New ${type} parameter created.`);
-            showToast('Parameter created.', 'success');
-        }
-        localStorage.setItem("systemEvalParams", JSON.stringify(params));
+        let allDrafts = get("draftParameters") || {};
+        if (!allDrafts[deptStr]) allDrafts[deptStr] = [];
 
-        renderParamsTable();
-        updateParamCount();
+        if (editId && editDept === deptStr) {
+            const idx = allDrafts[deptStr].findIndex(p => p.id === editId);
+            if (idx > -1) allDrafts[deptStr][idx] = entry;
+        } else {
+            allDrafts[deptStr].unshift(entry);
+        }
+
+        set("draftParameters", allDrafts);
+        appendAuditLog(session, 'superuser', 'UPDATE', 'Parameters', `${deptStr} — ${name}`, 'Parameter details modified by Superuser.');
+        showToast('Parameter saved to drafts.', 'success');
+        
+        renderSuperuserParameters();
         closeParamModal();
     });
 }
 
 function updateParamCount() {
-    const el = document.getElementById('statTotalParams');
-    if (el) el.textContent = params.length;
-    const el2 = document.getElementById('statActiveParams');
-    if (el2) el2.textContent = params.filter(p => p.status === 'active').length;
-}
+    let total = 0;
+    let active = 0;
+    Object.values(deptConfigs).forEach(ps => total += ps.length);
+    Object.entries(statuses).forEach(([d, s]) => { if(s === 'APPROVED') active += (deptConfigs[d]?.length || 0); });
 
-function closeParamModal() {
-    document.getElementById('paramModal')?.classList.remove('active');
-    const form = document.getElementById('paramForm');
-    if (form) { form.reset(); delete form.dataset.editId; }
-    const title = document.getElementById('paramModalTitle');
-    if (title) title.textContent = 'Add Evaluation Parameter';
+    if (document.getElementById('statTotalParams')) document.getElementById('statTotalParams').textContent = total;
+    if (document.getElementById('statActiveParams')) document.getElementById('statActiveParams').textContent = active;
 }
 
 window.openAddParam = () => {
     const form = document.getElementById('paramForm');
-    if (form) { form.reset(); delete form.dataset.editId; }
+    if (form) { form.reset(); delete form.dataset.editId; delete form.dataset.editDept; }
     document.getElementById('paramModal')?.classList.add('active');
 };
 
-window.openEditParam = (id) => {
-    const p = params.find(p => p.id === id);
+window.openEditParam = (id, dept) => {
+    const p = (deptConfigs[dept] || []).find(p => p.id === id);
     if (!p) return;
     const form = document.getElementById('paramForm');
     if (!form) return;
     form.paramName.value = p.name;
-    form.paramDesc.value = p.description || '';
-    form.paramType.value = p.type;
+    form.paramDesc.value = p.desc || p.description || '';
     form.paramWeight.value = p.weight;
-    form.paramStatus.value = p.status;
-    form.paramDepts.value = (p.departments || []).join(', ');
+    form.paramDepts.value = dept;
     form.dataset.editId = id;
-    const title = document.getElementById('paramModalTitle');
-    if (title) title.textContent = 'Edit Evaluation Parameter';
+    form.dataset.editDept = dept;
+    document.getElementById('paramModalTitle').textContent = 'Edit Parameter';
     document.getElementById('paramModal')?.classList.add('active');
 };
 
-window.confirmDeleteParam = (id) => {
-    const p = params.find(p => p.id === id);
-    if (!p) return;
-    document.getElementById('deleteItemName').textContent = p.name;
-    document.getElementById('confirmDeleteBtn').onclick = () => {
-        params = params.filter(p => p.id !== id);
-        localStorage.setItem("systemEvalParams", JSON.stringify(params));
-        appendAuditLog(session, 'superuser', 'DELETE', 'Evaluation Parameters', `${id} — ${p.name}`, 'Parameter removed.');
-        showToast(`Parameter "${p.name}" deleted.`, 'info');
-        renderParamsTable();
-        updateParamCount();
-        document.getElementById('deleteModal')?.classList.remove('active');
-    };
-    document.getElementById('deleteModal')?.classList.add('active');
+window.approveDeptParams = (dept) => {
+    let allStatuses = get("departmentConfigStatus") || {};
+    let allDrafts = get("draftParameters") || {};
+    let allActive = get("activeParameters") || {};
+
+    allActive[dept] = allDrafts[dept];
+    allStatuses[dept] = 'APPROVED';
+
+    set("activeParameters", allActive);
+    set("departmentConfigStatus", allStatuses);
+
+    appendAuditLog(session, 'superuser', 'APPROVE', 'Parameters', `${dept} Configuration`, 'Department evaluation parameters approved.');
+    showToast(`${dept} parameters approved!`, 'success');
+    renderSuperuserParameters();
 };
 
-window.closeParamModal = closeParamModal;
+window.closeParamModal = () => {
+    document.getElementById('paramModal')?.classList.remove('active');
+};
 window.closeDeleteModal = () => document.getElementById('deleteModal')?.classList.remove('active');

@@ -12,11 +12,15 @@ export async function renderHodDashboard() {
     const allUsers = await usersRes.json();
     const allCourses = await coursesRes.json();
     
-    // CYCLE FIX: Filter data for the active cycle
+    // If no active cycle is found in state, try to find the latest one from submissions
     const cycleState = get("systemCycleState") || { id: "SETUP" };
-    const activeCycleId = cycleState.id;
-
+    let activeCycleId = cycleState.id;
     const allSubmissions = get("submittedFeedback") || [];
+    
+    if (activeCycleId === "SETUP" && allSubmissions.length > 0) {
+        activeCycleId = allSubmissions[allSubmissions.length - 1].cycleId;
+    }
+
     const allActionReports = get("actionReports") || [];
     
     const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
@@ -53,30 +57,17 @@ export async function renderHodDashboard() {
     document.getElementById("deptResponseRate").innerText = `${responseRate.toFixed(1)}%`;
     document.getElementById("respProgressBar").style.width = `${Math.min(responseRate, 100)}%`;
 
-    // Calculate Pending / Flagged Actions
+    // Calculate Pending Actions
     let pendingCheckins = 0;
-    let flaggedCount = 0;
 
     myFaculty.forEach(faculty => {
         const fCourses = deptCourses.filter(c => c.facultyId === faculty.id);
         fCourses.forEach(course => {
-            const courseFeedback = deptFeedback.filter(f => f.course === course.id);
-            let courseScore = 0, cCount = 0;
-            courseFeedback.forEach(f => {
-                if (f.ratings) Object.values(f.ratings).forEach(val => {
-                    if (typeof val === 'number') { courseScore += val; cCount++; }
-                });
-            });
-            const cAvg = cCount > 0 ? courseScore / cCount : 0;
-            
-            if (cAvg > 0 && cAvg < 3.5) flaggedCount++; // Below threshold
-            
             const actionReport = actionReports.find(a => a.facultyId === faculty.id && a.courseId === course.id);
             if (actionReport && actionReport.status === "SUBMITTED") pendingCheckins++;
         });
     });
 
-    document.getElementById("flaggedCount").innerText = flaggedCount;
     document.getElementById("pendingCheckins").innerText = pendingCheckins;
 
     // Populate Faculty Quick Table

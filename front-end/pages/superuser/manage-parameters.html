@@ -72,7 +72,6 @@
                 <thead>
                     <tr>
                         <th>Parameter</th>
-                        <th>Type</th>
                         <th>Weight</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -105,16 +104,6 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="paramType">Type</label>
-                    <select id="paramType" name="paramType">
-                        <option value="rating">Rating (1–5)</option>
-                        <option value="text">Open-Ended Text</option>
-                        <option value="yesno">Yes / No</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
                     <label for="paramWeight">Weight (%)</label>
                     <input type="number" id="paramWeight" name="paramWeight" min="0" max="100" value="0" placeholder="0">
                 </div>
@@ -127,8 +116,8 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="paramDepts">Departments (comma-separated)</label>
-                <input type="text" id="paramDepts" name="paramDepts" placeholder="e.g. Computer Science, AI, Mathematics">
+                <label for="paramDepts">Department (Exact Name)</label>
+                <input type="text" id="paramDepts" name="paramDepts" placeholder="e.g. Computer Science">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-outline" onclick="closeParamModal()">Cancel</button>
