@@ -153,6 +153,8 @@
             const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
             const idx = users.findIndex(u => u.id === user.id);
             if (idx !== -1) { users[idx].password = nw; localStorage.setItem("systemUsers", JSON.stringify(users)); }
+
+        logAction("UPDATE", "Profile", "Password updated successfully");
             msg.textContent = "Password updated successfully!"; msg.className = "pw-msg success";
             ["pwCurrent","pwNew","pwConfirm"].forEach(id => document.getElementById(id).value = "");
         };

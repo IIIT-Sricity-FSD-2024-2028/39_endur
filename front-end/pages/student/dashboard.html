@@ -15,6 +15,46 @@
     <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/components/stats.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .progress-hero {
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            border-radius: var(--radius-xl);
+            padding: 32px;
+            color: white;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 20px 25px -5px rgba(79, 70, 229, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-hero::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+        .hero-content h2 { font-size: 1.8rem; margin-bottom: 8px; font-weight: 800; }
+        .hero-content p { opacity: 0.9; font-size: 1rem; }
+        .hero-visual { text-align: right; min-width: 200px; }
+        .progress-circle-container { position: relative; width: 100px; height: 100px; margin-left: auto; }
+        .progress-svg { transform: rotate(-90deg); width: 100px; height: 100px; }
+        .progress-bg { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 8; }
+        .progress-bar { fill: none; stroke: white; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -51,30 +91,47 @@
             <!-- GLOBAL CYCLE BANNER -->
             <div id="cycleStatusBanner" style="display: none; padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px;"></div>
 
-            <h1 id="welcomeText"></h1>
-            <p class="subtitle">Here is what's happening with your academic feedback today.</p>
+            <h1 id="welcomeText" class="animate-in"></h1>
+            <p class="subtitle animate-in delay-1">Here is what's happening with your academic feedback today.</p>
+
+            <!-- PROGRESS HERO -->
+            <div class="progress-hero animate-in delay-2" id="progressHero" style="display: none;">
+                <div class="hero-content">
+                    <h2 id="heroProgressTitle">You're almost there!</h2>
+                    <p id="heroProgressSub">Complete your remaining feedbacks to help improve campus quality.</p>
+                </div>
+                <div class="hero-visual">
+                    <div class="progress-circle-container">
+                        <svg class="progress-svg">
+                            <circle class="progress-bg" cx="50" cy="50" r="40"></circle>
+                            <circle class="progress-bar" id="heroProgressBar" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+                        </svg>
+                        <div class="progress-text" id="heroProgressPercent">0%</div>
+                    </div>
+                </div>
+            </div>
 
             <!-- STATS -->
-            <div class="stats-grid">
-                <div class="stat-card">
+            <div class="stats-grid animate-in delay-3">
+                <div class="stat-card animate-in delay-1">
                     <p>Completed</p>
                     <h2 id="statCompleted">0</h2>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-2">
                     <p>In Progress</p>
                     <h2 id="statProgress">0</h2>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-3">
                     <p>Pending</p>
                     <h2 id="statPending">0</h2>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-4">
                     <p>Total Courses</p>
                     <h2 id="statTotal">0</h2>
                 </div>
             </div>
 
-            <h2 class="section-title">Course Progress Overview</h2>
+            <h2 class="section-title animate-in delay-4">Course Progress Overview</h2>
 
             <table class="data-table">
                 <thead>

@@ -119,9 +119,11 @@ function loadDraft() {
     });
 }
 
+import { logAction } from "../core/audit.js";
+
 /* =========================
-SUBMIT
-========================= */
+   SUBMIT
+   ========================= */
 window.submitFeedback = async function () {
     if (Object.keys(ratings).length < currentQuestions.length) {
         alert(`Please answer all ${currentQuestions.length} questions before submitting.`);
@@ -145,7 +147,7 @@ window.submitFeedback = async function () {
 
     let submitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
 
-    submitted.push({
+    const newFeedback = {
         responseId: "RESP_" + new Date().getTime(),
         userId: user.id,
         course: courseId,
@@ -156,7 +158,9 @@ window.submitFeedback = async function () {
         date: new Date().toISOString(),
         status: "processed",
         isValid: true
-    });
+    };
+
+    submitted.push(newFeedback);
 
     localStorage.setItem("submittedFeedback", JSON.stringify(submitted));
 
@@ -164,6 +168,7 @@ window.submitFeedback = async function () {
     if (drafts[user.id]) delete drafts[user.id][courseId];
     localStorage.setItem("feedbackDraft", JSON.stringify(drafts));
 
+    logAction("CREATE", "Feedback", `Submitted feedback for course ${courseId}`);
     window.location.href = "feedback-success.html";
 };
 

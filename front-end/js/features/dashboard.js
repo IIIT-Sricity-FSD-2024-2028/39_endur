@@ -106,6 +106,7 @@ export async function updateStats() {
     const cycleState = get("systemCycleState") || { id: "FALLBACK_CYCLE" };
 
     const myCourses = allCourses.filter(c => user.enrolledCourses && user.enrolledCourses.includes(c.id));
+    // Add meta-review to stats too
     myCourses.push({ id: "reviewOfReviews", name: "Platform System Review (Review of Reviews)" });
 
     let completed = 0, progress = 0, pending = 0;
@@ -117,17 +118,48 @@ export async function updateStats() {
         else pending++;
     });
 
-    const statComp = document.getElementById("statCompleted");
-    if (statComp) statComp.innerText = completed;
+    // Render Stats
+    if (document.getElementById("statCompleted")) document.getElementById("statCompleted").innerText = completed;
+    if (document.getElementById("statProgress")) document.getElementById("statProgress").innerText = progress;
+    if (document.getElementById("statPending")) document.getElementById("statPending").innerText = pending;
+    if (document.getElementById("statTotal")) document.getElementById("statTotal").innerText = myCourses.length;
 
-    const statProg = document.getElementById("statProgress");
-    if (statProg) statProg.innerText = progress;
+    // Render Progress Hero
+    const hero = document.getElementById("progressHero");
+    if (hero) {
+        if (cycleState.phase === "STUDENT_FEEDBACK" && myCourses.length > 0) {
+            hero.style.display = "flex";
+            const percent = Math.round((completed / myCourses.length) * 100);
+            
+            const titleEl = document.getElementById("heroProgressTitle");
+            const subEl = document.getElementById("heroProgressSub");
+            const percentEl = document.getElementById("heroProgressPercent");
+            const barEl = document.getElementById("heroProgressBar");
 
-    const statPend = document.getElementById("statPending");
-    if (statPend) statPend.innerText = pending;
+            if (percent === 100) {
+                titleEl.innerText = "All Done! 🎉";
+                subEl.innerText = "Thank you for completing all your feedbacks this cycle.";
+            } else if (percent > 50) {
+                titleEl.innerText = "You're getting there!";
+                subEl.innerText = `Just ${pending} more feedback${pending > 1 ? 's' : ''} to go. You've got this!`;
+            } else {
+                titleEl.innerText = "Welcome back!";
+                subEl.innerText = `You have ${pending} course evaluation${pending > 1 ? 's' : ''} waiting for you.`;
+            }
 
-    const statTot = document.getElementById("statTotal");
-    if (statTot) statTot.innerText = myCourses.length;
+            if (percentEl) percentEl.innerText = `${percent}%`;
+            
+            if (barEl) {
+                const radius = 40;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (percent / 100) * circumference;
+                barEl.style.strokeDasharray = circumference;
+                barEl.style.strokeDashoffset = offset;
+            }
+        } else {
+            hero.style.display = "none";
+        }
+    }
 }
 
 function statusLabel(status) {

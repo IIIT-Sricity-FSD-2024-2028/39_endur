@@ -116,6 +116,7 @@
 
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
+    import { logAction } from "../../js/core/audit.js";
 
     const user = requireAuth();
     if (user) {
@@ -160,6 +161,8 @@
         const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
         const idx = users.findIndex(u => u.id === session.id);
         if (idx !== -1) { users[idx].password = nw; localStorage.setItem("systemUsers", JSON.stringify(users)); }
+        
+        logAction("UPDATE", "Profile", "Password updated successfully");
         msg.textContent = "Password updated successfully!"; msg.className = "pw-msg success";
         ["pwCurrent","pwNew","pwConfirm"].forEach(id => document.getElementById(id).value = "");
     };

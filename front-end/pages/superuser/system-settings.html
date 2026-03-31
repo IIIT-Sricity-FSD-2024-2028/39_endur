@@ -263,6 +263,7 @@
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
     import { showToast } from '../../js/features/admin-utils.js';
+    import { logAction } from '../../js/core/audit.js';
 
     document.addEventListener('DOMContentLoaded', function() {
         const user = requireAuth();
@@ -282,10 +283,6 @@
         if (saved.semester)    document.getElementById('settingSemester').value  = saved.semester;
         if (saved.domain)      document.getElementById('settingDomain').value    = saved.domain;
         if (saved.minResp)     document.getElementById('settingMinResp').value   = saved.minResp;
-        if (saved.anon  === false) document.getElementById('toggleAnon').classList.remove('on');
-        if (saved.late  === true)  document.getElementById('toggleLate').classList.add('on');
-        if (saved.autoClose === false) document.getElementById('toggleAutoClose').classList.remove('on');
-        if (saved.hodApproval === false) document.getElementById('toggleHodApproval').classList.remove('on');
     });
 
     window.toggleSetting = function(btn) {
@@ -302,10 +299,6 @@
             timezone:    document.getElementById('settingTimezone').value,
             minResp:     document.getElementById('settingMinResp').value,
             scale:       document.getElementById('settingScale').value,
-            anon:        document.getElementById('toggleAnon').classList.contains('on'),
-            late:        document.getElementById('toggleLate').classList.contains('on'),
-            autoClose:   document.getElementById('toggleAutoClose').classList.contains('on'),
-            hodApproval: document.getElementById('toggleHodApproval').classList.contains('on'),
         };
         localStorage.setItem('systemSettingsConfig', JSON.stringify(config));
 
@@ -313,6 +306,7 @@
         ind.classList.add('visible');
         setTimeout(function(){ ind.classList.remove('visible'); }, 3000);
 
+        logAction("UPDATE", "Settings", `Updated institution configuration: ${config.instName}`);
         showToast('Institution settings saved successfully.', 'success');
     };
 
@@ -323,10 +317,8 @@
         document.getElementById('settingAcadYear').value = '2025–2026';
         document.getElementById('settingDomain').value   = '@iiits.in';
         document.getElementById('settingMinResp').value  = '5';
-        document.getElementById('toggleAnon').classList.add('on');
-        document.getElementById('toggleLate').classList.remove('on');
-        document.getElementById('toggleAutoClose').classList.add('on');
-        document.getElementById('toggleHodApproval').classList.add('on');
+        
+        logAction("UPDATE", "Settings", "Reset institution settings to defaults");
         showToast('Settings reset to defaults.', 'info');
     };
 </script>
