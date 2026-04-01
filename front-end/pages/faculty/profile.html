@@ -151,13 +151,16 @@
         const conf = document.getElementById("pwConfirm").value.trim();
         const msg  = document.getElementById("pwMsg");
         msg.className = "pw-msg"; msg.textContent = "";
+
         const session = JSON.parse(localStorage.getItem("endurSession"));
         if (!session) { msg.textContent = "Session expired."; msg.className = "pw-msg error"; return; }
         if (cur !== session.password) { msg.textContent = "Current password is incorrect."; msg.className = "pw-msg error"; return; }
         if (nw.length < 3) { msg.textContent = "New password must be at least 3 characters."; msg.className = "pw-msg error"; return; }
         if (nw !== conf) { msg.textContent = "Passwords do not match."; msg.className = "pw-msg error"; return; }
+
         session.password = nw;
         localStorage.setItem("endurSession", JSON.stringify(session));
+
         const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
         const idx = users.findIndex(u => u.id === session.id);
         if (idx !== -1) { users[idx].password = nw; localStorage.setItem("systemUsers", JSON.stringify(users)); }
