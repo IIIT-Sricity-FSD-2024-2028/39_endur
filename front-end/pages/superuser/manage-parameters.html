@@ -117,8 +117,10 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="paramDepts">Department (Exact Name)</label>
-                <input type="text" id="paramDepts" name="paramDepts" placeholder="e.g. Computer Science">
+                <label for="paramDepts">Department</label>
+                <select id="paramDepts" name="paramDepts">
+                    <option value="" disabled selected>Select a department...</option>
+                </select>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-outline" onclick="closeParamModal()">Cancel</button>

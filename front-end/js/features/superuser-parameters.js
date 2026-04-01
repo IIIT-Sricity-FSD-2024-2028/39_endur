@@ -25,9 +25,27 @@ export async function renderSuperuserParameters() {
     });
 
     renderParamsTable();
+    populateDeptDropdown(allDepts);
+
+    // FIX: Call these bindings safely. By using .onsubmit, we prevent the "quadrupling" listener duplication bug.
     bindParamForm();
     bindSearch();
+
     updateParamCount();
+}
+
+function populateDeptDropdown(depts) {
+    const select = document.getElementById('paramDepts');
+    if (!select) return;
+
+    // Preserve the original disabled option
+    select.innerHTML = '<option value="" disabled selected>Select a department...</option>';
+    depts.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        select.appendChild(opt);
+    });
 }
 
 function renderParamsTable(filter = '') {
@@ -74,7 +92,8 @@ function renderParamsTable(filter = '') {
             <td>
                 <div style="display:flex;gap:8px;">
                     <button class="btn-small" onclick="openEditParam('${p.id}', '${p.department}')">Edit</button>
-                    ${p.status === 'SUBMITTED' ? `<button class="btn-small btn-primary" style="padding:4px 8px; font-size:11px;" onclick="approveDeptParams('${p.department}')">Approve Dept</button>` : ''}
+                    <button class="btn-small btn-danger-soft" onclick="openDeleteParam('${p.id}', '${p.department}')">Delete</button>
+                    ${p.status === 'SUBMITTED' ? `<button class="btn-small btn-primary" style="padding:4px 8px; font-size:11px;" onclick="approveDeptParams('${p.department}')">Approve</button>` : ''}
                 </div>
             </td>
         </tr>
@@ -83,14 +102,18 @@ function renderParamsTable(filter = '') {
 
 function bindSearch() {
     const search = document.getElementById('paramSearch');
-    search?.addEventListener('input', () => renderParamsTable(search.value.toLowerCase()));
+    // FIX: Use oninput instead of addEventListener to prevent duplication loops
+    if (search) {
+        search.oninput = () => renderParamsTable(search.value.toLowerCase());
+    }
 }
 
 function bindParamForm() {
     const form = document.getElementById('paramForm');
     if (!form) return;
 
-    form.addEventListener('submit', (e) => {
+    // FIX: Use onsubmit to completely overwrite any existing listener, preventing the 4x/8x duplicating loop bug.
+    form.onsubmit = (e) => {
         e.preventDefault();
 
         const name = form.paramName.value.trim();
@@ -120,17 +143,17 @@ function bindParamForm() {
         set("draftParameters", allDrafts);
         appendAuditLog(session, 'superuser', 'UPDATE', 'Parameters', `${deptStr} — ${name}`, 'Parameter details modified by Superuser.');
         showToast('Parameter saved to drafts.', 'success');
-        
+
         renderSuperuserParameters();
         closeParamModal();
-    });
+    };
 }
 
 function updateParamCount() {
     let total = 0;
     let active = 0;
     Object.values(deptConfigs).forEach(ps => total += ps.length);
-    Object.entries(statuses).forEach(([d, s]) => { if(s === 'APPROVED') active += (deptConfigs[d]?.length || 0); });
+    Object.entries(statuses).forEach(([d, s]) => { if (s === 'APPROVED') active += (deptConfigs[d]?.length || 0); });
 
     if (document.getElementById('statTotalParams')) document.getElementById('statTotalParams').textContent = total;
     if (document.getElementById('statActiveParams')) document.getElementById('statActiveParams').textContent = active;
@@ -138,7 +161,14 @@ function updateParamCount() {
 
 window.openAddParam = () => {
     const form = document.getElementById('paramForm');
-    if (form) { form.reset(); delete form.dataset.editId; delete form.dataset.editDept; }
+    if (form) { 
+        form.reset(); 
+        delete form.dataset.editId; 
+        delete form.dataset.editDept; 
+        // Reset the select styling
+        form.paramDepts.value = "";
+    }
+    document.getElementById('paramModalTitle').textContent = 'Add Evaluation Parameter';
     document.getElementById('paramModal')?.classList.add('active');
 };
 
@@ -155,6 +185,32 @@ window.openEditParam = (id, dept) => {
     form.dataset.editDept = dept;
     document.getElementById('paramModalTitle').textContent = 'Edit Parameter';
     document.getElementById('paramModal')?.classList.add('active');
+};
+
+// FIX: New Delete Logic
+window.openDeleteParam = (id, dept) => {
+    const p = (deptConfigs[dept] || []).find(p => p.id === id);
+    if (!p) return;
+
+    document.getElementById('deleteItemName').textContent = p.name;
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+    // Wire the confirmation button to safely delete this exact ID
+    confirmBtn.onclick = () => {
+        let allDrafts = get("draftParameters") || {};
+        if (allDrafts[dept]) {
+            allDrafts[dept] = allDrafts[dept].filter(item => item.id !== id);
+            set("draftParameters", allDrafts);
+
+            appendAuditLog(session, 'superuser', 'DELETE', 'Parameters', `${dept} — ${p.name}`, 'Parameter deleted by Superuser.');
+            showToast('Parameter deleted successfully.', 'success');
+
+            renderSuperuserParameters();
+        }
+        closeDeleteModal();
+    };
+
+    document.getElementById('deleteModal')?.classList.add('active');
 };
 
 window.approveDeptParams = (dept) => {

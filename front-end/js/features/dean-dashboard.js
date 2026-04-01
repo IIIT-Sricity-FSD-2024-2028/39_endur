@@ -121,44 +121,5 @@ export async function renderDeanDashboard() {
         });
     }
 
-    // 6. Generate Smart Institutional Alerts
-    const alertsContainer = document.getElementById("alertsContainer");
-    alertsContainer.innerHTML = "";
-    let alertCount = 0;
-
-    // Alert A: Pending Parameters from HODs
-    Object.keys(configStatuses).forEach(dept => {
-        if (configStatuses[dept] === "SUBMITTED") {
-            alertsContainer.innerHTML += `
-                <div class="alert-card alert-warning">
-                    <h4>⚠️ Parameter Approval Required</h4>
-                    <p>The HOD of <strong>${dept}</strong> has submitted new evaluation parameters for your review.</p>
-                </div>
-            `;
-            alertCount++;
-        }
-    });
-
-    // Alert B: Data Abnormality (Underperforming Departments)
-    deptArray.forEach(dept => {
-        if (dept.avg > 0 && dept.avg < 3.5) {
-            alertsContainer.innerHTML += `
-                <div class="alert-card alert-danger">
-                    <h4>📉 Data Abnormality</h4>
-                    <p>Pattern of low feedback detected across the <strong>${dept.name}</strong> department.</p>
-                </div>
-            `;
-            alertCount++;
-        }
-    });
-
-    // Alert C: Placeholder Success
-    if (alertCount === 0) {
-        alertsContainer.innerHTML = `
-            <div class="alert-card alert-success">
-                <h4>✅ All Systems Nominal</h4>
-                <p>No urgent institutional alerts at this time.</p>
-            </div>
-        `;
-    }
+    // Institutional Alerts removed per user request
 }

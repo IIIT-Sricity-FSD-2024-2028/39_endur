@@ -25,7 +25,9 @@ export async function initDeanFaculty() {
         fetch("../../js/mock-data/courses.json")
     ]);
     
-    const users = await usersRes.json();
+    // Priority: systemUsers > users.json (Sync with Superuser actions)
+    const mockUsers = await usersRes.json();
+    const users = JSON.parse(localStorage.getItem("systemUsers")) || mockUsers;
     allCourses = await coursesRes.json();
     submissions = get("submittedFeedback") || [];
     
