@@ -12,17 +12,17 @@ export async function renderReviewCheckins() {
     const banner = document.getElementById("cyclePhaseBanner");
     const emptyDetail = document.getElementById("emptyDetail");
     const checkinDetail = document.getElementById("checkinDetail");
-    
+
     const cycleState = get("systemCycleState") || { id: "SETUP", phase: "PREPARATION" };
     const activeCycleId = cycleState.id;
     const badgeEl = document.getElementById("activeCycleBadge");
-    if(badgeEl) badgeEl.innerText = activeCycleId;
+    if (badgeEl) badgeEl.innerText = activeCycleId;
 
     if (cycleState.phase !== "FACULTY_REFLECTION") {
         listContainer.innerHTML = `<div style="padding: 30px; text-align: center; color: #64748b; font-size: 14px;">No active check-ins for the current cycle.</div>`;
         checkinDetail.style.display = "none";
         emptyDetail.style.display = "flex";
-        
+
         let reason = "The feedback cycle has been completed and archived.";
         if (cycleState.phase === "PREPARATION") reason = "The next cycle is still in the preparation phase.";
         if (cycleState.phase === "STUDENT_FEEDBACK") reason = "Students are currently providing feedback.";
@@ -39,7 +39,7 @@ export async function renderReviewCheckins() {
             banner.style.background = "#f8fafc"; banner.style.border = "1px solid #cbd5e1"; banner.style.color = "#475569";
             banner.innerHTML = "<strong>🔒 Module Locked:</strong> Review check-ins are only active during the Faculty Reflection phase.";
         }
-        return; 
+        return;
     }
 
     if (banner) {
@@ -257,7 +257,7 @@ function processCheckinAction(newStatus) {
 
     const actionReports = get("actionReports") || [];
     const cycleState = get("systemCycleState") || { id: "SETUP" };
-    
+
     // Make sure we update the specific report for THIS cycle
     const reportIndex = actionReports.findIndex(a => a.facultyId === currentActiveFacultyId && a.courseId === currentActiveCourseId && a.cycleId === cycleState.id);
 

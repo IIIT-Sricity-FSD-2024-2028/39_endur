@@ -1,15 +1,40 @@
 import { get, set } from "../core/storage.js";
+import { getSession } from "../core/session.js";
+import { appendAuditLog } from "./admin-utils.js";
 
 const PHASES = ["PREPARATION", "STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"];
+const DEFAULT_PARAMETERS = [
+    { id: "clarity", name: "Clarity of Explanation", desc: "Effectiveness of teaching methods and clear delivery.", weight: 25 },
+    { id: "structure", name: "Structure of Course", desc: "Organization of materials and syllabus adherence.", weight: 25 },
+    { id: "engagement", name: "Student Engagement", desc: "Fostering an interactive and responsive environment.", weight: 25 },
+    { id: "difficulty", name: "Difficulty Level", desc: "Appropriateness of the coursework difficulty.", weight: 25 }
+];
 
 export function initCycleManagement() {
     renderCycleTracker();
     renderApprovalQueue();
+    renderHistory();
 }
 
 function renderCycleTracker() {
-    let cycleObj = get("systemCycleState");
-    
+    let rawCycles = get("systemFeedbackCycles") || [];
+    let cycles = rawCycles.map(c => ({
+        ...c,
+        phase: c.phase || (c.status === "active" ? "STUDENT_FEEDBACK" : "COMPLETED")
+    }));
+
+    // Save enriched objects back so everyone is in sync
+    set("systemFeedbackCycles", cycles);
+
+    let cycleObj = cycles.find(c => c.status === "active");
+
+    // Sync legacy systemCycleState for compatibility with other roles
+    if (cycleObj) {
+        set("systemCycleState", { id: cycleObj.cycleName, phase: cycleObj.phase });
+    } else {
+        set("systemCycleState", { phase: "COMPLETED" });
+    }
+
     const createSection = document.getElementById("createCycleSection");
     const activeCard = document.getElementById("activeCycleCard");
     const approvalCard = document.getElementById("approvalQueueCard");
@@ -18,11 +43,11 @@ function renderCycleTracker() {
     if (!cycleObj || cycleObj.phase === "COMPLETED") {
         createSection.style.display = "block";
         btn.style.display = "none";
-        
+
         if (!cycleObj) {
             activeCard.style.display = "none";
             approvalCard.style.display = "none";
-            return; 
+            return;
         }
     } else {
         createSection.style.display = "none";
@@ -33,12 +58,12 @@ function renderCycleTracker() {
     activeCard.style.display = "block";
     const currentPhaseIndex = PHASES.indexOf(cycleObj.phase);
 
-    document.getElementById("currentCycleName").innerText = cycleObj.id;
+    document.getElementById("currentCycleName").innerText = cycleObj.cycleName || cycleObj.id;
 
     PHASES.forEach((phase, index) => {
         const stepEl = document.getElementById(`step_${phase}`);
         if (!stepEl) return;
-        
+
         stepEl.classList.remove("active", "completed");
         if (index < currentPhaseIndex) {
             stepEl.classList.add("completed");
@@ -51,28 +76,47 @@ function renderCycleTracker() {
     const desc = document.getElementById("currentCycleDesc");
     const deadlineText = document.getElementById("deadlineText");
 
-    badge.innerText = cycleObj.phase.replace("_", " ");
+    const phaseString = cycleObj.phase ? cycleObj.phase.replace(/_/g, " ") : "UNKNOWN";
+    badge.innerText = phaseString;
     deadlineText.innerText = "";
+
+    // Fill specific phase dates if available
+    function formatDateShort(iso) {
+        if (!iso) return '';
+        return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    const dPrep = document.getElementById("date_PREPARATION");
+    if (dPrep) dPrep.innerText = cycleObj.prepDeadline ? `Ends: ${formatDateShort(cycleObj.prepDeadline)}` : '';
+
+    const dStud = document.getElementById("date_STUDENT_FEEDBACK");
+    if (dStud) dStud.innerText = cycleObj.studentDeadline ? `Ends: ${formatDateShort(cycleObj.studentDeadline)}` : '';
+
+    const dRef = document.getElementById("date_FACULTY_REFLECTION");
+    if (dRef) dRef.innerText = cycleObj.reflectionDeadline ? `Ends: ${formatDateShort(cycleObj.reflectionDeadline)}` : '';
+
+    const dComp = document.getElementById("date_COMPLETED");
+    if (dComp) dComp.innerText = cycleObj.endTimestamp && cycleObj.phase === 'COMPLETED' ? `Ended: ${formatDateShort(cycleObj.endTimestamp)}` : '';
 
     if (cycleObj.phase === "PREPARATION") {
         badge.className = "badge neutral";
         desc.innerText = "Review HOD parameters below before launching.";
         btn.innerText = "Launch Student Feedback Phase";
         approvalCard.style.display = "block";
-    } 
+    }
     else if (cycleObj.phase === "STUDENT_FEEDBACK") {
         badge.className = "badge primary";
         desc.innerText = "Students are currently submitting feedback. Faculty forms are locked.";
         btn.innerText = "Close Student Phase & Open Faculty Reflection";
         approvalCard.style.display = "none";
-        if(cycleObj.studentDeadline) deadlineText.innerText = `Closes: ${new Date(cycleObj.studentDeadline).toLocaleString()}`;
+        if (cycleObj.studentDeadline) deadlineText.innerText = `Closes: ${new Date(cycleObj.studentDeadline).toLocaleString()}`;
     }
     else if (cycleObj.phase === "FACULTY_REFLECTION") {
         badge.className = "badge warning";
         desc.innerText = "Students locked. Faculty are submitting Self-Reflections and Action Reports.";
         btn.innerText = "Complete & Archive Cycle";
         approvalCard.style.display = "none";
-        if(cycleObj.reflectionDeadline) deadlineText.innerText = `Deadline: ${new Date(cycleObj.reflectionDeadline).toLocaleString()}`;
+        if (cycleObj.reflectionDeadline) deadlineText.innerText = `Deadline: ${new Date(cycleObj.reflectionDeadline).toLocaleString()}`;
     }
     else if (cycleObj.phase === "COMPLETED") {
         badge.className = "badge success";
@@ -84,8 +128,18 @@ function renderCycleTracker() {
 
 export function createNewCycle() {
     const nameInput = document.getElementById("newCycleName").value.trim();
-    if (!nameInput) {
-        alert("Please enter a name for the new feedback cycle.");
+    const prep = document.getElementById("dlPrep").value;
+    const student = document.getElementById("dlStudent").value;
+    const ref = document.getElementById("dlReflection").value;
+
+    if (!nameInput || !prep || !student || !ref) {
+        alert("Please enter a name and select all deadlines for the new feedback cycle.");
+        return;
+    }
+
+    const dPrep = new Date(prep), dStudent = new Date(student), dRef = new Date(ref);
+    if (dPrep >= dStudent || dStudent >= dRef) {
+        alert('Deadlines must be chronological (Prep -> Student -> Reflection).');
         return;
     }
 
@@ -98,47 +152,72 @@ export function createNewCycle() {
     // ==========================================
     // CYCLE INHERITANCE FIX
     // ==========================================
-    // Grab the parameters that were active in the previous cycle
+    // Grab current parameters and statuses
     const previousActiveParams = get("activeParameters") || {};
+    const users = get("systemUsers") || [];
+    const allDepts = [...new Set(users.map(u => u.department || u.dept).filter(Boolean))];
     
-    // Copy them over to be the new drafts, and pre-approve them
-    set("draftParameters", previousActiveParams);
-    
+    let newDrafts = {};
     let newStatuses = {};
-    Object.keys(previousActiveParams).forEach(dept => {
-        newStatuses[dept] = "APPROVED"; // Seamless rollover
+
+    allDepts.forEach(dept => {
+        const existing = previousActiveParams[dept] || [];
+        const sum = existing.reduce((s, p) => s + (p.weight || 0), 0);
+        
+        if (existing.length > 0 && sum === 100) {
+            newDrafts[dept] = existing;
+            newStatuses[dept] = "APPROVED"; // Carry over if valid
+        } else {
+            newDrafts[dept] = JSON.parse(JSON.stringify(DEFAULT_PARAMETERS));
+            newStatuses[dept] = "DRAFT"; // Force HODs to review defaults
+        }
     });
-    
+
+    set("draftParameters", newDrafts);
     set("departmentConfigStatus", newStatuses);
     set("departmentConfigNotes", {});
 
-    let cyclesArray = get("feedbackCycles") || [];
-    cyclesArray.forEach(c => c.status = "completed");
-    cyclesArray.push({
-        cycleId: nameInput,
+    let cyclesArray = get("systemFeedbackCycles") || [];
+    cyclesArray.forEach(c => c.status = "closed");
+    cyclesArray.unshift({
+        cycleId: 'CYCLE' + Date.now().toString(36).toUpperCase(),
+        cycleName: nameInput,
+        type: 'weekly',
         status: "active",
-        endTimestamp: new Date(new Date().getTime() + 7*24*60*60*1000).toISOString() 
+        phase: "PREPARATION",
+        startTimestamp: new Date().toISOString(),
+        endTimestamp: dRef.toISOString(),
+        prepDeadline: dPrep.toISOString(),
+        studentDeadline: dStudent.toISOString(),
+        reflectionDeadline: dRef.toISOString()
     });
-    set("feedbackCycles", cyclesArray);
+    set("systemFeedbackCycles", cyclesArray);
 
-    cycleObj = {
+    const session = getSession();
+    if (session) appendAuditLog(session, 'dean', 'CREATE', 'Feedback Cycles', nameInput, 'Dean initialized new feedback cycle.');
+
+    set("systemCycleState", {
         id: nameInput,
         phase: "PREPARATION",
-        studentDeadline: null,
-        reflectionDeadline: null
-    };
-    set("systemCycleState", cycleObj);
+        prepDeadline: dPrep.toISOString(),
+        studentDeadline: dStudent.toISOString(),
+        reflectionDeadline: dRef.toISOString()
+    });
 
-    document.getElementById("newCycleName").value = "";
-    
+    document.getElementById("createCycleForm").reset();
+    document.getElementById('createCycleSection').style.display = 'none';
+
     renderCycleTracker();
     renderApprovalQueue();
+    renderHistory();
 }
 
 function renderApprovalQueue() {
     const listContainer = document.getElementById("approvalListContainer");
     let statuses = get("departmentConfigStatus") || {};
-    
+    let cycleObj = get("systemCycleState") || {};
+
+
     fetch("../../js/mock-data/users.json").then(res => res.json()).then(users => {
         const hods = users.filter(u => u.role === "hod");
         const depts = [...new Set(hods.map(h => h.department))];
@@ -149,7 +228,7 @@ function renderApprovalQueue() {
         }
 
         listContainer.innerHTML = "";
-        
+
         depts.forEach(dept => {
             const status = statuses[dept] || "DRAFT";
             let statusBadge = "";
@@ -165,8 +244,8 @@ function renderApprovalQueue() {
                 statusBadge = `<span class="badge danger" style="font-size: 10px;">REVISION PENDING</span>`;
                 actionButtons = `<span style="color: #d97706; font-size: 12px;">⏳ Waiting on HOD</span>`;
             } else {
-                statusBadge = `<span class="badge neutral" style="font-size: 10px;">DRAFTING</span>`;
-                actionButtons = `<span style="color: #94a3b8; font-size: 12px;">Not Submitted</span>`;
+                statusBadge = `<span class="badge neutral" style="font-size: 10px;">NO ACTION YET</span>`;
+                actionButtons = `<span style="color: #94a3b8; font-size: 12px;">Waiting for HOD</span>`;
             }
 
             const row = document.createElement("div");
@@ -189,25 +268,38 @@ export function viewRequest(dept) {
 export function advanceCyclePhase() {
     let cycleObj = get("systemCycleState") || { phase: "PREPARATION" };
     const currentIndex = PHASES.indexOf(cycleObj.phase);
-    
+
     if (currentIndex === 0) {
         let statuses = get("departmentConfigStatus") || {};
-        const pending = Object.values(statuses).some(s => s === "SUBMITTED" || s === "REVISION_REQUESTED");
-        
-        if (pending) {
-            const force = confirm("Warning: Some departments have unapproved parameters. Launching now will force them to use default parameters. Continue?");
-            if (!force) return;
+        let drafts = get("draftParameters") || {};
+        const users = get("systemUsers") || [];
+        const allDepts = [...new Set(users.map(u => u.department || u.dept).filter(Boolean))];
+
+        const failingDepts = [];
+        allDepts.forEach(dept => {
+            const params = drafts[dept] || [];
+            const sum = params.reduce((s, p) => s + (p.weight || 0), 0);
+            if (sum !== 100) failingDepts.push(`${dept} (${sum}%)`);
+        });
+
+        if (failingDepts.length > 0) {
+            alert(`⚠️ LAUNCH ABORTED: The following departments do not have exactly 100% total weightage:\n\n${failingDepts.join('\n')}\n\nPlease fix these configurations in the Evaluation Parameters review section first.`);
+            return;
         }
 
-        let allDrafts = get("draftParameters") || {};
+        const pendingReview = Object.values(statuses).some(s => s === "SUBMITTED" || s === "REVISION_REQUESTED");
+        if (pendingReview) {
+            const confirmLaunch = confirm("Note: Some departments are'Pending Review'. Launching now will finalize their current 100% configurations. Continue?");
+            if (!confirmLaunch) return;
+        }
+
         let activeParams = {};
-        
-        Object.keys(allDrafts).forEach(dept => {
-            if (statuses[dept] === "APPROVED") {
-                activeParams[dept] = allDrafts[dept];
-            }
-        });
+        allDepts.forEach(dept => { activeParams[dept] = drafts[dept]; });
         set("activeParameters", activeParams);
+        
+        let newStatuses = {};
+        allDepts.forEach(dept => { newStatuses[dept] = "APPROVED"; });
+        set("departmentConfigStatus", newStatuses);
 
         const d = new Date();
         d.setDate(d.getDate() + 7);
@@ -217,7 +309,7 @@ export function advanceCyclePhase() {
         const d = new Date();
         d.setHours(d.getHours() + 24);
         cycleObj.reflectionDeadline = d.toISOString();
-        
+
         const actionD = new Date(d);
         actionD.setHours(actionD.getHours() + 72);
         cycleObj.actionDeadline = actionD.toISOString();
@@ -226,6 +318,53 @@ export function advanceCyclePhase() {
     if (currentIndex < PHASES.length - 1) {
         cycleObj.phase = PHASES[currentIndex + 1];
         set("systemCycleState", cycleObj);
+
+        let rawCycles = get("systemFeedbackCycles") || [];
+        let cycles = rawCycles.map(c => ({
+            ...c,
+            phase: c.phase || (c.status === "active" ? "STUDENT_FEEDBACK" : "COMPLETED")
+        }));
+
+        let active = cycles.find(c => c.status === "active");
+        if (active) {
+            active.phase = cycleObj.phase;
+            if (active.phase === "COMPLETED") active.status = "closed";
+            set("systemFeedbackCycles", cycles);
+        }
+
+        const session = getSession();
+        if (session) {
+            let logMsg = active && active.phase === "COMPLETED" ? "Cycle successfully completed and archived." : `Phase advanced to ${cycleObj.phase.replace(/_/g, " ")}.`;
+            appendAuditLog(session, 'dean', 'UPDATE', 'Feedback Cycles', cycleObj.id || 'Active Cycle', logMsg);
+        }
+
         renderCycleTracker();
+        renderHistory();
     }
+}
+
+function renderHistory() {
+    const listContainer = document.getElementById("cycleHistoryContainer");
+    if (!listContainer) return; // if div is missing, skip
+
+    let cyclesArray = get("systemFeedbackCycles") || [];
+    if (!cyclesArray.length) {
+        listContainer.innerHTML = '<p style="padding: 20px 0; color: #64748b; font-style: italic;">No cycle history found.</p>';
+        return;
+    }
+
+    listContainer.innerHTML = cyclesArray.map(c => {
+        return `
+        <div class="approval-row">
+            <div>
+                <strong style="color: #0f172a; font-size: 14px;">${c.cycleName || c.cycleId}</strong>
+            </div>
+            <div>
+                <span class="badge ${c.status === 'active' ? 'success' : 'neutral'}" style="font-size: 10px;">${(c.status || '').toUpperCase()}</span>
+            </div>
+            <div style="text-align: right;">
+                <span style="color: #64748b; font-size: 12px;">${c.status === 'active' ? 'IN PROGRESS' : 'ARCHIVED'}</span>
+            </div>
+        </div>`;
+    }).join('');
 }

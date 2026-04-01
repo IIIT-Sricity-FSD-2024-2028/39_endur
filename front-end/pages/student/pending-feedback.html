@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Pending Feedbacks</title>
@@ -14,6 +15,7 @@
     <link rel="stylesheet" href="../../css/components/badge.css">
     <link rel="stylesheet" href="../../css/pages/dashboard.css">
 </head>
+
 <body>
     <div class="dashboard-layout">
 
@@ -45,9 +47,10 @@
         <main class="dashboard-content">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
                 <h1>Pending Feedbacks</h1>
-                <span id="cycleBadge" class="badge neutral" style="font-size: 11px; text-transform: uppercase;">LOADING...</span>
+                <span id="cycleBadge" class="badge neutral"
+                    style="font-size: 11px; text-transform: uppercase;">LOADING...</span>
             </div>
-            
+
             <p id="pageSubtitle" class="subtitle">Complete feedback cycles assigned to you.</p>
             <div id="pendingContainer" class="feedback-list"></div>
 
@@ -106,14 +109,33 @@
             }
 
             let deadlineText = "TBD";
-            if (cycleState.studentDeadline) {
+            
+            // Robust Deadline Fix: Find active cycle in full cycle history
+            const allCycles = JSON.parse(localStorage.getItem("systemFeedbackCycles")) || [];
+            const activeCycle = allCycles.find(c => c.status === "active");
+            
+            if (activeCycle && activeCycle.studentDeadline) {
+                const deadlineDate = new Date(activeCycle.studentDeadline);
+                deadlineText = deadlineDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+            } else if (cycleState.studentDeadline) {
                 const deadlineDate = new Date(cycleState.studentDeadline);
-                deadlineText = deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                deadlineText = deadlineDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             }
 
             const myCourses = allCourses.filter(c => myCourseIds.includes(c.id));
+            
+            myCourses.push({
+                id: "reviewOfReviews",
+                name: "Platform System Review",
+                type: "review",
+                color: "green"
+            });
 
             myCourses.forEach(course => {
+                // Unified Data Fix: Fetch course details from global systemCourses for the thumbnail
+                const systemCourses = JSON.parse(localStorage.getItem("systemCourses")) || [];
+                const courseInfo = systemCourses.find(c => c.id === course.id) || course;
+
                 const done = submitted.find(
                     f => f.course === course.id && f.userId === user.id && f.cycleId === currentCycleId
                 );
@@ -132,14 +154,18 @@
                     window.location.href = "feedback-form.html";
                 };
 
+                const thumb = course.id === "reviewOfReviews" ? 'img_bookclub.jpg' : (courseInfo.thumbnail || 'img_read.jpg');
+
                 card.innerHTML = `
-                    <div>
+                    <div style="flex: 1;">
                         <p class="deadline">Deadline: ${deadlineText}</p>
                         <h3>${course.name}</h3>
                         <p>${course.type === "review" ? "Review of Reviews" : "Course Feedback"}</p>
                         <button class="btn-primary">Start →</button>
                     </div>
-                    <div class="color-block ${course.color || 'blue'}"></div>
+                    <div class="course-thumb" style="width: 120px; height: 100%; border-radius: 0 12px 12px 0; overflow: hidden; flex-shrink: 0;">
+                        <img src="../../assets/images/${thumb}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
                 `;
 
                 container.appendChild(card);
@@ -153,4 +179,5 @@
         }
     </script>
 </body>
+
 </html>

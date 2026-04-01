@@ -36,7 +36,7 @@ export function initParameters() {
     if (!allDrafts[user.department] || allDrafts[user.department].length === 0) {
         if (activeParams[user.department] && activeParams[user.department].length > 0) {
             allDrafts[user.department] = activeParams[user.department];
-            statuses[user.department] = "APPROVED"; 
+            statuses[user.department] = "DRAFT"; 
         } else {
             allDrafts[user.department] = DEFAULT_PARAMETERS;
             statuses[user.department] = "DRAFT";
@@ -186,8 +186,29 @@ function renderAll(params, status = "DRAFT") {
             finalizeBtn.disabled = true;
             finalizeBtn.style.opacity = "0.5";
             finalizeBtn.style.cursor = "not-allowed";
-            if(isCycleActive || isCycleCompleted) finalizeBtn.innerText = "Locked";
-            else finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "Submitted";
+            if(isCycleActive || isCycleCompleted) {
+                finalizeBtn.innerText = "Locked";
+            } else {
+                finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "In Review";
+                
+                // Only allow "Edit Again" if REVISION_REQUESTED or if APPROVED (not while SUBMITTED/IN REVIEW)
+                if(status === "APPROVED" || status === "REVISION_REQUESTED") {
+                    let unlockBtn = document.getElementById("unlockDraftBtn");
+                    if(!unlockBtn) {
+                        unlockBtn = document.createElement("button");
+                        unlockBtn.id = "unlockDraftBtn";
+                        unlockBtn.className = "btn-outline";
+                        unlockBtn.style.marginLeft = "10px";
+                        unlockBtn.innerText = "Edit Again";
+                        unlockBtn.onclick = () => window.revertToDraft();
+                        finalizeBtn.parentNode.insertBefore(unlockBtn, finalizeBtn.nextSibling);
+                    }
+                } else if (status === "SUBMITTED") {
+                    // Force remove Edit Again if it existed
+                    const ex = document.getElementById("unlockDraftBtn");
+                    if(ex) ex.remove();
+                }
+            }
         }
     } else {
         if (finalizeBtn) finalizeBtn.innerText = "Submit Configuration";
@@ -391,6 +412,12 @@ export function saveParameter() {
     allDrafts[user.department] = deptParams;
     set("draftParameters", allDrafts);
     
+    // Audit Log
+    const session = getSession();
+    import('./admin-utils.js').then(utils => {
+        utils.appendAuditLog(session, 'hod', editingParamId ? 'UPDATE' : 'CREATE', 'Parameters', name, `Parameter ${editingParamId ? 'updated' : 'created'} by HOD.`);
+    });
+
     closeParamModal();
     renderAll(deptParams, "DRAFT");
 }
@@ -412,6 +439,23 @@ export function finalizeConfig() {
     statuses[user.department] = "SUBMITTED";
     set("departmentConfigStatus", statuses);
 
+    // Audit Log
+    const session = getSession();
+    import('./admin-utils.js').then(utils => {
+        utils.appendAuditLog(session, 'hod', 'SUBMIT', 'Parameters', `${user.department} Config`, 'Parameter configuration submitted for review.');
+    });
+
     renderAll(deptParams, "SUBMITTED");
     alert("✅ Success! Your department's Evaluation Parameters have been submitted to the Dean for review.");
+}
+
+export function revertToDraft() {
+    if (checkPhaseLock()) return;
+    const user = getSession();
+    let statuses = get("departmentConfigStatus") || {};
+    statuses[user.department] = "DRAFT";
+    set("departmentConfigStatus", statuses);
+    
+    let drafts = get("draftParameters") || {};
+    renderAll(drafts[user.department] || [], "DRAFT");
 }

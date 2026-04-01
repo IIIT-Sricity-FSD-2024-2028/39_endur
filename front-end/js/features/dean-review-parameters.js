@@ -1,4 +1,6 @@
 import { get, set } from "../core/storage.js";
+import { getSession } from "../core/session.js";
+import { appendAuditLog } from "../features/admin-utils.js";
 
 let targetDept = null;
 
@@ -40,6 +42,28 @@ export function initReview() {
     }
 
     document.getElementById("totalWeight").innerText = `${total}%`;
+    const approveBtn = document.querySelector('button[onclick="approveConfig()"]');
+    const warningEl = document.getElementById("weightWarning");
+
+    if (total !== 100) {
+        document.getElementById("totalWeight").style.color = "var(--danger)";
+        if (approveBtn) {
+            approveBtn.disabled = true;
+            approveBtn.style.opacity = "0.5";
+            approveBtn.title = `Total weightage must be 100% (currently ${total}%)`;
+        }
+        if (warningEl) {
+            warningEl.style.display = "block";
+            warningEl.innerText = `⚠️ Total weightage is ${total}%. It must be exactly 100% before approval.`;
+        }
+    } else {
+        document.getElementById("totalWeight").style.color = "var(--primary)";
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.style.opacity = "1";
+        }
+        if (warningEl) warningEl.style.display = "none";
+    }
 }
 
 export function approveConfig() {
@@ -49,6 +73,10 @@ export function approveConfig() {
     statuses[targetDept] = "APPROVED";
     set("departmentConfigStatus", statuses);
     
+    // Audit Log
+    const session = getSession();
+    appendAuditLog(session, 'dean', 'APPROVE', 'Parameters', `${targetDept} Config`, `Parameter configuration approved by Dean.`);
+
     alert(`Configuration for ${targetDept} has been approved.`);
     window.location.href = "cycle-management.html";
 }
@@ -71,6 +99,10 @@ export function requestRevision() {
     set("departmentConfigStatus", statuses);
     set("departmentConfigNotes", notes);
     
+    // Audit Log
+    const session = getSession();
+    appendAuditLog(session, 'dean', 'REVISE', 'Parameters', `${targetDept} Config`, `Revision requested for ${targetDept} parameters.`);
+
     alert(`Revision requested. Notes sent to ${targetDept} HOD.`);
     window.location.href = "cycle-management.html";
 }

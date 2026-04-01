@@ -89,6 +89,8 @@ function loadDraft() {
     });
 }
 
+import { logAction } from "../core/audit.js";
+
 export function submitSelfReflection() {
     // Validate that ALL dynamic parameters have been rated
     if (Object.keys(ratings).length < activeParamsForDept.length) {
@@ -132,5 +134,6 @@ export function submitSelfReflection() {
     delete drafts[user.id];
     set("selfReflectionDraft", drafts);
 
+    logAction("CREATE", "Reflection", `Submitted self-reflection for course ${activeCourse}`);
     window.location.href = "gap-analysis.html";
 }

@@ -8,7 +8,11 @@
 <title>Feedback Submitted</title>
 
 <link rel="stylesheet" href="../../css/base.css">
-<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/layout.css">
+<link rel="stylesheet" href="../../css/utilities.css">
+<link rel="stylesheet" href="../../css/components/button.css">
+<link rel="stylesheet" href="../../css/components/card.css">
+<link rel="stylesheet" href="../../css/components/success.css">
 <link rel="stylesheet" href="../../css/pages/dashboard.css">
 
 </head>
@@ -69,19 +73,14 @@ Head Back to Dashboard →
 
 
 
-<script src="../../js/core/session.js"></script>
-
-<script>
+<script type="module">
+import { requireAuth } from "../../js/core/session.js";
 
 requireAuth();
 
-
-function goDashboard(){
-
-window.location.href = "dashboard.html";
-
-}
-
+window.goDashboard = function() {
+    window.location.href = "dashboard.html";
+};
 </script>
 
 

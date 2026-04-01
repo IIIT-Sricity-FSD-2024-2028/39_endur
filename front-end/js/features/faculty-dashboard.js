@@ -18,13 +18,24 @@ export async function renderFacultyDashboard() {
     const allCourses = await getCourses();
     const myCourses = allCourses.filter(c => c.facultyId === user.id);
 
+    // Use systemUsers for real enrollment counts (fallback to static json)
+    const allSystemUsers = JSON.parse(localStorage.getItem("systemUsers")) || [];
+    const allStudents = allSystemUsers.filter(u => u.role === "student");
+
     const allSubmissions = get("submittedFeedback") || [];
     const allReflections = get("selfReflection") || [];
     const cycleState = get("systemCycleState") || { id: "SYSTEM SETUP", phase: "PREPARATION" };
-    
-    // CYCLE FIX: Only grab data for the active cycle
+
     const activeCycleId = cycleState.id;
-    const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+
+    // Filter to active cycle submissions — fall back to ALL submissions if none match
+    // (handles fresh sessions where cycleState.id may not match stored feedback's cycleId)
+    let submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+    if (submissions.length === 0) {
+        // Fallback: show all feedback for this faculty's courses regardless of cycle
+        const myIds = new Set(myCourses.map(c => c.id));
+        submissions = allSubmissions.filter(f => myIds.has(f.course));
+    }
     const reflections = allReflections.filter(r => r.cycleId === activeCycleId);
 
     const cycleBadge = document.getElementById("dashboardCycleName");
@@ -82,13 +93,15 @@ export async function renderFacultyDashboard() {
                 sumOfAverages += studentFormAvg;
             });
 
-            courseAvgPercentage = (sumOfAverages / responses) * 20; 
+            courseAvgPercentage = (sumOfAverages / responses) * 20;
             totalStudentScorePercentage += courseAvgPercentage;
             coursesWithFeedbackCount++;
         }
 
         totalResponses += responses;
-        totalStudentsEnrolled += course.enrolled || 50; 
+        // Count students actually enrolled in this course
+        const enrolledStudents = allStudents.filter(s => s.enrolledCourses && s.enrolledCourses.includes(course.id)).length;
+        totalStudentsEnrolled += enrolledStudents > 0 ? enrolledStudents : (course.enrolled || 0);
 
         // Uses the pre-filtered 'reflections' array
         const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id);
@@ -99,14 +112,14 @@ export async function renderFacultyDashboard() {
             let selfMetricSum = 0;
             let selfMetricCount = 0;
             const expected = hasReflection.expectedRatings || {};
-            
+
             Object.values(expected).forEach(val => {
-                if(typeof val === 'number') { selfMetricSum += val; selfMetricCount++; }
+                if (typeof val === 'number') { selfMetricSum += val; selfMetricCount++; }
             });
 
             const selfAvgPercentage = selfMetricCount > 0 ? (selfMetricSum / selfMetricCount) * 20 : 0;
             const absoluteGap = Math.abs(selfAvgPercentage - courseAvgPercentage);
-            
+
             totalGapAccumulator += absoluteGap;
             gapCalculatedCourses++;
         }
@@ -137,16 +150,18 @@ export async function renderFacultyDashboard() {
 
     const finalAvgScore = coursesWithFeedbackCount > 0 ? (totalStudentScorePercentage / coursesWithFeedbackCount).toFixed(0) : 0;
     const finalGapScore = gapCalculatedCourses > 0 ? (totalGapAccumulator / gapCalculatedCourses).toFixed(0) : 0;
-    
+
     const avgScoreEl = document.getElementById("avgScore");
     const gapScoreEl = document.getElementById("gapScore");
-    
+
+    // Student Satisfaction = real average, NEVER locked (it's student data, not reflection-gated)
+    if (avgScoreEl) avgScoreEl.innerText = finalAvgScore > 0 ? `${finalAvgScore}%` : "N/A";
+
+    // Performance Gap IS gated on self-reflection (needs both signals)
     if (pendingReflectionCount > 0 && ["PREPARATION", "STUDENT_FEEDBACK", "FACULTY_REFLECTION"].includes(cycleState.phase)) {
-        if (avgScoreEl) { avgScoreEl.innerHTML = `<span style="font-size: 18px; color: #94a3b8;">Locked 🔒</span>`; }
         if (gapScoreEl) { gapScoreEl.innerHTML = `<span style="font-size: 18px; color: #94a3b8;">Locked 🔒</span>`; }
     } else {
-        if (avgScoreEl) avgScoreEl.innerText = `${finalAvgScore}%`;
-        if (gapScoreEl) gapScoreEl.innerText = `${finalGapScore}%`;
+        if (gapScoreEl) gapScoreEl.innerText = finalGapScore > 0 ? `${finalGapScore}%` : "N/A";
     }
 
     const finalResponseRate = totalStudentsEnrolled > 0 ? Math.round((totalResponses / totalStudentsEnrolled) * 100) : 0;

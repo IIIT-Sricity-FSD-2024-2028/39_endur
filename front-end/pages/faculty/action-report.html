@@ -39,8 +39,9 @@
 
         <nav class="sidebar-menu">
             <a href="dashboard.html">Dashboard</a>
-            <a class="active" href="reports.html">Feedback Reports</a>
-            <a href="profile.html">Profile</a>
+            <a href="reports.html">Feedback Reports</a>
+            <a class="active" href="action-report.html">Action Reports</a>
+            <a href="historical-trends.html">Historical Trends</a>
         </nav>
 
         <a href="profile.html" class="sidebar-user">
@@ -60,10 +61,17 @@
                 <h2>Action Report</h2>
                 <span id="courseIdLabel" class="badge primary"></span>
             </div>
-            <button class="btn-outline" onclick="window.location.href='reports.html'">← Back to Reports</button>
+            <a href="reports.html" class="btn-outline">← Back to Reports</a>
         </div>
-
         <p class="subtitle" style="margin-bottom: 24px;">Faculty Performance Improvement Plan</p>
+
+        <!-- No course selected state -->
+        <div id="noCourseState" style="display:none; margin-top: 40px; text-align:center; padding: 60px 20px;">
+            <div style="font-size:3rem;margin-bottom:16px;">📋</div>
+            <h2 style="margin-bottom:8px;">No Course Selected</h2>
+            <p class="subtitle" style="margin-bottom:24px;">Please select a course from Feedback Reports first, then come back to submit your Action Report.</p>
+            <a href="reports.html" class="btn-primary">Go to Feedback Reports →</a>
+        </div>
 
         <!-- HOD FEEDBACK BANNERS (Hidden by default, controlled by JS) -->
         <div id="revisionBanner" class="card" style="display: none; background: #fef2f2; border: 1px solid #f87171; margin-bottom: 24px;">

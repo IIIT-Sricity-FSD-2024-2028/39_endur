@@ -10,8 +10,7 @@
       "CS102",
       "CS103",
       "CS104",
-      "CS105",
-      "reviewOfReviews1"
+      "CS105"
     ]
   },
   {
@@ -25,8 +24,7 @@
       "CS107",
       "CS108",
       "MA201",
-      "MA202",
-      "reviewOfReviews1"
+      "MA202"
     ]
   },
   {
@@ -40,8 +38,7 @@
       "EC202",
       "HS101",
       "HS102",
-      "CS101",
-      "reviewOfReviews1"
+      "CS101"
     ]
   },
   {
@@ -55,8 +52,7 @@
       "CS103",
       "CS104",
       "CS105",
-      "CS106",
-      "reviewOfReviews1"
+      "CS106"
     ]
   },
   {
@@ -70,8 +66,7 @@
       "CS108",
       "MA201",
       "MA202",
-      "EC201",
-      "reviewOfReviews1"
+      "EC201"
     ]
   },
   {
@@ -85,8 +80,7 @@
       "HS101",
       "HS102",
       "CS101",
-      "CS102",
-      "reviewOfReviews1"
+      "CS102"
     ]
   },
   {
@@ -100,8 +94,7 @@
       "CS104",
       "CS105",
       "CS106",
-      "CS107",
-      "reviewOfReviews1"
+      "CS107"
     ]
   },
   {
@@ -115,8 +108,7 @@
       "MA201",
       "MA202",
       "EC201",
-      "EC202",
-      "reviewOfReviews1"
+      "EC202"
     ]
   },
   {
@@ -130,8 +122,7 @@
       "HS102",
       "CS101",
       "CS102",
-      "CS103",
-      "reviewOfReviews1"
+      "CS103"
     ]
   },
   {
@@ -145,8 +136,7 @@
       "CS105",
       "CS106",
       "CS107",
-      "CS108",
-      "reviewOfReviews1"
+      "CS108"
     ]
   },
   {
@@ -160,8 +150,7 @@
       "MA202",
       "EC201",
       "EC202",
-      "HS101",
-      "reviewOfReviews1"
+      "HS101"
     ]
   },
   {
@@ -175,8 +164,7 @@
       "CS101",
       "CS102",
       "CS103",
-      "CS104",
-      "reviewOfReviews1"
+      "CS104"
     ]
   },
   {
@@ -190,8 +178,7 @@
       "CS106",
       "CS107",
       "CS108",
-      "MA201",
-      "reviewOfReviews1"
+      "MA201"
     ]
   },
   {
@@ -205,8 +192,7 @@
       "EC201",
       "EC202",
       "HS101",
-      "HS102",
-      "reviewOfReviews1"
+      "HS102"
     ]
   },
   {
@@ -220,8 +206,7 @@
       "CS103",
       "CS105",
       "CS107",
-      "MA201",
-      "reviewOfReviews1"
+      "MA201"
     ]
   },
   {
@@ -289,7 +274,7 @@
       "hod"
     ]
   },
-   {
+  {
     "id": "F402",
     "password": "123",
     "name": "Dr. Elon Musk",

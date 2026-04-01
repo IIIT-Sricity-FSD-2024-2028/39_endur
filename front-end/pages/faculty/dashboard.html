@@ -29,8 +29,10 @@
             </div>
 
             <nav class="sidebar-menu">
-                <a class="active">Dashboard</a>
+                <a class="active" href="dashboard.html">Dashboard</a>
                 <a href="reports.html">Feedback Reports</a>
+                <a href="action-report.html">Action Reports</a>
+                <a href="historical-trends.html">Historical Trends</a>
             </nav>
 
             <a href="profile.html" class="sidebar-user">
@@ -48,37 +50,37 @@
             <!-- DOMAIN PHASE BANNER -->
             <div id="phaseBanner" style="padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px; display: none;"></div>
 
-            <h1>
+            <h1 class="animate-in">
                 Faculty Dashboard
-                <span id="dashboardCycleName" class="badge neutral" style="text-transform: uppercase;">
+                <span id="dashboardCycleName" class="badge neutral animate-pop delay-1" style="text-transform: uppercase;">
                     LOADING CYCLE...
                 </span>
             </h1>
 
             <!-- STATS -->
             <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-1">
                     <p>Student Satisfaction</p>
                     <h2 id="avgScore">0%</h2>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-2">
                     <p>Response Rate</p>
                     <h2 id="responseRate">0%</h2>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-3">
                     <p>Pending Reflections</p>
                     <h2 id="pendingReflection">0</h2>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card animate-in delay-4">
                     <p>Performance Gap</p>
                     <h2 id="gapScore">0%</h2>
                 </div>
             </div>
 
-            <h2 class="section-title">Current Courses</h2>
+            <h2 class="section-title animate-in delay-4">Current Courses</h2>
 
             <table class="data-table">
                 <thead>
