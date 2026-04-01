@@ -23,9 +23,11 @@
             padding: 40px; 
             border-radius: 20px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            background: #ffffff; /* Explicit background */
         }
         .modal h2 { font-size: 2rem; margin-bottom: 30px; font-weight: 800; color: #0f172a; }
         .form-group label { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 8px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
         
         /* Remove dropdown arrow for disabled select */
         select:disabled {
@@ -35,12 +37,21 @@
             background-image: none !important;
             cursor: default;
         }
+
+        /* Ensure footer buttons are visible */
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding-top: 24px;
+            margin-top: 24px;
+            border-top: 1px solid #f1f5f9;
+        }
     </style>
 </head>
 <body>
 <div class="dashboard-layout">
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <img src="../../assets/logos/endur-logo.svg" alt="Endur">
@@ -61,7 +72,6 @@
         </a>
     </aside>
 
-    <!-- MAIN -->
     <main class="dashboard-content">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
             <div>
@@ -73,7 +83,7 @@
 
         <div class="page-actions" style="margin-top: 30px;">
             <div class="search-wrap">
-                <span class="search-icon">🔍</span>
+                
                 <input id="courseSearch" class="search-bar" type="search" placeholder="Search by name, ID, or faculty…" style="margin:0">
             </div>
         </div>
@@ -97,43 +107,49 @@
     </main>
 </div>
 
-<!-- COURSE MODAL -->
 <div class="modal-overlay" id="courseModal">
     <div class="modal">
         <h2 id="courseModalTitle">Add Course</h2>
-        <form id="courseForm" onsubmit="event.preventDefault(); saveCourse();">
+        <form id="courseForm" class="course-form" onsubmit="event.preventDefault(); saveCourse();">
+            
+            <div class="form-group">
+                <label>Course ID</label>
+                <input type="text" id="courseId" placeholder="e.g. CS101" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Course Name</label>
+                <input type="text" id="courseName" placeholder="e.g. Data Structures" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Department</label>
+                <select id="courseDeptSelect" required>
+                    <option value="">Select Department</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Assign Faculty</label>
+                <select id="courseFaculty" required>
+                    <option value="">Select Faculty</option>
+                </select>
+            </div>
+            
+            <div id="deptEnrollmentOption" class="form-group" style="display: flex; align-items: center; gap: 10px; background: rgba(139, 92, 246, 0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.1);">
+                <input type="checkbox" id="autoEnrollDept" style="width: auto; margin: 0; cursor: pointer;">
+                <label for="autoEnrollDept" style="margin: 0; cursor: pointer; color: #4c1d95; text-transform: none; font-weight: 600;">Auto-enroll all students in this department</label>
+            </div>
+
             <div class="form-group" style="margin-top: 20px; display: flex; align-items: center; gap: 20px; background: rgba(0,0,0,0.02); padding: 20px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);">
-                <img id="modalThumbPreview" src="" style="width: 100px; height: 100px; border-radius: 12px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                <img id="modalThumbPreview" src="" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background:#e2e8f0;">
                 <div>
                     <label style="margin: 0;">Course Artwork</label>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">Each course is assigned unique artwork upon creation.</p>
                 </div>
             </div>
-            <div class="form-group">
-                <label style="margin-top: 10px; display: block;">Course ID</label>
-                <input type="text" id="courseId" placeholder="e.g. CS101">
-            </div>
-            <div class="form-group">
-                <label>Course Name</label>
-                <input type="text" id="courseName" placeholder="e.g. Data Structures">
-            </div>
-            <div class="form-group">
-                <label>Department</label>
-                <select id="courseDeptSelect">
-                    <option value="">Select Department</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Assign Faculty</label>
-                <select id="courseFaculty">
-                    <option value="">Select Faculty</option>
-                </select>
-            </div>
-            <div id="deptEnrollmentOption" class="form-group" style="display: flex; align-items: center; gap: 10px; background: rgba(139, 92, 246, 0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.1);">
-                <input type="checkbox" id="autoEnrollDept" style="width: auto; margin: 0; cursor: pointer;">
-                <label for="autoEnrollDept" style="margin: 0; cursor: pointer; color: #4c1d95; text-transform: none; font-weight: 600;">Auto-enroll all students in this department</label>
-            </div>
-            <div class="modal-footer" style="padding-top: 20px;">
+
+            <div class="modal-footer">
                 <button type="button" class="btn-outline" onclick="closeCourseModal()">Cancel</button>
                 <button type="submit" class="btn-primary">Save Course</button>
             </div>
@@ -141,7 +157,6 @@
     </div>
 </div>
 
-<!-- ASSIGNMENT MODAL -->
 <div class="modal-overlay" id="assignModal">
     <div class="modal" style="width: 500px;">
         <h2 id="assignCourseTitle">Assign Students</h2>
@@ -149,10 +164,9 @@
         <p class="subtitle" style="margin-bottom: 20px;">Select students to enroll in this course.</p>
         
         <div class="student-list" id="studentSelectContainer">
-            <!-- Populated via JS -->
-        </div>
+            </div>
 
-        <div class="modal-footer" style="padding-top:20px; border-top:1px solid #e2e8f0; margin-top:20px;">
+        <div class="modal-footer">
             <button type="button" class="btn-outline" onclick="closeAssignModal()">Cancel</button>
             <button type="button" class="btn-primary" onclick="saveAssignments()">Save Enrollments</button>
         </div>
@@ -183,6 +197,16 @@
         window.saveAssignments = saveAssignments;
         window.closeCourseModal = closeCourseModal;
         window.closeAssignModal = closeAssignModal;
+    });
+
+    // UX FIX: Close modals when clicking on the dark background overlay
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            // Check if the actual overlay background was clicked, NOT the modal inside it
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+            }
+        });
     });
 </script>
 </body>
