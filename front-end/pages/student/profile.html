@@ -164,8 +164,7 @@
         const nw   = document.getElementById("pwNew").value.trim();
         const conf = document.getElementById("pwConfirm").value.trim();
         const msg  = document.getElementById("pwMsg");
-        msg.className = "pw-msg";
-        msg.textContent = "";
+        msg.className = "pw-msg"; msg.textContent = "";
 
         const session = JSON.parse(localStorage.getItem("endurSession"));
         if (!session) { msg.textContent = "Session expired. Please log in again."; msg.className = "pw-msg error"; return; }
@@ -173,11 +172,9 @@
         if (nw.length < 3) { msg.textContent = "New password must be at least 3 characters."; msg.className = "pw-msg error"; return; }
         if (nw !== conf) { msg.textContent = "Passwords do not match."; msg.className = "pw-msg error"; return; }
 
-        // Update session
         session.password = nw;
         localStorage.setItem("endurSession", JSON.stringify(session));
 
-        // Also update systemUsers so login still works
         const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
         const idx = users.findIndex(u => u.id === session.id);
         if (idx !== -1) { users[idx].password = nw; localStorage.setItem("systemUsers", JSON.stringify(users)); }
