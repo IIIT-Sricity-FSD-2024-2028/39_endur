@@ -40,7 +40,7 @@ let FeedbackResponsesController = class FeedbackResponsesController {
 exports.FeedbackResponsesController = FeedbackResponsesController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
     (0, swagger_1.ApiOperation)({ summary: 'List feedback responses (filterable by cycle/course/student)' }),
     (0, swagger_1.ApiQuery)({ name: 'cycleId', required: false }),
     (0, swagger_1.ApiQuery)({ name: 'courseId', required: false }),

@@ -3379,14 +3379,26 @@
             "type": "string",
             "example": "Data Structures"
           },
-          "facultyId": {
-            "type": "string",
-            "example": "F101",
-            "description": "Faculty user ID"
+          "facultyIds": {
+            "example": [
+              "F101",
+              "F102"
+            ],
+            "description": "Array of Faculty user IDs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
-          "faculty": {
-            "type": "string",
-            "example": "Dr. Alan Turing"
+          "facultyNames": {
+            "example": [
+              "Dr. Alan Turing",
+              "Dr. Grace Hopper"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "department": {
             "type": "string",
@@ -3408,7 +3420,7 @@
         "required": [
           "id",
           "name",
-          "facultyId"
+          "facultyIds"
         ]
       },
       "UpdateCourseDto": {
@@ -3418,11 +3430,17 @@
             "type": "string",
             "example": "Data Structures Advanced"
           },
-          "facultyId": {
-            "type": "string"
+          "facultyIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
-          "faculty": {
-            "type": "string"
+          "facultyNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "department": {
             "type": "string"
@@ -3494,6 +3512,14 @@
             "type": "string",
             "example": "2026-04-26T23:59:59Z"
           },
+          "prepDeadline": {
+            "type": "string",
+            "example": "2026-04-20T23:59:59Z"
+          },
+          "studentDeadline": {
+            "type": "string",
+            "example": "2026-04-25T23:59:59Z"
+          },
           "reflectionDeadline": {
             "type": "string",
             "example": "2026-04-27T23:59:59Z"
@@ -3522,6 +3548,12 @@
             "type": "string"
           },
           "endTimestamp": {
+            "type": "string"
+          },
+          "prepDeadline": {
+            "type": "string"
+          },
+          "studentDeadline": {
             "type": "string"
           },
           "reflectionDeadline": {
@@ -3656,6 +3688,10 @@
           "studentId": {
             "type": "string",
             "example": "S001"
+          },
+          "facultyId": {
+            "type": "string",
+            "example": "F001"
           },
           "ratings": {
             "type": "object",

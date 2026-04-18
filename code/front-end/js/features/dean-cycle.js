@@ -74,7 +74,15 @@ export async function createNewCycle() {
     if (dPrep >= dStudent || dStudent >= dRef) { alert('Deadlines must be chronological (Prep → Student → Reflection).'); return; }
 
     try {
-        await POST('/feedback-cycles', { cycleName: nameInput, type: 'weekly', startTimestamp: dPrep.toISOString(), endTimestamp: dRef.toISOString(), reflectionDeadline: dRef.toISOString() });
+        await POST('/feedback-cycles', { 
+            cycleName: nameInput, 
+            type: 'weekly', 
+            startTimestamp: new Date().toISOString(), 
+            prepDeadline: dPrep.toISOString(), 
+            studentDeadline: dStudent.toISOString(), 
+            reflectionDeadline: dRef.toISOString(), 
+            endTimestamp: dRef.toISOString() 
+        });
         showToast('Cycle created successfully!', 'success');
         document.getElementById('createCycleForm')?.reset();
         await initCycleManagement();

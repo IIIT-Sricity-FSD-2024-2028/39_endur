@@ -1,58 +1,72 @@
 [
-    {
-        "id": "CS101",
-        "name": "Data Structures",
-        "facultyId": "F001",
-        "faculty": "Dr. Alan Turing",
-        "department": "Computer Science",
-        "type": "standard"
-    },
-    {
-        "id": "CS102",
-        "name": "Algorithms",
-        "facultyId": "F002",
-        "faculty": "Dr. Ada Lovelace",
-        "department": "Computer Science",
-        "type": "standard"
-    },
-    {
-        "id": "CS201",
-        "name": "Operating Systems",
-        "facultyId": "F001",
-        "faculty": "Dr. Alan Turing",
-        "department": "Computer Science",
-        "type": "standard"
-    },
-    {
-        "id": "EE101",
-        "name": "Circuit Theory",
-        "facultyId": "F003",
-        "faculty": "Dr. Nikola Tesla",
-        "department": "Electronics",
-        "type": "standard"
-    },
-    {
-        "id": "EE102",
-        "name": "Signals and Systems",
-        "facultyId": "F004",
-        "faculty": "Dr. Claude Shannon",
-        "department": "Electronics",
-        "type": "standard"
-    },
-    {
-        "id": "ME101",
-        "name": "Thermodynamics",
-        "facultyId": "F005",
-        "faculty": "Dr. Rudolf Clausius",
-        "department": "Mechanical",
-        "type": "standard"
-    },
-    {
-        "id": "ME102",
-        "name": "Fluid Mechanics",
-        "facultyId": "F006",
-        "faculty": "Dr. Daniel Bernoulli",
-        "department": "Mechanical",
-        "type": "standard"
-    }
+  {
+    "id": "CS101",
+    "name": "Data Structures",
+    "facultyIds": ["F002", "F010"],
+    "facultyNames": ["Dr. Olivia Johnson", "Dr. Ivan Davis"],
+    "department": "Computer Science",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_read.jpg"
+  },
+  {
+    "id": "CS102",
+    "name": "Algorithms",
+    "facultyIds": ["F012"],
+    "facultyNames": ["Dr. Mia Smith"],
+    "department": "Computer Science",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_bookclub.jpg"
+  },
+  {
+    "id": "ME101",
+    "name": "Thermodynamics",
+    "facultyIds": ["F001"],
+    "facultyNames": ["Dr. Liam Rodriguez"],
+    "department": "Mechanical Engineering",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_breakfast.jpg"
+  },
+  {
+    "id": "ME102",
+    "name": "Fluid Mechanics",
+    "facultyIds": ["F003"],
+    "facultyNames": ["Dr. Judy Rodriguez"],
+    "department": "Mechanical Engineering",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_backtoschool.jpg"
+  },
+  {
+    "id": "EE101",
+    "name": "Circuit Theory",
+    "facultyIds": ["F014"],
+    "facultyNames": ["Dr. Ivan Hernandez"],
+    "department": "Electrical Engineering",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_learnlanguage.jpg"
+  },
+  {
+    "id": "PH101",
+    "name": "Classical Mechanics",
+    "facultyIds": ["F005", "F009"],
+    "facultyNames": ["Dr. Trent Hernandez", "Dr. Quinn Smith"],
+    "department": "Physics",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_read.jpg"
+  },
+  {
+    "id": "MA101",
+    "name": "Calculus",
+    "facultyIds": ["F006"],
+    "facultyNames": ["Dr. Eve Hernandez"],
+    "department": "Mathematics",
+    "type": "standard",
+    "enrolled": 0,
+    "thumbnail": "img_bookclub.jpg"
+  }
 ]

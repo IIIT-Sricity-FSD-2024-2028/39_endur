@@ -1,6 +1,6 @@
-cycleName,type,startTimestamp,endTimestamp,reflectionDeadline,actionReportDeadline,courseId,facultyId,ratingsJson,openEndedComment
-"Spring 2024 - Week 5 Feedback",weekly,2024-03-01T00:00:00Z,2024-03-15T23:59:59Z,2024-03-20T23:59:59Z,2024-03-25T23:59:59Z,CS201,F001,"{""EP-CS-01"": 5, ""EP-CS-02"": 4, ""EP-CS-03"": 5}","Great lectures, very engaging!"
-"Spring 2024 - Week 5 Feedback",weekly,2024-03-01T00:00:00Z,2024-03-15T23:59:59Z,2024-03-20T23:59:59Z,2024-03-25T23:59:59Z,CS201,F001,"{""EP-CS-01"": 4, ""EP-CS-02"": 4, ""EP-CS-03"": 3}","Slightly fast paced, but overall good."
-"Spring 2024 - Midterm Review",midterm,2024-04-01T00:00:00Z,2024-04-30T23:59:59Z,2024-05-05T23:59:59Z,2024-05-10T23:59:59Z,CS201,F001,"{""EP-CS-01"": 5, ""EP-CS-02"": 5, ""EP-CS-03"": 5}","Best course this semester."
-"Fall 2023 - End Term",endterm,2023-11-01T00:00:00Z,2023-12-01T23:59:59Z,2023-12-10T23:59:59Z,2023-12-15T23:59:59Z,CS201,F001,"{""EP-CS-01"": 3, ""EP-CS-02"": 4, ""EP-CS-03"": 4}","Tough exams but I learned a lot."
-"Fall 2023 - End Term",endterm,2023-11-01T00:00:00Z,2023-12-01T23:59:59Z,2023-12-10T23:59:59Z,2023-12-15T23:59:59Z,ME101,F002,"{""EP-ME-01"": 4, ""EP-ME-02"": 3}","Good labs."
+cycleName,type,startTimestamp,endTimestamp,reflectionDeadline,actionReportDeadline,parametersJson,courseId,facultyId,studentId,ratingsJson,openEndedComment
+Fall 2025 Midterm,midterm,2025-10-01T00:00:00Z,2025-10-15T23:59:59Z,2025-10-20T23:59:59Z,2025-10-25T23:59:59Z,,CS101,F002,S001,"{""delivery"":85,""relevance"":90,""support"":80,""assessment"":88}","Dr. Johnson provides incredibly clear structure in Data Structures."
+Fall 2025 Midterm,midterm,2025-10-01T00:00:00Z,2025-10-15T23:59:59Z,2025-10-20T23:59:59Z,2025-10-25T23:59:59Z,,CS101,F010,S001,"{""delivery"":70,""relevance"":90,""support"":95,""assessment"":85}","Dr. Davis was a great co-teacher, very helpful in labs."
+Fall 2025 Midterm,midterm,2025-10-01T00:00:00Z,2025-10-15T23:59:59Z,2025-10-20T23:59:59Z,2025-10-25T23:59:59Z,,ME101,F001,S002,"{""delivery"":95,""relevance"":90,""support"":85,""assessment"":90}","Best thermodynamics classes ever."
+Spring 2026 Formative 1,weekly,2026-02-01T00:00:00Z,2026-02-07T23:59:59Z,2026-02-10T23:59:59Z,,,CS102,F012,S001,"{""delivery"":80,""relevance"":85,""support"":75,""assessment"":80}","Good algorithms pacing."
+Spring 2026 Formative 1,weekly,2026-02-01T00:00:00Z,2026-02-07T23:59:59Z,2026-02-10T23:59:59Z,,,PH101,F005,S004,"{""delivery"":60,""relevance"":70,""support"":65,""assessment"":70}","Found classical mechanics quite tough to follow initially."

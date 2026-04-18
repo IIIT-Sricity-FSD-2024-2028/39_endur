@@ -25,7 +25,7 @@ export class CoursesService {
   findAll(department?: string, facultyId?: string) {
     let courses = this.store.getCourses();
     if (department) courses = courses.filter((c) => c.department === department);
-    if (facultyId) courses = courses.filter((c) => c.facultyId === facultyId);
+    if (facultyId) courses = courses.filter((c) => c.facultyIds && c.facultyIds.includes(facultyId));
     return courses;
   }
 

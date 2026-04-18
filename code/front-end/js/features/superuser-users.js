@@ -217,7 +217,14 @@ export async function previewBulkFile() {
         if (!u.id || !u.name || !u.role || !u.password) return true;
         if (!/^[a-zA-Z0-9]+$/.test(u.id)) return true;
         const prefix = rolePrefixes[u.role.toLowerCase()];
-        return !prefix || !u.id.toUpperCase().startsWith(prefix);
+        if (!prefix || !u.id.toUpperCase().startsWith(prefix)) return true;
+        // Department check for academic roles
+        if (['student', 'faculty', 'hod'].includes(u.role.toLowerCase())) {
+            if (u.department && u.department !== 'Unassigned') {
+                if (!departmentsList.some(d => d.name === u.department)) return true;
+            }
+        }
+        return false;
     });
 
     if (invalidUsers.length > 0) {

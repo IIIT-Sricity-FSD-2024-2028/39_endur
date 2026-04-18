@@ -32,7 +32,6 @@
             <a href="manage-users.html">👥 Manage Users</a>
             <a href="manage-courses.html">📚 Manage Courses</a>
             <a href="manage-cycles.html">🔄 Feedback Cycles</a>
-            <a class="active" href="manage-parameters.html">⚙️ Eval. Parameters</a>
             <a href="manage-departments.html">🏢 Departments</a>
             <a href="audit-logs.html">📋 Audit Logs</a>
             <a href="system-settings.html">🛡️ System Settings</a>
@@ -44,9 +43,9 @@
     </aside>
 
     <main class="dashboard-content">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div class="form-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <div>
-                <h1>Evaluation Parameters</h1>
+                <h2 class="section-title" style="margin:0">Cycle Evaluation Parameters</h2>
                 <p class="subtitle">Define and manage evaluation criteria by department.</p>
             </div>
             <span class="badge primary">SUPER USER</span>
@@ -60,7 +59,6 @@
         <div class="page-actions">
             <input id="paramSearch" class="search-bar" type="search" placeholder="Search parameters…" style="margin:0">
             <div class="page-actions-right" style="display:flex;gap:12px;">
-                <button class="btn-outline" onclick="openParamBulkModal()">📥 Import Parameters</button>
                 <button class="btn-primary" onclick="openAddParam()">+ Add Parameter</button>
             </div>
         </div>

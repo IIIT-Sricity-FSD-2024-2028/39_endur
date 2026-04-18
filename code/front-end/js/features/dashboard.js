@@ -17,12 +17,12 @@ function getStatus(courseId, userId, currentCycleId, allSubmissions) {
 }
 
 export async function updateDashboard() {
+    const user = getSession();
     let [allCourses, cycleState, allSubmissions] = await Promise.all([
         getCourses(),
         getCycleState(),
-        GET('/feedback-responses').catch(() => [])
+        GET(`/feedback-responses?studentId=${user.id}`).catch(() => [])
     ]);
-    const user = getSession();
     const table = document.getElementById('dashboardTable');
     const currentCycleId = cycleState.id || 'FALLBACK_CYCLE';
     const isFeedbackOpen = cycleState.phase === 'STUDENT_FEEDBACK';
@@ -90,12 +90,12 @@ export async function updateDashboard() {
 }
 
 export async function updateStats() {
+    const user = getSession();
     const [allCourses, cycleState, allSubmissions] = await Promise.all([
         getCourses(),
         getCycleState(),
-        GET('/feedback-responses').catch(() => [])
+        GET(`/feedback-responses?studentId=${user.id}`).catch(() => [])
     ]);
-    const user = getSession();
     const myCourses = allCourses.filter(c => user?.enrolledCourses?.includes(c.id));
     // myCourses.push({ id: 'reviewOfReviews', name: 'Platform System Review' });
 

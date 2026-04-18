@@ -96,15 +96,15 @@ export async function renderDeanDashboard() {
         } else {
             deptArray.forEach(dept => {
                 const displayAvg = dept.avg > 0 ? dept.avg.toFixed(1) : 'N/A';
-                const isDanger = dept.avg > 0 && dept.avg < 3.5;
+                const isDanger = dept.avg > 0 && dept.avg < 70;
                 const barColor = isDanger ? '#ef4444' : '#1e3a8a';
-                const widthPct = dept.avg > 0 ? (dept.avg / 5) * 100 : 0;
+                const widthPct = dept.avg > 0 ? dept.avg : 0;
                 const row = document.createElement('div');
                 row.className = 'dept-row';
                 row.innerHTML = `
                     <div class="dept-header">
                         <span style="${isDanger ? 'color:#ef4444' : ''}">${dept.name}</span>
-                        <span style="${isDanger ? 'color:#ef4444' : ''}">${displayAvg} / 5</span>
+                        <span style="${isDanger ? 'color:#ef4444' : ''}">${displayAvg} / 100</span>
                     </div>
                     <div class="dept-bar-bg">
                         <div class="dept-bar-fill" style="width:${widthPct}%;background-color:${barColor}"></div>
@@ -134,8 +134,7 @@ export async function renderDeanDashboard() {
                                 FacultyID: faculty?.id || '',
                                 Department: faculty?.department || '',
                                 Parameter: pCode,
-                                Rating: v,
-                                Comments: f.comments || ""
+                                Rating: v
                             });
                         }
                     });

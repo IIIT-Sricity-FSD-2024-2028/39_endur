@@ -3,6 +3,7 @@ import { CreateFeedbackCycleDto, UpdateFeedbackCycleDto, UpdateCycleStatusDto } 
 export declare class FeedbackCyclesService {
     private readonly store;
     constructor(store: DataStoreService);
+    generateDefaultParameters(): Record<string, any[]>;
     findAll(): any[];
     findActive(): any[];
     findOne(id: string): any;
@@ -10,13 +11,17 @@ export declare class FeedbackCyclesService {
     create(dto: CreateFeedbackCycleDto, actorId?: string, actorName?: string): {
         status: string;
         phase: string;
+        departmentParameters: Record<string, any[]>;
         cycleName: string;
         type?: string;
         startTimestamp: string;
         endTimestamp: string;
+        prepDeadline?: string;
+        studentDeadline?: string;
         reflectionDeadline?: string;
         actionReportDeadline?: string;
         responses?: any[];
+        parametersJson?: string;
         cycleId: string;
     };
     update(id: string, dto: UpdateFeedbackCycleDto, actorId?: string, actorName?: string): any;

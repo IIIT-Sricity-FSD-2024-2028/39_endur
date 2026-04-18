@@ -5,11 +5,12 @@ export declare class FeedbackResponsesService {
     constructor(store: DataStoreService);
     findAll(cycleId?: string, courseId?: string, studentId?: string): any[];
     submit(dto: SubmitFeedbackDto): {
+        ratings: any[] | Record<string, number> | undefined;
         submittedAt: string;
         cycleId: string;
         courseId: string;
         studentId: string;
-        ratings?: Record<string, number>;
+        facultyId?: string;
         openEndedComment?: string;
         id: string;
     };

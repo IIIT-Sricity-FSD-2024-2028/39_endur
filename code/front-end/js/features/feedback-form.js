@@ -34,7 +34,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         course = await GET(`/courses/${courseId}`);
         document.getElementById('courseTitle').innerText = `${course.id} — ${course.name}`;
-        if (course.facultyId) faculty = await GET(`/users/${course.facultyId}`).catch(() => null);
+        
+        let validFacultyIds = course.facultyIds || [];
+        if (course.facultyId && !validFacultyIds.includes(course.facultyId)) {
+            validFacultyIds.push(course.facultyId);
+        }
+
+        const selectorContainer = document.getElementById('facultySelectorContainer');
+        const selectEl = document.getElementById('evalFacultySelect');
+
+        if (validFacultyIds.length > 1) {
+            selectorContainer.style.display = 'block';
+            selectEl.innerHTML = '<option value="">Select Faculty...</option>';
+            for (let i = 0; i < validFacultyIds.length; i++) {
+                const fid = validFacultyIds[i];
+                const fname = (course.facultyNames && course.facultyNames[i]) ? course.facultyNames[i] : fid;
+                selectEl.innerHTML += `<option value="${fid}">${fname}</option>`;
+            }
+            faculty = await GET(`/users/${validFacultyIds[0]}`).catch(() => null);
+        } else if (validFacultyIds.length === 1) {
+            selectEl.innerHTML = `<option value="${validFacultyIds[0]}" selected>${validFacultyIds[0]}</option>`;
+            faculty = await GET(`/users/${validFacultyIds[0]}`).catch(() => null);
+        }
     } catch (e) { console.error('Failed to load course:', e); return; }
 
     // Load evaluation parameters for the faculty's department
@@ -119,9 +140,15 @@ window.submitFeedback = async function() {
         cycleId: cycleState?.id || 'FALLBACK_CYCLE',
         courseId,
         studentId: user.id,
+        facultyId: document.getElementById('evalFacultySelect')?.value || undefined,
         ratings,
         openEndedComment: document.getElementById('commentBox')?.value || '',
     };
+    
+    if (document.getElementById('facultySelectorContainer')?.style.display === 'block' && !payload.facultyId) {
+        alert('Please select the faculty member you are evaluating.');
+        return;
+    }
 
     try {
         await POST('/feedback-responses', payload, 'student');

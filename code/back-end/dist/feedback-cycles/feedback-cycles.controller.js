@@ -80,7 +80,7 @@ __decorate([
 ], FeedbackCyclesController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)('superuser', 'admin'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, swagger_1.ApiOperation)({ summary: 'Create a feedback cycle (superuser/admin only)' }),
     __param(0, (0, common_1.Body)()),
@@ -91,7 +91,7 @@ __decorate([
 ], FeedbackCyclesController.prototype, "create", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, roles_decorator_1.Roles)('superuser', 'admin'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a feedback cycle (superuser/admin only)' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -102,7 +102,7 @@ __decorate([
 ], FeedbackCyclesController.prototype, "update", null);
 __decorate([
     (0, common_1.Patch)(':id/status'),
-    (0, roles_decorator_1.Roles)('superuser', 'admin'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean'),
     (0, swagger_1.ApiOperation)({ summary: 'Update cycle status/phase (superuser/admin only)' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),

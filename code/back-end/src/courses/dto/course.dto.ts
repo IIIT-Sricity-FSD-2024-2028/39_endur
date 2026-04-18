@@ -10,14 +10,14 @@ export class CreateCourseDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'F101', description: 'Faculty user ID' })
-  @IsString()
-  facultyId: string;
+  @ApiProperty({ example: ['F101', 'F102'], type: [String], description: 'Array of Faculty user IDs' })
+  @IsArray()
+  facultyIds: string[];
 
-  @ApiPropertyOptional({ example: 'Dr. Alan Turing' })
+  @ApiPropertyOptional({ example: ['Dr. Alan Turing', 'Dr. Grace Hopper'], type: [String] })
   @IsOptional()
-  @IsString()
-  faculty?: string;
+  @IsArray()
+  facultyNames?: string[];
 
   @ApiPropertyOptional({ example: 'Computer Science' })
   @IsOptional()
@@ -46,15 +46,15 @@ export class UpdateCourseDto {
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsString()
-  facultyId?: string;
+  @IsArray()
+  facultyIds?: string[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsString()
-  faculty?: string;
+  @IsArray()
+  facultyNames?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

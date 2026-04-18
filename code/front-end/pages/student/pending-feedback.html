@@ -144,7 +144,7 @@
                     window.location.href = "feedback-form.html";
                 };
 
-                const thumb = course.id === "reviewOfReviews" ? 'img_bookclub.jpg' : (courseInfo.thumbnail || 'img_read.jpg');
+                const thumb = course.id === "reviewOfReviews" ? 'img_bookclub.jpg' : (course.thumbnail || 'img_read.jpg');
 
                 card.innerHTML = `
                     <div style="flex: 1;">

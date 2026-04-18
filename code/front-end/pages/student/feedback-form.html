@@ -31,6 +31,13 @@
     <h1 id="courseTitle">Loading...</h1>
     <p class="subtitle">Feedback Form</p>
 
+    <!-- FACULTY SELECTOR (DYNAMIC) -->
+    <div id="facultySelectorContainer" style="display:none; background:#fff; padding:16px; border-radius:12px; margin-bottom:24px; border:1px solid var(--glass-border);">
+        <label for="evalFacultySelect" style="display:block; font-weight:600; margin-bottom:8px;">Which faculty member are you evaluating?</label>
+        <select id="evalFacultySelect" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e2e8f0; background:rgba(241,245,249,0.5);">
+        </select>
+    </div>
+
     <!-- DYNAMIC CONTAINER -->
     <div class="feedback-grid" id="dynamicQuestionsContainer">
         <!-- Rendered via JS -->

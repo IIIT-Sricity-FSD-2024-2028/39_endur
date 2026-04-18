@@ -10,6 +10,23 @@ import {
 export class FeedbackCyclesService {
   constructor(private readonly store: DataStoreService) {}
 
+  generateDefaultParameters() {
+    const depts = this.store.getDepartments();
+    const map: Record<string, any[]> = {};
+    const defaultParams = [
+      { id: 'delivery', name: 'Course Delivery & Clarity', weight: 25 },
+      { id: 'relevance', name: 'Course Relevance', weight: 25 },
+      { id: 'support', name: 'Faculty Support & Availability', weight: 25 },
+      { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
+    ];
+    for (const d of depts) {
+      map[d.id] = [...defaultParams];
+    }
+    // Also include an Unassigned fallback
+    map['Unassigned'] = [...defaultParams];
+    return map;
+  }
+
   findAll() {
     return this.store.getFeedbackCycles();
   }
@@ -31,11 +48,28 @@ export class FeedbackCyclesService {
 
   create(dto: CreateFeedbackCycleDto, actorId?: string, actorName?: string) {
     const cycles = this.store.getFeedbackCycles();
+    const activeParams = this.store.getActiveParameters();
+    const depts = this.store.getDepartments();
+    const finalParams: Record<string, any[]> = {};
+    const defaultParams = [
+      { id: 'delivery', name: 'Course Delivery & Clarity', weight: 25 },
+      { id: 'relevance', name: 'Course Relevance', weight: 25 },
+      { id: 'support', name: 'Faculty Support & Availability', weight: 25 },
+      { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
+    ];
+    for (const d of depts) {
+      if (activeParams[d.name]) finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.name]));
+      else if (activeParams[d.id]) finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.id]));
+      else finalParams[d.name] = [...defaultParams];
+    }
+    finalParams['Unassigned'] = [...defaultParams];
+
     const entry = {
       cycleId: this.store.genId('CYCLE'),
       ...dto,
       status: 'active',
       phase: 'PREPARATION',
+      departmentParameters: finalParams
     };
     cycles.unshift(entry);
     this.store.setFeedbackCycles(cycles);
@@ -122,21 +156,47 @@ export class FeedbackCyclesService {
 
     for (const dto of cyclesToImport) {
       const cycleId = this.store.genId('CYCLE');
-      const entry = { cycleId, ...dto, status: 'closed', phase: 'COMPLETED' };
+      
+      let params: any = null;
+      try { params = dto.parametersJson ? JSON.parse(dto.parametersJson) : null; } catch (e) {}
+      if (!params || typeof params !== 'object') {
+         params = this.generateDefaultParameters();
+      }
+
+      const entry = { cycleId, ...dto, status: 'closed', phase: 'COMPLETED', departmentParameters: params };
       delete entry.responses; // don't store raw responses in cycle object
+      delete entry.parametersJson;
       
       cycles.unshift(entry);
       success.push(entry);
 
       if (dto.responses && Array.isArray(dto.responses)) {
-        dto.responses.forEach(r => {
+         dto.responses.forEach(r => {
+           let rawRatings: any = {};
+           try { rawRatings = r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {}; } catch (e) {}
+
+           const course = this.store.getCourses().find(c => c.id === r.courseId);
+           const department = course ? course.department : 'Unassigned';
+           const activeParamsForCycle = params[department] || params['Unassigned'] || [];
+           
+           let enrichedRatings: any[] = [];
+           Object.entries(rawRatings).forEach(([key, score]) => {
+              const pDef = activeParamsForCycle.find(p => p.id === key);
+              enrichedRatings.push({
+                  id: key,
+                  name: pDef ? pDef.name : key,
+                  weight: pDef ? pDef.weight : 25,
+                  score: Number(score)
+              });
+           });
+
            responsesStore.push({
              responseId: this.store.genId('RESP'),
              cycleId: cycleId,
              studentId: r.studentId || this.store.genId('ANON'),
              courseId: r.courseId,
              facultyId: r.facultyId,
-             ratings: r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {},
+             ratings: enrichedRatings.length > 0 ? enrichedRatings : rawRatings,
              comments: r.openEndedComment || r.comments || '',
              submittedAt: new Date().toISOString()
            });

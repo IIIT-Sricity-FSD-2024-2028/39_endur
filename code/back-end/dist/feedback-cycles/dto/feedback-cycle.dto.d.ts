@@ -3,15 +3,20 @@ export declare class CreateFeedbackCycleDto {
     type?: string;
     startTimestamp: string;
     endTimestamp: string;
+    prepDeadline?: string;
+    studentDeadline?: string;
     reflectionDeadline?: string;
     actionReportDeadline?: string;
     responses?: any[];
+    parametersJson?: string;
 }
 export declare class UpdateFeedbackCycleDto {
     cycleName?: string;
     type?: string;
     startTimestamp?: string;
     endTimestamp?: string;
+    prepDeadline?: string;
+    studentDeadline?: string;
     reflectionDeadline?: string;
     actionReportDeadline?: string;
 }

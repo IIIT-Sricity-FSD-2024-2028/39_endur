@@ -15,8 +15,8 @@ const swagger_1 = require("@nestjs/swagger");
 class CreateCourseDto {
     id;
     name;
-    facultyId;
-    faculty;
+    facultyIds;
+    facultyNames;
     department;
     type;
     enrolled;
@@ -34,16 +34,16 @@ __decorate([
     __metadata("design:type", String)
 ], CreateCourseDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'F101', description: 'Faculty user ID' }),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateCourseDto.prototype, "facultyId", void 0);
+    (0, swagger_1.ApiProperty)({ example: ['F101', 'F102'], type: [String], description: 'Array of Faculty user IDs' }),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateCourseDto.prototype, "facultyIds", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'Dr. Alan Turing' }),
+    (0, swagger_1.ApiPropertyOptional)({ example: ['Dr. Alan Turing', 'Dr. Grace Hopper'], type: [String] }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateCourseDto.prototype, "faculty", void 0);
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateCourseDto.prototype, "facultyNames", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'Computer Science' }),
     (0, class_validator_1.IsOptional)(),
@@ -70,8 +70,8 @@ __decorate([
 ], CreateCourseDto.prototype, "thumbnail", void 0);
 class UpdateCourseDto {
     name;
-    facultyId;
-    faculty;
+    facultyIds;
+    facultyNames;
     department;
     thumbnail;
 }
@@ -83,17 +83,17 @@ __decorate([
     __metadata("design:type", String)
 ], UpdateCourseDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ type: [String] }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCourseDto.prototype, "facultyId", void 0);
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], UpdateCourseDto.prototype, "facultyIds", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ type: [String] }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateCourseDto.prototype, "faculty", void 0);
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], UpdateCourseDto.prototype, "facultyNames", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)(),
     (0, class_validator_1.IsOptional)(),

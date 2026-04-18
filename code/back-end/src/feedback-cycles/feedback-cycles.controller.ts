@@ -41,7 +41,7 @@ export class FeedbackCyclesController {
   findOne(@Param('id') id: string) { return this.svc.findOne(id); }
 
   @Post()
-  @Roles('superuser', 'admin')
+  @Roles('superuser', 'admin', 'dean')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a feedback cycle (superuser/admin only)' })
   create(@Body() dto: CreateFeedbackCycleDto, @Request() req: any) {
@@ -49,14 +49,14 @@ export class FeedbackCyclesController {
   }
 
   @Patch(':id')
-  @Roles('superuser', 'admin')
+  @Roles('superuser', 'admin', 'dean')
   @ApiOperation({ summary: 'Update a feedback cycle (superuser/admin only)' })
   update(@Param('id') id: string, @Body() dto: UpdateFeedbackCycleDto, @Request() req: any) {
     return this.svc.update(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
   }
 
   @Patch(':id/status')
-  @Roles('superuser', 'admin')
+  @Roles('superuser', 'admin', 'dean')
   @ApiOperation({ summary: 'Update cycle status/phase (superuser/admin only)' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateCycleStatusDto, @Request() req: any) {
     return this.svc.updateStatus(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);

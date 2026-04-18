@@ -16,6 +16,7 @@ class SubmitFeedbackDto {
     cycleId;
     courseId;
     studentId;
+    facultyId;
     ratings;
     openEndedComment;
 }
@@ -35,6 +36,12 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SubmitFeedbackDto.prototype, "studentId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'F001' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SubmitFeedbackDto.prototype, "facultyId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: { EP001: 4, EP002: 5 }, description: 'Parameter ID → rating score map' }),
     (0, class_validator_1.IsOptional)(),

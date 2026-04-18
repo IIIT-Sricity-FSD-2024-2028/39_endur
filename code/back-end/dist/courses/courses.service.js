@@ -32,7 +32,7 @@ let CoursesService = class CoursesService {
         if (department)
             courses = courses.filter((c) => c.department === department);
         if (facultyId)
-            courses = courses.filter((c) => c.facultyId === facultyId);
+            courses = courses.filter((c) => c.facultyIds && c.facultyIds.includes(facultyId));
         return courses;
     }
     findOne(id) {

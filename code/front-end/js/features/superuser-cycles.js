@@ -44,6 +44,7 @@ function renderCycleTable(filter = '') {
                         ? `<button class="btn-small" style="color:var(--warning)" onclick="suCloseCycle('${c.cycleId}')">Close</button>`
                         : `<button class="btn-small" style="color:var(--accent)" onclick="suReopenCycle('${c.cycleId}')">Reopen</button>`
                     }
+                    <button class="btn-small" style="background:#5b21b6;color:#fff;" onclick="suManageCycleParams('${c.cycleId}')">Parameters</button>
                     <button class="btn-small btn-danger-soft" onclick="suDeleteCycle('${c.cycleId}')">Delete</button>
                 </div>
             </td>
@@ -105,6 +106,11 @@ function bindCycleForm() {
         suCloseCycleModal();
     };
 }
+
+window.suManageCycleParams = (id) => {
+    localStorage.setItem('activeCycleId', id);
+    window.location.href = 'manage-parameters.html';
+};
 
 function updateCycleCount() {
     const el = document.getElementById('statTotalCycles');
@@ -209,15 +215,16 @@ function parseCSV(text) {
                 endTimestamp: row.endTimestamp,
                 reflectionDeadline: row.reflectionDeadline || undefined,
                 actionReportDeadline: row.actionReportDeadline || undefined,
+                parametersJson: row.parametersJson || undefined,
                 responses: []
             };
         }
         
-        // Add responses if available
-        if (row.facultyId) {
+        if (row.facultyId || row.facultyIds) {
             cycleMap[row.cycleName].responses.push({
+                studentId: row.studentId || '',
                 courseId: row.courseId || '',
-                facultyId: row.facultyId || '',
+                facultyId: row.facultyId || row.facultyIds || '',
                 ratingsJson: row.ratingsJson || '',
                 openEndedComment: row.openEndedComment || ''
             });

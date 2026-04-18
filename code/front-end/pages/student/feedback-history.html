@@ -84,20 +84,43 @@
         table.innerHTML = "";
 
         mySubmissions.forEach(s => {
-            const course = courses.find(c => c.id === s.course);
+            const course = courses.find(c => c.id === s.courseId);
             const cycleText = s.cycleId ? s.cycleId : "Archived Cycle";
+            const dateStr = s.submittedAt ? new Date(s.submittedAt).toLocaleDateString() : "Unknown";
+
+            let detailsHtml = '';
+            if (s.ratings) {
+                const isArray = Array.isArray(s.ratings);
+                let html = '<div style="margin-top:12px; padding:12px; background:rgba(241,245,249,0.5); border-radius:8px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">';
+                if (isArray) {
+                    s.ratings.forEach(r => {
+                        html += `<div><span style="font-size:11px; color:#64748b;">${r.name}:</span> <strong>${r.score}%</strong></div>`;
+                    });
+                } else {
+                    Object.entries(s.ratings).forEach(([k,v]) => {
+                        html += `<div><span style="font-size:11px; color:#64748b;">${k}:</span> <strong>${v}%</strong></div>`;
+                    });
+                }
+                html += '</div>';
+                
+                if (s.comments) {
+                    html += `<div style="margin-top:8px; padding:12px; font-size:12px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; font-style:italic;">"${s.comments}"</div>`;
+                }
+                detailsHtml = html;
+            }
 
             table.innerHTML += `
-                <tr>
-                    <td>
-                        <strong>${course?.name || s.course}</strong><br>
-                        <span class="sub-text">${s.course}</span>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding-top:16px; padding-bottom:16px;">
+                        <strong>${course?.name || s.courseId}</strong><br>
+                        <span class="sub-text">${s.courseId}</span>
+                        ${detailsHtml}
                     </td>
-                    <td>
+                    <td style="vertical-align:top; padding-top:16px;">
                         <span class="badge neutral" style="font-size: 11px; text-transform: uppercase;">${cycleText}</span>
                     </td>
-                    <td>${new Date(s.date).toLocaleDateString()}</td>
-                    <td>
+                    <td style="vertical-align:top; padding-top:16px;">${dateStr}</td>
+                    <td style="vertical-align:top; padding-top:16px;">
                         <span class="badge complete">Completed</span>
                     </td>
                 </tr>

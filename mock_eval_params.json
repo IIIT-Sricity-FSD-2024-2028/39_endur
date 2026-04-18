@@ -31,49 +31,49 @@
         "name": "Clarity of Explanation",
         "description": "How clearly concepts are communicated.",
         "weight": 30,
-        "department": "Electronics",
+        "department": "Electrical Engineering",
         "type": "rating"
     },
     {
         "name": "Lab Guidance",
         "description": "Effectiveness of practical lab instruction.",
         "weight": 30,
-        "department": "Electronics",
+        "department": "Electrical Engineering",
         "type": "rating"
     },
     {
         "name": "Course Pacing",
         "description": "Appropriate pacing of content delivery.",
         "weight": 20,
-        "department": "Electronics",
+        "department": "Electrical Engineering",
         "type": "rating"
     },
     {
         "name": "Student Support",
         "description": "Availability and helpfulness during office hours.",
         "weight": 20,
-        "department": "Electronics",
+        "department": "Electrical Engineering",
         "type": "rating"
     },
     {
         "name": "Teaching Effectiveness",
         "description": "Overall quality of instruction.",
         "weight": 40,
-        "department": "Mechanical",
+        "department": "Mechanical Engineering",
         "type": "rating"
     },
     {
         "name": "Practical Application",
         "description": "Real-world examples and case studies.",
         "weight": 30,
-        "department": "Mechanical",
+        "department": "Mechanical Engineering",
         "type": "rating"
     },
     {
         "name": "Student Engagement",
         "description": "Classroom interaction and participation.",
         "weight": 30,
-        "department": "Mechanical",
+        "department": "Mechanical Engineering",
         "type": "rating"
     }
 ]

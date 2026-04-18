@@ -29,13 +29,30 @@ let FeedbackResponsesService = class FeedbackResponsesService {
     }
     submit(dto) {
         const responses = this.store.getFeedbackResponses();
-        const existing = responses.find((r) => r.cycleId === dto.cycleId && r.courseId === dto.courseId && r.studentId === dto.studentId);
+        const existing = responses.find((r) => r.cycleId === dto.cycleId && r.courseId === dto.courseId && r.studentId === dto.studentId && (r.facultyId === dto.facultyId || !dto.facultyId));
         if (existing) {
             throw new common_1.ConflictException('Feedback already submitted for this course in this cycle');
+        }
+        const course = this.store.getCourses().find(c => c.id === dto.courseId);
+        const department = course ? course.department : 'Unassigned';
+        const cycle = this.store.getFeedbackCycles().find(c => c.cycleId === dto.cycleId);
+        let enrichedRatings = [];
+        if (cycle && cycle.departmentParameters && dto.ratings) {
+            const params = cycle.departmentParameters[department] || cycle.departmentParameters['Unassigned'] || [];
+            Object.entries(dto.ratings).forEach(([key, score]) => {
+                const pDef = params.find(p => p.id === key);
+                enrichedRatings.push({
+                    id: key,
+                    name: pDef ? pDef.name : key,
+                    weight: pDef ? pDef.weight : 25,
+                    score: Number(score)
+                });
+            });
         }
         const entry = {
             id: this.store.genId('FR'),
             ...dto,
+            ratings: enrichedRatings.length > 0 ? enrichedRatings : dto.ratings,
             submittedAt: new Date().toISOString(),
         };
         responses.push(entry);

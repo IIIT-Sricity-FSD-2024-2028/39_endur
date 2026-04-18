@@ -222,8 +222,8 @@ document.addEventListener("DOMContentLoaded", function() {
         currentCharts.push(ch);
     }
 
-    function renderCourse(course, allFeedback) {
-        var fb = allFeedback.filter(function(f){ return f.course === course.id; });
+    function renderCourse(course, allFeedback, allCycles) {
+        var fb = allFeedback.filter(function(f){ return f.courseId === course.id; });
         destroyCharts();
 
         if (fb.length === 0) {
@@ -236,57 +236,80 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        // Aggregate ratings
-        var totals = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
-        var counts  = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+        var totals = {};
+        var counts  = {};
+        var paramNames = {}; 
+        
+        // Use default parameter names as fallback
+        var defaultsMap = {
+            delivery: "Course Delivery & Clarity",
+            relevance: "Course Relevance",
+            support: "Faculty Support & Availability",
+            assessment: "Fairness of Assessments"
+        };
+
         fb.forEach(function(f) {
             if (!f.ratings) return;
-            ["clarity","structure","engagement","difficulty"].forEach(function(k) {
+            const cycle = allCycles.find(c => c.cycleId === f.cycleId);
+            const deptParams = cycle?.departmentParameters?.[user.department] || cycle?.departmentParameters?.['Unassigned'] || [];
+            
+            Object.keys(f.ratings).forEach(function(k) {
                 if (typeof f.ratings[k] === "number") {
+                    if (!totals[k]) { totals[k] = 0; counts[k] = 0; }
                     totals[k] += f.ratings[k];
                     counts[k]++;
+                    
+                    const pDef = deptParams.find(p => p.id === k);
+                    if (pDef) paramNames[k] = pDef.name;
+                    else if (!paramNames[k]) paramNames[k] = defaultsMap[k] || k;
                 }
             });
         });
 
-        function pct(k) {
-            return counts[k] > 0 ? +((totals[k] / counts[k]) * 20).toFixed(1) : 0;
-        }
+        // 1-100 scale averaging natively
+        function pct(k) { return counts[k] > 0 ? +(totals[k] / counts[k]).toFixed(1) : 0; }
 
-        var clarity    = pct("clarity");
-        var structure  = pct("structure");
-        var engagement = pct("engagement");
-        var difficulty = pct("difficulty");
-        var overall    = +((clarity + structure + engagement + difficulty) / 4).toFixed(1);
+        var keys = Object.keys(totals);
+        var sumOverall = 0;
+        var processed = keys.map(function(k) {
+            var val = pct(k);
+            sumOverall += val;
+            return { id: k, name: paramNames[k], val: val };
+        });
+        
+        var overall = processed.length > 0 ? +(sumOverall / processed.length).toFixed(1) : 0;
 
-        pageContent.innerHTML =
-            // Score hero
-            '<div class="score-hero">' +
+        // Build dynamic HTML
+        var html = '<div class="score-hero">' +
             '<div class="score-pill"><span class="val">' + overall + '%</span><span class="lbl">Overall Score</span></div>' +
-            '<div class="score-pill" style="background:linear-gradient(135deg,#10b981,#059669)"><span class="val">' + fb.length + '</span><span class="lbl">Responses</span></div>' +
-            '<div class="score-pill" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)"><span class="val">' + clarity + '%</span><span class="lbl">Clarity</span></div>' +
-            '<div class="score-pill" style="background:linear-gradient(135deg,#f59e0b,#d97706)"><span class="val">' + engagement + '%</span><span class="lbl">Engagement</span></div>' +
-            '</div>' +
-            // Main line chart
+            '<div class="score-pill" style="background:linear-gradient(135deg,#10b981,#059669)"><span class="val">' + fb.length + '</span><span class="lbl">Responses</span></div>';
+        
+        // Dynamically append top 2 score pills natively to save massive CSS space
+        var top2 = processed.slice(0, 2);
+        var gradColors = ['linear-gradient(135deg,#8b5cf6,#7c3aed)', 'linear-gradient(135deg,#f59e0b,#d97706)'];
+        top2.forEach((p, idx) => {
+             html += '<div class="score-pill" style="background:'+gradColors[idx]+'"><span class="val">' + p.val + '%</span><span class="lbl">' + p.name + '</span></div>';
+        });
+        
+        html += '</div>' +
             '<div class="main-chart-card">' +
             '<h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;">Overall Performance Over Time</h3>' +
             '<p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;">Current score with simulated historical trajectory.</p>' +
-            '<canvas id="mainLineChart"></canvas>' +
-            '</div>' +
-            // 4 bar charts
-            '<div class="chart-grid">' +
-            '<div class="chart-card"><h3>📖 Clarity of Instruction</h3><p class="chart-sub">How clearly material was presented.</p><canvas id="clarityChart"></canvas></div>' +
-            '<div class="chart-card"><h3>🏗️ Course Structure</h3><p class="chart-sub">Organisation and logical flow of content.</p><canvas id="structureChart"></canvas></div>' +
-            '<div class="chart-card"><h3>💡 Student Engagement</h3><p class="chart-sub">Level of interactive involvement created.</p><canvas id="engagementChart"></canvas></div>' +
-            '<div class="chart-card"><h3>⚖️ Difficulty Balance</h3><p class="chart-sub">Perceived fairness of course difficulty.</p><canvas id="difficultyChart"></canvas></div>' +
-            '</div>';
+            '<canvas id="mainLineChart"></canvas></div><div class="chart-grid">';
+            
+        // Dynamically spawn Bar Cards
+        var iconMap = ["📖", "🏗️", "💡", "⚖️", "📊", "🎯"];
+        processed.forEach(function(p, i) {
+            var icon = iconMap[i % iconMap.length];
+            html += '<div class="chart-card"><h3>' + icon + ' ' + p.name + '</h3><p class="chart-sub">Historical mapped averages.</p><canvas id="chart_' + p.id + '"></canvas></div>';
+        });
+        html += '</div>';
 
-        // Render charts AFTER innerHTML is set
-        mkLine("mainLineChart",   "Overall %",    makeHistory(overall,    20));
-        mkBar("clarityChart",     "Clarity %",    makeHistory(clarity,    18));
-        mkBar("structureChart",   "Structure %",  makeHistory(structure,  18));
-        mkBar("engagementChart",  "Engagement %", makeHistory(engagement, 18));
-        mkBar("difficultyChart",  "Difficulty %", makeHistory(difficulty, 18));
+        pageContent.innerHTML = html;
+
+        // Render charts synchronously
+        mkLine("mainLineChart", "Overall %", makeHistory(overall, 20));
+        processed.forEach(function(p) { mkBar("chart_" + p.id, p.name + " %", makeHistory(p.val, 18)); });
     }
 
     let btnBindingDone = false;
@@ -295,10 +318,12 @@ document.addEventListener("DOMContentLoaded", function() {
     Promise.all([
         fetch("http://localhost:3000/api/courses", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()),
         fetch("http://localhost:3000/api/feedback-responses", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()).catch(() => []),
+        fetch("http://localhost:3000/api/feedback-cycles", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()).catch(() => []),
     ])
         .then(function(results) {
             var allCourses = results[0];
             var allFeedbackRaw = results[1];
+            var allCycles = results[2];
             var myCourses = allCourses.filter(function(c){ return c.facultyId === user.id; });
 
             if (myCourses.length === 0) {
@@ -347,15 +372,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 btn.onclick = function() {
                     document.querySelectorAll(".course-btn").forEach(function(b){ b.classList.remove("active"); });
                     btn.classList.add("active");
-                    // Fix: filter by courseId (API field), not course
                     var courseFeedback = myFeedback.filter(function(f){ return f.courseId === course.id; });
-                    renderCourse(course, courseFeedback);
+                    renderCourse(course, courseFeedback, allCycles);
                 };
                 selectorEl.appendChild(btn);
             });
 
             var firstCourseFeedback = myFeedback.filter(function(f){ return f.courseId === myCourses[0].id; });
-            renderCourse(myCourses[0], firstCourseFeedback);
+            renderCourse(myCourses[0], firstCourseFeedback, allCycles);
         })
         .catch(function(e) {
             console.error("Failed to load data", e);

@@ -19,6 +19,16 @@ export class CreateFeedbackCycleDto {
   @IsDateString()
   endTimestamp: string;
 
+  @ApiPropertyOptional({ example: '2026-04-20T23:59:59Z' })
+  @IsOptional()
+  @IsDateString()
+  prepDeadline?: string;
+
+  @ApiPropertyOptional({ example: '2026-04-25T23:59:59Z' })
+  @IsOptional()
+  @IsDateString()
+  studentDeadline?: string;
+
   @ApiPropertyOptional({ example: '2026-04-27T23:59:59Z' })
   @IsOptional()
   @IsDateString()
@@ -31,6 +41,10 @@ export class CreateFeedbackCycleDto {
 
   @IsOptional()
   responses?: any[];
+
+  @IsOptional()
+  @IsString()
+  parametersJson?: string;
 }
 
 export class UpdateFeedbackCycleDto {
@@ -53,6 +67,16 @@ export class UpdateFeedbackCycleDto {
   @IsOptional()
   @IsDateString()
   endTimestamp?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  prepDeadline?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  studentDeadline?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -9,9 +9,20 @@ export function getSession() {
 
 export function requireAuth() {
     const session = getSession();
+
     if (!session) {
-        window.location.href = "../../login.html";
+        window.location.replace("../../login.html");
         return null;
+    }
+
+    // SPA Guard against Back-button via bfcache
+    if (!window._bfcacheGuardAttached) {
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted && !getSession()) {
+                window.location.replace("../../login.html");
+            }
+        });
+        window._bfcacheGuardAttached = true;
     }
 
     const setAvatars = () => {

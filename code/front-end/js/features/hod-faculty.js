@@ -1,5 +1,6 @@
 import { GET } from '../core/api.js';
 import { getSession } from '../core/session.js';
+import { exportToCSV } from './admin-utils.js';
 
 export async function renderFacultyManagement() {
     const user = getSession();
@@ -77,11 +78,42 @@ export async function renderFacultyManagement() {
                 <td><span class="designation-badge">${designation}</span></td>
                 <td style="max-width: 150px;">${coursePillsHtml}</td>
                 <td>
-                    <strong style="color: #1e3a8a; font-size: 15px;">${facultyAvgScore > 0 ? facultyAvgScore.toFixed(1) : "0.0"}/5.0</strong>
-                    <div class="perf-bar-bg"><div class="perf-bar-fill" style="width: ${facultyAvgScore > 0 ? barWidth : 0}%;"></div></div>
+                    <strong style="color: #1e3a8a; font-size: 15px;">${facultyAvgScore > 0 ? facultyAvgScore.toFixed(1) : "0.0"}/100</strong>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill" style="width: ${facultyAvgScore > 0 ? facultyAvgScore : 0}%;"></div></div>
                 </td>
             `;
             tableBody.appendChild(tr);
         }
     });
+
+    // Handle Export
+    const btnExport = document.getElementById("btnExportDeptCSV");
+    if (btnExport) {
+        btnExport.onclick = () => {
+             const exportRows = myFaculty.map(f => {
+                  const fb = submissions.filter(sub => sub.facultyId === f.id);
+                  let avgScore = 0;
+                  if (fb.length > 0) {
+                      let sumAvgs = 0;
+                      fb.forEach(sub => {
+                          let mSum = 0; let mCount = 0;
+                          if (sub.ratings) {
+                               Object.values(sub.ratings).forEach(v => {
+                                    if (typeof v === 'number') { mSum += v; mCount++; }
+                               });
+                          }
+                          sumAvgs += (mCount > 0 ? (mSum / mCount) : 0);
+                      });
+                      avgScore = +(sumAvgs / fb.length).toFixed(1);
+                  }
+                  return {
+                       "Faculty Name": f.name,
+                       "Employee ID": f.id,
+                       "Total Responses": fb.length,
+                       "Overall Aggregate Average (0-100 scale)": avgScore
+                  };
+             });
+             exportToCSV(`Dept_${user.department}_Faculty_Trends.csv`, exportRows);
+        };
+    }
 }

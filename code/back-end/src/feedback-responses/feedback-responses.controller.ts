@@ -16,7 +16,7 @@ export class FeedbackResponsesController {
   constructor(private readonly svc: FeedbackResponsesService) {}
 
   @Get()
-  @Roles('superuser', 'admin', 'dean', 'hod', 'faculty')
+  @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'List feedback responses (filterable by cycle/course/student)' })
   @ApiQuery({ name: 'cycleId', required: false })
   @ApiQuery({ name: 'courseId', required: false })

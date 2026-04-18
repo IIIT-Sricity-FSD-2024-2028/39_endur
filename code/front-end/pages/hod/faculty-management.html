@@ -78,8 +78,13 @@
 
     <!-- MAIN -->
     <main class="dashboard-content">
-        <h1>Faculty Management</h1>
-        <p class="subtitle" style="margin-bottom: 30px;">Oversee and manage department faculty performance and assignments.</p>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom: 24px; gap: 16px;">
+            <div>
+                <h1>Faculty Management</h1>
+                <p class="subtitle" style="margin-bottom:0;">Oversee and manage department faculty performance and assignments.</p>
+            </div>
+            <button class="btn-outline" id="btnExportDeptCSV" style="display:flex;align-items:center;gap:6px;">📥 Export Feedback Trends</button>
+        </div>
 
         <!-- FACULTY TABLE -->
         <div class="card" style="padding: 0;">

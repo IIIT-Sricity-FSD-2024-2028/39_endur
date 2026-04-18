@@ -1,8 +1,8 @@
 export declare class CreateCourseDto {
     id: string;
     name: string;
-    facultyId: string;
-    faculty?: string;
+    facultyIds: string[];
+    facultyNames?: string[];
     department?: string;
     type?: string;
     enrolled?: number;
@@ -10,8 +10,8 @@ export declare class CreateCourseDto {
 }
 export declare class UpdateCourseDto {
     name?: string;
-    facultyId?: string;
-    faculty?: string;
+    facultyIds?: string[];
+    facultyNames?: string[];
     department?: string;
     thumbnail?: string;
 }

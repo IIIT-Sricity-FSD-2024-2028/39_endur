@@ -14,6 +14,11 @@ export class SubmitFeedbackDto {
   @IsString()
   studentId: string;
 
+  @ApiPropertyOptional({ example: 'F001' })
+  @IsOptional()
+  @IsString()
+  facultyId?: string;
+
   @ApiPropertyOptional({ example: { EP001: 4, EP002: 5 }, description: 'Parameter ID → rating score map' })
   @IsOptional()
   @IsObject()

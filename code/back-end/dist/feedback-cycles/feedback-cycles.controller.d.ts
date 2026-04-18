@@ -10,13 +10,17 @@ export declare class FeedbackCyclesController {
     create(dto: CreateFeedbackCycleDto, req: any): {
         status: string;
         phase: string;
+        departmentParameters: Record<string, any[]>;
         cycleName: string;
         type?: string;
         startTimestamp: string;
         endTimestamp: string;
+        prepDeadline?: string;
+        studentDeadline?: string;
         reflectionDeadline?: string;
         actionReportDeadline?: string;
         responses?: any[];
+        parametersJson?: string;
         cycleId: string;
     };
     update(id: string, dto: UpdateFeedbackCycleDto, req: any): any;

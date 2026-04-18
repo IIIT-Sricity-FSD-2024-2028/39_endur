@@ -57,7 +57,7 @@ function renderCourseTable(filter = '') {
                     <small style="color:var(--text-muted)">${c.id}</small>
                 </div>
             </td>
-            <td>${c.faculty || '—'}<br><small style="color:var(--text-muted)">${c.facultyId || ''}</small></td>
+            <td>${(c.facultyNames && c.facultyNames.length > 0) ? c.facultyNames.join('<br>') : '—'}<br><small style="color:var(--text-muted)">${(c.facultyIds && c.facultyIds.length > 0) ? c.facultyIds.join(', ') : 'Unassigned'}</small></td>
             <td><span class="badge neutral">${c.department}</span></td>
             <td><strong>${c.enrolled || 0}</strong> Students</td>
             <td>
@@ -105,18 +105,20 @@ export async function saveCourse() {
     const id = document.getElementById('courseId').value.trim();
     const name = document.getElementById('courseName').value.trim();
     const facultySelect = document.getElementById('courseFaculty');
-    const facultyId = facultySelect.value;
-    const facultyOption = facultySelect.options[facultySelect.selectedIndex];
-    const facultyName = facultyOption?.dataset?.name || '';
+    const selectedOptions = Array.from(facultySelect.selectedOptions);
+    const facultyIds = selectedOptions.map(opt => opt.value);
+    const facultyNames = selectedOptions.map(opt => opt.dataset?.name || '');
+    const firstDept = selectedOptions[0]?.dataset?.dept || '';
+    
     const deptSelect = document.getElementById('courseDeptSelect');
-    const dept = deptSelect.value || facultyOption?.dataset?.dept || '';
+    const dept = deptSelect.value || firstDept || '';
     const shouldAutoEnroll = document.getElementById('autoEnrollDept')?.checked;
 
-    if (!id || !name || !facultyId) { showToast('ID, Name, and Faculty are required.', 'error'); return; }
+    if (!id || !name || facultyIds.length === 0) { showToast('ID, Name, and Faculty are required.', 'error'); return; }
     if (!/^[a-zA-Z0-9]+$/.test(id)) { showToast('Course ID cannot contain special characters.', 'error'); return; }
 
     const editId = form.dataset.editId;
-    const payload = { name, faculty: facultyName, facultyId, department: dept, thumbnail: currentModalThumb };
+    const payload = { name, facultyNames, facultyIds, department: dept, thumbnail: currentModalThumb };
 
     try {
         if (editId) {
@@ -180,12 +182,15 @@ export function openEditCourse(id) {
     if (!c) return;
     const form = document.getElementById('courseForm');
     if (document.getElementById('autoEnrollDept')) document.getElementById('autoEnrollDept').checked = false;
-    document.getElementById('courseId').value = c.id;
-    document.getElementById('courseId').disabled = true;
-    document.getElementById('courseName').value = c.name;
+    if (!form) return;
+    form.courseId.value = c.id;
+    form.courseId.disabled = true;
+    form.courseName.value = c.name;
+    const facultySelect = document.getElementById('courseFaculty');
+    Array.from(facultySelect.options).forEach(opt => {
+        opt.selected = (c.facultyIds || []).includes(opt.value);
+    });
     document.getElementById('courseDeptSelect').value = c.department || '';
-    document.getElementById('courseFaculty').value = c.facultyId;
-    document.getElementById('courseFaculty').disabled = true;
     updateModalThumbPreview(c.thumbnail);
     form.dataset.editId = id;
     document.getElementById('courseModalTitle').textContent = 'Edit Course';
@@ -231,9 +236,16 @@ function parseCSV(text) {
     if (lines.length < 2) return [];
     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
     return lines.slice(1).map(line => {
-        const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const vals = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
         const obj = {};
-        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        headers.forEach((h, i) => { 
+            let val = vals[i] || '';
+            if (h === 'facultyIds' || h === 'facultyNames') {
+                obj[h] = val ? val.split(';').map(x => x.trim()) : [];
+            } else {
+                obj[h] = val;
+            }
+        });
         if (obj.enrolled) obj.enrolled = Number(obj.enrolled) || 0;
         return obj;
     });
@@ -262,12 +274,16 @@ export async function previewCourseBulkFile() {
 
     if (!parsed.length) { showToast('No valid data found.', 'error'); return; }
 
-    const missing = parsed.filter(c => !c.id || !c.name || !c.facultyId);
-    if (missing.length) { showToast(`${missing.length} rows missing required fields (id, name, facultyId).`, 'error'); return; }
+    const missing = parsed.filter(c => !c.id || !c.name || !c.facultyIds || c.facultyIds.length === 0);
+    if (missing.length) { showToast(`${missing.length} rows missing required fields (id, name, facultyIds).`, 'error'); return; }
+    
+    // Check conflicts
+    const conflicts = parsed.filter(c => courses.some(ex => ex.id === c.id));
+    if (conflicts.length) { showToast(`Found ${conflicts.length} duplicate Course IDs. Remove them to proceed.`, 'error'); return; }
 
     window.__bulkCourseData = parsed;
     const preview = document.getElementById('courseBulkPreviewBody');
-    if (preview) preview.innerHTML = parsed.slice(0, 20).map(c => `<tr><td><code>${c.id}</code></td><td>${c.name}</td><td>${c.facultyId}</td><td>${c.department || '—'}</td></tr>`).join('');
+    if (preview) preview.innerHTML = parsed.slice(0, 20).map(c => `<tr><td>${c.id}</td><td>${c.name}</td><td>${(c.facultyIds || []).join(', ')}</td></tr>`).join('');
     const section = document.getElementById('courseBulkPreviewSection');
     if (section) { section.style.display = 'block'; document.getElementById('courseBulkPreviewCount').textContent = `${parsed.length} courses to import`; }
 }

@@ -1,8 +1,8 @@
-id,name,facultyId,faculty,department,type
-CS101,Data Structures,F001,Dr. Alan Turing,Computer Science,standard
-CS102,Algorithms,F002,Dr. Ada Lovelace,Computer Science,standard
-CS201,Operating Systems,F001,Dr. Alan Turing,Computer Science,standard
-EE101,Circuit Theory,F003,Dr. Nikola Tesla,Electronics,standard
-EE102,Signals and Systems,F004,Dr. Claude Shannon,Electronics,standard
-ME101,Thermodynamics,F005,Dr. Rudolf Clausius,Mechanical,standard
-ME102,Fluid Mechanics,F006,Dr. Daniel Bernoulli,Mechanical,standard
+id,name,facultyIds,facultyNames,department,type
+CS101,Data Structures,F002;F010,Dr. Olivia Johnson;Dr. Ivan Davis,Computer Science,standard
+CS102,Algorithms,F012,Dr. Mia Smith,Computer Science,standard
+ME101,Thermodynamics,F001,Dr. Liam Rodriguez,Mechanical Engineering,standard
+ME102,Fluid Mechanics,F003,Dr. Judy Rodriguez,Mechanical Engineering,standard
+EE101,Circuit Theory,F014,Dr. Ivan Hernandez,Electrical Engineering,standard
+PH101,Classical Mechanics,F005;F009,Dr. Trent Hernandez;Dr. Quinn Smith,Physics,standard
+MA101,Calculus,F006,Dr. Eve Hernandez,Mathematics,standard

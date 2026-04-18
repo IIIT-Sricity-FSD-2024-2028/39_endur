@@ -22,21 +22,22 @@ export async function renderHistoricalTrends() {
     let counts = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
 
     courseFeedback.forEach(f => {
+        if (f.facultyId && f.facultyId !== user.id && (!Array.isArray(f.facultyIds) || !f.facultyIds.includes(user.id))) {
+            return; // Only count feedback meant explicitly for this faculty
+        }
+
         if (f.ratings) {
-            // Mapping default param keys dynamically or relying on standard ones.
-            // As we don't have hardcoded IDs easily mapping to these tags, we'll try to find them by substring or generic keys.
-            // For now, we'll iterate and accumulate if they match standard keys or just fallback.
-            // A realistic implementation would use the dynamic param IDs, but keeping the math working:
-            Object.keys(f.ratings).forEach(k => {
-                const kLower = k.toLowerCase();
-                const val = f.ratings[k];
-                if(typeof val === 'number') {
-                    if(kLower.includes('clarity')) { totals.clarity += val; counts.clarity++; }
-                    else if(kLower.includes('structure')) { totals.structure += val; counts.structure++; }
-                    else if(kLower.includes('engagement')) { totals.engagement += val; counts.engagement++; }
-                    else if(kLower.includes('difficulty')) { totals.difficulty += val; counts.difficulty++; }
+            let ratingArray = Array.isArray(f.ratings) ? f.ratings : Object.entries(f.ratings).map(([k,v]) => ({id: k, score: v}));
+            
+            ratingArray.forEach(r => {
+                const kLower = (r.id || r.name || '').toLowerCase();
+                const val = Number(r.score);
+                if (!isNaN(val)) {
+                    if (kLower.includes('clarity') || kLower.includes('delivery')) { totals.clarity += val; counts.clarity++; }
+                    else if (kLower.includes('structure') || kLower.includes('relevance')) { totals.structure += val; counts.structure++; }
+                    else if (kLower.includes('engagement') || kLower.includes('support')) { totals.engagement += val; counts.engagement++; }
+                    else if (kLower.includes('difficulty') || kLower.includes('assessment')) { totals.difficulty += val; counts.difficulty++; }
                     else {
-                        // generic fallback
                         totals.clarity += val; counts.clarity++;
                     }
                 }

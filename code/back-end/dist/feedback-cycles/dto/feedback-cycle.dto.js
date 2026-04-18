@@ -17,9 +17,12 @@ class CreateFeedbackCycleDto {
     type;
     startTimestamp;
     endTimestamp;
+    prepDeadline;
+    studentDeadline;
     reflectionDeadline;
     actionReportDeadline;
     responses;
+    parametersJson;
 }
 exports.CreateFeedbackCycleDto = CreateFeedbackCycleDto;
 __decorate([
@@ -44,6 +47,18 @@ __decorate([
     __metadata("design:type", String)
 ], CreateFeedbackCycleDto.prototype, "endTimestamp", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: '2026-04-20T23:59:59Z' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], CreateFeedbackCycleDto.prototype, "prepDeadline", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: '2026-04-25T23:59:59Z' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], CreateFeedbackCycleDto.prototype, "studentDeadline", void 0);
+__decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: '2026-04-27T23:59:59Z' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsDateString)(),
@@ -59,11 +74,18 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], CreateFeedbackCycleDto.prototype, "responses", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateFeedbackCycleDto.prototype, "parametersJson", void 0);
 class UpdateFeedbackCycleDto {
     cycleName;
     type;
     startTimestamp;
     endTimestamp;
+    prepDeadline;
+    studentDeadline;
     reflectionDeadline;
     actionReportDeadline;
 }
@@ -92,6 +114,18 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], UpdateFeedbackCycleDto.prototype, "endTimestamp", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], UpdateFeedbackCycleDto.prototype, "prepDeadline", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], UpdateFeedbackCycleDto.prototype, "studentDeadline", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)(),
     (0, class_validator_1.IsOptional)(),

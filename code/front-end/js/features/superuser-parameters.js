@@ -5,21 +5,31 @@ let deptConfigs = {};
 let statuses = {};
 let session = null;
 let allDepts = [];
+let activeCycle = null;
 
 export async function renderSuperuserParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const cycleId = urlParams.get('cycleId') || localStorage.getItem('activeCycleId');
+    if (!cycleId) {
+        showToast('No Cycle ID provided. Returning to cycles list.', 'error');
+        setTimeout(() => window.location.href = 'manage-cycles.html', 1500);
+        return;
+    }
+
     session = getSession();
     try {
-        const flatParams = await GET('/evaluation-parameters');
-        statuses = await GET('/evaluation-parameters/status');
-
-        deptConfigs = {};
-        flatParams.forEach(p => {
-            if (!deptConfigs[p.department]) deptConfigs[p.department] = [];
-            deptConfigs[p.department].push(p);
-        });
+        activeCycle = await GET(`/feedback-cycles/${cycleId}`);
+        if (!activeCycle.departmentParameters) activeCycle.departmentParameters = {};
+        
+        deptConfigs = activeCycle.departmentParameters;
         allDepts = Object.keys(deptConfigs).sort();
+        
+        document.getElementById('statTotalParams').textContent = `Cycle: ${activeCycle.cycleName}`;
+        if (document.getElementById('statActiveParams')) document.getElementById('statActiveParams').style.display = 'none';
+
+        statuses = Object.keys(deptConfigs).reduce((acc, d) => ({...acc, [d]: 'APPROVED'}), {});
     } catch (e) {
-        showToast('Failed to load parameters from server.', 'error');
+        showToast('Failed to load cycle data.', 'error');
         deptConfigs = {};
         statuses = {};
     }
@@ -28,19 +38,20 @@ export async function renderSuperuserParameters() {
     populateDeptDropdown(allDepts);
     bindParamForm();
     bindSearch();
-    updateParamCount();
 }
 
 function populateDeptDropdown(depts) {
     const select = document.getElementById('paramDepts');
     if (!select) return;
-    select.innerHTML = '<option value="" disabled selected>Select a department...</option>';
-    depts.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = d;
-        select.appendChild(opt);
-    });
+    
+    // Also include all standard departments from endpoint
+    GET('/departments').then(sysDepts => {
+        const dNames = sysDepts.map(d => d.name);
+        [...new Set([...depts, ...dNames])].sort().forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d; opt.textContent = d; select.appendChild(opt);
+        });
+    }).catch(()=>{});
 }
 
 function renderParamsTable(filter = '') {
@@ -49,23 +60,17 @@ function renderParamsTable(filter = '') {
 
     let flatList = [];
     Object.entries(deptConfigs).forEach(([dept, params]) => {
-        params.forEach(p => {
-            flatList.push({ ...p, department: dept, status: statuses[dept] || 'DRAFT' });
-        });
+        params.forEach(p => { flatList.push({ ...p, department: dept }); });
     });
 
-    const list = filter
-        ? flatList.filter(p => p.name.toLowerCase().includes(filter) || p.department.toLowerCase().includes(filter))
-        : flatList;
+    const list = filter ? flatList.filter(p => p.name.toLowerCase().includes(filter) || p.department.toLowerCase().includes(filter)) : flatList;
 
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">No parameters found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">No parameters.</td></tr>';
         return;
     }
 
     tbody.innerHTML = list.map(p => {
-        const displayStatus = p.status === 'SUBMITTED' ? 'IN REVIEW' : (p.status === 'APPROVED' ? 'APPROVED' : 'DRAFT');
-        const badgeClass = p.status === 'APPROVED' ? 'success' : (p.status === 'SUBMITTED' ? 'warning' : 'neutral');
         const deptParams = deptConfigs[p.department] || [];
         const totalWeight = deptParams.reduce((sum, item) => sum + (item.weight || 0), 0);
         const weightStatus = totalWeight === 100 ? '✅ 100%' : `⚠️ ${totalWeight}%`;
@@ -80,22 +85,30 @@ function renderParamsTable(filter = '') {
                 <span style="font-size:0.7rem;color:${weightColor};font-weight:700;margin-left:8px;">(${weightStatus})</span>
             </td>
             <td>${p.weight > 0 ? `<strong>${p.weight}%</strong>` : '—'}</td>
-            <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
+            <td><span class="badge success">CYCLE BOUND</span></td>
             <td>
                 <div style="display:flex;gap:8px;">
                     <button class="btn-small" onclick="openEditParam('${p.id}', '${p.department}')">Edit</button>
                     <button class="btn-small btn-danger-soft" onclick="openDeleteParam('${p.id}', '${p.department}')">Delete</button>
-                    ${p.status === 'SUBMITTED' ? `<button class="btn-small btn-primary" style="padding:4px 8px;font-size:11px;" onclick="approveDeptParams('${p.department}')">Approve</button>` : ''}
                 </div>
             </td>
-        </tr>
-        `;
+        </tr>`;
     }).join('');
 }
 
 function bindSearch() {
     const search = document.getElementById('paramSearch');
     if (search) search.oninput = () => renderParamsTable(search.value.toLowerCase());
+}
+
+async function saveCycleParams() {
+    try {
+        await PATCH(`/feedback-cycles/${activeCycle.cycleId}`, { departmentParameters: deptConfigs });
+        showToast('Cycle parameters updated globally!', 'success');
+        activeCycle = await GET(`/feedback-cycles/${activeCycle.cycleId}`);
+    } catch(e) {
+        showToast(e.message || 'Failed to sync cycle', 'error');
+    }
 }
 
 function bindParamForm() {
@@ -113,32 +126,30 @@ function bindParamForm() {
 
         if (!name || !deptStr) { showToast('Name and Department are required.', 'error'); return; }
 
-        try {
-            if (editId) {
-                await PATCH(`/evaluation-parameters/${editId}/dept/${encodeURIComponent(editDept)}`, { name, description: desc, weight });
-                showToast('Parameter updated.', 'success');
-            } else {
-                await POST('/evaluation-parameters', { name, description: desc, weight, department: deptStr });
-                showToast('Parameter saved.', 'success');
+        if (!deptConfigs[deptStr]) deptConfigs[deptStr] = [];
+
+        if (editId) {
+            // Edit mode
+            if (editDept !== deptStr) {
+                if(deptConfigs[editDept]) deptConfigs[editDept] = deptConfigs[editDept].filter(x => x.id !== editId);
             }
-        } catch (err) {
-            showToast(err.message || 'Failed to save parameter.', 'error');
-            return;
+            const existingInNew = deptConfigs[deptStr].find(x => x.id === editId);
+            if (existingInNew) {
+                existingInNew.name = name; existingInNew.description = desc; existingInNew.weight = weight;
+            } else {
+                deptConfigs[deptStr].push({ id: editId, name, description: desc, weight });
+            }
+        } else {
+            // Create mode
+            deptConfigs[deptStr].push({ id: 'P_'+Date.now(), name, description: desc, weight });
         }
 
-        await renderSuperuserParameters();
+        await saveCycleParams();
+        renderParamsTable();
         closeParamModal();
     };
 }
 
-function updateParamCount() {
-    let total = 0;
-    let active = 0;
-    Object.values(deptConfigs).forEach(ps => total += ps.length);
-    Object.entries(statuses).forEach(([d, s]) => { if (s === 'APPROVED') active += (deptConfigs[d]?.length || 0); });
-    if (document.getElementById('statTotalParams')) document.getElementById('statTotalParams').textContent = total;
-    if (document.getElementById('statActiveParams')) document.getElementById('statActiveParams').textContent = active;
-}
 
 export function openAddParam() {
     const form = document.getElementById('paramForm');
@@ -169,9 +180,10 @@ export function openDeleteParam(id, dept) {
     const confirmBtn = document.getElementById('confirmDeleteBtn');
     confirmBtn.onclick = async () => {
         try {
-            await DELETE(`/evaluation-parameters/${id}/dept/${encodeURIComponent(dept)}`);
-            showToast('Parameter deleted.', 'success');
-            await renderSuperuserParameters();
+            deptConfigs[dept] = deptConfigs[dept].filter(x => x.id !== id);
+            await saveCycleParams();
+            showToast('Parameter deleted from cycle.', 'success');
+            renderParamsTable();
         } catch (err) { showToast(err.message, 'error'); }
         closeDeleteModal();
     };

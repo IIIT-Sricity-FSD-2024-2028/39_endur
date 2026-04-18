@@ -247,7 +247,7 @@
 
     <script type="module">
         import { requireAuth } from "../../js/core/session.js";
-        import { initCycleManagement, advanceCyclePhase, createNewCycle, viewRequest } from "../../js/features/dean-cycle.js";
+        import { initCycleManagement, advanceCyclePhase, createNewCycle } from "../../js/features/dean-cycle.js";
 
         document.addEventListener("DOMContentLoaded", () => {
             const user = requireAuth();
@@ -260,7 +260,6 @@
 
             window.advanceCyclePhase = advanceCyclePhase;
             window.createNewCycle = createNewCycle;
-            window.viewRequest = viewRequest;
         });
     </script>
 

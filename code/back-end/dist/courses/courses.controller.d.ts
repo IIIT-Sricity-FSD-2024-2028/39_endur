@@ -10,8 +10,8 @@ export declare class CoursesController {
         thumbnail: string;
         id: string;
         name: string;
-        facultyId: string;
-        faculty?: string;
+        facultyIds: string[];
+        facultyNames?: string[];
         department?: string;
         type?: string;
     };
