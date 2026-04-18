@@ -6,15 +6,7 @@ let allCourses = [];
 let submissions = [];
 let activeDepartment = null;
 
-const deptIcons = {
-    "Computer Science": "💻",
-    "Mathematics": "📐",
-    "Physics": "⚛️",
-    "Engineering & Tech": "🦾",
-    "Sciences": "🔬",
-    "Arts & Humanities": "🎨",
-    "Business": "📊"
-};
+let departmentsData = [];
 
 export async function initDeanFaculty() {
     const user = getSession();
@@ -22,7 +14,7 @@ export async function initDeanFaculty() {
 
     let allUsers = [];
     try {
-        [allUsers, allCourses] = await Promise.all([GET('/users'), GET('/courses')]);
+        [allUsers, allCourses, departmentsData] = await Promise.all([GET('/users'), GET('/courses'), GET('/departments')]);
         submissions = await GET('/feedback-responses').catch(() => []);
     } catch (e) { console.error('Dean faculty: failed to load data', e); }
 
@@ -42,7 +34,6 @@ export async function initDeanFaculty() {
     cardsContainer.innerHTML = "";
 
     deptNames.forEach(dept => {
-        const icon = deptIcons[dept] || "🏛️";
         const count = deptCounts[dept];
         
         const card = document.createElement("div");
@@ -55,7 +46,6 @@ export async function initDeanFaculty() {
             renderTable();
         };
         card.innerHTML = `
-            <div class="dept-icon">${icon}</div>
             <div>
                 <strong style="display: block; color: #0f172a; font-size: 14px;">${dept}</strong>
                 <span style="color: #64748b; font-size: 12px;">${count} Members</span>

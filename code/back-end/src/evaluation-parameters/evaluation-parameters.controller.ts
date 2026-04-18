@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
 import { EvaluationParametersService } from './evaluation-parameters.service';
-import { CreateEvalParamDto, UpdateEvalParamDto } from './dto/eval-param.dto';
+import { CreateEvalParamDto, UpdateEvalParamDto, BulkImportEvalParamsDto } from './dto/eval-param.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
@@ -85,5 +85,20 @@ export class EvaluationParametersController {
   @ApiOperation({ summary: 'Submit dept params for approval (hod only)' })
   submit(@Param('department') dept: string, @Request() req: any) {
     return this.svc.submit(dept, req.headers['x-user-id'], req.headers['x-user-name']);
+  }
+
+  @Post('dept/:department/reject')
+  @Roles('superuser', 'dean')
+  @ApiOperation({ summary: 'Reject dept params to request revision (superuser/dean only)' })
+  reject(@Param('department') dept: string, @Body('note') note: string, @Request() req: any) {
+    return this.svc.reject(dept, note, req.headers['x-user-id'], req.headers['x-user-name']);
+  }
+
+  @Post('bulk')
+  @Roles('superuser', 'admin')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Bulk import evaluation parameters from JSON array (superuser/admin only)' })
+  bulkImport(@Body() dto: BulkImportEvalParamsDto, @Request() req: any) {
+    return this.svc.bulkCreate(dto.params, req.headers['x-user-id'], req.headers['x-user-name']);
   }
 }

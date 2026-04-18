@@ -8,6 +8,7 @@ import {
   CreateFeedbackCycleDto,
   UpdateFeedbackCycleDto,
   UpdateCycleStatusDto,
+  BulkImportCyclesDto,
 } from './dto/feedback-cycle.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -66,5 +67,13 @@ export class FeedbackCyclesController {
   @ApiOperation({ summary: 'Delete a feedback cycle (superuser/admin only)' })
   remove(@Param('id') id: string, @Request() req: any) {
     return this.svc.remove(id, req.headers['x-user-id'], req.headers['x-user-name']);
+  }
+
+  @Post('bulk')
+  @Roles('superuser', 'admin')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Bulk import historical feedback cycles (superuser/admin only)' })
+  bulkImport(@Body() dto: BulkImportCyclesDto, @Request() req: any) {
+    return this.svc.bulkCreate(dto.cycles, req.headers['x-user-id'], req.headers['x-user-name']);
   }
 }

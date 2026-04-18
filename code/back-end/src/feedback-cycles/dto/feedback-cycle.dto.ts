@@ -28,6 +28,9 @@ export class CreateFeedbackCycleDto {
   @IsOptional()
   @IsDateString()
   actionReportDeadline?: string;
+
+  @IsOptional()
+  responses?: any[];
 }
 
 export class UpdateFeedbackCycleDto {
@@ -72,3 +75,11 @@ export class UpdateCycleStatusDto {
   @IsString()
   phase?: string;
 }
+
+import { IsArray } from 'class-validator';
+export class BulkImportCyclesDto {
+  @ApiProperty({ type: [CreateFeedbackCycleDto] })
+  @IsArray()
+  cycles: CreateFeedbackCycleDto[];
+}
+

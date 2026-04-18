@@ -1,5 +1,5 @@
 import { FeedbackCyclesService } from './feedback-cycles.service';
-import { CreateFeedbackCycleDto, UpdateFeedbackCycleDto, UpdateCycleStatusDto } from './dto/feedback-cycle.dto';
+import { CreateFeedbackCycleDto, UpdateFeedbackCycleDto, UpdateCycleStatusDto, BulkImportCyclesDto } from './dto/feedback-cycle.dto';
 export declare class FeedbackCyclesController {
     private readonly svc;
     constructor(svc: FeedbackCyclesService);
@@ -16,11 +16,20 @@ export declare class FeedbackCyclesController {
         endTimestamp: string;
         reflectionDeadline?: string;
         actionReportDeadline?: string;
+        responses?: any[];
         cycleId: string;
     };
     update(id: string, dto: UpdateFeedbackCycleDto, req: any): any;
     updateStatus(id: string, dto: UpdateCycleStatusDto, req: any): any;
     remove(id: string, req: any): {
         message: string;
+    };
+    bulkImport(dto: BulkImportCyclesDto, req: any): {
+        success: any[];
+        failed: {
+            cycle: any;
+            reason: string;
+        }[];
+        total: number;
     };
 }

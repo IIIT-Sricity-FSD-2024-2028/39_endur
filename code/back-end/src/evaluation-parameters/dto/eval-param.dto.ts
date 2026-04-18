@@ -60,3 +60,10 @@ export class UpdateEvalParamDto {
   @IsString()
   status?: string;
 }
+
+export class BulkImportEvalParamsDto {
+  @ApiProperty({ type: [CreateEvalParamDto] })
+  @IsArray()
+  params: CreateEvalParamDto[];
+}
+

@@ -1,0 +1,8 @@
+id,name,facultyId,faculty,department,type
+CS101,Data Structures,F001,Dr. Alan Turing,Computer Science,standard
+CS102,Algorithms,F002,Dr. Ada Lovelace,Computer Science,standard
+CS201,Operating Systems,F001,Dr. Alan Turing,Computer Science,standard
+EE101,Circuit Theory,F003,Dr. Nikola Tesla,Electronics,standard
+EE102,Signals and Systems,F004,Dr. Claude Shannon,Electronics,standard
+ME101,Thermodynamics,F005,Dr. Rudolf Clausius,Mechanical,standard
+ME102,Fluid Mechanics,F006,Dr. Daniel Bernoulli,Mechanical,standard

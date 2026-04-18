@@ -102,4 +102,35 @@ export async function renderHodDashboard() {
             tableBody.appendChild(tr);
         });
     }
+
+    // EXPORT LOGIC
+    const btn = document.getElementById('btnExportCSV');
+    if (btn) {
+        btn.onclick = async () => {
+            const { exportToCSV } = await import('./admin-utils.js');
+            const exportData = [];
+            const myDeptFeedback = allSubmissions.filter(f => {
+                const c = allCourses.find(course => course.id === f.courseId);
+                return c && c.department === user.department;
+            });
+            myDeptFeedback.forEach(f => {
+                let sum = 0, count = 0;
+                if(f.ratings) { 
+                    Object.entries(f.ratings).forEach(([pCode, v]) => {
+                        if (typeof v === 'number') {
+                            exportData.push({
+                                CycleID: f.cycleId,
+                                CourseID: f.courseId,
+                                FacultyID: allCourses.find(c => c.id === f.courseId)?.facultyId || '',
+                                Parameter: pCode,
+                                Rating: v,
+                                Comments: f.comments || ""
+                            });
+                        }
+                    });
+                }
+            });
+            exportToCSV(`HOD_Trends_${user.department.replace(/\s+/g, '_')}.csv`, exportData);
+        };
+    }
 }

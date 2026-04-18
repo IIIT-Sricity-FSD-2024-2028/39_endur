@@ -1,15 +1,3 @@
-to add - 
-
-1. urgent - feedback cycles and such are completely broken rn - complete overhaul
-- make sure all leftover data from front end is moved to backend
-- add abilties to import courses, evaluation parameters, feedback cycles trends
-- add ability to view archived feedback cycles (for all users)
-- ensure consistency between all users
-2. give abilties to faculty, dean and hod to export previous feedback trends 
-3. make sure all front end calls to mock data previously are now to backend
-4. add email to be a field in import and to be defined by superuser
-
-known issuses - 
-1. make sure all front end calls to mock data previously are now to backend
-2. error handling and edge cases required more testing
-3. consistency issuses.
+1. ensure imported feedback cyles are linked properly.
+2. ensure proper guards for every role.
+3. restrict going back after logging out without logging in.

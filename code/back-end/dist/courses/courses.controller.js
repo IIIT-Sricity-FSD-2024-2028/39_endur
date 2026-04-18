@@ -42,6 +42,9 @@ let CoursesController = class CoursesController {
     enroll(id, dto, req) {
         return this.svc.enroll(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
     }
+    bulkImport(dto, req) {
+        return this.svc.bulkCreate(dto.courses, req.headers['x-user-id'], req.headers['x-user-name']);
+    }
 };
 exports.CoursesController = CoursesController;
 __decorate([
@@ -108,6 +111,17 @@ __decorate([
     __metadata("design:paramtypes", [String, course_dto_1.EnrollStudentsDto, Object]),
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "enroll", null);
+__decorate([
+    (0, common_1.Post)('bulk'),
+    (0, roles_decorator_1.Roles)('superuser'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    (0, swagger_1.ApiOperation)({ summary: 'Bulk import courses from JSON array (superuser only)' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [course_dto_1.BulkImportCoursesDto, Object]),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "bulkImport", null);
 exports.CoursesController = CoursesController = __decorate([
     (0, swagger_1.ApiTags)('Courses'),
     (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),

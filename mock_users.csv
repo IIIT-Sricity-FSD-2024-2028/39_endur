@@ -1,65 +1,65 @@
-id,name,role,password,department
-S001,Ivan Garcia,student,password123,Physics
-S002,Quinn Miller,student,password123,Computer Science
-S003,Alice Garcia,student,password123,Architecture
-S004,Alice Davis,student,password123,Physics
-S005,Ivan Miller,student,password123,Mechanical Engineering
-S006,Romeo Gonzalez,student,password123,Physics
-S007,Peggy Lopez,student,password123,Mechanical Engineering
-S008,Quinn Jones,student,password123,Physics
-S009,Romeo Davis,student,password123,Physics
-S010,Sybil Rodriguez,student,password123,Physics
-S011,Diana Garcia,student,password123,Mechanical Engineering
-S012,Ivan Garcia,student,password123,Architecture
-S013,Grace Anderson,student,password123,Electrical Engineering
-S014,Victor Hernandez,student,password123,Computer Science
-S015,Frank Wilson,student,password123,Computer Science
-S016,Peggy Hernandez,student,password123,Electrical Engineering
-S017,Trent Hernandez,student,password123,Electrical Engineering
-S018,Eve Martinez,student,password123,Mathematics
-S019,Trent Jones,student,password123,Computer Science
-S020,Frank Thomas,student,password123,Electrical Engineering
-S021,Zoe Martin,student,password123,Computer Science
-S022,Victor Jackson,student,password123,Physics
-S023,Liam Williams,student,password123,Mathematics
-S024,Charlie Thomas,student,password123,Architecture
-S025,Walter Miller,student,password123,Physics
-S026,Sybil Wilson,student,password123,Architecture
-S027,Grace Anderson,student,password123,Mechanical Engineering
-S028,Diana Hernandez,student,password123,Mathematics
-S029,Walter Jones,student,password123,Mechanical Engineering
-S030,Quinn Hernandez,student,password123,Mechanical Engineering
-S031,Walter Martin,student,password123,Mechanical Engineering
-S032,Romeo Hernandez,student,password123,Mechanical Engineering
-S033,Ivan Wilson,student,password123,Physics
-S034,Diana Garcia,student,password123,Electrical Engineering
-S035,Heidi Miller,student,password123,Physics
-S036,Liam Johnson,student,password123,Architecture
-S037,Olivia Davis,student,password123,Architecture
-S038,Eve Martinez,student,password123,Architecture
-S039,Romeo Davis,student,password123,Physics
-S040,Charlie Garcia,student,password123,Architecture
-S041,Eve Martinez,student,password123,Mechanical Engineering
-S042,Olivia Taylor,student,password123,Architecture
-S043,Heidi Gonzalez,student,password123,Electrical Engineering
-S044,Diana Moore,student,password123,Electrical Engineering
-S045,Victor Johnson,student,password123,Mechanical Engineering
-F001,Dr. Liam Rodriguez,faculty,password123,Mechanical Engineering
-F002,Dr. Olivia Johnson,faculty,password123,Computer Science
-F003,Dr. Judy Rodriguez,faculty,password123,Mechanical Engineering
-F004,Dr. Noah Moore,faculty,password123,Mechanical Engineering
-F005,Dr. Trent Hernandez,faculty,password123,Physics
-F006,Dr. Eve Hernandez,faculty,password123,Architecture
-F007,Dr. Charlie Hernandez,faculty,password123,Architecture
-F008,Dr. Diana Wilson,faculty,password123,Mechanical Engineering
-F009,Dr. Quinn Smith,faculty,password123,Physics
-F010,Dr. Ivan Davis,faculty,password123,Computer Science
-F011,Dr. Quinn Jackson,faculty,password123,Mechanical Engineering
-F012,Dr. Mia Smith,faculty,password123,Computer Science
-F013,Dr. Diana Martinez,faculty,password123,Mechanical Engineering
-F014,Dr. Ivan Hernandez,faculty,password123,Electrical Engineering
-F015,Dr. Grace Smith,faculty,password123,Physics
-H001,Prof. Alan Turing,hod,password123,Computer Science
-D001,Dr. Richard Feynman,dean,password123,Administration
-A001,Alice Williams,admin,password123,IT Support
-A002,Zoe Smith,admin,password123,IT Support
+id,password,name,role,email,department,enrolledCourses
+S001,password123,Ivan Garcia,student,ivan.garcia@example.com,Physics,
+S002,password123,Quinn Miller,student,quinn.miller@example.com,Computer Science,
+S003,password123,Alice Garcia,student,alice.garcia@example.com,Architecture,
+S004,password123,Alice Davis,student,alice.davis@example.com,Physics,
+S005,password123,Ivan Miller,student,ivan.miller@example.com,Mechanical Engineering,
+S006,password123,Romeo Gonzalez,student,romeo.gonzalez@example.com,Physics,
+S007,password123,Peggy Lopez,student,peggy.lopez@example.com,Mechanical Engineering,
+S008,password123,Quinn Jones,student,quinn.jones@example.com,Physics,
+S009,password123,Romeo Davis,student,romeo.davis@example.com,Physics,
+S010,password123,Sybil Rodriguez,student,sybil.rodriguez@example.com,Physics,
+S011,password123,Diana Garcia,student,diana.garcia@example.com,Mechanical Engineering,
+S012,password123,Ivan Garcia,student,ivan.garcia@example.com,Architecture,
+S013,password123,Grace Anderson,student,grace.anderson@example.com,Electrical Engineering,
+S014,password123,Victor Hernandez,student,victor.hernandez@example.com,Computer Science,
+S015,password123,Frank Wilson,student,frank.wilson@example.com,Computer Science,
+S016,password123,Peggy Hernandez,student,peggy.hernandez@example.com,Electrical Engineering,
+S017,password123,Trent Hernandez,student,trent.hernandez@example.com,Electrical Engineering,
+S018,password123,Eve Martinez,student,eve.martinez@example.com,Mathematics,
+S019,password123,Trent Jones,student,trent.jones@example.com,Computer Science,
+S020,password123,Frank Thomas,student,frank.thomas@example.com,Electrical Engineering,
+S021,password123,Zoe Martin,student,zoe.martin@example.com,Computer Science,
+S022,password123,Victor Jackson,student,victor.jackson@example.com,Physics,
+S023,password123,Liam Williams,student,liam.williams@example.com,Mathematics,
+S024,password123,Charlie Thomas,student,charlie.thomas@example.com,Architecture,
+S025,password123,Walter Miller,student,walter.miller@example.com,Physics,
+S026,password123,Sybil Wilson,student,sybil.wilson@example.com,Architecture,
+S027,password123,Grace Anderson,student,grace.anderson@example.com,Mechanical Engineering,
+S028,password123,Diana Hernandez,student,diana.hernandez@example.com,Mathematics,
+S029,password123,Walter Jones,student,walter.jones@example.com,Mechanical Engineering,
+S030,password123,Quinn Hernandez,student,quinn.hernandez@example.com,Mechanical Engineering,
+S031,password123,Walter Martin,student,walter.martin@example.com,Mechanical Engineering,
+S032,password123,Romeo Hernandez,student,romeo.hernandez@example.com,Mechanical Engineering,
+S033,password123,Ivan Wilson,student,ivan.wilson@example.com,Physics,
+S034,password123,Diana Garcia,student,diana.garcia@example.com,Electrical Engineering,
+S035,password123,Heidi Miller,student,heidi.miller@example.com,Physics,
+S036,password123,Liam Johnson,student,liam.johnson@example.com,Architecture,
+S037,password123,Olivia Davis,student,olivia.davis@example.com,Architecture,
+S038,password123,Eve Martinez,student,eve.martinez@example.com,Architecture,
+S039,password123,Romeo Davis,student,romeo.davis@example.com,Physics,
+S040,password123,Charlie Garcia,student,charlie.garcia@example.com,Architecture,
+S041,password123,Eve Martinez,student,eve.martinez@example.com,Mechanical Engineering,
+S042,password123,Olivia Taylor,student,olivia.taylor@example.com,Architecture,
+S043,password123,Heidi Gonzalez,student,heidi.gonzalez@example.com,Electrical Engineering,
+S044,password123,Diana Moore,student,diana.moore@example.com,Electrical Engineering,
+S045,password123,Victor Johnson,student,victor.johnson@example.com,Mechanical Engineering,
+F001,password123,Dr. Liam Rodriguez,faculty,dr..liam.rodriguez@example.com,Mechanical Engineering,
+F002,password123,Dr. Olivia Johnson,faculty,dr..olivia.johnson@example.com,Computer Science,
+F003,password123,Dr. Judy Rodriguez,faculty,dr..judy.rodriguez@example.com,Mechanical Engineering,
+F004,password123,Dr. Noah Moore,faculty,dr..noah.moore@example.com,Mechanical Engineering,
+F005,password123,Dr. Trent Hernandez,faculty,dr..trent.hernandez@example.com,Physics,
+F006,password123,Dr. Eve Hernandez,faculty,dr..eve.hernandez@example.com,Architecture,
+F007,password123,Dr. Charlie Hernandez,faculty,dr..charlie.hernandez@example.com,Architecture,
+F008,password123,Dr. Diana Wilson,faculty,dr..diana.wilson@example.com,Mechanical Engineering,
+F009,password123,Dr. Quinn Smith,faculty,dr..quinn.smith@example.com,Physics,
+F010,password123,Dr. Ivan Davis,faculty,dr..ivan.davis@example.com,Computer Science,
+F011,password123,Dr. Quinn Jackson,faculty,dr..quinn.jackson@example.com,Mechanical Engineering,
+F012,password123,Dr. Mia Smith,faculty,dr..mia.smith@example.com,Computer Science,
+F013,password123,Dr. Diana Martinez,faculty,dr..diana.martinez@example.com,Mechanical Engineering,
+F014,password123,Dr. Ivan Hernandez,faculty,dr..ivan.hernandez@example.com,Electrical Engineering,
+F015,password123,Dr. Grace Smith,faculty,dr..grace.smith@example.com,Physics,
+H001,password123,Prof. Alan Turing,hod,prof..alan.turing@example.com,Computer Science,
+D001,password123,Dr. Richard Feynman,dean,dr..richard.feynman@example.com,Administration,
+A001,password123,Alice Williams,admin,alice.williams@example.com,IT Support,
+A002,password123,Zoe Smith,admin,zoe.smith@example.com,IT Support,

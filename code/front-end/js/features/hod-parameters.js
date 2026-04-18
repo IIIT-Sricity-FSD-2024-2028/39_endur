@@ -1,13 +1,13 @@
-import { get, set } from "../core/storage.js";
+import { GET, POST, PATCH, DELETE } from "../core/api.js";
 import { getSession } from "../core/session.js";
 
 const CHART_COLORS = ["#3b82f6", "#a855f7", "#f59e0b", "#10b981", "#ef4444", "#6366f1"];
 
 export const DEFAULT_PARAMETERS = [
-    { id: "clarity", name: "Clarity of Explanation", desc: "Effectiveness of teaching methods and clear delivery.", weight: 25 },
-    { id: "structure", name: "Structure of Course", desc: "Organization of materials and syllabus adherence.", weight: 25 },
-    { id: "engagement", name: "Student Engagement", desc: "Fostering an interactive and responsive environment.", weight: 25 },
-    { id: "difficulty", name: "Difficulty Level", desc: "Appropriateness of the coursework difficulty.", weight: 25 }
+    { name: "Clarity of Explanation", desc: "Effectiveness of teaching methods and clear delivery.", weight: 25 },
+    { name: "Structure of Course", desc: "Organization of materials and syllabus adherence.", weight: 25 },
+    { name: "Student Engagement", desc: "Fostering an interactive and responsive environment.", weight: 25 },
+    { name: "Difficulty Level", desc: "Appropriateness of the coursework difficulty.", weight: 25 }
 ];
 
 let editingParamId = null;
@@ -17,35 +17,41 @@ let dragStartX = 0;
 let dragLeftIndex = -1;
 let initialLeftWeight = 0;
 let initialRightWeight = 0;
+let deptParams = [];
+let currentStatus = "DRAFT";
+let isLockedGlobal = false;
+let globalCycleState = {};
 
-// Security check to prevent backend manipulation when closed
-function checkPhaseLock() {
-    const cycleState = get("systemCycleState") || { phase: "COMPLETED" };
-    return cycleState.phase !== "PREPARATION";
+async function fetchParams() {
+    const user = getSession();
+    try {
+        const statuses = await GET('/evaluation-parameters/status');
+        currentStatus = statuses[user.department] || "DRAFT";
+        const fetchedParams = await GET(`/evaluation-parameters/dept/${encodeURIComponent(user.department)}`);
+        
+        if (fetchedParams.length === 0 && currentStatus === "DRAFT") {
+            // Seed defaults
+            let sum = 0;
+            for (const p of DEFAULT_PARAMETERS) {
+                await POST(`/evaluation-parameters`, { name: p.name, description: p.desc, weight: p.weight, department: user.department });
+            }
+            deptParams = await GET(`/evaluation-parameters/dept/${encodeURIComponent(user.department)}`);
+        } else {
+            deptParams = fetchedParams;
+        }
+    } catch(e) {
+        deptParams = [];
+    }
 }
 
-export function initParameters() {
+export async function initParameters() {
     const user = getSession();
     if (!user) return;
 
-    let allDrafts = get("draftParameters") || {};
-    let activeParams = get("activeParameters") || {};
-    let statuses = get("departmentConfigStatus") || {};
-    
-    // Inherit from active parameters first, fallback to default if completely new
-    if (!allDrafts[user.department] || allDrafts[user.department].length === 0) {
-        if (activeParams[user.department] && activeParams[user.department].length > 0) {
-            allDrafts[user.department] = activeParams[user.department];
-            statuses[user.department] = "DRAFT"; 
-        } else {
-            allDrafts[user.department] = DEFAULT_PARAMETERS;
-            statuses[user.department] = "DRAFT";
-        }
-        set("draftParameters", allDrafts);
-        set("departmentConfigStatus", statuses);
-    }
-    
-    let currentStatus = statuses[user.department] || "DRAFT";
+    try { globalCycleState = await GET('/feedback-cycles/state'); } 
+    catch { globalCycleState = { id: 'SETUP', phase: 'PREPARATION' }; }
+
+    await fetchParams();
 
     if (!isDragEventsAttached) {
         document.addEventListener("mousemove", handleDragMove);
@@ -53,44 +59,48 @@ export function initParameters() {
         isDragEventsAttached = true;
     }
     
-    renderAll(allDrafts[user.department], currentStatus);
+    renderAll();
 }
 
-function renderAll(params, status = "DRAFT") {
+function renderAll() {
     const user = getSession();
-    const cycleState = get("systemCycleState") || { id: "SETUP", phase: "COMPLETED" };
     
     const badgeEl = document.getElementById("cycleNameBadge");
-    if(badgeEl) badgeEl.innerText = cycleState.id;
+    if(badgeEl) badgeEl.innerText = globalCycleState.id || 'PREPARATION';
 
-    const isCycleActive = cycleState.phase === "STUDENT_FEEDBACK" || cycleState.phase === "FACULTY_REFLECTION" || cycleState.phase === "ACTION_REPORT";
-    const isCycleCompleted = cycleState.phase === "COMPLETED";
+    const isCycleActive = ["STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"].includes(globalCycleState.phase);
+    const isCycleCompleted = globalCycleState.phase === "COMPLETED";
     
     let isLocked = false;
-    if (isCycleActive || isCycleCompleted) {
+    if (isCycleActive) {
         isLocked = true;
-    } else if (cycleState.phase === "PREPARATION") {
-        isLocked = (status === "SUBMITTED" || status === "APPROVED");
+    } else if (globalCycleState.phase === "PREPARATION") {
+        isLocked = (currentStatus === "SUBMITTED" || currentStatus === "APPROVED");
     }
+    isLockedGlobal = isLocked;
 
     const listContainer = document.getElementById("paramListContainer");
     const stackedBar = document.getElementById("stackedBar");
     const legendContainer = document.getElementById("legendContainer");
     
+    if(!listContainer || !stackedBar || !legendContainer) return;
+
     listContainer.innerHTML = "";
     stackedBar.innerHTML = "";
     legendContainer.innerHTML = "";
 
-    document.getElementById("statusBannerCycleActive").style.display = isCycleActive ? "block" : "none";
+    document.getElementById("statusBannerCycleActive").style.display = (isCycleActive && !isCycleCompleted) ? "block" : "none";
     document.getElementById("statusBannerCompleted").style.display = isCycleCompleted ? "block" : "none"; 
-    document.getElementById("statusBannerPending").style.display = (status === "SUBMITTED" && cycleState.phase === "PREPARATION") ? "block" : "none";
-    document.getElementById("statusBannerApproved").style.display = (status === "APPROVED" && cycleState.phase === "PREPARATION") ? "block" : "none";
+    document.getElementById("statusBannerPending").style.display = (currentStatus === "SUBMITTED" && globalCycleState.phase === "PREPARATION") ? "block" : "none";
+    document.getElementById("statusBannerApproved").style.display = (currentStatus === "APPROVED" && globalCycleState.phase === "PREPARATION") ? "block" : "none";
     
     const revBanner = document.getElementById("statusBannerRevision");
-    if (status === "REVISION_REQUESTED" && cycleState.phase === "PREPARATION") {
+    if (currentStatus === "REVISION_REQUESTED" && globalCycleState.phase === "PREPARATION") {
         revBanner.style.display = "block";
-        const notesObj = get("departmentConfigNotes") || {};
-        document.getElementById("deanNotesText").innerText = notesObj[user.department] || "Please revise your configuration.";
+        GET('/evaluation-parameters/status').then(res => {
+            // Note: need notes API, backend doesn't export notes endpoint directly, using generic text for now.
+             document.getElementById("deanNotesText").innerText = "Please revise your configuration.";
+        });
     } else {
         revBanner.style.display = "none";
     }
@@ -104,7 +114,7 @@ function renderAll(params, status = "DRAFT") {
 
     let totalWeight = 0;
 
-    params.forEach((param, index) => {
+    deptParams.forEach((param, index) => {
         const weightNum = parseInt(param.weight);
         totalWeight += weightNum;
         const color = CHART_COLORS[index % CHART_COLORS.length];
@@ -128,7 +138,7 @@ function renderAll(params, status = "DRAFT") {
         row.innerHTML = `
             <div>
                 <strong style="color: #0f172a; font-size: 14px;">${param.name}</strong>
-                <p class="param-desc">${param.desc}</p>
+                <p class="param-desc">${param.description || param.desc || ''}</p>
             </div>
             <div class="weight-display">
                 <div class="mini-bar"><div class="mini-bar-fill" style="width: ${weightNum}%; background: ${color}"></div></div>
@@ -143,15 +153,15 @@ function renderAll(params, status = "DRAFT") {
         const segment = document.createElement("div");
         segment.style.cssText = `position: relative; height: 100%; width: ${weightNum}%; background-color: ${color};`;
         
-        if (index < params.length - 1 && !isLocked) {
+        if (index < deptParams.length - 1 && !isLocked) {
             const handle = document.createElement("div");
             handle.className = "drag-handle";
             handle.addEventListener("mousedown", (e) => {
                 isDragging = true;
                 dragStartX = e.clientX;
                 dragLeftIndex = index;
-                initialLeftWeight = parseInt(params[index].weight);
-                initialRightWeight = parseInt(params[index+1].weight);
+                initialLeftWeight = parseInt(deptParams[index].weight);
+                initialRightWeight = parseInt(deptParams[index+1].weight);
                 handle.classList.add("active");
                 document.body.classList.add("dragging-bar");
             });
@@ -177,10 +187,10 @@ function renderAll(params, status = "DRAFT") {
         magicWandBtn.style.display = isLocked ? "none" : "block";
     }
 
-    totalEl.innerText = `${totalWeight}%`;
+    if(totalEl) totalEl.innerText = `${totalWeight}%`;
     
     if (isLocked) {
-        totalEl.style.color = "#1e3a8a";
+        if(totalEl) totalEl.style.color = "#1e3a8a";
         if(warningEl) warningEl.style.display = "none";
         if (finalizeBtn) {
             finalizeBtn.disabled = true;
@@ -189,10 +199,9 @@ function renderAll(params, status = "DRAFT") {
             if(isCycleActive || isCycleCompleted) {
                 finalizeBtn.innerText = "Locked";
             } else {
-                finalizeBtn.innerText = status === "APPROVED" ? "Approved" : "In Review";
+                finalizeBtn.innerText = currentStatus === "APPROVED" ? "Approved" : "In Review";
                 
-                // Only allow "Edit Again" if REVISION_REQUESTED or if APPROVED (not while SUBMITTED/IN REVIEW)
-                if(status === "APPROVED" || status === "REVISION_REQUESTED") {
+                if(currentStatus === "APPROVED" || currentStatus === "REVISION_REQUESTED") {
                     let unlockBtn = document.getElementById("unlockDraftBtn");
                     if(!unlockBtn) {
                         unlockBtn = document.createElement("button");
@@ -203,8 +212,7 @@ function renderAll(params, status = "DRAFT") {
                         unlockBtn.onclick = () => window.revertToDraft();
                         finalizeBtn.parentNode.insertBefore(unlockBtn, finalizeBtn.nextSibling);
                     }
-                } else if (status === "SUBMITTED") {
-                    // Force remove Edit Again if it existed
+                } else if (currentStatus === "SUBMITTED") {
                     const ex = document.getElementById("unlockDraftBtn");
                     if(ex) ex.remove();
                 }
@@ -213,7 +221,7 @@ function renderAll(params, status = "DRAFT") {
     } else {
         if (finalizeBtn) finalizeBtn.innerText = "Submit Configuration";
         if (totalWeight !== 100) {
-            totalEl.style.color = "#dc2626";
+            if(totalEl) totalEl.style.color = "#dc2626";
             if(warningEl) warningEl.style.display = "flex"; 
             if (finalizeBtn) {
                 finalizeBtn.disabled = true;
@@ -221,7 +229,7 @@ function renderAll(params, status = "DRAFT") {
                 finalizeBtn.style.cursor = "not-allowed";
             }
         } else {
-            totalEl.style.color = "#1e3a8a";
+            if(totalEl) totalEl.style.color = "#1e3a8a";
             if(warningEl) warningEl.style.display = "none";
             if (finalizeBtn) {
                 finalizeBtn.disabled = false;
@@ -231,7 +239,7 @@ function renderAll(params, status = "DRAFT") {
         }
     }
 
-    if (params.length === 0) {
+    if (deptParams.length === 0) {
         listContainer.innerHTML = `<p style="padding: 20px 0; color: #64748b; text-align: center;">No parameters defined.</p>`;
     }
 }
@@ -253,18 +261,13 @@ function handleDragMove(e) {
     stackedBar.children[dragLeftIndex+1].style.width = newRight + "%";
 }
 
-function handleDragEnd(e) {
+async function handleDragEnd(e) {
     if (!isDragging) return;
     isDragging = false;
     document.body.classList.remove("dragging-bar");
     document.querySelectorAll('.drag-handle').forEach(h => h.classList.remove('active'));
 
-    if (checkPhaseLock()) return;
-
-    const user = getSession();
-    let allDrafts = get("draftParameters") || {};
-    let params = allDrafts[user.department] || [];
-    let statuses = get("departmentConfigStatus") || {};
+    if (isLockedGlobal) return;
 
     const stackedBar = document.getElementById("stackedBar");
     const containerWidth = stackedBar.getBoundingClientRect().width;
@@ -278,57 +281,55 @@ function handleDragEnd(e) {
     if (newRight < 1) { newRight = 1; newLeft = initialLeftWeight + initialRightWeight - 1; }
 
     if (newLeft !== initialLeftWeight) {
-        params[dragLeftIndex].weight = newLeft;
-        params[dragLeftIndex+1].weight = newRight;
+        deptParams[dragLeftIndex].weight = newLeft;
+        deptParams[dragLeftIndex+1].weight = newRight;
         
-        statuses[user.department] = "DRAFT";
-        set("departmentConfigStatus", statuses);
-
-        allDrafts[user.department] = params;
-        set("draftParameters", allDrafts);
-        renderAll(params, "DRAFT");
+        const user = getSession();
+        try {
+            await PATCH(`/evaluation-parameters/${deptParams[dragLeftIndex].id}/dept/${encodeURIComponent(user.department)}`, { weight: newLeft });
+            await PATCH(`/evaluation-parameters/${deptParams[dragLeftIndex+1].id}/dept/${encodeURIComponent(user.department)}`, { weight: newRight });
+            await fetchParams();
+        } catch(e) {}
+        renderAll();
     } else {
-        renderAll(params, statuses[user.department]);
+        renderAll();
     }
 }
 
-export function autoBalance() {
-    if (checkPhaseLock()) return;
-    const user = getSession();
-    let allDrafts = get("draftParameters") || {};
-    let params = allDrafts[user.department] || [];
-    if (params.length === 0) return;
+export async function autoBalance() {
+    if (isLockedGlobal) return;
+    if (deptParams.length === 0) return;
 
-    let total = params.reduce((sum, p) => sum + parseInt(p.weight), 0);
+    let total = deptParams.reduce((sum, p) => sum + parseInt(p.weight), 0);
     if (total === 100 || total === 0) return;
 
     let newTotal = 0;
+    const user = getSession();
     
-    params.forEach((p, i) => {
-        if (i === params.length - 1) {
-            p.weight = 100 - newTotal;
-            if(p.weight <= 0) p.weight = 1; 
-        } else {
-            let scaled = Math.round(parseInt(p.weight) * (100 / total));
-            if (scaled < 1) scaled = 1; 
-            p.weight = scaled;
-            newTotal += scaled;
+    try {
+        for(let i=0; i<deptParams.length; i++) {
+            const p = deptParams[i];
+            let w;
+            if (i === deptParams.length - 1) {
+                w = 100 - newTotal;
+                if(w <= 0) w = 1; 
+            } else {
+                let scaled = Math.round(parseInt(p.weight) * (100 / total));
+                if (scaled < 1) scaled = 1; 
+                w = scaled;
+                newTotal += scaled;
+            }
+            await PATCH(`/evaluation-parameters/${p.id}/dept/${encodeURIComponent(user.department)}`, { weight: w });
         }
-    });
-
-    let statuses = get("departmentConfigStatus") || {};
-    statuses[user.department] = "DRAFT";
-    set("departmentConfigStatus", statuses);
-
-    allDrafts[user.department] = params;
-    set("draftParameters", allDrafts);
-    renderAll(params, "DRAFT");
+        await fetchParams();
+        renderAll();
+    } catch(e) {
+        alert("Autobalance failed.");
+    }
 }
 
 export function openParamModal(id = null) {
     editingParamId = id;
-    const user = getSession();
-    
     const title = document.getElementById("modalTitle");
     const nameInput = document.getElementById("newParamName");
     const descInput = document.getElementById("newParamDesc");
@@ -336,13 +337,10 @@ export function openParamModal(id = null) {
 
     if (id) {
         title.innerText = "Edit Parameter";
-        let allDrafts = get("draftParameters") || {};
-        let deptParams = allDrafts[user.department] || [];
         const param = deptParams.find(p => p.id === id);
-        
         if (param) {
             nameInput.value = param.name;
-            descInput.value = param.desc;
+            descInput.value = param.description || param.desc || '';
             weightInput.value = param.weight;
         }
     } else {
@@ -360,22 +358,20 @@ export function closeParamModal() {
     editingParamId = null;
 }
 
-export function deleteParameter(id) {
-    if (checkPhaseLock()) return;
+export async function deleteParameter(id) {
+    if (isLockedGlobal) return;
     const user = getSession();
-    let allDrafts = get("draftParameters") || {};
-    let statuses = get("departmentConfigStatus") || {};
-    
-    statuses[user.department] = "DRAFT";
-    set("departmentConfigStatus", statuses);
-
-    allDrafts[user.department] = allDrafts[user.department].filter(p => p.id !== id);
-    set("draftParameters", allDrafts);
-    renderAll(allDrafts[user.department], "DRAFT");
+    try {
+        await DELETE(`/evaluation-parameters/${id}/dept/${encodeURIComponent(user.department)}`);
+        await fetchParams();
+        renderAll();
+    } catch(err) {
+        alert("Failed to delete: " + err.message);
+    }
 }
 
-export function saveParameter() {
-    if (checkPhaseLock()) return;
+export async function saveParameter() {
+    if (isLockedGlobal) return;
     const name = document.getElementById("newParamName").value.trim();
     const desc = document.getElementById("newParamDesc").value.trim();
     const weight = parseInt(document.getElementById("newParamWeight").value);
@@ -386,48 +382,27 @@ export function saveParameter() {
     }
     
     const user = getSession();
-    let allDrafts = get("draftParameters") || {};
-    let statuses = get("departmentConfigStatus") || {};
-    let deptParams = allDrafts[user.department] || [];
-    
-    statuses[user.department] = "DRAFT";
-    set("departmentConfigStatus", statuses);
-
-    if (editingParamId) {
-        const index = deptParams.findIndex(p => p.id === editingParamId);
-        if (index > -1) {
-            deptParams[index].name = name;
-            deptParams[index].desc = desc;
-            deptParams[index].weight = weight;
+    try {
+        if (editingParamId) {
+            await PATCH(`/evaluation-parameters/${editingParamId}/dept/${encodeURIComponent(user.department)}`, {
+                name, description: desc, weight
+            });
+        } else {
+            await POST('/evaluation-parameters', {
+                name, description: desc, weight, department: user.department
+            });
         }
-    } else {
-        deptParams.push({
-            id: "p" + new Date().getTime(),
-            name: name,
-            desc: desc || "No description provided.",
-            weight: weight
-        });
+        await fetchParams();
+        closeParamModal();
+        renderAll();
+    } catch(err) {
+        alert("Failed to save: " + err.message);
     }
-
-    allDrafts[user.department] = deptParams;
-    set("draftParameters", allDrafts);
-    
-    // Audit Log
-    const session = getSession();
-    import('./admin-utils.js').then(utils => {
-        utils.appendAuditLog(session, 'hod', editingParamId ? 'UPDATE' : 'CREATE', 'Parameters', name, `Parameter ${editingParamId ? 'updated' : 'created'} by HOD.`);
-    });
-
-    closeParamModal();
-    renderAll(deptParams, "DRAFT");
 }
 
-export function finalizeConfig() {
-    if (checkPhaseLock()) return;
+export async function finalizeConfig() {
+    if (isLockedGlobal) return;
     const user = getSession();
-    let allDrafts = get("draftParameters") || {};
-    let deptParams = allDrafts[user.department] || [];
-    
     const totalWeight = deptParams.reduce((sum, p) => sum + parseInt(p.weight), 0);
     
     if (totalWeight !== 100) {
@@ -435,27 +410,27 @@ export function finalizeConfig() {
         return;
     }
 
-    let statuses = get("departmentConfigStatus") || {};
-    statuses[user.department] = "SUBMITTED";
-    set("departmentConfigStatus", statuses);
-
-    // Audit Log
-    const session = getSession();
-    import('./admin-utils.js').then(utils => {
-        utils.appendAuditLog(session, 'hod', 'SUBMIT', 'Parameters', `${user.department} Config`, 'Parameter configuration submitted for review.');
-    });
-
-    renderAll(deptParams, "SUBMITTED");
-    alert("✅ Success! Your department's Evaluation Parameters have been submitted to the Dean for review.");
+    try {
+        await POST(`/evaluation-parameters/dept/${encodeURIComponent(user.department)}/submit`, {});
+        alert("✅ Success! Your department's Evaluation Parameters have been submitted to the Dean for review.");
+        await fetchParams();
+        renderAll();
+    } catch(err) {
+        alert("Failed to submit: " + err.message);
+    }
 }
 
 export function revertToDraft() {
-    if (checkPhaseLock()) return;
-    const user = getSession();
-    let statuses = get("departmentConfigStatus") || {};
-    statuses[user.department] = "DRAFT";
-    set("departmentConfigStatus", statuses);
-    
-    let drafts = get("draftParameters") || {};
-    renderAll(drafts[user.department] || [], "DRAFT");
+    // Currently, there's no endpoint to "unsubmit", but saving/editing natively places it back into DRAFT state on the backend.
+    // We'll mimic this by attempting an edit or just alerting to make a change.
+    alert("Make any edit or re-balance your weights to automatically transition back to DRAFT state.");
 }
+
+// Window bindings
+window.openParamModal = openParamModal;
+window.closeParamModal = closeParamModal;
+window.saveParameter = saveParameter;
+window.deleteParameter = deleteParameter;
+window.autoBalance = autoBalance;
+window.finalizeConfig = finalizeConfig;
+window.revertToDraft = revertToDraft;

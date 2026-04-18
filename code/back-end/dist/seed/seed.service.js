@@ -15,7 +15,7 @@ let SeedService = class SeedService {
             {
                 id: 'SU001',
                 password: 'superuser123',
-                name: 'Super User',
+                name: 'SuperUser',
                 role: 'superuser',
                 department: 'System',
             },

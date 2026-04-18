@@ -5,6 +5,7 @@ export declare class CreateFeedbackCycleDto {
     endTimestamp: string;
     reflectionDeadline?: string;
     actionReportDeadline?: string;
+    responses?: any[];
 }
 export declare class UpdateFeedbackCycleDto {
     cycleName?: string;
@@ -17,4 +18,7 @@ export declare class UpdateFeedbackCycleDto {
 export declare class UpdateCycleStatusDto {
     status: string;
     phase?: string;
+}
+export declare class BulkImportCyclesDto {
+    cycles: CreateFeedbackCycleDto[];
 }

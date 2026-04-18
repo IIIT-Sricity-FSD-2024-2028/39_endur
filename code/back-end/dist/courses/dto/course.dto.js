@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EnrollStudentsDto = exports.UpdateCourseDto = exports.CreateCourseDto = void 0;
+exports.BulkImportCoursesDto = exports.EnrollStudentsDto = exports.UpdateCourseDto = exports.CreateCourseDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class CreateCourseDto {
@@ -122,4 +122,13 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], EnrollStudentsDto.prototype, "autoDept", void 0);
+class BulkImportCoursesDto {
+    courses;
+}
+exports.BulkImportCoursesDto = BulkImportCoursesDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ type: [CreateCourseDto] }),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], BulkImportCoursesDto.prototype, "courses", void 0);
 //# sourceMappingURL=course.dto.js.map

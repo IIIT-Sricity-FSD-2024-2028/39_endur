@@ -134,20 +134,19 @@
 
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initActionReport } from "../../js/features/action-report.js";
+    import { initActionReport } from "../../js/features/faculty-action-report.js";
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
         const user = requireAuth();
-        if(!user) return;
+        if (!user) return;
 
         document.getElementById("userName").innerText = user.name;
         document.getElementById("userDept").innerText = user.department;
-        
-        const avatarEl = document.getElementById("avatar");
-        if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
 
-        // Initialize the page logic
-        initActionReport();
+        const avatarEl = document.getElementById("avatar");
+        if (avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+
+        await initActionReport();
     });
 </script>
 

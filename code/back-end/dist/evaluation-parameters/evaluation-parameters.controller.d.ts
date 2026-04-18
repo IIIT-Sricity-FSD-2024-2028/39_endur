@@ -1,5 +1,5 @@
 import { EvaluationParametersService } from './evaluation-parameters.service';
-import { CreateEvalParamDto, UpdateEvalParamDto } from './dto/eval-param.dto';
+import { CreateEvalParamDto, UpdateEvalParamDto, BulkImportEvalParamsDto } from './dto/eval-param.dto';
 export declare class EvaluationParametersController {
     private readonly svc;
     constructor(svc: EvaluationParametersService);
@@ -25,5 +25,16 @@ export declare class EvaluationParametersController {
     };
     submit(dept: string, req: any): {
         message: string;
+    };
+    reject(dept: string, note: string, req: any): {
+        message: string;
+    };
+    bulkImport(dto: BulkImportEvalParamsDto, req: any): {
+        success: any[];
+        failed: {
+            param: any;
+            reason: string;
+        }[];
+        total: number;
     };
 }

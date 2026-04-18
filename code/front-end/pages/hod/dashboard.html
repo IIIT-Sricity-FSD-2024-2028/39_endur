@@ -47,8 +47,13 @@
 
     <!-- MAIN -->
     <main class="dashboard-content">
-        <h1>Department Dashboard</h1>
-        <p class="subtitle" style="margin-bottom: 30px;"></p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px;">
+            <div>
+                <h1 style="margin-bottom: 5px;">Department Dashboard</h1>
+                <p class="subtitle" style="margin-bottom: 0;"></p>
+            </div>
+            <button id="exportTrendsBtn" class="btn-primary" style="display: none;">Export Trends (CSV)</button>
+        </div>
 
         <!-- STATS GRID -->
         <div class="stats-grid" style="margin-bottom: 40px;">
@@ -79,8 +84,9 @@
 
         <!-- FACULTY TABLE -->
         <div class="card" style="padding: 0;">
-            <div style="padding: 24px;">
+            <div style="padding: 24px; display:flex; justify-content:space-between; align-items:center;">
                 <h3 style="margin: 0;">Faculty Performance Overview</h3>
+                <button id="btnExportCSV" class="btn-outline" style="display:flex;align-items:center;gap:6px;">📥 Export Department Data</button>
             </div>
             
             <table class="data-table" style="margin: 0; border-top: 1px solid #e2e8f0;">

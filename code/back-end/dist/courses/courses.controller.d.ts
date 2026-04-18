@@ -1,5 +1,5 @@
 import { CoursesService } from './courses.service';
-import { CreateCourseDto, UpdateCourseDto, EnrollStudentsDto } from './dto/course.dto';
+import { CreateCourseDto, UpdateCourseDto, EnrollStudentsDto, BulkImportCoursesDto } from './dto/course.dto';
 export declare class CoursesController {
     private readonly svc;
     constructor(svc: CoursesService);
@@ -20,4 +20,12 @@ export declare class CoursesController {
         message: string;
     };
     enroll(id: string, dto: EnrollStudentsDto, req: any): any;
+    bulkImport(dto: BulkImportCoursesDto, req: any): {
+        success: any[];
+        failed: {
+            course: any;
+            reason: string;
+        }[];
+        total: number;
+    };
 }

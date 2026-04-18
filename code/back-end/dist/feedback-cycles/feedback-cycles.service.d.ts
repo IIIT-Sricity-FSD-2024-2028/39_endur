@@ -16,11 +16,20 @@ export declare class FeedbackCyclesService {
         endTimestamp: string;
         reflectionDeadline?: string;
         actionReportDeadline?: string;
+        responses?: any[];
         cycleId: string;
     };
     update(id: string, dto: UpdateFeedbackCycleDto, actorId?: string, actorName?: string): any;
     updateStatus(id: string, dto: UpdateCycleStatusDto, actorId?: string, actorName?: string): any;
     remove(id: string, actorId?: string, actorName?: string): {
         message: string;
+    };
+    bulkCreate(cyclesToImport: CreateFeedbackCycleDto[], actorId?: string, actorName?: string): {
+        success: any[];
+        failed: {
+            cycle: any;
+            reason: string;
+        }[];
+        total: number;
     };
 }

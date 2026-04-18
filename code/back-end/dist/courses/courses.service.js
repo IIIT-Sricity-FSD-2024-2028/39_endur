@@ -132,6 +132,25 @@ let CoursesService = class CoursesService {
         });
         return courses[courseIdx];
     }
+    bulkCreate(coursesToImport, actorId, actorName) {
+        const existing = this.store.getCourses();
+        const success = [];
+        const failed = [];
+        for (const dto of coursesToImport) {
+            if (existing.find((c) => c.id === dto.id)) {
+                failed.push({ course: dto, reason: `Course ID ${dto.id} already exists` });
+                continue;
+            }
+            const entry = { ...dto, enrolled: dto.enrolled || 0, thumbnail: dto.thumbnail || THUMBNAILS[Math.floor(Math.random() * THUMBNAILS.length)] };
+            existing.unshift(entry);
+            success.push(entry);
+        }
+        this.store.setCourses(existing);
+        if (success.length > 0) {
+            this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'Super User', actorRole: 'superuser', action: 'BULK_CREATE', module: 'Courses', target: `${success.length} courses`, details: `Bulk import: ${success.length} created, ${failed.length} failed.` });
+        }
+        return { success, failed, total: coursesToImport.length };
+    }
 };
 exports.CoursesService = CoursesService;
 exports.CoursesService = CoursesService = __decorate([

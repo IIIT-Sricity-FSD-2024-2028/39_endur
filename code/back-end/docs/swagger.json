@@ -894,6 +894,73 @@
         ]
       }
     },
+    "/api/courses/bulk": {
+      "post": {
+        "operationId": "CoursesController_bulkImport",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkImportCoursesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Bulk import courses from JSON array (superuser only)",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
     "/api/feedback-cycles": {
       "get": {
         "operationId": "FeedbackCyclesController_findAll",
@@ -1401,6 +1468,73 @@
           }
         },
         "summary": "Update cycle status/phase (superuser/admin only)",
+        "tags": [
+          "Feedback Cycles"
+        ]
+      }
+    },
+    "/api/feedback-cycles/bulk": {
+      "post": {
+        "operationId": "FeedbackCyclesController_bulkImport",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkImportCyclesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Bulk import historical feedback cycles (superuser/admin only)",
         "tags": [
           "Feedback Cycles"
         ]
@@ -1942,6 +2076,138 @@
         ]
       }
     },
+    "/api/evaluation-parameters/dept/{department}/reject": {
+      "post": {
+        "operationId": "EvaluationParametersController_reject",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Reject dept params to request revision (superuser/dean only)",
+        "tags": [
+          "Evaluation Parameters"
+        ]
+      }
+    },
+    "/api/evaluation-parameters/bulk": {
+      "post": {
+        "operationId": "EvaluationParametersController_bulkImport",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkImportEvalParamsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Bulk import evaluation parameters from JSON array (superuser/admin only)",
+        "tags": [
+          "Evaluation Parameters"
+        ]
+      }
+    },
     "/api/feedback-responses": {
       "get": {
         "operationId": "FeedbackResponsesController_findAll",
@@ -2330,6 +2596,638 @@
           "Audit Logs"
         ]
       }
+    },
+    "/api/faculty-reports/self-reflections": {
+      "get": {
+        "operationId": "FacultyReportsController_findReflections",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "facultyId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get all self reflections",
+        "tags": [
+          "Faculty Reports & Check-ins"
+        ]
+      },
+      "post": {
+        "operationId": "FacultyReportsController_submitReflection",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSelfReflectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Submit or update a self reflection",
+        "tags": [
+          "Faculty Reports & Check-ins"
+        ]
+      }
+    },
+    "/api/faculty-reports/action-reports": {
+      "get": {
+        "operationId": "FacultyReportsController_findActionReports",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "facultyId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get all action reports",
+        "tags": [
+          "Faculty Reports & Check-ins"
+        ]
+      },
+      "post": {
+        "operationId": "FacultyReportsController_submitActionReport",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitActionReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Submit or resubmit an action report",
+        "tags": [
+          "Faculty Reports & Check-ins"
+        ]
+      }
+    },
+    "/api/faculty-reports/action-reports/{id}/checkin": {
+      "patch": {
+        "operationId": "FacultyReportsController_reviewCheckin",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCheckinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "HOD review / finalize / request revision on action report",
+        "tags": [
+          "Faculty Reports & Check-ins"
+        ]
+      }
+    },
+    "/api/departments": {
+      "get": {
+        "operationId": "DepartmentsController_findAll",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Departments"
+        ]
+      },
+      "post": {
+        "operationId": "DepartmentsController_create",
+        "parameters": [
+          {
+            "name": "x-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepartmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Departments"
+        ]
+      }
+    },
+    "/api/departments/bulk": {
+      "post": {
+        "operationId": "DepartmentsController_bulkCreate",
+        "parameters": [
+          {
+            "name": "x-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Departments"
+        ]
+      }
+    },
+    "/api/departments/{id}": {
+      "delete": {
+        "operationId": "DepartmentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Departments"
+        ]
+      }
     }
   },
   "info": {
@@ -2391,6 +3289,10 @@
               "admin"
             ]
           },
+          "email": {
+            "type": "string",
+            "example": "student@university.edu"
+          },
           "department": {
             "type": "string",
             "example": "Computer Science"
@@ -2442,6 +3344,10 @@
           "role": {
             "type": "string",
             "example": "faculty"
+          },
+          "email": {
+            "type": "string",
+            "example": "faculty@university.edu"
           },
           "department": {
             "type": "string",
@@ -2549,6 +3455,20 @@
           "studentIds"
         ]
       },
+      "BulkImportCoursesDto": {
+        "type": "object",
+        "properties": {
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateCourseDto"
+            }
+          }
+        },
+        "required": [
+          "courses"
+        ]
+      },
       "CreateFeedbackCycleDto": {
         "type": "object",
         "properties": {
@@ -2634,6 +3554,20 @@
           "status"
         ]
       },
+      "BulkImportCyclesDto": {
+        "type": "object",
+        "properties": {
+          "cycles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateFeedbackCycleDto"
+            }
+          }
+        },
+        "required": [
+          "cycles"
+        ]
+      },
       "CreateEvalParamDto": {
         "type": "object",
         "properties": {
@@ -2694,6 +3628,20 @@
           }
         }
       },
+      "BulkImportEvalParamsDto": {
+        "type": "object",
+        "properties": {
+          "params": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateEvalParamDto"
+            }
+          }
+        },
+        "required": [
+          "params"
+        ]
+      },
       "SubmitFeedbackDto": {
         "type": "object",
         "properties": {
@@ -2727,6 +3675,85 @@
           "courseId",
           "studentId"
         ]
+      },
+      "SubmitSelfReflectionDto": {
+        "type": "object",
+        "properties": {
+          "facultyId": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "cycleId": {
+            "type": "string"
+          },
+          "expectedRatings": {
+            "type": "object"
+          },
+          "reflectionText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "facultyId",
+          "courseId",
+          "cycleId",
+          "expectedRatings",
+          "reflectionText"
+        ]
+      },
+      "SubmitActionReportDto": {
+        "type": "object",
+        "properties": {
+          "facultyId": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "cycleId": {
+            "type": "string"
+          },
+          "rootCause": {
+            "type": "string"
+          },
+          "plannedStrategies": {
+            "type": "string"
+          },
+          "timeline": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "facultyId",
+          "courseId",
+          "cycleId",
+          "rootCause",
+          "plannedStrategies",
+          "timeline"
+        ]
+      },
+      "ReviewCheckinDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "hodNotes": {
+            "type": "string"
+          },
+          "hodOutcomes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "CreateDepartmentDto": {
+        "type": "object",
+        "properties": {}
       }
     }
   }

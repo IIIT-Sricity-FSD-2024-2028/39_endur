@@ -1,3 +1,4 @@
+import { OnModuleInit } from '@nestjs/common';
 export interface AuditLog {
     id: string;
     timestamp: string;
@@ -9,8 +10,9 @@ export interface AuditLog {
     target: string;
     details: string;
 }
-export declare class DataStoreService {
+export declare class DataStoreService implements OnModuleInit {
     private courses;
+    private departments;
     private feedbackCycles;
     private evaluationParameters;
     private feedbackResponses;
@@ -18,12 +20,17 @@ export declare class DataStoreService {
     private draftParameters;
     private activeParameters;
     private departmentConfigStatus;
+    private departmentConfigNotes;
     private selfReflections;
     private actionReports;
     private reviewCheckins;
     private cycleState;
+    onModuleInit(): void;
+    private _seedAll;
     getCourses(): any[];
     setCourses(c: any[]): void;
+    getDepartments(): any[];
+    setDepartments(d: any[]): void;
     getFeedbackCycles(): any[];
     setFeedbackCycles(c: any[]): void;
     getCycleState(): any;
@@ -36,6 +43,8 @@ export declare class DataStoreService {
     setActiveParameters(a: Record<string, any[]>): void;
     getDeptConfigStatus(): Record<string, string>;
     setDeptConfigStatus(s: Record<string, string>): void;
+    getDeptConfigNotes(): Record<string, string>;
+    setDeptConfigNotes(n: Record<string, string>): void;
     getFeedbackResponses(): any[];
     setFeedbackResponses(r: any[]): void;
     getSelfReflections(): any[];

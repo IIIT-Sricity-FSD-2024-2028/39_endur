@@ -87,7 +87,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { get } from '../../js/core/storage.js';
+    import { GET } from '../../js/core/api.js';
 
     let flatParams = [];
 
@@ -99,24 +99,23 @@
         const av = document.getElementById('avatar');
         if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
 
-        loadData();
+        await loadData();
         renderTable();
         bindFilters();
     });
 
-    function loadData() {
-        const drafts = get("draftParameters") || {};
-        const finals = get("activeParameters") || {};
-        const statuses = get("departmentConfigStatus") || {};
-        
+    async function loadData() {
         flatParams = [];
-        const depts = new Set([...Object.keys(drafts), ...Object.keys(finals)]);
-        depts.forEach(d => {
-            const list = drafts[d] || finals[d] || [];
-            list.forEach(p => {
-                flatParams.push({...p, department: d, status: statuses[d] || 'DRAFT'});
+        try {
+            const allParams = await GET('/evaluation-parameters');
+            const statuses = await GET('/evaluation-parameters/status');
+            
+            allParams.forEach(p => {
+                flatParams.push({...p, status: statuses[p.department] || 'DRAFT'});
             });
-        });
+        } catch(e) {
+            console.error(e);
+        }
     }
 
     function renderTable(search = '', status = '') {

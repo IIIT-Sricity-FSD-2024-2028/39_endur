@@ -1,8 +1,8 @@
-import { get, set, remove } from '../core/storage.js';
+import { getSession } from '../core/session.js';
 import { GET } from '../core/api.js';
 
 export async function initProfile() {
-    const user = get("endurSession");
+    const user = getSession();
     if (!user) return;
 
     // Populate UI
@@ -42,27 +42,26 @@ export async function initProfile() {
 }
 
 function logout() {
-    remove("endurSession");
+    localStorage.removeItem("endurSession");
     window.location.href = "../../login.html";
 }
 
 async function switchRole(targetRole) {
-    const currentUser = get('endurSession');
+    const currentUser = getSession();
     try {
         const allUsers = await GET('/users');
         const targetUser = allUsers.find(u => u.name === currentUser.name && u.role === targetRole);
         if (targetUser) {
-            set('endurSession', targetUser);
+            localStorage.setItem('endurSession', JSON.stringify(targetUser));
             window.location.href = `../${targetRole}/dashboard.html`;
         } else {
             currentUser.role = targetRole;
-            set('endurSession', currentUser);
+            localStorage.setItem('endurSession', JSON.stringify(currentUser));
             window.location.href = `../${targetRole}/dashboard.html`;
         }
     } catch {
         currentUser.role = targetRole;
-        set('endurSession', currentUser);
+        localStorage.setItem('endurSession', JSON.stringify(currentUser));
         window.location.href = `../${targetRole}/dashboard.html`;
     }
 }
-

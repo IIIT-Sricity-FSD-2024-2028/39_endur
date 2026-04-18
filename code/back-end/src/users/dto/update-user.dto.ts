@@ -17,6 +17,11 @@ export class UpdateUserDto {
   @IsString()
   role?: string;
 
+  @ApiPropertyOptional({ example: 'faculty@university.edu' })
+  @IsOptional()
+  @IsString()
+  email?: string;
+
   @ApiPropertyOptional({ example: 'Mathematics' })
   @IsOptional()
   @IsString()

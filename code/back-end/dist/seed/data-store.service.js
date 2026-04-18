@@ -10,6 +10,7 @@ exports.DataStoreService = void 0;
 const common_1 = require("@nestjs/common");
 let DataStoreService = class DataStoreService {
     courses = [];
+    departments = [];
     feedbackCycles = [];
     evaluationParameters = [];
     feedbackResponses = [];
@@ -17,12 +18,35 @@ let DataStoreService = class DataStoreService {
     draftParameters = {};
     activeParameters = {};
     departmentConfigStatus = {};
+    departmentConfigNotes = {};
     selfReflections = [];
     actionReports = [];
     reviewCheckins = [];
-    cycleState = { phase: 'COMPLETED' };
+    cycleState = { phase: 'PREPARATION' };
+    onModuleInit() {
+        this._seedAll();
+    }
+    _seedAll() {
+        this.departments = [];
+        this.evaluationParameters = [];
+        this.activeParameters = {};
+        this.departmentConfigStatus = {};
+        this.courses = [];
+        this.feedbackCycles = [];
+        this.cycleState = {
+            id: 'SETUP',
+            cycleName: '',
+            phase: 'PREPARATION',
+            status: 'closed',
+        };
+        this.feedbackResponses = [];
+        this.selfReflections = [];
+        this.actionReports = [];
+    }
     getCourses() { return this.courses; }
     setCourses(c) { this.courses = c; }
+    getDepartments() { return this.departments; }
+    setDepartments(d) { this.departments = d; }
     getFeedbackCycles() { return this.feedbackCycles; }
     setFeedbackCycles(c) { this.feedbackCycles = c; }
     getCycleState() { return this.cycleState; }
@@ -35,6 +59,8 @@ let DataStoreService = class DataStoreService {
     setActiveParameters(a) { this.activeParameters = a; }
     getDeptConfigStatus() { return this.departmentConfigStatus; }
     setDeptConfigStatus(s) { this.departmentConfigStatus = s; }
+    getDeptConfigNotes() { return this.departmentConfigNotes; }
+    setDeptConfigNotes(n) { this.departmentConfigNotes = n; }
     getFeedbackResponses() { return this.feedbackResponses; }
     setFeedbackResponses(r) { this.feedbackResponses = r; }
     getSelfReflections() { return this.selfReflections; }

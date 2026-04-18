@@ -50,12 +50,15 @@
             <!-- DOMAIN PHASE BANNER -->
             <div id="phaseBanner" style="padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px; display: none;"></div>
 
-            <h1 class="animate-in">
-                Faculty Dashboard
-                <span id="dashboardCycleName" class="badge neutral animate-pop delay-1" style="text-transform: uppercase;">
-                    LOADING CYCLE...
-                </span>
-            </h1>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 class="animate-in" style="margin-bottom: 0;">
+                    Faculty Dashboard
+                    <span id="dashboardCycleName" class="badge neutral animate-pop delay-1" style="text-transform: uppercase;">
+                        LOADING CYCLE...
+                    </span>
+                </h1>
+                <button id="exportTrendsBtn" class="btn-primary" style="display: none;">Export Trends (CSV)</button>
+            </div>
 
             <!-- STATS -->
             <div class="stats-grid">

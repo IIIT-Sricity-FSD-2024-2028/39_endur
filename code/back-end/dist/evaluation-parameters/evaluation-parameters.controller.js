@@ -48,6 +48,12 @@ let EvaluationParametersController = class EvaluationParametersController {
     submit(dept, req) {
         return this.svc.submit(dept, req.headers['x-user-id'], req.headers['x-user-name']);
     }
+    reject(dept, note, req) {
+        return this.svc.reject(dept, note, req.headers['x-user-id'], req.headers['x-user-name']);
+    }
+    bulkImport(dto, req) {
+        return this.svc.bulkCreate(dto.params, req.headers['x-user-id'], req.headers['x-user-name']);
+    }
 };
 exports.EvaluationParametersController = EvaluationParametersController;
 __decorate([
@@ -131,6 +137,28 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], EvaluationParametersController.prototype, "submit", null);
+__decorate([
+    (0, common_1.Post)('dept/:department/reject'),
+    (0, roles_decorator_1.Roles)('superuser', 'dean'),
+    (0, swagger_1.ApiOperation)({ summary: 'Reject dept params to request revision (superuser/dean only)' }),
+    __param(0, (0, common_1.Param)('department')),
+    __param(1, (0, common_1.Body)('note')),
+    __param(2, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", void 0)
+], EvaluationParametersController.prototype, "reject", null);
+__decorate([
+    (0, common_1.Post)('bulk'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    (0, swagger_1.ApiOperation)({ summary: 'Bulk import evaluation parameters from JSON array (superuser/admin only)' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [eval_param_dto_1.BulkImportEvalParamsDto, Object]),
+    __metadata("design:returntype", void 0)
+], EvaluationParametersController.prototype, "bulkImport", null);
 exports.EvaluationParametersController = EvaluationParametersController = __decorate([
     (0, swagger_1.ApiTags)('Evaluation Parameters'),
     (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),

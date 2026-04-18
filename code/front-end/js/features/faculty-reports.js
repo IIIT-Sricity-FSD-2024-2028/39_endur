@@ -1,244 +1,239 @@
-import { GET } from '../core/api.js';
-import { getSession } from '../core/session.js';
+/**
+ * faculty-reports.js
+ * Report page feature — all data from API, zero localStorage reads.
+ */
+import { GET, getSession } from '../core/api.js';
+import { getMyReflections } from './faculty-self-reflection.js';
+import { getMyActionReports } from './faculty-action-report.js';
 
 export async function renderFacultyReports() {
     const user = getSession();
     if (!user) return;
 
+    // ── 1. Fetch all needed data from API ──────────────────────────────────────
     let allCourses = [];
     try { allCourses = await GET('/courses'); } catch {}
-    const myCourses = allCourses.filter(course => course.facultyId === user.id);
+    const myCourses = allCourses.filter(c => c.facultyId === user.id);
 
-    if (myCourses.length === 0) return;
+    if (myCourses.length === 0) {
+        _showNoCourses();
+        return;
+    }
 
     let cycleState;
-    try { cycleState = await GET('/feedback-cycles/state'); } catch { cycleState = { id: 'SETUP', phase: 'PREPARATION' }; }
-    const currentPhase = cycleState?.phase || 'PREPARATION';
+    try { cycleState = await GET('/feedback-cycles/state'); }
+    catch { cycleState = { id: 'SETUP', phase: 'PREPARATION' }; }
     const activeCycleId = cycleState?.id || 'SETUP';
+    const currentPhase = cycleState?.phase || 'PREPARATION';
 
-    let allFeedbackRaw = [];
-    try { allFeedbackRaw = await GET(`/feedback-responses?cycleId=${activeCycleId}`); } catch {}
-    const allFeedback = allFeedbackRaw;
-    const reflections = JSON.parse(localStorage.getItem('selfReflection') || '[]').filter(r => r.cycleId === activeCycleId);
-    const actionReports = JSON.parse(localStorage.getItem('actionReports') || '[]').filter(a => a.cycleId === activeCycleId);
+    let allFeedback = [];
+    try { allFeedback = await GET(`/feedback-responses?cycleId=${activeCycleId}`); } catch {}
 
-    // Trend history — generated from actual submissions
-    const summaryData = { history: myCourses.map((c, i) => ({ cycle: `Cycle ${i+1}`, rating: 3 + Math.random() * 1.5 })).slice(0, 6) };
+    // Fetch reflections and action reports from API (not localStorage)
+    const reflections = await getMyReflections(activeCycleId);
+    const actionReports = await getMyActionReports(activeCycleId);
 
-
-    // GLOBAL ALERT: Check for Pending Revisions
-    const globalAlertContainer = document.getElementById("globalAlertContainer");
-    if (globalAlertContainer) {
-        const needsRevision = actionReports.filter(a => a.facultyId === user.id && a.status === "REVISION_REQUESTED");
+    // ── 2. Render revisions alert ─────────────────────────────────────────────
+    const alertBox = document.getElementById('globalAlertContainer');
+    if (alertBox) {
+        const needsRevision = actionReports.filter(a => a.status === 'REVISION_REQUESTED');
         if (needsRevision.length > 0) {
-            const coursesText = needsRevision.map(a => a.courseId).join(", ");
-            globalAlertContainer.innerHTML = `
-                <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 8px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
-                    <div style="font-size: 24px;">⚠️</div>
+            const ids = needsRevision.map(a => a.courseId).join(', ');
+            alertBox.innerHTML = `
+                <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px;border-radius:8px;margin-bottom:24px;display:flex;align-items:center;gap:16px;">
+                    <div style="font-size:24px">⚠️</div>
                     <div>
-                        <h3 style="color: #991b1b; margin-bottom: 4px; font-size: 15px;">Action Required: HOD Revision Requested</h3>
-                        <p style="color: #b91c1c; font-size: 14px; margin: 0;">The HOD has requested revisions for your Action Reports in: <strong>${coursesText}</strong>. Please select the course below and update your report.</p>
+                        <h3 style="color:#991b1b;margin-bottom:4px;font-size:15px">Action Required: HOD Revision Requested</h3>
+                        <p style="color:#b91c1c;font-size:14px;margin:0">Please revise your Action Reports for: <strong>${ids}</strong></p>
                     </div>
-                </div>
-            `;
+                    <a href="action-report.html" class="btn-danger" style="flex-shrink:0;margin-left:auto">Revise Now →</a>
+                </div>`;
         } else {
-            globalAlertContainer.innerHTML = "";
+            alertBox.innerHTML = '';
         }
     }
 
-    const dotsContainer = document.getElementById("courseDots");
-    const actionDotsContainer = document.getElementById("actionDots");
+    // ── 3. Build course tab selector ─────────────────────────────────────────
+    const selector = document.getElementById('courseSelector');
+    const reportContent = document.getElementById('reportContent');
+    const anonNote = document.getElementById('anonNote');
+    const noCoursesState = document.getElementById('noCoursesState');
 
-    if (dotsContainer) dotsContainer.innerHTML = "";
-    if (actionDotsContainer) actionDotsContainer.innerHTML = "";
+    if (noCoursesState) noCoursesState.style.display = 'none';
+    if (reportContent) reportContent.style.display = 'block';
+    if (anonNote) anonNote.style.display = 'block';
 
-    myCourses.forEach((course, index) => {
-        const dot = document.createElement("span");
-        dot.style.cssText = "height: 12px; width: 12px; border-radius: 50%; background-color: #ccc; cursor: pointer; transition: 0.2s;";
-        dot.onclick = () => selectCourse(index);
-        if (dotsContainer) dotsContainer.appendChild(dot);
-
-        const actionDot = document.createElement("span");
-        actionDot.style.cssText = "height: 12px; width: 12px; border-radius: 50%; background-color: #ccc; cursor: pointer; transition: 0.2s;";
-        actionDot.onclick = () => selectCourse(index);
-        if (actionDotsContainer) actionDotsContainer.appendChild(actionDot);
-    });
-
-    function selectCourse(index) {
-        const course = myCourses[index];
-        localStorage.setItem("activeFacultyCourse", course.id);
-
-        if (dotsContainer) {
-            Array.from(dotsContainer.children).forEach((dot, i) => {
-                dot.style.backgroundColor = i === index ? "var(--primary)" : "#ccc";
-                dot.style.transform = i === index ? "scale(1.2)" : "scale(1)";
-            });
-        }
-        if (actionDotsContainer) {
-            Array.from(actionDotsContainer.children).forEach((dot, i) => {
-                dot.style.backgroundColor = i === index ? "var(--primary)" : "#ccc";
-                dot.style.transform = i === index ? "scale(1.2)" : "scale(1)";
-            });
-        }
-
-        const nameEl = document.getElementById("currentCourseName");
-        if (nameEl) nameEl.innerText = `${course.id}`;
-
-        const courseFeedback = allFeedback.filter(f => f.courseId === course.id);
-        const responseCount = courseFeedback.length;
-
-        const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id);
-        const hasActionReport = actionReports.find(a => a.courseId === course.id && a.facultyId === user.id);
-
-        let totalScore = 0;
-        let metricCount = 0;
-
-        courseFeedback.forEach(feedback => {
-            if (feedback.ratings) {
-                Object.values(feedback.ratings).forEach(val => {
-                    if (typeof val === 'number') { totalScore += val; metricCount++; }
-                });
-            }
+    if (selector) {
+        selector.innerHTML = '';
+        myCourses.forEach((course, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'course-tab' + (i === 0 ? ' active' : '');
+            btn.dataset.id = course.id;
+            btn.textContent = `${course.id} — ${course.name}`;
+            btn.onclick = () => {
+                document.querySelectorAll('.course-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                localStorage.setItem('activeFacultyCourse', course.id);
+                renderCourse(course, allFeedback, reflections, actionReports, activeCycleId, currentPhase, user);
+            };
+            selector.appendChild(btn);
         });
-
-        const realAverage = metricCount > 0 ? (totalScore / metricCount).toFixed(1) : 0;
-        const avgEl = document.getElementById("avgRating");
-
-        if (avgEl) {
-            if (responseCount === 0) {
-                avgEl.innerText = "0/5";
-                avgEl.style.opacity = "0.5";
-            } else if (!hasReflection && currentPhase !== "ACTION_REPORT" && currentPhase !== "COMPLETED") {
-                avgEl.innerText = "?/5";
-                avgEl.style.opacity = "0.5";
-                avgEl.title = "Submit your self-reflection to reveal the student average.";
-            } else {
-                avgEl.innerText = `${realAverage}/5`;
-                avgEl.style.opacity = "1";
-                avgEl.title = "Actual Student Average";
-            }
-        }
-
-        const feedbackBtn = document.getElementById("feedbackActionBtn");
-
-        if (feedbackBtn) {
-            if (hasReflection) {
-                feedbackBtn.innerText = "View Gap Analysis →";
-                feedbackBtn.className = "btn-outline";
-                feedbackBtn.style.opacity = "1";
-                feedbackBtn.disabled = false;
-                feedbackBtn.onclick = () => window.location.href = "gap-analysis.html";
-            }
-            else if (currentPhase === "PREPARATION" || currentPhase === "STUDENT_FEEDBACK") {
-                feedbackBtn.innerText = `Locked (Waiting for Student Phase to close)`;
-                feedbackBtn.className = "btn-outline";
-                feedbackBtn.style.opacity = "0.6";
-                feedbackBtn.disabled = true;
-            }
-            else if (currentPhase === "FACULTY_REFLECTION") {
-                feedbackBtn.innerText = "Start Self-Reflection →";
-                feedbackBtn.className = "btn-primary";
-                feedbackBtn.style.opacity = "1";
-                feedbackBtn.disabled = false;
-                feedbackBtn.onclick = () => window.location.href = "self-reflection.html";
-            }
-            else {
-                feedbackBtn.innerText = "Reflection Period Ended";
-                feedbackBtn.className = "btn-outline";
-                feedbackBtn.style.opacity = "0.6";
-                feedbackBtn.disabled = true;
-            }
-        }
-
-        const arBtn = document.getElementById("actionReportBtn");
-        const arMsg = document.getElementById("actionReportMsg");
-
-        if (arBtn && arMsg) {
-            arMsg.style.display = "none";
-            arBtn.disabled = false;
-
-            if (hasActionReport && (hasActionReport.status === "FINALIZED" || hasActionReport.status === "SUBMITTED")) {
-                if (hasActionReport.status === "FINALIZED") {
-                    arBtn.innerText = "View Finalized Report →";
-                    arBtn.className = "btn-outline";
-                    arBtn.style.opacity = "1";
-                    arMsg.innerHTML = "✅ <strong>Check-in Finalized</strong> by HOD.";
-                    arMsg.style.color = "#4ade80";
-                    arMsg.style.display = "block";
-                } else {
-                    arBtn.innerText = "View Action Report →";
-                    arBtn.className = "btn-primary";
-                    arBtn.style.opacity = "1";
-                    arMsg.innerHTML = "⏳ Submitted - Pending HOD Review";
-                    arMsg.style.color = "#94a3b8";
-                    arMsg.style.display = "block";
-                }
-                arBtn.onclick = () => window.location.href = "action-report.html";
-            }
-            else if (hasActionReport && hasActionReport.status === "REVISION_REQUESTED") {
-                arBtn.innerText = "Revise Action Report →";
-                arBtn.className = "btn-danger";
-                arBtn.style.opacity = "1";
-                arMsg.innerHTML = "<strong>⚠️ HOD requested a revision.</strong> Please update your report.";
-                arMsg.style.color = "#f87171";
-                arMsg.style.display = "block";
-                arBtn.onclick = () => window.location.href = "action-report.html";
-            }
-            else {
-                if (currentPhase === "COMPLETED") {
-                    arBtn.innerText = "Action Report Period Ended";
-                    arBtn.className = "btn-outline";
-                    arBtn.style.opacity = "0.6";
-                    arBtn.disabled = true;
-                }
-                else if (!hasReflection) {
-                    arBtn.innerText = "Locked";
-                    arBtn.className = "btn-outline";
-                    arBtn.style.opacity = "0.6";
-                    arBtn.disabled = true;
-                    arMsg.innerHTML = "⚠️ Please submit your Self-Reflection to unlock.";
-                    arMsg.style.color = "#cbd5e1";
-                    arMsg.style.display = "block";
-                }
-                else {
-                    arBtn.innerText = "Start Action Report →";
-                    arBtn.className = "btn-primary";
-                    arBtn.style.opacity = "1";
-                    arBtn.onclick = () => window.location.href = "action-report.html";
-                }
-            }
-        }
-
-        const courseEl = document.getElementById("actionCourse");
-        if (courseEl) courseEl.innerText = `${course.id} - ${course.name}`;
     }
 
-    selectCourse(0);
+    // Select first course
+    localStorage.setItem('activeFacultyCourse', myCourses[0].id);
+    renderCourse(myCourses[0], allFeedback, reflections, actionReports, activeCycleId, currentPhase, user);
 
-    const deadlineEl = document.getElementById("actionDeadline");
+    // ── 4. Deadline display ───────────────────────────────────────────────────
+    const deadlineEl = document.getElementById('actionDeadline');
     if (deadlineEl) {
-        if (cycleState.actionDeadline) {
-            // Read the explicitly stamped deadline
-            deadlineEl.innerText = new Date(cycleState.actionDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        } else if (cycleState.reflectionDeadline) {
-            // Failsafe: Dynamically calculate 72 hours after the reflection deadline
-            const fallbackDate = new Date(cycleState.reflectionDeadline);
-            fallbackDate.setHours(fallbackDate.getHours() + 72);
-            deadlineEl.innerText = fallbackDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (cycleState?.actionDeadline) {
+            deadlineEl.innerText = _fmt(cycleState.actionDeadline);
+        } else if (cycleState?.reflectionDeadline) {
+            const fb = new Date(cycleState.reflectionDeadline);
+            fb.setHours(fb.getHours() + 72);
+            deadlineEl.innerText = _fmt(fb.toISOString());
         } else {
-            deadlineEl.innerText = "TBD";
+            deadlineEl.innerText = 'TBD';
         }
-    }
-
-    const chart = document.getElementById("trendChart");
-    if (chart) {
-        chart.innerHTML = "";
-        summaryData.history.forEach(item => {
-            const bar = document.createElement("div");
-            bar.className = "chart-bar";
-            bar.style.height = (item.rating * 20) + "px";
-            chart.appendChild(bar);
-        });
     }
 }
 
+function renderCourse(course, allFeedback, reflections, actionReports, activeCycleId, currentPhase, user) {
+    // Filter feedback for THIS course and cycle — use courseId (API field)
+    const courseFeedback = allFeedback.filter(f => f.courseId === course.id);
+    const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id);
+    const hasActionReport = actionReports.find(a => a.courseId === course.id && a.facultyId === user.id);
+
+    // ── Phase tag ─────────────────────────────────────────────────────────────
+    const phaseTag = document.getElementById('phaseTag');
+    const phaseLabels = {
+        PREPARATION: { label: 'Preparation', cls: 'phase-locked' },
+        STUDENT_FEEDBACK: { label: 'Student Feedback Open', cls: 'phase-active' },
+        FACULTY_REFLECTION: { label: 'Reflection Phase', cls: 'phase-open' },
+        ACTION_REPORT: { label: 'Action Report Phase', cls: 'phase-active' },
+        COMPLETED: { label: 'Cycle Completed', cls: 'phase-locked' },
+    };
+    const pInfo = phaseLabels[currentPhase] || { label: currentPhase, cls: 'phase-locked' };
+    if (phaseTag) { phaseTag.textContent = pInfo.label; phaseTag.className = `phase-badge ${pInfo.cls}`; }
+
+    // ── Aggregate ratings (API returns ratings as object keyed by param ID) ───
+    const ratingTotals = {};
+    const ratingCounts = {};
+    courseFeedback.forEach(f => {
+        if (!f.ratings) return;
+        Object.entries(f.ratings).forEach(([paramId, score]) => {
+            if (typeof score !== 'number') return;
+            ratingTotals[paramId] = (ratingTotals[paramId] || 0) + score;
+            ratingCounts[paramId] = (ratingCounts[paramId] || 0) + 1;
+        });
+    });
+
+    // Overall average across all params
+    const allParamAvgs = Object.keys(ratingTotals).map(k => ratingTotals[k] / ratingCounts[k]);
+    const overall = allParamAvgs.length > 0
+        ? (allParamAvgs.reduce((a, b) => a + b, 0) / allParamAvgs.length).toFixed(1)
+        : null;
+
+    // ── Score display ─────────────────────────────────────────────────────────
+    const scoreEl = document.getElementById('scoreDisplay');
+    const respEl = document.getElementById('responseCount');
+    if (respEl) respEl.textContent = courseFeedback.length;
+
+    const canSeeRatings = courseFeedback.length > 0 &&
+        (hasReflection || currentPhase === 'ACTION_REPORT' || currentPhase === 'COMPLETED');
+
+    if (scoreEl) {
+        if (courseFeedback.length === 0) {
+            scoreEl.innerHTML = `<span class="na">No responses yet</span>`;
+        } else if (!canSeeRatings) {
+            scoreEl.innerHTML = `<span class="na">Submit self-reflection to reveal</span>`;
+        } else {
+            scoreEl.innerHTML = `<span class="big">${overall}</span><span class="of">/ 5</span>`;
+        }
+    }
+
+    // ── Per-param metric rows ─────────────────────────────────────────────────
+    const metricsEl = document.getElementById('metricRows');
+    if (metricsEl) {
+        if (!canSeeRatings) {
+            const lockCount = Object.keys(ratingTotals).length;
+            metricsEl.innerHTML = `<div class="metric-row"><span class="label">All Parameters</span><span class="value locked">🔒 Submit reflection to unlock</span></div>`;
+        } else {
+            metricsEl.innerHTML = Object.keys(ratingTotals).map(paramId => {
+                const avg = (ratingTotals[paramId] / ratingCounts[paramId]).toFixed(1);
+                return `<div class="metric-row"><span class="label">${paramId}</span><span class="value">${avg} / 5</span></div>`;
+            }).join('') || `<div class="metric-row"><span class="label">No metrics</span><span class="value locked">—</span></div>`;
+        }
+    }
+
+    // ── Primary action button ─────────────────────────────────────────────────
+    const btn = document.getElementById('primaryActionBtn');
+    const actionTitle = document.getElementById('actionTitle');
+    const actionDesc = document.getElementById('actionDesc');
+    if (!btn) return;
+
+    btn.disabled = false;
+    btn.onclick = null;
+    btn.className = 'btn-primary action-btn';
+
+    if (hasReflection) {
+        if (actionTitle) actionTitle.textContent = 'View Gap Analysis';
+        if (actionDesc) actionDesc.textContent = 'Reflection submitted. Review your performance gap vs student expectations.';
+        btn.textContent = 'Open Gap Analysis →';
+        btn.onclick = () => window.location.href = 'gap-analysis.html';
+    } else if (currentPhase === 'PREPARATION' || currentPhase === 'STUDENT_FEEDBACK') {
+        if (actionTitle) actionTitle.textContent = 'Self-Reflection';
+        if (actionDesc) actionDesc.textContent = 'Locked until the student feedback phase is complete.';
+        btn.textContent = 'Not Available Yet';
+        btn.className = 'btn-outline action-btn';
+        btn.disabled = true;
+    } else if (currentPhase === 'FACULTY_REFLECTION') {
+        if (actionTitle) actionTitle.textContent = 'Submit Self-Reflection';
+        if (actionDesc) actionDesc.textContent = 'Rate your own performance before reviewing student results.';
+        btn.textContent = 'Start Self-Reflection →';
+        btn.onclick = () => { localStorage.setItem('activeFacultyCourse', course.id); window.location.href = 'self-reflection.html'; };
+    } else if (currentPhase === 'ACTION_REPORT' || currentPhase === 'COMPLETED') {
+        if (hasActionReport?.status === 'FINALIZED') {
+            if (actionTitle) actionTitle.textContent = 'Action Report (Finalized)';
+            if (actionDesc) actionDesc.textContent = '✅ HOD has reviewed and finalized this report.';
+            btn.textContent = 'View Report →';
+            btn.className = 'btn-outline action-btn';
+            btn.onclick = () => window.location.href = 'action-report.html';
+        } else if (hasActionReport?.status === 'SUBMITTED') {
+            if (actionTitle) actionTitle.textContent = 'Action Report (Pending HOD)';
+            if (actionDesc) actionDesc.textContent = '⏳ Submitted — awaiting HOD review.';
+            btn.textContent = 'View Report →';
+            btn.className = 'btn-outline action-btn';
+            btn.onclick = () => window.location.href = 'action-report.html';
+        } else if (hasActionReport?.status === 'REVISION_REQUESTED') {
+            if (actionTitle) actionTitle.textContent = 'Action Report (Revision Needed)';
+            if (actionDesc) actionDesc.textContent = '⚠️ HOD has requested a revision.';
+            btn.textContent = 'Revise Report →';
+            btn.className = 'btn-danger action-btn';
+            btn.onclick = () => window.location.href = 'action-report.html';
+        } else {
+            if (actionTitle) actionTitle.textContent = 'Submit Action Report';
+            if (actionDesc) actionDesc.textContent = 'Outline your improvement plan based on the gap analysis.';
+            btn.textContent = 'Start Action Report →';
+            btn.onclick = () => { localStorage.setItem('activeFacultyCourse', course.id); window.location.href = 'action-report.html'; };
+        }
+    } else {
+        if (actionTitle) actionTitle.textContent = 'No Actions Required';
+        if (actionDesc) actionDesc.textContent = 'Monitor this page as the cycle progresses.';
+        btn.textContent = 'Waiting…';
+        btn.disabled = true;
+        btn.className = 'btn-outline action-btn';
+    }
+}
+
+function _showNoCourses() {
+    const noCoursesState = document.getElementById('noCoursesState');
+    const reportContent = document.getElementById('reportContent');
+    if (noCoursesState) noCoursesState.style.display = 'block';
+    if (reportContent) reportContent.style.display = 'none';
+}
+
+function _fmt(iso) {
+    return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+}

@@ -22,6 +22,11 @@ export class CreateUserDto {
   @IsString()
   role: string;
 
+  @ApiPropertyOptional({ example: 'student@university.edu' })
+  @IsOptional()
+  @IsString()
+  email?: string;
+
   @ApiPropertyOptional({ example: 'Computer Science' })
   @IsOptional()
   @IsString()

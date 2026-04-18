@@ -3,6 +3,7 @@ export declare class CreateUserDto {
     password: string;
     name: string;
     role: string;
+    email?: string;
     department?: string;
     enrolledCourses?: string[];
 }

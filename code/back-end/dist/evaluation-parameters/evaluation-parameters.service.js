@@ -130,16 +130,39 @@ let EvaluationParametersService = class EvaluationParametersService {
         const statuses = this.store.getDeptConfigStatus();
         statuses[department] = 'SUBMITTED';
         this.store.setDeptConfigStatus(statuses);
-        this.store.appendAuditLog({
-            actor: actorId || 'SU001',
-            actorName: actorName || 'HOD',
-            actorRole: 'hod',
-            action: 'SUBMIT',
-            module: 'Evaluation Parameters',
-            target: `${department} Configuration`,
-            details: `Department evaluation parameters submitted for approval.`,
-        });
+        this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'HOD', actorRole: 'hod', action: 'SUBMIT', module: 'Evaluation Parameters', target: `${department} Configuration`, details: `Department evaluation parameters submitted for approval.` });
         return { message: `${department} parameters submitted for approval` };
+    }
+    reject(department, note, actorId, actorName) {
+        const statuses = this.store.getDeptConfigStatus();
+        statuses[department] = 'REVISION_REQUESTED';
+        this.store.setDeptConfigStatus(statuses);
+        let notes = this.store.getDeptConfigNotes() || {};
+        notes[department] = note || 'Please revise your configuration.';
+        this.store.setDeptConfigNotes(notes);
+        this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'Dean', actorRole: 'dean', action: 'REVISE', module: 'Evaluation Parameters', target: `${department} Configuration`, details: `Revision requested: ${note}` });
+        return { message: `Revision requested for ${department} parameters.` };
+    }
+    bulkCreate(paramsToImport, actorId, actorName) {
+        const drafts = this.store.getDraftParameters();
+        const success = [];
+        const failed = [];
+        for (const dto of paramsToImport) {
+            if (!dto.department) {
+                failed.push({ param: dto, reason: 'Missing department field' });
+                continue;
+            }
+            if (!drafts[dto.department])
+                drafts[dto.department] = [];
+            const entry = { id: this.store.genId('EP'), name: dto.name, description: dto.description || '', category: dto.category || '', weight: dto.weight, type: dto.type || 'rating' };
+            drafts[dto.department].push(entry);
+            success.push({ ...entry, department: dto.department });
+        }
+        this.store.setDraftParameters(drafts);
+        if (success.length > 0) {
+            this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'Super User', actorRole: 'superuser', action: 'BULK_CREATE', module: 'Evaluation Parameters', target: `${success.length} params`, details: `Bulk import: ${success.length} created, ${failed.length} failed.` });
+        }
+        return { success, failed, total: paramsToImport.length };
     }
 };
 exports.EvaluationParametersService = EvaluationParametersService;

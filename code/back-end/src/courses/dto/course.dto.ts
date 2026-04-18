@@ -77,3 +77,10 @@ export class EnrollStudentsDto {
   @IsBoolean()
   autoDept?: boolean;
 }
+
+export class BulkImportCoursesDto {
+  @ApiProperty({ type: [CreateCourseDto] })
+  @IsArray()
+  courses: CreateCourseDto[];
+}
+

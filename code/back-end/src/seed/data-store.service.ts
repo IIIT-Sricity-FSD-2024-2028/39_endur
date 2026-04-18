@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 export interface AuditLog {
   id: string;
@@ -13,9 +13,10 @@ export interface AuditLog {
 }
 
 @Injectable()
-export class DataStoreService {
+export class DataStoreService implements OnModuleInit {
   // ─── In-Memory Stores ────────────────────────────────────────────
   private courses: any[] = [];
+  private departments: any[] = [];
   private feedbackCycles: any[] = [];
   private evaluationParameters: any[] = [];
   private feedbackResponses: any[] = [];
@@ -23,14 +24,57 @@ export class DataStoreService {
   private draftParameters: Record<string, any[]> = {};
   private activeParameters: Record<string, any[]> = {};
   private departmentConfigStatus: Record<string, string> = {};
+  private departmentConfigNotes: Record<string, string> = {};
   private selfReflections: any[] = [];
   private actionReports: any[] = [];
   private reviewCheckins: any[] = [];
-  private cycleState: any = { phase: 'COMPLETED' };
+  private cycleState: any = { phase: 'PREPARATION' };
+
+  // ─── Lifecycle ───────────────────────────────────────────────────
+  onModuleInit() {
+    this._seedAll();
+  }
+
+  private _seedAll() {
+    // ── Departments ────────────────────────────────────────────────
+    this.departments = [];
+
+    // ── Evaluation Parameters ──────────────────────────────────────
+    this.evaluationParameters = [];
+    this.activeParameters = {};
+    this.departmentConfigStatus = {};
+
+    // ── Courses (link faculty by ID) ───────────────────────────────
+    this.courses = [];
+
+    // ── Feedback Cycles ────────────────────────────────────────────
+    this.feedbackCycles = [];
+
+    // Active cycle state — currently in student feedback phase
+    this.cycleState = {
+      id: 'SETUP',
+      cycleName: '',
+      phase: 'PREPARATION',
+      status: 'closed',
+    };
+
+    // ── Feedback Responses ─────────────────────────────────────────
+    this.feedbackResponses = [];
+
+    // ── Self-Reflections (for completed cycles only) ───────────────
+    this.selfReflections = [];
+
+    // ── Action Reports (for completed cycles — HOD reviewed) ───────
+    this.actionReports = [];
+  }
 
   // ─── Courses ─────────────────────────────────────────────────────
   getCourses() { return this.courses; }
   setCourses(c: any[]) { this.courses = c; }
+
+  // ─── Departments ──────────────────────────────────────────────────
+  getDepartments() { return this.departments; }
+  setDepartments(d: any[]) { this.departments = d; }
 
   // ─── Feedback Cycles ─────────────────────────────────────────────
   getFeedbackCycles() { return this.feedbackCycles; }
@@ -47,6 +91,8 @@ export class DataStoreService {
   setActiveParameters(a: Record<string, any[]>) { this.activeParameters = a; }
   getDeptConfigStatus() { return this.departmentConfigStatus; }
   setDeptConfigStatus(s: Record<string, string>) { this.departmentConfigStatus = s; }
+  getDeptConfigNotes() { return this.departmentConfigNotes; }
+  setDeptConfigNotes(n: Record<string, string>) { this.departmentConfigNotes = n; }
 
   // ─── Feedback Responses ──────────────────────────────────────────
   getFeedbackResponses() { return this.feedbackResponses; }

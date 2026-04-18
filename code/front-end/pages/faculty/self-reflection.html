@@ -178,20 +178,18 @@
 
 <script type="module">
     import { requireAuth } from "../../js/core/session.js";
-    import { initSelfReflection, submitSelfReflection } from "../../js/features/self-reflection.js";
+    import { initSelfReflection, submitSelfReflection } from "../../js/features/faculty-self-reflection.js";
 
-    const user = requireAuth();
-    if (user) {
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = requireAuth();
+        if (!user) return;
         document.getElementById("userName").innerText = user.name;
         document.getElementById("userDept").innerText = user.department;
         const av = document.getElementById("avatar");
         if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
 
-        const activeCourse = localStorage.getItem("activeFacultyCourse");
-        document.getElementById("activeCourseLabel").textContent = activeCourse || "No course selected";
-
-        initSelfReflection();
-    }
+        await initSelfReflection();
+    });
 
     window.submitSelfReflection = submitSelfReflection;
 </script>

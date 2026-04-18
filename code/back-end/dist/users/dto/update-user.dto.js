@@ -16,6 +16,7 @@ class UpdateUserDto {
     name;
     password;
     role;
+    email;
     department;
     enrolledCourses;
     currentPassword;
@@ -39,6 +40,12 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateUserDto.prototype, "role", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'faculty@university.edu' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateUserDto.prototype, "email", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'Mathematics' }),
     (0, class_validator_1.IsOptional)(),

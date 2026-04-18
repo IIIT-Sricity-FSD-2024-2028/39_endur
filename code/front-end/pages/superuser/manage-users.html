@@ -18,13 +18,10 @@
         .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
         .btn-danger-soft { color:var(--danger); border-color:rgba(239,68,68,0.3); }
         .btn-danger-soft:hover { background:rgba(239,68,68,0.08); border-color:var(--danger); }
-        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
     </style>
 </head>
 <body>
 <div class="dashboard-layout">
-
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <img src="../../assets/logos/endur-logo.svg" alt="Endur">
@@ -36,6 +33,7 @@
             <a href="manage-courses.html">📚 Manage Courses</a>
             <a href="manage-cycles.html">🔄 Feedback Cycles</a>
             <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="manage-departments.html">🏢 Departments</a>
             <a href="audit-logs.html">📋 Audit Logs</a>
             <a href="system-settings.html">🛡️ System Settings</a>
         </nav>
@@ -45,7 +43,6 @@
         </a>
     </aside>
 
-    <!-- MAIN -->
     <main class="dashboard-content">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
             <div>
@@ -55,7 +52,6 @@
             <span class="badge primary">SUPER USER</span>
         </div>
 
-        <!-- STATS -->
         <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
             <div class="stat-card"><p>Total Users</p><h2 id="statTotalUsers">—</h2></div>
             <div class="stat-card"><p>Students</p><h2 id="statStudents">—</h2></div>
@@ -63,7 +59,6 @@
             <div class="stat-card"><p>Staff</p><h2 id="statStaff">—</h2></div>
         </div>
 
-        <!-- ACTIONS ROW -->
         <div class="page-actions">
             <input id="userSearch" class="search-bar" type="search" placeholder="Search by name, ID, or department…" style="margin:0">
             <div class="page-actions-right">
@@ -77,150 +72,66 @@
                     <option value="superuser">Super User</option>
                 </select>
                 <button class="btn-outline" onclick="openBulkImportModal()" style="display:flex;align-items:center;gap:6px;">📥 Import Users</button>
-                <button id="addUserBtn" class="btn-primary" onclick="openAddUser()">+ Add User</button>
+                <button class="btn-primary" onclick="openAddUser()">+ Add User</button>
             </div>
         </div>
 
-        <!-- TABLE -->
         <div class="card-panel">
-            <table class="data-table" style="border:none;border-radius:0">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Full Name</th>
-                        <th>Role</th>
-                        <th>Department</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="usersTableBody">
-                    <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Loading users…</td></tr>
-                </tbody>
+            <table class="data-table">
+                <thead><tr><th>ID</th><th>Full Name</th><th>Role</th><th>Department</th><th>Actions</th></tr></thead>
+                <tbody id="usersTableBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Loading users…</td></tr></tbody>
             </table>
         </div>
     </main>
 </div>
 
-<!-- ADD/EDIT USER MODAL -->
 <div class="modal-overlay" id="userModal">
     <div class="modal-card">
-        <h3>
-            <span id="userModalTitle">Add New User</span>
-            <button class="modal-close" onclick="closeUserModal()">✕</button>
-        </h3>
-        <form id="userForm" novalidate>
+        <h3><span id="userModalTitle">Add New User</span> <button class="modal-close" onclick="closeUserModal()">✕</button></h3>
+        <form id="userForm">
             <div class="form-row">
-                <div class="form-group">
-                    <label for="userName">Full Name</label>
-                    <input type="text" id="userName" name="userName" placeholder="e.g. Dr. Ada Lovelace">
-                    <span class="field-error"></span>
-                </div>
-                <div class="form-group">
-                    <label for="userId">User ID</label>
-                    <input type="text" id="userId" name="userId" placeholder="e.g. F999">
-                    <span class="field-error"></span>
-                </div>
+                <div class="form-group"><label>Full Name</label><input type="text" id="userName" name="userName"></div>
+                <div class="form-group"><label>User ID</label><input type="text" id="userId" name="userId"></div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label for="userRole">Role</label>
-                    <select id="userRole" name="userRole">
-                        <option value="">Select role…</option>
-                        <option value="student">Student</option>
-                        <option value="faculty">Faculty</option>
-                        <option value="hod">HOD</option>
-                        <option value="dean">Dean</option>
-                        <option value="admin">Admin</option>
-                        <option value="superuser">Super User</option>
-                    </select>
-                    <span class="field-error"></span>
-                </div>
-                <div class="form-group">
-                    <label for="userDept">Department</label>
-                    <input type="text" id="userDept" name="userDept" list="userDeptList" placeholder="Select or type new department…" autocomplete="off">
-                    <datalist id="userDeptList"></datalist>
-                    <span class="field-error"></span>
-                </div>
+                <div class="form-group"><label>Role</label><select id="userRole" name="userRole"><option value="">Select role…</option><option value="student">Student</option><option value="faculty">Faculty</option><option value="hod">HOD</option><option value="dean">Dean</option><option value="admin">Admin</option><option value="superuser">Super User</option></select></div>
+                <div class="form-group"><label>Department</label><select id="userDept" name="userDept"><option value="">Loading departments...</option></select></div>
             </div>
-            <div class="form-group" id="passwordGroup">
-                <label for="userPassword">Password</label>
-                <input type="password" id="userPassword" name="userPassword" placeholder="Set account password">
-                <span class="field-error"></span>
+            <div class="form-row">
+                <div class="form-group"><label>Email Address</label><input type="email" id="userEmail" name="userEmail" placeholder="e.g. user@example.com"></div>
+                <div class="form-group"><label for="userPassword">Password</label><input type="password" id="userPassword" name="userPassword" placeholder="Leave blank if unchanged"></div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-outline" onclick="closeUserModal()">Cancel</button>
-                <button type="submit" class="btn-primary">Save User</button>
-            </div>
+            <div class="modal-footer"><button type="button" class="btn-outline" onclick="closeUserModal()">Cancel</button><button type="submit" class="btn-primary">Save User</button></div>
         </form>
     </div>
 </div>
 
-<!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay" id="deleteModal">
     <div class="modal-card confirm-dialog">
-        <h3>
-            Delete User
-            <button class="modal-close" onclick="closeDeleteModal()">✕</button>
-        </h3>
-        <p>Are you sure you want to permanently delete <strong id="deleteUserName"></strong>? This action cannot be undone.</p>
-        <div class="modal-footer">
-            <button class="btn-outline" onclick="closeDeleteModal()">Cancel</button>
-            <button class="btn-danger" id="confirmDeleteBtn">Delete</button>
-        </div>
+        <h3>Delete User <button class="modal-close" onclick="closeDeleteModal()">✕</button></h3>
+        <p>Delete <strong id="deleteUserName"></strong>?</p>
+        <div class="modal-footer"><button class="btn-outline" onclick="closeDeleteModal()">Cancel</button><button class="btn-danger" id="confirmDeleteBtn">Delete</button></div>
     </div>
 </div>
 
-<div id="toastContainer"></div>
-
-<!-- BULK IMPORT MODAL -->
 <div class="modal-overlay" id="bulkModal">
     <div class="modal-card" style="max-width:650px;width:90%">
-        <h3>
-            <span>📥 Import Users</span>
-            <button class="modal-close" onclick="closeBulkModal()">✕</button>
-        </h3>
-        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px">
-            Upload a <strong>.json</strong> or <strong>.csv</strong> file with user data. Required fields: <code>id</code>, <code>name</code>, <code>role</code>, <code>password</code>. Optional: <code>department</code>.
-        </p>
-
-        <!-- CSV Template hint -->
-        <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px;margin-bottom:16px;font-size:0.82rem;color:var(--text-muted)">
-            <strong>CSV format:</strong><br>
-            <code>id,name,role,password,department</code><br>
-            <code>S001,Alice Smith,student,pass123,Computer Science</code>
-        </div>
-
-        <div class="form-group" style="margin-bottom:24px">
-            <label for="bulkFileInput">Select File (.json or .csv)</label>
-            <input type="file" id="bulkFileInput" accept=".json,.csv" style="padding:8px 0" onchange="previewBulkFile()">
-        </div>
-
-        <!-- Preview section -->
-        <div id="bulkPreviewSection" style="display:none">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <strong id="bulkPreviewCount"></strong>
-                <span style="font-size:0.8rem;color:var(--text-muted)">(showing first 20)</span>
-            </div>
-            <div style="max-height:240px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:var(--radius-md)">
-                <table class="data-table" style="border:none;border-radius:0">
-                    <thead>
-                        <tr><th>ID</th><th>Name</th><th>Role</th><th>Department</th></tr>
-                    </thead>
-                    <tbody id="bulkPreviewBody"></tbody>
-                </table>
+        <h3>📥 Import Users <button class="modal-close" onclick="closeBulkModal()">✕</button></h3>
+        <p>Required: <code>id</code>, <code>name</code>, <code>role</code>, <code>password</code>. Optional: <code>email</code>.</p>
+        <input type="file" id="bulkFileInput" accept=".json,.csv" onchange="previewBulkFile()">
+        <div id="bulkPreviewSection" style="display:none;margin-top:20px">
+            <strong id="bulkPreviewCount"></strong>
+            <div style="max-height:240px;overflow-y:auto;border:1px solid #ddd;border-radius:8px">
+                <table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Dept</th><th>Email</th></tr></thead><tbody id="bulkPreviewBody"></tbody></table>
             </div>
         </div>
-
-        <div class="modal-footer" style="margin-top:20px">
-            <button class="btn-outline" onclick="closeBulkModal()">Cancel</button>
-            <button class="btn-primary" id="commitBulkBtn" onclick="commitBulkImport()">Confirm Import</button>
-        </div>
+        <div class="modal-footer"><button class="btn-outline" onclick="closeBulkModal()">Cancel</button><button class="btn-primary" id="commitBulkBtn" onclick="commitBulkImport()">Confirm Import</button></div>
     </div>
 </div>
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { renderSuperuserUsers } from '../../js/features/superuser-users.js';
+    import { renderSuperuserUsers, openAddUser, openEditUser, confirmDeleteUser, closeUserModal, closeDeleteModal, openBulkImportModal, closeBulkModal, previewBulkFile, commitBulkImport } from '../../js/features/superuser-users.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -228,19 +139,20 @@
         document.getElementById('userName').textContent = user.name;
         const av = document.getElementById('avatar');
         if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
-
         await renderSuperuserUsers();
-
-        // Populate stat cards after load
-        setTimeout(() => {
-            const users = window._suUsersRef || [];
-        }, 100);
     });
 
-    // Close modal on backdrop click
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('active'); });
-    });
+    window.openAddUser = openAddUser;
+    window.openEditUser = openEditUser;
+    window.confirmDeleteUser = confirmDeleteUser;
+    window.closeUserModal = closeUserModal;
+    window.closeDeleteModal = closeDeleteModal;
+    window.openBulkImportModal = openBulkImportModal;
+    window.closeBulkModal = closeBulkModal;
+    window.previewBulkFile = previewBulkFile;
+    window.commitBulkImport = commitBulkImport;
+
+    document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); }));
 </script>
 </body>
 </html>

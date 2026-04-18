@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { CoursesService } from './courses.service';
-import { CreateCourseDto, UpdateCourseDto, EnrollStudentsDto } from './dto/course.dto';
+import { CreateCourseDto, UpdateCourseDto, EnrollStudentsDto, BulkImportCoursesDto } from './dto/course.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
@@ -58,5 +58,13 @@ export class CoursesController {
   @ApiOperation({ summary: 'Assign/update student enrollments for a course (superuser only)' })
   enroll(@Param('id') id: string, @Body() dto: EnrollStudentsDto, @Request() req: any) {
     return this.svc.enroll(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
+  }
+
+  @Post('bulk')
+  @Roles('superuser')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Bulk import courses from JSON array (superuser only)' })
+  bulkImport(@Body() dto: BulkImportCoursesDto, @Request() req: any) {
+    return this.svc.bulkCreate(dto.courses, req.headers['x-user-id'], req.headers['x-user-name']);
   }
 }

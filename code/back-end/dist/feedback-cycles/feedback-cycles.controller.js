@@ -40,6 +40,9 @@ let FeedbackCyclesController = class FeedbackCyclesController {
     remove(id, req) {
         return this.svc.remove(id, req.headers['x-user-id'], req.headers['x-user-name']);
     }
+    bulkImport(dto, req) {
+        return this.svc.bulkCreate(dto.cycles, req.headers['x-user-id'], req.headers['x-user-name']);
+    }
 };
 exports.FeedbackCyclesController = FeedbackCyclesController;
 __decorate([
@@ -118,6 +121,17 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], FeedbackCyclesController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Post)('bulk'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    (0, swagger_1.ApiOperation)({ summary: 'Bulk import historical feedback cycles (superuser/admin only)' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [feedback_cycle_dto_1.BulkImportCyclesDto, Object]),
+    __metadata("design:returntype", void 0)
+], FeedbackCyclesController.prototype, "bulkImport", null);
 exports.FeedbackCyclesController = FeedbackCyclesController = __decorate([
     (0, swagger_1.ApiTags)('Feedback Cycles'),
     (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),

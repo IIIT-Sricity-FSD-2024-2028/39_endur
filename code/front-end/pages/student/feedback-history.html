@@ -61,7 +61,7 @@
 
     <script type="module">
         import { requireAuth } from "../../js/core/session.js";
-        import { get } from "../../js/core/storage.js";
+        import { GET } from "../../js/core/api.js";
 
         const user = requireAuth();
 
@@ -69,15 +69,16 @@
         document.getElementById("userDept").innerText = user.department;
         document.getElementById("avatar").innerText = user.name.split(" ").map(n=>n[0]).join("");
 
-        const submissions = get("submittedFeedback") || [];
-        
-        // Sort by newest first
-        const mySubmissions = submissions
-            .filter(s => s.userId === user.id)
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+        let mySubmissions = [];
+        try {
+            const allSubmissions = await GET(`/feedback-responses?studentId=${encodeURIComponent(user.id)}`);
+            mySubmissions = allSubmissions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        } catch(e) {}
 
-        const res = await fetch("http://localhost:3000/api/courses");
-        const courses = await res.json();
+        let courses = window.allCourses || [];
+        try {
+            courses = await GET("/courses");
+        } catch(e) {}
 
         const table = document.getElementById("historyTable");
         table.innerHTML = "";

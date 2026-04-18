@@ -13,3 +13,6 @@ export declare class UpdateEvalParamDto {
     weight?: number;
     status?: string;
 }
+export declare class BulkImportEvalParamsDto {
+    params: CreateEvalParamDto[];
+}

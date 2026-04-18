@@ -31,7 +31,16 @@ export async function api(method, path, body = null, roleOverride = null) {
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({ message: res.statusText }));
-        throw new ApiError(err.message || 'Request failed', res.status, err);
+        let msg = err.message || 'Request failed';
+        if (Array.isArray(msg)) {
+            msg = msg.slice(0, 2).join(', ') + (msg.length > 2 ? ` (and ${msg.length - 2} more errors)` : '');
+        } else if (typeof msg === 'string' && msg.split(',').length > 5) {
+            const parts = msg.split(',');
+            msg = parts.slice(0, 2).join(',') + ` (and ${parts.length - 2} more errors)`;
+        } else if (typeof msg === 'string' && msg.length > 150) {
+            msg = msg.substring(0, 150) + '...';
+        }
+        throw new ApiError(msg, res.status, err);
     }
 
     // 204 No Content

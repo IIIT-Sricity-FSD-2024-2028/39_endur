@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateCycleStatusDto = exports.UpdateFeedbackCycleDto = exports.CreateFeedbackCycleDto = void 0;
+exports.BulkImportCyclesDto = exports.UpdateCycleStatusDto = exports.UpdateFeedbackCycleDto = exports.CreateFeedbackCycleDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class CreateFeedbackCycleDto {
@@ -19,6 +19,7 @@ class CreateFeedbackCycleDto {
     endTimestamp;
     reflectionDeadline;
     actionReportDeadline;
+    responses;
 }
 exports.CreateFeedbackCycleDto = CreateFeedbackCycleDto;
 __decorate([
@@ -54,6 +55,10 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], CreateFeedbackCycleDto.prototype, "actionReportDeadline", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateFeedbackCycleDto.prototype, "responses", void 0);
 class UpdateFeedbackCycleDto {
     cycleName;
     type;
@@ -115,4 +120,14 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateCycleStatusDto.prototype, "phase", void 0);
+const class_validator_2 = require("class-validator");
+class BulkImportCyclesDto {
+    cycles;
+}
+exports.BulkImportCyclesDto = BulkImportCyclesDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ type: [CreateFeedbackCycleDto] }),
+    (0, class_validator_2.IsArray)(),
+    __metadata("design:type", Array)
+], BulkImportCyclesDto.prototype, "cycles", void 0);
 //# sourceMappingURL=feedback-cycle.dto.js.map

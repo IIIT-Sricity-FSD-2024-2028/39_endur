@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateEvalParamDto = exports.CreateEvalParamDto = void 0;
+exports.BulkImportEvalParamsDto = exports.UpdateEvalParamDto = exports.CreateEvalParamDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class CreateEvalParamDto {
@@ -96,4 +96,13 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateEvalParamDto.prototype, "status", void 0);
+class BulkImportEvalParamsDto {
+    params;
+}
+exports.BulkImportEvalParamsDto = BulkImportEvalParamsDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ type: [CreateEvalParamDto] }),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], BulkImportEvalParamsDto.prototype, "params", void 0);
 //# sourceMappingURL=eval-param.dto.js.map

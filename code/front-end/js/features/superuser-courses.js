@@ -5,13 +5,14 @@ const THUMBNAILS = ['img_backtoschool.jpg', 'img_bookclub.jpg', 'img_breakfast.j
 
 let courses = [];
 let users = [];
+let departments = [];
 let session = null;
 let currentModalThumb = THUMBNAILS[0];
 
 export async function initSuperuserCourses() {
     session = getSession();
     try {
-        [courses, users] = await Promise.all([GET('/courses'), GET('/users')]);
+        [courses, users, departments] = await Promise.all([GET('/courses'), GET('/users'), GET('/departments')]);
     } catch (e) {
         showToast('Failed to load data from server.', 'error');
         courses = []; users = [];
@@ -29,7 +30,6 @@ function updateModalThumbPreview(thumb) {
 }
 
 export function shuffleCourseImage() { updateModalThumbPreview(); }
-window.shuffleCourseImage = shuffleCourseImage;
 
 function renderCourseTable(filter = '') {
     const tbody = document.getElementById('courseTableBody');
@@ -72,10 +72,11 @@ function renderCourseTable(filter = '') {
 }
 
 function populateDeptSelect() {
-    const dataList = document.getElementById('courseDeptList');
+    const dataList = document.getElementById('courseDeptSelect');
     if (!dataList) return;
-    const depts = [...new Set(users.map(u => u.department).filter(Boolean))].sort();
-    dataList.innerHTML = depts.map(d => `<option value="${d}">`).join('');
+    
+    dataList.innerHTML = '<option value="">Select Department</option>' + 
+        departments.map(d => `<option value="${d.name}" data-id="${d.id}">${d.name}</option>`).join('');
 }
 
 function populateFacultySelect() {
@@ -112,7 +113,6 @@ export async function saveCourse() {
     const shouldAutoEnroll = document.getElementById('autoEnrollDept')?.checked;
 
     if (!id || !name || !facultyId) { showToast('ID, Name, and Faculty are required.', 'error'); return; }
-    
     if (!/^[a-zA-Z0-9]+$/.test(id)) { showToast('Course ID cannot contain special characters.', 'error'); return; }
 
     const editId = form.dataset.editId;
@@ -123,40 +123,35 @@ export async function saveCourse() {
             const updated = await PATCH(`/courses/${editId}`, payload);
             const idx = courses.findIndex(c => c.id === editId);
             if (idx > -1) courses[idx] = updated;
-
             if (shouldAutoEnroll) {
                 const deptStudents = users.filter(u => u.role === 'student' && u.department === dept).map(u => u.id);
                 if (deptStudents.length) {
                     const enrolledUpdated = await POST(`/courses/${editId}/enroll`, { studentIds: deptStudents });
                     courses[idx] = enrolledUpdated;
-                    users = await GET('/users'); // Refresh local students state
+                    users = await GET('/users');
                 }
             }
         } else {
             payload.id = id;
             const created = await POST('/courses', payload);
             courses.unshift(created);
-
             if (shouldAutoEnroll) {
                 const deptStudents = users.filter(u => u.role === 'student' && u.department === dept).map(u => u.id);
                 if (deptStudents.length) {
                     const updated = await POST(`/courses/${id}/enroll`, { studentIds: deptStudents });
                     const idx = courses.findIndex(c => c.id === id);
                     if (idx > -1) courses[idx] = updated;
-                    users = await GET('/users'); // Refresh local students state
+                    users = await GET('/users');
                 }
             }
         }
         showToast('Course saved successfully.', 'success');
         renderCourseTable();
         closeCourseModal();
-    } catch (err) {
-        showToast(err.message || 'Failed to save course.', 'error');
-    }
+    } catch (err) { showToast(err.message || 'Failed to save course.', 'error'); }
 }
-window.saveCourse = saveCourse;
 
-window.deleteCourse = async (id) => {
+export async function deleteCourse(id) {
     const c = courses.find(c => c.id === id);
     if (!c || !confirm(`Delete course "${c.name}"?`)) return;
     try {
@@ -165,7 +160,7 @@ window.deleteCourse = async (id) => {
         showToast('Course deleted.', 'info');
         renderCourseTable();
     } catch (err) { showToast(err.message, 'error'); }
-};
+}
 
 export function openAddCourse() {
     const form = document.getElementById('courseForm');
@@ -179,7 +174,6 @@ export function openAddCourse() {
     updateModalThumbPreview();
     document.getElementById('courseModal').classList.add('active');
 }
-window.openAddCourse = openAddCourse;
 
 export function openEditCourse(id) {
     const c = courses.find(c => c.id === id);
@@ -197,7 +191,6 @@ export function openEditCourse(id) {
     document.getElementById('courseModalTitle').textContent = 'Edit Course';
     document.getElementById('courseModal').classList.add('active');
 }
-window.openEditCourse = openEditCourse;
 
 export function openAssignStudents(id) {
     const c = courses.find(c => c.id === id);
@@ -211,7 +204,6 @@ export function openAssignStudents(id) {
     });
     document.getElementById('assignModal').classList.add('active');
 }
-window.openAssignStudents = openAssignStudents;
 
 export async function saveAssignments() {
     const courseId = document.getElementById('assignCourseId').value;
@@ -220,18 +212,78 @@ export async function saveAssignments() {
         const updated = await POST(`/courses/${courseId}/enroll`, { studentIds: selectedStudents });
         const courseIdx = courses.findIndex(c => c.id === courseId);
         if (courseIdx > -1) courses[courseIdx] = updated;
-        users = await GET('/users'); // Refresh local students state to reflect new enrollments
+        users = await GET('/users');
         showToast(`Assignments updated for ${courseId}.`, 'success');
         renderCourseTable();
         closeAssignModal();
     } catch (err) { showToast(err.message, 'error'); }
 }
-window.saveAssignments = saveAssignments;
 
 export function closeCourseModal() { document.getElementById('courseModal').classList.remove('active'); }
-window.closeCourseModal = closeCourseModal;
-
 export function closeAssignModal() { document.getElementById('assignModal').classList.remove('active'); }
-window.closeAssignModal = closeAssignModal;
 
+// Bind search
 document.getElementById('courseSearch')?.addEventListener('input', (e) => renderCourseTable(e.target.value.toLowerCase()));
+
+// ===== BULK IMPORT =====
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    return lines.slice(1).map(line => {
+        const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        if (obj.enrolled) obj.enrolled = Number(obj.enrolled) || 0;
+        return obj;
+    });
+}
+
+export function openCourseBulkModal() {
+    document.getElementById('courseBulkModal')?.classList.add('active');
+    document.getElementById('courseBulkPreviewSection').style.display = 'none';
+    document.getElementById('courseBulkFileInput').value = '';
+}
+
+export function closeCourseBulkModal() {
+    document.getElementById('courseBulkModal')?.classList.remove('active');
+}
+
+export async function previewCourseBulkFile() {
+    const file = document.getElementById('courseBulkFileInput')?.files[0];
+    if (!file) { showToast('Please select a file first.', 'error'); return; }
+    const text = await file.text();
+    let parsed = [];
+    try {
+        if (file.name.endsWith('.json')) { const raw = JSON.parse(text); parsed = Array.isArray(raw) ? raw : raw.courses || []; }
+        else if (file.name.endsWith('.csv')) { parsed = parseCSV(text); }
+        else { showToast('Only .json and .csv files are supported.', 'error'); return; }
+    } catch (err) { showToast('Failed to parse file: ' + err.message, 'error'); return; }
+
+    if (!parsed.length) { showToast('No valid data found.', 'error'); return; }
+
+    const missing = parsed.filter(c => !c.id || !c.name || !c.facultyId);
+    if (missing.length) { showToast(`${missing.length} rows missing required fields (id, name, facultyId).`, 'error'); return; }
+
+    window.__bulkCourseData = parsed;
+    const preview = document.getElementById('courseBulkPreviewBody');
+    if (preview) preview.innerHTML = parsed.slice(0, 20).map(c => `<tr><td><code>${c.id}</code></td><td>${c.name}</td><td>${c.facultyId}</td><td>${c.department || '—'}</td></tr>`).join('');
+    const section = document.getElementById('courseBulkPreviewSection');
+    if (section) { section.style.display = 'block'; document.getElementById('courseBulkPreviewCount').textContent = `${parsed.length} courses to import`; }
+}
+
+export async function commitCourseBulkImport() {
+    const data = window.__bulkCourseData;
+    if (!data?.length) { showToast('No data to import.', 'error'); return; }
+    const btn = document.getElementById('commitCourseBulkBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+    try {
+        const result = await POST('/courses/bulk', { courses: data });
+        const { success, failed, total } = result;
+        courses.unshift(...success);
+        renderCourseTable();
+        showToast(`Imported ${success.length}/${total} courses. ${failed.length ? failed.length + ' failed.' : ''}`, success.length > 0 ? 'success' : 'error');
+        closeCourseBulkModal();
+    } catch (err) { showToast('Bulk import failed: ' + err.message, 'error'); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; } }
+}

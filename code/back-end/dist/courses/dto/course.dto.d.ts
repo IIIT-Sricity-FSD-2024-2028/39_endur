@@ -19,3 +19,6 @@ export declare class EnrollStudentsDto {
     studentIds: string[];
     autoDept?: boolean;
 }
+export declare class BulkImportCoursesDto {
+    courses: CreateCourseDto[];
+}

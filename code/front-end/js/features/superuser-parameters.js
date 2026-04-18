@@ -12,7 +12,6 @@ export async function renderSuperuserParameters() {
         const flatParams = await GET('/evaluation-parameters');
         statuses = await GET('/evaluation-parameters/status');
 
-        // Rebuild deptConfigs from flat list
         deptConfigs = {};
         flatParams.forEach(p => {
             if (!deptConfigs[p.department]) deptConfigs[p.department] = [];
@@ -141,14 +140,14 @@ function updateParamCount() {
     if (document.getElementById('statActiveParams')) document.getElementById('statActiveParams').textContent = active;
 }
 
-window.openAddParam = () => {
+export function openAddParam() {
     const form = document.getElementById('paramForm');
     if (form) { form.reset(); delete form.dataset.editId; delete form.dataset.editDept; form.paramDepts.value = ''; }
     document.getElementById('paramModalTitle').textContent = 'Add Evaluation Parameter';
     document.getElementById('paramModal')?.classList.add('active');
-};
+}
 
-window.openEditParam = (id, dept) => {
+export function openEditParam(id, dept) {
     const p = (deptConfigs[dept] || []).find(p => p.id === id);
     if (!p) return;
     const form = document.getElementById('paramForm');
@@ -161,9 +160,9 @@ window.openEditParam = (id, dept) => {
     form.dataset.editDept = dept;
     document.getElementById('paramModalTitle').textContent = 'Edit Parameter';
     document.getElementById('paramModal')?.classList.add('active');
-};
+}
 
-window.openDeleteParam = (id, dept) => {
+export function openDeleteParam(id, dept) {
     const p = (deptConfigs[dept] || []).find(p => p.id === id);
     if (!p) return;
     document.getElementById('deleteItemName').textContent = p.name;
@@ -177,15 +176,71 @@ window.openDeleteParam = (id, dept) => {
         closeDeleteModal();
     };
     document.getElementById('deleteModal')?.classList.add('active');
-};
+}
 
-window.approveDeptParams = async (dept) => {
+export async function approveDeptParams(dept) {
     try {
         await POST(`/evaluation-parameters/dept/${encodeURIComponent(dept)}/approve`, {});
         showToast(`${dept} parameters approved!`, 'success');
         await renderSuperuserParameters();
     } catch (err) { showToast(err.message, 'error'); }
-};
+}
 
-window.closeParamModal = () => document.getElementById('paramModal')?.classList.remove('active');
-window.closeDeleteModal = () => document.getElementById('deleteModal')?.classList.remove('active');
+export function closeParamModal() { document.getElementById('paramModal')?.classList.remove('active'); }
+export function closeDeleteModal() { document.getElementById('deleteModal')?.classList.remove('active'); }
+
+// ===== BULK IMPORT =====
+function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    return lines.slice(1).map(line => {
+        const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        if (obj.weight) obj.weight = Number(obj.weight) || 0;
+        return obj;
+    });
+}
+
+export function openParamBulkModal() {
+    document.getElementById('paramBulkModal')?.classList.add('active');
+    document.getElementById('paramBulkPreviewSection').style.display = 'none';
+    document.getElementById('paramBulkFileInput').value = '';
+}
+export function closeParamBulkModal() { document.getElementById('paramBulkModal')?.classList.remove('active'); }
+
+export async function previewParamBulkFile() {
+    const file = document.getElementById('paramBulkFileInput')?.files[0];
+    if (!file) { showToast('Please select a file first.', 'error'); return; }
+    const text = await file.text();
+    let parsed = [];
+    try {
+        if (file.name.endsWith('.json')) { const raw = JSON.parse(text); parsed = Array.isArray(raw) ? raw : raw.params || []; }
+        else if (file.name.endsWith('.csv')) { parsed = parseCSV(text); }
+        else { showToast('Only .json and .csv files are supported.', 'error'); return; }
+    } catch (err) { showToast('Failed to parse file: ' + err.message, 'error'); return; }
+    if (!parsed.length) { showToast('No valid data found.', 'error'); return; }
+    const missing = parsed.filter(p => !p.name || !p.department || p.weight === undefined);
+    if (missing.length) { showToast(`${missing.length} rows missing required fields (name, department, weight).`, 'error'); return; }
+    window.__bulkParamData = parsed;
+    const preview = document.getElementById('paramBulkPreviewBody');
+    if (preview) preview.innerHTML = parsed.slice(0, 20).map(p => `<tr><td>${p.name}</td><td>${p.department}</td><td>${p.weight}%</td><td>${p.type || 'rating'}</td></tr>`).join('');
+    const section = document.getElementById('paramBulkPreviewSection');
+    if (section) { section.style.display = 'block'; document.getElementById('paramBulkPreviewCount').textContent = `${parsed.length} parameters to import`; }
+}
+
+export async function commitParamBulkImport() {
+    const data = window.__bulkParamData;
+    if (!data?.length) { showToast('No data to import.', 'error'); return; }
+    const btn = document.getElementById('commitParamBulkBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+    try {
+        const result = await POST('/evaluation-parameters/bulk', { params: data });
+        const { success, failed, total } = result;
+        showToast(`Imported ${success.length}/${total} parameters. ${failed.length ? failed.length + ' failed.' : ''}`, success.length > 0 ? 'success' : 'error');
+        await renderSuperuserParameters();
+        closeParamBulkModal();
+    } catch (err) { showToast('Bulk import failed: ' + err.message, 'error'); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; } }
+}

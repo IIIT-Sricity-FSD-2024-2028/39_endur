@@ -18,13 +18,10 @@
         .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
         .btn-danger-soft { color:var(--danger); border-color:rgba(239,68,68,0.3); }
         .btn-danger-soft:hover { background:rgba(239,68,68,0.08); border-color:var(--danger); }
-        /* removed su-badge */ .unused { background:var(--primary); color:#fff; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
     </style>
 </head>
 <body>
 <div class="dashboard-layout">
-
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <img src="../../assets/logos/endur-logo.svg" alt="Endur">
@@ -36,6 +33,7 @@
             <a href="manage-courses.html">📚 Manage Courses</a>
             <a href="manage-cycles.html">🔄 Feedback Cycles</a>
             <a class="active" href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="manage-departments.html">🏢 Departments</a>
             <a href="audit-logs.html">📋 Audit Logs</a>
             <a href="system-settings.html">🛡️ System Settings</a>
         </nav>
@@ -45,100 +43,70 @@
         </a>
     </aside>
 
-    <!-- MAIN -->
     <main class="dashboard-content">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
             <div>
                 <h1>Evaluation Parameters</h1>
-                <p class="subtitle">Define, activate, and manage feedback evaluation criteria across all departments.</p>
+                <p class="subtitle">Define and manage evaluation criteria by department.</p>
             </div>
             <span class="badge primary">SUPER USER</span>
         </div>
 
-        <!-- STATS -->
         <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
             <div class="stat-card"><p>Total Parameters</p><h2 id="statTotalParams">—</h2></div>
             <div class="stat-card"><p>Active Parameters</p><h2 id="statActiveParams">—</h2></div>
         </div>
 
-        <!-- ACTIONS -->
         <div class="page-actions">
             <input id="paramSearch" class="search-bar" type="search" placeholder="Search parameters…" style="margin:0">
-            <button class="btn-primary" onclick="openAddParam()">+ Add Parameter</button>
+            <div class="page-actions-right" style="display:flex;gap:12px;">
+                <button class="btn-outline" onclick="openParamBulkModal()">📥 Import Parameters</button>
+                <button class="btn-primary" onclick="openAddParam()">+ Add Parameter</button>
+            </div>
         </div>
 
-        <!-- TABLE -->
         <div class="card-panel">
-            <table class="data-table" style="border:none;border-radius:0">
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Weight</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="paramsTableBody">
-                    <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Loading parameters…</td></tr>
-                </tbody>
+            <table class="data-table">
+                <thead><tr><th>Parameter</th><th>Weight</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="paramsTableBody"><tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr></tbody>
             </table>
         </div>
     </main>
 </div>
 
-<!-- ADD/EDIT PARAM MODAL -->
 <div class="modal-overlay" id="paramModal">
     <div class="modal-card">
-        <h3>
-            <span id="paramModalTitle">Add Evaluation Parameter</span>
-            <button class="modal-close" onclick="closeParamModal()">✕</button>
-        </h3>
-        <form id="paramForm" novalidate>
-            <div class="form-group">
-                <label for="paramName">Parameter Name</label>
-                <input type="text" id="paramName" name="paramName" placeholder="e.g. Teaching Clarity">
-                <span class="field-error"></span>
-            </div>
-            <div class="form-group">
-                <label for="paramDesc">Description</label>
-                <textarea id="paramDesc" name="paramDesc" rows="2" style="height:70px" placeholder="Brief description of what this measures…"></textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="paramWeight">Weight (%)</label>
-                    <input type="number" id="paramWeight" name="paramWeight" min="0" max="100" value="0" placeholder="0">
-                </div>
-                <div class="form-group">
-                    <label for="paramStatus">Status</label>
-                    <select id="paramStatus" name="paramStatus">
-                        <option value="active">Active</option>
-                        <option value="draft">Draft</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="paramDepts">Department</label>
-                <select id="paramDepts" name="paramDepts">
-                    <option value="" disabled selected>Select a department...</option>
-                </select>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-outline" onclick="closeParamModal()">Cancel</button>
-                <button type="submit" class="btn-primary">Save Parameter</button>
-            </div>
+        <h3><span id="paramModalTitle">Add Evaluation Parameter</span> <button class="modal-close" onclick="closeParamModal()">✕</button></h3>
+        <form id="paramForm">
+            <div class="form-group"><label>Parameter Name</label><input type="text" id="paramName" required></div>
+            <div class="form-group"><label>Description</label><textarea id="paramDesc" rows="2"></textarea></div>
+            <div class="form-group"><label>Weight (%)</label><input type="number" id="paramWeight" required></div>
+            <div class="form-group"><label>Department</label><select id="paramDepts" required></select></div>
+            <div class="modal-footer"><button type="button" class="btn-outline" onclick="closeParamModal()">Cancel</button><button type="submit" class="btn-primary">Save Parameter</button></div>
         </form>
     </div>
 </div>
 
-<!-- DELETE CONFIRM -->
+<div class="modal-overlay" id="paramBulkModal">
+    <div class="modal-card" style="max-width:650px;width:90%">
+        <h3>📥 Import Parameters <button class="modal-close" onclick="closeParamBulkModal()">✕</button></h3>
+        <p>Required: <code>name</code>, <code>department</code>, <code>weight</code>.</p>
+        <input type="file" id="paramBulkFileInput" accept=".json,.csv" onchange="previewParamBulkFile()">
+        <div id="paramBulkPreviewSection" style="display:none;margin-top:20px">
+            <strong id="paramBulkPreviewCount"></strong>
+            <div style="max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;margin-top:10px">
+                <table class="data-table"><thead><tr><th>Name</th><th>Dept</th><th>Weight</th></tr></thead><tbody id="paramBulkPreviewBody"></tbody></table>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn-outline" onclick="closeParamBulkModal()">Cancel</button><button class="btn-primary" id="commitParamBulkBtn" onclick="commitParamBulkImport()">Confirm Import</button></div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="deleteModal">
     <div class="modal-card confirm-dialog">
         <h3>Delete Parameter <button class="modal-close" onclick="closeDeleteModal()">✕</button></h3>
-        <p>Permanently delete <strong id="deleteItemName"></strong>? This cannot be undone.</p>
-        <div class="modal-footer">
-            <button class="btn-outline" onclick="closeDeleteModal()">Cancel</button>
-            <button class="btn-danger" id="confirmDeleteBtn">Delete Permanently</button>
-        </div>
+        <p>Delete <strong id="deleteItemName"></strong>?</p>
+        <div class="modal-footer"><button class="btn-outline" onclick="closeDeleteModal()">Cancel</button><button class="btn-primary" id="confirmDeleteBtn">Delete</button></div>
     </div>
 </div>
 
@@ -146,7 +114,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { renderSuperuserParameters } from '../../js/features/superuser-parameters.js';
+    import { renderSuperuserParameters, openAddParam, openEditParam, openDeleteParam, approveDeptParams, closeParamModal, closeDeleteModal, openParamBulkModal, closeParamBulkModal, previewParamBulkFile, commitParamBulkImport } from '../../js/features/superuser-parameters.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -157,9 +125,18 @@
         await renderSuperuserParameters();
     });
 
-    document.querySelectorAll('.modal-overlay').forEach(o => {
-        o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); });
-    });
+    window.openAddParam = openAddParam;
+    window.openEditParam = openEditParam;
+    window.openDeleteParam = openDeleteParam;
+    window.approveDeptParams = approveDeptParams;
+    window.closeParamModal = closeParamModal;
+    window.closeDeleteModal = closeDeleteModal;
+    window.openParamBulkModal = openParamBulkModal;
+    window.closeParamBulkModal = closeParamBulkModal;
+    window.previewParamBulkFile = previewParamBulkFile;
+    window.commitParamBulkImport = commitParamBulkImport;
+
+    document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); }));
 </script>
 </body>
 </html>

@@ -94,11 +94,16 @@
 
     <main class="dashboard-content">
         <div class="trend-header">
-            <div>
-                <h1>Historical Trends</h1>
-                <p class="subtitle">Track your teaching performance across feedback cycles.</p>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;">
+                <div>
+                    <h1>Historical Trends</h1>
+                    <p class="subtitle">Track your teaching performance across feedback cycles.</p>
+                </div>
+                <div style="display:flex;gap:12px;">
+                    <button class="btn-primary" id="btnExportCSV" style="display:flex;align-items:center;gap:6px;">📥 Export Feedback Report (CSV)</button>
+                    <a href="reports.html" class="btn-outline">← Back to Reports</a>
+                </div>
             </div>
-            <a href="reports.html" class="btn-outline">← Back to Reports</a>
         </div>
 
         <div id="courseSelector" class="course-selector"></div>
@@ -114,6 +119,8 @@
 
 <script type="module">
 import { requireAuth } from "../../js/core/session.js";
+import { GET } from "../../js/core/api.js";
+import { exportToCSV } from "../../js/features/admin-utils.js";
 
 document.addEventListener("DOMContentLoaded", function() {
     const user = requireAuth();
@@ -282,27 +289,52 @@ document.addEventListener("DOMContentLoaded", function() {
         mkBar("difficultyChart",  "Difficulty %", makeHistory(difficulty, 18));
     }
 
-    // Load courses and feedback
-    fetch("http://localhost:3000/api/courses")
-        .then(function(r){ return r.json(); })
-        .then(function(allCourses) {
+    let btnBindingDone = false;
+
+    // Load courses and feedback from API (not localStorage)
+    Promise.all([
+        fetch("http://localhost:3000/api/courses", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()),
+        fetch("http://localhost:3000/api/feedback-responses", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()).catch(() => []),
+    ])
+        .then(function(results) {
+            var allCourses = results[0];
+            var allFeedbackRaw = results[1];
             var myCourses = allCourses.filter(function(c){ return c.facultyId === user.id; });
-            var allFeedback = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
 
             if (myCourses.length === 0) {
                 showEmpty("No Courses Assigned", "You have no courses assigned in the system.");
                 return;
             }
 
-            // Check if any feedback exists at all for this faculty
+            // API uses courseId (not course) — filter correctly
             var myIds = {};
             myCourses.forEach(function(c){ myIds[c.id] = true; });
-            var myFeedback = allFeedback.filter(function(f){ return myIds[f.course]; });
+            var myFeedback = allFeedbackRaw.filter(function(f){ return myIds[f.courseId]; });
 
             if (myFeedback.length === 0) {
                 showEmpty("No Feedback Data Yet",
                     "Historical trends appear once students have submitted feedback for your courses.");
                 return;
+            }
+
+            if (!btnBindingDone) {
+                btnBindingDone = true;
+                const exportBtn = document.getElementById("btnExportCSV");
+                if (exportBtn) {
+                    exportBtn.addEventListener("click", function() {
+                        if (!myFeedback || !myFeedback.length) {
+                            alert("No data available to export.");
+                            return;
+                        }
+                        const exportData = myFeedback.map(fb => ({
+                            CycleID: fb.cycleId,
+                            CourseID: fb.courseId,
+                            Ratings: JSON.stringify(fb.ratings || {}),
+                            Comments: fb.comments || ""
+                        }));
+                        exportToCSV(`faculty_trends_${user.id}.csv`, exportData);
+                    });
+                }
             }
 
             // Show selector and render first course
@@ -315,16 +347,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 btn.onclick = function() {
                     document.querySelectorAll(".course-btn").forEach(function(b){ b.classList.remove("active"); });
                     btn.classList.add("active");
-                    renderCourse(course, myFeedback);
+                    // Fix: filter by courseId (API field), not course
+                    var courseFeedback = myFeedback.filter(function(f){ return f.courseId === course.id; });
+                    renderCourse(course, courseFeedback);
                 };
                 selectorEl.appendChild(btn);
             });
 
-            renderCourse(myCourses[0], myFeedback);
+            var firstCourseFeedback = myFeedback.filter(function(f){ return f.courseId === myCourses[0].id; });
+            renderCourse(myCourses[0], firstCourseFeedback);
         })
         .catch(function(e) {
-            console.error("Failed to load courses", e);
-            showEmpty("Error Loading Data", "Could not load course data. Please refresh the page.");
+            console.error("Failed to load data", e);
+            showEmpty("Error Loading Data", "Could not load data. Please refresh the page.");
         });
 });
 </script>

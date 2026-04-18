@@ -26,4 +26,15 @@ export declare class EvaluationParametersService {
     submit(department: string, actorId?: string, actorName?: string): {
         message: string;
     };
+    reject(department: string, note?: string, actorId?: string, actorName?: string): {
+        message: string;
+    };
+    bulkCreate(paramsToImport: CreateEvalParamDto[], actorId?: string, actorName?: string): {
+        success: any[];
+        failed: {
+            param: any;
+            reason: string;
+        }[];
+        total: number;
+    };
 }

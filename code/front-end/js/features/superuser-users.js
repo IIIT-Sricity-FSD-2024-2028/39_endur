@@ -2,15 +2,18 @@ import { showToast, formatDate, appendAuditLog } from './admin-utils.js';
 import { GET, POST, PATCH, DELETE, getSession } from '../core/api.js';
 
 let users = [];
+let departmentsList = [];
 let session = null;
 
 export async function renderSuperuserUsers() {
     session = getSession();
     try {
         users = await GET('/users');
+        departmentsList = await GET('/departments');
     } catch (e) {
-        showToast('Failed to load users from server.', 'error');
+        showToast('Failed to load data from server.', 'error');
         users = [];
+        departmentsList = [];
     }
 
     renderUsersTable();
@@ -55,10 +58,10 @@ function renderUsersTable(filter = '') {
 }
 
 function populateDeptSelect() {
-    const dataList = document.getElementById('userDeptList');
-    if (!dataList) return;
-    const depts = [...new Set(users.map(u => u.department).filter(Boolean))].sort();
-    dataList.innerHTML = depts.map(d => `<option value="${d}">`).join('');
+    const list = document.getElementById('userDept');
+    if (!list) return;
+    list.innerHTML = '<option value="">Select Department</option>' + 
+        departmentsList.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
 }
 
 function roleBadge(role) {
@@ -120,6 +123,7 @@ function bindUserForm() {
         const id = form.userId.value.trim();
         const role = form.userRole.value;
         const dept = form.userDept.value.trim();
+        const email = form.userEmail.value.trim();
         const password = form.userPassword.value;
         const editId = form.dataset.editId;
 
@@ -148,13 +152,16 @@ function bindUserForm() {
         try {
             if (editId) {
                 const update = { name, role, department: dept };
+                if (email) update.email = email;
                 if (password) update.password = password;
                 await PATCH(`/users/${editId}`, update);
                 const idx = users.findIndex(u => u.id === editId);
                 if (idx > -1) users[idx] = { ...users[idx], ...update };
                 showToast(`User "${name}" updated successfully.`, 'success');
             } else {
-                const created = await POST('/users', { id, password, name, role, department: dept });
+                const payload = { id, password, name, role, department: dept };
+                if (email) payload.email = email;
+                const created = await POST('/users', payload);
                 users.unshift(created);
                 showToast(`User "${name}" created successfully.`, 'success');
             }
@@ -170,18 +177,18 @@ function bindUserForm() {
 }
 
 // ===== BULK IMPORT =====
-window.openBulkImportModal = () => {
+export function openBulkImportModal() {
     const modal = document.getElementById('bulkModal');
     if (modal) modal.classList.add('active');
     document.getElementById('bulkPreviewSection').style.display = 'none';
     document.getElementById('bulkFileInput').value = '';
-};
+}
 
-window.closeBulkModal = () => {
+export function closeBulkModal() {
     document.getElementById('bulkModal')?.classList.remove('active');
-};
+}
 
-window.previewBulkFile = async () => {
+export async function previewBulkFile() {
     const fileInput = document.getElementById('bulkFileInput');
     const file = fileInput?.files[0];
     if (!file) { showToast('Please select a file first.', 'error'); return; }
@@ -204,16 +211,17 @@ window.previewBulkFile = async () => {
         return;
     }
 
-    // Validate IDs
+    // Validate IDs and strict fields
     const rolePrefixes = { student: 'S', faculty: 'F', admin: 'A', dean: 'D', hod: 'H', superuser: 'SU' };
     const invalidUsers = parsed.filter(u => {
-        if (!u.id || !/^[a-zA-Z0-9]+$/.test(u.id)) return true;
-        const prefix = rolePrefixes[u.role?.toLowerCase()];
-        return prefix && !u.id.toUpperCase().startsWith(prefix);
+        if (!u.id || !u.name || !u.role || !u.password) return true;
+        if (!/^[a-zA-Z0-9]+$/.test(u.id)) return true;
+        const prefix = rolePrefixes[u.role.toLowerCase()];
+        return !prefix || !u.id.toUpperCase().startsWith(prefix);
     });
 
     if (invalidUsers.length > 0) {
-        showToast(`Found ${invalidUsers.length} users with invalid IDs. IDs must be alphanumeric and start with the correct role prefix.`, 'error');
+        showToast(`Found ${invalidUsers.length} invalid users. Ensure all rows have id, name, role, password, and correct prefixes.`, 'error');
         return;
     }
 
@@ -230,6 +238,7 @@ window.previewBulkFile = async () => {
                 <td>${u.name || '—'}</td>
                 <td><span class="badge ${roleBadge(u.role || '')}">${u.role || '—'}</span></td>
                 <td>${u.department || '—'}</td>
+                <td>${u.email || '—'}</td>
             </tr>
         `).join('');
     }
@@ -237,9 +246,9 @@ window.previewBulkFile = async () => {
         section.style.display = 'block';
         document.getElementById('bulkPreviewCount').textContent = `${parsed.length} users to import`;
     }
-};
+}
 
-window.commitBulkImport = async () => {
+export async function commitBulkImport() {
     const data = window.__bulkImportData;
     if (!data || !data.length) { showToast('No data to import.', 'error'); return; }
 
@@ -267,7 +276,7 @@ window.commitBulkImport = async () => {
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Confirm Import'; }
     }
-};
+}
 
 function parseCSV(text) {
     const lines = text.trim().split('\n');
@@ -276,7 +285,15 @@ function parseCSV(text) {
     return lines.slice(1).map(line => {
         const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
         const obj = {};
-        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        headers.forEach((h, i) => { 
+            let val = vals[i] || '';
+            // Handle array fields
+            if (h === 'enrolledCourses') {
+                obj[h] = val ? val.split(';').map(x => x.trim()) : [];
+            } else {
+                obj[h] = val;
+            }
+        });
         return obj;
     });
 }
@@ -310,22 +327,25 @@ function updateUserCount() {
     if (elSt) elSt.textContent = users.filter(u => ['admin', 'superuser'].includes(u.role)).length;
 }
 
-function closeUserModal() {
+export function closeUserModal() {
     document.getElementById('userModal')?.classList.remove('active');
     const form = document.getElementById('userForm');
     if (form) { form.reset(); delete form.dataset.editId; }
     const title = document.getElementById('userModalTitle');
     if (title) title.textContent = 'Add New User';
+    // Reset password label back to required
+    const pwLabel = document.querySelector('label[for="userPassword"]');
+    if (pwLabel) pwLabel.textContent = 'Password';
 }
 
 // ===== GLOBAL HANDLERS =====
-window.openAddUser = () => {
+export function openAddUser() {
     const form = document.getElementById('userForm');
     if (form) { form.reset(); delete form.dataset.editId; clearErrors(form); }
     document.getElementById('userModal')?.classList.add('active');
-};
+}
 
-window.openEditUser = (id) => {
+export function openEditUser(id) {
     const u = users.find(u => u.id === id);
     if (!u) return;
     const form = document.getElementById('userForm');
@@ -335,16 +355,18 @@ window.openEditUser = (id) => {
     form.userId.value = u.id;
     form.userRole.value = u.role;
     form.userDept.value = u.department || '';
+    form.userEmail.value = u.email || '';
     form.userPassword.value = '';
     form.dataset.editId = id;
     const title = document.getElementById('userModalTitle');
     if (title) title.textContent = 'Edit User';
+    // Update password label to signal it's optional when editing
     const pwLabel = document.querySelector('label[for="userPassword"]');
-    if (pwLabel) pwLabel.textContent = 'New Password (leave blank to keep current)';
+    if (pwLabel) pwLabel.textContent = 'Password (leave blank to keep current)';
     document.getElementById('userModal')?.classList.add('active');
-};
+}
 
-window.confirmDeleteUser = (id) => {
+export function confirmDeleteUser(id) {
     const u = users.find(u => u.id === id);
     if (!u) return;
     document.getElementById('deleteUserName').textContent = `${u.name} (${u.id})`;
@@ -361,7 +383,6 @@ window.confirmDeleteUser = (id) => {
         closeDeleteModal();
     };
     document.getElementById('deleteModal')?.classList.add('active');
-};
+}
 
-window.closeUserModal = closeUserModal;
-window.closeDeleteModal = () => document.getElementById('deleteModal')?.classList.remove('active');
+export const closeDeleteModal = () => document.getElementById('deleteModal')?.classList.remove('active');

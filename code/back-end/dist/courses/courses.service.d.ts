@@ -22,4 +22,12 @@ export declare class CoursesService {
         message: string;
     };
     enroll(courseId: string, dto: EnrollStudentsDto, actorId?: string, actorName?: string): any;
+    bulkCreate(coursesToImport: CreateCourseDto[], actorId?: string, actorName?: string): {
+        success: any[];
+        failed: {
+            course: any;
+            reason: string;
+        }[];
+        total: number;
+    };
 }

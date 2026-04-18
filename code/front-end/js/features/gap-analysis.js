@@ -1,13 +1,14 @@
-import { get } from "../core/storage.js";
-import { getSession } from "../core/session.js";
+import { getSession, requireAuth } from "../core/session.js";
+import { GET } from "../core/api.js";
 
 export async function renderGapAnalysis() {
-    const allStudentData = get("submittedFeedback") || [];
-    const allReflectionData = get("selfReflection") || [];
     const user = getSession();
     if (!user) return;
 
-    const cycleState = get("systemCycleState") || { id: "FALLBACK" };
+    let cycleState = { id: "FALLBACK" };
+    try {
+        cycleState = await GET('/feedback-cycles/state');
+    } catch(e) {}
     const activeCycleId = cycleState.id;
 
     const activeCourse = localStorage.getItem("activeFacultyCourse");
@@ -16,12 +17,12 @@ export async function renderGapAnalysis() {
         return;
     }
 
-    // CYCLE FIX: Filter for current cycle
-    const reflection = allReflectionData.find(r => 
-        r.facultyId === user.id && 
-        r.courseId === activeCourse && 
-        r.cycleId === activeCycleId
-    );
+    let allReflectionData = [];
+    try {
+        allReflectionData = await GET(`/faculty-reports/self-reflections?courseId=${encodeURIComponent(activeCourse)}&cycleId=${activeCycleId}`);
+    } catch(e) {}
+
+    const reflection = allReflectionData.find(r => r.facultyId === user.id);
 
     if (!reflection) {
         alert("No reflection found for the current cycle. Please submit one first.");
@@ -32,11 +33,10 @@ export async function renderGapAnalysis() {
     const courseTitleEl = document.getElementById("courseTitle");
     if (courseTitleEl) courseTitleEl.innerText = `${activeCourse} Gap Analysis`;
 
-    // CYCLE FIX: Only use student feedback from THIS cycle
-    const courseFeedback = allStudentData.filter(f => 
-        f.course === activeCourse && 
-        f.cycleId === activeCycleId
-    );
+    let courseFeedback = [];
+    try {
+        courseFeedback = await GET(`/feedback-responses?courseId=${encodeURIComponent(activeCourse)}&cycleId=${activeCycleId}`);
+    } catch(e) {}
     
     let totals = {};
     let counts = {};
@@ -58,8 +58,10 @@ export async function renderGapAnalysis() {
     const rows = [];
     let totalSelf = 0, totalStudent = 0, validMetricsCount = 0;
 
-    const activeParams = get("activeParameters") || {};
-    const deptParams = activeParams[user.department] || [];
+    let deptParams = [];
+    try {
+        deptParams = await GET(`/evaluation-parameters/dept/${encodeURIComponent(user.department)}`);
+    } catch(e) {}
 
     function getParamName(id) {
         const param = deptParams.find(p => p.id === id);

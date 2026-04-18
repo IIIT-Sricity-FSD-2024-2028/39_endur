@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Departments — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+</head>
+<body>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-courses.html">📚 Manage Courses</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a class="active" href="manage-departments.html">🏢 Departments</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+            <a href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;">
+            <div>
+                <h1>Departments</h1>
+                <p class="subtitle">Manage academic departments across the institution.</p>
+            </div>
+            <div style="display:flex;gap:12px;">
+                <button class="btn-outline" onclick="openBulkModal()">📥 Import Departments</button>
+                <button class="btn-primary" onclick="openAddDepartment()">+ Add Department</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Department ID</th>
+                        <th>Name</th>
+                        <th style="width:100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="departmentTableBody">
+                    <tr><td colspan="3" style="text-align:center;padding:40px;">Loading departments...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- Department Modal -->
+<div class="modal-overlay" id="deptModal">
+    <div class="modal-card" style="max-width:600px;">
+        <h3 id="deptModalTitle">Add Department <button class="modal-close" onclick="closeDeptModal()">✕</button></h3>
+        <form id="deptForm" onsubmit="event.preventDefault(); saveDepartment();">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Department Name</label>
+                    <input type="text" id="deptName" required placeholder="e.g. Computer Science">
+                </div>
+                <div class="form-group">
+                    <label>Department Code / ID <small>(Must be unique)</small></label>
+                    <input type="text" id="deptId" required placeholder="e.g. DEPT-CS">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeDeptModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Department</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bulk Import Modal -->
+<div class="modal-overlay" id="bulkModal">
+    <div class="modal-card" style="max-width:650px;width:90%">
+        <h3>📥 Import Departments <button class="modal-close" onclick="closeBulkModal()">✕</button></h3>
+        <p>Required fields: <code>id</code>, <code>name</code>. IDs must begin with <code>DEPT-</code>.</p>
+        
+        <input type="file" id="bulkFileInput" accept=".json,.csv" onchange="previewBulkFile()" style="margin-top:10px;">
+        
+        <div id="bulkPreviewSection" style="display:none;margin-top:20px">
+            <strong id="bulkPreviewCount" style="display:block;margin-bottom:8px"></strong>
+            <div style="max-height:240px;overflow-y:auto;border:1px solid var(--border-color);border-radius:8px">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bulkPreviewBody"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="modal-footer" style="margin-top:24px">
+            <button class="btn-outline" onclick="closeBulkModal()">Cancel</button>
+            <button class="btn-primary" id="commitBulkBtn" onclick="commitBulkImport()">Confirm Import</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { initDepartments, openAddDepartment, closeDeptModal, saveDepartment, deleteDepartment, openBulkModal, closeBulkModal, previewBulkFile, commitBulkImport } from '../../js/features/superuser-departments.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const user = requireAuth();
+        if(!user || user.role !== 'superuser') return;
+
+        document.getElementById('userName').textContent = user.name;
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
+
+        initDepartments();
+    });
+
+    window.openAddDepartment = openAddDepartment;
+    window.closeDeptModal = closeDeptModal;
+    window.saveDepartment = saveDepartment;
+    window.deleteDepartment = deleteDepartment;
+    
+    // Bulk functionality hooks
+    window.openBulkModal = openBulkModal;
+    window.closeBulkModal = closeBulkModal;
+    window.previewBulkFile = previewBulkFile;
+    window.commitBulkImport = commitBulkImport;
+</script>
+</body>
+</html>

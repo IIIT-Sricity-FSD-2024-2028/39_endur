@@ -16,6 +16,8 @@ const feedback_cycles_module_1 = require("./feedback-cycles/feedback-cycles.modu
 const evaluation_parameters_module_1 = require("./evaluation-parameters/evaluation-parameters.module");
 const feedback_responses_module_1 = require("./feedback-responses/feedback-responses.module");
 const audit_logs_module_1 = require("./audit-logs/audit-logs.module");
+const faculty_reports_module_1 = require("./faculty-reports/faculty-reports.module");
+const departments_module_1 = require("./departments/departments.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -30,6 +32,8 @@ exports.AppModule = AppModule = __decorate([
             evaluation_parameters_module_1.EvaluationParametersModule,
             feedback_responses_module_1.FeedbackResponsesModule,
             audit_logs_module_1.AuditLogsModule,
+            faculty_reports_module_1.FacultyReportsModule,
+            departments_module_1.DepartmentsModule,
         ],
     })
 ], AppModule);

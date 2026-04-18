@@ -1,0 +1,23 @@
+[
+    {
+        "cycleName": "Spring 2025 - Week 5 Feedback",
+        "type": "weekly",
+        "startTimestamp": "2025-03-01T00:00:00Z",
+        "endTimestamp": "2025-03-15T23:59:59Z",
+        "reflectionDeadline": "2025-03-20T23:59:59Z"
+    },
+    {
+        "cycleName": "Spring 2025 - Midterm Review",
+        "type": "midterm",
+        "startTimestamp": "2025-04-01T00:00:00Z",
+        "endTimestamp": "2025-04-30T23:59:59Z",
+        "reflectionDeadline": "2025-05-05T23:59:59Z"
+    },
+    {
+        "cycleName": "Fall 2024 - End Term",
+        "type": "endterm",
+        "startTimestamp": "2024-11-01T00:00:00Z",
+        "endTimestamp": "2024-12-01T23:59:59Z",
+        "reflectionDeadline": "2024-12-10T23:59:59Z"
+    }
+]

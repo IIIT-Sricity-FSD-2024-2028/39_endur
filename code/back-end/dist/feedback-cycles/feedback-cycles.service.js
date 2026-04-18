@@ -107,16 +107,43 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         if (!cycle)
             throw new common_1.NotFoundException(`Cycle ${id} not found`);
         this.store.setFeedbackCycles(cycles.filter((c) => c.cycleId !== id));
-        this.store.appendAuditLog({
-            actor: actorId || 'SU001',
-            actorName: actorName || 'Super User',
-            actorRole: 'admin',
-            action: 'DELETE',
-            module: 'Feedback Cycles',
-            target: `${id} — ${cycle.cycleName}`,
-            details: 'Cycle permanently deleted.',
-        });
+        this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'Super User', actorRole: 'admin', action: 'DELETE', module: 'Feedback Cycles', target: `${id} — ${cycle.cycleName}`, details: 'Cycle permanently deleted.' });
         return { message: `Cycle ${id} deleted` };
+    }
+    bulkCreate(cyclesToImport, actorId, actorName) {
+        const cycles = this.store.getFeedbackCycles();
+        const responsesStore = this.store.getFeedbackResponses();
+        const success = [];
+        const failed = [];
+        cycles.forEach(c => { if (c.status === 'active')
+            c.status = 'closed'; });
+        for (const dto of cyclesToImport) {
+            const cycleId = this.store.genId('CYCLE');
+            const entry = { cycleId, ...dto, status: 'closed', phase: 'COMPLETED' };
+            delete entry.responses;
+            cycles.unshift(entry);
+            success.push(entry);
+            if (dto.responses && Array.isArray(dto.responses)) {
+                dto.responses.forEach(r => {
+                    responsesStore.push({
+                        responseId: this.store.genId('RESP'),
+                        cycleId: cycleId,
+                        studentId: r.studentId || this.store.genId('ANON'),
+                        courseId: r.courseId,
+                        facultyId: r.facultyId,
+                        ratings: r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {},
+                        comments: r.openEndedComment || r.comments || '',
+                        submittedAt: new Date().toISOString()
+                    });
+                });
+            }
+        }
+        this.store.setFeedbackCycles(cycles);
+        this.store.setFeedbackResponses(responsesStore);
+        if (success.length > 0) {
+            this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'Super User', actorRole: 'superuser', action: 'BULK_CREATE', module: 'Feedback Cycles', target: `${success.length} cycles`, details: `Bulk import: ${success.length} historical cycles imported.` });
+        }
+        return { success, failed, total: cyclesToImport.length };
     }
 };
 exports.FeedbackCyclesService = FeedbackCyclesService;

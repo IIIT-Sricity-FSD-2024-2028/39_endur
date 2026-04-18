@@ -7,6 +7,8 @@ import { FeedbackCyclesModule } from './feedback-cycles/feedback-cycles.module';
 import { EvaluationParametersModule } from './evaluation-parameters/evaluation-parameters.module';
 import { FeedbackResponsesModule } from './feedback-responses/feedback-responses.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { FacultyReportsModule } from './faculty-reports/faculty-reports.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     EvaluationParametersModule,
     FeedbackResponsesModule,
     AuditLogsModule,
+    FacultyReportsModule,
+    DepartmentsModule,
   ],
 })
 export class AppModule {}

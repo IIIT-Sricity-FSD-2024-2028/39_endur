@@ -1,0 +1,58 @@
+[
+    {
+        "id": "CS101",
+        "name": "Data Structures",
+        "facultyId": "F001",
+        "faculty": "Dr. Alan Turing",
+        "department": "Computer Science",
+        "type": "standard"
+    },
+    {
+        "id": "CS102",
+        "name": "Algorithms",
+        "facultyId": "F002",
+        "faculty": "Dr. Ada Lovelace",
+        "department": "Computer Science",
+        "type": "standard"
+    },
+    {
+        "id": "CS201",
+        "name": "Operating Systems",
+        "facultyId": "F001",
+        "faculty": "Dr. Alan Turing",
+        "department": "Computer Science",
+        "type": "standard"
+    },
+    {
+        "id": "EE101",
+        "name": "Circuit Theory",
+        "facultyId": "F003",
+        "faculty": "Dr. Nikola Tesla",
+        "department": "Electronics",
+        "type": "standard"
+    },
+    {
+        "id": "EE102",
+        "name": "Signals and Systems",
+        "facultyId": "F004",
+        "faculty": "Dr. Claude Shannon",
+        "department": "Electronics",
+        "type": "standard"
+    },
+    {
+        "id": "ME101",
+        "name": "Thermodynamics",
+        "facultyId": "F005",
+        "faculty": "Dr. Rudolf Clausius",
+        "department": "Mechanical",
+        "type": "standard"
+    },
+    {
+        "id": "ME102",
+        "name": "Fluid Mechanics",
+        "facultyId": "F006",
+        "faculty": "Dr. Daniel Bernoulli",
+        "department": "Mechanical",
+        "type": "standard"
+    }
+]

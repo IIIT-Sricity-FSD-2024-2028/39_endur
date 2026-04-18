@@ -1,0 +1,6 @@
+cycleName,type,startTimestamp,endTimestamp,reflectionDeadline,actionReportDeadline,courseId,facultyId,ratingsJson,openEndedComment
+"Spring 2024 - Week 5 Feedback",weekly,2024-03-01T00:00:00Z,2024-03-15T23:59:59Z,2024-03-20T23:59:59Z,2024-03-25T23:59:59Z,CS201,F001,"{""EP-CS-01"": 5, ""EP-CS-02"": 4, ""EP-CS-03"": 5}","Great lectures, very engaging!"
+"Spring 2024 - Week 5 Feedback",weekly,2024-03-01T00:00:00Z,2024-03-15T23:59:59Z,2024-03-20T23:59:59Z,2024-03-25T23:59:59Z,CS201,F001,"{""EP-CS-01"": 4, ""EP-CS-02"": 4, ""EP-CS-03"": 3}","Slightly fast paced, but overall good."
+"Spring 2024 - Midterm Review",midterm,2024-04-01T00:00:00Z,2024-04-30T23:59:59Z,2024-05-05T23:59:59Z,2024-05-10T23:59:59Z,CS201,F001,"{""EP-CS-01"": 5, ""EP-CS-02"": 5, ""EP-CS-03"": 5}","Best course this semester."
+"Fall 2023 - End Term",endterm,2023-11-01T00:00:00Z,2023-12-01T23:59:59Z,2023-12-10T23:59:59Z,2023-12-15T23:59:59Z,CS201,F001,"{""EP-CS-01"": 3, ""EP-CS-02"": 4, ""EP-CS-03"": 4}","Tough exams but I learned a lot."
+"Fall 2023 - End Term",endterm,2023-11-01T00:00:00Z,2023-12-01T23:59:59Z,2023-12-10T23:59:59Z,2023-12-15T23:59:59Z,ME101,F002,"{""EP-ME-01"": 4, ""EP-ME-02"": 3}","Good labs."
