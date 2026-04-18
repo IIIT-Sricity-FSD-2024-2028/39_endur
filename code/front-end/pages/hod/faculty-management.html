@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Faculty Management | HOD</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        /* Specific tweaks for this page to match Figma */
+        .designation-badge {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .course-pill {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: inline-block;
+            margin: 2px;
+        }
+        .perf-bar-bg {
+            height: 4px;
+            width: 80px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            margin-top: 6px;
+        }
+        .perf-bar-fill {
+            height: 100%;
+            background: #1e3a8a; /* Dark blue from Figma */
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur Logo">
+            <div>
+                <strong>Endur</strong>
+                <p>Institutional Portal</p>
+            </div>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active" href="faculty-management.html">Faculty Management</a>
+            <!-- FIXED: Added actual file links here -->
+            <a href="review-checkin.html">Review Check In</a>
+            <a href="evaluation-parameters.html">Evaluation Parameters</a>
+        </nav>
+
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+        <h1>Faculty Management</h1>
+        <p class="subtitle" style="margin-bottom: 30px;">Oversee and manage department faculty performance and assignments.</p>
+
+        <!-- FACULTY TABLE -->
+        <div class="card" style="padding: 0;">
+            <table class="data-table" style="margin: 0; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="padding-left: 30px;">NAME</th>
+                        <th>EMPLOYEE ID</th>
+                        <th>DESIGNATION</th>
+                        <th>ASSIGNED COURSES</th>
+                        <th>PERFORMANCE</th>
+                    </tr>
+                </thead>
+                <tbody id="managementTableBody">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { renderFacultyManagement } from "../../js/features/hod-faculty.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const user = requireAuth();
+        if(!user) return;
+
+        // Populate Sidebar
+        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userDept").innerText = user.department;
+        
+        const avatarEl = document.getElementById("avatar");
+        if(avatarEl) {
+            avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+        }
+
+        // Render Data
+        renderFacultyManagement();
+    });
+</script>
+
+</body>
+</html>

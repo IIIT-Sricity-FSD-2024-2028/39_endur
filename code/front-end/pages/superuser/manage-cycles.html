@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Cycles — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active {
+            background: var(--primary-light);
+            color: var(--primary-active);
+        }
+
+        /* removed su-badge */
+        .unused {
+            background: var(--primary);
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-danger-soft {
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger-soft:hover {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: var(--danger);
+        }
+
+        /* ── Phase Tracker (matching dean style) ── */
+        .phase-tracker {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            margin: 32px 0 8px;
+        }
+
+        .phase-tracker::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.1);
+            z-index: 1;
+            border-radius: 2px;
+        }
+
+        .phase-step {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            flex: 1;
+        }
+
+        .phase-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--surface);
+            backdrop-filter: blur(8px);
+            border: 2px solid var(--glass-border);
+            margin: 0 auto 10px;
+            transition: 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .phase-step.active .phase-dot {
+            background: var(--primary);
+            border-color: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2);
+        }
+
+        .phase-step.completed .phase-dot {
+            background: var(--accent);
+            border-color: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+        }
+
+        .phase-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .phase-step.active .phase-label {
+            color: var(--primary-active);
+        }
+
+        .phase-step.completed .phase-label {
+            color: var(--accent);
+        }
+
+        /* ── History Table Row ── */
+        .approval-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .approval-row:last-child {
+            border-bottom: none;
+        }
+
+        .approval-row.header {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-layout">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+                <div><strong>Endur</strong>
+                    <p>Super User Portal</p>
+                </div>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="dashboard.html">📊 Dashboard</a>
+                <a href="manage-users.html">👥 Manage Users</a>
+                <a href="manage-courses.html">📚 Manage Courses</a>
+                <a class="active" href="manage-cycles.html">🔄 Feedback Cycles</a>
+                <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+                <a href="audit-logs.html">📋 Audit Logs</a>
+                <a href="system-settings.html">🛡️ System Settings</a>
+            </nav>
+            <a href="profile.html" class="sidebar-user">
+                <div class="avatar" id="avatar"></div>
+                <div><strong id="userName"></strong>
+                    <p>Super User</p>
+                </div>
+            </a>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="dashboard-content">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+                <div>
+                    <h1>Feedback Cycle Management</h1>
+                    <p class="subtitle">Control institutional timelines, launch new cycles, and manage history.</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span class="badge primary">SUPER USER</span>
+                    <button id="launchBtn" class="btn-primary" onclick="suLaunchNewCycle()" style="display:none">Launch
+                        New Cycle</button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+                <div class="stat-card">
+                    <p>Total Cycles</p>
+                    <h2 id="statTotal">—</h2>
+                </div>
+                <div class="stat-card">
+                    <p>Active Cycles</p>
+                    <h2 id="statActive">—</h2>
+                </div>
+                <div class="stat-card">
+                    <p>Closed Cycles</p>
+                    <h2 id="statClosed">—</h2>
+                </div>
+            </div>
+
+            <!-- Initialize new cycle form (shown when all cycles closed) -->
+            <div id="createCycleSection" class="card"
+                style="display:none;background:rgba(248,250,252,0.5);border:1px dashed rgba(203,213,225,0.8);margin-bottom:0;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;">
+                    <div style="flex:1;min-width:200px;">
+                        <h3 style="color:#1e3a8a;margin-bottom:4px;">Initialize New Feedback Cycle</h3>
+                        <p style="color:var(--text-muted);font-size:13px;">Define the exact deadlines for each phase.
+                            Cycle starts immediately.</p>
+                    </div>
+
+                    <form id="createCycleForm"
+                        style="display:flex;flex-direction:column;gap:12px;flex:2;min-width:400px;"
+                        onsubmit="event.preventDefault(); suCreateNewCycle()">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <input type="text" id="newCycleName" placeholder='Cycle Name (e.g. "Fall 2026")' required
+                                style="flex:1;padding:10px 14px;border:1.5px solid var(--glass-border);border-radius:var(--radius-md);background:var(--surface);font-family:inherit;font-size:0.9rem;">
+                        </div>
+
+                        <div
+                            style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:white;padding:12px;border:1px solid var(--glass-border);border-radius:var(--radius-md);">
+                            <div>
+                                <label
+                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Prep
+                                    Ends</label>
+                                <input type="date" id="dlPrep" required
+                                    style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-family:inherit;font-size:12px;">
+                            </div>
+                            <div>
+                                <label
+                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Student
+                                    Feedback Ends</label>
+                                <input type="date" id="dlStudent" required
+                                    style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-family:inherit;font-size:12px;">
+                            </div>
+                            <div>
+                                <label
+                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Reflection
+                                    Ends</label>
+                                <input type="date" id="dlReflection" required
+                                    style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-family:inherit;font-size:12px;">
+                            </div>
+                        </div>
+
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
+                            <button type="button" class="btn-outline"
+                                onclick="document.getElementById('createCycleSection').style.display='none'">Cancel</button>
+                            <button type="submit" class="btn-primary">Launch Timeline</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Active Cycle Card -->
+            <div class="card" id="activeCycleCard" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <h3 id="currentCycleName" style="margin-bottom:4px;">CYCLE NAME</h3>
+                        <p id="currentCycleDesc" style="color:var(--text-muted);font-size:14px;"></p>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <span class="badge" id="cycleStatusBadge">STATUS</span>
+                        <button class="btn-small" onclick="suAdvancedOptions()" style="color:var(--primary)">Advance
+                            Phase →</button>
+                        <button class="btn-small btn-danger-soft" onclick="suForceCloseCycle()">Force Close</button>
+                    </div>
+                </div>
+
+                <!-- Phase Tracker -->
+                <div class="phase-tracker" id="phaseTracker">
+                    <div class="phase-step" id="step_PREPARATION">
+                        <div class="phase-dot"></div>
+                        <div class="phase-label">Preparation</div>
+                        <div id="date_PREPARATION" style="font-size:10px;color:var(--text-muted);margin-top:4px;"></div>
+                    </div>
+                    <div class="phase-step" id="step_STUDENT_FEEDBACK">
+                        <div class="phase-dot"></div>
+                        <div class="phase-label">Student Feedback</div>
+                        <div id="date_STUDENT_FEEDBACK" style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+                        </div>
+                    </div>
+                    <div class="phase-step" id="step_FACULTY_REFLECTION">
+                        <div class="phase-dot"></div>
+                        <div class="phase-label">Faculty Reflection</div>
+                        <div id="date_FACULTY_REFLECTION"
+                            style="font-size:10px;color:var(--text-muted);margin-top:4px;"></div>
+                    </div>
+                    <div class="phase-step" id="step_COMPLETED">
+                        <div class="phase-dot"></div>
+                        <div class="phase-label">Completed</div>
+                        <div id="date_COMPLETED" style="font-size:10px;color:var(--text-muted);margin-top:4px;"></div>
+                    </div>
+                </div>
+
+                <p id="phaseHint" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;text-align:center;">
+                </p>
+            </div>
+
+            <!-- All Cycles History -->
+            <h2 class="section-title">All Cycles</h2>
+            <div class="card" style="padding:0;">
+                <div style="padding:var(--space-3) var(--space-4);">
+                    <div class="approval-row header">
+                        <div>Cycle</div>
+                        <div>Type</div>
+                        <div>Status</div>
+                        <div>Actions</div>
+                    </div>
+                    <div id="cycleHistoryList"></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal-card confirm-dialog">
+            <h3>Delete Cycle <button class="modal-close"
+                    onclick="document.getElementById('deleteModal').classList.remove('active')">✕</button></h3>
+            <p>Permanently delete <strong id="deleteItemName"></strong>? This cannot be undone.</p>
+            <div class="modal-footer">
+                <button class="btn-outline"
+                    onclick="document.getElementById('deleteModal').classList.remove('active')">Cancel</button>
+                <button class="btn-danger" id="confirmDeleteBtn">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <script type="module">
+        import { GET, POST, PATCH, DELETE } from '../../js/core/api.js';
+        import { requireAuth } from '../../js/core/session.js';
+        import { showToast, formatDate } from '../../js/features/admin-utils.js';
+
+        const PHASES = ['PREPARATION', 'STUDENT_FEEDBACK', 'FACULTY_REFLECTION', 'COMPLETED'];
+        const PHASE_HINTS = {
+            PREPARATION: 'HOD parameters are being configured and waiting for approval.',
+            STUDENT_FEEDBACK: 'Students are actively submitting feedback for their courses.',
+            FACULTY_REFLECTION: 'Faculty are filling out self-reflection forms based on feedback.',
+            COMPLETED: 'This cycle is complete. All data has been collected.'
+        };
+
+        let cycles = [];
+        let session = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = requireAuth();
+            if (!user || user.role !== 'superuser') { window.location.href = '../../login.html'; return; }
+            session = user;
+            document.getElementById('userName').textContent = user.name;
+            const av = document.getElementById('avatar');
+            if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+
+            await loadCycles();
+        });
+
+        async function loadCycles() {
+            try {
+                cycles = await GET('/feedback-cycles');
+                renderAll();
+            } catch (err) {
+                showToast('Failed to load cycles', 'error');
+            }
+        }
+
+        function renderAll() {
+            updateStats();
+            renderActiveCycle();
+            renderHistory();
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').textContent = cycles.length;
+            document.getElementById('statActive').textContent = cycles.filter(c => c.status === 'active').length;
+            document.getElementById('statClosed').textContent = cycles.filter(c => c.status !== 'active').length;
+        }
+
+        function renderActiveCycle() {
+            const active = cycles.find(c => c.status === 'active');
+            const createSection = document.getElementById('createCycleSection');
+            const activeCard = document.getElementById('activeCycleCard');
+            const launchBtn = document.getElementById('launchBtn');
+
+            if (!active) {
+                createSection.style.display = 'block';
+                activeCard.style.display = 'none';
+                launchBtn.style.display = 'none';
+                return;
+            }
+
+            createSection.style.display = 'none';
+            activeCard.style.display = 'block';
+            launchBtn.style.display = 'block';
+
+            document.getElementById('currentCycleName').textContent = active.cycleName;
+            document.getElementById('currentCycleDesc').textContent =
+                `${formatDate(active.startTimestamp)} → ${formatDate(active.endTimestamp)}`;
+
+            const badge = document.getElementById('cycleStatusBadge');
+            badge.textContent = active.status.toUpperCase();
+            badge.className = `badge ${active.status === 'active' ? 'success' : 'neutral'}`;
+
+            const currentPhaseIdx = PHASES.indexOf(active.phase || 'COMPLETED');
+            PHASES.forEach((p, i) => {
+                const step = document.getElementById(`step_${p}`);
+                if (!step) return;
+                step.classList.remove('active', 'completed');
+                if (i < currentPhaseIdx) step.classList.add('completed');
+                else if (i === currentPhaseIdx) step.classList.add('active');
+
+                const ds = document.getElementById(`date_${p}`);
+                if (ds) {
+                    if (p === 'PREPARATION' && active.prepDeadline) ds.textContent = `Ends: ${formatDateShort(active.prepDeadline)}`;
+                    else if (p === 'STUDENT_FEEDBACK' && active.studentDeadline) ds.textContent = `Ends: ${formatDateShort(active.studentDeadline)}`;
+                    else if (p === 'FACULTY_REFLECTION' && active.reflectionDeadline) ds.textContent = `Ends: ${formatDateShort(active.reflectionDeadline)}`;
+                    else if (p === 'COMPLETED' && active.endTimestamp) ds.textContent = `Ended: ${formatDateShort(active.endTimestamp)}`;
+                }
+            });
+
+            document.getElementById('phaseHint').textContent = PHASE_HINTS[active.phase] || '';
+
+            window.suAdvancedOptions = async () => {
+                const nextIdx = currentPhaseIdx + 1;
+                if (nextIdx >= PHASES.length) { showToast('Cycle is already completed.', 'info'); return; }
+                const nextPhase = PHASES[nextIdx];
+                const status = nextIdx === PHASES.length - 1 ? 'closed' : 'active';
+                try {
+                    await PATCH(`/feedback-cycles/${active.cycleId || active.id}/status`, { phase: nextPhase, status });
+                    showToast(`Phase advanced to ${nextPhase.replace(/_/g, ' ')}.`, 'success');
+                    await loadCycles();
+                } catch (err) { showToast(err.message, 'error'); }
+            };
+
+            window.suForceCloseCycle = async () => {
+                try {
+                    await PATCH(`/feedback-cycles/${active.cycleId || active.id}/status`, { phase: 'COMPLETED', status: 'closed' });
+                    showToast(`Cycle closed.`, 'info');
+                    await loadCycles();
+                } catch (err) { showToast(err.message, 'error'); }
+            };
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('cycleHistoryList');
+            if (!cycles.length) {
+                container.innerHTML = '<p style="text-align:center;padding:24px;color:var(--text-muted)">No cycles yet.</p>';
+                return;
+            }
+            container.innerHTML = cycles.map(c => `
+            <div class="approval-row">
+                <div>
+                    <strong>${c.cycleName}</strong>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">${formatDate(c.startTimestamp)} → ${formatDate(c.endTimestamp)}</p>
+                </div>
+                <div><span class="badge neutral">${c.type || 'weekly'}</span></div>
+                <div><span class="badge ${c.status === 'active' ? 'success' : 'neutral'}">${c.status}</span></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${c.status !== 'active'
+                    ? `<button class="btn-small" style="color:var(--accent)" onclick="suReopen('${c.cycleId || c.id}')">Reopen</button>`
+                    : ''
+                }
+                    <button class="btn-small btn-danger-soft" onclick="suDelete('${c.cycleId || c.id}')">Delete</button>
+                </div>
+            </div>
+        `).join('');
+        }
+
+        window.suCreateNewCycle = async () => {
+            const name = document.getElementById('newCycleName').value.trim();
+            const prep = document.getElementById('dlPrep').value;
+            const student = document.getElementById('dlStudent').value;
+            const ref = document.getElementById('dlReflection').value;
+
+            if (!name || !prep || !student || !ref) { showToast('All timeline details are required.', 'error'); return; }
+            if (cycles.find(c => c.status === 'active')) { showToast('Close the active cycle first.', 'error'); return; }
+
+            const dPrep = new Date(prep), dStudent = new Date(student), dRef = new Date(ref);
+            if (dPrep >= dStudent || dStudent >= dRef) {
+                showToast('Deadlines must be chronological (Prep -> Student -> Reflection).', 'error'); return;
+            }
+
+            const payload = {
+                cycleName: name,
+                type: 'weekly',
+                startTimestamp: new Date().toISOString(),
+                endTimestamp: dRef.toISOString(),
+                prepDeadline: dPrep.toISOString(),
+                studentDeadline: dStudent.toISOString(),
+                reflectionDeadline: dRef.toISOString(),
+                status: 'active',
+                phase: 'PREPARATION'
+            };
+
+            try {
+                await POST('/feedback-cycles', payload);
+                document.getElementById('createCycleForm').reset();
+                document.getElementById('createCycleSection').style.display = 'none';
+                showToast(`Cycle "${name}" created.`, 'success');
+                await loadCycles();
+            } catch (err) { showToast(err.message, 'error'); }
+        };
+
+        window.suLaunchNewCycle = () => {
+            document.getElementById('createCycleSection').style.display = 'block';
+            document.getElementById('createCycleSection').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        function formatDateShort(isoString) {
+            if (!isoString) return '';
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        window.suReopen = async (id) => {
+            if (cycles.find(c => c.status === 'active')) { showToast('Close the active cycle before reopening another.', 'error'); return; }
+            try {
+                await PATCH(`/feedback-cycles/${id}/status`, { phase: 'PREPARATION', status: 'active' });
+                showToast(`Cycle reopened.`, 'success');
+                await loadCycles();
+            } catch (err) { showToast(err.message, 'error'); }
+        };
+
+        window.suDelete = (id) => {
+            const c = cycles.find(cy => cy.cycleId === id || cy.id === id);
+            if (!c) return;
+            document.getElementById('deleteItemName').textContent = c.cycleName;
+            document.getElementById('confirmDeleteBtn').onclick = async () => {
+                try {
+                    await DELETE(`/feedback-cycles/${id}`);
+                    showToast(`Cycle deleted.`, 'info');
+                    document.getElementById('deleteModal').classList.remove('active');
+                    await loadCycles();
+                } catch (err) { showToast(err.message, 'error'); }
+            };
+            document.getElementById('deleteModal').classList.add('active');
+        };
+
+        document.querySelectorAll('.modal-overlay').forEach(o => {
+            o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); });
+        });
+    </script>
+</body>
+
+</html>

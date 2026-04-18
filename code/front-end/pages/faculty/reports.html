@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Feedback Reports | Faculty — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .alert-banner {
+            background: #fef2f2;
+            border-left: 4px solid #dc2626;
+            border-radius: var(--radius-lg);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+        .alert-banner h4 { color: #991b1b; margin-bottom: 3px; font-size: 0.95rem; }
+        .alert-banner p  { color: #b91c1c; font-size: 0.85rem; margin: 0; }
+
+        .course-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+        .course-tab {
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: 1.5px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+        .course-tab.active { background: var(--primary); color: white; }
+        .course-tab:hover { opacity: 0.8; }
+
+        .feedback-status-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            box-shadow: var(--shadow-glass);
+        }
+        .feedback-status-card h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .metric-row:last-child { border-bottom: none; }
+        .metric-row .label { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
+        .metric-row .value { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+        .metric-row .value.locked { color: var(--text-muted); font-size: 0.9rem; font-style: italic; }
+
+        .action-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            box-shadow: var(--shadow-glass);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .action-card .action-info h3 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+        .action-card .action-info p { font-size: 0.85rem; color: var(--text-muted); }
+        .action-card .action-btn { flex-shrink: 0; }
+
+        .phase-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .phase-open   { background: #dcfce7; color: #166534; }
+        .phase-locked { background: #f1f5f9; color: #64748b; }
+        .phase-active { background: var(--primary-light); color: var(--primary-active); }
+
+        .score-display {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .score-display .big { font-size: 2.5rem; font-weight: 800; color: var(--primary); line-height: 1; }
+        .score-display .of  { font-size: 1rem; color: var(--text-muted); }
+        .score-display .na  { font-size: 1rem; color: var(--text-muted); font-style: italic; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div><strong>Endur</strong><p>Faculty Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active" href="reports.html">Feedback Reports</a>
+            <a href="action-report.html">Action Reports</a>
+            <a href="historical-trends.html">Historical Trends</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+
+        <div id="globalAlertContainer"></div>
+
+        <div>
+            <h1>Feedback Reports</h1>
+            <p class="subtitle">Evaluate your performance metrics per course for the active cycle.</p>
+        </div>
+
+        <!-- Course Tabs -->
+        <div id="courseSelector" class="course-selector"></div>
+
+        <!-- No courses state -->
+        <div id="noCoursesState" style="display:none; text-align:center; padding: 60px 20px;">
+            <div style="font-size:3rem;margin-bottom:16px;">📋</div>
+            <h2 style="margin-bottom:8px;">No Courses Assigned</h2>
+            <p class="subtitle">You have no courses assigned for the current cycle.</p>
+        </div>
+
+        <!-- Data content -->
+        <div id="reportContent" style="display:none">
+
+            <!-- Ratings Card -->
+            <div class="feedback-status-card">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                    <h2 style="margin:0">Student Feedback Results</h2>
+                    <span id="phaseTag" class="phase-badge phase-locked">LOADING</span>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:24px;margin-bottom:24px;flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">Average Rating</div>
+                        <div class="score-display" id="scoreDisplay">
+                            <span class="na">Waiting for data</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">Responses</div>
+                        <div style="font-size:2rem;font-weight:800;color:var(--text-main)" id="responseCount">0</div>
+                    </div>
+                </div>
+
+                <div id="metricRows"></div>
+            </div>
+
+            <!-- Primary Action Card -->
+            <div class="action-card">
+                <div class="action-info">
+                    <h3 id="actionTitle">Primary Action</h3>
+                    <p id="actionDesc">—</p>
+                </div>
+                <button id="primaryActionBtn" class="btn-primary action-btn" disabled>Loading…</button>
+            </div>
+
+        </div>
+
+        <!-- Anonymity notice -->
+        <div id="anonNote" class="info-box" style="display:none">🔒 All student feedback is anonymized and cannot be attributed to individuals.</div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+
+    const user = requireAuth();
+    if (!user) throw new Error("Not authenticated");
+
+    document.getElementById("userName").innerText = user.name;
+    document.getElementById("userDept").innerText = user.department;
+    const av = document.getElementById("avatar");
+    if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
+
+    const coursesRes = await fetch("http://localhost:3000/api/courses");
+    const allCourses = await coursesRes.json();
+    const myCourses = allCourses.filter(c => c.facultyId === user.id);
+
+    const cycleState = JSON.parse(localStorage.getItem("systemCycleState")) || { id: "SETUP", phase: "PREPARATION" };
+    const allFeedback = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
+    const reflections = JSON.parse(localStorage.getItem("selfReflection")) || [];
+    const actionReports = JSON.parse(localStorage.getItem("actionReports")) || [];
+
+    // HOD revision alert
+    const alertBox = document.getElementById("globalAlertContainer");
+    const revisions = actionReports.filter(a => a.facultyId === user.id && a.status === "REVISION_REQUESTED");
+    if (revisions.length > 0) {
+        const ids = revisions.map(a => a.courseId).join(", ");
+        alertBox.innerHTML = `
+            <div class="alert-banner">
+                <div style="font-size:1.5rem">⚠️</div>
+                <div>
+                    <h4>Action Required — HOD Revision Requested</h4>
+                    <p>Please revise your Action Report for: <strong>${ids}</strong></p>
+                </div>
+                <a href="action-report.html" class="btn-danger" style="flex-shrink:0;margin-left:auto;">Revise Now →</a>
+            </div>`;
+    }
+
+    const selector = document.getElementById("courseSelector");
+
+    if (myCourses.length === 0) {
+        document.getElementById("noCoursesState").style.display = "block";
+    } else {
+        document.getElementById("reportContent").style.display = "block";
+        document.getElementById("anonNote").style.display = "block";
+
+        myCourses.forEach((course, i) => {
+            const btn = document.createElement("button");
+            btn.className = "course-tab" + (i === 0 ? " active" : "");
+            btn.dataset.id = course.id;
+            btn.textContent = `${course.id} — ${course.name}`;
+            btn.onclick = () => renderCourse(course);
+            selector.appendChild(btn);
+        });
+
+        renderCourse(myCourses[0]);
+    }
+
+    function renderCourse(course) {
+        // Update tabs
+        document.querySelectorAll(".course-tab").forEach(b => b.classList.remove("active"));
+        const tab = document.querySelector(`.course-tab[data-id="${course.id}"]`);
+        if (tab) tab.classList.add("active");
+
+        localStorage.setItem("activeFacultyCourse", course.id);
+
+        const courseFeedback = allFeedback.filter(f => f.course === course.id && f.cycleId === cycleState.id);
+        const hasReflection = reflections.find(r => r.courseId === course.id && r.facultyId === user.id && r.cycleId === cycleState.id);
+        const hasActionReport = actionReports.find(a => a.courseId === course.id && a.facultyId === user.id && a.cycleId === cycleState.id);
+        const phase = cycleState.phase;
+
+        // Phase tag
+        const phaseTag = document.getElementById("phaseTag");
+        const phaseLabels = {
+            PREPARATION: { label: "Preparation", cls: "phase-locked" },
+            STUDENT_FEEDBACK: { label: "Student Feedback Open", cls: "phase-active" },
+            FACULTY_REFLECTION: { label: "Reflection Phase", cls: "phase-open" },
+            ACTION_REPORT: { label: "Action Report Phase", cls: "phase-active" },
+            COMPLETED: { label: "Cycle Completed", cls: "phase-locked" },
+        };
+        const pInfo = phaseLabels[phase] || { label: phase, cls: "phase-locked" };
+        phaseTag.textContent = pInfo.label;
+        phaseTag.className = `phase-badge ${pInfo.cls}`;
+
+        // Aggregate metrics
+        let totals = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+        let counts  = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+        courseFeedback.forEach(f => {
+            if (!f.ratings) return;
+            ["clarity","structure","engagement","difficulty"].forEach(k => {
+                if (typeof f.ratings[k] === "number") { totals[k] += f.ratings[k]; counts[k]++; }
+            });
+        });
+
+        const pct = k => counts[k] > 0 ? (totals[k] / counts[k]).toFixed(1) : null;
+        const clarity    = pct("clarity");
+        const structure  = pct("structure");
+        const engagement = pct("engagement");
+        const difficulty = pct("difficulty");
+        const defined    = [clarity, structure, engagement, difficulty].filter(v => v !== null);
+        const overall    = defined.length > 0 ? (defined.reduce((a, b) => a + parseFloat(b), 0) / defined.length).toFixed(1) : null;
+
+        // Score display
+        const scoreEl = document.getElementById("scoreDisplay");
+        const respEl  = document.getElementById("responseCount");
+        respEl.textContent = courseFeedback.length;
+
+        if (courseFeedback.length === 0) {
+            scoreEl.innerHTML = `<span class="na">No responses yet</span>`;
+        } else if (!hasReflection && phase !== "ACTION_REPORT" && phase !== "COMPLETED") {
+            scoreEl.innerHTML = `<span class="na">Submit self-reflection to reveal</span>`;
+        } else {
+            scoreEl.innerHTML = `<span class="big">${overall}</span><span class="of">/ 5</span>`;
+        }
+
+        // Metric rows
+        const metricsEl = document.getElementById("metricRows");
+        const metrics = [
+            { key: "clarity",    label: "Clarity of Instruction"  },
+            { key: "structure",  label: "Course Structure"         },
+            { key: "engagement", label: "Student Engagement"       },
+            { key: "difficulty", label: "Difficulty Balance"       },
+        ];
+        const canSeeMetrics = courseFeedback.length > 0 && (hasReflection || phase === "ACTION_REPORT" || phase === "COMPLETED");
+        metricsEl.innerHTML = metrics.map(m => {
+            const val = pct(m.key);
+            const display = !canSeeMetrics ? `<span class="value locked">🔒 Locked</span>`
+                          : val === null   ? `<span class="value locked">No data</span>`
+                          : `<span class="value">${val} / 5</span>`;
+            return `<div class="metric-row"><span class="label">${m.label}</span>${display}</div>`;
+        }).join("");
+
+        // Primary action button
+        const btn  = document.getElementById("primaryActionBtn");
+        const title = document.getElementById("actionTitle");
+        const desc  = document.getElementById("actionDesc");
+
+        btn.className = "btn-primary action-btn";
+        btn.disabled = false;
+        btn.onclick = null;
+
+        if (hasReflection) {
+            title.textContent = "View Gap Analysis";
+            desc.textContent = "Your self-reflection has been submitted. Review your performance gap vs student expectations.";
+            btn.textContent = "Open Gap Analysis →";
+            btn.onclick = () => window.location.href = "gap-analysis.html";
+        } else if (phase === "PREPARATION" || phase === "STUDENT_FEEDBACK") {
+            title.textContent = "Self-Reflection";
+            desc.textContent = "Locked until the student feedback phase is complete.";
+            btn.textContent = "Not Available Yet";
+            btn.className = "btn-outline action-btn";
+            btn.disabled = true;
+        } else if (phase === "FACULTY_REFLECTION") {
+            title.textContent = "Submit Self-Reflection";
+            desc.textContent = "Rate your own performance across key metrics before reviewing student results.";
+            btn.textContent = "Start Self-Reflection →";
+            btn.onclick = () => window.location.href = "self-reflection.html";
+        } else if (phase === "ACTION_REPORT" || phase === "COMPLETED") {
+            if (hasActionReport && hasActionReport.status === "FINALIZED") {
+                title.textContent = "Action Report (Finalized)";
+                desc.textContent = "✅ Your HOD has reviewed and finalized this action report.";
+                btn.textContent = "View Report →";
+                btn.className = "btn-outline action-btn";
+                btn.onclick = () => window.location.href = "action-report.html";
+            } else if (hasActionReport && hasActionReport.status === "SUBMITTED") {
+                title.textContent = "Action Report (Pending HOD)";
+                desc.textContent = "⏳ Submitted — awaiting HOD review.";
+                btn.textContent = "View Report →";
+                btn.className = "btn-outline action-btn";
+                btn.onclick = () => window.location.href = "action-report.html";
+            } else if (hasActionReport && hasActionReport.status === "REVISION_REQUESTED") {
+                title.textContent = "Action Report (Revision Needed)";
+                desc.textContent = "⚠️ HOD has requested a revision. Please update and resubmit.";
+                btn.textContent = "Revise Report →";
+                btn.className = "btn-danger action-btn";
+                btn.onclick = () => window.location.href = "action-report.html";
+            } else {
+                title.textContent = "Submit Action Report";
+                desc.textContent = "Outline your improvement plan based on the gap analysis and HOD check-in.";
+                btn.textContent = "Start Action Report →";
+                btn.onclick = () => window.location.href = "action-report.html";
+            }
+        } else {
+            title.textContent = "No Actions Required";
+            desc.textContent = "Monitor this page as the cycle progresses.";
+            btn.textContent = "Waiting…";
+            btn.disabled = true;
+            btn.className = "btn-outline action-btn";
+        }
+    }
+</script>
+</body>
+</html>

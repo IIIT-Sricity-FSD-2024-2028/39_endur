@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings — Super User — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .settings-section {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-glass);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .section-header {
+            padding: 22px 28px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255,255,255,0.35);
+        }
+        .section-header h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0;
+        }
+        .section-header p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+        .section-icon {
+            font-size: 1.5rem;
+            width: 44px;
+            height: 44px;
+            background: var(--primary-light);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .settings-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        .settings-grid-2 > * {
+            border-right: 1px solid var(--glass-border);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .settings-grid-2 > *:nth-child(even) {
+            border-right: none;
+        }
+        .settings-grid-2 > *:nth-last-child(-n+2) {
+            border-bottom: none;
+        }
+        .setting-field {
+            padding: 20px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .setting-field label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .setting-field .hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .settings-input {
+            padding: 10px 14px;
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: var(--bg);
+            font-size: 0.92rem;
+            color: var(--text-main);
+            transition: border-color 0.2s;
+            width: 100%;
+            font-family: inherit;
+        }
+        .settings-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .section-actions {
+            padding: 20px 28px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: rgba(255,255,255,0.2);
+            align-items: center;
+        }
+        .save-indicator {
+            display: none;
+            font-size: 0.85rem;
+            color: #16a34a;
+            font-weight: 500;
+            align-items: center;
+            gap: 6px;
+            margin-right: auto;
+        }
+        .save-indicator.visible { display: flex; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Super User Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-users.html">👥 Manage Users</a>
+            <a href="manage-courses.html">📚 Manage Courses</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+            <a class="active" href="system-settings.html">🛡️ System Settings</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p>Super User</p></div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:8px;">
+            <div>
+                <h1>System Settings</h1>
+                <p class="subtitle">Institution-wide configuration for the Endur platform.</p>
+            </div>
+            <span class="badge primary">SUPER USER</span>
+        </div>
+
+        <div class="settings-section">
+            <div class="section-header">
+                <div class="section-icon">🏛️</div>
+                <div>
+                    <h3>Institution Configuration</h3>
+                    <p>Core identity and academic calendar settings for your institution.</p>
+                </div>
+            </div>
+
+            <div class="settings-grid-2">
+                <div class="setting-field">
+                    <label>Institution Name</label>
+                    <input id="settingInstName" class="settings-input" type="text" value="IIIT Sricity">
+                    <span class="hint">Displayed across all portals and reports.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Institution Short Code</label>
+                    <input id="settingInstCode" class="settings-input" type="text" value="IIITS">
+                    <span class="hint">Used in IDs, exports, and integrations.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Academic Year</label>
+                    <input id="settingAcadYear" class="settings-input" type="text" value="2025–2026">
+                    <span class="hint">e.g. 2025–2026</span>
+                </div>
+                <div class="setting-field">
+                    <label>Current Semester</label>
+                    <select id="settingSemester" class="settings-input">
+                        <option>Odd Semester</option>
+                        <option>Even Semester</option>
+                    </select>
+                    <span class="hint">Determines which courses are active this cycle.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Allowed Email Domain</label>
+                    <input id="settingDomain" class="settings-input" type="text" value="@iiits.in">
+                    <span class="hint">Only accounts with this domain can register.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Timezone</label>
+                    <select id="settingTimezone" class="settings-input">
+                        <option>Asia/Kolkata (IST)</option>
+                        <option>UTC</option>
+                        <option>America/New_York (EST)</option>
+                    </select>
+                    <span class="hint">Used for cycle deadlines and scheduling.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Minimum Responses to Reveal</label>
+                    <input id="settingMinResp" class="settings-input" type="number" value="5" min="1" max="50">
+                    <span class="hint">Faculty see results only after this many submissions.</span>
+                </div>
+                <div class="setting-field">
+                    <label>Rating Scale</label>
+                    <select id="settingScale" class="settings-input">
+                        <option>1 – 5</option>
+                        <option>1 – 10</option>
+                        <option>1 – 4</option>
+                    </select>
+                    <span class="hint">Scale used for all quantitative feedback questions.</span>
+                </div>
+            </div>
+
+            <div class="section-actions">
+                <span class="save-indicator" id="saveIndicator">✓ Saved successfully</span>
+                <button class="btn-outline" onclick="resetSettings()">Reset to Defaults</button>
+                <button class="btn-primary" onclick="saveSettings()">Save Changes</button>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<div id="toastContainer"></div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { showToast, appendAuditLog } from '../../js/features/admin-utils.js'; // FIX: Corrected import
+
+    let sessionUser = null; // Store user globally for the audit log
+
+    document.addEventListener('DOMContentLoaded', function() {
+        sessionUser = requireAuth();
+        if (!sessionUser || sessionUser.role !== 'superuser') {
+            window.location.href = '../../login.html';
+            return;
+        }
+        
+        document.getElementById('userName').textContent = sessionUser.name;
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = sessionUser.name.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase();
+
+        // FIX: Added timezone and scale to the load logic
+        const saved = JSON.parse(localStorage.getItem('systemSettingsConfig') || '{}');
+        if (saved.instName)    document.getElementById('settingInstName').value  = saved.instName;
+        if (saved.instCode)    document.getElementById('settingInstCode').value  = saved.instCode;
+        if (saved.acadYear)    document.getElementById('settingAcadYear').value  = saved.acadYear;
+        if (saved.semester)    document.getElementById('settingSemester').value  = saved.semester;
+        if (saved.domain)      document.getElementById('settingDomain').value    = saved.domain;
+        if (saved.minResp)     document.getElementById('settingMinResp').value   = saved.minResp;
+        if (saved.timezone)    document.getElementById('settingTimezone').value  = saved.timezone;
+        if (saved.scale)       document.getElementById('settingScale').value     = saved.scale;
+    });
+
+    window.saveSettings = function() {
+        const config = {
+            instName:    document.getElementById('settingInstName').value,
+            instCode:    document.getElementById('settingInstCode').value,
+            acadYear:    document.getElementById('settingAcadYear').value,
+            semester:    document.getElementById('settingSemester').value,
+            domain:      document.getElementById('settingDomain').value,
+            timezone:    document.getElementById('settingTimezone').value,
+            minResp:     document.getElementById('settingMinResp').value,
+            scale:       document.getElementById('settingScale').value,
+        };
+        localStorage.setItem('systemSettingsConfig', JSON.stringify(config));
+
+        const ind = document.getElementById('saveIndicator');
+        ind.classList.add('visible');
+        setTimeout(function(){ ind.classList.remove('visible'); }, 3000);
+
+        // FIX: Using the correct audit logger
+        if (sessionUser) {
+            appendAuditLog(sessionUser, 'superuser', 'UPDATE', 'Settings', 'Institution Config', `Updated institution configuration: ${config.instName}`);
+        }
+        showToast('Institution settings saved successfully.', 'success');
+    };
+
+    window.resetSettings = function() {
+        localStorage.removeItem('systemSettingsConfig');
+        
+        // FIX: Ensure resetting also resets dropdowns correctly
+        document.getElementById('settingInstName').value = 'IIIT Sricity';
+        document.getElementById('settingInstCode').value = 'IIITS';
+        document.getElementById('settingAcadYear').value = '2025–2026';
+        document.getElementById('settingSemester').value = 'Odd Semester';
+        document.getElementById('settingDomain').value   = '@iiits.in';
+        document.getElementById('settingTimezone').value = 'Asia/Kolkata (IST)';
+        document.getElementById('settingMinResp').value  = '5';
+        document.getElementById('settingScale').value    = '1 – 5';
+        
+        if (sessionUser) {
+            appendAuditLog(sessionUser, 'superuser', 'UPDATE', 'Settings', 'Institution Config', "Reset institution settings to defaults");
+        }
+        showToast('Settings reset to defaults.', 'info');
+    };
+</script>
+</body>
+</html>

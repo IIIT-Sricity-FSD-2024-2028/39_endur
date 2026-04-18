@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Review of Reviews</title>
+    <link rel="stylesheet" href="../../css/base.css">
+
+    <link rel="stylesheet" href="../../css/layout.css">
+
+    <link rel="stylesheet" href="../../css/utilities.css">
+
+    <link rel="stylesheet" href="../../css/forms.css">
+
+
+    <!-- components -->
+
+    <link rel="stylesheet" href="../../css/components/button.css">
+
+    <link rel="stylesheet" href="../../css/components/card.css">
+
+    <link rel="stylesheet" href="../../css/components/form.css">
+
+    <link rel="stylesheet" href="../../css/components/rating.css">
+
+
+    <!-- page hub -->
+
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
+
+</head>
+
+
+<body>
+
+
+    <div class="form-layout review-form">
+
+
+        <div class="form-header">
+
+            <h2>
+
+                Review of Reviews
+
+            </h2>
+
+
+            <button onclick="goBack()" class="close-btn">
+
+                ✕
+
+            </button>
+
+        </div>
+
+
+
+
+        <div class="info-box review-info">
+
+            <strong>
+
+                Help Improve the Feedback System
+
+            </strong>
+
+            <p>
+
+                Your responses help refine how feedback is collected and used.
+
+            </p>
+
+        </div>
+
+
+
+
+        <h1>
+
+            Feedback System Evaluation
+
+        </h1>
+
+
+        <p class="subtitle">
+
+            Evaluate the usefulness and fairness of the feedback process.
+
+        </p>
+
+
+
+
+        <div class="feedback-grid">
+
+
+            <div class="question-card">
+
+                <h3>Clarity of Questions</h3>
+
+                <p>
+
+                    Were feedback questions easy to understand?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('questionClarity',1)">★</span>
+                    <span onclick="setRating('questionClarity',2)">★</span>
+                    <span onclick="setRating('questionClarity',3)">★</span>
+                    <span onclick="setRating('questionClarity',4)">★</span>
+                    <span onclick="setRating('questionClarity',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="question-card">
+
+                <h3>Time Required</h3>
+
+                <p>
+
+                    Was feedback quick and convenient to complete?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('timeEffort',1)">★</span>
+                    <span onclick="setRating('timeEffort',2)">★</span>
+                    <span onclick="setRating('timeEffort',3)">★</span>
+                    <span onclick="setRating('timeEffort',4)">★</span>
+                    <span onclick="setRating('timeEffort',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="question-card">
+
+                <h3>Fairness</h3>
+
+                <p>
+
+                    Did the feedback process feel fair and unbiased?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('fairness',1)">★</span>
+                    <span onclick="setRating('fairness',2)">★</span>
+                    <span onclick="setRating('fairness',3)">★</span>
+                    <span onclick="setRating('fairness',4)">★</span>
+                    <span onclick="setRating('fairness',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="question-card">
+
+                <h3>Usefulness</h3>
+
+                <p>
+
+                    Do you believe feedback leads to real improvements?
+
+                </p>
+
+                <div class="rating">
+
+                    <span onclick="setRating('usefulness',1)">★</span>
+                    <span onclick="setRating('usefulness',2)">★</span>
+                    <span onclick="setRating('usefulness',3)">★</span>
+                    <span onclick="setRating('usefulness',4)">★</span>
+                    <span onclick="setRating('usefulness',5)">★</span>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+
+        <textarea id="commentBox" placeholder="Suggestions to improve the feedback system..."></textarea>
+
+
+
+
+        <button class="btn-primary" onclick="submitReviewOfReviews()">
+
+            Submit Evaluation
+
+        </button>
+
+
+
+    </div>
+
+
+
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        
+        requireAuth();
+
+        window.ratings = {};
+
+        window.setRating = function(field, value) {
+            window.ratings[field] = value;
+            const stars = document.querySelectorAll(`[onclick*="'${field}'"]`);
+            stars.forEach((star, index) => {
+                star.classList.toggle("active", index < value);
+            });
+        };
+
+        window.submitReviewOfReviews = function() {
+            if (Object.keys(window.ratings).length < 4) {
+                alert("Please answer all questions before submitting.");
+                return;
+            }
+
+            const data = {
+                type: "reviewOfReviews",
+                ratings: window.ratings,
+                date: new Date().toISOString()
+            };
+
+            // 1. Store the actual review blob
+            let stored = JSON.parse(localStorage.getItem("reviewOfReviews")) || [];
+            stored.push(data);
+            localStorage.setItem("reviewOfReviews", JSON.stringify(stored));
+
+            // 2. Register it as completed feedback in the current cycle so dashboard updates
+            const user = JSON.parse(localStorage.getItem("endurSession"));
+            const cycleState = JSON.parse(localStorage.getItem("systemCycleState")) || { id: "FALLBACK" };
+            let submitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
+            
+            submitted.push({
+                course: "reviewOfReviews",
+                userId: user ? user.id : "UNKNOWN",
+                cycleId: cycleState.id,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem("submittedFeedback", JSON.stringify(submitted));
+
+            window.location.href = "feedback-success.html";
+        };
+
+        window.goBack = function() {
+            window.history.back();
+        };
+
+    </script>
+
+
+</body>
+
+</html>

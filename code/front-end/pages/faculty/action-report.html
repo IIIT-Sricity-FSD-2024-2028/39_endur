@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Action Report</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: inherit;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div>
+                <strong>Endur</strong>
+                <p>Faculty Portal</p>
+            </div>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="reports.html">Feedback Reports</a>
+            <a class="active" href="action-report.html">Action Reports</a>
+            <a href="historical-trends.html">Historical Trends</a>
+        </nav>
+
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="dashboard-content">
+
+        <div class="form-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h2>Action Report</h2>
+                <span id="courseIdLabel" class="badge primary"></span>
+            </div>
+            <a href="reports.html" class="btn-outline">← Back to Reports</a>
+        </div>
+        <p class="subtitle" style="margin-bottom: 24px;">Faculty Performance Improvement Plan</p>
+
+        <!-- No course selected state -->
+        <div id="noCourseState" style="display:none; margin-top: 40px; text-align:center; padding: 60px 20px;">
+            <div style="font-size:3rem;margin-bottom:16px;">📋</div>
+            <h2 style="margin-bottom:8px;">No Course Selected</h2>
+            <p class="subtitle" style="margin-bottom:24px;">Please select a course from Feedback Reports first, then come back to submit your Action Report.</p>
+            <a href="reports.html" class="btn-primary">Go to Feedback Reports →</a>
+        </div>
+
+        <!-- HOD FEEDBACK BANNERS (Hidden by default, controlled by JS) -->
+        <div id="revisionBanner" class="card" style="display: none; background: #fef2f2; border: 1px solid #f87171; margin-bottom: 24px;">
+            <h3 style="color: #dc2626; font-size: 16px; margin-bottom: 12px;">⚠️ Revision Requested by HOD</h3>
+            <div style="margin-bottom: 12px;">
+                <strong style="color: #991b1b; font-size: 13px;">HOD Notes:</strong>
+                <p id="revHodNotes" style="color: #7f1d1d; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <div>
+                <strong style="color: #991b1b; font-size: 13px;">Suggested Outcomes:</strong>
+                <p id="revHodOutcomes" style="color: #7f1d1d; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <p style="font-size: 13px; color: #dc2626; margin-top: 16px; font-weight: bold;">Please update your Action Report below and resubmit.</p>
+        </div>
+
+        <div id="finalizedBanner" class="card" style="display: none; background: #f0fdf4; border: 1px solid #4ade80; margin-bottom: 24px;">
+            <h3 style="color: #16a34a; font-size: 16px; margin-bottom: 12px;">✅ Check-in Finalized</h3>
+            <div style="margin-bottom: 12px;">
+                <strong style="color: #14532d; font-size: 13px;">HOD Notes:</strong>
+                <p id="finHodNotes" style="color: #166534; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <div>
+                <strong style="color: #14532d; font-size: 13px;">Agreed Outcomes:</strong>
+                <p id="finHodOutcomes" style="color: #166534; font-size: 14px; margin-top: 4px;"></p>
+            </div>
+            <p style="font-size: 13px; color: #16a34a; margin-top: 16px; font-style: italic;">This report is now locked and stored in your administrative records.</p>
+        </div>
+
+        <!-- FORM WRAPPER -->
+        <form id="actionReportForm">
+            <!-- ROOT CAUSE -->
+            <div class="card">
+                <h3 style="margin-bottom: 8px;">Root Cause Analysis</h3>
+                <p style="color: #64748b; font-size: 14px;">Identify the core reasons for the performance gap based on your Gap Analysis.</p>
+                <textarea id="rootCause" rows="4" placeholder="Enter analysis..." required></textarea>
+            </div>
+
+            <!-- IMPROVEMENT PLAN -->
+            <div class="card">
+                <h3 style="margin-bottom: 8px;">Planned Strategies</h3>
+                <p style="color: #64748b; font-size: 14px;">Outline specific, actionable steps you will take to address the root cause.</p>
+                <textarea id="plannedStrategies" rows="4" placeholder="Example: Introduce weekly interactive Q&A sessions..." required></textarea>
+            </div>
+
+            <!-- TIMELINE -->
+            <div class="card">
+                <h3 style="margin-bottom: 8px;">Implementation Timeline</h3>
+                <p style="color: #64748b; font-size: 14px;">When will these changes be applied in your course delivery?</p>
+                <textarea id="timeline" rows="2" placeholder="Example: Changes will take effect starting Week 5." required></textarea>
+            </div>
+
+            <!-- SUBMIT BUTTON -->
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                <button type="submit" class="btn-primary" style="padding: 12px 24px;">Submit Action Report</button>
+            </div>
+        </form>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { initActionReport } from "../../js/features/action-report.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const user = requireAuth();
+        if(!user) return;
+
+        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userDept").innerText = user.department;
+        
+        const avatarEl = document.getElementById("avatar");
+        if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+
+        // Initialize the page logic
+        initActionReport();
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Historical Trends | Faculty — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            box-shadow: var(--shadow-glass);
+        }
+        .chart-card h3 { font-size: 0.97rem; font-weight: 700; margin-bottom: 4px; color: var(--text-main); }
+        .chart-card .chart-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
+        .chart-card canvas { max-height: 200px; }
+        .main-chart-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            box-shadow: var(--shadow-glass);
+            margin-top: 20px;
+        }
+        .main-chart-card canvas { max-height: 280px; }
+        .trend-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+        .score-hero { display:flex; gap:16px; margin-top:20px; flex-wrap:wrap; }
+        .score-pill {
+            background: linear-gradient(135deg, var(--primary), #3b82f6);
+            color: white;
+            border-radius: var(--radius-xl);
+            padding: 18px 22px;
+            text-align: center;
+            min-width: 120px;
+            flex: 1;
+        }
+        .score-pill .val { font-size: 2rem; font-weight: 800; display: block; line-height: 1; }
+        .score-pill .lbl { font-size: 0.75rem; opacity: 0.85; font-weight: 500; }
+        .empty-state-chart {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 200px;
+            color: var(--text-muted); font-size: 0.9rem; text-align: center; gap: 10px;
+        }
+        .empty-state-chart .emoji { font-size: 2.5rem; }
+        .course-selector { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+        .course-btn {
+            padding: 7px 18px; border-radius: 999px;
+            border: 1.5px solid var(--primary);
+            background: transparent; color: var(--primary);
+            font-size: 0.83rem; font-weight: 600;
+            cursor: pointer; transition: all 0.18s;
+        }
+        .course-btn.active { background: var(--primary); color: white; }
+        .course-btn:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div><strong>Endur</strong><p>Faculty Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="reports.html">Feedback Reports</a>
+            <a href="action-report.html">Action Reports</a>
+            <a class="active" href="historical-trends.html">Historical Trends</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+        <div class="trend-header">
+            <div>
+                <h1>Historical Trends</h1>
+                <p class="subtitle">Track your teaching performance across feedback cycles.</p>
+            </div>
+            <a href="reports.html" class="btn-outline">← Back to Reports</a>
+        </div>
+
+        <div id="courseSelector" class="course-selector"></div>
+
+        <div id="pageContent">
+            <!-- Filled by JS -->
+        </div>
+    </main>
+</div>
+
+<!-- Load Chart.js synchronously BEFORE module script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+<script type="module">
+import { requireAuth } from "../../js/core/session.js";
+
+document.addEventListener("DOMContentLoaded", function() {
+    const user = requireAuth();
+    if (!user) return;
+
+    // Populate sidebar immediately
+    document.getElementById("userName").innerText = user.name;
+    document.getElementById("userDept").innerText = user.department;
+    var av = document.getElementById("avatar");
+    if (av) {
+        av.textContent = user.name.split(" ").filter(function(n){ return n; })
+            .map(function(n){ return n[0]; }).join("").toUpperCase();
+    }
+
+    var pageContent  = document.getElementById("pageContent");
+    var selectorEl   = document.getElementById("courseSelector");
+    var currentCharts = [];
+
+    function showEmpty(msg, sub) {
+        destroyCharts();
+        selectorEl.style.display = "none";
+        pageContent.innerHTML =
+            '<div class="main-chart-card"><div class="empty-state-chart">' +
+            '<span class="emoji">📊</span>' +
+            '<strong>' + msg + '</strong>' +
+            '<p>' + sub + '</p>' +
+            '</div></div>';
+    }
+
+    function destroyCharts() {
+        currentCharts.forEach(function(c) { try { c.destroy(); } catch(e){} });
+        currentCharts = [];
+    }
+
+    function makeHistory(current, variance) {
+        variance = variance || 18;
+        if (!current || current <= 0) return [0, 0, 0, 0, 0];
+        return [
+            Math.max(20, +(current - variance - Math.random() * 8).toFixed(1)),
+            Math.max(30, +(current - variance * 0.6 - Math.random() * 6).toFixed(1)),
+            Math.max(40, +(current - variance * 0.3 - Math.random() * 4).toFixed(1)),
+            Math.max(50, +(current - Math.random() * 5).toFixed(1)),
+            +current.toFixed(1)
+        ];
+    }
+
+    var SEMS = ["Fall '23", "Spring '24", "Fall '24", "Spring '25", "Now"];
+    var BAR_COLORS = ["#d1d5db","#9ca3af","#6b7280","#4b5563","#3b82f6"];
+
+    function mkLine(id, label, data) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var ch = new Chart(el.getContext("2d"), {
+            type: "line",
+            data: {
+                labels: SEMS,
+                datasets: [{
+                    label: label, data: data, fill: true,
+                    borderColor: "#3b82f6",
+                    backgroundColor: "rgba(59,130,246,0.1)",
+                    tension: 0.4, pointRadius: 5,
+                    pointBackgroundColor: "#3b82f6", borderWidth: 2.5
+                }]
+            },
+            options: {
+                responsive: true, plugins: { legend: { display: false } },
+                scales: {
+                    y: { min: 0, max: 100,
+                         ticks: { callback: function(v){ return v + "%"; } },
+                         grid: { color: "rgba(0,0,0,0.05)" } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+        currentCharts.push(ch);
+    }
+
+    function mkBar(id, label, data) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var ch = new Chart(el.getContext("2d"), {
+            type: "bar",
+            data: {
+                labels: SEMS,
+                datasets: [{ label: label, data: data,
+                    backgroundColor: BAR_COLORS,
+                    borderRadius: 5, borderSkipped: false }]
+            },
+            options: {
+                responsive: true, plugins: { legend: { display: false } },
+                scales: {
+                    y: { min: 0, max: 100,
+                         ticks: { callback: function(v){ return v + "%"; } },
+                         grid: { color: "rgba(0,0,0,0.05)" } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+        currentCharts.push(ch);
+    }
+
+    function renderCourse(course, allFeedback) {
+        var fb = allFeedback.filter(function(f){ return f.course === course.id; });
+        destroyCharts();
+
+        if (fb.length === 0) {
+            pageContent.innerHTML =
+                '<div class="main-chart-card"><div class="empty-state-chart">' +
+                '<span class="emoji">📭</span>' +
+                '<strong>No feedback for ' + course.id + '</strong>' +
+                '<p>No student responses recorded for this course yet.</p>' +
+                '</div></div>';
+            return;
+        }
+
+        // Aggregate ratings
+        var totals = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+        var counts  = { clarity: 0, structure: 0, engagement: 0, difficulty: 0 };
+        fb.forEach(function(f) {
+            if (!f.ratings) return;
+            ["clarity","structure","engagement","difficulty"].forEach(function(k) {
+                if (typeof f.ratings[k] === "number") {
+                    totals[k] += f.ratings[k];
+                    counts[k]++;
+                }
+            });
+        });
+
+        function pct(k) {
+            return counts[k] > 0 ? +((totals[k] / counts[k]) * 20).toFixed(1) : 0;
+        }
+
+        var clarity    = pct("clarity");
+        var structure  = pct("structure");
+        var engagement = pct("engagement");
+        var difficulty = pct("difficulty");
+        var overall    = +((clarity + structure + engagement + difficulty) / 4).toFixed(1);
+
+        pageContent.innerHTML =
+            // Score hero
+            '<div class="score-hero">' +
+            '<div class="score-pill"><span class="val">' + overall + '%</span><span class="lbl">Overall Score</span></div>' +
+            '<div class="score-pill" style="background:linear-gradient(135deg,#10b981,#059669)"><span class="val">' + fb.length + '</span><span class="lbl">Responses</span></div>' +
+            '<div class="score-pill" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)"><span class="val">' + clarity + '%</span><span class="lbl">Clarity</span></div>' +
+            '<div class="score-pill" style="background:linear-gradient(135deg,#f59e0b,#d97706)"><span class="val">' + engagement + '%</span><span class="lbl">Engagement</span></div>' +
+            '</div>' +
+            // Main line chart
+            '<div class="main-chart-card">' +
+            '<h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;">Overall Performance Over Time</h3>' +
+            '<p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;">Current score with simulated historical trajectory.</p>' +
+            '<canvas id="mainLineChart"></canvas>' +
+            '</div>' +
+            // 4 bar charts
+            '<div class="chart-grid">' +
+            '<div class="chart-card"><h3>📖 Clarity of Instruction</h3><p class="chart-sub">How clearly material was presented.</p><canvas id="clarityChart"></canvas></div>' +
+            '<div class="chart-card"><h3>🏗️ Course Structure</h3><p class="chart-sub">Organisation and logical flow of content.</p><canvas id="structureChart"></canvas></div>' +
+            '<div class="chart-card"><h3>💡 Student Engagement</h3><p class="chart-sub">Level of interactive involvement created.</p><canvas id="engagementChart"></canvas></div>' +
+            '<div class="chart-card"><h3>⚖️ Difficulty Balance</h3><p class="chart-sub">Perceived fairness of course difficulty.</p><canvas id="difficultyChart"></canvas></div>' +
+            '</div>';
+
+        // Render charts AFTER innerHTML is set
+        mkLine("mainLineChart",   "Overall %",    makeHistory(overall,    20));
+        mkBar("clarityChart",     "Clarity %",    makeHistory(clarity,    18));
+        mkBar("structureChart",   "Structure %",  makeHistory(structure,  18));
+        mkBar("engagementChart",  "Engagement %", makeHistory(engagement, 18));
+        mkBar("difficultyChart",  "Difficulty %", makeHistory(difficulty, 18));
+    }
+
+    // Load courses and feedback
+    fetch("http://localhost:3000/api/courses")
+        .then(function(r){ return r.json(); })
+        .then(function(allCourses) {
+            var myCourses = allCourses.filter(function(c){ return c.facultyId === user.id; });
+            var allFeedback = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
+
+            if (myCourses.length === 0) {
+                showEmpty("No Courses Assigned", "You have no courses assigned in the system.");
+                return;
+            }
+
+            // Check if any feedback exists at all for this faculty
+            var myIds = {};
+            myCourses.forEach(function(c){ myIds[c.id] = true; });
+            var myFeedback = allFeedback.filter(function(f){ return myIds[f.course]; });
+
+            if (myFeedback.length === 0) {
+                showEmpty("No Feedback Data Yet",
+                    "Historical trends appear once students have submitted feedback for your courses.");
+                return;
+            }
+
+            // Show selector and render first course
+            selectorEl.style.display = "";
+            myCourses.forEach(function(course, i) {
+                var btn = document.createElement("button");
+                btn.className = "course-btn" + (i === 0 ? " active" : "");
+                btn.dataset.id = course.id;
+                btn.textContent = course.id + " \u2014 " + course.name;
+                btn.onclick = function() {
+                    document.querySelectorAll(".course-btn").forEach(function(b){ b.classList.remove("active"); });
+                    btn.classList.add("active");
+                    renderCourse(course, myFeedback);
+                };
+                selectorEl.appendChild(btn);
+            });
+
+            renderCourse(myCourses[0], myFeedback);
+        })
+        .catch(function(e) {
+            console.error("Failed to load courses", e);
+            showEmpty("Error Loading Data", "Could not load course data. Please refresh the page.");
+        });
+});
+</script>
+</body>
+</html>
