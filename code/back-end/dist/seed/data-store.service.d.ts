@@ -1,0 +1,50 @@
+export interface AuditLog {
+    id: string;
+    timestamp: string;
+    actor: string;
+    actorName: string;
+    actorRole: string;
+    action: string;
+    module: string;
+    target: string;
+    details: string;
+}
+export declare class DataStoreService {
+    private courses;
+    private feedbackCycles;
+    private evaluationParameters;
+    private feedbackResponses;
+    private auditLogs;
+    private draftParameters;
+    private activeParameters;
+    private departmentConfigStatus;
+    private selfReflections;
+    private actionReports;
+    private reviewCheckins;
+    private cycleState;
+    getCourses(): any[];
+    setCourses(c: any[]): void;
+    getFeedbackCycles(): any[];
+    setFeedbackCycles(c: any[]): void;
+    getCycleState(): any;
+    setCycleState(s: any): void;
+    getEvalParams(): any[];
+    setEvalParams(p: any[]): void;
+    getDraftParameters(): Record<string, any[]>;
+    setDraftParameters(d: Record<string, any[]>): void;
+    getActiveParameters(): Record<string, any[]>;
+    setActiveParameters(a: Record<string, any[]>): void;
+    getDeptConfigStatus(): Record<string, string>;
+    setDeptConfigStatus(s: Record<string, string>): void;
+    getFeedbackResponses(): any[];
+    setFeedbackResponses(r: any[]): void;
+    getSelfReflections(): any[];
+    setSelfReflections(r: any[]): void;
+    getActionReports(): any[];
+    setActionReports(r: any[]): void;
+    getReviewCheckins(): any[];
+    setReviewCheckins(r: any[]): void;
+    getAuditLogs(): AuditLog[];
+    appendAuditLog(entry: Omit<AuditLog, 'id' | 'timestamp'>): void;
+    genId(prefix?: string): string;
+}

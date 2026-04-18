@@ -1,0 +1,450 @@
+[
+  {
+    "id": "S001",
+    "name": "Ivan Garcia",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S002",
+    "name": "Quinn Miller",
+    "role": "student",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S003",
+    "name": "Alice Garcia",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S004",
+    "name": "Alice Davis",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S005",
+    "name": "Ivan Miller",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S006",
+    "name": "Romeo Gonzalez",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S007",
+    "name": "Peggy Lopez",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S008",
+    "name": "Quinn Jones",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S009",
+    "name": "Romeo Davis",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S010",
+    "name": "Sybil Rodriguez",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S011",
+    "name": "Diana Garcia",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S012",
+    "name": "Ivan Garcia",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S013",
+    "name": "Grace Anderson",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S014",
+    "name": "Victor Hernandez",
+    "role": "student",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S015",
+    "name": "Frank Wilson",
+    "role": "student",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S016",
+    "name": "Peggy Hernandez",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S017",
+    "name": "Trent Hernandez",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S018",
+    "name": "Eve Martinez",
+    "role": "student",
+    "password": "password123",
+    "department": "Mathematics"
+  },
+  {
+    "id": "S019",
+    "name": "Trent Jones",
+    "role": "student",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S020",
+    "name": "Frank Thomas",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S021",
+    "name": "Zoe Martin",
+    "role": "student",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "S022",
+    "name": "Victor Jackson",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S023",
+    "name": "Liam Williams",
+    "role": "student",
+    "password": "password123",
+    "department": "Mathematics"
+  },
+  {
+    "id": "S024",
+    "name": "Charlie Thomas",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S025",
+    "name": "Walter Miller",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S026",
+    "name": "Sybil Wilson",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S027",
+    "name": "Grace Anderson",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S028",
+    "name": "Diana Hernandez",
+    "role": "student",
+    "password": "password123",
+    "department": "Mathematics"
+  },
+  {
+    "id": "S029",
+    "name": "Walter Jones",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S030",
+    "name": "Quinn Hernandez",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S031",
+    "name": "Walter Martin",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S032",
+    "name": "Romeo Hernandez",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S033",
+    "name": "Ivan Wilson",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S034",
+    "name": "Diana Garcia",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S035",
+    "name": "Heidi Miller",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S036",
+    "name": "Liam Johnson",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S037",
+    "name": "Olivia Davis",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S038",
+    "name": "Eve Martinez",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S039",
+    "name": "Romeo Davis",
+    "role": "student",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "S040",
+    "name": "Charlie Garcia",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S041",
+    "name": "Eve Martinez",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "S042",
+    "name": "Olivia Taylor",
+    "role": "student",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "S043",
+    "name": "Heidi Gonzalez",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S044",
+    "name": "Diana Moore",
+    "role": "student",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "S045",
+    "name": "Victor Johnson",
+    "role": "student",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F001",
+    "name": "Dr. Liam Rodriguez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F002",
+    "name": "Dr. Olivia Johnson",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "F003",
+    "name": "Dr. Judy Rodriguez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F004",
+    "name": "Dr. Noah Moore",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F005",
+    "name": "Dr. Trent Hernandez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "F006",
+    "name": "Dr. Eve Hernandez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "F007",
+    "name": "Dr. Charlie Hernandez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Architecture"
+  },
+  {
+    "id": "F008",
+    "name": "Dr. Diana Wilson",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F009",
+    "name": "Dr. Quinn Smith",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "F010",
+    "name": "Dr. Ivan Davis",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "F011",
+    "name": "Dr. Quinn Jackson",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F012",
+    "name": "Dr. Mia Smith",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "F013",
+    "name": "Dr. Diana Martinez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Mechanical Engineering"
+  },
+  {
+    "id": "F014",
+    "name": "Dr. Ivan Hernandez",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Electrical Engineering"
+  },
+  {
+    "id": "F015",
+    "name": "Dr. Grace Smith",
+    "role": "faculty",
+    "password": "password123",
+    "department": "Physics"
+  },
+  {
+    "id": "H001",
+    "name": "Prof. Alan Turing",
+    "role": "hod",
+    "password": "password123",
+    "department": "Computer Science"
+  },
+  {
+    "id": "D001",
+    "name": "Dr. Richard Feynman",
+    "role": "dean",
+    "password": "password123",
+    "department": "Administration"
+  },
+  {
+    "id": "A001",
+    "name": "Alice Williams",
+    "role": "admin",
+    "password": "password123",
+    "department": "IT Support"
+  },
+  {
+    "id": "A002",
+    "name": "Zoe Smith",
+    "role": "admin",
+    "password": "password123",
+    "department": "IT Support"
+  }
+]

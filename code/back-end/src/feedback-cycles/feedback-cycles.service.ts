@@ -1,0 +1,121 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DataStoreService } from '../seed/data-store.service';
+import {
+  CreateFeedbackCycleDto,
+  UpdateFeedbackCycleDto,
+  UpdateCycleStatusDto,
+} from './dto/feedback-cycle.dto';
+
+@Injectable()
+export class FeedbackCyclesService {
+  constructor(private readonly store: DataStoreService) {}
+
+  findAll() {
+    return this.store.getFeedbackCycles();
+  }
+
+  findActive() {
+    const cycles = this.store.getFeedbackCycles();
+    return cycles.filter((c) => c.status === 'active');
+  }
+
+  findOne(id: string) {
+    const cycle = this.store.getFeedbackCycles().find((c) => c.cycleId === id);
+    if (!cycle) throw new NotFoundException(`Cycle ${id} not found`);
+    return cycle;
+  }
+
+  getCycleState() {
+    return this.store.getCycleState();
+  }
+
+  create(dto: CreateFeedbackCycleDto, actorId?: string, actorName?: string) {
+    const cycles = this.store.getFeedbackCycles();
+    const entry = {
+      cycleId: this.store.genId('CYCLE'),
+      ...dto,
+      status: 'active',
+      phase: 'PREPARATION',
+    };
+    cycles.unshift(entry);
+    this.store.setFeedbackCycles(cycles);
+
+    this.store.appendAuditLog({
+      actor: actorId || 'SU001',
+      actorName: actorName || 'Super User',
+      actorRole: actorId ? 'admin' : 'superuser',
+      action: 'CREATE',
+      module: 'Feedback Cycles',
+      target: `${entry.cycleId} — ${dto.cycleName}`,
+      details: 'New feedback cycle created.',
+    });
+    return entry;
+  }
+
+  update(id: string, dto: UpdateFeedbackCycleDto, actorId?: string, actorName?: string) {
+    const cycles = this.store.getFeedbackCycles();
+    const idx = cycles.findIndex((c) => c.cycleId === id);
+    if (idx === -1) throw new NotFoundException(`Cycle ${id} not found`);
+    cycles[idx] = { ...cycles[idx], ...dto };
+    this.store.setFeedbackCycles(cycles);
+
+    this.store.appendAuditLog({
+      actor: actorId || 'SU001',
+      actorName: actorName || 'Super User',
+      actorRole: 'admin',
+      action: 'UPDATE',
+      module: 'Feedback Cycles',
+      target: `${id} — ${cycles[idx].cycleName}`,
+      details: 'Cycle details updated.',
+    });
+    return cycles[idx];
+  }
+
+  updateStatus(id: string, dto: UpdateCycleStatusDto, actorId?: string, actorName?: string) {
+    const cycles = this.store.getFeedbackCycles();
+    const idx = cycles.findIndex((c) => c.cycleId === id);
+    if (idx === -1) throw new NotFoundException(`Cycle ${id} not found`);
+    cycles[idx].status = dto.status;
+    if (dto.phase) cycles[idx].phase = dto.phase;
+    this.store.setFeedbackCycles(cycles);
+
+    // Also update global cycle state if activating
+    if (dto.status === 'active' && dto.phase) {
+      this.store.setCycleState({ id, phase: dto.phase, ...cycles[idx] });
+    } else if (dto.status === 'closed') {
+      const state = this.store.getCycleState();
+      if (state?.id === id) {
+        this.store.setCycleState({ ...state, status: 'closed', phase: 'COMPLETED' });
+      }
+    }
+
+    this.store.appendAuditLog({
+      actor: actorId || 'SU001',
+      actorName: actorName || 'Super User',
+      actorRole: 'admin',
+      action: 'UPDATE',
+      module: 'Feedback Cycles',
+      target: `${id} — ${cycles[idx].cycleName}`,
+      details: `Cycle status changed to '${dto.status}'.`,
+    });
+    return cycles[idx];
+  }
+
+  remove(id: string, actorId?: string, actorName?: string) {
+    const cycles = this.store.getFeedbackCycles();
+    const cycle = cycles.find((c) => c.cycleId === id);
+    if (!cycle) throw new NotFoundException(`Cycle ${id} not found`);
+    this.store.setFeedbackCycles(cycles.filter((c) => c.cycleId !== id));
+
+    this.store.appendAuditLog({
+      actor: actorId || 'SU001',
+      actorName: actorName || 'Super User',
+      actorRole: 'admin',
+      action: 'DELETE',
+      module: 'Feedback Cycles',
+      target: `${id} — ${cycle.cycleName}`,
+      details: 'Cycle permanently deleted.',
+    });
+    return { message: `Cycle ${id} deleted` };
+  }
+}
