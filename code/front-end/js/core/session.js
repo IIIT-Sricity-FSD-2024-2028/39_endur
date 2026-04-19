@@ -7,11 +7,27 @@ export function getSession() {
 }
 
 
-export function requireAuth() {
+export function requireAuth(allowedRole = null) {
     const session = getSession();
 
     if (!session) {
         window.location.replace("../../login.html");
+        return null;
+    }
+
+    // Role Guard
+    if (allowedRole && session.role !== allowedRole) {
+        // If they have a role but it's not the right one, send them to their own dashboard
+        const dashboardMap = {
+            'student': '../student/dashboard.html',
+            'faculty': '../faculty/dashboard.html',
+            'hod':     '../hod/dashboard.html',
+            'dean':    '../dean/dashboard.html',
+            'admin':   '../admin/dashboard.html',
+            'superuser': '../superuser/dashboard.html'
+        };
+        const target = dashboardMap[session.role] || '../../login.html';
+        window.location.replace(target);
         return null;
     }
 

@@ -1,8 +1,9 @@
+import { refreshSession } from '../core/api.js';
 import { getSession } from '../core/session.js';
 import { GET } from '../core/api.js';
 
 export async function initProfile() {
-    const user = getSession();
+    const user = await refreshSession();
     if (!user) return;
 
     // Populate UI

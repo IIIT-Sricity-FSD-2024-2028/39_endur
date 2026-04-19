@@ -30,4 +30,8 @@ export declare class CoursesService {
         }[];
         total: number;
     };
+    autoAssignAll(actorId?: string, actorName?: string): {
+        message: string;
+        totalAssignments: number;
+    };
 }

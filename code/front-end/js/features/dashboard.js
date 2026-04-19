@@ -1,7 +1,8 @@
-import { GET, getSession } from '../core/api.js';
+import { GET, getSession, refreshSession } from '../core/api.js';
 
-async function getCourses() {
-    return GET('/courses');
+async function getMyCourses() {
+    try { return await GET('/users/me/courses'); }
+    catch { return []; }
 }
 
 async function getCycleState() {
@@ -17,9 +18,11 @@ function getStatus(courseId, userId, currentCycleId, allSubmissions) {
 }
 
 export async function updateDashboard() {
-    const user = getSession();
-    let [allCourses, cycleState, allSubmissions] = await Promise.all([
-        getCourses(),
+    const user = await refreshSession();
+    if (!user) return;
+
+    let [myCourses, cycleState, allSubmissions] = await Promise.all([
+        getMyCourses(),
         getCycleState(),
         GET(`/feedback-responses?studentId=${user.id}`).catch(() => [])
     ]);
@@ -48,8 +51,6 @@ export async function updateDashboard() {
     }
 
     if (table) table.innerHTML = '';
-
-    const myCourses = allCourses.filter(c => user?.enrolledCourses?.includes(c.id));
     // Remove the hardcoded reviewOfReviews to align with user expectation of 0 pending when 0 courses enrolled
     // myCourses.push({ id: 'reviewOfReviews', name: 'Platform System Review (Review of Reviews)' });
 
@@ -90,13 +91,14 @@ export async function updateDashboard() {
 }
 
 export async function updateStats() {
-    const user = getSession();
-    const [allCourses, cycleState, allSubmissions] = await Promise.all([
-        getCourses(),
+    const user = getSession(); 
+    if (!user) return;
+
+    const [myCourses, cycleState, allSubmissions] = await Promise.all([
+        getMyCourses(),
         getCycleState(),
         GET(`/feedback-responses?studentId=${user.id}`).catch(() => [])
     ]);
-    const myCourses = allCourses.filter(c => user?.enrolledCourses?.includes(c.id));
     // myCourses.push({ id: 'reviewOfReviews', name: 'Platform System Review' });
 
     let completed = 0, progress = 0, pending = 0;

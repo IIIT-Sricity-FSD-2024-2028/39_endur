@@ -109,282 +109,130 @@
         <div id="courseSelector" class="course-selector"></div>
 
         <div id="pageContent">
-            <!-- Filled by JS -->
+
+            <!-- Score pills -->
+            <div class="score-hero" id="scorePills" style="margin-top:20px">
+                <div class="score-pill">
+                    <span class="val" id="overallScore">—</span>
+                    <span class="lbl">Overall Score</span>
+                </div>
+            </div>
+
+            <!-- Main trend line -->
+            <div class="main-chart-card" style="margin-top:20px">
+                <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;">Performance Over Cycles</h3>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;">Each bar = one feedback cycle. Derived from actual student responses.</p>
+                <div id="trendLine" style="display:flex;align-items:flex-end;height:140px;gap:8px;padding:0 4px;"></div>
+            </div>
+
+            <!-- Per-param dynamic charts -->
+            <div class="chart-grid" id="paramChartGrid" style="margin-top:20px"></div>
+
+            <!-- Recent responses breakdown table -->
+            <div class="main-chart-card" style="margin-top:24px">
+                <h3 style="font-size:1rem;font-weight:700;margin-bottom:16px;">📋 Recent Feedback Responses</h3>
+                <div style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Cycle</th>
+                                <th>Date</th>
+                                <th>Overall</th>
+                                <th>Parameter Breakdown & Comments</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentResponsesTable">
+                            <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </main>
 </div>
 
-<!-- Load Chart.js synchronously BEFORE module script -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
 <script type="module">
-import { requireAuth } from "../../js/core/session.js";
-import { GET } from "../../js/core/api.js";
-import { exportToCSV } from "../../js/features/admin-utils.js";
+import { requireAuth }          from '../../js/core/session.js';
+import { renderHistoricalTrends } from '../../js/features/historical-trends.js';
+import { GET }                  from '../../js/core/api.js';
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener('DOMContentLoaded', async () => {
     const user = requireAuth();
     if (!user) return;
 
-    // Populate sidebar immediately
-    document.getElementById("userName").innerText = user.name;
-    document.getElementById("userDept").innerText = user.department;
-    var av = document.getElementById("avatar");
-    if (av) {
-        av.textContent = user.name.split(" ").filter(function(n){ return n; })
-            .map(function(n){ return n[0]; }).join("").toUpperCase();
-    }
+    document.getElementById('userName').innerText = user.name;
+    document.getElementById('userDept').innerText = user.department;
+    const av = document.getElementById('avatar');
+    if (av) av.textContent = user.name.split(' ').filter(n=>n).map(n=>n[0]).join('').toUpperCase();
 
-    var pageContent  = document.getElementById("pageContent");
-    var selectorEl   = document.getElementById("courseSelector");
-    var currentCharts = [];
+    // Build course selector from this faculty's courses
+    const selectorEl = document.getElementById('courseSelector');
+    let myCourses = [];
+    try {
+        const all = await GET('/courses');
+        myCourses = all.filter(c =>
+            c.facultyId === user.id ||
+            (Array.isArray(c.facultyIds) && c.facultyIds.includes(user.id))
+        );
+    } catch {}
 
-    function showEmpty(msg, sub) {
-        destroyCharts();
-        selectorEl.style.display = "none";
-        pageContent.innerHTML =
-            '<div class="main-chart-card"><div class="empty-state-chart">' +
-            '<span class="emoji">📊</span>' +
-            '<strong>' + msg + '</strong>' +
-            '<p>' + sub + '</p>' +
-            '</div></div>';
-    }
-
-    function destroyCharts() {
-        currentCharts.forEach(function(c) { try { c.destroy(); } catch(e){} });
-        currentCharts = [];
-    }
-
-    function makeHistory(current, variance) {
-        variance = variance || 18;
-        if (!current || current <= 0) return [0, 0, 0, 0, 0];
-        return [
-            Math.max(20, +(current - variance - Math.random() * 8).toFixed(1)),
-            Math.max(30, +(current - variance * 0.6 - Math.random() * 6).toFixed(1)),
-            Math.max(40, +(current - variance * 0.3 - Math.random() * 4).toFixed(1)),
-            Math.max(50, +(current - Math.random() * 5).toFixed(1)),
-            +current.toFixed(1)
-        ];
-    }
-
-    var SEMS = ["Fall '23", "Spring '24", "Fall '24", "Spring '25", "Now"];
-    var BAR_COLORS = ["#d1d5db","#9ca3af","#6b7280","#4b5563","#3b82f6"];
-
-    function mkLine(id, label, data) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        var ch = new Chart(el.getContext("2d"), {
-            type: "line",
-            data: {
-                labels: SEMS,
-                datasets: [{
-                    label: label, data: data, fill: true,
-                    borderColor: "#3b82f6",
-                    backgroundColor: "rgba(59,130,246,0.1)",
-                    tension: 0.4, pointRadius: 5,
-                    pointBackgroundColor: "#3b82f6", borderWidth: 2.5
-                }]
-            },
-            options: {
-                responsive: true, plugins: { legend: { display: false } },
-                scales: {
-                    y: { min: 0, max: 100,
-                         ticks: { callback: function(v){ return v + "%"; } },
-                         grid: { color: "rgba(0,0,0,0.05)" } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-        currentCharts.push(ch);
-    }
-
-    function mkBar(id, label, data) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        var ch = new Chart(el.getContext("2d"), {
-            type: "bar",
-            data: {
-                labels: SEMS,
-                datasets: [{ label: label, data: data,
-                    backgroundColor: BAR_COLORS,
-                    borderRadius: 5, borderSkipped: false }]
-            },
-            options: {
-                responsive: true, plugins: { legend: { display: false } },
-                scales: {
-                    y: { min: 0, max: 100,
-                         ticks: { callback: function(v){ return v + "%"; } },
-                         grid: { color: "rgba(0,0,0,0.05)" } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-        currentCharts.push(ch);
-    }
-
-    function renderCourse(course, allFeedback, allCycles) {
-        var fb = allFeedback.filter(function(f){ return f.courseId === course.id; });
-        destroyCharts();
-
-        if (fb.length === 0) {
-            pageContent.innerHTML =
-                '<div class="main-chart-card"><div class="empty-state-chart">' +
-                '<span class="emoji">📭</span>' +
-                '<strong>No feedback for ' + course.id + '</strong>' +
-                '<p>No student responses recorded for this course yet.</p>' +
-                '</div></div>';
-            return;
-        }
-
-        var totals = {};
-        var counts  = {};
-        var paramNames = {}; 
-        
-        // Use default parameter names as fallback
-        var defaultsMap = {
-            delivery: "Course Delivery & Clarity",
-            relevance: "Course Relevance",
-            support: "Faculty Support & Availability",
-            assessment: "Fairness of Assessments"
+    if (myCourses.length > 1) {
+        selectorEl.style.display = 'flex';
+        // "All" button
+        const allBtn = document.createElement('button');
+        allBtn.className = 'course-btn active';
+        allBtn.textContent = 'All Courses';
+        allBtn.onclick = () => {
+            localStorage.removeItem('activeFacultyCourse');
+            document.querySelectorAll('.course-btn').forEach(b => b.classList.remove('active'));
+            allBtn.classList.add('active');
+            renderHistoricalTrends();
         };
+        selectorEl.appendChild(allBtn);
 
-        fb.forEach(function(f) {
-            if (!f.ratings) return;
-            const cycle = allCycles.find(c => c.cycleId === f.cycleId);
-            const deptParams = cycle?.departmentParameters?.[user.department] || cycle?.departmentParameters?.['Unassigned'] || [];
-            
-            Object.keys(f.ratings).forEach(function(k) {
-                if (typeof f.ratings[k] === "number") {
-                    if (!totals[k]) { totals[k] = 0; counts[k] = 0; }
-                    totals[k] += f.ratings[k];
-                    counts[k]++;
-                    
-                    const pDef = deptParams.find(p => p.id === k);
-                    if (pDef) paramNames[k] = pDef.name;
-                    else if (!paramNames[k]) paramNames[k] = defaultsMap[k] || k;
-                }
-            });
+        myCourses.forEach(course => {
+            const btn = document.createElement('button');
+            btn.className = 'course-btn';
+            btn.dataset.id = course.id;
+            btn.textContent = `${course.id} — ${course.name}`;
+            btn.onclick = () => {
+                localStorage.setItem('activeFacultyCourse', course.id);
+                document.querySelectorAll('.course-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderHistoricalTrends();
+            };
+            selectorEl.appendChild(btn);
         });
-
-        // 1-100 scale averaging natively
-        function pct(k) { return counts[k] > 0 ? +(totals[k] / counts[k]).toFixed(1) : 0; }
-
-        var keys = Object.keys(totals);
-        var sumOverall = 0;
-        var processed = keys.map(function(k) {
-            var val = pct(k);
-            sumOverall += val;
-            return { id: k, name: paramNames[k], val: val };
-        });
-        
-        var overall = processed.length > 0 ? +(sumOverall / processed.length).toFixed(1) : 0;
-
-        // Build dynamic HTML
-        var html = '<div class="score-hero">' +
-            '<div class="score-pill"><span class="val">' + overall + '%</span><span class="lbl">Overall Score</span></div>' +
-            '<div class="score-pill" style="background:linear-gradient(135deg,#10b981,#059669)"><span class="val">' + fb.length + '</span><span class="lbl">Responses</span></div>';
-        
-        // Dynamically append top 2 score pills natively to save massive CSS space
-        var top2 = processed.slice(0, 2);
-        var gradColors = ['linear-gradient(135deg,#8b5cf6,#7c3aed)', 'linear-gradient(135deg,#f59e0b,#d97706)'];
-        top2.forEach((p, idx) => {
-             html += '<div class="score-pill" style="background:'+gradColors[idx]+'"><span class="val">' + p.val + '%</span><span class="lbl">' + p.name + '</span></div>';
-        });
-        
-        html += '</div>' +
-            '<div class="main-chart-card">' +
-            '<h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;">Overall Performance Over Time</h3>' +
-            '<p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;">Current score with simulated historical trajectory.</p>' +
-            '<canvas id="mainLineChart"></canvas></div><div class="chart-grid">';
-            
-        // Dynamically spawn Bar Cards
-        var iconMap = ["📖", "🏗️", "💡", "⚖️", "📊", "🎯"];
-        processed.forEach(function(p, i) {
-            var icon = iconMap[i % iconMap.length];
-            html += '<div class="chart-card"><h3>' + icon + ' ' + p.name + '</h3><p class="chart-sub">Historical mapped averages.</p><canvas id="chart_' + p.id + '"></canvas></div>';
-        });
-        html += '</div>';
-
-        pageContent.innerHTML = html;
-
-        // Render charts synchronously
-        mkLine("mainLineChart", "Overall %", makeHistory(overall, 20));
-        processed.forEach(function(p) { mkBar("chart_" + p.id, p.name + " %", makeHistory(p.val, 18)); });
     }
 
-    let btnBindingDone = false;
+    // Export CSV
+    const exportBtn = document.getElementById('btnExportCSV');
+    if (exportBtn) {
+        exportBtn.onclick = async () => {
+            try {
+                const responses = await GET(`/feedback-responses?facultyId=${encodeURIComponent(user.id)}`);
+                const rows = responses.map(r => ({
+                    ResponseId: r.responseId ?? r.id ?? '',
+                    CycleId:    r.cycleId,
+                    CourseId:   r.courseId,
+                    FacultyId:  r.facultyId ?? '',
+                    Ratings:    JSON.stringify(r.ratings ?? []),
+                    Submitted:  r.submittedAt,
+                }));
+                const csv = [Object.keys(rows[0]).join(','), ...rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                a.download = `faculty_trends_${user.id}.csv`;
+                a.click();
+            } catch { alert('No data to export.'); }
+        };
+    }
 
-    // Load courses and feedback from API (not localStorage)
-    Promise.all([
-        fetch("http://localhost:3000/api/courses", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()),
-        fetch("http://localhost:3000/api/feedback-responses", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()).catch(() => []),
-        fetch("http://localhost:3000/api/feedback-cycles", { headers: { 'x-role': user.role, 'x-user-id': user.id } }).then(r => r.json()).catch(() => []),
-    ])
-        .then(function(results) {
-            var allCourses = results[0];
-            var allFeedbackRaw = results[1];
-            var allCycles = results[2];
-            var myCourses = allCourses.filter(function(c){ return c.facultyId === user.id; });
-
-            if (myCourses.length === 0) {
-                showEmpty("No Courses Assigned", "You have no courses assigned in the system.");
-                return;
-            }
-
-            // API uses courseId (not course) — filter correctly
-            var myIds = {};
-            myCourses.forEach(function(c){ myIds[c.id] = true; });
-            var myFeedback = allFeedbackRaw.filter(function(f){ return myIds[f.courseId]; });
-
-            if (myFeedback.length === 0) {
-                showEmpty("No Feedback Data Yet",
-                    "Historical trends appear once students have submitted feedback for your courses.");
-                return;
-            }
-
-            if (!btnBindingDone) {
-                btnBindingDone = true;
-                const exportBtn = document.getElementById("btnExportCSV");
-                if (exportBtn) {
-                    exportBtn.addEventListener("click", function() {
-                        if (!myFeedback || !myFeedback.length) {
-                            alert("No data available to export.");
-                            return;
-                        }
-                        const exportData = myFeedback.map(fb => ({
-                            CycleID: fb.cycleId,
-                            CourseID: fb.courseId,
-                            Ratings: JSON.stringify(fb.ratings || {}),
-                            Comments: fb.comments || ""
-                        }));
-                        exportToCSV(`faculty_trends_${user.id}.csv`, exportData);
-                    });
-                }
-            }
-
-            // Show selector and render first course
-            selectorEl.style.display = "";
-            myCourses.forEach(function(course, i) {
-                var btn = document.createElement("button");
-                btn.className = "course-btn" + (i === 0 ? " active" : "");
-                btn.dataset.id = course.id;
-                btn.textContent = course.id + " \u2014 " + course.name;
-                btn.onclick = function() {
-                    document.querySelectorAll(".course-btn").forEach(function(b){ b.classList.remove("active"); });
-                    btn.classList.add("active");
-                    var courseFeedback = myFeedback.filter(function(f){ return f.courseId === course.id; });
-                    renderCourse(course, courseFeedback, allCycles);
-                };
-                selectorEl.appendChild(btn);
-            });
-
-            var firstCourseFeedback = myFeedback.filter(function(f){ return f.courseId === myCourses[0].id; });
-            renderCourse(myCourses[0], firstCourseFeedback, allCycles);
-        })
-        .catch(function(e) {
-            console.error("Failed to load data", e);
-            showEmpty("Error Loading Data", "Could not load data. Please refresh the page.");
-        });
+    await renderHistoricalTrends();
 });
 </script>
 </body>

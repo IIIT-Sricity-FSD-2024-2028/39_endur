@@ -45,6 +45,9 @@ let CoursesController = class CoursesController {
     bulkImport(dto, req) {
         return this.svc.bulkCreate(dto.courses, req.headers['x-user-id'], req.headers['x-user-name']);
     }
+    autoAssignAll(req) {
+        return this.svc.autoAssignAll(req.headers['x-user-id'], req.headers['x-user-name']);
+    }
 };
 exports.CoursesController = CoursesController;
 __decorate([
@@ -122,6 +125,15 @@ __decorate([
     __metadata("design:paramtypes", [course_dto_1.BulkImportCoursesDto, Object]),
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "bulkImport", null);
+__decorate([
+    (0, common_1.Post)('auto-assign-all'),
+    (0, roles_decorator_1.Roles)('superuser'),
+    (0, swagger_1.ApiOperation)({ summary: 'Global auto-enrollment for all courses based on department (superuser only)' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "autoAssignAll", null);
 exports.CoursesController = CoursesController = __decorate([
     (0, swagger_1.ApiTags)('Courses'),
     (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),

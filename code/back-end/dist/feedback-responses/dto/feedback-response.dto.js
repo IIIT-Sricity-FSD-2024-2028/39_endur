@@ -9,20 +9,42 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SubmitFeedbackDto = void 0;
+exports.SubmitFeedbackDto = exports.RatingEntryDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const swagger_1 = require("@nestjs/swagger");
+class RatingEntryDto {
+    paramId;
+    score;
+    comment;
+}
+exports.RatingEntryDto = RatingEntryDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'EV101' }),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], RatingEntryDto.prototype, "paramId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 5 }),
+    __metadata("design:type", Number)
+], RatingEntryDto.prototype, "score", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Great explanation of concepts!' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], RatingEntryDto.prototype, "comment", void 0);
 class SubmitFeedbackDto {
     cycleId;
     courseId;
     studentId;
+    studentDepartment;
     facultyId;
     ratings;
-    openEndedComment;
 }
 exports.SubmitFeedbackDto = SubmitFeedbackDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'CYCLE_W5' }),
+    (0, swagger_1.ApiProperty)({ example: 'CYC-101' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SubmitFeedbackDto.prototype, "cycleId", void 0);
@@ -37,21 +59,28 @@ __decorate([
     __metadata("design:type", String)
 ], SubmitFeedbackDto.prototype, "studentId", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'DEPT-CS' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SubmitFeedbackDto.prototype, "studentDepartment", void 0);
+__decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'F001' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SubmitFeedbackDto.prototype, "facultyId", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: { EP001: 4, EP002: 5 }, description: 'Parameter ID → rating score map' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsObject)(),
-    __metadata("design:type", Object)
+    (0, swagger_1.ApiProperty)({
+        type: [RatingEntryDto],
+        example: [
+            { paramId: 'EV101', score: 5, comment: 'Excellent!' },
+            { paramId: 'EV102', score: 4, comment: 'Very relevant.' },
+        ],
+    }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => RatingEntryDto),
+    __metadata("design:type", Array)
 ], SubmitFeedbackDto.prototype, "ratings", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'Great course!' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], SubmitFeedbackDto.prototype, "openEndedComment", void 0);
 //# sourceMappingURL=feedback-response.dto.js.map

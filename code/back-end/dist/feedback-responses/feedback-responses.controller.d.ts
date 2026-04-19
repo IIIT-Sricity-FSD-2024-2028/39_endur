@@ -3,23 +3,38 @@ import { SubmitFeedbackDto } from './dto/feedback-response.dto';
 export declare class FeedbackResponsesController {
     private readonly svc;
     constructor(svc: FeedbackResponsesService);
-    findAll(cycleId?: string, courseId?: string, studentId?: string): any[];
+    findAll(cycleId?: string, courseId?: string, studentId?: string, facultyId?: string): any[];
     submit(dto: SubmitFeedbackDto): {
-        ratings: any[] | Record<string, number> | undefined;
-        submittedAt: string;
+        responseId: string;
         cycleId: string;
-        courseId: string;
         studentId: string;
-        facultyId?: string;
-        openEndedComment?: string;
-        id: string;
+        studentDepartment: any;
+        courseId: string;
+        facultyId: string | null;
+        ratings: {
+            paramId: string;
+            paramName: string;
+            weight: number;
+            score: number;
+            comment: string;
+        }[];
+        submittedAt: string;
     };
     getSummary(courseId: string, cycleId?: string): {
         courseId: string;
         cycleId: string | undefined;
         totalResponses: number;
-        averageRatings: Record<string, number>;
-        comments: string[];
+        averageRatings: {
+            paramId: string;
+            paramName: string;
+            weight: number;
+            averageScore: number;
+        }[];
+        comments: {
+            paramId: string;
+            paramName: string;
+            comment: string;
+        }[];
     };
     checkSubmitted(courseId: string, studentId: string, cycleId: string): {
         submitted: boolean;

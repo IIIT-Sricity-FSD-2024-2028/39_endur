@@ -34,11 +34,12 @@ function renderCycleTable(filter = '') {
         <tr>
             <td><code style="background:rgba(59,130,246,0.1);padding:2px 8px;border-radius:4px;font-size:0.85rem">${c.cycleId}</code></td>
             <td><strong>${c.cycleName}</strong></td>
-            <td><span class="badge neutral">${c.type || 'weekly'}</span></td>
+            <td><span class="badge neutral">${c.type || 'cycle'}</span></td>
             <td>${formatDate(c.startTimestamp)} → ${formatDate(c.endTimestamp)}</td>
             <td><span class="badge ${c.status === 'active' ? 'success' : 'neutral'}">${c.status}</span></td>
             <td>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn-small" onclick="suViewCycleResponses('${c.cycleId}')">View</button>
                     <button class="btn-small" onclick="suEditCycle('${c.cycleId}')">Edit</button>
                     ${c.status === 'active'
                         ? `<button class="btn-small" style="color:var(--warning)" onclick="suCloseCycle('${c.cycleId}')">Close</button>`
@@ -76,12 +77,11 @@ function bindCycleForm() {
         if (errs.length) { showToast(errs[0], 'error'); return; }
 
         const payload = {
-            cycleName: name,
-            type,
-            startTimestamp: new Date(start).toISOString(),
-            endTimestamp: new Date(end).toISOString(),
-            reflectionDeadline: refDl ? new Date(refDl).toISOString() : undefined,
-            actionReportDeadline: actDl ? new Date(actDl).toISOString() : undefined,
+            cycleName:       name,
+            type:            form.cycleType?.value || 'weekly',
+            startTimestamp:  new Date(start).toISOString(),
+            studentDeadline: form.studentDeadline?.value ? new Date(form.studentDeadline.value).toISOString() : new Date(end).toISOString(),
+            endTimestamp:    new Date(end).toISOString(),
         };
 
         const editId = form.dataset.editId;
@@ -105,6 +105,86 @@ function bindCycleForm() {
         updateCycleCount();
         suCloseCycleModal();
     };
+}
+
+// Superuser View Responses — studentId IS visible
+export function suViewCycleResponses(cycleId) {
+    window.suViewCycleResponsesAsync(cycleId);
+}
+
+export async function suViewCycleResponsesAsync(cycleId) {
+    let modal = document.getElementById('suResponsesModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'suResponsesModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-card" style="max-width:800px;width:95%">
+            <h3 id="suRespTitle">Cycle Responses <button class="modal-close" onclick="document.getElementById('suResponsesModal').classList.remove('active')">&#x2715;</button></h3>
+            <div style="overflow-x:auto;max-height:60vh;overflow-y:auto" id="suRespBody"></div>
+            <div class="modal-footer"><button class="btn-outline" onclick="document.getElementById('suResponsesModal').classList.remove('active')">Close</button></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target===modal) modal.classList.remove('active'); });
+    }
+    const body  = document.getElementById('suRespBody');
+    const title = document.getElementById('suRespTitle');
+    const cycle = cycles.find(c => c.cycleId === cycleId);
+    title.textContent = `Responses — ${cycle?.cycleName ?? cycleId} (Superuser)`;
+    body.innerHTML = '<p style="padding:20px;color:var(--text-muted)">Loading…</p>';
+    modal.classList.add('active');
+    try {
+        const [responses, allCourses] = await Promise.all([GET(`/feedback-responses?cycleId=${cycleId}`), GET('/courses')]);
+        if (!responses.length) { body.innerHTML='<p style="padding:20px;text-align:center;color:var(--text-muted)">No responses recorded for this cycle.</p>'; return; }
+        
+        body.innerHTML = `
+            <style>
+                .resp-det { font-size: 11px; color: #64748b; margin-top: 4px; padding: 4px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; }
+                .resp-comm { display: block; font-style: italic; color: #94a3b8; border-top: 1px solid #f1f5f9; margin-top: 2px; padding-top: 2px; }
+            </style>
+            <table class="data-table">
+                <thead><tr><th>Student & Course</th><th>Faculty</th><th>Dept</th><th>Date</th><th>Score & Breakdown</th></tr></thead>
+                <tbody>
+                ${responses.map(r => {
+                    const course = allCourses.find(c => c.id === r.courseId);
+                    const scores = (r.ratings || []).map(x => {
+                        let s = Number(x.score || 0);
+                        if (s > 5) s = s / 20;
+                        return s;
+                    });
+                    const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length * 20).toFixed(1) + '%' : '—';
+                    
+                    const ratingsHtml = (r.ratings || []).map(rt => {
+                        let s = Number(rt.score || 0);
+                        if (s > 5) s = s / 20;
+                        return `<div class="resp-det">
+                            <strong>${rt.paramName || rt.paramId}</strong>: ${s.toFixed(1)}/5
+                            ${rt.comment ? `<span class="resp-comm">"${rt.comment}"</span>` : ''}
+                        </div>`;
+                    }).join('');
+
+                    const isSuper = session?.role === 'superuser';
+                    const displayStudentId = isSuper ? (r.studentId ?? '—') : 'S-***';
+
+                    return `<tr>
+                        <td>
+                            <code style="font-size:10px;color:var(--primary)">${displayStudentId}</code><br>
+                            <strong>${course?.name ?? r.courseId}</strong>
+                        </td>
+                        <td>${r.facultyId ?? '—'}</td>
+                        <td>${r.studentDepartment ?? '—'}</td>
+                        <td style="font-size:12px">${r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : '—'}</td>
+                        <td>
+                            <div style="font-weight:700;color:var(--primary);margin-bottom:4px">${avg}</div>
+                            ${ratingsHtml}
+                        </td>
+                    </tr>`;
+                }).join('')}
+                </tbody>
+            </table>`;
+    } catch (e) {
+        console.error(e);
+        body.innerHTML='<p style="padding:20px;color:var(--danger)">Failed to load responses.</p>';
+    }
 }
 
 window.suManageCycleParams = (id) => {
@@ -139,12 +219,10 @@ export function suEditCycle(id) {
     if (!c) return;
     const form = document.getElementById('cycleForm');
     if (!form) return;
-    form.cycleName.value = c.cycleName;
-    form.cycleType.value = c.type || 'weekly';
-    form.startDate.value = c.startTimestamp?.slice(0, 10) || '';
-    form.endDate.value = c.endTimestamp?.slice(0, 10) || '';
-    form.reflectionDeadline.value = c.reflectionDeadline?.slice(0, 10) || '';
-    form.actionReportDeadline.value = c.actionReportDeadline?.slice(0, 10) || '';
+    if (form.cycleName)       form.cycleName.value       = c.cycleName || '';
+    if (form.startDate)       form.startDate.value       = c.startTimestamp?.slice(0, 10) || '';
+    if (form.studentDeadline) form.studentDeadline.value = c.studentDeadline?.slice(0, 10) || '';
+    if (form.endDate)         form.endDate.value         = c.endTimestamp?.slice(0, 10) || '';
     form.dataset.editId = id;
     document.getElementById('cycleModalTitle').textContent = 'Edit Feedback Cycle';
     document.getElementById('cycleModal')?.classList.add('active');

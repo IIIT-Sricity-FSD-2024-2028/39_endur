@@ -19,6 +19,10 @@ export declare class EvaluationParametersService {
     remove(id: string, department: string, actorId?: string, actorName?: string): {
         message: string;
     };
+    revertToDraft(department: string, actorId?: string, actorName?: string): {
+        message: string;
+        status: string;
+    };
     approve(department: string, actorId?: string, actorName?: string): {
         message: string;
         params: any[];

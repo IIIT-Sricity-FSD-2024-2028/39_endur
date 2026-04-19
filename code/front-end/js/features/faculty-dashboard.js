@@ -91,9 +91,12 @@ export async function renderFacultyDashboard() {
         if (responses > 0) {
             let scoreSum = 0, scoreCount = 0;
             courseFeedback.forEach(f => {
-                if (!f.ratings) return;
-                Object.values(f.ratings).forEach(v => {
-                    if (typeof v === 'number') { scoreSum += v; scoreCount++; }
+                if (!Array.isArray(f.ratings)) return;
+                f.ratings.forEach(entry => {
+                    let s = Number(entry.score ?? 0);
+                    if (s > 5) s = s / 20;
+                    scoreSum += s;
+                    scoreCount += 1;
                 });
             });
             courseAvgPct = scoreCount > 0 ? (scoreSum / scoreCount) * 20 : 0;
@@ -124,11 +127,13 @@ export async function renderFacultyDashboard() {
         }
 
         // Display avg calculation
+        const isLocked = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase) || (!hasReflection && !['ACTION_REPORT', 'COMPLETED'].includes(phase));
         let displayAvg;
         if (responses === 0) {
             displayAvg = `<span style="color:#94a3b8">N/A</span>`;
-        } else if (!hasReflection && phase !== 'ACTION_REPORT' && phase !== 'COMPLETED') {
-            displayAvg = `<span title="Complete Self-Reflection to unlock" style="color:#94a3b8;font-size:13px">Locked 🔒</span>`;
+        } else if (isLocked) {
+            const lockMsg = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase) ? 'Scores locked until deadline' : 'Complete Self-Reflection to unlock';
+            displayAvg = `<span title="${lockMsg}" style="color:#94a3b8;font-size:13px">Locked 🔒</span>`;
         } else {
             displayAvg = `${courseAvgPct.toFixed(0)}%`;
         }
@@ -178,11 +183,17 @@ function _setStats(avgScore, responseRate, pendingReflections, gapScore, phase =
     const pendEl = document.getElementById('pendingReflection');
     const gapEl = document.getElementById('gapScore');
 
-    if (avgEl) avgEl.innerText = +avgScore > 0 ? `${avgScore}%` : 'N/A';
+    if (avgEl) {
+        if (['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase)) {
+            avgEl.innerHTML = `<span style="font-size:18px;color:#94a3b8">Locked 🔒</span>`;
+        } else {
+            avgEl.innerText = +avgScore > 0 ? `${avgScore}%` : 'N/A';
+        }
+    }
     if (rateEl) rateEl.innerText = `${responseRate}%`;
     if (pendEl) { pendEl.innerText = pendingReflections; if (pendingReflections > 0) pendEl.style.color = '#d97706'; }
     if (gapEl) {
-        const gapLocked = pendingReflections > 0 && ['PREPARATION', 'STUDENT_FEEDBACK', 'FACULTY_REFLECTION'].includes(phase);
+        const gapLocked = (pendingReflections > 0 || ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase));
         if (gapLocked) { gapEl.innerHTML = `<span style="font-size:18px;color:#94a3b8">Locked 🔒</span>`; }
         else { gapEl.innerText = +gapScore > 0 ? `${gapScore}%` : 'N/A'; }
     }

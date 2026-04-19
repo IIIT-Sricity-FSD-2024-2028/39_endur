@@ -420,10 +420,17 @@ export async function finalizeConfig() {
     }
 }
 
-export function revertToDraft() {
-    // Currently, there's no endpoint to "unsubmit", but saving/editing natively places it back into DRAFT state on the backend.
-    // We'll mimic this by attempting an edit or just alerting to make a change.
-    alert("Make any edit or re-balance your weights to automatically transition back to DRAFT state.");
+export async function revertToDraft() {
+    if (!confirm("Are you sure you want to unlock this configuration? It will return to DRAFT state and you will need to re-submit for approval.")) return;
+    
+    const user = getSession();
+    try {
+        await POST(`/evaluation-parameters/dept/${encodeURIComponent(user.department)}/revert`, {});
+        await fetchParams();
+        renderAll();
+    } catch(err) {
+        alert("Failed to revert: " + err.message);
+    }
 }
 
 // Window bindings

@@ -42,6 +42,9 @@ let EvaluationParametersController = class EvaluationParametersController {
     remove(id, dept, req) {
         return this.svc.remove(id, dept, req.headers['x-user-id'], req.headers['x-user-name']);
     }
+    revert(dept, req) {
+        return this.svc.revertToDraft(dept, req.headers['x-user-id'], req.headers['x-user-name']);
+    }
     approve(dept, req) {
         return this.svc.approve(dept, req.headers['x-user-id'], req.headers['x-user-name']);
     }
@@ -108,8 +111,8 @@ __decorate([
 ], EvaluationParametersController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id/dept/:department'),
-    (0, roles_decorator_1.Roles)('superuser', 'admin'),
-    (0, swagger_1.ApiOperation)({ summary: 'Delete a parameter (superuser/admin only)' }),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'hod'),
+    (0, swagger_1.ApiOperation)({ summary: 'Delete a parameter (superuser/admin/hod)' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('department')),
     __param(2, (0, common_1.Request)()),
@@ -117,6 +120,16 @@ __decorate([
     __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", void 0)
 ], EvaluationParametersController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Post)('dept/:department/revert'),
+    (0, roles_decorator_1.Roles)('hod'),
+    (0, swagger_1.ApiOperation)({ summary: 'Revert dept params from SUBMITTED back to DRAFT (hod only)' }),
+    __param(0, (0, common_1.Param)('department')),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], EvaluationParametersController.prototype, "revert", null);
 __decorate([
     (0, common_1.Post)('dept/:department/approve'),
     (0, roles_decorator_1.Roles)('superuser', 'dean'),

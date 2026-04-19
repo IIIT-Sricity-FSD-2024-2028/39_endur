@@ -229,11 +229,12 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { showToast, appendAuditLog } from '../../js/features/admin-utils.js'; // FIX: Corrected import
+    import { GET, PATCH } from '../../js/core/api.js';
+    import { showToast } from '../../js/features/admin-utils.js';
 
     let sessionUser = null; // Store user globally for the audit log
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
         sessionUser = requireAuth();
         if (!sessionUser || sessionUser.role !== 'superuser') {
             window.location.href = '../../login.html';
@@ -244,59 +245,74 @@
         const av = document.getElementById('avatar');
         if (av) av.textContent = sessionUser.name.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase();
 
-        // FIX: Added timezone and scale to the load logic
-        const saved = JSON.parse(localStorage.getItem('systemSettingsConfig') || '{}');
-        if (saved.instName)    document.getElementById('settingInstName').value  = saved.instName;
-        if (saved.instCode)    document.getElementById('settingInstCode').value  = saved.instCode;
-        if (saved.acadYear)    document.getElementById('settingAcadYear').value  = saved.acadYear;
-        if (saved.semester)    document.getElementById('settingSemester').value  = saved.semester;
-        if (saved.domain)      document.getElementById('settingDomain').value    = saved.domain;
-        if (saved.minResp)     document.getElementById('settingMinResp').value   = saved.minResp;
-        if (saved.timezone)    document.getElementById('settingTimezone').value  = saved.timezone;
-        if (saved.scale)       document.getElementById('settingScale').value     = saved.scale;
+        try {
+            const saved = await GET('/settings');
+            if (saved.instName)    document.getElementById('settingInstName').value  = saved.instName;
+            if (saved.instCode)    document.getElementById('settingInstCode').value  = saved.instCode;
+            if (saved.acadYear)    document.getElementById('settingAcadYear').value  = saved.acadYear;
+            if (saved.semester)    document.getElementById('settingSemester').value  = saved.semester;
+            if (saved.domain)      document.getElementById('settingDomain').value    = saved.domain;
+            if (saved.minResp)     document.getElementById('settingMinResp').value   = saved.minResp;
+            if (saved.timezone)    document.getElementById('settingTimezone').value  = saved.timezone;
+            if (saved.scale)       document.getElementById('settingScale').value     = saved.scale;
+        } catch (e) {
+            showToast('Failed to load system settings from server.', 'error');
+        }
     });
 
-    window.saveSettings = function() {
+    window.saveSettings = async function() {
         const config = {
             instName:    document.getElementById('settingInstName').value,
             instCode:    document.getElementById('settingInstCode').value,
-            acadYear:    document.getElementById('settingAcadYear').value,
+            acadYear:    document.getElementById('settingInstYear').value,
             semester:    document.getElementById('settingSemester').value,
             domain:      document.getElementById('settingDomain').value,
             timezone:    document.getElementById('settingTimezone').value,
             minResp:     document.getElementById('settingMinResp').value,
             scale:       document.getElementById('settingScale').value,
         };
-        localStorage.setItem('systemSettingsConfig', JSON.stringify(config));
-
-        const ind = document.getElementById('saveIndicator');
-        ind.classList.add('visible');
-        setTimeout(function(){ ind.classList.remove('visible'); }, 3000);
-
-        // FIX: Using the correct audit logger
-        if (sessionUser) {
-            appendAuditLog(sessionUser, 'superuser', 'UPDATE', 'Settings', 'Institution Config', `Updated institution configuration: ${config.instName}`);
+        
+        try {
+            await PATCH('/settings', config);
+            const ind = document.getElementById('saveIndicator');
+            ind.classList.add('visible');
+            setTimeout(function(){ ind.classList.remove('visible'); }, 3000);
+            showToast('Institution settings saved globally.', 'success');
+        } catch (e) {
+            showToast('Failed to save settings: ' + e.message, 'error');
         }
-        showToast('Institution settings saved successfully.', 'success');
     };
 
-    window.resetSettings = function() {
-        localStorage.removeItem('systemSettingsConfig');
+    window.resetSettings = async function() {
+        if (!confirm('Reset all system settings to defaults?')) return;
         
-        // FIX: Ensure resetting also resets dropdowns correctly
-        document.getElementById('settingInstName').value = 'IIIT Sricity';
-        document.getElementById('settingInstCode').value = 'IIITS';
-        document.getElementById('settingAcadYear').value = '2025–2026';
-        document.getElementById('settingSemester').value = 'Odd Semester';
-        document.getElementById('settingDomain').value   = '@iiits.in';
-        document.getElementById('settingTimezone').value = 'Asia/Kolkata (IST)';
-        document.getElementById('settingMinResp').value  = '5';
-        document.getElementById('settingScale').value    = '1 – 5';
-        
-        if (sessionUser) {
-            appendAuditLog(sessionUser, 'superuser', 'UPDATE', 'Settings', 'Institution Config', "Reset institution settings to defaults");
+        const defaults = {
+            instName: 'IIIT Sricity',
+            instCode: 'IIITS',
+            acadYear: '2025–2026',
+            semester: 'Odd Semester',
+            domain: '@iiits.in',
+            timezone: 'Asia/Kolkata (IST)',
+            minResp: 5,
+            scale: '1 – 5',
+        };
+
+        try {
+            await PATCH('/settings', defaults);
+            
+            document.getElementById('settingInstName').value = defaults.instName;
+            document.getElementById('settingInstCode').value = defaults.instCode;
+            document.getElementById('settingAcadYear').value = defaults.acadYear;
+            document.getElementById('settingSemester').value = defaults.semester;
+            document.getElementById('settingDomain').value   = defaults.domain;
+            document.getElementById('settingTimezone').value = defaults.timezone;
+            document.getElementById('settingMinResp').value  = defaults.minResp;
+            document.getElementById('settingScale').value    = defaults.scale;
+            
+            showToast('Settings reset to defaults globally.', 'info');
+        } catch (e) {
+            showToast('Failed to reset settings: ' + e.message, 'error');
         }
-        showToast('Settings reset to defaults.', 'info');
     };
 </script>
 </body>

@@ -45,6 +45,22 @@ export class UsersController {
   ) {
     return this.usersService.findAll(role, department);
   }
+  
+  @Get('profile/me')
+  @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
+  @ApiOperation({ summary: 'Get current logged in user profile' })
+  getMe(@Request() req: any) {
+    const userId = req.headers['x-user-id'];
+    return this.usersService.findOne(userId);
+  }
+
+  @Get('me/courses')
+  @Roles('student')
+  @ApiOperation({ summary: 'Get enrolled courses for the current student' })
+  getMyCourses(@Request() req: any) {
+    const userId = req.headers['x-user-id'];
+    return this.usersService.getEnrolledCourses(userId);
+  }
 
   @Get(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')

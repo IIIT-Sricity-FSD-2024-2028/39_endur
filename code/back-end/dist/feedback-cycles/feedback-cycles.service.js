@@ -46,7 +46,26 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         return cycle;
     }
     getCycleState() {
-        return this.store.getCycleState();
+        const explicit = this.store.getCycleState();
+        if (explicit)
+            return explicit;
+        const cycles = this.store.getFeedbackCycles();
+        if (!cycles.length)
+            return null;
+        const active = cycles.find(c => c.status === 'active');
+        if (active) {
+            const now = new Date();
+            const studentDl = new Date(active.studentDeadline || active.endTimestamp);
+            const phase = now < studentDl ? 'STUDENT_FEEDBACK' : (active.phase || 'FACULTY_REFLECTION');
+            return { id: active.cycleId, cycleName: active.cycleName, phase, status: active.status };
+        }
+        const latest = [...cycles].sort((a, b) => new Date(b.startTimestamp).getTime() - new Date(a.startTimestamp).getTime())[0];
+        return {
+            id: latest.cycleId,
+            cycleName: latest.cycleName,
+            phase: latest.phase || 'COMPLETED',
+            status: latest.status || 'closed'
+        };
     }
     create(dto, actorId, actorName) {
         const cycles = this.store.getFeedbackCycles();
@@ -168,33 +187,60 @@ let FeedbackCyclesService = class FeedbackCyclesService {
             success.push(entry);
             if (dto.responses && Array.isArray(dto.responses)) {
                 dto.responses.forEach(r => {
-                    let rawRatings = {};
-                    try {
-                        rawRatings = r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {};
-                    }
-                    catch (e) { }
+                    let enrichedRatings = [];
                     const course = this.store.getCourses().find(c => c.id === r.courseId);
                     const department = course ? course.department : 'Unassigned';
                     const activeParamsForCycle = params[department] || params['Unassigned'] || [];
-                    let enrichedRatings = [];
-                    Object.entries(rawRatings).forEach(([key, score]) => {
-                        const pDef = activeParamsForCycle.find(p => p.id === key);
-                        enrichedRatings.push({
-                            id: key,
-                            name: pDef ? pDef.name : key,
-                            weight: pDef ? pDef.weight : 25,
-                            score: Number(score)
+                    if (Array.isArray(r.ratings)) {
+                        enrichedRatings = r.ratings.map(rt => {
+                            const pDef = activeParamsForCycle.find(p => p.id === rt.paramId);
+                            let score = Number(rt.score);
+                            if (score > 5)
+                                score = score / 20;
+                            return {
+                                paramId: rt.paramId,
+                                paramName: pDef ? pDef.name : rt.paramId,
+                                weight: pDef ? pDef.weight : 25,
+                                score: score,
+                                comment: rt.comment ?? ''
+                            };
                         });
-                    });
+                    }
+                    else {
+                        let rawRatings = {};
+                        try {
+                            rawRatings = r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {};
+                        }
+                        catch (e) { }
+                        Object.entries(rawRatings).forEach(([key, val]) => {
+                            if (val === undefined || val === null || val === '')
+                                return;
+                            let score = Number(val);
+                            if (isNaN(score))
+                                return;
+                            const pDef = activeParamsForCycle.find(p => p.id === key);
+                            if (score > 5)
+                                score = score / 20;
+                            enrichedRatings.push({
+                                paramId: key,
+                                paramName: pDef ? pDef.name : key,
+                                weight: pDef ? pDef.weight : 25,
+                                score: score,
+                                comment: r.openEndedComment || r.comments || ''
+                            });
+                        });
+                    }
+                    if (enrichedRatings.length === 0)
+                        return;
                     responsesStore.push({
                         responseId: this.store.genId('RESP'),
                         cycleId: cycleId,
-                        studentId: r.studentId || this.store.genId('ANON'),
+                        studentId: r.studentId || `ANON-${this.store.genId('')}`,
                         courseId: r.courseId,
                         facultyId: r.facultyId,
-                        ratings: enrichedRatings.length > 0 ? enrichedRatings : rawRatings,
-                        comments: r.openEndedComment || r.comments || '',
-                        submittedAt: new Date().toISOString()
+                        studentDepartment: department,
+                        ratings: enrichedRatings,
+                        submittedAt: r.submittedAt || new Date().toISOString()
                     });
                 });
             }

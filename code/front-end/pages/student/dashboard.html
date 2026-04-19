@@ -198,7 +198,7 @@
         import { requireAuth } from "../../js/core/session.js";
         import { updateDashboard, updateStats } from "../../js/features/dashboard.js";
 
-        const user = requireAuth();
+        const user = requireAuth('student');
 
         document.getElementById("welcomeText").innerText = `Welcome back, ${user.name.split(" ")[0]}`;
         document.getElementById("userName").innerText = user.name;

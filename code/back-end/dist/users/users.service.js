@@ -160,6 +160,14 @@ let UsersService = class UsersService {
         });
         this.seedService.setUsers(users);
     }
+    getEnrolledCourses(userId) {
+        const user = this.findOneWithPassword(userId);
+        if (!user)
+            throw new common_1.NotFoundException(`User ${userId} not found`);
+        const enrollmentIds = user.enrolledCourses || [];
+        const allCourses = this.store.getCourses();
+        return allCourses.filter((c) => enrollmentIds.includes(c.id));
+    }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([

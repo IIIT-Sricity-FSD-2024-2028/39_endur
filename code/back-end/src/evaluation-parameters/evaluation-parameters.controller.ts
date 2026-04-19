@@ -63,14 +63,21 @@ export class EvaluationParametersController {
   }
 
   @Delete(':id/dept/:department')
-  @Roles('superuser', 'admin')
-  @ApiOperation({ summary: 'Delete a parameter (superuser/admin only)' })
+  @Roles('superuser', 'admin', 'hod')
+  @ApiOperation({ summary: 'Delete a parameter (superuser/admin/hod)' })
   remove(
     @Param('id') id: string,
     @Param('department') dept: string,
     @Request() req: any,
   ) {
     return this.svc.remove(id, dept, req.headers['x-user-id'], req.headers['x-user-name']);
+  }
+
+  @Post('dept/:department/revert')
+  @Roles('hod')
+  @ApiOperation({ summary: 'Revert dept params from SUBMITTED back to DRAFT (hod only)' })
+  revert(@Param('department') dept: string, @Request() req: any) {
+    return this.svc.revertToDraft(dept, req.headers['x-user-id'], req.headers['x-user-name']);
   }
 
   @Post('dept/:department/approve')

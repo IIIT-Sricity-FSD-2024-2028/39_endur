@@ -66,22 +66,19 @@ async function renderCycleTracker() {
 
 export async function createNewCycle() {
     const nameInput = document.getElementById('newCycleName').value.trim();
-    const prep = document.getElementById('dlPrep').value;
-    const student = document.getElementById('dlStudent').value;
-    const ref = document.getElementById('dlReflection').value;
-    if (!nameInput || !prep || !student || !ref) { alert('Please enter a name and select all deadlines.'); return; }
-    const dPrep = new Date(prep), dStudent = new Date(student), dRef = new Date(ref);
-    if (dPrep >= dStudent || dStudent >= dRef) { alert('Deadlines must be chronological (Prep → Student → Reflection).'); return; }
+    const start   = document.getElementById('dlStart')?.value || document.getElementById('dlPrep')?.value;
+    const student = document.getElementById('dlStudent')?.value;
+    const end     = document.getElementById('dlEnd')?.value || document.getElementById('dlReflection')?.value;
+    if (!nameInput || !start || !student || !end) { alert('Please enter a name and select all dates.'); return; }
+    const dStart = new Date(start), dStudent = new Date(student), dEnd = new Date(end);
+    if (dStart >= dStudent || dStudent >= dEnd) { alert('Dates must be chronological: Start → Student Deadline → End.'); return; }
 
     try {
-        await POST('/feedback-cycles', { 
-            cycleName: nameInput, 
-            type: 'weekly', 
-            startTimestamp: new Date().toISOString(), 
-            prepDeadline: dPrep.toISOString(), 
-            studentDeadline: dStudent.toISOString(), 
-            reflectionDeadline: dRef.toISOString(), 
-            endTimestamp: dRef.toISOString() 
+        await POST('/feedback-cycles', {
+            cycleName:       nameInput,
+            startTimestamp:  dStart.toISOString(),
+            studentDeadline: dStudent.toISOString(),
+            endTimestamp:    dEnd.toISOString(),
         });
         showToast('Cycle created successfully!', 'success');
         document.getElementById('createCycleForm')?.reset();
@@ -149,9 +146,66 @@ async function renderHistory() {
     try { cycles = await GET('/feedback-cycles'); } catch {}
     if (!cycles.length) { listContainer.innerHTML = '<p style="padding:20px 0;color:#64748b;font-style:italic;">No cycle history found.</p>'; return; }
     listContainer.innerHTML = cycles.map(c => `
-        <div class="approval-row">
-            <div><strong style="color:#0f172a;font-size:14px;">${c.cycleName || c.cycleId}</strong></div>
+        <div class="approval-row" style="grid-template-columns:2fr 1fr 1fr 1fr;">
+            <div>
+                <strong style="color:#0f172a;font-size:14px;">${c.cycleName || c.cycleId}</strong>
+                <p style="font-size:11px;color:#94a3b8;margin-top:2px">${c.startTimestamp ? new Date(c.startTimestamp).toLocaleDateString() : ''} — ${c.endTimestamp ? new Date(c.endTimestamp).toLocaleDateString() : ''}</p>
+            </div>
             <div><span class="badge ${c.status === 'active' ? 'success' : 'neutral'}" style="font-size:10px;">${(c.status || '').toUpperCase()}</span></div>
-            <div style="text-align:right;"><span style="color:#64748b;font-size:12px;">${c.status === 'active' ? 'IN PROGRESS' : 'ARCHIVED'}</span></div>
+            <div><span style="color:#64748b;font-size:12px;">${(c.phase||'COMPLETED').replace(/_/g,' ')}</span></div>
+            <div style="text-align:right;"><button class="btn-small" onclick="deanViewResponses('${c.cycleId}')">View</button></div>
         </div>`).join('');
+
+    // View responses modal handler (Dean — studentId masked)
+    window.deanViewResponses = async (cycleId) => {
+        let modal = document.getElementById('deanResponsesModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'deanResponsesModal';
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `<div class="modal-card" style="max-width:750px;width:95%">
+                <h3 id="deanRespTitle">Cycle Responses <button class="modal-close" onclick="document.getElementById('deanResponsesModal').classList.remove('active')">✕</button></h3>
+                <div style="overflow-x:auto;max-height:60vh;overflow-y:auto" id="deanRespBody"></div>
+                <div class="modal-footer"><button class="btn-outline" onclick="document.getElementById('deanResponsesModal').classList.remove('active')">Close</button></div>
+            </div>`;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', e => { if (e.target===modal) modal.classList.remove('active'); });
+        }
+        const body = document.getElementById('deanRespBody');
+        document.getElementById('deanRespTitle').textContent = `Responses — ${cycles.find(c=>c.cycleId===cycleId)?.cycleName??cycleId}`;
+        body.innerHTML = '<p style="padding:20px;color:var(--text-muted)">Loading…</p>';
+        modal.classList.add('active');
+        try {
+            const [responses, allCourses] = await Promise.all([GET(`/feedback-responses?cycleId=${cycleId}`), GET('/courses')]);
+            if (!responses.length) { body.innerHTML='<p style="padding:20px;text-align:center;color:var(--text-muted)">No responses recorded.</p>'; return; }
+            body.innerHTML = `
+                <style>
+                    .resp-det { font-size: 11px; color: #64748b; margin-top: 4px; display: grid; gap: 4px; padding: 8px; background: #f8fafc; border-radius: 4px; }
+                    .resp-comm { font-style: italic; color: var(--primary); }
+                </style>
+                <table class="data-table"><thead><tr><th>Course & Faculty</th><th>Dept</th><th>Date</th><th>Score & Breakdown</th></tr></thead><tbody>
+                ${responses.map(r => {
+                    const course = allCourses.find(c=>c.id===r.courseId);
+                    const avg = Array.isArray(r.ratings) && r.ratings.length ? (() => {
+                        const scores = r.ratings.map(x => {
+                            let s = Number(x.score || 0);
+                            if (s > 5) s = s / 20;
+                            return s;
+                        });
+                        return (scores.reduce((a, b) => a + b, 0) / scores.length * 20).toFixed(1) + '%';
+                    })() : '—';
+                    const ratingsHtml = Array.isArray(r.ratings) ? r.ratings.map(rt => {
+                        let s = Number(rt.score || 0);
+                        if (s > 5) s = s / 20;
+                        return `<div class="resp-det"><span><strong>${rt.paramName || rt.paramId}</strong>: ${s.toFixed(1)}/5</span>${rt.comment ? `<span class="resp-comm">"${rt.comment}"</span>` : ''}</div>`;
+                    }).join('') : '';
+                    return `<tr>
+                        <td><strong>${course?.name??r.courseId}</strong><br><span style="font-size:11px;color:var(--text-muted)">${r.facultyId??'—'}</span></td>
+                        <td>${r.studentDepartment??'—'}</td>
+                        <td style="font-size:12px">${r.submittedAt?new Date(r.submittedAt).toLocaleDateString():'—'}</td>
+                        <td><strong>${avg}</strong>${ratingsHtml}</td>
+                    </tr>`;
+                }).join('')}</tbody></table>`;
+        } catch { body.innerHTML='<p style="padding:20px;color:var(--danger)">Failed to load responses.</p>'; }
+    };
 }

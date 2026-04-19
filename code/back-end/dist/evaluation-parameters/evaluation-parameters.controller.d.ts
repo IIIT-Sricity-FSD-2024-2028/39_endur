@@ -19,6 +19,10 @@ export declare class EvaluationParametersController {
     remove(id: string, dept: string, req: any): {
         message: string;
     };
+    revert(dept: string, req: any): {
+        message: string;
+        status: string;
+    };
     approve(dept: string, req: any): {
         message: string;
         params: any[];

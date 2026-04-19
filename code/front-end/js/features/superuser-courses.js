@@ -94,7 +94,7 @@ function populateStudentSelect() {
     const students = users.filter(u => u.role === 'student');
     container.innerHTML = students.map(s => `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:0.9rem;">
-            <input type="checkbox" name="assignStudent" value="${s.id}" id="s_${s.id}">
+            <input type="checkbox" name="assignStudent" value="${s.id}" data-dept="${s.department || ''}" id="s_${s.id}">
             <label for="s_${s.id}">${s.name} <small style="color:var(--text-muted)">(${s.id})</small></label>
         </div>
     `).join('');
@@ -210,6 +210,24 @@ export function openAssignStudents(id) {
     document.getElementById('assignModal').classList.add('active');
 }
 
+export function autoSelectDeptStudents() {
+    const courseId = document.getElementById('assignCourseId').value;
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+    const dept = course.department;
+    if (!dept) { showToast('Course has no department assigned.', 'warning'); return; }
+    
+    const checkboxed = document.querySelectorAll('input[name="assignStudent"]');
+    let count = 0;
+    checkboxed.forEach(cb => {
+        if (cb.dataset.dept === dept) {
+            cb.checked = true;
+            count++;
+        }
+    });
+    showToast(`Selected ${count} students from ${dept}.`, 'info');
+}
+
 export async function saveAssignments() {
     const courseId = document.getElementById('assignCourseId').value;
     const selectedStudents = Array.from(document.querySelectorAll('input[name="assignStudent"]:checked')).map(cb => cb.value);
@@ -222,6 +240,20 @@ export async function saveAssignments() {
         renderCourseTable();
         closeAssignModal();
     } catch (err) { showToast(err.message, 'error'); }
+}
+
+export async function globalAutoAssign() {
+    if (!confirm('This will automatically enroll ALL students into ALL available courses matching their department. Proceed?')) return;
+    
+    try {
+        const result = await POST('/courses/auto-assign-all');
+        showToast(`Success: ${result.totalAssignments} enrollments processed.`, 'success');
+        // Refresh local state
+        await initSuperuserCourses();
+        renderCourseTable();
+    } catch (err) {
+        showToast(err.message || 'Global assignment failed.', 'error');
+    }
 }
 
 export function closeCourseModal() { document.getElementById('courseModal').classList.remove('active'); }

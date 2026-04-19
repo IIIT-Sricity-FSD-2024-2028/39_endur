@@ -67,4 +67,11 @@ export class CoursesController {
   bulkImport(@Body() dto: BulkImportCoursesDto, @Request() req: any) {
     return this.svc.bulkCreate(dto.courses, req.headers['x-user-id'], req.headers['x-user-name']);
   }
+
+  @Post('auto-assign-all')
+  @Roles('superuser')
+  @ApiOperation({ summary: 'Global auto-enrollment for all courses based on department (superuser only)' })
+  autoAssignAll(@Request() req: any) {
+    return this.svc.autoAssignAll(req.headers['x-user-id'], req.headers['x-user-name']);
+  }
 }

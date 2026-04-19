@@ -1,56 +1,32 @@
 [
   {
+    "cycleId": "CYC-2025-01",
     "cycleName": "Fall 2025 Midterm",
     "type": "midterm",
-    "startTimestamp": "2025-10-01T00:00:00Z",
-    "endTimestamp": "2025-10-15T23:59:59Z",
-    "reflectionDeadline": "2025-10-20T23:59:59Z",
-    "actionReportDeadline": "2025-10-25T23:59:59Z",
-    "responses": [
-      {
-        "courseId": "CS101",
-        "facultyId": "F002",
-        "studentId": "S001",
-        "ratingsJson": "{\"delivery\":85,\"relevance\":90,\"support\":80,\"assessment\":88}",
-        "openEndedComment": "Dr. Johnson provides incredibly clear structure in Data Structures."
-      },
-      {
-        "courseId": "CS101",
-        "facultyId": "F010",
-        "studentId": "S001",
-        "ratingsJson": "{\"delivery\":70,\"relevance\":90,\"support\":95,\"assessment\":85}",
-        "openEndedComment": "Dr. Davis was a great co-teacher, very helpful in labs."
-      },
-      {
-        "courseId": "ME101",
-        "facultyId": "F001",
-        "studentId": "S002",
-        "ratingsJson": "{\"delivery\":95,\"relevance\":90,\"support\":85,\"assessment\":90}",
-        "openEndedComment": "Best thermodynamics classes ever."
-      }
-    ]
+    "startTimestamp": "2025-10-01T08:00:00Z",
+    "studentDeadline": "2025-10-15T23:59:59Z",
+    "endTimestamp": "2025-10-20T23:59:59Z",
+    "status": "closed",
+    "phase": "COMPLETED"
   },
   {
+    "cycleId": "CYC-2026-01",
     "cycleName": "Spring 2026 Formative 1",
     "type": "weekly",
-    "startTimestamp": "2026-02-01T00:00:00Z",
-    "endTimestamp": "2026-02-07T23:59:59Z",
-    "reflectionDeadline": "2026-02-10T23:59:59Z",
-    "responses": [
-      {
-        "courseId": "CS102",
-        "facultyId": "F012",
-        "studentId": "S001",
-        "ratingsJson": "{\"delivery\":80,\"relevance\":85,\"support\":75,\"assessment\":80}",
-        "openEndedComment": "Good algorithms pacing."
-      },
-      {
-        "courseId": "PH101",
-        "facultyId": "F005",
-        "studentId": "S004",
-        "ratingsJson": "{\"delivery\":60,\"relevance\":70,\"support\":65,\"assessment\":70}",
-        "openEndedComment": "Found classical mechanics quite tough to follow initially."
-      }
-    ]
+    "startTimestamp": "2026-02-01T08:00:00Z",
+    "studentDeadline": "2026-02-10T23:59:59Z",
+    "endTimestamp": "2026-02-15T23:59:59Z",
+    "status": "closed",
+    "phase": "COMPLETED"
+  },
+  {
+    "cycleId": "CYC-2026-ACTIVE",
+    "cycleName": "Summer 2026 Active",
+    "type": "weekly",
+    "startTimestamp": "2026-06-01T08:00:00Z",
+    "studentDeadline": "2026-08-30T23:59:59Z",
+    "endTimestamp": "2026-09-05T23:59:59Z",
+    "status": "active",
+    "phase": "STUDENT_FEEDBACK"
   }
 ]

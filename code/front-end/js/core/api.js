@@ -76,6 +76,17 @@ export function setSession(user) {
     localStorage.setItem('endurSession', JSON.stringify(user));
 }
 
+export async function refreshSession() {
+    try {
+        const user = await GET('/users/profile/me');
+        if (user) setSession(user);
+        return user;
+    } catch (e) {
+        console.error('Failed to refresh session:', e);
+        return getSession();
+    }
+}
+
 export function clearSession() {
     localStorage.removeItem('endurSession');
 }

@@ -177,4 +177,12 @@ export class UsersService {
     });
     this.seedService.setUsers(users);
   }
+
+  getEnrolledCourses(userId: string) {
+    const user = this.findOneWithPassword(userId);
+    if (!user) throw new NotFoundException(`User ${userId} not found`);
+    const enrollmentIds = user.enrolledCourses || [];
+    const allCourses = this.store.getCourses();
+    return allCourses.filter((c) => enrollmentIds.includes(c.id));
+  }
 }

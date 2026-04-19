@@ -1,3 +1,10 @@
-1. ensure imported feedback cyles are linked properly.
-2. ensure historical trends work for imported roles for all users.
-3. ensure proper guards for every role.
+agenda - 
+- check if hod's evaluation paramters definition works properly
+- ensure imported feedback cyles are linked properly.
+- ensure historical trends work for imported roles for all users.
+- ensure proper guards for every role.
+
+fixes (later) - 
+- make sure system settings in superusers actually works
+- make sure that every export button work and properly formats the data.
+- overhaul action reports and self reflection systems

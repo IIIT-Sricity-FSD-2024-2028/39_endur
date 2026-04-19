@@ -1,0 +1,44 @@
+[
+  {
+    "cycleId": "CYC-2025-01",
+    "studentId": "S001",
+    "courseId": "CS101",
+    "studentDepartment": "Computer Science",
+    "facultyId": "F001",
+    "submittedAt": "2025-10-10T14:30:00Z",
+    "ratings": [
+      { "paramId": "delivery", "paramName": "Course Delivery", "score": 5, "weight": 25, "comment": "Great lectures, very clear." },
+      { "paramId": "relevance", "paramName": "Relevance", "score": 4, "weight": 25, "comment": "Content is good but could use more modern examples." },
+      { "paramId": "support", "paramName": "Support", "score": 5, "weight": 25, "comment": "Dr. Smith is always available for help." },
+      { "paramId": "assessment", "paramName": "Assessment", "score": 4, "weight": 25, "comment": "Midterm was fair but long." }
+    ]
+  },
+  {
+    "cycleId": "CYC-2025-01",
+    "studentId": "S002",
+    "courseId": "CS101",
+    "studentDepartment": "Computer Science",
+    "facultyId": "F001",
+    "submittedAt": "2025-10-11T09:15:00Z",
+    "ratings": [
+      { "paramId": "delivery", "paramName": "Course Delivery", "score": 4, "weight": 25, "comment": "Sometimes goes too fast." },
+      { "paramId": "relevance", "paramName": "Relevance", "score": 5, "weight": 25, "comment": "Extremely relevant to current industry." },
+      { "paramId": "support", "paramName": "Support", "score": 4, "weight": 25, "comment": "Friendly but labs are crowded." },
+      { "paramId": "assessment", "paramName": "Assessment", "score": 5, "weight": 25, "comment": "Quizzes helped keep on track." }
+    ]
+  },
+  {
+    "cycleId": "CYC-2026-01",
+    "studentId": "S001",
+    "courseId": "CS102",
+    "studentDepartment": "Computer Science",
+    "facultyId": "F002",
+    "submittedAt": "2026-02-05T16:20:00Z",
+    "ratings": [
+      { "paramId": "delivery", "paramName": "Course Delivery", "score": 3, "weight": 25, "comment": "Hard to follow the math parts." },
+      { "paramId": "relevance", "paramName": "Relevance", "score": 5, "weight": 25, "comment": "Fundamental concepts well explained." },
+      { "paramId": "support", "paramName": "Support", "score": 3, "weight": 25, "comment": "Took few days to get email back." },
+      { "paramId": "assessment", "paramName": "Assessment", "score": 4, "weight": 25, "comment": "Group project was a good learning experience." }
+    ]
+  }
+]

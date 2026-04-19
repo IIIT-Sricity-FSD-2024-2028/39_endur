@@ -140,26 +140,26 @@
                         </div>
 
                         <div
-                            style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:white;padding:12px;border:1px solid #cbd5e1;border-radius:6px;">
+                            style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:white;padding:12px;border:1px solid #cbd5e1;border-radius:6px;">
                             <div>
                                 <label
-                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Prep
-                                    Ends</label>
-                                <input type="date" id="dlPrep" required
+                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Start
+                                    Date</label>
+                                <input type="date" id="dlStart" required
                                     style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-family:inherit;font-size:12px;">
                             </div>
                             <div>
                                 <label
                                     style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Student
-                                    Feedback Ends</label>
+                                    Feedback Deadline</label>
                                 <input type="date" id="dlStudent" required
                                     style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-family:inherit;font-size:12px;">
                             </div>
                             <div>
                                 <label
-                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Reflection
-                                    Ends</label>
-                                <input type="date" id="dlReflection" required
+                                    style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">End
+                                    Date</label>
+                                <input type="date" id="dlEnd" required
                                     style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-family:inherit;font-size:12px;">
                             </div>
                         </div>
@@ -233,10 +233,11 @@
             <div class="card" style="padding: 0;">
                 <div style="padding: 24px;">
                     <div
-                        style="display: grid; grid-template-columns: 2fr 1fr 1fr; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">
+                        style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">
                         <div>Cycle</div>
                         <div>Status</div>
-                        <div style="text-align: right;">Phase</div>
+                        <div>Phase</div>
+                        <div style="text-align:right">Actions</div>
                     </div>
                     <div id="cycleHistoryContainer"></div>
                 </div>

@@ -28,4 +28,8 @@ export declare class CoursesController {
         }[];
         total: number;
     };
+    autoAssignAll(req: any): {
+        message: string;
+        totalAssignments: number;
+    };
 }

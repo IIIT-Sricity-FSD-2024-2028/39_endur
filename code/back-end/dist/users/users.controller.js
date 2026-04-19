@@ -29,6 +29,14 @@ let UsersController = class UsersController {
     findAll(role, department) {
         return this.usersService.findAll(role, department);
     }
+    getMe(req) {
+        const userId = req.headers['x-user-id'];
+        return this.usersService.findOne(userId);
+    }
+    getMyCourses(req) {
+        const userId = req.headers['x-user-id'];
+        return this.usersService.getEnrolledCourses(userId);
+    }
     findOne(id) {
         return this.usersService.findOne(id);
     }
@@ -64,6 +72,24 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('profile/me'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get current logged in user profile' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "getMe", null);
+__decorate([
+    (0, common_1.Get)('me/courses'),
+    (0, roles_decorator_1.Roles)('student'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get enrolled courses for the current student' }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "getMyCourses", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),

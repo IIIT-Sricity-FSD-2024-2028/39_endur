@@ -151,6 +151,33 @@ let CoursesService = class CoursesService {
         }
         return { success, failed, total: coursesToImport.length };
     }
+    autoAssignAll(actorId, actorName) {
+        const courses = this.store.getCourses();
+        const students = this.seedService.getUsers().filter(u => u.role === 'student');
+        let totalAssignments = 0;
+        courses.forEach(course => {
+            const dept = course.department;
+            if (!dept)
+                return;
+            const matchingStudentIds = students
+                .filter(s => s.department === dept)
+                .map(s => s.id);
+            if (matchingStudentIds.length === 0)
+                return;
+            this.enroll(course.id, { studentIds: matchingStudentIds }, actorId, actorName);
+            totalAssignments += matchingStudentIds.length;
+        });
+        this.store.appendAuditLog({
+            actor: actorId || 'SU001',
+            actorName: actorName || 'Super User',
+            actorRole: 'superuser',
+            action: 'BULK_ASSIGN',
+            module: 'Courses',
+            target: 'All Courses',
+            details: `Global auto-assignment completed. Applied matching logic across ${courses.length} courses.`
+        });
+        return { message: 'Global auto-assignment complete.', totalAssignments };
+    }
 };
 exports.CoursesService = CoursesService;
 exports.CoursesService = CoursesService = __decorate([

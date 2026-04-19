@@ -17,16 +17,18 @@ export class FeedbackResponsesController {
 
   @Get()
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
-  @ApiOperation({ summary: 'List feedback responses (filterable by cycle/course/student)' })
-  @ApiQuery({ name: 'cycleId', required: false })
-  @ApiQuery({ name: 'courseId', required: false })
+  @ApiOperation({ summary: 'List feedback responses (filterable by cycle/course/student/faculty)' })
+  @ApiQuery({ name: 'cycleId',   required: false })
+  @ApiQuery({ name: 'courseId',  required: false })
   @ApiQuery({ name: 'studentId', required: false })
+  @ApiQuery({ name: 'facultyId', required: false })
   findAll(
-    @Query('cycleId') cycleId?: string,
-    @Query('courseId') courseId?: string,
+    @Query('cycleId')   cycleId?:   string,
+    @Query('courseId')  courseId?:  string,
     @Query('studentId') studentId?: string,
+    @Query('facultyId') facultyId?: string,
   ) {
-    return this.svc.findAll(cycleId, courseId, studentId);
+    return this.svc.findAll(cycleId, courseId, studentId, facultyId);
   }
 
   @Post()

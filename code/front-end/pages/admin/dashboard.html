@@ -146,9 +146,8 @@
     import { renderAdminDashboard } from '../../js/features/admin-dashboard.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
-        const user = requireAuth();
+        const user = requireAuth('admin');
         if (!user) return;
-        if (user.role !== 'admin') { window.location.href = '../../login.html'; return; }
 
         document.getElementById('welcomeText').textContent = `Welcome, ${user.name.split(' ')[0]}`;
         document.getElementById('userName').textContent = user.name;

@@ -13,6 +13,15 @@ export declare class UsersController {
         enrolledCourses?: string[];
         thumbnail?: string;
     }[];
+    getMe(req: any): {
+        id: string;
+        name: string;
+        role: string;
+        department?: string;
+        enrolledCourses?: string[];
+        thumbnail?: string;
+    };
+    getMyCourses(req: any): any[];
     findOne(id: string): {
         id: string;
         name: string;

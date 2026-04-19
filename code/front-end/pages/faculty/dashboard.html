@@ -110,7 +110,7 @@
         import { renderFacultyDashboard } from "../../js/features/faculty-dashboard.js";
 
         document.addEventListener("DOMContentLoaded", () => {
-            const user = requireAuth();
+            const user = requireAuth('faculty');
 
             const nameEl = document.getElementById("userName");
             const deptEl = document.getElementById("userDept");

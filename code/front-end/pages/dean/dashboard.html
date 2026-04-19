@@ -121,7 +121,7 @@
     import { renderDeanDashboard } from "../../js/features/dean-dashboard.js";
 
     document.addEventListener("DOMContentLoaded", () => {
-        const user = requireAuth();
+        const user = requireAuth('dean');
         if(!user) return;
 
         document.getElementById("userName").innerText = user.name;

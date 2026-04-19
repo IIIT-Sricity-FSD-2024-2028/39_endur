@@ -58,7 +58,8 @@
             <div class="search-wrap">
                 <input id="courseSearch" class="search-bar" type="search" placeholder="Search by name, ID, or faculty…" style="margin:0">
             </div>
-            <div class="page-actions-right">
+            <div class="page-actions-right" style="display:flex;gap:12px;">
+                <button class="btn-outline" onclick="globalAutoAssign()" style="display:flex;align-items:center;gap:6px;">⚡ Global Auto-Assign</button>
                 <button class="btn-outline" onclick="openCourseBulkModal()" style="display:flex;align-items:center;gap:6px;">📥 Import Courses</button>
             </div>
         </div>
@@ -104,7 +105,11 @@
         <h2 id="assignCourseTitle">Assign Students</h2>
         <input type="hidden" id="assignCourseId">
         <div class="student-list" id="studentSelectContainer"></div>
-        <div class="modal-footer"><button type="button" class="btn-outline" onclick="closeAssignModal()">Cancel</button><button type="button" class="btn-primary" onclick="saveAssignments()">Save Enrollments</button></div>
+        <div class="modal-footer">
+            <button type="button" class="btn-outline" style="margin-right:auto;" onclick="autoSelectDeptStudents()">Auto-Select (Dept)</button>
+            <button type="button" class="btn-outline" onclick="closeAssignModal()">Cancel</button>
+            <button type="button" class="btn-primary" onclick="saveAssignments()">Save Enrollments</button>
+        </div>
     </div>
 </div>
 
@@ -125,7 +130,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { initSuperuserCourses, saveCourse, deleteCourse, openAddCourse, openEditCourse, openAssignStudents, saveAssignments, closeCourseModal, closeAssignModal, openCourseBulkModal, closeCourseBulkModal, previewCourseBulkFile, commitCourseBulkImport } from '../../js/features/superuser-courses.js';
+    import { initSuperuserCourses, saveCourse, deleteCourse, openAddCourse, openEditCourse, openAssignStudents, saveAssignments, autoSelectDeptStudents, globalAutoAssign, closeCourseModal, closeAssignModal, openCourseBulkModal, closeCourseBulkModal, previewCourseBulkFile, commitCourseBulkImport } from '../../js/features/superuser-courses.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -142,7 +147,9 @@
     window.openAddCourse = openAddCourse;
     window.openEditCourse = openEditCourse;
     window.openAssignStudents = openAssignStudents;
+    window.autoSelectDeptStudents = autoSelectDeptStudents;
     window.saveAssignments = saveAssignments;
+    window.globalAutoAssign = globalAutoAssign;
     window.closeCourseModal = closeCourseModal;
     window.closeAssignModal = closeAssignModal;
     window.openCourseBulkModal = openCourseBulkModal;

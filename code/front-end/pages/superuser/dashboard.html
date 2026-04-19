@@ -175,13 +175,8 @@
     import { renderSuperuserDashboard } from '../../js/features/superuser-dashboard.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
-        const user = requireAuth();
+        const user = requireAuth('superuser');
         if (!user) return;
-
-        if (user.role !== 'superuser') {
-            window.location.href = '../../login.html';
-            return;
-        }
 
         document.getElementById('welcomeText').textContent = `Welcome, ${user.name.split(' ')[0]}`;
         document.getElementById('userName').textContent = user.name;

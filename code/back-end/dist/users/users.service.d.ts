@@ -44,4 +44,5 @@ export declare class UsersService {
         message: string;
     };
     updateEnrollments(courseId: string, studentIds: string[]): void;
+    getEnrolledCourses(userId: string): any[];
 }

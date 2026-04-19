@@ -112,7 +112,7 @@
     import { renderHodDashboard } from "../../js/features/hod-dashboard.js";
 
     document.addEventListener("DOMContentLoaded", () => {
-        const user = requireAuth();
+        const user = requireAuth('hod');
         if(!user) return;
 
         // Populate Sidebar

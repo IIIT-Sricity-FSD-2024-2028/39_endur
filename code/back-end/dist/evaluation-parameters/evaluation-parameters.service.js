@@ -94,13 +94,31 @@ let EvaluationParametersService = class EvaluationParametersService {
         this.store.appendAuditLog({
             actor: actorId || 'SU001',
             actorName: actorName || 'Super User',
-            actorRole: 'superuser',
+            actorRole: 'hod',
             action: 'DELETE',
             module: 'Evaluation Parameters',
             target: `${department} — ${param.name}`,
             details: 'Parameter deleted.',
         });
         return { message: `Parameter ${id} deleted` };
+    }
+    revertToDraft(department, actorId, actorName) {
+        const statuses = this.store.getDeptConfigStatus();
+        statuses[department] = 'DRAFT';
+        this.store.setDeptConfigStatus(statuses);
+        const notes = this.store.getDeptConfigNotes() || {};
+        delete notes[department];
+        this.store.setDeptConfigNotes(notes);
+        this.store.appendAuditLog({
+            actor: actorId || 'SU001',
+            actorName: actorName || 'HOD',
+            actorRole: 'hod',
+            action: 'REVERT',
+            module: 'Evaluation Parameters',
+            target: `${department} Configuration`,
+            details: 'Configuration reverted to DRAFT status for editing.',
+        });
+        return { message: `${department} parameters reverted to DRAFT`, status: 'DRAFT' };
     }
     approve(department, actorId, actorName) {
         const drafts = this.store.getDraftParameters();

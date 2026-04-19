@@ -203,6 +203,120 @@
         ]
       }
     },
+    "/api/users/profile/me": {
+      "get": {
+        "operationId": "UsersController_getMe",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get current logged in user profile",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/users/me/courses": {
+      "get": {
+        "operationId": "UsersController_getMyCourses",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get enrolled courses for the current student",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/api/users/{id}": {
       "get": {
         "operationId": "UsersController_findOne",
@@ -956,6 +1070,63 @@
           }
         },
         "summary": "Bulk import courses from JSON array (superuser only)",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/api/courses/auto-assign-all": {
+      "post": {
+        "operationId": "CoursesController_autoAssignAll",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Global auto-enrollment for all courses based on department (superuser only)",
         "tags": [
           "Courses"
         ]
@@ -1940,7 +2111,72 @@
             "description": ""
           }
         },
-        "summary": "Delete a parameter (superuser/admin only)",
+        "summary": "Delete a parameter (superuser/admin/hod)",
+        "tags": [
+          "Evaluation Parameters"
+        ]
+      }
+    },
+    "/api/evaluation-parameters/dept/{department}/revert": {
+      "post": {
+        "operationId": "EvaluationParametersController_revert",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Revert dept params from SUBMITTED back to DRAFT (hod only)",
         "tags": [
           "Evaluation Parameters"
         ]
@@ -2246,6 +2482,14 @@
             }
           },
           {
+            "name": "facultyId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "in": "header",
             "name": "X-Role",
             "required": false,
@@ -2283,7 +2527,7 @@
             "description": ""
           }
         },
-        "summary": "List feedback responses (filterable by cycle/course/student)",
+        "summary": "List feedback responses (filterable by cycle/course/student/faculty)",
         "tags": [
           "Feedback Responses"
         ]
@@ -3228,6 +3472,118 @@
           "Departments"
         ]
       }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "SettingsController_findAll",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get global system settings",
+        "tags": [
+          "Settings"
+        ]
+      },
+      "patch": {
+        "operationId": "SettingsController_update",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update global system settings (superuser only)",
+        "tags": [
+          "Settings"
+        ]
+      }
     }
   },
   "info": {
@@ -3674,12 +4030,33 @@
           "params"
         ]
       },
+      "RatingEntryDto": {
+        "type": "object",
+        "properties": {
+          "paramId": {
+            "type": "string",
+            "example": "EV101"
+          },
+          "score": {
+            "type": "number",
+            "example": 5
+          },
+          "comment": {
+            "type": "string",
+            "example": "Great explanation of concepts!"
+          }
+        },
+        "required": [
+          "paramId",
+          "score"
+        ]
+      },
       "SubmitFeedbackDto": {
         "type": "object",
         "properties": {
           "cycleId": {
             "type": "string",
-            "example": "CYCLE_W5"
+            "example": "CYC-101"
           },
           "courseId": {
             "type": "string",
@@ -3689,27 +4066,38 @@
             "type": "string",
             "example": "S001"
           },
+          "studentDepartment": {
+            "type": "string",
+            "example": "DEPT-CS"
+          },
           "facultyId": {
             "type": "string",
             "example": "F001"
           },
           "ratings": {
-            "type": "object",
-            "example": {
-              "EP001": 4,
-              "EP002": 5
-            },
-            "description": "Parameter ID → rating score map"
-          },
-          "openEndedComment": {
-            "type": "string",
-            "example": "Great course!"
+            "example": [
+              {
+                "paramId": "EV101",
+                "score": 5,
+                "comment": "Excellent!"
+              },
+              {
+                "paramId": "EV102",
+                "score": 4,
+                "comment": "Very relevant."
+              }
+            ],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RatingEntryDto"
+            }
           }
         },
         "required": [
           "cycleId",
           "courseId",
-          "studentId"
+          "studentId",
+          "ratings"
         ]
       },
       "SubmitSelfReflectionDto": {

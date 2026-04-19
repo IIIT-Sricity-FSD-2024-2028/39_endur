@@ -9,6 +9,7 @@ import { FeedbackResponsesModule } from './feedback-responses/feedback-responses
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { FacultyReportsModule } from './faculty-reports/faculty-reports.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DepartmentsModule } from './departments/departments.module';
     AuditLogsModule,
     FacultyReportsModule,
     DepartmentsModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

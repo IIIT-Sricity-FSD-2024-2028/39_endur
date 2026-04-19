@@ -24,8 +24,8 @@ let FeedbackResponsesController = class FeedbackResponsesController {
     constructor(svc) {
         this.svc = svc;
     }
-    findAll(cycleId, courseId, studentId) {
-        return this.svc.findAll(cycleId, courseId, studentId);
+    findAll(cycleId, courseId, studentId, facultyId) {
+        return this.svc.findAll(cycleId, courseId, studentId, facultyId);
     }
     submit(dto) {
         return this.svc.submit(dto);
@@ -41,15 +41,17 @@ exports.FeedbackResponsesController = FeedbackResponsesController;
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
-    (0, swagger_1.ApiOperation)({ summary: 'List feedback responses (filterable by cycle/course/student)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'List feedback responses (filterable by cycle/course/student/faculty)' }),
     (0, swagger_1.ApiQuery)({ name: 'cycleId', required: false }),
     (0, swagger_1.ApiQuery)({ name: 'courseId', required: false }),
     (0, swagger_1.ApiQuery)({ name: 'studentId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'facultyId', required: false }),
     __param(0, (0, common_1.Query)('cycleId')),
     __param(1, (0, common_1.Query)('courseId')),
     __param(2, (0, common_1.Query)('studentId')),
+    __param(3, (0, common_1.Query)('facultyId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", void 0)
 ], FeedbackResponsesController.prototype, "findAll", null);
 __decorate([

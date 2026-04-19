@@ -73,16 +73,12 @@
     <div class="modal-card">
         <h3 id="cycleModalTitle">Create Feedback Cycle</h3>
         <form id="cycleForm">
-            <div class="form-group"><label>Cycle Name</label><input type="text" id="cycleName" required></div>
-            <div class="form-group"><label>Type</label><select id="cycleType"><option value="weekly">Weekly</option><option value="biweekly">Bi-Weekly</option><option value="monthly">Monthly</option></select></div>
+            <div class="form-group"><label>Cycle Name</label><input type="text" name="cycleName" id="cycleName" required></div>
             <div class="form-row">
-                <div class="form-group"><label>Start Date</label><input type="date" id="startDate" required></div>
-                <div class="form-group"><label>End Date</label><input type="date" id="endDate" required></div>
+                <div class="form-group"><label>Start Date</label><input type="date" name="startDate" id="startDate" required></div>
+                <div class="form-group"><label>Student Feedback Deadline</label><input type="date" name="studentDeadline" id="studentDeadline" required></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Reflection Deadline</label><input type="date" id="reflectionDeadline"></div>
-                <div class="form-group"><label>Action Report Deadline</label><input type="date" id="actionReportDeadline"></div>
-            </div>
+            <div class="form-group"><label>End Date</label><input type="date" name="endDate" id="endDate" required></div>
             <div class="modal-footer"><button type="button" class="btn-outline" onclick="suCloseCycleModal()">Cancel</button><button type="submit" class="btn-primary">Save Cycle</button></div>
         </form>
     </div>
@@ -113,7 +109,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { renderSuperuserCycles, suOpenAddCycle, suEditCycle, suCloseCycle, suReopenCycle, suDeleteCycle, suCloseCycleModal, closeDeleteModal, openCycleBulkModal, closeCycleBulkModal, previewCycleBulkFile, commitCycleBulkImport } from '../../js/features/superuser-cycles.js';
+    import { renderSuperuserCycles, suOpenAddCycle, suEditCycle, suCloseCycle, suReopenCycle, suDeleteCycle, suCloseCycleModal, closeDeleteModal, openCycleBulkModal, closeCycleBulkModal, previewCycleBulkFile, commitCycleBulkImport, suViewCycleResponses, suViewCycleResponsesAsync } from '../../js/features/superuser-cycles.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -135,8 +131,9 @@
     window.closeCycleBulkModal = closeCycleBulkModal;
     window.previewCycleBulkFile = previewCycleBulkFile;
     window.commitCycleBulkImport = commitCycleBulkImport;
+    window.suViewCycleResponses = suViewCycleResponses;
+    window.suViewCycleResponsesAsync = suViewCycleResponsesAsync;
 
-    document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); }));
 </script>
 </body>
 </html>
