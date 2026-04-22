@@ -23,3 +23,9 @@ export class ReviewCheckinDto {
   @ApiPropertyOptional() @IsOptional() @IsString() hodNotes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() hodOutcomes?: string;
 }
+
+export class TriggerActionReportDto {
+  @ApiProperty() @IsString() @IsNotEmpty() facultyId: string;
+  @ApiProperty() @IsString() @IsNotEmpty() courseId: string;
+  @ApiProperty() @IsString() @IsNotEmpty() cycleId: string;
+}

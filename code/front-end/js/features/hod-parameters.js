@@ -65,14 +65,25 @@ export async function initParameters() {
 function renderAll() {
     const user = getSession();
     
-    const badgeEl = document.getElementById("cycleNameBadge");
-    if(badgeEl) badgeEl.innerText = globalCycleState.id || 'PREPARATION';
-
+    const isPrep = globalCycleState.phase === "PREPARATION" && globalCycleState.id !== "SETUP";
+    const isNoCycle = globalCycleState.id === "SETUP";
     const isCycleActive = ["STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"].includes(globalCycleState.phase);
     const isCycleCompleted = globalCycleState.phase === "COMPLETED";
-    
+
+    if (badgeEl) {
+        if (isNoCycle) {
+            badgeEl.innerText = "No Active Cycle";
+            badgeEl.style.background = "#f1f5f9";
+            badgeEl.style.color = "#64748b";
+        } else {
+            badgeEl.innerText = globalCycleState.id;
+        }
+    }
+
     let isLocked = false;
-    if (isCycleActive) {
+    if (isNoCycle) {
+        isLocked = true;
+    } else if (isCycleActive) {
         isLocked = true;
     } else if (globalCycleState.phase === "PREPARATION") {
         isLocked = (currentStatus === "SUBMITTED" || currentStatus === "APPROVED");
@@ -89,13 +100,16 @@ function renderAll() {
     stackedBar.innerHTML = "";
     legendContainer.innerHTML = "";
 
+    if (document.getElementById("statusBannerNoCycle")) {
+        document.getElementById("statusBannerNoCycle").style.display = isNoCycle ? "block" : "none";
+    }
     document.getElementById("statusBannerCycleActive").style.display = (isCycleActive && !isCycleCompleted) ? "block" : "none";
     document.getElementById("statusBannerCompleted").style.display = isCycleCompleted ? "block" : "none"; 
-    document.getElementById("statusBannerPending").style.display = (currentStatus === "SUBMITTED" && globalCycleState.phase === "PREPARATION") ? "block" : "none";
-    document.getElementById("statusBannerApproved").style.display = (currentStatus === "APPROVED" && globalCycleState.phase === "PREPARATION") ? "block" : "none";
+    document.getElementById("statusBannerPending").style.display = (currentStatus === "SUBMITTED" && isPrep) ? "block" : "none";
+    document.getElementById("statusBannerApproved").style.display = (currentStatus === "APPROVED" && isPrep) ? "block" : "none";
     
     const revBanner = document.getElementById("statusBannerRevision");
-    if (currentStatus === "REVISION_REQUESTED" && globalCycleState.phase === "PREPARATION") {
+    if (currentStatus === "REVISION_REQUESTED" && isPrep) {
         revBanner.style.display = "block";
         GET('/evaluation-parameters/status').then(res => {
             // Note: need notes API, backend doesn't export notes endpoint directly, using generic text for now.
@@ -119,6 +133,10 @@ function renderAll() {
         totalWeight += weightNum;
         const color = CHART_COLORS[index % CHART_COLORS.length];
 
+        // Robust naming fallback
+        const pName = param.name || param.paramName || param.label || `Parameter ${index + 1}`;
+        const pDesc = param.description || param.desc || '';
+
         let actionButtonsHtml = "";
         if (!isLocked) {
             actionButtonsHtml = `
@@ -137,8 +155,8 @@ function renderAll() {
         row.className = "param-row";
         row.innerHTML = `
             <div>
-                <strong style="color: #0f172a; font-size: 14px;">${param.name}</strong>
-                <p class="param-desc">${param.description || param.desc || ''}</p>
+                <strong style="color: #0f172a; font-size: 14px;">${pName}</strong>
+                <p class="param-desc">${pDesc}</p>
             </div>
             <div class="weight-display">
                 <div class="mini-bar"><div class="mini-bar-fill" style="width: ${weightNum}%; background: ${color}"></div></div>
@@ -172,7 +190,7 @@ function renderAll() {
         const legend = document.createElement("div");
         legend.className = "legend-item";
         legend.innerHTML = `
-            <div><span class="legend-dot" style="background-color: ${color}"></span> ${param.name}</div>
+            <div><span class="legend-dot" style="background-color: ${color}"></span> ${pName}</div>
             <strong style="color: #0f172a;">${weightNum}%</strong>
         `;
         legendContainer.appendChild(legend);

@@ -79,12 +79,15 @@ let FeedbackCyclesService = class FeedbackCyclesService {
             { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
         ];
         for (const d of depts) {
-            if (activeParams[d.name])
+            if (activeParams[d.name]) {
                 finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.name]));
-            else if (activeParams[d.id])
+            }
+            else if (activeParams[d.id]) {
                 finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.id]));
-            else
+            }
+            else {
                 finalParams[d.name] = [...defaultParams];
+            }
         }
         finalParams['Unassigned'] = [...defaultParams];
         const entry = {

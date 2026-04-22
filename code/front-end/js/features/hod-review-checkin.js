@@ -128,10 +128,42 @@ function openDetailView(data) {
         if (actionBar) actionBar.innerHTML = '<div style="flex:1;display:flex;align-items:center;"><span style="color:#16a34a;font-size:14px;font-weight:600;">✅ Check-in Finalized</span></div>';
     } else if (!data.actionReport || data.actionReport.status === 'REVISION_REQUESTED') {
         notesEl.disabled = true; outcomesEl.disabled = true;
-        if (actionBar) actionBar.innerHTML = `<div style="flex:1;display:flex;align-items:center;"><span style="color:#dc2626;font-size:14px;font-weight:600;">${!data.actionReport ? '⚠️ Action Report not arrived yet' : '⏳ Waiting for Faculty to Resubmit'}</span></div><button class="btn-outline" disabled style="opacity:0.5">Request Revision</button><button class="btn-primary" disabled style="opacity:0.5">Finalize Check-in</button>`;
+        if (actionBar) {
+            if (!data.actionReport) {
+                actionBar.innerHTML = `
+                    <div style="flex:1;display:flex;align-items:center;">
+                        <span style="color:#64748b;font-size:14px;font-weight:600;">⚠️ No Action Report assigned yet</span>
+                    </div>
+                    <button class="btn-primary" onclick="triggerActionReport()" style="background:#4f46e5;">Assign Action Plan</button>
+                `;
+            } else {
+                actionBar.innerHTML = `
+                    <div style="flex:1;display:flex;align-items:center;">
+                        <span style="color:#dc2626;font-size:14px;font-weight:600;">⏳ Waiting for Faculty to Resubmit</span>
+                    </div>
+                    <button class="btn-outline" disabled style="opacity:0.5">Request Revision</button>
+                    <button class="btn-primary" disabled style="opacity:0.5">Finalize Check-in</button>
+                `;
+            }
+        }
     } else {
         notesEl.disabled = false; outcomesEl.disabled = false;
         if (actionBar) actionBar.innerHTML = `<button class="btn-outline" onclick="requestRevision()">Request Revision</button><button class="btn-primary" onclick="finalizeCheckin()" style="background:#1e3a8a;">Finalize Check-in</button>`;
+    }
+}
+
+async function triggerActionReport() {
+    const cycle = document.getElementById('activeCycleBadge').innerText;
+    try {
+        await POST('/faculty-reports/action-reports/trigger', {
+            facultyId: currentActiveFacultyId,
+            courseId: currentActiveCourseId,
+            cycleId: cycle
+        });
+        alert('✅ Action Plan has been assigned to this faculty member.');
+        renderReviewCheckins();
+    } catch (err) {
+        alert('Failed to trigger: ' + (err.message || 'Server error'));
     }
 }
 

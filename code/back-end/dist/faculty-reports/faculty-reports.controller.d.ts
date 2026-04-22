@@ -1,5 +1,5 @@
 import { FacultyReportsService } from './faculty-reports.service';
-import { SubmitSelfReflectionDto, SubmitActionReportDto, ReviewCheckinDto } from './dto/faculty-report.dto';
+import { SubmitSelfReflectionDto, SubmitActionReportDto, ReviewCheckinDto, TriggerActionReportDto } from './dto/faculty-report.dto';
 export declare class FacultyReportsController {
     private readonly svc;
     constructor(svc: FacultyReportsService);
@@ -15,5 +15,6 @@ export declare class FacultyReportsController {
     };
     findActionReports(cycleId?: string, courseId?: string, facultyId?: string): any[];
     submitActionReport(dto: SubmitActionReportDto, req: any): any;
+    triggerActionReport(dto: TriggerActionReportDto, req: any): any;
     reviewCheckin(id: string, dto: ReviewCheckinDto, req: any): any;
 }

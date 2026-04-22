@@ -122,4 +122,17 @@ export async function renderGapAnalysis() {
             </div>
         `).join("") : 
         "<p style='color: #64748b; font-style: italic;'>No student comments available for this cycle.</p>";
+
+    // Show Action link if marked by HOD
+    try {
+        const myActions = await GET(`/faculty-reports/action-reports?courseId=${encodeURIComponent(activeCourse)}&cycleId=${activeCycleId}&facultyId=${user.id}`);
+        if (myActions.length > 0) {
+            const container = document.getElementById("actionContainer");
+            const btn = document.getElementById("btnAction");
+            if (container && btn) {
+                container.style.display = "block";
+                btn.onclick = () => window.location.href = "action-report.html";
+            }
+        }
+    } catch(e) {}
 }

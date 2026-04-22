@@ -36,6 +36,9 @@ let FacultyReportsController = class FacultyReportsController {
     submitActionReport(dto, req) {
         return this.svc.submitActionReport(dto, req.headers['x-user-id'], req.headers['x-user-name']);
     }
+    triggerActionReport(dto, req) {
+        return this.svc.markActionRequired(dto, req.headers['x-user-id'], req.headers['x-user-name']);
+    }
     reviewCheckin(id, dto, req) {
         return this.svc.reviewCheckin(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
     }
@@ -89,6 +92,16 @@ __decorate([
     __metadata("design:paramtypes", [faculty_report_dto_1.SubmitActionReportDto, Object]),
     __metadata("design:returntype", void 0)
 ], FacultyReportsController.prototype, "submitActionReport", null);
+__decorate([
+    (0, common_1.Post)('action-reports/trigger'),
+    (0, roles_decorator_1.Roles)('hod', 'dean', 'superuser'),
+    (0, swagger_1.ApiOperation)({ summary: 'HOD triggers an action report for a faculty' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [faculty_report_dto_1.TriggerActionReportDto, Object]),
+    __metadata("design:returntype", void 0)
+], FacultyReportsController.prototype, "triggerActionReport", null);
 __decorate([
     (0, common_1.Patch)('action-reports/:id/checkin'),
     (0, roles_decorator_1.Roles)('hod', 'dean', 'superuser'),

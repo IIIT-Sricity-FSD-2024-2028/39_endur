@@ -67,6 +67,36 @@ let FacultyReportsService = class FacultyReportsService {
         this.store.appendAuditLog({ actor: actorId || dto.facultyId, actorName: actorName || 'Faculty', actorRole: 'faculty', action: existingIdx > -1 ? 'UPDATE' : 'CREATE', module: 'Action Reports', target: `${dto.courseId} (Cycle: ${dto.cycleId})`, details: 'Action report submitted.' });
         return entry;
     }
+    markActionRequired(dto, actorId, actorName) {
+        const reports = this.store.getActionReports();
+        const existing = reports.find(r => r.facultyId === dto.facultyId && r.courseId === dto.courseId && r.cycleId === dto.cycleId);
+        if (existing) {
+            return existing;
+        }
+        const entry = {
+            reportId: `ACT_${Date.now()}`,
+            ...dto,
+            status: 'REQUIRED',
+            rootCause: '',
+            plannedStrategies: '',
+            timeline: '',
+            hodNotes: '',
+            hodOutcomes: '',
+            submissionDate: null,
+        };
+        reports.push(entry);
+        this.store.setActionReports(reports);
+        this.store.appendAuditLog({
+            actor: actorId || 'HOD',
+            actorName: actorName || 'HOD',
+            actorRole: 'hod',
+            action: 'TRIGGER',
+            module: 'Action Reports',
+            target: `${dto.courseId} (Faculty: ${dto.facultyId})`,
+            details: 'Action report explicitly required by HOD.',
+        });
+        return entry;
+    }
     reviewCheckin(reportId, dto, actorId, actorName) {
         const reports = this.store.getActionReports();
         const idx = reports.findIndex(r => r.reportId === reportId);

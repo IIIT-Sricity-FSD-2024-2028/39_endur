@@ -127,14 +127,17 @@ export async function renderFacultyDashboard() {
         }
 
         // Display avg calculation
-        const isLocked = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase) || (!hasReflection && !['ACTION_REPORT', 'COMPLETED'].includes(phase));
+        // UNLOCK logic: Allow scores during Reflection and Action stages for gap analysis.
+        const isLocked = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase);
         let displayAvg;
         if (responses === 0) {
             displayAvg = `<span style="color:#94a3b8">N/A</span>`;
         } else if (isLocked) {
-            const lockMsg = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase) ? 'Scores locked until deadline' : 'Complete Self-Reflection to unlock';
+            const lockMsg = 'Scores locked until student feedback deadline';
             displayAvg = `<span title="${lockMsg}" style="color:#94a3b8;font-size:13px">Locked 🔒</span>`;
         } else {
+            // Check if reflection is pending to add a "Self-Reflection Pending" badge if needed, 
+            // but show the score anyway as per user request for Gap Analysis phase.
             displayAvg = `${courseAvgPct.toFixed(0)}%`;
         }
 

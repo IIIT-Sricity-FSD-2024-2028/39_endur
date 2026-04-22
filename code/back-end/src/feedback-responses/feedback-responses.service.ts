@@ -48,14 +48,19 @@ export class FeedbackResponsesService {
     // Enrich ratings array — preserve comment, add name + weight snapshot
     const enrichedRatings = (dto.ratings || []).map((r) => {
       const def = paramLookup.get(r.paramId);
+      
+      let rawScore = Number(r.score);
+      // Safety: If score is invalid or missing, represent as null so it doesn't skew averages as 0
+      const score = isNaN(rawScore) ? null : rawScore;
+
       return {
         paramId:   r.paramId,
         paramName: def?.name  ?? r.paramId,
         weight:    def?.weight ?? 25,
-        score:     Number(r.score),
+        score:     score, 
         comment:   r.comment ?? '',
       };
-    });
+    }).filter(r => r.score !== null); // Skip scores that couldn't be parsed
 
     const entry = {
       responseId:        this.store.genId('RESP'),

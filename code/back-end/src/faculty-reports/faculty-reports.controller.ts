@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiHeader } from '@nestjs/swagger';
 import { FacultyReportsService } from './faculty-reports.service';
-import { SubmitSelfReflectionDto, SubmitActionReportDto, ReviewCheckinDto } from './dto/faculty-report.dto';
+import { SubmitSelfReflectionDto, SubmitActionReportDto, ReviewCheckinDto, TriggerActionReportDto } from './dto/faculty-report.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
@@ -44,6 +44,13 @@ export class FacultyReportsController {
   @ApiOperation({ summary: 'Submit or resubmit an action report' })
   submitActionReport(@Body() dto: SubmitActionReportDto, @Request() req: any) {
     return this.svc.submitActionReport(dto, req.headers['x-user-id'], req.headers['x-user-name']);
+  }
+
+  @Post('action-reports/trigger')
+  @Roles('hod', 'dean', 'superuser')
+  @ApiOperation({ summary: 'HOD triggers an action report for a faculty' })
+  triggerActionReport(@Body() dto: TriggerActionReportDto, @Request() req: any) {
+    return this.svc.markActionRequired(dto, req.headers['x-user-id'], req.headers['x-user-name']);
   }
 
   @Patch('action-reports/:id/checkin')

@@ -30,7 +30,18 @@ export class EvaluationParametersService {
     return drafts[department] || [];
   }
 
+  private ensurePreparationPhase() {
+    const state = this.store.getCycleState();
+    if (!state || state.id === 'SETUP') {
+      throw new BadRequestException('No active evaluation cycle initialized.');
+    }
+    if (state.phase !== 'PREPARATION') {
+      throw new BadRequestException(`Parameter modifications are only allowed in PREPARATION phase. Current phase: ${state.phase}`);
+    }
+  }
+
   create(dto: CreateEvalParamDto, actorId?: string, actorName?: string, actorRole?: string) {
+    this.ensurePreparationPhase();
     const drafts = this.store.getDraftParameters();
     if (!drafts[dto.department]) drafts[dto.department] = [];
 
@@ -60,6 +71,7 @@ export class EvaluationParametersService {
   }
 
   update(id: string, department: string, dto: UpdateEvalParamDto, actorId?: string, actorName?: string) {
+    this.ensurePreparationPhase();
     const drafts = this.store.getDraftParameters();
     if (!drafts[department]) throw new NotFoundException(`No parameters found for ${department}`);
     const idx = drafts[department].findIndex((p) => p.id === id);
@@ -82,6 +94,7 @@ export class EvaluationParametersService {
   }
 
   remove(id: string, department: string, actorId?: string, actorName?: string) {
+    this.ensurePreparationPhase();
     const drafts = this.store.getDraftParameters();
     if (!drafts[department]) throw new NotFoundException(`No parameters found for ${department}`);
     const param = drafts[department].find((p) => p.id === id);
@@ -103,6 +116,7 @@ export class EvaluationParametersService {
   }
 
   revertToDraft(department: string, actorId?: string, actorName?: string) {
+    this.ensurePreparationPhase();
     const statuses = this.store.getDeptConfigStatus();
     statuses[department] = 'DRAFT';
     this.store.setDeptConfigStatus(statuses);
@@ -157,6 +171,7 @@ export class EvaluationParametersService {
   }
 
   submit(department: string, actorId?: string, actorName?: string) {
+    this.ensurePreparationPhase();
     const statuses = this.store.getDeptConfigStatus();
     statuses[department] = 'SUBMITTED';
     this.store.setDeptConfigStatus(statuses);

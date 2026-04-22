@@ -74,17 +74,30 @@ export class FeedbackCyclesService {
     const activeParams = this.store.getActiveParameters();
     const depts = this.store.getDepartments();
     const finalParams: Record<string, any[]> = {};
+    
+    // Predicatable IDs for institutional defaults to ensure student form & backend match
     const defaultParams = [
-      { id: 'delivery', name: 'Course Delivery & Clarity', weight: 25 },
-      { id: 'relevance', name: 'Course Relevance', weight: 25 },
-      { id: 'support', name: 'Faculty Support & Availability', weight: 25 },
-      { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
+      { id: 'delivery',   name: 'Course Delivery & Clarity',     weight: 25 },
+      { id: 'relevance',  name: 'Course Relevance',               weight: 25 },
+      { id: 'support',    name: 'Faculty Support & Availability', weight: 25 },
+      { id: 'assessment', name: 'Fairness of Assessments',        weight: 25 },
     ];
+
     for (const d of depts) {
-      if (activeParams[d.name]) finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.name]));
-      else if (activeParams[d.id]) finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.id]));
-      else finalParams[d.name] = [...defaultParams];
+      // Priority 1: Keyed by Name (e.g., 'Computer Science')
+      if (activeParams[d.name]) {
+        finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.name]));
+      } 
+      // Priority 2: Keyed by ID (e.g., 'CS')
+      else if (activeParams[d.id]) {
+        finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.id]));
+      }
+      // Fallback: Keyed by department name with defaults
+      else {
+        finalParams[d.name] = [...defaultParams];
+      }
     }
+    // Also include 'Unassigned' fallback
     finalParams['Unassigned'] = [...defaultParams];
 
     const entry = {

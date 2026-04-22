@@ -3133,6 +3133,73 @@
         ]
       }
     },
+    "/api/faculty-reports/action-reports/trigger": {
+      "post": {
+        "operationId": "FacultyReportsController_triggerActionReport",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerActionReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "HOD triggers an action report for a faculty",
+        "tags": [
+          "Faculty Reports & Check-ins"
+        ]
+      }
+    },
     "/api/faculty-reports/action-reports/{id}/checkin": {
       "patch": {
         "operationId": "FacultyReportsController_reviewCheckin",
@@ -4156,6 +4223,25 @@
           "rootCause",
           "plannedStrategies",
           "timeline"
+        ]
+      },
+      "TriggerActionReportDto": {
+        "type": "object",
+        "properties": {
+          "facultyId": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "cycleId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "facultyId",
+          "courseId",
+          "cycleId"
         ]
       },
       "ReviewCheckinDto": {

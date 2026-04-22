@@ -200,23 +200,38 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
             btn.textContent = 'View Report →';
             btn.className = 'btn-outline action-btn';
             btn.onclick = () => window.location.href = 'action-report.html';
-        } else if (hasActionReport?.status === 'SUBMITTED') {
-            if (actionTitle) actionTitle.textContent = 'Action Report (Pending HOD)';
-            if (actionDesc) actionDesc.textContent = '⏳ Submitted — awaiting HOD review.';
             btn.textContent = 'View Report →';
             btn.className = 'btn-outline action-btn';
             btn.onclick = () => window.location.href = 'action-report.html';
-        } else if (hasActionReport?.status === 'REVISION_REQUESTED') {
-            if (actionTitle) actionTitle.textContent = 'Action Report (Revision Needed)';
-            if (actionDesc) actionDesc.textContent = '⚠️ HOD has requested a revision.';
-            btn.textContent = 'Revise Report →';
-            btn.className = 'btn-danger action-btn';
-            btn.onclick = () => window.location.href = 'action-report.html';
+        } else if (hasActionReport) {
+            // REQUIRED, SUBMITTED, or REVISION_REQUESTED
+            if (hasActionReport.status === 'SUBMITTED') {
+                if (actionTitle) actionTitle.textContent = 'Action Report (Pending HOD)';
+                if (actionDesc) actionDesc.textContent = '⏳ Submitted — awaiting HOD review.';
+                btn.textContent = 'View Report →';
+                btn.className = 'btn-outline action-btn';
+                btn.onclick = () => window.location.href = 'action-report.html';
+            } else if (hasActionReport.status === 'REVISION_REQUESTED') {
+                if (actionTitle) actionTitle.textContent = 'Action Report (Revision Needed)';
+                if (actionDesc) actionDesc.textContent = '⚠️ HOD has requested a revision.';
+                btn.textContent = 'Revise Report →';
+                btn.className = 'btn-danger action-btn';
+                btn.onclick = () => window.location.href = 'action-report.html';
+            } else {
+                // Status is REQUIRED
+                if (actionTitle) actionTitle.textContent = 'Submit Action Report';
+                if (actionDesc) actionDesc.textContent = 'HOD has requested an improvement plan based on feedback results.';
+                btn.textContent = 'Start Action Report →';
+                btn.onclick = () => { localStorage.setItem('activeFacultyCourse', course.id); window.location.href = 'action-report.html'; };
+            }
         } else {
-            if (actionTitle) actionTitle.textContent = 'Submit Action Report';
-            if (actionDesc) actionDesc.textContent = 'Outline your improvement plan based on the gap analysis.';
-            btn.textContent = 'Start Action Report →';
-            btn.onclick = () => { localStorage.setItem('activeFacultyCourse', course.id); window.location.href = 'action-report.html'; };
+            // Not marked for action
+            if (actionTitle) actionTitle.textContent = 'No Action Report Required';
+            if (actionDesc) actionDesc.textContent = 'Based on current scores, no mandatory action report was assigned by the HOD.';
+            btn.textContent = 'N/A';
+            btn.className = 'btn-outline action-btn';
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
         }
     } else {
         if (actionTitle) actionTitle.textContent = 'No Actions Required';

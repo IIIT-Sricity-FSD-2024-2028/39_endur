@@ -18,3 +18,8 @@ export declare class ReviewCheckinDto {
     hodNotes?: string;
     hodOutcomes?: string;
 }
+export declare class TriggerActionReportDto {
+    facultyId: string;
+    courseId: string;
+    cycleId: string;
+}

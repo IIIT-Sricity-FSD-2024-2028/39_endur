@@ -50,14 +50,16 @@ let FeedbackResponsesService = class FeedbackResponsesService {
         }
         const enrichedRatings = (dto.ratings || []).map((r) => {
             const def = paramLookup.get(r.paramId);
+            let rawScore = Number(r.score);
+            const score = isNaN(rawScore) ? null : rawScore;
             return {
                 paramId: r.paramId,
                 paramName: def?.name ?? r.paramId,
                 weight: def?.weight ?? 25,
-                score: Number(r.score),
+                score: score,
                 comment: r.comment ?? '',
             };
-        });
+        }).filter(r => r.score !== null);
         const entry = {
             responseId: this.store.genId('RESP'),
             cycleId: dto.cycleId,

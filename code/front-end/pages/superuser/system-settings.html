@@ -259,12 +259,11 @@
             showToast('Failed to load system settings from server.', 'error');
         }
     });
-
     window.saveSettings = async function() {
         const config = {
             instName:    document.getElementById('settingInstName').value,
             instCode:    document.getElementById('settingInstCode').value,
-            acadYear:    document.getElementById('settingInstYear').value,
+            acadYear:    document.getElementById('settingAcadYear').value,
             semester:    document.getElementById('settingSemester').value,
             domain:      document.getElementById('settingDomain').value,
             timezone:    document.getElementById('settingTimezone').value,

@@ -15,7 +15,7 @@ export declare class FeedbackResponsesController {
             paramId: string;
             paramName: string;
             weight: number;
-            score: number;
+            score: number | null;
             comment: string;
         }[];
         submittedAt: string;

@@ -3,8 +3,8 @@ agenda -
 - ensure imported feedback cyles are linked properly.
 - ensure historical trends work for imported roles for all users.
 - ensure proper guards for every role.
+- overhaul action reports and self reflection systems
 
 fixes (later) - 
 - make sure system settings in superusers actually works
 - make sure that every export button work and properly formats the data.
-- overhaul action reports and self reflection systems

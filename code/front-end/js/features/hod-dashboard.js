@@ -20,7 +20,9 @@ export async function renderHodDashboard() {
     try { const res = await GET(`/feedback-responses?cycleId=${activeCycleId}`); allSubmissions = res; }
     catch { allSubmissions = []; }
 
-    const allActionReports = JSON.parse(localStorage.getItem('actionReports') || '[]');
+    let allActionReports = [];
+    try { allActionReports = await GET('/faculty-reports/action-reports'); }
+    catch { allActionReports = []; }
 
     const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
     const actionReports = allActionReports.filter(a => a.cycleId === activeCycleId);

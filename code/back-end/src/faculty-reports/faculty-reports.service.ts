@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataStoreService } from '../seed/data-store.service';
-import { SubmitSelfReflectionDto, SubmitActionReportDto, ReviewCheckinDto } from './dto/faculty-report.dto';
+import { SubmitSelfReflectionDto, SubmitActionReportDto, ReviewCheckinDto, TriggerActionReportDto } from './dto/faculty-report.dto';
 
 @Injectable()
 export class FacultyReportsService {
@@ -45,6 +45,42 @@ export class FacultyReportsService {
     } else reports.push(entry);
     this.store.setActionReports(reports);
     this.store.appendAuditLog({ actor: actorId || dto.facultyId, actorName: actorName || 'Faculty', actorRole: 'faculty', action: existingIdx > -1 ? 'UPDATE' : 'CREATE', module: 'Action Reports', target: `${dto.courseId} (Cycle: ${dto.cycleId})`, details: 'Action report submitted.' });
+    return entry;
+  }
+
+  markActionRequired(dto: TriggerActionReportDto, actorId?: string, actorName?: string) {
+    const reports = this.store.getActionReports();
+    const existing = reports.find(r => r.facultyId === dto.facultyId && r.courseId === dto.courseId && r.cycleId === dto.cycleId);
+    
+    if (existing) {
+      return existing; // Already exists or marked
+    }
+
+    const entry = {
+      reportId: `ACT_${Date.now()}`,
+      ...dto,
+      status: 'REQUIRED',
+      rootCause: '',
+      plannedStrategies: '',
+      timeline: '',
+      hodNotes: '',
+      hodOutcomes: '',
+      submissionDate: null,
+    };
+
+    reports.push(entry);
+    this.store.setActionReports(reports);
+
+    this.store.appendAuditLog({
+      actor: actorId || 'HOD',
+      actorName: actorName || 'HOD',
+      actorRole: 'hod',
+      action: 'TRIGGER',
+      module: 'Action Reports',
+      target: `${dto.courseId} (Faculty: ${dto.facultyId})`,
+      details: 'Action report explicitly required by HOD.',
+    });
+
     return entry;
   }
 
