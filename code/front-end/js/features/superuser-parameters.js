@@ -9,7 +9,7 @@ let activeCycle = null;
 
 export async function renderSuperuserParameters() {
     const urlParams = new URLSearchParams(window.location.search);
-    const cycleId = urlParams.get('cycleId') || localStorage.getItem('activeCycleId');
+    const cycleId = urlParams.get('cycleId');
     if (!cycleId) {
         showToast('No Cycle ID provided. Returning to cycles list.', 'error');
         setTimeout(() => window.location.href = 'manage-cycles.html', 1500);

@@ -40,7 +40,7 @@ export async function initSelfReflection() {
     const user = getSession();
     if (!user) return;
 
-    const activeCourse = localStorage.getItem('activeFacultyCourse');
+    const activeCourse = new URLSearchParams(window.location.search).get('courseId');
     if (!activeCourse) {
         const label = document.getElementById('activeCourseLabel');
         if (label) label.textContent = 'No course selected — go back to Reports';
@@ -61,12 +61,11 @@ export async function initSelfReflection() {
     const label = document.getElementById('activeCourseLabel');
     if (label) label.textContent = course ? `${course.id} — ${course.name}` : activeCourse;
 
-    // Load eval parameters for this faculty's department
-    let evalParams = [];
-    try { evalParams = await GET('/evaluation-parameters'); } catch {}
-    const myParams = evalParams.filter(p =>
-        (!p.department || p.department === user.department) && p.status !== 'DRAFT'
-    );
+    // Load eval parameters for this faculty's department from the active cycle
+    let myParams = [];
+    try { 
+        myParams = await GET(`/feedback-cycles/${activeCycleId}/parameters?department=${encodeURIComponent(user.department)}`); 
+    } catch {}
 
     // Check for existing reflection
     let existing = null;

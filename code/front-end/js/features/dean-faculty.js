@@ -94,7 +94,7 @@ function renderTable() {
     };
 
     filteredFaculty.forEach(faculty => {
-        const assignedCourses = allCourses.filter(c => c.facultyId === faculty.id).map(c => c.id);
+        const assignedCourses = allCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id))).map(c => c.id);
         const coursesHtml = assignedCourses.length > 0 
             ? assignedCourses.join(", ") 
             : `<span style="color:#94a3b8; font-style:italic;">None</span>`;
@@ -107,9 +107,10 @@ function renderTable() {
             let sumAverages = 0;
             facultyFeedback.forEach(f => {
                 let metricSum = 0, metricCount = 0;
-                if (f.ratings) {
-                    Object.values(f.ratings).forEach(val => {
-                        if (typeof val === 'number') { metricSum += val; metricCount++; }
+                if (Array.isArray(f.ratings)) {
+                    f.ratings.forEach(rating => {
+                        const score = Number(rating.score);
+                        if (!isNaN(score)) { metricSum += score; metricCount++; }
                     });
                 }
                 sumAverages += (metricCount > 0 ? (metricSum / metricCount) : 0);

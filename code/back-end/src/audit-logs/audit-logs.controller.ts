@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
 import { AuditLogsService } from './audit-logs.service';
 import { RoleGuard } from '../common/guards/role.guard';
@@ -25,5 +25,20 @@ export class AuditLogsController {
     @Query('actor') actor?: string,
   ) {
     return this.svc.findAll(Number(page) || 1, Number(limit) || 50, module, actor);
+  }
+
+  @Post()
+  @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
+  @ApiOperation({ summary: 'Create an audit log entry from the frontend' })
+  create(@Body() body: any, @Request() req: any) {
+    return this.svc.create({
+      actor: body.actor || req.headers['x-user-id'] || 'UNKNOWN',
+      actorName: body.actorName || req.headers['x-user-name'] || 'Unknown',
+      actorRole: body.actorRole || req.headers['x-role'] || 'unknown',
+      action: body.action || 'LOG',
+      module: body.module || 'General',
+      target: body.target || '',
+      details: body.details || '',
+    });
   }
 }

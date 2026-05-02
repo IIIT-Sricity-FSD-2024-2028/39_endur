@@ -47,13 +47,13 @@ export async function renderReviewCheckins() {
 
     const viewDataList = [];
     myFaculty.forEach(faculty => {
-        const facultyCourses = allCourses.filter(c => c.facultyId === faculty.id);
+        const facultyCourses = allCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id)));
         facultyCourses.forEach(course => {
             const courseFeedback = allSubmissions.filter(f => f.course === course.id);
             let avgScore = 0;
             if (courseFeedback.length > 0) {
                 const sumAverages = courseFeedback.reduce((sum, f) => {
-                    const vals = Object.values(f.ratings || {}).filter(v => typeof v === 'number');
+                    const vals = Array.isArray(f.ratings) ? f.ratings.map(r => Number(r.score)).filter(s => !isNaN(s)) : [];
                     return sum + (vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : 0);
                 }, 0);
                 avgScore = sumAverages / courseFeedback.length;

@@ -171,15 +171,22 @@
         }
     };
 
-    window.switchRole = function(targetRole) {
+    window.switchRole = async function(targetRole) {
         const currentUser = JSON.parse(localStorage.getItem("endurSession"));
-        const users = JSON.parse(localStorage.getItem("systemUsers")) || [];
-        let target = users.find(u => u.name === currentUser.name && u.role === targetRole);
-        if (!target) {
-            target = { ...currentUser, role: targetRole };
+        try {
+            const { GET } = await import('../../js/core/api.js');
+            const users = await GET('/users');
+            let target = users.find(u => u.name === currentUser.name && u.role === targetRole);
+            if (!target) {
+                target = { ...currentUser, role: targetRole };
+            }
+            localStorage.setItem("endurSession", JSON.stringify(target));
+            window.location.href = `../${targetRole}/dashboard.html`;
+        } catch {
+            const target = { ...currentUser, role: targetRole };
+            localStorage.setItem("endurSession", JSON.stringify(target));
+            window.location.href = `../${targetRole}/dashboard.html`;
         }
-        localStorage.setItem("endurSession", JSON.stringify(target));
-        window.location.href = `../${targetRole}/dashboard.html`;
     };
 
     window.logout = function() {

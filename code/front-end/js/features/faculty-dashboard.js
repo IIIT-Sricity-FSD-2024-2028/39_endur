@@ -21,7 +21,7 @@ export async function renderFacultyDashboard() {
     if (!user) return;
 
     const allCourses = await getCourses();
-    const myCourses = allCourses.filter(c => c.facultyId === user.id);
+    const myCourses = allCourses.filter(c => c.facultyId === user.id || (c.facultyIds && c.facultyIds.includes(user.id)));
     const cycleState = await getCycleState();
     const activeCycleId = cycleState?.id || 'FALLBACK_CYCLE';
 
@@ -172,7 +172,12 @@ export async function renderFacultyDashboard() {
             const rows = ['Cycle ID,Course ID,User ID,Avg Score'];
             myFeedback.forEach(f => {
                 let sum = 0, count = 0;
-                if (f.ratings) Object.values(f.ratings).filter(v => typeof v === 'number').forEach(v => { sum += v; count++; });
+                if (Array.isArray(f.ratings)) {
+                    f.ratings.forEach(r => {
+                        const score = Number(r.score);
+                        if (!isNaN(score)) { sum += score; count++; }
+                    });
+                }
                 rows.push(`${f.cycleId},${f.courseId},${f.studentId || f.userId},${count ? (sum / count).toFixed(2) : 0}`);
             });
             downloadCSV(`Faculty_Trends_${user.id}_${activeCycleId}.csv`, rows.join('\n'));

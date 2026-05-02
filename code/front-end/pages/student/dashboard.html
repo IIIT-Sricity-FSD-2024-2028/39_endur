@@ -205,12 +205,11 @@
         document.getElementById("userDept").innerText = user.department;
 
         window.openFeedback = function (courseId) {
-            localStorage.setItem("activeCourse", courseId);
             if (courseId.includes("reviewOfReviews")) {
                 window.location.href = "review-of-reviews.html";
                 return;
             }
-            window.location.href = "feedback-form.html";
+            window.location.href = `feedback-form.html?courseId=${encodeURIComponent(courseId)}`;
         };
 
         updateDashboard();

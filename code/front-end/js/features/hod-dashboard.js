@@ -33,19 +33,20 @@ export async function renderHodDashboard() {
     // Department-wide stats
     const deptFeedback = submissions.filter(f => {
         const course = allCourses.find(c => c.id === f.courseId);
-        return course && facultyIds.includes(course.facultyId);
+        return course && (facultyIds.includes(course.facultyId) || (course.facultyIds && course.facultyIds.some(fid => facultyIds.includes(fid))));
     });
     let totalDeptScore = 0, deptMetricCount = 0;
     deptFeedback.forEach(f => {
-        if (f.ratings) Object.values(f.ratings).forEach(val => {
-            if (typeof val === 'number') { totalDeptScore += val; deptMetricCount++; }
+        if (Array.isArray(f.ratings)) f.ratings.forEach(val => {
+            const score = Number(val.score);
+            if (!isNaN(score)) { totalDeptScore += score; deptMetricCount++; }
         });
     });
 
     const deptAverage = deptMetricCount > 0 ? (totalDeptScore / deptMetricCount) : 0;
     const deptSatisfaction = deptAverage > 0 ? (deptAverage / 5) * 100 : 0;
 
-    const deptCourses = allCourses.filter(c => facultyIds.includes(c.facultyId));
+    const deptCourses = allCourses.filter(c => facultyIds.includes(c.facultyId) || (c.facultyIds && c.facultyIds.some(fid => facultyIds.includes(fid))));
     const estimatedStudents = deptCourses.length * 40;
     const responseRate = estimatedStudents > 0 ? (deptFeedback.length / estimatedStudents) * 100 : 0;
 
@@ -61,7 +62,7 @@ export async function renderHodDashboard() {
     // Pending check-ins
     let pendingCheckins = 0;
     myFaculty.forEach(faculty => {
-        const fCourses = deptCourses.filter(c => c.facultyId === faculty.id);
+        const fCourses = deptCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id)));
         fCourses.forEach(course => {
             const actionReport = actionReports.find(a => a.facultyId === faculty.id && a.courseId === course.id);
             if (actionReport && actionReport.status === 'SUBMITTED') pendingCheckins++;
@@ -76,15 +77,16 @@ export async function renderHodDashboard() {
     if (tableBody) {
         tableBody.innerHTML = '';
         myFaculty.slice(0, 5).forEach(faculty => {
-            const fCourses = deptCourses.filter(c => c.facultyId === faculty.id);
+            const fCourses = deptCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id)));
             let facultyAvgScore = 0, fCount = 0;
             const facultyFeedback = deptFeedback.filter(f => {
                 const c = allCourses.find(c => c.id === f.courseId);
                 return c && c.facultyId === faculty.id;
             });
             facultyFeedback.forEach(f => {
-                if (f.ratings) Object.values(f.ratings).forEach(val => {
-                    if (typeof val === 'number') { facultyAvgScore += val; fCount++; }
+                if (Array.isArray(f.ratings)) f.ratings.forEach(val => {
+                    const score = Number(val.score);
+                    if (!isNaN(score)) { facultyAvgScore += score; fCount++; }
                 });
             });
             const finalAvg = fCount > 0 ? (facultyAvgScore / fCount).toFixed(1) : 'N/A';
@@ -117,16 +119,17 @@ export async function renderHodDashboard() {
             });
             myDeptFeedback.forEach(f => {
                 let sum = 0, count = 0;
-                if(f.ratings) { 
-                    Object.entries(f.ratings).forEach(([pCode, v]) => {
-                        if (typeof v === 'number') {
+                if(Array.isArray(f.ratings)) { 
+                    f.ratings.forEach(rating => {
+                        const score = Number(rating.score);
+                        if (!isNaN(score)) {
                             exportData.push({
                                 CycleID: f.cycleId,
                                 CourseID: f.courseId,
                                 FacultyID: allCourses.find(c => c.id === f.courseId)?.facultyId || '',
-                                Parameter: pCode,
-                                Rating: v,
-                                Comments: f.comments || ""
+                                Parameter: rating.paramName || rating.paramId,
+                                Rating: score,
+                                Comments: rating.comment || ""
                             });
                         }
                     });

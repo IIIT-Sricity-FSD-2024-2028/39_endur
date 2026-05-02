@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataStoreService } from '../seed/data-store.service';
+import { DataStoreService, AuditLog } from '../seed/data-store.service';
 
 @Injectable()
 export class AuditLogsService {
@@ -15,5 +15,10 @@ export class AuditLogsService {
     const data = logs.slice(start, start + limit);
 
     return { total, page, limit, data };
+  }
+
+  create(entry: Omit<AuditLog, 'id' | 'timestamp'>) {
+    this.store.appendAuditLog(entry);
+    return { message: 'Audit log entry created' };
   }
 }

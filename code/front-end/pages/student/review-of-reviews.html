@@ -231,35 +231,34 @@
             });
         };
 
-        window.submitReviewOfReviews = function() {
+        window.submitReviewOfReviews = async function() {
             if (Object.keys(window.ratings).length < 4) {
                 alert("Please answer all questions before submitting.");
                 return;
             }
 
-            const data = {
-                type: "reviewOfReviews",
-                ratings: window.ratings,
-                date: new Date().toISOString()
-            };
+            const { GET, POST, getSession } = await import('../../js/core/api.js');
+            const user = getSession();
+            let cycleState;
+            try { cycleState = await GET('/feedback-cycles/state'); } catch { cycleState = { id: 'FALLBACK' }; }
 
-            // 1. Store the actual review blob
-            let stored = JSON.parse(localStorage.getItem("reviewOfReviews")) || [];
-            stored.push(data);
-            localStorage.setItem("reviewOfReviews", JSON.stringify(stored));
+            const ratingsArray = Object.entries(window.ratings).map(([paramId, score]) => ({
+                paramId,
+                score,
+                comment: ''
+            }));
 
-            // 2. Register it as completed feedback in the current cycle so dashboard updates
-            const user = JSON.parse(localStorage.getItem("endurSession"));
-            const cycleState = JSON.parse(localStorage.getItem("systemCycleState")) || { id: "FALLBACK" };
-            let submitted = JSON.parse(localStorage.getItem("submittedFeedback")) || [];
-            
-            submitted.push({
-                course: "reviewOfReviews",
-                userId: user ? user.id : "UNKNOWN",
-                cycleId: cycleState.id,
-                timestamp: new Date().toISOString()
-            });
-            localStorage.setItem("submittedFeedback", JSON.stringify(submitted));
+            try {
+                await POST('/feedback-responses', {
+                    cycleId: cycleState.id,
+                    courseId: 'reviewOfReviews',
+                    studentId: user?.id || 'UNKNOWN',
+                    studentDepartment: user?.department || '',
+                    ratings: ratingsArray,
+                }, 'student');
+            } catch (err) {
+                console.warn('Failed to submit review of reviews:', err);
+            }
 
             window.location.href = "feedback-success.html";
         };

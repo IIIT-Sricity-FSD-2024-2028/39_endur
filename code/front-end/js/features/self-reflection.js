@@ -40,7 +40,7 @@ export async function initSelfReflection() {
     // Load draft from backend if available
     if (activeCycleId) {
         try {
-            const activeCourse = localStorage.getItem('activeFacultyCourse');
+            const activeCourse = new URLSearchParams(window.location.search).get('courseId');
             const refs = await GET(`/faculty-reports/self-reflections?facultyId=${user.id}&courseId=${activeCourse}&cycleId=${activeCycleId}`);
             if (refs[0]) {
                 Object.assign(ratings, refs[0].expectedRatings || {});
@@ -79,7 +79,7 @@ export async function submitSelfReflection() {
     if (!textValue) { alert('Please provide qualitative feedback in the text area.'); return; }
 
     const user = getSession();
-    const activeCourse = localStorage.getItem('activeFacultyCourse');
+    const activeCourse = new URLSearchParams(window.location.search).get('courseId');
     if (!activeCycleId) { alert('No active feedback cycle found.'); return; }
 
     const expectedRatings = {};

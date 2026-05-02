@@ -7,24 +7,38 @@ export declare class EvaluationParametersController {
     getDeptStatus(): Record<string, string>;
     getDraftsByDept(dept: string): any[];
     create(dto: CreateEvalParamDto, req: any): {
+        department: string;
+        id: string;
+        name: string;
+        description: string;
+        category: string;
+        weight: number;
+        type: string;
+    };
+    update(id: string, dept: string, dto: UpdateEvalParamDto, req: any): any;
+    remove(id: string, dept: string, req: any): {
         message: string;
-        success?: undefined;
-        failed?: undefined;
-        total?: undefined;
-    } | {
+    };
+    revert(dept: string, req: any): {
+        message: string;
+        status: string;
+    };
+    approve(dept: string, req: any): {
+        message: string;
+        params: any[];
+    };
+    submit(dept: string, req: any): {
+        message: string;
+    };
+    reject(dept: string, note: string, req: any): {
+        message: string;
+    };
+    bulkImport(dto: BulkImportEvalParamsDto, req: any): {
         success: any[];
         failed: {
             param: any;
             reason: string;
         }[];
-        total: any;
-        message?: undefined;
+        total: number;
     };
-    update(id: string, dept: string, dto: UpdateEvalParamDto, req: any): any;
-    remove(id: string, dept: string, req: any): any;
-    revert(dept: string, req: any): any;
-    approve(dept: string, req: any): any;
-    submit(dept: string, req: any): any;
-    reject(dept: string, note: string, req: any): any;
-    bulkImport(dto: BulkImportEvalParamsDto, req: any): any;
 }

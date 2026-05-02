@@ -110,7 +110,7 @@ async function renderApprovalQueue() {
         listContainer.appendChild(row);
     });
 
-    window.viewRequest = (dept) => { localStorage.setItem('activeReviewDept', dept); window.location.href = 'review-parameters.html'; };
+    window.viewRequest = (dept) => { window.location.href = `review-parameters.html?dept=${encodeURIComponent(dept)}`; };
 }
 
 export async function advanceCyclePhase() {

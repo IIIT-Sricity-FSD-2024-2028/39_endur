@@ -187,7 +187,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         allBtn.className = 'course-btn active';
         allBtn.textContent = 'All Courses';
         allBtn.onclick = () => {
-            localStorage.removeItem('activeFacultyCourse');
+            // Remove courseId from URL and reload trends
+            const url = new URL(window.location);
+            url.searchParams.delete('courseId');
+            window.history.replaceState({}, '', url);
             document.querySelectorAll('.course-btn').forEach(b => b.classList.remove('active'));
             allBtn.classList.add('active');
             renderHistoricalTrends();
@@ -200,7 +203,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.dataset.id = course.id;
             btn.textContent = `${course.id} — ${course.name}`;
             btn.onclick = () => {
-                localStorage.setItem('activeFacultyCourse', course.id);
+                const url = new URL(window.location);
+                url.searchParams.set('courseId', course.id);
+                window.history.replaceState({}, '', url);
                 document.querySelectorAll('.course-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 renderHistoricalTrends();

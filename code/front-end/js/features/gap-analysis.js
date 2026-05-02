@@ -11,7 +11,7 @@ export async function renderGapAnalysis() {
     } catch(e) {}
     const activeCycleId = cycleState.id;
 
-    const activeCourse = localStorage.getItem("activeFacultyCourse");
+    const activeCourse = new URLSearchParams(window.location.search).get('courseId');
     if (!activeCourse) {
         window.location.href = "reports.html";
         return;
@@ -43,15 +43,17 @@ export async function renderGapAnalysis() {
     let comments = [];
 
     courseFeedback.forEach(f => {
-        if (f.ratings) {
-            Object.keys(f.ratings).forEach(key => {
-                if (typeof f.ratings[key] === 'number') {
-                    totals[key] = (totals[key] || 0) + f.ratings[key];
+        if (Array.isArray(f.ratings)) {
+            f.ratings.forEach(rating => {
+                const score = Number(rating.score);
+                if (!isNaN(score)) {
+                    const key = rating.paramId;
+                    totals[key] = (totals[key] || 0) + score;
                     counts[key] = (counts[key] || 0) + 1;
                 }
+                if (rating.comment?.trim()) comments.push(`(${rating.paramName || rating.paramId}) ${rating.comment}`);
             });
         }
-        if (f.comment?.trim()) comments.push(f.comment);
     });
 
     const expected = reflection.expectedRatings || {};

@@ -5,7 +5,7 @@ import { appendAuditLog } from "../features/admin-utils.js";
 let targetDept = null;
 
 export async function initReview() {
-    targetDept = localStorage.getItem("activeReviewDept");
+    targetDept = new URLSearchParams(window.location.search).get('dept');
     
     if (!targetDept) {
         window.location.href = "cycle-management.html";

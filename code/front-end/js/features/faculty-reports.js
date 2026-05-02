@@ -13,7 +13,7 @@ export async function renderFacultyReports() {
     // ── 1. Fetch all needed data from API ──────────────────────────────────────
     let allCourses = [];
     try { allCourses = await GET('/courses'); } catch {}
-    const myCourses = allCourses.filter(c => c.facultyId === user.id);
+    const myCourses = allCourses.filter(c => c.facultyId === user.id || (c.facultyIds && c.facultyIds.includes(user.id)));
 
     if (myCourses.length === 0) {
         _showNoCourses();
@@ -73,7 +73,6 @@ export async function renderFacultyReports() {
             btn.onclick = () => {
                 document.querySelectorAll('.course-tab').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                localStorage.setItem('activeFacultyCourse', course.id);
                 renderCourse(course, allFeedback, reflections, actionReports, activeCycleId, currentPhase, user);
             };
             selector.appendChild(btn);
@@ -81,7 +80,6 @@ export async function renderFacultyReports() {
     }
 
     // Select first course
-    localStorage.setItem('activeFacultyCourse', myCourses[0].id);
     renderCourse(myCourses[0], allFeedback, reflections, actionReports, activeCycleId, currentPhase, user);
 
     // ── 4. Deadline display ───────────────────────────────────────────────────
@@ -121,11 +119,13 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
     const ratingTotals = {};
     const ratingCounts = {};
     courseFeedback.forEach(f => {
-        if (!f.ratings) return;
-        Object.entries(f.ratings).forEach(([paramId, score]) => {
-            if (typeof score !== 'number') return;
-            ratingTotals[paramId] = (ratingTotals[paramId] || 0) + score;
-            ratingCounts[paramId] = (ratingCounts[paramId] || 0) + 1;
+        if (!Array.isArray(f.ratings)) return;
+        f.ratings.forEach(rating => {
+            const score = Number(rating.score);
+            if (isNaN(score)) return;
+            const key = rating.paramName || rating.paramId;
+            ratingTotals[key] = (ratingTotals[key] || 0) + score;
+            ratingCounts[key] = (ratingCounts[key] || 0) + 1;
         });
     });
 
@@ -192,7 +192,7 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
         if (actionTitle) actionTitle.textContent = 'Submit Self-Reflection';
         if (actionDesc) actionDesc.textContent = 'Rate your own performance before reviewing student results.';
         btn.textContent = 'Start Self-Reflection →';
-        btn.onclick = () => { localStorage.setItem('activeFacultyCourse', course.id); window.location.href = 'self-reflection.html'; };
+        btn.onclick = () => { window.location.href = `self-reflection.html?courseId=${encodeURIComponent(course.id)}`; };
     } else if (currentPhase === 'ACTION_REPORT' || currentPhase === 'COMPLETED') {
         if (hasActionReport?.status === 'FINALIZED') {
             if (actionTitle) actionTitle.textContent = 'Action Report (Finalized)';
@@ -222,7 +222,7 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
                 if (actionTitle) actionTitle.textContent = 'Submit Action Report';
                 if (actionDesc) actionDesc.textContent = 'HOD has requested an improvement plan based on feedback results.';
                 btn.textContent = 'Start Action Report →';
-                btn.onclick = () => { localStorage.setItem('activeFacultyCourse', course.id); window.location.href = 'action-report.html'; };
+                btn.onclick = () => { window.location.href = `action-report.html?courseId=${encodeURIComponent(course.id)}`; };
             }
         } else {
             // Not marked for action

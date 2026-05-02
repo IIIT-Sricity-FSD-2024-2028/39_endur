@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    const courseId = localStorage.getItem('activeCourse');
+    const courseId = new URLSearchParams(window.location.search).get('courseId');
     if (!courseId) return;
 
     let course, resolvedFacultyId = null;
@@ -84,7 +84,7 @@ function renderQuestions(params) {
         div.className = 'question-card';
         div.innerHTML = `
             <h3>${q.name}</h3>
-            <p style="font-size:12px;color:#64748b;margin-bottom:8px;">${q.description || ''} <span style="font-size:11px;color:#a78bfa;">(Weight: ${q.weight ?? 25}%)</span></p>
+            <p style="font-size:12px;color:#64748b;margin-bottom:8px;">${q.description || ''}</p>
             <div class="rating">
                 <span onclick="setRating('${q.id}', 1)">★</span>
                 <span onclick="setRating('${q.id}', 2)">★</span>
@@ -119,7 +119,7 @@ window.saveComment = function(paramId, text) {
 
 /* ========================= DRAFT ========================= */
 function saveDraft() {
-    const course = localStorage.getItem('activeCourse');
+    const course = new URLSearchParams(window.location.search).get('courseId');
     const user   = getSession();
     let drafts   = JSON.parse(localStorage.getItem('feedbackDraft') || '{}');
     if (!drafts[user.id]) drafts[user.id] = {};
@@ -128,7 +128,7 @@ function saveDraft() {
 }
 
 function loadDraft() {
-    const course = localStorage.getItem('activeCourse');
+    const course = new URLSearchParams(window.location.search).get('courseId');
     const user   = getSession();
     let drafts   = JSON.parse(localStorage.getItem('feedbackDraft') || '{}');
     const saved  = drafts[user?.id]?.[course];
@@ -152,7 +152,7 @@ window.submitFeedback = async function() {
         return;
     }
 
-    const courseId = localStorage.getItem('activeCourse');
+    const courseId = new URLSearchParams(window.location.search).get('courseId');
     const user     = getSession();
     let cycleState;
     try { cycleState = await GET('/feedback-cycles/state'); } catch { cycleState = null; }

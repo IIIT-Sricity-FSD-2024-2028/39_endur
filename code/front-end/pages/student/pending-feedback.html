@@ -136,12 +136,11 @@
                 card.className = "feedback-card";
                 
                 card.onclick = () => {
-                    localStorage.setItem("activeCourse", course.id);
                     if (course.id.includes("reviewOfReviews")) {
                         window.location.href = "review-of-reviews.html";
                         return;
                     }
-                    window.location.href = "feedback-form.html";
+                    window.location.href = `feedback-form.html?courseId=${encodeURIComponent(course.id)}`;
                 };
 
                 const thumb = course.id === "reviewOfReviews" ? 'img_bookclub.jpg' : (course.thumbnail || 'img_read.jpg');

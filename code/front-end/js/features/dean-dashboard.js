@@ -48,9 +48,10 @@ export async function renderDeanDashboard() {
         const faculty = course ? facultyList.find(u => u.id === course.facultyId) : null;
         const dept = faculty?.department;
 
-        if (f.ratings) {
-            Object.values(f.ratings).forEach(val => {
-                if (typeof val !== 'number') return;
+        if (Array.isArray(f.ratings)) {
+            f.ratings.forEach(rating => {
+                const val = Number(rating.score);
+                if (isNaN(val)) return;
                 instTotalScore += val;
                 instMetricCount++;
                 if (dept && departments[dept]) {
@@ -123,9 +124,10 @@ export async function renderDeanDashboard() {
             const { exportToCSV } = await import('./admin-utils.js');
             const exportData = [];
             allSubmissions.forEach(f => {
-                if (f.ratings) {
-                    Object.entries(f.ratings).forEach(([pCode, v]) => {
-                        if (typeof v === 'number') {
+                if (Array.isArray(f.ratings)) {
+                    f.ratings.forEach(rating => {
+                        const score = Number(rating.score);
+                        if (!isNaN(score)) {
                             const course = allCourses.find(c => c.id === f.courseId);
                             const faculty = facultyList.find(fac => fac.id === course?.facultyId);
                             exportData.push({
@@ -133,8 +135,8 @@ export async function renderDeanDashboard() {
                                 CourseID: f.courseId,
                                 FacultyID: faculty?.id || '',
                                 Department: faculty?.department || '',
-                                Parameter: pCode,
-                                Rating: v
+                                Parameter: rating.paramName || rating.paramId,
+                                Rating: score
                             });
                         }
                     });

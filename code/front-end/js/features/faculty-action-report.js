@@ -46,7 +46,7 @@ export async function initActionReport() {
     const user = getSession();
     if (!user) return;
 
-    const activeCourse = localStorage.getItem('activeFacultyCourse');
+    const activeCourse = new URLSearchParams(window.location.search).get('courseId');
     const noCourseState = document.getElementById('noCourseState');
     const form = document.getElementById('actionReportForm');
 

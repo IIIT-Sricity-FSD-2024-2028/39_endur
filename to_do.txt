@@ -3,8 +3,12 @@ agenda -
 - ensure imported feedback cyles are linked properly.
 - ensure historical trends work for imported roles for all users.
 - ensure proper guards for every role.
-- overhaul action reports and self reflection systems
+- faculty portal feedback reports and action reports are completely broken.
+- superuser create cycle does not work.
+- remove global optional comment option and dont show weights to students.
+- check the overhaul action reports and self reflection systems
 
 fixes (later) - 
 - make sure system settings in superusers actually works
 - make sure that every export button work and properly formats the data.
+- admin portal to be checked completely.

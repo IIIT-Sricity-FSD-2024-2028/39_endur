@@ -64,11 +64,11 @@ function bindCycleForm() {
         e.preventDefault();
         const errs = [];
         const name = form.cycleName.value.trim();
-        const type = form.cycleType.value;
-        const start = form.startDate.value;
-        const end = form.endDate.value;
-        const refDl = form.reflectionDeadline.value;
-        const actDl = form.actionReportDeadline.value;
+        const type = form.cycleType?.value || '';
+        const start = form.startDate?.value || '';
+        const end = form.endDate?.value || '';
+        const refDl = form.reflectionDeadline?.value || '';
+        const actDl = form.actionReportDeadline?.value || '';
 
         if (!name) errs.push('Cycle name is required.');
         if (!start) errs.push('Start date is required.');
@@ -188,8 +188,7 @@ export async function suViewCycleResponsesAsync(cycleId) {
 }
 
 window.suManageCycleParams = (id) => {
-    localStorage.setItem('activeCycleId', id);
-    window.location.href = 'manage-parameters.html';
+    window.location.href = `manage-parameters.html?cycleId=${encodeURIComponent(id)}`;
 };
 
 function updateCycleCount() {

@@ -34,7 +34,7 @@ export async function renderFacultyManagement() {
     };
 
     myFaculty.forEach(faculty => {
-        const facultyCourses = allCourses.filter(c => c.facultyId === faculty.id);
+        const facultyCourses = allCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id)));
         
         let coursePillsHtml = "";
         facultyCourses.forEach(c => {
@@ -52,9 +52,10 @@ export async function renderFacultyManagement() {
             facultyFeedback.forEach(f => {
                 let metricSum = 0;
                 let metricCount = 0;
-                if (f.ratings) {
-                    Object.values(f.ratings).forEach(val => {
-                        if (typeof val === 'number') { metricSum += val; metricCount++; }
+                if (Array.isArray(f.ratings)) {
+                    f.ratings.forEach(val => {
+                        const score = Number(val.score);
+                        if (!isNaN(score)) { metricSum += score; metricCount++; }
                     });
                 }
                 sumAverages += (metricCount > 0 ? (metricSum / metricCount) : 0);
@@ -97,9 +98,10 @@ export async function renderFacultyManagement() {
                       let sumAvgs = 0;
                       fb.forEach(sub => {
                           let mSum = 0; let mCount = 0;
-                          if (sub.ratings) {
-                               Object.values(sub.ratings).forEach(v => {
-                                    if (typeof v === 'number') { mSum += v; mCount++; }
+                          if (Array.isArray(sub.ratings)) {
+                               sub.ratings.forEach(v => {
+                                    const score = Number(v.score);
+                                    if (!isNaN(score)) { mSum += score; mCount++; }
                                });
                           }
                           sumAvgs += (mCount > 0 ? (mSum / mCount) : 0);

@@ -92,10 +92,13 @@ export function genId(prefix = 'ID') {
 }
 
 /**
- * Log an action to in-memory audit log (also stored in window.__auditLog)
+ * Log an action to the backend audit-logs endpoint (fire-and-forget)
  */
 export function appendAuditLog(actor, actorRole, action, module, target, details) {
-    console.log(`[Frontend Audit Auto-Captured] ${action} in ${module}: ${target} - ${details}`);
+    import('../core/api.js').then(({ POST }) => {
+        POST('/audit-logs', { actor, actorRole, action, module, target, details }).catch(() => {});
+    });
+    console.log(`[Audit] ${action} in ${module}: ${target} - ${details}`);
 }
 
 export function exportToCSV(filename, rows) {

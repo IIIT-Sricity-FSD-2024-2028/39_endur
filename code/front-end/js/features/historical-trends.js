@@ -23,7 +23,7 @@ export async function renderHistoricalTrends() {
         return;
     }
 
-    const activeCourse = localStorage.getItem('activeFacultyCourse');
+    const activeCourse = new URLSearchParams(window.location.search).get('courseId');
     const courseLabel  = document.getElementById('trendCourseLabel');
     if (courseLabel) courseLabel.innerText = activeCourse ? `(${activeCourse})` : '(all courses)';
 
