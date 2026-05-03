@@ -70,6 +70,7 @@ function renderAll() {
     const isCycleActive = ["STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"].includes(globalCycleState.phase);
     const isCycleCompleted = globalCycleState.phase === "COMPLETED";
 
+    const badgeEl = document.getElementById("cycleBadge");
     if (badgeEl) {
         if (isNoCycle) {
             badgeEl.innerText = "No Active Cycle";

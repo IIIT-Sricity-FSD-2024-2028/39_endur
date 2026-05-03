@@ -15,7 +15,7 @@ export async function initSelfReflection() {
         const cycles = await GET('/feedback-cycles');
         const active = cycles.find(c => c.status === 'active');
         activeCycleId = active?.cycleId || null;
-    } catch {}
+    } catch { }
 
     // Load parameters from backend
     try {
@@ -52,11 +52,11 @@ export async function initSelfReflection() {
                     if (el) el.querySelectorAll('span').forEach((s, i) => s.classList.toggle('active', i < value));
                 });
             }
-        } catch {}
+        } catch { }
     }
 
     const ta = document.getElementById('reflectionText');
-    if (ta) ta.addEventListener('input', () => {}); // no local draft needed
+    if (ta) ta.addEventListener('input', () => { }); // no local draft needed
 }
 
 function handleRatingChange(field, value) { ratings[field] = value; }
@@ -93,7 +93,7 @@ export async function submitSelfReflection() {
             expectedRatings,
             reflectionText: textValue,
         });
-        window.location.href = 'gap-analysis.html';
+        window.location.href = `gap-analysis.html?courseId=${encodeURIComponent(activeCourse)}`;
     } catch (err) {
         alert('Failed to submit reflection: ' + (err.message || 'Server error'));
     }

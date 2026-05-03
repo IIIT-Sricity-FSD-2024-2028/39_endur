@@ -56,20 +56,20 @@ export async function initSelfReflection() {
 
     // Get course details
     let courses = [];
-    try { courses = await GET('/courses'); } catch {}
+    try { courses = await GET('/courses'); } catch { }
     const course = courses.find(c => c.id === activeCourse);
     const label = document.getElementById('activeCourseLabel');
     if (label) label.textContent = course ? `${course.id} — ${course.name}` : activeCourse;
 
     // Load eval parameters for this faculty's department from the active cycle
     let myParams = [];
-    try { 
-        myParams = await GET(`/feedback-cycles/${activeCycleId}/parameters?department=${encodeURIComponent(user.department)}`); 
-    } catch {}
+    try {
+        myParams = await GET(`/feedback-cycles/${activeCycleId}/parameters?department=${encodeURIComponent(user.department)}`);
+    } catch { }
 
     // Check for existing reflection
     let existing = null;
-    try { existing = await getReflectionForCourse(activeCourse, activeCycleId); } catch {}
+    try { existing = await getReflectionForCourse(activeCourse, activeCycleId); } catch { }
 
     // Render quantitative questions
     const container = document.getElementById('dynamicQuestionsContainer');
@@ -91,7 +91,7 @@ export async function initSelfReflection() {
             <h4>${param.name}</h4>
             <p>${param.description || ''} <span style="font-size:0.8rem;color:var(--text-muted)">(Weight: ${param.weight || 0}%)</span></p>
             <div class="rating" id="rating_${param.id}">
-                ${[1,2,3,4,5].map(n => `<span data-val="${n}" onclick="setRating('${param.id}', ${n}, ${JSON.stringify(myParams)})">★</span>`).join('')}
+                ${[1, 2, 3, 4, 5].map(n => `<span data-val="${n}" onclick="setRating('${param.id}', ${n}, ${JSON.stringify(myParams)})">★</span>`).join('')}
             </div>
         </div>
     `).join('');
@@ -152,7 +152,7 @@ export async function submitSelfReflection() {
             expectedRatings,
             reflectionText,
         });
-        window.location.href = 'gap-analysis.html';
+        window.location.href = `gap-analysis.html?courseId=${encodeURIComponent(activeCourse)}`;
     } catch (err) {
         alert('Failed to submit reflection: ' + (err.message || 'Server error'));
     }

@@ -26,6 +26,17 @@ let AuditLogsController = class AuditLogsController {
     findAll(page, limit, module, actor) {
         return this.svc.findAll(Number(page) || 1, Number(limit) || 50, module, actor);
     }
+    create(body, req) {
+        return this.svc.create({
+            actor: body.actor || req.headers['x-user-id'] || 'UNKNOWN',
+            actorName: body.actorName || req.headers['x-user-name'] || 'Unknown',
+            actorRole: body.actorRole || req.headers['x-role'] || 'unknown',
+            action: body.action || 'LOG',
+            module: body.module || 'General',
+            target: body.target || '',
+            details: body.details || '',
+        });
+    }
 };
 exports.AuditLogsController = AuditLogsController;
 __decorate([
@@ -44,6 +55,16 @@ __decorate([
     __metadata("design:paramtypes", [Number, Number, String, String]),
     __metadata("design:returntype", void 0)
 ], AuditLogsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Post)(),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
+    (0, swagger_1.ApiOperation)({ summary: 'Create an audit log entry from the frontend' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], AuditLogsController.prototype, "create", null);
 exports.AuditLogsController = AuditLogsController = __decorate([
     (0, swagger_1.ApiTags)('Audit Logs'),
     (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),

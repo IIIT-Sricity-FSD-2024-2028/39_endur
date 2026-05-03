@@ -66,19 +66,19 @@ async function renderCycleTracker() {
 
 export async function createNewCycle() {
     const nameInput = document.getElementById('newCycleName').value.trim();
-    const start   = document.getElementById('dlStart')?.value || document.getElementById('dlPrep')?.value;
+    const start = document.getElementById('dlStart')?.value || document.getElementById('dlPrep')?.value;
     const student = document.getElementById('dlStudent')?.value;
-    const end     = document.getElementById('dlEnd')?.value || document.getElementById('dlReflection')?.value;
+    const end = document.getElementById('dlEnd')?.value || document.getElementById('dlReflection')?.value;
     if (!nameInput || !start || !student || !end) { alert('Please enter a name and select all dates.'); return; }
     const dStart = new Date(start), dStudent = new Date(student), dEnd = new Date(end);
     if (dStart >= dStudent || dStudent >= dEnd) { alert('Dates must be chronological: Start → Student Deadline → End.'); return; }
 
     try {
         await POST('/feedback-cycles', {
-            cycleName:       nameInput,
-            startTimestamp:  dStart.toISOString(),
+            cycleName: nameInput,
+            startTimestamp: dStart.toISOString(),
             studentDeadline: dStudent.toISOString(),
-            endTimestamp:    dEnd.toISOString(),
+            endTimestamp: dEnd.toISOString(),
         });
         showToast('Cycle created successfully!', 'success');
         document.getElementById('createCycleForm')?.reset();
@@ -92,9 +92,9 @@ async function renderApprovalQueue() {
     const listContainer = document.getElementById('approvalListContainer');
     if (!listContainer) return;
     let statusMap = {};
-    try { statusMap = await GET('/evaluation-parameters/status'); } catch {}
+    try { statusMap = await GET('/evaluation-parameters/status'); } catch { }
     let deptsData = [];
-    try { deptsData = await GET('/departments'); } catch {}
+    try { deptsData = await GET('/departments'); } catch { }
     const depts = deptsData.map(d => d.name).sort();
 
     if (!depts.length) { listContainer.innerHTML = `<p style="padding:20px 0;color:#64748b;font-style:italic;">No departments found.</p>`; return; }
@@ -110,7 +110,10 @@ async function renderApprovalQueue() {
         listContainer.appendChild(row);
     });
 
-    window.viewRequest = (dept) => { window.location.href = `review-parameters.html?dept=${encodeURIComponent(dept)}`; };
+    window.viewRequest = (dept) => { 
+        sessionStorage.setItem('reviewDeptId', dept);
+        window.location.href = `review-parameters.html?dept=${encodeURIComponent(dept)}`; 
+    };
 }
 
 export async function advanceCyclePhase() {
@@ -121,7 +124,7 @@ export async function advanceCyclePhase() {
     if (currentIndex === 0) {
         // Validate all dept params add up to 100%
         let statusMap = {};
-        try { statusMap = await GET('/evaluation-parameters/status'); } catch {}
+        try { statusMap = await GET('/evaluation-parameters/status'); } catch { }
         const notApproved = Object.entries(statusMap).filter(([, s]) => s !== 'APPROVED').map(([d]) => d);
         if (notApproved.length > 0 && !confirm(`Some departments are not fully approved (${notApproved.join(', ')}). Launch anyway?`)) return;
     }
@@ -143,7 +146,7 @@ async function renderHistory() {
     const listContainer = document.getElementById('cycleHistoryContainer');
     if (!listContainer) return;
     let cycles = [];
-    try { cycles = await GET('/feedback-cycles'); } catch {}
+    try { cycles = await GET('/feedback-cycles'); } catch { }
     if (!cycles.length) { listContainer.innerHTML = '<p style="padding:20px 0;color:#64748b;font-style:italic;">No cycle history found.</p>'; return; }
     listContainer.innerHTML = cycles.map(c => `
         <div class="approval-row" style="grid-template-columns:2fr 1fr 1fr 1fr;">
@@ -152,7 +155,7 @@ async function renderHistory() {
                 <p style="font-size:11px;color:#94a3b8;margin-top:2px">${c.startTimestamp ? new Date(c.startTimestamp).toLocaleDateString() : ''} — ${c.endTimestamp ? new Date(c.endTimestamp).toLocaleDateString() : ''}</p>
             </div>
             <div><span class="badge ${c.status === 'active' ? 'success' : 'neutral'}" style="font-size:10px;">${(c.status || '').toUpperCase()}</span></div>
-            <div><span style="color:#64748b;font-size:12px;">${(c.phase||'COMPLETED').replace(/_/g,' ')}</span></div>
+            <div><span style="color:#64748b;font-size:12px;">${(c.phase || 'COMPLETED').replace(/_/g, ' ')}</span></div>
             <div style="text-align:right;"><button class="btn-small" onclick="deanViewResponses('${c.cycleId}')">View</button></div>
         </div>`).join('');
 
@@ -169,15 +172,15 @@ async function renderHistory() {
                 <div class="modal-footer"><button class="btn-outline" onclick="document.getElementById('deanResponsesModal').classList.remove('active')">Close</button></div>
             </div>`;
             document.body.appendChild(modal);
-            modal.addEventListener('click', e => { if (e.target===modal) modal.classList.remove('active'); });
+            modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
         }
         const body = document.getElementById('deanRespBody');
-        document.getElementById('deanRespTitle').textContent = `Responses — ${cycles.find(c=>c.cycleId===cycleId)?.cycleName??cycleId}`;
+        document.getElementById('deanRespTitle').textContent = `Responses — ${cycles.find(c => c.cycleId === cycleId)?.cycleName ?? cycleId}`;
         body.innerHTML = '<p style="padding:20px;color:var(--text-muted)">Loading…</p>';
         modal.classList.add('active');
         try {
             const [responses, allCourses] = await Promise.all([GET(`/feedback-responses?cycleId=${cycleId}`), GET('/courses')]);
-            if (!responses.length) { body.innerHTML='<p style="padding:20px;text-align:center;color:var(--text-muted)">No responses recorded.</p>'; return; }
+            if (!responses.length) { body.innerHTML = '<p style="padding:20px;text-align:center;color:var(--text-muted)">No responses recorded.</p>'; return; }
             body.innerHTML = `
                 <style>
                     .resp-det { font-size: 11px; color: #64748b; margin-top: 4px; display: grid; gap: 4px; padding: 8px; background: #f8fafc; border-radius: 4px; }
@@ -185,27 +188,27 @@ async function renderHistory() {
                 </style>
                 <table class="data-table"><thead><tr><th>Course & Faculty</th><th>Dept</th><th>Date</th><th>Score & Breakdown</th></tr></thead><tbody>
                 ${responses.map(r => {
-                    const course = allCourses.find(c=>c.id===r.courseId);
-                    const avg = Array.isArray(r.ratings) && r.ratings.length ? (() => {
-                        const scores = r.ratings.map(x => {
-                            let s = Number(x.score || 0);
-                            if (s > 5) s = s / 20;
-                            return s;
-                        });
-                        return (scores.reduce((a, b) => a + b, 0) / scores.length * 20).toFixed(1) + '%';
-                    })() : '—';
-                    const ratingsHtml = Array.isArray(r.ratings) ? r.ratings.map(rt => {
-                        let s = Number(rt.score || 0);
+                const course = allCourses.find(c => c.id === r.courseId);
+                const avg = Array.isArray(r.ratings) && r.ratings.length ? (() => {
+                    const scores = r.ratings.map(x => {
+                        let s = Number(x.score || 0);
                         if (s > 5) s = s / 20;
-                        return `<div class="resp-det"><span><strong>${rt.paramName || rt.paramId}</strong>: ${s.toFixed(1)}/5</span>${rt.comment ? `<span class="resp-comm">"${rt.comment}"</span>` : ''}</div>`;
-                    }).join('') : '';
-                    return `<tr>
-                        <td><strong>${course?.name??r.courseId}</strong><br><span style="font-size:11px;color:var(--text-muted)">${r.facultyId??'—'}</span></td>
-                        <td>${r.studentDepartment??'—'}</td>
-                        <td style="font-size:12px">${r.submittedAt?new Date(r.submittedAt).toLocaleDateString():'—'}</td>
+                        return s;
+                    });
+                    return (scores.reduce((a, b) => a + b, 0) / scores.length * 20).toFixed(1) + '%';
+                })() : '—';
+                const ratingsHtml = Array.isArray(r.ratings) ? r.ratings.map(rt => {
+                    let s = Number(rt.score || 0);
+                    if (s > 5) s = s / 20;
+                    return `<div class="resp-det"><span><strong>${rt.paramName || rt.paramId}</strong>: ${s.toFixed(1)}/5</span>${rt.comment ? `<span class="resp-comm">"${rt.comment}"</span>` : ''}</div>`;
+                }).join('') : '';
+                return `<tr>
+                        <td><strong>${course?.name ?? r.courseId}</strong><br><span style="font-size:11px;color:var(--text-muted)">${r.facultyId ?? '—'}</span></td>
+                        <td>${r.studentDepartment ?? '—'}</td>
+                        <td style="font-size:12px">${r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : '—'}</td>
                         <td><strong>${avg}</strong>${ratingsHtml}</td>
                     </tr>`;
-                }).join('')}</tbody></table>`;
-        } catch { body.innerHTML='<p style="padding:20px;color:var(--danger)">Failed to load responses.</p>'; }
+            }).join('')}</tbody></table>`;
+        } catch { body.innerHTML = '<p style="padding:20px;color:var(--danger)">Failed to load responses.</p>'; }
     };
 }

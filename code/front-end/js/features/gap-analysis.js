@@ -8,7 +8,7 @@ export async function renderGapAnalysis() {
     let cycleState = { id: "FALLBACK" };
     try {
         cycleState = await GET('/feedback-cycles/state');
-    } catch(e) {}
+    } catch (e) { }
     const activeCycleId = cycleState.id;
 
     const activeCourse = new URLSearchParams(window.location.search).get('courseId');
@@ -20,13 +20,13 @@ export async function renderGapAnalysis() {
     let allReflectionData = [];
     try {
         allReflectionData = await GET(`/faculty-reports/self-reflections?courseId=${encodeURIComponent(activeCourse)}&cycleId=${activeCycleId}`);
-    } catch(e) {}
+    } catch (e) { }
 
     const reflection = allReflectionData.find(r => r.facultyId === user.id);
 
     if (!reflection) {
         alert("No reflection found for the current cycle. Please submit one first.");
-        window.location.href = "self-reflection.html";
+        window.location.href = `self-reflection.html?courseId=${encodeURIComponent(activeCourse)}`;
         return;
     }
 
@@ -36,8 +36,8 @@ export async function renderGapAnalysis() {
     let courseFeedback = [];
     try {
         courseFeedback = await GET(`/feedback-responses?courseId=${encodeURIComponent(activeCourse)}&cycleId=${activeCycleId}`);
-    } catch(e) {}
-    
+    } catch (e) { }
+
     let totals = {};
     let counts = {};
     let comments = [];
@@ -63,7 +63,7 @@ export async function renderGapAnalysis() {
     let deptParams = [];
     try {
         deptParams = await GET(`/evaluation-parameters/dept/${encodeURIComponent(user.department)}`);
-    } catch(e) {}
+    } catch (e) { }
 
     function getParamName(id) {
         const param = deptParams.find(p => p.id === id);
@@ -72,7 +72,7 @@ export async function renderGapAnalysis() {
 
     const formatGapText = (gapValue) => {
         const pct = (gapValue * 20).toFixed(0);
-        if (gapValue > 0.2) return `<strong style="color: #d97706;">+${pct}%</strong>`; 
+        if (gapValue > 0.2) return `<strong style="color: #d97706;">+${pct}%</strong>`;
         if (gapValue < -0.2) return `<strong style="color: #16a34a;">${pct}%</strong>`;
         return `<strong style="color: #64748b;">0%</strong>`;
     };
@@ -80,13 +80,13 @@ export async function renderGapAnalysis() {
     Object.keys(expected).forEach(field => {
         const selfScore = expected[field];
         const studentScore = counts[field] ? (totals[field] / counts[field]) : 0;
-        const gap = selfScore - studentScore; 
+        const gap = selfScore - studentScore;
 
-        rows.push({ 
-            field: getParamName(field), 
-            selfScore, 
-            studentScore, 
-            gap 
+        rows.push({
+            field: getParamName(field),
+            selfScore,
+            studentScore,
+            gap
         });
 
         totalSelf += selfScore;
@@ -100,7 +100,7 @@ export async function renderGapAnalysis() {
 
     document.getElementById("selfScore").innerText = (avgSelf * 20).toFixed(0) + "%";
     document.getElementById("studentScore").innerText = (avgStudent * 20).toFixed(0) + "%";
-    
+
     const gapScoreEl = document.getElementById("gapScore");
     const gapPct = (overallGap * 20).toFixed(0);
     gapScoreEl.innerText = (overallGap > 0 ? "+" : "") + gapPct + "%";
@@ -117,12 +117,12 @@ export async function renderGapAnalysis() {
     `).join("");
 
     const container = document.getElementById("commentList");
-    container.innerHTML = comments.length ? 
+    container.innerHTML = comments.length ?
         comments.slice(-5).map(text => `
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; color: #334155; font-size: 14px; line-height: 1.5;">
                 "${text}"
             </div>
-        `).join("") : 
+        `).join("") :
         "<p style='color: #64748b; font-style: italic;'>No student comments available for this cycle.</p>";
 
     // Show Action link if marked by HOD
@@ -133,8 +133,8 @@ export async function renderGapAnalysis() {
             const btn = document.getElementById("btnAction");
             if (container && btn) {
                 container.style.display = "block";
-                btn.onclick = () => window.location.href = "action-report.html";
+                btn.onclick = () => window.location.href = `action-report.html?courseId=${encodeURIComponent(activeCourse)}`;
             }
         }
-    } catch(e) {}
+    } catch (e) { }
 }

@@ -28,6 +28,10 @@ let AuditLogsService = class AuditLogsService {
         const data = logs.slice(start, start + limit);
         return { total, page, limit, data };
     }
+    create(entry) {
+        this.store.appendAuditLog(entry);
+        return { message: 'Audit log entry created' };
+    }
 };
 exports.AuditLogsService = AuditLogsService;
 exports.AuditLogsService = AuditLogsService = __decorate([

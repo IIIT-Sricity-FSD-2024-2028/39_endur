@@ -71,9 +71,9 @@
         if (user) {
             document.getElementById("userName").innerText = user.name;
             document.getElementById("userDept").innerText = user.department;
-            
+
             const avatarEl = document.querySelector(".avatar");
-            if(avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
+            if (avatarEl) avatarEl.innerText = user.name.split(" ").map(n => n[0]).join("");
 
             loadPending();
         }
@@ -85,20 +85,20 @@
                 GET('/feedback-responses').catch(() => []),
                 GET('/feedback-cycles/state').catch(() => ({ id: 'NO ACTIVE CYCLE', phase: 'COMPLETED' }))
             ]);
-            
+
             const myCourseIds = user.enrolledCourses || [];
 
             const currentCycleId = cycleState.id;
             const isFeedbackOpen = cycleState.phase === "STUDENT_FEEDBACK";
 
             const badgeEl = document.getElementById("cycleBadge");
-            if(badgeEl) badgeEl.innerText = currentCycleId;
+            if (badgeEl) badgeEl.innerText = currentCycleId;
 
             const container = document.getElementById("pendingContainer");
             const emptyState = document.getElementById("emptyPending");
             const emptyTitle = document.getElementById("emptyTitle");
             const emptyDesc = document.getElementById("emptyDesc");
-            
+
             container.innerHTML = "";
 
             // UX FIX: If feedback phase is NOT active, show empty state immediately
@@ -117,7 +117,7 @@
             }
 
             const myCourses = allCourses.filter(c => myCourseIds.includes(c.id));
-            
+
             myCourses.push({
                 id: "reviewOfReviews",
                 name: "Platform System Review",
@@ -130,11 +130,11 @@
                     f => f.courseId === course.id && f.studentId === user.id && f.cycleId === currentCycleId
                 );
 
-                if (done) return; 
+                if (done) return;
 
                 const card = document.createElement("div");
                 card.className = "feedback-card";
-                
+
                 card.onclick = () => {
                     if (course.id.includes("reviewOfReviews")) {
                         window.location.href = "review-of-reviews.html";

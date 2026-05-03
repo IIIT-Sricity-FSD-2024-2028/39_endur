@@ -32,14 +32,11 @@ export async function renderHistoricalTrends() {
         ? allResponses.filter(r => r.courseId === activeCourse)
         : allResponses;
 
-    // Visibility Guard: ONLY show responses if the cycle is closed OR student deadline passed
-    const now = new Date();
+    // Visibility Guard: ONLY show responses from fully COMPLETED cycles
     myResponses = myResponses.filter(r => {
         const cycle = allCycles.find(c => c.cycleId === r.cycleId);
-        if (!cycle) return true; 
-        if (cycle.status === 'closed') return true;
-        const studentDl = new Date(cycle.studentDeadline || cycle.endTimestamp);
-        return now >= studentDl;
+        if (!cycle) return false; // unknown cycle — exclude
+        return cycle.status === 'closed';
     });
 
     if (!myResponses.length) {

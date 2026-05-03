@@ -43,17 +43,18 @@
     </aside>
 
     <main class="dashboard-content">
-        <div class="form-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div class="form-header" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
             <div>
-                <h2 class="section-title" style="margin:0">Cycle Evaluation Parameters</h2>
-                <p class="subtitle">Define and manage evaluation criteria by department.</p>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+                    <button class="btn-small btn-outline" onclick="window.location.href='manage-cycles.html'" style="padding:4px 12px;display:flex;align-items:center;gap:4px">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        Back
+                    </button>
+                    <h2 class="section-title" style="margin:0">Cycle Evaluation Parameters</h2>
+                </div>
+                <p class="subtitle" style="margin:0">Define and manage evaluation criteria by department. <span id="cycleNameDisplay" style="color:var(--primary);font-weight:600;margin-left:8px;"></span></p>
             </div>
             <span class="badge primary">SUPER USER</span>
-        </div>
-
-        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-            <div class="stat-card"><p>Total Parameters</p><h2 id="statTotalParams">—</h2></div>
-            <div class="stat-card"><p>Active Parameters</p><h2 id="statActiveParams">—</h2></div>
         </div>
 
         <div class="page-actions">

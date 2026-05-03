@@ -1,4 +1,4 @@
-import { DataStoreService } from '../seed/data-store.service';
+import { DataStoreService, AuditLog } from '../seed/data-store.service';
 export declare class AuditLogsService {
     private readonly store;
     constructor(store: DataStoreService);
@@ -6,6 +6,9 @@ export declare class AuditLogsService {
         total: number;
         page: number;
         limit: number;
-        data: import("../seed/data-store.service").AuditLog[];
+        data: AuditLog[];
+    };
+    create(entry: Omit<AuditLog, 'id' | 'timestamp'>): {
+        message: string;
     };
 }

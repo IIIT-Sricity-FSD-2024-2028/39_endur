@@ -15,7 +15,6 @@ export async function renderSuperuserDashboard() {
         safeSet('statTotalUsers', users.length);
         safeSet('statTotalCycles', cycles.length);
         safeSet('statActiveCycles', cycles.filter(c => c.status === 'active').length);
-        safeSet('statActiveParams', params.length);
 
         // Role breakdown
         const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc; }, {});

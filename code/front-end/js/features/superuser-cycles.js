@@ -22,19 +22,22 @@ function renderCycleTable(filter = '') {
     if (!tbody) return;
 
     const list = filter
-        ? cycles.filter(c => c.cycleName.toLowerCase().includes(filter) || c.cycleId.toLowerCase().includes(filter))
+        ? cycles.filter(c => 
+            (c.cycleName || '').toLowerCase().includes(filter) || 
+            (c.name || '').toLowerCase().includes(filter) || 
+            (c.cycleId || '').toLowerCase().includes(filter)
+        )
         : cycles;
 
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">No cycles found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">No cycles found.</td></tr>';
         return;
     }
 
     tbody.innerHTML = list.map(c => `
         <tr>
             <td><code style="background:rgba(59,130,246,0.1);padding:2px 8px;border-radius:4px;font-size:0.85rem">${c.cycleId}</code></td>
-            <td><strong>${c.cycleName}</strong></td>
-            <td><span class="badge neutral">${c.type || 'cycle'}</span></td>
+            <td><strong>${c.cycleName || c.name || 'Untitled Cycle'}</strong></td>
             <td>${formatDate(c.startTimestamp)} → ${formatDate(c.endTimestamp)}</td>
             <td><span class="badge ${c.status === 'active' ? 'success' : 'neutral'}">${c.status}</span></td>
             <td>
@@ -42,9 +45,9 @@ function renderCycleTable(filter = '') {
                     <button class="btn-small" onclick="suViewCycleResponses('${c.cycleId}')">View</button>
                     <button class="btn-small" onclick="suEditCycle('${c.cycleId}')">Edit</button>
                     ${c.status === 'active'
-                        ? `<button class="btn-small" style="color:var(--warning)" onclick="suCloseCycle('${c.cycleId}')">Close</button>`
-                        : `<button class="btn-small" style="color:var(--accent)" onclick="suReopenCycle('${c.cycleId}')">Reopen</button>`
-                    }
+            ? `<button class="btn-small" style="color:var(--warning)" onclick="suCloseCycle('${c.cycleId}')">Close</button>`
+            : `<button class="btn-small" style="color:var(--accent)" onclick="suReopenCycle('${c.cycleId}')">Reopen</button>`
+        }
                     <button class="btn-small" style="background:#5b21b6;color:#fff;" onclick="suManageCycleParams('${c.cycleId}')">Parameters</button>
                     <button class="btn-small btn-danger-soft" onclick="suDeleteCycle('${c.cycleId}')">Delete</button>
                 </div>
@@ -77,11 +80,11 @@ function bindCycleForm() {
         if (errs.length) { showToast(errs[0], 'error'); return; }
 
         const payload = {
-            cycleName:       name,
-            type:            form.cycleType?.value || 'weekly',
-            startTimestamp:  new Date(start).toISOString(),
+            cycleName: name,
+            type: form.cycleType?.value || 'weekly',
+            startTimestamp: new Date(start).toISOString(),
             studentDeadline: form.studentDeadline?.value ? new Date(form.studentDeadline.value).toISOString() : new Date(end).toISOString(),
-            endTimestamp:    new Date(end).toISOString(),
+            endTimestamp: new Date(end).toISOString(),
         };
 
         const editId = form.dataset.editId;
@@ -124,9 +127,9 @@ export async function suViewCycleResponsesAsync(cycleId) {
             <div class="modal-footer"><button class="btn-outline" onclick="document.getElementById('suResponsesModal').classList.remove('active')">Close</button></div>
         </div>`;
         document.body.appendChild(modal);
-        modal.addEventListener('click', e => { if (e.target===modal) modal.classList.remove('active'); });
+        modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
     }
-    const body  = document.getElementById('suRespBody');
+    const body = document.getElementById('suRespBody');
     const title = document.getElementById('suRespTitle');
     const cycle = cycles.find(c => c.cycleId === cycleId);
     title.textContent = `Responses — ${cycle?.cycleName ?? cycleId} (Superuser)`;
@@ -134,8 +137,8 @@ export async function suViewCycleResponsesAsync(cycleId) {
     modal.classList.add('active');
     try {
         const [responses, allCourses] = await Promise.all([GET(`/feedback-responses?cycleId=${cycleId}`), GET('/courses')]);
-        if (!responses.length) { body.innerHTML='<p style="padding:20px;text-align:center;color:var(--text-muted)">No responses recorded for this cycle.</p>'; return; }
-        
+        if (!responses.length) { body.innerHTML = '<p style="padding:20px;text-align:center;color:var(--text-muted)">No responses recorded for this cycle.</p>'; return; }
+
         body.innerHTML = `
             <style>
                 .resp-det { font-size: 11px; color: #64748b; margin-top: 4px; padding: 4px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; }
@@ -145,27 +148,27 @@ export async function suViewCycleResponsesAsync(cycleId) {
                 <thead><tr><th>Student & Course</th><th>Faculty</th><th>Dept</th><th>Date</th><th>Score & Breakdown</th></tr></thead>
                 <tbody>
                 ${responses.map(r => {
-                    const course = allCourses.find(c => c.id === r.courseId);
-                    const scores = (r.ratings || []).map(x => {
-                        let s = Number(x.score || 0);
-                        if (s > 5) s = s / 20;
-                        return s;
-                    });
-                    const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length * 20).toFixed(1) + '%' : '—';
-                    
-                    const ratingsHtml = (r.ratings || []).map(rt => {
-                        let s = Number(rt.score || 0);
-                        if (s > 5) s = s / 20;
-                        return `<div class="resp-det">
+            const course = allCourses.find(c => c.id === r.courseId);
+            const scores = (r.ratings || []).map(x => {
+                let s = Number(x.score || 0);
+                if (s > 5) s = s / 20;
+                return s;
+            });
+            const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length * 20).toFixed(1) + '%' : '—';
+
+            const ratingsHtml = (r.ratings || []).map(rt => {
+                let s = Number(rt.score || 0);
+                if (s > 5) s = s / 20;
+                return `<div class="resp-det">
                             <strong>${rt.paramName || rt.paramId}</strong>: ${s.toFixed(1)}/5
                             ${rt.comment ? `<span class="resp-comm">"${rt.comment}"</span>` : ''}
                         </div>`;
-                    }).join('');
+            }).join('');
 
-                    const isSuper = session?.role === 'superuser';
-                    const displayStudentId = isSuper ? (r.studentId ?? '—') : 'S-***';
+            const isSuper = session?.role === 'superuser';
+            const displayStudentId = isSuper ? (r.studentId ?? '—') : 'S-***';
 
-                    return `<tr>
+            return `<tr>
                         <td>
                             <code style="font-size:10px;color:var(--primary)">${displayStudentId}</code><br>
                             <strong>${course?.name ?? r.courseId}</strong>
@@ -178,16 +181,17 @@ export async function suViewCycleResponsesAsync(cycleId) {
                             ${ratingsHtml}
                         </td>
                     </tr>`;
-                }).join('')}
+        }).join('')}
                 </tbody>
             </table>`;
     } catch (e) {
         console.error(e);
-        body.innerHTML='<p style="padding:20px;color:var(--danger)">Failed to load responses.</p>';
+        body.innerHTML = '<p style="padding:20px;color:var(--danger)">Failed to load responses.</p>';
     }
 }
 
 window.suManageCycleParams = (id) => {
+    sessionStorage.setItem('manageCycleId', id);
     window.location.href = `manage-parameters.html?cycleId=${encodeURIComponent(id)}`;
 };
 
@@ -218,10 +222,10 @@ export function suEditCycle(id) {
     if (!c) return;
     const form = document.getElementById('cycleForm');
     if (!form) return;
-    if (form.cycleName)       form.cycleName.value       = c.cycleName || '';
-    if (form.startDate)       form.startDate.value       = c.startTimestamp?.slice(0, 10) || '';
+    if (form.cycleName) form.cycleName.value = c.cycleName || '';
+    if (form.startDate) form.startDate.value = c.startTimestamp?.slice(0, 10) || '';
     if (form.studentDeadline) form.studentDeadline.value = c.studentDeadline?.slice(0, 10) || '';
-    if (form.endDate)         form.endDate.value         = c.endTimestamp?.slice(0, 10) || '';
+    if (form.endDate) form.endDate.value = c.endTimestamp?.slice(0, 10) || '';
     form.dataset.editId = id;
     document.getElementById('cycleModalTitle').textContent = 'Edit Feedback Cycle';
     document.getElementById('cycleModal')?.classList.add('active');
@@ -272,7 +276,7 @@ function parseCSV(text) {
     const lines = text.trim().split('\n');
     if (lines.length < 2) return [];
     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-    
+
     const parsedRows = lines.slice(1).map(line => {
         // match commas outside quotes
         const vals = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
@@ -296,7 +300,7 @@ function parseCSV(text) {
                 responses: []
             };
         }
-        
+
         if (row.facultyId || row.facultyIds) {
             cycleMap[row.cycleName].responses.push({
                 studentId: row.studentId || '',

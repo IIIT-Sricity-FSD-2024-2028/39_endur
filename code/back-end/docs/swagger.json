@@ -2839,6 +2839,61 @@
         "tags": [
           "Audit Logs"
         ]
+      },
+      "post": {
+        "operationId": "AuditLogsController_create",
+        "parameters": [
+          {
+            "name": "x-role",
+            "in": "header",
+            "description": "Caller role for RBAC",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "admin",
+                "dean",
+                "hod",
+                "faculty",
+                "student"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-User-Name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create an audit log entry from the frontend",
+        "tags": [
+          "Audit Logs"
+        ]
       }
     },
     "/api/faculty-reports/self-reflections": {

@@ -9,8 +9,8 @@ let activeCycle = null;
 
 export async function renderSuperuserParameters() {
     const urlParams = new URLSearchParams(window.location.search);
-    const cycleId = urlParams.get('cycleId');
-    if (!cycleId) {
+    const cycleId = urlParams.get('cycleId') || sessionStorage.getItem('manageCycleId');
+    if (!cycleId || cycleId === 'undefined' || cycleId === 'null') {
         showToast('No Cycle ID provided. Returning to cycles list.', 'error');
         setTimeout(() => window.location.href = 'manage-cycles.html', 1500);
         return;
@@ -24,8 +24,8 @@ export async function renderSuperuserParameters() {
         deptConfigs = activeCycle.departmentParameters;
         allDepts = Object.keys(deptConfigs).sort();
         
-        document.getElementById('statTotalParams').textContent = `Cycle: ${activeCycle.cycleName}`;
-        if (document.getElementById('statActiveParams')) document.getElementById('statActiveParams').style.display = 'none';
+        const nameEl = document.getElementById('cycleNameDisplay');
+        if (nameEl) nameEl.textContent = `(Cycle: ${activeCycle.cycleName})`;
 
         statuses = Object.keys(deptConfigs).reduce((acc, d) => ({...acc, [d]: 'APPROVED'}), {});
     } catch (e) {

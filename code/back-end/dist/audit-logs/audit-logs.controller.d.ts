@@ -8,4 +8,7 @@ export declare class AuditLogsController {
         limit: number;
         data: import("../seed/data-store.service").AuditLog[];
     };
+    create(body: any, req: any): {
+        message: string;
+    };
 }

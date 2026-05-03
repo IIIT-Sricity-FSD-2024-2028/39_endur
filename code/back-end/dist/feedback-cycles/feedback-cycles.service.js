@@ -56,7 +56,7 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         if (active) {
             const now = new Date();
             const studentDl = new Date(active.studentDeadline || active.endTimestamp);
-            const phase = now < studentDl ? 'STUDENT_FEEDBACK' : (active.phase || 'FACULTY_REFLECTION');
+            const phase = active.phase || (now < studentDl ? 'STUDENT_FEEDBACK' : 'FACULTY_REFLECTION');
             return { id: active.cycleId, cycleName: active.cycleName, phase, status: active.status };
         }
         const latest = [...cycles].sort((a, b) => new Date(b.startTimestamp).getTime() - new Date(a.startTimestamp).getTime())[0];

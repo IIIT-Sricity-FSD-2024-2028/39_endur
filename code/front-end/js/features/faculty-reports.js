@@ -12,7 +12,7 @@ export async function renderFacultyReports() {
 
     // ── 1. Fetch all needed data from API ──────────────────────────────────────
     let allCourses = [];
-    try { allCourses = await GET('/courses'); } catch {}
+    try { allCourses = await GET('/courses'); } catch { }
     const myCourses = allCourses.filter(c => c.facultyId === user.id || (c.facultyIds && c.facultyIds.includes(user.id)));
 
     if (myCourses.length === 0) {
@@ -27,7 +27,7 @@ export async function renderFacultyReports() {
     const currentPhase = cycleState?.phase || 'PREPARATION';
 
     let allFeedback = [];
-    try { allFeedback = await GET(`/feedback-responses?cycleId=${activeCycleId}`); } catch {}
+    try { allFeedback = await GET(`/feedback-responses?cycleId=${activeCycleId}`); } catch { }
 
     // Fetch reflections and action reports from API (not localStorage)
     const reflections = await getMyReflections(activeCycleId);
@@ -46,7 +46,7 @@ export async function renderFacultyReports() {
                         <h3 style="color:#991b1b;margin-bottom:4px;font-size:15px">Action Required: HOD Revision Requested</h3>
                         <p style="color:#b91c1c;font-size:14px;margin:0">Please revise your Action Reports for: <strong>${ids}</strong></p>
                     </div>
-                    <a href="action-report.html" class="btn-danger" style="flex-shrink:0;margin-left:auto">Revise Now →</a>
+                    <a href="action-report.html?courseId=${encodeURIComponent(needsRevision[0].courseId)}" class="btn-danger" style="flex-shrink:0;margin-left:auto">Revise Now →</a>
                 </div>`;
         } else {
             alertBox.innerHTML = '';
@@ -140,8 +140,8 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
     const respEl = document.getElementById('responseCount');
     if (respEl) respEl.textContent = courseFeedback.length;
 
-    const canSeeRatings = courseFeedback.length > 0 &&
-        (hasReflection || currentPhase === 'ACTION_REPORT' || currentPhase === 'COMPLETED');
+    // Faculty can only see current-cycle ratings after submitting self-reflection
+    const canSeeRatings = courseFeedback.length > 0 && !!hasReflection;
 
     if (scoreEl) {
         if (courseFeedback.length === 0) {
@@ -181,7 +181,7 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
         if (actionTitle) actionTitle.textContent = 'View Gap Analysis';
         if (actionDesc) actionDesc.textContent = 'Reflection submitted. Review your performance gap vs student expectations.';
         btn.textContent = 'Open Gap Analysis →';
-        btn.onclick = () => window.location.href = 'gap-analysis.html';
+        btn.onclick = () => window.location.href = `gap-analysis.html?courseId=${encodeURIComponent(course.id)}`;
     } else if (currentPhase === 'PREPARATION' || currentPhase === 'STUDENT_FEEDBACK') {
         if (actionTitle) actionTitle.textContent = 'Self-Reflection';
         if (actionDesc) actionDesc.textContent = 'Locked until the student feedback phase is complete.';
@@ -199,10 +199,7 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
             if (actionDesc) actionDesc.textContent = '✅ HOD has reviewed and finalized this report.';
             btn.textContent = 'View Report →';
             btn.className = 'btn-outline action-btn';
-            btn.onclick = () => window.location.href = 'action-report.html';
-            btn.textContent = 'View Report →';
-            btn.className = 'btn-outline action-btn';
-            btn.onclick = () => window.location.href = 'action-report.html';
+            btn.onclick = () => window.location.href = `action-report.html?courseId=${encodeURIComponent(course.id)}`;
         } else if (hasActionReport) {
             // REQUIRED, SUBMITTED, or REVISION_REQUESTED
             if (hasActionReport.status === 'SUBMITTED') {
@@ -210,13 +207,13 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
                 if (actionDesc) actionDesc.textContent = '⏳ Submitted — awaiting HOD review.';
                 btn.textContent = 'View Report →';
                 btn.className = 'btn-outline action-btn';
-                btn.onclick = () => window.location.href = 'action-report.html';
+                btn.onclick = () => window.location.href = `action-report.html?courseId=${encodeURIComponent(course.id)}`;
             } else if (hasActionReport.status === 'REVISION_REQUESTED') {
                 if (actionTitle) actionTitle.textContent = 'Action Report (Revision Needed)';
                 if (actionDesc) actionDesc.textContent = '⚠️ HOD has requested a revision.';
                 btn.textContent = 'Revise Report →';
                 btn.className = 'btn-danger action-btn';
-                btn.onclick = () => window.location.href = 'action-report.html';
+                btn.onclick = () => window.location.href = `action-report.html?courseId=${encodeURIComponent(course.id)}`;
             } else {
                 // Status is REQUIRED
                 if (actionTitle) actionTitle.textContent = 'Submit Action Report';
