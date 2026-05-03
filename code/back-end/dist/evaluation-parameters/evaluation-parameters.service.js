@@ -33,6 +33,9 @@ let EvaluationParametersService = class EvaluationParametersService {
     getDeptStatus() {
         return this.store.getDeptConfigStatus();
     }
+    getDeptNotes() {
+        return this.store.getDeptConfigNotes();
+    }
     getDraftsByDept(department) {
         const drafts = this.store.getDraftParameters();
         return drafts[department] || [];

@@ -6,6 +6,7 @@ export declare class EvaluationParametersController {
     findAll(dept?: string): any[];
     getDeptStatus(): Record<string, string>;
     getDraftsByDept(dept: string): any[];
+    getDeptNotes(): Record<string, string>;
     create(dto: CreateEvalParamDto, req: any): {
         department: string;
         id: string;

@@ -44,7 +44,7 @@ export function closeDeptModal() {
 }
 
 export async function saveDepartment() {
-    const id = document.getElementById('deptId').value.trim();
+    let id = document.getElementById('deptId').value.trim();
     const name = document.getElementById('deptName').value.trim();
 
     if (!id || !name) {

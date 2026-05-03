@@ -37,7 +37,7 @@ export async function renderFacultyDashboard() {
 
     // ── Phase Banner ──────────────────────────────────────────────────────────
     const cycleBadge = document.getElementById('dashboardCycleName');
-    if (cycleBadge) cycleBadge.innerText = cycleState?.cycleName || activeCycleId;
+    if (cycleBadge) cycleBadge.innerText = cycleState?.cycleName || cycleState?.name || activeCycleId;
 
     const banner = document.getElementById('phaseBanner');
     if (banner) {
@@ -99,7 +99,8 @@ export async function renderFacultyDashboard() {
                     scoreCount += 1;
                 });
             });
-            courseAvgPct = scoreCount > 0 ? (scoreSum / scoreCount) * 20 : 0;
+            const avg = scoreCount > 0 ? (scoreSum / scoreCount) : 0;
+            courseAvgPct = isNaN(avg) ? 0 : avg * 20;
             totalScoreAcc += courseAvgPct;
             coursesWithData++;
         }
@@ -127,7 +128,7 @@ export async function renderFacultyDashboard() {
         }
 
         // Display avg calculation
-        // UNLOCK logic: Allow scores during Reflection and Action stages for gap analysis.
+        // UNLOCK logic: Enforce self-reflection before showing current cycle scores.
         const isLocked = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase);
         let displayAvg;
         if (responses === 0) {
@@ -135,9 +136,10 @@ export async function renderFacultyDashboard() {
         } else if (isLocked) {
             const lockMsg = 'Scores locked until student feedback deadline';
             displayAvg = `<span title="${lockMsg}" style="color:#94a3b8;font-size:13px">Locked 🔒</span>`;
+        } else if (!hasReflection) {
+            const lockMsg = 'Submit self-reflection to unlock feedback scores';
+            displayAvg = `<span title="${lockMsg}" style="color:#f59e0b;font-size:13px">Reflection Needed 🔒</span>`;
         } else {
-            // Check if reflection is pending to add a "Self-Reflection Pending" badge if needed, 
-            // but show the score anyway as per user request for Gap Analysis phase.
             displayAvg = `${courseAvgPct.toFixed(0)}%`;
         }
 

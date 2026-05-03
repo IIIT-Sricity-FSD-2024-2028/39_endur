@@ -37,6 +37,13 @@ export class EvaluationParametersController {
     return this.svc.getDraftsByDept(dept);
   }
 
+  @Get('notes')
+  @Roles('superuser', 'admin', 'dean', 'hod')
+  @ApiOperation({ summary: 'Get department config notes map' })
+  getDeptNotes() {
+    return this.svc.getDeptNotes();
+  }
+
   @Post()
   @Roles('superuser', 'admin', 'hod')
   @HttpCode(HttpStatus.CREATED)

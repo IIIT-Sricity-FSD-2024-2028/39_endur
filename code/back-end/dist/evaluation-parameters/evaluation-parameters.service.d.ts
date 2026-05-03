@@ -5,6 +5,7 @@ export declare class EvaluationParametersService {
     constructor(store: DataStoreService);
     findAll(department?: string): any[];
     getDeptStatus(): Record<string, string>;
+    getDeptNotes(): Record<string, string>;
     getDraftsByDept(department: string): any[];
     private ensurePreparationPhase;
     create(dto: CreateEvalParamDto, actorId?: string, actorName?: string, actorRole?: string): {

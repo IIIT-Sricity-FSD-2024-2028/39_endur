@@ -52,7 +52,7 @@ export async function renderHistoricalTrends() {
             const cycle = allCycles.find(c => c.cycleId === r.cycleId);
             cycleMap[r.cycleId] = {
                 cycleId:   r.cycleId,
-                cycleName: cycle?.cycleName ?? r.cycleId,
+                cycleName: cycle?.cycleName || cycle?.name || r.cycleId,
                 startDate: cycle?.startTimestamp ?? '',
                 responses: [],
             };
@@ -155,23 +155,27 @@ function renderParamCharts(paramAverages, sortedCycles) {
     const chartGrid = document.getElementById('paramChartGrid');
     if (chartGrid) {
         const iconMap = ['📖', '🏗️', '💡', '⚖️', '📊', '🎯'];
-        chartGrid.innerHTML = paramAverages.map((p, i) => `
+        chartGrid.innerHTML = paramAverages.map((p, i) => {
+            const safeId = p.id.replace(/[^a-zA-Z0-9]/g, '');
+            return `
             <div class="chart-card">
                 <h3>${iconMap[i % iconMap.length]} ${p.name}</h3>
                 <p class="chart-sub">Avg: <strong>${p.avgPct.toFixed(1)}%</strong> — ${p.responseCount} response${p.responseCount !== 1 ? 's' : ''}</p>
-                <canvas id="chart_${p.id}"></canvas>
+                <canvas id="chart_${safeId}"></canvas>
             </div>
-        `).join('');
+            `;
+        }).join('');
 
         // Render chart bars after DOM update
         setTimeout(() => {
             paramAverages.forEach(p => {
+                const safeId = p.id.replace(/[^a-zA-Z0-9]/g, '');
                 const history = sortedCycles.map(c => {
                     const { paramAverages: pa } = computeAggregates(c.responses);
                     return pa.find(x => x.id === p.id)?.avgPct ?? 0;
                 });
                 while (history.length < 4) history.unshift(0);
-                renderChartCanvas(`chart_${p.id}`, p.name, history.slice(-4), sortedCycles.slice(-4).map(c => c.cycleName));
+                renderChartCanvas(`chart_${safeId}`, p.name, history.slice(-4), sortedCycles.slice(-4).map(c => c.cycleName));
             });
         }, 0);
     }

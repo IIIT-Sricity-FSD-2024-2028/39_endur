@@ -64,7 +64,11 @@ export async function initSelfReflection() {
     // Load eval parameters for this faculty's department from the active cycle
     let myParams = [];
     try {
-        myParams = await GET(`/feedback-cycles/${activeCycleId}/parameters?department=${encodeURIComponent(user.department)}`);
+        const fullCycle = await GET(`/feedback-cycles/${activeCycleId}`);
+        const deptParams = fullCycle?.departmentParameters;
+        if (deptParams) {
+            myParams = deptParams[user.department] || deptParams['Unassigned'] || Object.values(deptParams)[0] || [];
+        }
     } catch { }
 
     // Check for existing reflection

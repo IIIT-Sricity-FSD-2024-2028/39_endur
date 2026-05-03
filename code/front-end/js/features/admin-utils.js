@@ -88,7 +88,7 @@ export function formatDateTime(iso) {
  * Generate a simple unique ID
  */
 export function genId(prefix = 'ID') {
-    return `${prefix}${Date.now().toString(36).toUpperCase()}`;
+    return `${prefix}${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 }
 
 /**

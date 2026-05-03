@@ -46,26 +46,7 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         return cycle;
     }
     getCycleState() {
-        const explicit = this.store.getCycleState();
-        if (explicit)
-            return explicit;
-        const cycles = this.store.getFeedbackCycles();
-        if (!cycles.length)
-            return null;
-        const active = cycles.find(c => c.status === 'active');
-        if (active) {
-            const now = new Date();
-            const studentDl = new Date(active.studentDeadline || active.endTimestamp);
-            const phase = active.phase || (now < studentDl ? 'STUDENT_FEEDBACK' : 'FACULTY_REFLECTION');
-            return { id: active.cycleId, cycleName: active.cycleName, phase, status: active.status };
-        }
-        const latest = [...cycles].sort((a, b) => new Date(b.startTimestamp).getTime() - new Date(a.startTimestamp).getTime())[0];
-        return {
-            id: latest.cycleId,
-            cycleName: latest.cycleName,
-            phase: latest.phase || 'COMPLETED',
-            status: latest.status || 'closed'
-        };
+        return this.store.getCycleState();
     }
     create(dto, actorId, actorName) {
         const cycles = this.store.getFeedbackCycles();
@@ -133,6 +114,30 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         const idx = cycles.findIndex((c) => c.cycleId === id);
         if (idx === -1)
             throw new common_1.NotFoundException(`Cycle ${id} not found`);
+        if (dto.phase === 'STUDENT_FEEDBACK' && cycles[idx].phase === 'PREPARATION') {
+            const activeParams = this.store.getActiveParameters();
+            const depts = this.store.getDepartments();
+            const finalParams = {};
+            const defaultParams = [
+                { id: 'delivery', name: 'Course Delivery & Clarity', weight: 25 },
+                { id: 'relevance', name: 'Course Relevance', weight: 25 },
+                { id: 'support', name: 'Faculty Support & Availability', weight: 25 },
+                { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
+            ];
+            for (const d of depts) {
+                if (activeParams[d.name]) {
+                    finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.name]));
+                }
+                else if (activeParams[d.id]) {
+                    finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.id]));
+                }
+                else {
+                    finalParams[d.name] = [...defaultParams];
+                }
+            }
+            finalParams['Unassigned'] = [...defaultParams];
+            cycles[idx].departmentParameters = finalParams;
+        }
         cycles[idx].status = dto.status;
         if (dto.phase)
             cycles[idx].phase = dto.phase;

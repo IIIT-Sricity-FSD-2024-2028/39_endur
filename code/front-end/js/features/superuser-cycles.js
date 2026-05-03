@@ -112,7 +112,7 @@ function bindCycleForm() {
 
 // Superuser View Responses — studentId IS visible
 export function suViewCycleResponses(cycleId) {
-    window.suViewCycleResponsesAsync(cycleId);
+    suViewCycleResponsesAsync(cycleId);
 }
 
 export async function suViewCycleResponsesAsync(cycleId) {
@@ -222,7 +222,7 @@ export function suEditCycle(id) {
     if (!c) return;
     const form = document.getElementById('cycleForm');
     if (!form) return;
-    if (form.cycleName) form.cycleName.value = c.cycleName || '';
+    if (form.cycleName) form.cycleName.value = c.cycleName || c.name || '';
     if (form.startDate) form.startDate.value = c.startTimestamp?.slice(0, 10) || '';
     if (form.studentDeadline) form.studentDeadline.value = c.studentDeadline?.slice(0, 10) || '';
     if (form.endDate) form.endDate.value = c.endTimestamp?.slice(0, 10) || '';
@@ -254,13 +254,14 @@ export async function suReopenCycle(id) {
 export function suDeleteCycle(id) {
     const c = cycles.find(c => c.cycleId === id);
     if (!c) return;
-    document.getElementById('deleteItemName').textContent = c.cycleName;
+    const displayName = c.cycleName || c.name || id;
+    document.getElementById('deleteItemName').textContent = displayName;
     const confirmBtn = document.getElementById('confirmDeleteBtn');
     confirmBtn.onclick = async () => {
         try {
             await DELETE(`/feedback-cycles/${id}`);
             cycles = cycles.filter(c => c.cycleId !== id);
-            showToast(`Cycle "${c.cycleName}" deleted.`, 'info');
+            showToast(`Cycle "${displayName}" deleted.`, 'info');
             renderCycleTable();
             updateCycleCount();
         } catch (err) { showToast(err.message, 'error'); }

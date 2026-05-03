@@ -26,7 +26,8 @@ export async function initReview() {
             container.innerHTML = `<p style="color: #64748b; font-style: italic;">No parameters drafted yet.</p>`;
         } else {
             params.forEach(p => {
-                total += parseInt(p.weight);
+                const w = Number(p.weight || 0);
+                total += w;
                 container.innerHTML += `
                     <div class="param-card">
                         <div>
@@ -34,7 +35,7 @@ export async function initReview() {
                             <p style="color: #64748b; font-size: 14px; margin-top: 4px;">${p.description || p.desc || ''}</p>
                         </div>
                         <div style="font-weight: bold; color: #1e3a8a; font-size: 18px; padding-left: 20px; text-align: right;">
-                            ${p.weight}%
+                            ${w}%
                         </div>
                     </div>
                 `;

@@ -70,14 +70,14 @@ function renderAll() {
     const isCycleActive = ["STUDENT_FEEDBACK", "FACULTY_REFLECTION", "COMPLETED"].includes(globalCycleState.phase);
     const isCycleCompleted = globalCycleState.phase === "COMPLETED";
 
-    const badgeEl = document.getElementById("cycleBadge");
+    const badgeEl = document.getElementById("cycleBadge") || document.getElementById("cycleNameBadge");
     if (badgeEl) {
         if (isNoCycle) {
             badgeEl.innerText = "No Active Cycle";
             badgeEl.style.background = "#f1f5f9";
             badgeEl.style.color = "#64748b";
         } else {
-            badgeEl.innerText = globalCycleState.id;
+            badgeEl.innerText = globalCycleState.cycleName || globalCycleState.name || globalCycleState.id || "Active Cycle";
         }
     }
 
@@ -112,9 +112,9 @@ function renderAll() {
     const revBanner = document.getElementById("statusBannerRevision");
     if (currentStatus === "REVISION_REQUESTED" && isPrep) {
         revBanner.style.display = "block";
-        GET('/evaluation-parameters/status').then(res => {
-            // Note: need notes API, backend doesn't export notes endpoint directly, using generic text for now.
-             document.getElementById("deanNotesText").innerText = "Please revise your configuration.";
+        GET('/evaluation-parameters/notes').then(notes => {
+             const deanNote = notes[user.department] || "Please revise your configuration.";
+             document.getElementById("deanNotesText").innerText = deanNote;
         });
     } else {
         revBanner.style.display = "none";

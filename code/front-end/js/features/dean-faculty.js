@@ -86,11 +86,7 @@ function renderTable() {
 
     const getDesignation = (id, role) => {
         if (role === "hod") return "Head of Dept";
-        const lastDigit = parseInt(id.slice(-1)) || 0;
-        if (lastDigit <= 2) return "Professor";
-        if (lastDigit <= 4) return "Associate Prof";
-        if (lastDigit <= 7) return "Assistant Prof";
-        return "Lecturer";
+        return "Professor";
     };
 
     filteredFaculty.forEach(faculty => {

@@ -92,7 +92,26 @@ export class DataStoreService implements OnModuleInit {
   // ─── Feedback Cycles ─────────────────────────────────────────────
   getFeedbackCycles() { return this.feedbackCycles; }
   setFeedbackCycles(c: any[]) { this.feedbackCycles = c; }
-  getCycleState() { return this.cycleState; }
+  getCycleState() {
+    const cycles = this.getFeedbackCycles();
+    if (!cycles.length) return this.cycleState;
+
+    const active = cycles.find(c => c.status === 'active');
+    if (active) {
+      const now = new Date();
+      const studentDl = new Date(active.studentDeadline || active.endTimestamp || now);
+      const phase = active.phase || (now < studentDl ? 'STUDENT_FEEDBACK' : 'FACULTY_REFLECTION');
+      return { id: active.cycleId, cycleName: active.cycleName, phase, status: active.status };
+    }
+
+    const latest = [...cycles].sort((a, b) => new Date(b.startTimestamp).getTime() - new Date(a.startTimestamp).getTime())[0];
+    return { 
+      id: latest.cycleId, 
+      cycleName: latest.cycleName, 
+      phase: latest.phase || 'COMPLETED', 
+      status: latest.status || 'closed' 
+    };
+  }
   setCycleState(s: any) { this.cycleState = s; }
 
   // ─── Evaluation Parameters ───────────────────────────────────────

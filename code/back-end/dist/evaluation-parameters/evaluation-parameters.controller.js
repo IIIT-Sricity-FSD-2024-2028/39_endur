@@ -33,6 +33,9 @@ let EvaluationParametersController = class EvaluationParametersController {
     getDraftsByDept(dept) {
         return this.svc.getDraftsByDept(dept);
     }
+    getDeptNotes() {
+        return this.svc.getDeptNotes();
+    }
     create(dto, req) {
         return this.svc.create(dto, req.headers['x-user-id'], req.headers['x-user-name'], req.headers['x-role']);
     }
@@ -86,6 +89,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], EvaluationParametersController.prototype, "getDraftsByDept", null);
+__decorate([
+    (0, common_1.Get)('notes'),
+    (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get department config notes map' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], EvaluationParametersController.prototype, "getDeptNotes", null);
 __decorate([
     (0, common_1.Post)(),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'hod'),

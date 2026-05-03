@@ -25,6 +25,10 @@ export class EvaluationParametersService {
     return this.store.getDeptConfigStatus();
   }
 
+  getDeptNotes() {
+    return this.store.getDeptConfigNotes();
+  }
+
   getDraftsByDept(department: string) {
     const drafts = this.store.getDraftParameters();
     return drafts[department] || [];

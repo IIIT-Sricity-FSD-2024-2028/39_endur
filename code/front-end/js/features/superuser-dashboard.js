@@ -74,6 +74,6 @@ function roleBadge(role) {
 }
 
 function actionBadge(action) {
-    const map = { CREATE: 'success', UPDATE: 'primary', DELETE: 'danger', APPROVE: 'progress', BULK_CREATE: 'success' };
+    const map = { CREATE: 'success', UPDATE: 'primary', DELETE: 'danger', APPROVE: 'progress', BULK_CREATE: 'success', REOPEN: 'success', CLOSE: 'warning' };
     return map[action] || 'neutral';
 }
