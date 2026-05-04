@@ -51,11 +51,21 @@ function bindFilters() {
 }
 
 function roleBadge(role) {
-    const map = { superuser: 'danger', admin: 'primary', dean: 'progress', hod: 'warning', faculty: 'neutral' };
+    const map = { superuser: 'danger', admin: 'primary', dean: 'progress', hod: 'warning', faculty: 'neutral', student: 'neutral' };
     return map[role] || 'neutral';
 }
 
 function actionBadge(action) {
-    const map = { CREATE: 'success', UPDATE: 'primary', DELETE: 'danger', APPROVE: 'progress', VIEW: 'neutral', BULK_CREATE: 'success', ASSIGN: 'primary', SUBMIT: 'warning' };
+    const map = { 
+        CREATE: 'success', 
+        UPDATE: 'primary', 
+        DELETE: 'danger', 
+        APPROVE: 'progress', 
+        VIEW: 'neutral', 
+        BULK_CREATE: 'success', 
+        BULK_ASSIGN: 'primary',
+        ASSIGN: 'primary', 
+        SUBMIT: 'warning' 
+    };
     return map[action] || 'neutral';
 }

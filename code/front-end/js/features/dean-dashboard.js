@@ -120,35 +120,7 @@ export async function renderDeanDashboard() {
         }
     }
 
-    // ── 6. Export Button ──────────────────────────────────────────────────────
-    const btn = document.getElementById('exportTrendsBtn');
-    if (btn) {
-        btn.style.display = 'block';
-        btn.onclick = async () => {
-            const { exportToCSV } = await import('./admin-utils.js');
-            const exportData = [];
-            allSubmissions.forEach(f => {
-                if (Array.isArray(f.ratings)) {
-                    f.ratings.forEach(rating => {
-                        const score = Number(rating.score);
-                        if (!isNaN(score)) {
-                            const course = allCourses.find(c => c.id === f.courseId);
-                            const faculty = facultyList.find(fac => fac.id === course?.facultyId);
-                            exportData.push({
-                                CycleID: f.cycleId,
-                                CourseID: f.courseId,
-                                FacultyID: faculty?.id || '',
-                                Department: faculty?.department || '',
-                                Parameter: rating.paramName || rating.paramId,
-                                Rating: score
-                            });
-                        }
-                    });
-                }
-            });
-            exportToCSV('Dean_Institutional_Trends.csv', exportData);
-        };
-    }
+    // Export button removed by user request
 }
 
 function _setEl(id, val) {
