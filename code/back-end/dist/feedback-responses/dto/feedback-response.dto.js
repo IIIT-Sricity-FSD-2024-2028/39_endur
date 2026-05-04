@@ -26,6 +26,7 @@ __decorate([
 ], RatingEntryDto.prototype, "paramId", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({ example: 5 }),
+    (0, class_validator_1.IsNumber)(),
     __metadata("design:type", Number)
 ], RatingEntryDto.prototype, "score", void 0);
 __decorate([

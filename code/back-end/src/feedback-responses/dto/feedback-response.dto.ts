@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -8,6 +8,7 @@ export class RatingEntryDto {
   paramId: string;
 
   @ApiProperty({ example: 5 })
+  @IsNumber()
   score: number;
 
   @ApiPropertyOptional({ example: 'Great explanation of concepts!' })

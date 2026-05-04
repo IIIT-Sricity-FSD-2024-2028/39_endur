@@ -44,14 +44,18 @@ export async function renderDeanDashboard() {
     let instTotalScore = 0, instMetricCount = 0;
 
     allSubmissions.forEach(f => {
-        const course = allCourses.find(c => c.id === f.courseId);
-        const faculty = course ? facultyList.find(u => u.id === course.facultyId) : null;
+        const facultyId = f.facultyId || allCourses.find(c => c.id === f.courseId)?.facultyId;
+        const faculty = facultyList.find(u => u.id === facultyId);
         const dept = faculty?.department;
 
         if (Array.isArray(f.ratings)) {
             f.ratings.forEach(rating => {
-                const val = Number(rating.score);
+                let val = Number(rating.score);
                 if (isNaN(val)) return;
+                
+                // Normalize to 100-point scale for UI
+                if (val <= 5) val = val * 20; 
+
                 instTotalScore += val;
                 instMetricCount++;
                 if (dept && departments[dept]) {
@@ -63,7 +67,7 @@ export async function renderDeanDashboard() {
     });
 
     // ── 4. Stat Cards ─────────────────────────────────────────────────────────
-    const instAvg = instMetricCount > 0 ? (instTotalScore / instMetricCount).toFixed(1) : '0.0';
+    const instAvg = instMetricCount > 0 ? ((instTotalScore / instMetricCount) / 20).toFixed(1) : '0.0';
     _setEl('instOverallScore', instAvg);
     _setEl('instActiveCycles', cycles.filter(c => c.status === 'active').length);
 

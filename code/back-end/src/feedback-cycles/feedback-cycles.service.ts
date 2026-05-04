@@ -88,6 +88,13 @@ export class FeedbackCyclesService {
     cycles.unshift(entry);
     this.store.setFeedbackCycles(cycles);
 
+    // Reset parameter approval statuses for the new cycle
+    const newStatuses: Record<string, string> = {};
+    for (const d of depts) {
+      newStatuses[d.name] = 'DRAFT';
+    }
+    this.store.setDeptConfigStatus(newStatuses);
+
     this.store.appendAuditLog({
       actor: actorId || 'SU001',
       actorName: actorName || 'Super User',

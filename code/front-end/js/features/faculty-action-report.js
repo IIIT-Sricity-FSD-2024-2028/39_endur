@@ -1,7 +1,6 @@
 /**
  * faculty-action-report.js
  * Handles all action report API interactions.
- * Replaces localStorage-based actionReports storage.
  */
 import { GET, POST, PATCH, getSession } from '../core/api.js';
 import { showToast } from './admin-utils.js';
@@ -46,9 +45,33 @@ export async function initActionReport() {
     const user = getSession();
     if (!user) return;
 
-    const activeCourse = new URLSearchParams(window.location.search).get('courseId');
+    let activeCourse = new URLSearchParams(window.location.search).get('courseId');
     const noCourseState = document.getElementById('noCourseState');
     const form = document.getElementById('actionReportForm');
+
+    // Auto-detect course and build selector
+    try {
+        const allCourses = await GET('/courses');
+        const myCourses = allCourses.filter(c => c.facultyId === user.id || (c.facultyIds && c.facultyIds.includes(user.id)));
+
+        if (myCourses.length === 0) {
+            if (noCourseState) noCourseState.style.display = 'block';
+            if (form) form.style.display = 'none';
+            return;
+        }
+
+        if (!activeCourse) {
+            window.location.href = `action-report.html?courseId=${encodeURIComponent(myCourses[0].id)}`;
+            return;
+        }
+
+        const selectorEl = document.getElementById('courseSelector');
+        if (selectorEl) {
+            selectorEl.innerHTML = myCourses.map(c =>
+                `<button class="course-tab ${activeCourse === c.id ? 'active' : ''}" onclick="window.location.href='action-report.html?courseId=${c.id}'">${c.id}</button>`
+            ).join('');
+        }
+    } catch { }
 
     if (!activeCourse) {
         if (noCourseState) noCourseState.style.display = 'block';
@@ -65,15 +88,37 @@ export async function initActionReport() {
     catch { cycleState = { id: 'SETUP', phase: 'PREPARATION' }; }
     const cycleId = cycleState?.id;
 
-    if (!cycleId || cycleId === 'SETUP') {
-        if (noCourseState) { noCourseState.style.display = 'block'; noCourseState.querySelector('h2').textContent = 'No Active Cycle'; noCourseState.querySelector('p.subtitle').textContent = 'Action reports are only available during an active feedback cycle.'; }
+    if (!cycleId || cycleId === 'SETUP' || (cycleState.phase !== 'FACULTY_REFLECTION' && cycleState.phase !== 'ACTION_REPORT')) {
+        if (noCourseState) { 
+            noCourseState.style.display = 'block'; 
+            noCourseState.querySelector('h2').textContent = 'Phase Locked'; 
+            noCourseState.querySelector('p.subtitle').textContent = 'Action reports are only unlocked during the faculty reflection phase of the active cycle.'; 
+        }
         if (form) form.style.display = 'none';
         return;
     }
 
     // Check existing action report for this course + cycle
     let existing = null;
-    try { existing = await getActionReportForCourse(activeCourse, cycleId); } catch {}
+    try { existing = await getActionReportForCourse(activeCourse, cycleId); } catch { }
+
+    // Check if Self Reflection is submitted for current cycle
+    let hasReflection = false;
+    try {
+        const { getReflectionForCourse } = await import('./faculty-self-reflection.js');
+        const ref = await getReflectionForCourse(activeCourse, cycleId);
+        if (ref) hasReflection = true;
+    } catch { }
+
+    if (!hasReflection) {
+        if (noCourseState) { 
+            noCourseState.style.display = 'block'; 
+            noCourseState.querySelector('h2').textContent = 'Self-Reflection Required'; 
+            noCourseState.querySelector('p.subtitle').textContent = 'You must submit your Self-Reflection for this cycle before you can create an Action Report.'; 
+        }
+        if (form) form.style.display = 'none';
+        return;
+    }
 
     // Populate banners
     const revBanner = document.getElementById('revisionBanner');

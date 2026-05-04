@@ -83,7 +83,8 @@ let EvaluationParametersService = class EvaluationParametersService {
         const idx = drafts[department].findIndex((p) => p.id === id);
         if (idx === -1)
             throw new common_1.NotFoundException(`Parameter ${id} not found`);
-        drafts[department][idx] = { ...drafts[department][idx], ...dto };
+        const updateData = Object.fromEntries(Object.entries(dto).filter(([_, v]) => v !== undefined));
+        drafts[department][idx] = { ...drafts[department][idx], ...updateData };
         this.store.setDraftParameters(drafts);
         this.store.appendAuditLog({
             actor: actorId || 'SU001',

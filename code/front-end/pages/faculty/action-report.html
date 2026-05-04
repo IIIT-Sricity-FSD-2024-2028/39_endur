@@ -21,6 +21,26 @@
             font-family: inherit;
             resize: vertical;
         }
+
+        .course-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        .course-tab {
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: 1.5px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+        .course-tab.active { background: var(--primary); color: white; }
+        .course-tab:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -64,6 +84,9 @@
             <a href="reports.html" class="btn-outline">← Back to Reports</a>
         </div>
         <p class="subtitle" style="margin-bottom: 24px;">Faculty Performance Improvement Plan</p>
+
+        <!-- Course Tabs -->
+        <div id="courseSelector" class="course-selector"></div>
 
         <!-- No course selected state -->
         <div id="noCourseState" style="display:none; margin-top: 40px; text-align:center; padding: 60px 20px;">

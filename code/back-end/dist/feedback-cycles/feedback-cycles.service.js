@@ -80,6 +80,11 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         };
         cycles.unshift(entry);
         this.store.setFeedbackCycles(cycles);
+        const newStatuses = {};
+        for (const d of depts) {
+            newStatuses[d.name] = 'DRAFT';
+        }
+        this.store.setDeptConfigStatus(newStatuses);
         this.store.appendAuditLog({
             actor: actorId || 'SU001',
             actorName: actorName || 'Super User',

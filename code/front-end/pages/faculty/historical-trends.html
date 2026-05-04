@@ -220,15 +220,60 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportBtn.onclick = async () => {
             try {
                 const responses = await GET(`/feedback-responses?facultyId=${encodeURIComponent(user.id)}`);
-                const rows = responses.map(r => ({
-                    ResponseId: r.responseId ?? r.id ?? '',
-                    CycleId:    r.cycleId,
-                    CourseId:   r.courseId,
-                    FacultyId:  r.facultyId ?? '',
-                    Ratings:    JSON.stringify(r.ratings ?? []),
-                    Submitted:  r.submittedAt,
-                }));
-                const csv = [Object.keys(rows[0]).join(','), ...rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+                const allCourses = await GET('/courses');
+                const allCycles  = await GET('/feedback-cycles');
+                if (!responses.length) { alert('No data to export.'); return; }
+
+                // Collect all unique param names across responses
+                const paramNameSet = new Set();
+                responses.forEach(r => {
+                    if (Array.isArray(r.ratings)) {
+                        r.ratings.forEach(rt => paramNameSet.add(rt.paramName || rt.paramId));
+                    }
+                });
+                const paramNames = [...paramNameSet];
+
+                // Build header
+                const headers = ['Course', 'Course ID', 'Cycle', 'Date', 'Overall %', ...paramNames.map(p => `${p} (score/5)`), ...paramNames.map(p => `${p} (comment)`)];
+
+                // Build rows
+                const csvRows = responses.map(r => {
+                    const course = allCourses.find(c => c.id === r.courseId);
+                    const cycle  = allCycles.find(c => c.cycleId === r.cycleId);
+                    const date   = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : '';
+
+                    // Compute overall
+                    let overallPct = 0;
+                    if (Array.isArray(r.ratings) && r.ratings.length) {
+                        const scores = r.ratings.map(rt => { let s = Number(rt.score || 0); if (s > 5) s = s / 20; return s; });
+                        overallPct = (scores.reduce((a, b) => a + b, 0) / scores.length * 20);
+                    }
+
+                    const scoreMap = {};
+                    const commentMap = {};
+                    if (Array.isArray(r.ratings)) {
+                        r.ratings.forEach(rt => {
+                            const name = rt.paramName || rt.paramId;
+                            let s = Number(rt.score || 0);
+                            if (s > 5) s = s / 20;
+                            scoreMap[name] = s.toFixed(1);
+                            commentMap[name] = rt.comment || '';
+                        });
+                    }
+
+                    return [
+                        course?.name || r.courseId,
+                        r.courseId,
+                        cycle?.cycleName || r.cycleId,
+                        date,
+                        overallPct.toFixed(1),
+                        ...paramNames.map(p => scoreMap[p] || ''),
+                        ...paramNames.map(p => commentMap[p] || ''),
+                    ];
+                });
+
+                const escCSV = v => `"${String(v).replace(/"/g, '""')}"`;
+                const csv = [headers.map(escCSV).join(','), ...csvRows.map(row => row.map(escCSV).join(','))].join('\n');
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
                 a.download = `faculty_trends_${user.id}.csv`;

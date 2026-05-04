@@ -148,8 +148,10 @@ function renderCourse(course, allFeedback, reflections, actionReports, activeCyc
             scoreEl.innerHTML = `<span class="na">No responses yet</span>`;
         } else if (!canSeeRatings) {
             scoreEl.innerHTML = `<span class="na">Submit self-reflection to reveal</span>`;
-        } else {
+        } else if (overall !== null) {
             scoreEl.innerHTML = `<span class="big">${overall}</span><span class="of">/ 5</span>`;
+        } else {
+            scoreEl.innerHTML = `<span class="na">No rating data available</span>`;
         }
     }
 

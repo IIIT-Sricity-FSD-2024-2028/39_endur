@@ -174,8 +174,7 @@ function renderParamCharts(paramAverages, sortedCycles) {
                     const { paramAverages: pa } = computeAggregates(c.responses);
                     return pa.find(x => x.id === p.id)?.avgPct ?? 0;
                 });
-                while (history.length < 4) history.unshift(0);
-                renderChartCanvas(`chart_${safeId}`, p.name, history.slice(-4), sortedCycles.slice(-4).map(c => c.cycleName));
+                renderChartCanvas(`chart_${safeId}`, p.name, history, sortedCycles.map(c => c.cycleName || c.cycleId));
             });
         }, 0);
     }
@@ -231,17 +230,29 @@ function renderResponseTable(responses, allCourses, allCycles, user) {
         const ratingRows = Array.isArray(r.ratings) ? r.ratings.map(rt => {
             let score = Number(rt.score ?? 0);
             if (score > 5) score = score / 20;
-            return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;"><span style="color:#64748b">${rt.paramName ?? rt.paramId}</span><span><strong>${score.toFixed(1)}/5</strong>${rt.comment ? ` — <em style="color:#94a3b8">"${rt.comment}"</em>` : ''}</span></div>`;
+            const commentHtml = rt.comment
+                ? `<div style="font-size:11px;color:#94a3b8;font-style:italic;margin-top:2px;padding-left:8px;border-left:2px solid #e2e8f0;">"${rt.comment}"</div>`
+                : '';
+            return `<div style="padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+                    <span style="color:#334155;font-weight:500;">${rt.paramName ?? rt.paramId}</span>
+                    <strong style="color:#1e3a8a;">${score.toFixed(1)}/5</strong>
+                </div>
+                ${commentHtml}
+            </div>`;
         }).join('') : '';
 
         return `
-            <tr>
-                <td><strong>${course?.name ?? r.courseId}</strong><br><span style="font-size:11px;color:#94a3b8">${r.courseId}</span></td>
-                <td><span class="badge neutral" style="font-size:10px">${cycle?.cycleName ?? r.cycleId}</span></td>
-                <td style="font-size:13px">${date}</td>
-                <td><strong style="color:var(--primary)">${overallPct.toFixed(1)}%</strong></td>
-                <td>
-                    <div style="min-width:200px">${ratingRows}</div>
+            <tr style="border-bottom:1px solid #e2e8f0;">
+                <td style="padding:16px 12px;vertical-align:top;">
+                    <strong style="display:block;margin-bottom:2px;">${course?.name ?? r.courseId}</strong>
+                    <span style="font-size:11px;color:#94a3b8">${r.courseId}</span>
+                </td>
+                <td style="padding:16px 12px;vertical-align:top;"><span class="badge neutral" style="font-size:10px">${cycle?.cycleName ?? r.cycleId}</span></td>
+                <td style="padding:16px 12px;vertical-align:top;font-size:13px">${date}</td>
+                <td style="padding:16px 12px;vertical-align:top;"><strong style="color:var(--primary);font-size:1.1rem;">${overallPct.toFixed(1)}%</strong></td>
+                <td style="padding:16px 12px;vertical-align:top;">
+                    <div style="min-width:260px">${ratingRows}</div>
                 </td>
             </tr>
         `;

@@ -95,13 +95,13 @@ export async function initSelfReflection() {
             <h4>${param.name}</h4>
             <p>${param.description || ''} <span style="font-size:0.8rem;color:var(--text-muted)">(Weight: ${param.weight || 0}%)</span></p>
             <div class="rating" id="rating_${param.id}">
-                ${[1, 2, 3, 4, 5].map(n => `<span data-val="${n}" onclick="setRating('${param.id}', ${n}, ${JSON.stringify(myParams)})">★</span>`).join('')}
+                ${[1, 2, 3, 4, 5].map(n => `<span data-val="${n}" onclick="setRating('${param.id}', ${n})">★</span>`).join('')}
             </div>
         </div>
     `).join('');
 
     // Bind rating function to window
-    window.setRating = (paramId, val, params) => {
+    window.setRating = (paramId, val) => {
         ratings[paramId] = val;
         const ratingEl = document.getElementById(`rating_${paramId}`);
         if (ratingEl) {

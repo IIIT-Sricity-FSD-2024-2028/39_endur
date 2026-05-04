@@ -62,31 +62,7 @@
             </div>
         </div>
 
-        <!-- Academic Stats -->
-        <div class="profile-card">
-            <div class="card-section-header">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                <h3>Academic Activity</h3>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <span class="stat-num" id="statCourses">0</span>
-                    <span class="stat-label">Enrolled Courses</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-num" id="statSubmitted">0</span>
-                    <span class="stat-label">Feedbacks Submitted</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-num" id="statPending">0</span>
-                    <span class="stat-label">Pending</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-num" id="statCycles">0</span>
-                    <span class="stat-label">Cycles Participated</span>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Change Password -->
         <div class="profile-card">
@@ -128,41 +104,11 @@
 
     const user = requireAuth();
     if (!user) { /* redirected by requireAuth */ }
-    else {
-        // Sidebar
-        document.getElementById("userName").textContent = user.name;
-        document.getElementById("userDept").textContent = user.department;
-        const av = document.getElementById("avatar");
-        if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
 
-        // Hero
-        const initials = user.name.split(" ").map(n => n[0]).join("");
-        document.getElementById("avatarLarge").textContent = initials;
-        document.getElementById("heroName").textContent = user.name;
-        document.getElementById("heroRole").textContent = `${user.department} · Student`;
-
-        // Profile grid
-        document.getElementById("profileName").textContent = user.name;
-        document.getElementById("profileId").textContent = user.id;
-        document.getElementById("profileDept").textContent = user.department;
-        document.getElementById("profileEmail").textContent = user.email || `${user.id.toLowerCase()}@endur.edu`;
-
-        // Stats (fetch from API)
-        const { GET } = await import('../../js/core/api.js');
-        try {
-            const allSubmitted = await GET(`/feedback-responses?studentId=${encodeURIComponent(user.id)}`);
-            const enrolled = (user.enrolledCourses || []).length;
-            const submitted = allSubmitted.length;
-            const cycleIds = [...new Set(allSubmitted.map(s => s.cycleId))].length;
-            const pending = Math.max(0, enrolled - submitted);
-            document.getElementById("statCourses").textContent = enrolled;
-            document.getElementById("statSubmitted").textContent = submitted;
-            document.getElementById("statPending").textContent = pending;
-            document.getElementById("statCycles").textContent = cycleIds;
-        } catch {
-            document.getElementById("statCourses").textContent = (user.enrolledCourses || []).length;
-        }
-    }
+    window.logout = function() {
+        localStorage.removeItem("endurSession");
+        window.location.href = "../../login.html";
+    };
 
     window.changePassword = async (e) => {
         if (e) e.preventDefault();
@@ -208,10 +154,42 @@
         }
     };
 
-    window.logout = function() {
-        localStorage.removeItem("endurSession");
-        window.location.href = "../../login.html";
-    };
+    if (user) {
+        // Sidebar
+        document.getElementById("userName").textContent = user.name;
+        document.getElementById("userDept").textContent = user.department;
+        const av = document.getElementById("avatar");
+        if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
+
+        // Hero
+        const initials = user.name.split(" ").map(n => n[0]).join("");
+        document.getElementById("avatarLarge").textContent = initials;
+        document.getElementById("heroName").textContent = user.name;
+        document.getElementById("heroRole").textContent = `${user.department} · Student`;
+
+        // Profile grid
+        document.getElementById("profileName").textContent = user.name;
+        document.getElementById("profileId").textContent = user.id;
+        document.getElementById("profileDept").textContent = user.department;
+        document.getElementById("profileEmail").textContent = user.email || `${user.id.toLowerCase()}@endur.edu`;
+
+        // Stats (fetch from API)
+        const { GET } = await import('../../js/core/api.js');
+        try {
+            const allSubmitted = await GET(`/feedback-responses?studentId=${encodeURIComponent(user.id)}`);
+            const enrolled = (user.enrolledCourses || []).length;
+            const submitted = allSubmitted.length;
+            const cycleIds = [...new Set(allSubmitted.map(s => s.cycleId))].length;
+            const pending = Math.max(0, enrolled - submitted);
+            document.getElementById("statCourses").textContent = enrolled;
+            document.getElementById("statSubmitted").textContent = submitted;
+            document.getElementById("statPending").textContent = pending;
+            document.getElementById("statCycles").textContent = cycleIds;
+        } catch {
+            document.getElementById("statCourses").textContent = (user.enrolledCourses || []).length;
+        }
+    }
+
 </script>
 </body>
 </html>
