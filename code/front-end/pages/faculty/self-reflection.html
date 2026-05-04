@@ -18,89 +18,98 @@
             background: var(--surface);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius-xl);
-            padding: 28px 32px;
+            padding: 32px 36px;
             box-shadow: var(--shadow-glass);
+            margin-bottom: 24px;
         }
         .sr-card h3 {
             font-size: 1.05rem;
             font-weight: 700;
             color: var(--text-main);
-            margin-bottom: 20px;
+            margin-bottom: 24px;
             padding-bottom: 12px;
             border-bottom: 1px solid rgba(0,0,0,0.06);
         }
         .question-card {
-            padding: 20px 0;
+            padding: 32px 24px;
             border-bottom: 1px solid rgba(0,0,0,0.05);
             transition: all 0.2s;
+            border-radius: var(--radius-lg);
         }
-        .question-card:last-child { border-bottom: none; padding-bottom: 0; }
-        .question-card:first-child { padding-top: 0; }
+        .question-card:hover {
+            transform: translateX(6px);
+            background: rgba(0,0,0,0.01);
+        }
+        .question-card:last-child { border-bottom: none; margin-bottom: 0; }
         .question-card h4 {
-            font-size: 0.97rem;
+            font-size: 1.1rem;
             font-weight: 700;
             color: var(--text-main);
-            margin: 0 0 4px 0;
+            margin: 0 0 8px 0;
         }
         .question-card p {
-            font-size: 0.83rem;
+            font-size: 0.9rem;
             color: var(--text-muted);
-            margin: 0 0 12px 0;
+            margin: 0 0 16px 0;
+            line-height: 1.6;
         }
         .rating {
             display: inline-flex;
-            gap: 6px;
+            gap: 10px;
             align-items: center;
         }
         .rating span {
-            font-size: 28px;
+            font-size: 32px;
             cursor: pointer;
-            color: #d1d5db;
+            color: #e5e7eb;
             transition: all 0.15s;
             line-height: 1;
         }
-        .rating span.active { color: var(--warning); text-shadow: 0 2px 8px rgba(245,158,11,0.35); }
-        .rating span:hover { transform: scale(1.2) translateY(-2px); color: var(--warning); }
+        .rating span.active { color: var(--warning); text-shadow: 0 2px 10px rgba(245,158,11,0.4); }
+        .rating span:hover { transform: scale(1.25) translateY(-3px); color: var(--warning); }
 
         .qualitative-area {
             width: 100%;
-            padding: 14px 16px;
+            padding: 18px 20px;
             border: 1.5px solid var(--glass-border);
             border-radius: var(--radius-lg);
             font-family: inherit;
-            font-size: 0.92rem;
+            font-size: 0.95rem;
             background: var(--bg);
             color: var(--text-main);
             resize: vertical;
-            min-height: 120px;
-            margin-top: 12px;
-            transition: border-color 0.2s;
+            min-height: 160px;
+            margin-top: 16px;
+            transition: all 0.2s;
+            line-height: 1.6;
         }
         .qualitative-area:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(59,130,246,0.1);
         }
         .qual-label {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-main);
         }
         .qual-hint {
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             color: var(--text-muted);
-            margin-top: 4px;
+            margin-top: 6px;
         }
         .course-label-banner {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 14px 20px;
+            gap: 14px;
+            padding: 16px 24px;
             background: var(--primary-light);
-            border: 1px solid rgba(59,130,246,0.2);
+            border: 1px solid rgba(59,130,246,0.25);
             border-radius: var(--radius-lg);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: var(--primary-active);
             font-weight: 500;
+            margin-bottom: 28px;
         }
         .course-label-banner strong { font-weight: 700; }
         .form-actions-row {
@@ -109,6 +118,8 @@
             align-items: center;
             gap: 16px;
             flex-wrap: wrap;
+            margin-top: 32px;
+            padding-bottom: 40px;
         }
     </style>
 </head>

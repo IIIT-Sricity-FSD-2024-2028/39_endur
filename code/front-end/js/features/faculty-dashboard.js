@@ -162,29 +162,6 @@ export async function renderFacultyDashboard() {
     const finalRate = totalEnrolled > 0 ? Math.min(Math.round((totalResponses / totalEnrolled) * 100), 100) : 0;
 
     _setStats(finalAvg, finalRate, pendingReflectionCount, finalGap, phase);
-
-    // ── Export button ─────────────────────────────────────────────────────────
-    const exportBtn = document.getElementById('exportTrendsBtn');
-    if (exportBtn) {
-        exportBtn.style.display = 'block';
-        exportBtn.onclick = async () => {
-            const { downloadCSV } = await import('./admin-utils.js');
-            const myIds = new Set(myCourses.map(c => c.id));
-            const myFeedback = allSubmissions.filter(f => myIds.has(f.courseId));
-            const rows = ['Cycle ID,Course ID,User ID,Avg Score'];
-            myFeedback.forEach(f => {
-                let sum = 0, count = 0;
-                if (Array.isArray(f.ratings)) {
-                    f.ratings.forEach(r => {
-                        const score = Number(r.score);
-                        if (!isNaN(score)) { sum += score; count++; }
-                    });
-                }
-                rows.push(`${f.cycleId},${f.courseId},${f.studentId || f.userId},${count ? (sum / count).toFixed(2) : 0}`);
-            });
-            downloadCSV(`Faculty_Trends_${user.id}_${activeCycleId}.csv`, rows.join('\n'));
-        };
-    }
 }
 
 function _setStats(avgScore, responseRate, pendingReflections, gapScore, phase = '') {
@@ -194,7 +171,9 @@ function _setStats(avgScore, responseRate, pendingReflections, gapScore, phase =
     const gapEl = document.getElementById('gapScore');
 
     if (avgEl) {
-        if (['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase)) {
+        // Enforce: Lock score if cycle is active OR if faculty hasn't submitted reflections yet
+        const isLocked = ['PREPARATION', 'STUDENT_FEEDBACK'].includes(phase) || pendingReflections > 0;
+        if (isLocked) {
             avgEl.innerHTML = `<span style="font-size:18px;color:#94a3b8">Locked 🔒</span>`;
         } else {
             avgEl.innerText = +avgScore > 0 ? `${avgScore}%` : 'N/A';
