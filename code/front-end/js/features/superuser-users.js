@@ -214,7 +214,7 @@ export async function previewBulkFile() {
     // Validate IDs and strict fields
     const rolePrefixes = { student: 'S', faculty: 'F', admin: 'A', dean: 'D', hod: 'H', superuser: 'SU' };
     const invalidUsers = parsed.filter(u => {
-        if (!u.id || !u.name || !u.role || !u.password) return true;
+        if (!u.id || !u.name || !u.role || !u.password || !u.email || !u.department) return true;
         if (!/^[a-zA-Z0-9]+$/.test(u.id)) return true;
         const prefix = rolePrefixes[u.role.toLowerCase()];
         if (!prefix || !u.id.toUpperCase().startsWith(prefix)) return true;
@@ -228,7 +228,7 @@ export async function previewBulkFile() {
     });
 
     if (invalidUsers.length > 0) {
-        showToast(`Found ${invalidUsers.length} invalid users. Ensure all rows have id, name, role, password, and correct prefixes.`, 'error');
+        showToast(`Found ${invalidUsers.length} invalid users. Ensure all rows have id, name, role, password, email, and department.`, 'error');
         return;
     }
 

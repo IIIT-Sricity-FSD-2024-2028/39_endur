@@ -3735,7 +3735,9 @@
           "id",
           "password",
           "name",
-          "role"
+          "role",
+          "email",
+          "department"
         ]
       },
       "BulkImportDto": {
@@ -4263,7 +4265,21 @@
       },
       "CreateDepartmentDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "CS",
+            "description": "Unique department ID"
+          },
+          "name": {
+            "type": "string",
+            "example": "Computer Science"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
       }
     }
   }

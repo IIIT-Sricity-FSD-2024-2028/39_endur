@@ -3,6 +3,7 @@ import { CreateFeedbackCycleDto, UpdateFeedbackCycleDto, UpdateCycleStatusDto } 
 export declare class FeedbackCyclesService {
     private readonly store;
     constructor(store: DataStoreService);
+    private _calculatePhase;
     generateDefaultParameters(): Record<string, any[]>;
     findAll(): any[];
     findActive(): any[];

@@ -22,15 +22,13 @@ export class CreateUserDto {
   @IsString()
   role: string;
 
-  @ApiPropertyOptional({ example: 'student@university.edu' })
-  @IsOptional()
+  @ApiProperty({ example: 'student@university.edu' })
   @IsString()
-  email?: string;
+  email: string;
 
-  @ApiPropertyOptional({ example: 'Computer Science' })
-  @IsOptional()
+  @ApiProperty({ example: 'Computer Science' })
   @IsString()
-  department?: string;
+  department: string;
 
   @ApiPropertyOptional({ example: ['CS101', 'CS102'], type: [String] })
   @IsOptional()

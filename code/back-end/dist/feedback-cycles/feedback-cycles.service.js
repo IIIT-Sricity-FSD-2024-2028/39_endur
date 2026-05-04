@@ -17,6 +17,27 @@ let FeedbackCyclesService = class FeedbackCyclesService {
     constructor(store) {
         this.store = store;
     }
+    _calculatePhase(cycle) {
+        if (cycle.status === 'closed')
+            return 'COMPLETED';
+        const now = new Date();
+        const prepDl = cycle.prepDeadline ? new Date(cycle.prepDeadline) : null;
+        const studentDl = cycle.studentDeadline ? new Date(cycle.studentDeadline) : null;
+        const reflectionDl = cycle.reflectionDeadline ? new Date(cycle.reflectionDeadline) : null;
+        const actionDl = cycle.actionReportDeadline ? new Date(cycle.actionReportDeadline) : null;
+        const end = new Date(cycle.endTimestamp);
+        if (now >= end)
+            return 'COMPLETED';
+        if (actionDl && now >= actionDl)
+            return 'COMPLETED';
+        if (reflectionDl && now >= reflectionDl)
+            return 'ACTION_REPORT';
+        if (studentDl && now >= studentDl)
+            return 'FACULTY_REFLECTION';
+        if (prepDl && now >= prepDl)
+            return 'STUDENT_FEEDBACK';
+        return 'PREPARATION';
+    }
     generateDefaultParameters() {
         const depts = this.store.getDepartments();
         const map = {};
@@ -33,20 +54,32 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         return map;
     }
     findAll() {
-        return this.store.getFeedbackCycles();
+        const cycles = this.store.getFeedbackCycles();
+        return cycles.map(c => ({ ...c, phase: this._calculatePhase(c) }));
     }
     findActive() {
         const cycles = this.store.getFeedbackCycles();
-        return cycles.filter((c) => c.status === 'active');
+        return cycles
+            .filter((c) => c.status === 'active')
+            .map(c => ({ ...c, phase: this._calculatePhase(c) }));
     }
     findOne(id) {
         const cycle = this.store.getFeedbackCycles().find((c) => c.cycleId === id);
         if (!cycle)
             throw new common_1.NotFoundException(`Cycle ${id} not found`);
-        return cycle;
+        return { ...cycle, phase: this._calculatePhase(cycle) };
     }
     getCycleState() {
-        return this.store.getCycleState();
+        const cycles = this.store.getFeedbackCycles();
+        const active = cycles.find(c => c.status === 'active');
+        if (!active)
+            return this.store.getCycleState();
+        return {
+            id: active.cycleId,
+            cycleName: active.cycleName,
+            phase: this._calculatePhase(active),
+            status: active.status
+        };
     }
     create(dto, actorId, actorName) {
         const cycles = this.store.getFeedbackCycles();
