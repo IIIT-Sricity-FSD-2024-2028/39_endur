@@ -59,6 +59,7 @@
             </div>
             <div class="page-actions-right" style="display:flex;gap:12px;">
                 <button class="btn-outline" onclick="globalAutoAssign()" style="display:flex;align-items:center;gap:6px;">⚡ Global Auto-Assign</button>
+                <button class="btn-outline" onclick="exportCourses()" style="display:flex;align-items:center;gap:6px;">📤 Export Courses</button>
                 <button class="btn-outline" onclick="openCourseBulkModal()" style="display:flex;align-items:center;gap:6px;">📥 Import Courses</button>
             </div>
         </div>
@@ -129,7 +130,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { initSuperuserCourses, saveCourse, deleteCourse, openAddCourse, openEditCourse, openAssignStudents, saveAssignments, autoSelectDeptStudents, globalAutoAssign, closeCourseModal, closeAssignModal, openCourseBulkModal, closeCourseBulkModal, previewCourseBulkFile, commitCourseBulkImport } from '../../js/features/superuser-courses.js';
+    import { initSuperuserCourses, saveCourse, deleteCourse, openAddCourse, openEditCourse, openAssignStudents, saveAssignments, autoSelectDeptStudents, globalAutoAssign, closeCourseModal, closeAssignModal, openCourseBulkModal, closeCourseBulkModal, previewCourseBulkFile, commitCourseBulkImport, exportCourses } from '../../js/features/superuser-courses.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -155,6 +156,7 @@
     window.closeCourseBulkModal = closeCourseBulkModal;
     window.previewCourseBulkFile = previewCourseBulkFile;
     window.commitCourseBulkImport = commitCourseBulkImport;
+    window.exportCourses = exportCourses;
 
     document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', (e) => { if (e.target === o) o.classList.remove('active'); }));
 </script>

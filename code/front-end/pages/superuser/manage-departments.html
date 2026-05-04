@@ -41,6 +41,7 @@
                 <p class="subtitle">Manage academic departments across the institution.</p>
             </div>
             <div style="display:flex;gap:12px;">
+                <button class="btn-outline" onclick="exportDepartments()" style="display:flex;align-items:center;gap:6px;">📤 Export Departments</button>
                 <button class="btn-outline" onclick="openBulkModal()">📥 Import Departments</button>
                 <button class="btn-primary" onclick="openAddDepartment()">+ Add Department</button>
             </div>
@@ -120,7 +121,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { initDepartments, openAddDepartment, closeDeptModal, saveDepartment, deleteDepartment, openBulkModal, closeBulkModal, previewBulkFile, commitBulkImport } from '../../js/features/superuser-departments.js';
+    import { initDepartments, openAddDepartment, closeDeptModal, saveDepartment, deleteDepartment, openBulkModal, closeBulkModal, previewBulkFile, commitBulkImport, exportDepartments } from '../../js/features/superuser-departments.js';
 
     document.addEventListener('DOMContentLoaded', () => {
         const user = requireAuth();
@@ -143,6 +144,7 @@
     window.closeBulkModal = closeBulkModal;
     window.previewBulkFile = previewBulkFile;
     window.commitBulkImport = commitBulkImport;
+    window.exportDepartments = exportDepartments;
 </script>
 </body>
 </html>

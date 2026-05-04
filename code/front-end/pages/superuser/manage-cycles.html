@@ -45,6 +45,7 @@
                 <p class="subtitle">Timeline and phase management.</p>
             </div>
             <div style="display:flex;gap:12px;">
+                <button class="btn-outline" onclick="exportCycles()" style="display:flex;align-items:center;gap:6px;">📤 Export Cycles</button>
                 <button class="btn-outline" onclick="openCycleBulkModal()">📥 Import Cycles</button>
                 <button class="btn-primary" onclick="suOpenAddCycle()">+ Create Cycle</button>
             </div>
@@ -108,7 +109,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { renderSuperuserCycles, suOpenAddCycle, suEditCycle, suCloseCycle, suReopenCycle, suDeleteCycle, suCloseCycleModal, closeDeleteModal, openCycleBulkModal, closeCycleBulkModal, previewCycleBulkFile, commitCycleBulkImport, suViewCycleResponses, suViewCycleResponsesAsync } from '../../js/features/superuser-cycles.js';
+    import { renderSuperuserCycles, suOpenAddCycle, suEditCycle, suCloseCycle, suReopenCycle, suDeleteCycle, suCloseCycleModal, closeDeleteModal, openCycleBulkModal, closeCycleBulkModal, previewCycleBulkFile, commitCycleBulkImport, suViewCycleResponses, suViewCycleResponsesAsync, exportCycles } from '../../js/features/superuser-cycles.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -132,6 +133,7 @@
     window.commitCycleBulkImport = commitCycleBulkImport;
     window.suViewCycleResponses = suViewCycleResponses;
     window.suViewCycleResponsesAsync = suViewCycleResponsesAsync;
+    window.exportCycles = exportCycles;
 
 </script>
 </body>

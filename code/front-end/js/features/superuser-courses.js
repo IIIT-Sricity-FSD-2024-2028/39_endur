@@ -1,5 +1,19 @@
 import { GET, POST, PATCH, DELETE, getSession } from '../core/api.js';
-import { showToast } from './admin-utils.js';
+import { showToast, exportToCSV } from './admin-utils.js';
+
+export function exportCourses() {
+    if (!courses.length) { showToast('No courses to export.', 'error'); return; }
+    const rows = courses.map(c => ({
+        ID: c.id,
+        Name: c.name,
+        FacultyNames: (c.facultyNames || []).join('; '),
+        FacultyIDs: (c.facultyIds || []).join('; '),
+        Department: c.department || '',
+        EnrolledCount: c.enrolled || 0
+    }));
+    exportToCSV(`Endur_Courses_${new Date().toISOString().slice(0,10)}.csv`, rows);
+    showToast(`Exported ${rows.length} courses.`, 'success');
+}
 
 const THUMBNAILS = ['img_backtoschool.jpg', 'img_bookclub.jpg', 'img_breakfast.jpg', 'img_learnlanguage.jpg', 'img_read.jpg'];
 

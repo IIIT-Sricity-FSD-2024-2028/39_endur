@@ -69,6 +69,7 @@
                     <option value="admin">Admin</option>
                     <option value="superuser">Super User</option>
                 </select>
+                <button class="btn-outline" onclick="exportUsers()" style="display:flex;align-items:center;gap:6px;">📤 Export Users</button>
                 <button class="btn-outline" onclick="openBulkImportModal()" style="display:flex;align-items:center;gap:6px;">📥 Import Users</button>
                 <button class="btn-primary" onclick="openAddUser()">+ Add User</button>
             </div>
@@ -129,7 +130,7 @@
 
 <script type="module">
     import { requireAuth } from '../../js/core/session.js';
-    import { renderSuperuserUsers, openAddUser, openEditUser, confirmDeleteUser, closeUserModal, closeDeleteModal, openBulkImportModal, closeBulkModal, previewBulkFile, commitBulkImport } from '../../js/features/superuser-users.js';
+    import { renderSuperuserUsers, openAddUser, openEditUser, confirmDeleteUser, closeUserModal, closeDeleteModal, openBulkImportModal, closeBulkModal, previewBulkFile, commitBulkImport, exportUsers } from '../../js/features/superuser-users.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         const user = requireAuth();
@@ -149,6 +150,7 @@
     window.closeBulkModal = closeBulkModal;
     window.previewBulkFile = previewBulkFile;
     window.commitBulkImport = commitBulkImport;
+    window.exportUsers = exportUsers;
 
     document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); }));
 </script>

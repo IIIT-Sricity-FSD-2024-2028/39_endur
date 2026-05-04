@@ -1,5 +1,15 @@
 import { GET, POST, DELETE } from '../core/api.js';
-import { showToast } from './admin-utils.js';
+import { showToast, exportToCSV } from './admin-utils.js';
+
+export function exportDepartments() {
+    if (!departments.length) { showToast('No departments to export.', 'error'); return; }
+    const rows = departments.map(d => ({
+        ID: d.id,
+        Name: d.name
+    }));
+    exportToCSV(`Endur_Departments_${new Date().toISOString().slice(0,10)}.csv`, rows);
+    showToast(`Exported ${rows.length} departments.`, 'success');
+}
 
 let departments = [];
 

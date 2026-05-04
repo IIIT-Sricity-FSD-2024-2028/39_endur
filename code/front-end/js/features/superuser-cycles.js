@@ -1,5 +1,20 @@
 import { GET, POST, PATCH, DELETE, getSession } from '../core/api.js';
-import { showToast, formatDate, appendAuditLog } from './admin-utils.js';
+import { showToast, formatDate, appendAuditLog, exportToCSV } from './admin-utils.js';
+
+export function exportCycles() {
+    if (!cycles.length) { showToast('No cycles to export.', 'error'); return; }
+    const rows = cycles.map(c => ({
+        CycleID: c.cycleId,
+        Name: c.cycleName || c.name || 'Untitled',
+        Type: c.type || 'weekly',
+        Start: c.startTimestamp,
+        End: c.endTimestamp,
+        StudentDeadline: c.studentDeadline || '',
+        Status: c.status
+    }));
+    exportToCSV(`Endur_Cycles_${new Date().toISOString().slice(0,10)}.csv`, rows);
+    showToast(`Exported ${rows.length} cycles.`, 'success');
+}
 
 let cycles = [];
 let session = null;

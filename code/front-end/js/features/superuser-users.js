@@ -1,4 +1,4 @@
-import { showToast, formatDate, appendAuditLog } from './admin-utils.js';
+import { showToast, formatDate, appendAuditLog, exportToCSV } from './admin-utils.js';
 import { GET, POST, PATCH, DELETE, getSession } from '../core/api.js';
 
 let users = [];
@@ -393,3 +393,17 @@ export function confirmDeleteUser(id) {
 }
 
 export const closeDeleteModal = () => document.getElementById('deleteModal')?.classList.remove('active');
+
+export function exportUsers() {
+    if (!users.length) { showToast('No users to export.', 'error'); return; }
+    const rows = users.map(u => ({
+        ID: u.id,
+        Name: u.name,
+        Email: u.email || '',
+        Role: u.role,
+        Department: u.department || '',
+        EnrolledCourses: (u.enrolledCourses || []).join('; '),
+    }));
+    exportToCSV(`Endur_Users_${new Date().toISOString().slice(0,10)}.csv`, rows);
+    showToast(`Exported ${rows.length} users.`, 'success');
+}
