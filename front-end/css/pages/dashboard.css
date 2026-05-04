@@ -1,0 +1,36 @@
+/* layout */
+@import "../layout.css";
+
+/* components */
+@import "../components/sidebar.css";
+@import "../components/stats.css";
+@import "../components/table.css";
+@import "../components/badge.css";
+@import "../components/course-card.css";
+@import "../components/feedback-card.css";
+@import "../components/profile.css";
+@import "../components/form.css";
+@import "../components/rating.css";
+@import "../components/success.css";
+
+/* page-specific adjustments */
+.dashboard-content {
+  padding: var(--space-5);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: var(--space-4);
+  margin-top: 4px;
+}
+
+.section-title {
+  margin: var(--space-5) 0 var(--space-3);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — Endur</title>
+    <meta name="description"
+        content="Endur Admin Dashboard — operational overview of feedback cycles, parameters, and system activity.">
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active {
+            background: var(--primary-light);
+            color: var(--primary-active);
+        }
+
+        .sidebar-menu a:hover {
+            color: #059669;
+        }
+
+        /* removed admin-badge */
+        .unused {
+            background: var(--primary);
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .cycle-banner-info {
+            flex: 1;
+            min-width: 160px;
+        }
+
+        .cycle-banner-info p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .cycle-banner-info strong {
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-layout">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+                <div><strong>Endur</strong>
+                    <p>Admin Portal</p>
+                </div>
+            </div>
+            <nav class="sidebar-menu">
+                <a class="active" href="dashboard.html">📊 Dashboard</a>
+                <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+                <a href="audit-logs.html">📋 Audit Logs</a>
+            </nav>
+            <a href="profile.html" class="sidebar-user">
+                <div class="avatar" id="avatar"></div>
+                <div><strong id="userName"></strong>
+                    <p id="userDept"></p>
+                </div>
+            </a>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="dashboard-content">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+                <div>
+                    <h1 id="welcomeText">Admin Dashboard</h1>
+                    <p class="subtitle">Operational control — manage cycles, parameters, and role assignments.</p>
+                </div>
+                <span class="badge primary">ADMIN</span>
+            </div>
+
+            <!-- STATS -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p>Active Cycle</p>
+                    <h2 id="statActiveCycleName" style="font-size:1.1rem;margin-top:8px">—</h2>
+                </div>
+                <div class="stat-card">
+                    <p>Total Cycles</p>
+                    <h2 id="statTotalCycles">—</h2>
+                </div>
+                <div class="stat-card">
+                    <p>Total Departments</p>
+                    <h2 id="statTotalDepts">—</h2>
+                </div>
+                <div class="stat-card">
+                    <p>Faculty Members</p>
+                    <h2 id="statTotalFaculty">—</h2>
+                </div>
+            </div>
+
+            <!-- ACTIVE CYCLE BANNER -->
+            <div id="activeCycleBanner" style="display:none; margin: 40px 0; background: #fff; border-radius: 16px; padding: 24px; border: 1px solid #f1f5f9; box-shadow: var(--shadow-sm);">
+                <h2 class="section-title">Current Active Cycle</h2>
+                <div class="card-panel" style="padding:var(--space-4); display:flex; gap:var(--space-4); flex-wrap:wrap; align-items:center; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
+                    <div class="cycle-banner-info">
+                        <p>Cycle Name</p>
+                        <strong id="bannerCycleName">—</strong>
+                    </div>
+                    <div class="cycle-banner-info">
+                        <p>Start</p>
+                        <strong id="bannerStart">—</strong>
+                    </div>
+                    <div class="cycle-banner-info">
+                        <p>End</p>
+                        <strong id="bannerEnd">—</strong>
+                    </div>
+                    <a href="manage-cycles.html" class="btn-primary" style="white-space:nowrap;padding:10px 20px">Manage
+                        →</a>
+                </div>
+            </div>
+
+            <!-- RECENT ACTIVITY TABLE -->
+            <h2 class="section-title">Recent System Activity</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Actor</th>
+                        <th>Action</th>
+                        <th>Module</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="recentLogBody">
+                    <tr>
+                        <td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Loading activity…
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </main>
+    </div>
+
+    <script type="module">
+        import { requireAuth } from '../../js/core/session.js';
+        import { renderAdminDashboard } from '../../js/features/admin-dashboard.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = requireAuth('admin');
+            if (!user) return;
+
+            document.getElementById('welcomeText').textContent = `Welcome, ${user.name.split(' ')[0]}`;
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userDept').textContent = user.department || 'Admin';
+
+            const av = document.getElementById('avatar');
+            if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+
+            await renderAdminDashboard();
+        });
+    </script>
+</body>
+
+</html>
