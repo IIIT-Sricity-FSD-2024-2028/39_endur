@@ -80,14 +80,35 @@ export async function renderHistoricalTrends() {
 
 /* ── Aggregate helpers ─────────────────────────────────────────────── */
 function computeAggregates(responses) {
-    // Collect per-param: { id → { name, weight, sum, count } }
+    if (!responses.length) return { overallPct: 0, paramAverages: [] };
+
+    // 1. Calculate overall score for EACH response first (for total average accuracy)
+    const individualResponseScores = responses.map(r => {
+        if (!Array.isArray(r.ratings) || r.ratings.length === 0) return null;
+        let rSum = 0;
+        let rWeight = 0;
+        r.ratings.forEach(rt => {
+            let s = Number(rt.score ?? 0);
+            if (s > 5) s = s / 20; // Normalize 0-100 scale to 1-5 scale
+            const w = rt.weight ?? 25;
+            rSum += (s * 20) * w; // Scale to % and weight it
+            rWeight += w;
+        });
+        return rWeight > 0 ? rSum / rWeight : null;
+    }).filter(s => s !== null);
+
+    const overallPct = individualResponseScores.length > 0 
+        ? individualResponseScores.reduce((a, b) => a + b, 0) / individualResponseScores.length 
+        : 0;
+
+    // 2. Collect per-param averages for the charts
     const paramMap = {};
     responses.forEach(r => {
         if (!Array.isArray(r.ratings)) return;
         r.ratings.forEach(entry => {
             const k = entry.paramId;
             let score = Number(entry.score ?? 0);
-            if (score > 5) score = score / 20; // Normalize 0-100 scale to 1-5 scale for calculation
+            if (score > 5) score = score / 20;
 
             if (!paramMap[k]) paramMap[k] = { name: entry.paramName ?? k, weight: entry.weight ?? 25, sum: 0, count: 0 };
             paramMap[k].sum   += score;
@@ -103,10 +124,6 @@ function computeAggregates(responses) {
         avgPct:     count > 0 ? (sum / count) * 20 : 0,   // % out of 100
         responseCount: count,
     }));
-
-    // Weighted overall
-    const totalWeight = paramAverages.reduce((s, p) => s + (p.weight), 0) || 100;
-    const overallPct  = paramAverages.reduce((s, p) => s + (p.avgPct * p.weight / totalWeight), 0);
 
     return { overallPct, paramAverages };
 }

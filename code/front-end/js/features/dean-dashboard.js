@@ -48,21 +48,26 @@ export async function renderDeanDashboard() {
         const faculty = facultyList.find(u => u.id === facultyId);
         const dept = faculty?.department;
 
-        if (Array.isArray(f.ratings)) {
-            f.ratings.forEach(rating => {
-                let val = Number(rating.score);
-                if (isNaN(val)) return;
-                
-                // Normalize to 100-point scale for UI
-                if (val <= 5) val = val * 20; 
+        if (Array.isArray(f.ratings) && f.ratings.length > 0) {
+            let rSum = 0;
+            let rWeight = 0;
+            f.ratings.forEach(rt => {
+                let s = Number(rt.score ?? 0);
+                if (s > 5) s = s / 20; // Normalize
+                const w = rt.weight ?? 25;
+                rSum += (s * 20) * w; // Scale to % and weight
+                rWeight += w;
+            });
 
-                instTotalScore += val;
+            if (rWeight > 0) {
+                const rOverall = rSum / rWeight;
+                instTotalScore += rOverall;
                 instMetricCount++;
                 if (dept && departments[dept]) {
-                    departments[dept].totalScore += val;
+                    departments[dept].totalScore += rOverall;
                     departments[dept].metricCount++;
                 }
-            });
+            }
         }
     });
 

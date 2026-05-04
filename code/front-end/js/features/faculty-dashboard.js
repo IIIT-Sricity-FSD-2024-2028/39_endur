@@ -89,18 +89,24 @@ export async function renderFacultyDashboard() {
 
         let courseAvgPct = 0;
         if (responses > 0) {
-            let scoreSum = 0, scoreCount = 0;
-            courseFeedback.forEach(f => {
-                if (!Array.isArray(f.ratings)) return;
-                f.ratings.forEach(entry => {
-                    let s = Number(entry.score ?? 0);
+            const individualResponseScores = courseFeedback.map(f => {
+                if (!Array.isArray(f.ratings) || f.ratings.length === 0) return null;
+                let rSum = 0;
+                let rWeight = 0;
+                f.ratings.forEach(rt => {
+                    let s = Number(rt.score ?? 0);
                     if (s > 5) s = s / 20;
-                    scoreSum += s;
-                    scoreCount += 1;
+                    const w = rt.weight ?? 25;
+                    rSum += (s * 20) * w;
+                    rWeight += w;
                 });
-            });
-            const avg = scoreCount > 0 ? (scoreSum / scoreCount) : 0;
-            courseAvgPct = isNaN(avg) ? 0 : avg * 20;
+                return rWeight > 0 ? rSum / rWeight : null;
+            }).filter(s => s !== null);
+
+            courseAvgPct = individualResponseScores.length > 0 
+                ? individualResponseScores.reduce((a, b) => a + b, 0) / individualResponseScores.length 
+                : 0;
+
             totalScoreAcc += courseAvgPct;
             coursesWithData++;
         }
