@@ -307,7 +307,7 @@ export class FeedbackCyclesService {
               rawRatings = r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {};
             } catch (e) {}
 
-            Object.entries(rawRatings).forEach(([key, val]) => {
+            Object.entries(rawRatings).forEach(([key, val], idx) => {
               if (val === undefined || val === null || val === '') return;
               let score = Number(val);
               if (isNaN(score)) return;
@@ -320,7 +320,7 @@ export class FeedbackCyclesService {
                 paramName: pDef ? pDef.name : key,
                 weight: pDef ? pDef.weight : 25,
                 score: score,
-                comment: r.openEndedComment || r.comments || ''
+                comment: idx === 0 ? (r.openEndedComment || r.comments || '') : ''
               });
             });
           }
