@@ -45,4 +45,5 @@ export declare class UsersService {
     };
     updateEnrollments(courseId: string, studentIds: string[]): void;
     getEnrolledCourses(userId: string): any[];
+    private _syncCourseEnrollments;
 }
