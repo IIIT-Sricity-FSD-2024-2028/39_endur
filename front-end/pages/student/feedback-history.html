@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Feedback History | Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .details-grid {
+            margin-top: 12px;
+            padding: 16px;
+            background: var(--surface-alt);
+            border-radius: var(--radius-lg);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            border: 1px solid var(--glass-border);
+        }
+        .param-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .param-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+        .param-name { color: var(--text-muted); font-weight: 500; }
+        .param-score { font-weight: 700; color: var(--primary); }
+        .param-comment {
+            font-size: 0.75rem;
+            color: var(--text);
+            font-style: italic;
+            padding: 6px 8px;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid var(--primary-light);
+            margin-top: 4px;
+        }
+        .cycle-badge {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="../../assets/logos/endur-logo.svg">
+                <div>
+                    <strong>Endur</strong>
+                    <p>Student Portal</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="courses.html">My Courses</a>
+                <a href="pending-feedback.html">Pending Feedbacks</a>
+                <a class="active">History</a>
+            </nav>
+
+            <a href="profile.html" class="sidebar-user">
+                <div id="avatar" class="avatar"></div>
+                <div>
+                    <strong id="userName"></strong>
+                    <p id="userDept"></p>
+                </div>
+            </a>
+        </aside>
+
+        <main class="dashboard-content">
+            <div class="header-section">
+                <h1>Feedback History</h1>
+                <p class="subtitle">A transparent record of your evaluations and comments across semesters.</p>
+            </div>
+
+            <div class="card" style="margin-top: 24px; padding: 0; overflow: hidden;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Details & Breakdown</th>
+                            <th>Cycle</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable">
+                        <tr><td colspan="4" style="text-align:center; padding:40px; color:var(--text-muted);">Loading your feedback history...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { requireAuth } from "../../js/core/session.js";
+        import { GET } from "../../js/core/api.js";
+
+        const user = requireAuth();
+        if (!user) window.location.href = '../../login.html';
+
+        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userDept").innerText = user.department;
+        document.getElementById("avatar").innerText = user.name.split(" ").filter(n=>n).map(n=>n[0]).join("").toUpperCase();
+
+        async function initHistory() {
+            const table = document.getElementById("historyTable");
+            
+            try {
+                // Fetch all necessary data in parallel
+                const [submissions, courses, cycles] = await Promise.all([
+                    GET(`/feedback-responses?studentId=${encodeURIComponent(user.id)}`),
+                    GET("/courses"),
+                    GET("/feedback-cycles")
+                ]);
+
+                if (!submissions || submissions.length === 0) {
+                    table.innerHTML = `
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 60px; color: var(--text-muted);">
+                                <div style="font-size: 3rem; margin-bottom: 12px;">📊</div>
+                                <strong>No feedback submitted yet.</strong><br>
+                                Your past evaluations will appear here once submitted.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                // Sort by date descending
+                const sorted = submissions.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+                
+                table.innerHTML = sorted.map(s => {
+                    const course = courses.find(c => c.id === s.courseId);
+                    const cycle  = cycles.find(c => c.cycleId === s.cycleId);
+                    const dateStr = s.submittedAt ? new Date(s.submittedAt).toLocaleDateString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                    }) : "Unknown";
+
+                    // Build parameter breakdown
+                    let breakdownHtml = '<div class="details-grid">';
+                    if (Array.isArray(s.ratings)) {
+                        breakdownHtml += s.ratings.map(r => `
+                            <div class="param-item">
+                                <div class="param-header">
+                                    <span class="param-name">${r.paramName || r.paramId}</span>
+                                    <span class="param-score">
+                                        ${(() => {
+                                            let s = Number(r.score || 0);
+                                            if (s > 5) s = s / 20;
+                                            return s.toFixed(1);
+                                        })()}/5
+                                    </span>
+                                </div>
+                                ${r.comment ? `<div class="param-comment">"${r.comment}"</div>` : ''}
+                            </div>
+                        `).join('');
+                    } else {
+                        // Fallback for any legacy data
+                        breakdownHtml += '<div style="grid-column: 1/-1; color: var(--text-muted); font-size: 0.8rem;">Evaluation breakdown unavailable for this archived record.</div>';
+                    }
+                    breakdownHtml += '</div>';
+
+                    return `
+                        <tr style="border-bottom: 1px solid var(--glass-border);">
+                            <td style="padding: 20px;">
+                                <div style="margin-bottom: 4px;">
+                                    <strong>${course?.name || s.courseId}</strong>
+                                    <span style="margin-left: 8px; font-size: 0.75rem; color: var(--text-muted); padding: 2px 6px; background: var(--surface-alt); border-radius: 4px;">${s.courseId}</span>
+                                </div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                                    Faculty ID: ${s.facultyId || 'N/A'}
+                                </div>
+                                ${breakdownHtml}
+                            </td>
+                            <td style="vertical-align: top; padding-top: 24px;">
+                                <span class="cycle-badge">${cycle?.cycleName || s.cycleId || 'Archived Cycle'}</span>
+                            </td>
+                            <td style="vertical-align: top; padding-top: 24px; font-size: 0.9rem; color: var(--text-muted);">${dateStr}</td>
+                            <td style="vertical-align: top; padding-top: 24px;">
+                                <span class="badge success">Submitted</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error("History Load Error:", err);
+                table.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:var(--danger);">Failed to load history. Please try again.</td></tr>`;
+            }
+        }
+
+        initHistory();
+    </script>
+</body>
+</html>

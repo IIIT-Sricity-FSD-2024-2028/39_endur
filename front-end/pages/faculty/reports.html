@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Feedback Reports | Faculty — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .alert-banner {
+            background: #fef2f2;
+            border-left: 4px solid #dc2626;
+            border-radius: var(--radius-lg);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+        .alert-banner h4 { color: #991b1b; margin-bottom: 3px; font-size: 0.95rem; }
+        .alert-banner p  { color: #b91c1c; font-size: 0.85rem; margin: 0; }
+
+        .course-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+        .course-tab {
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: 1.5px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+        .course-tab.active { background: var(--primary); color: white; }
+        .course-tab:hover { opacity: 0.8; }
+
+        .feedback-status-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            box-shadow: var(--shadow-glass);
+        }
+        .feedback-status-card h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .metric-row:last-child { border-bottom: none; }
+        .metric-row .label { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
+        .metric-row .value { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+        .metric-row .value.locked { color: var(--text-muted); font-size: 0.9rem; font-style: italic; }
+
+        .action-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            box-shadow: var(--shadow-glass);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .action-card .action-info h3 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+        .action-card .action-info p { font-size: 0.85rem; color: var(--text-muted); }
+        .action-card .action-btn { flex-shrink: 0; }
+
+        .phase-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .phase-open   { background: #dcfce7; color: #166534; }
+        .phase-locked { background: #f1f5f9; color: #64748b; }
+        .phase-active { background: var(--primary-light); color: var(--primary-active); }
+
+        .score-display {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .score-display .big { font-size: 2.5rem; font-weight: 800; color: var(--primary); line-height: 1; }
+        .score-display .of  { font-size: 1rem; color: var(--text-muted); }
+        .score-display .na  { font-size: 1rem; color: var(--text-muted); font-style: italic; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg">
+            <div><strong>Endur</strong><p>Faculty Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active" href="reports.html">Feedback Reports</a>
+            <a href="action-report.html">Action Reports</a>
+            <a href="historical-trends.html">Historical Trends</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div id="avatar" class="avatar"></div>
+            <div>
+                <strong id="userName"></strong>
+                <p id="userDept"></p>
+            </div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+
+        <div id="globalAlertContainer"></div>
+
+        <div>
+            <h1>Feedback Reports</h1>
+            <p class="subtitle">Evaluate your performance metrics per course for the active cycle.</p>
+        </div>
+
+        <!-- Course Tabs -->
+        <div id="courseSelector" class="course-selector"></div>
+
+        <!-- No courses state -->
+        <div id="noCoursesState" style="display:none; text-align:center; padding: 60px 20px;">
+            <div style="font-size:3rem;margin-bottom:16px;">📋</div>
+            <h2 style="margin-bottom:8px;">No Courses Assigned</h2>
+            <p class="subtitle">You have no courses assigned for the current cycle.</p>
+        </div>
+
+        <!-- Data content -->
+        <div id="reportContent" style="display:none">
+
+            <!-- Ratings Card -->
+            <div class="feedback-status-card">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                    <h2 style="margin:0">Student Feedback Results</h2>
+                    <span id="phaseTag" class="phase-badge phase-locked">LOADING</span>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:24px;margin-bottom:24px;flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">Average Rating</div>
+                        <div class="score-display" id="scoreDisplay">
+                            <span class="na">Waiting for data</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">Responses</div>
+                        <div style="font-size:2rem;font-weight:800;color:var(--text-main)" id="responseCount">0</div>
+                    </div>
+                </div>
+
+                <div id="metricRows"></div>
+            </div>
+
+            <!-- Primary Action Card -->
+            <div class="action-card">
+                <div class="action-info">
+                    <h3 id="actionTitle">Primary Action</h3>
+                    <p id="actionDesc">—</p>
+                </div>
+                <button id="primaryActionBtn" class="btn-primary action-btn" disabled>Loading…</button>
+            </div>
+
+        </div>
+
+        <!-- Anonymity notice -->
+        <div id="anonNote" class="info-box" style="display:none">🔒 All student feedback is anonymized and cannot be attributed to individuals.</div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from "../../js/core/session.js";
+    import { renderFacultyReports } from "../../js/features/faculty-reports.js";
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = requireAuth();
+        if (!user) return;
+
+        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userDept").innerText = user.department;
+        const av = document.getElementById("avatar");
+        if (av) av.textContent = user.name.split(" ").map(n => n[0]).join("");
+
+        await renderFacultyReports();
+    });
+</script>
+</body>
+</html>

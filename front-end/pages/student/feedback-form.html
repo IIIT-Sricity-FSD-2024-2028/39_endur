@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Course Feedback</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/forms.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/card.css">
+    <link rel="stylesheet" href="../../css/components/form.css">
+    <link rel="stylesheet" href="../../css/components/rating.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <link rel="stylesheet" href="../../css/pages/feedback.css">
+</head>
+<body>
+
+<div class="form-layout">
+
+    <div class="form-header">
+        <h2>Course Feedback</h2>
+        <button onclick="window.history.back()" class="close-btn">✕</button>
+    </div>
+
+    <div class="info-box">
+        <strong>Anonymity Guaranteed</strong>
+        <p>Your responses are anonymous.</p>
+    </div>
+
+    <h1 id="courseTitle">Loading...</h1>
+    <p class="subtitle">Feedback Form</p>
+
+    <!-- FACULTY SELECTOR (DYNAMIC) -->
+    <div id="facultySelectorContainer" style="display:none; background:#fff; padding:16px; border-radius:12px; margin-bottom:24px; border:1px solid var(--glass-border);">
+        <label for="evalFacultySelect" style="display:block; font-weight:600; margin-bottom:8px;">Which faculty member are you evaluating?</label>
+        <select id="evalFacultySelect" style="width:100%; padding:10px; border-radius:8px; border:1px solid #e2e8f0; background:rgba(241,245,249,0.5);">
+        </select>
+    </div>
+
+    <!-- DYNAMIC CONTAINER -->
+    <div class="feedback-grid" id="dynamicQuestionsContainer">
+        <!-- Rendered via JS -->
+    </div>
+
+
+
+    <button onclick="window.submitFeedback()" class="btn-primary" style="margin-top: 24px;">Submit Feedback</button>
+
+</div>
+
+<script type="module" src="../../js/features/feedback-form.js"></script>
+
+</body>
+</html>
