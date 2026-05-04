@@ -17,26 +17,27 @@ export async function renderHodDashboard() {
     let activeCycleId = cycleState.id;
 
     let allSubmissions = [];
-    try { const res = await GET(`/feedback-responses?cycleId=${activeCycleId}`); allSubmissions = res; }
+    try { allSubmissions = await GET(`/feedback-responses`); }
     catch { allSubmissions = []; }
 
     let allActionReports = [];
     try { allActionReports = await GET('/faculty-reports/action-reports'); }
     catch { allActionReports = []; }
 
-    const submissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
+    const currentSubmissions = allSubmissions.filter(f => f.cycleId === activeCycleId);
     const actionReports = allActionReports.filter(a => a.cycleId === activeCycleId);
 
     const myFaculty = allUsers.filter(u => u.role === 'faculty' && u.department === user.department);
     const facultyIds = myFaculty.map(f => f.id);
 
-    // Department-wide stats
-    const deptFeedback = submissions.filter(f => {
+    // Department-wide stats (Satisfaction across ALL cycles)
+    const historicalDeptFeedback = allSubmissions.filter(f => {
         const course = allCourses.find(c => c.id === f.courseId);
         return course && (facultyIds.includes(course.facultyId) || (course.facultyIds && course.facultyIds.some(fid => facultyIds.includes(fid))));
     });
+    
     let totalDeptScore = 0, deptMetricCount = 0;
-    deptFeedback.forEach(f => {
+    historicalDeptFeedback.forEach(f => {
         if (Array.isArray(f.ratings)) f.ratings.forEach(val => {
             const score = Number(val.score);
             if (!isNaN(score)) { totalDeptScore += score; deptMetricCount++; }
@@ -47,8 +48,12 @@ export async function renderHodDashboard() {
     const deptSatisfaction = deptAverage > 0 ? (deptAverage / 5) * 100 : 0;
 
     const deptCourses = allCourses.filter(c => facultyIds.includes(c.facultyId) || (c.facultyIds && c.facultyIds.some(fid => facultyIds.includes(fid))));
-    const estimatedStudents = deptCourses.length * 40;
-    const responseRate = estimatedStudents > 0 ? (deptFeedback.length / estimatedStudents) * 100 : 0;
+    const currentDeptFeedback = currentSubmissions.filter(f => deptCourses.some(c => c.id === f.courseId));
+    
+    // Response rate based on students in department's courses (using unique submitters for those courses)
+    const uniqueDeptSubmitters = new Set(currentDeptFeedback.map(f => f.studentId || f.userId)).size;
+    const estimatedStudents = (deptCourses.length * 40) || 1; 
+    const responseRate = (uniqueDeptSubmitters / estimatedStudents) * 100;
 
     const deptSatEl = document.getElementById('deptSatisfaction');
     if (deptSatEl) deptSatEl.innerText = `${deptSatisfaction.toFixed(1)}%`;
@@ -78,29 +83,31 @@ export async function renderHodDashboard() {
         tableBody.innerHTML = '';
         myFaculty.slice(0, 5).forEach(faculty => {
             const fCourses = deptCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id)));
-            let facultyAvgScore = 0, fCount = 0;
-            const facultyFeedback = deptFeedback.filter(f => {
-                const c = allCourses.find(c => c.id === f.courseId);
-                return c && c.facultyId === faculty.id;
-            });
+            let totalScore = 0, metricCount = 0;
+            const facultyFeedback = allSubmissions.filter(f => f.facultyId === faculty.id);
+            
             facultyFeedback.forEach(f => {
                 if (Array.isArray(f.ratings)) f.ratings.forEach(val => {
                     const score = Number(val.score);
-                    if (!isNaN(score)) { facultyAvgScore += score; fCount++; }
+                    if (!isNaN(score)) { totalScore += score; metricCount++; }
                 });
             });
-            const finalAvg = fCount > 0 ? (facultyAvgScore / fCount).toFixed(1) : 'N/A';
+
+            const finalScore = metricCount > 0 ? (totalScore / metricCount) * 20 : 0;
             let statusBadge = `<span class="badge success">On Track</span>`;
-            if (finalAvg !== 'N/A' && parseFloat(finalAvg) < 3.5) {
-                statusBadge = `<span class="badge danger">Requires Review</span>`;
+            if (finalScore < 60 && metricCount > 0) {
+                statusBadge = `<span class="badge danger">Performance Alert</span>`;
+            } else if (metricCount === 0) {
+                statusBadge = `<span class="badge neutral">No Data</span>`;
             }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding-left:24px;padding-top:16px;padding-bottom:16px;">
                     <strong style="display:block;color:#0f172a;font-size:14px;">${faculty.name}</strong>
                 </td>
                 <td style="color:#64748b;">${fCourses.length} Courses</td>
-                <td><strong>${finalAvg}/5.0</strong></td>
+                <td><strong>${finalScore.toFixed(1)}/100</strong></td>
                 <td>${statusBadge}</td>
             `;
             tableBody.appendChild(tr);

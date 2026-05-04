@@ -29,7 +29,6 @@ export class DataStoreService implements OnModuleInit {
   private actionReports: any[] = [];
   private reviewCheckins: any[] = [];
   private cycleState: any = { phase: 'PREPARATION' };
-  private systemSettings: any = {};
 
   // ─── Lifecycle ───────────────────────────────────────────────────
   onModuleInit() {
@@ -68,17 +67,7 @@ export class DataStoreService implements OnModuleInit {
     // ── Action Reports (for completed cycles — HOD reviewed) ───────
     this.actionReports = [];
 
-    // ── System Settings ────────────────────────────────────────────
-    this.systemSettings = {
-      instName: 'IIIT Sricity',
-      instCode: 'IIITS',
-      acadYear: '2025–2026',
-      semester: 'Odd Semester',
-      domain: '@iiits.in',
-      timezone: 'Asia/Kolkata (IST)',
-      minResp: 5,
-      scale: '1 – 5',
-    };
+
   }
 
   // ─── Courses ─────────────────────────────────────────────────────
@@ -124,10 +113,6 @@ export class DataStoreService implements OnModuleInit {
   // ─── Review Checkins ─────────────────────────────────────────────
   getReviewCheckins() { return this.reviewCheckins; }
   setReviewCheckins(r: any[]) { this.reviewCheckins = r; }
-
-  // ─── System Settings ─────────────────────────────────────────────
-  getSystemSettings() { return this.systemSettings; }
-  setSystemSettings(s: any) { this.systemSettings = { ...this.systemSettings, ...s }; }
 
   // ─── Audit Logs ──────────────────────────────────────────────────
   getAuditLogs() { return this.auditLogs; }

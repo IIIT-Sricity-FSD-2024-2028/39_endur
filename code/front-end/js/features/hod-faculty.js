@@ -17,10 +17,9 @@ export async function renderFacultyManagement() {
 
     const activeCycleId = cycleState.id;
     let allSubmissions = [];
-    try { allSubmissions = await GET(`/feedback-responses?cycleId=${activeCycleId}`); } catch {}
+    try { allSubmissions = await GET(`/feedback-responses`); } catch {}
     const submissions = allSubmissions;
 
-    
     const myFaculty = allUsers.filter(u => u.role === "faculty" && u.department === user.department);
     const tableBody = document.getElementById("managementTableBody");
     if (tableBody) tableBody.innerHTML = "";
@@ -46,27 +45,23 @@ export async function renderFacultyManagement() {
         const responseCount = facultyFeedback.length;
         let facultyAvgScore = 0;
 
-        // DYNAMIC MATH FIX
         if (responseCount > 0) {
-            let sumAverages = 0;
+            let totalScore = 0;
+            let metricCount = 0;
             facultyFeedback.forEach(f => {
-                let metricSum = 0;
-                let metricCount = 0;
                 if (Array.isArray(f.ratings)) {
                     f.ratings.forEach(val => {
                         const score = Number(val.score);
-                        if (!isNaN(score)) { metricSum += score; metricCount++; }
+                        if (!isNaN(score)) { totalScore += score; metricCount++; }
                     });
                 }
-                sumAverages += (metricCount > 0 ? (metricSum / metricCount) : 0);
             });
-            facultyAvgScore = (sumAverages / responseCount);
+            facultyAvgScore = metricCount > 0 ? (totalScore / metricCount) * 20 : 0;
         }
 
         const nameParts = faculty.name.replace("Dr. ", "").replace("Ms. ", "").replace("Mrs. ", "").split(" ");
         const fakeEmail = `${nameParts[0][0].toLowerCase()}.${nameParts[nameParts.length-1].toLowerCase()}@endur.edu`;
         const designation = getDesignation(faculty.id);
-        const barWidth = (facultyAvgScore / 5) * 100;
 
         if (tableBody) {
             const tr = document.createElement("tr");
@@ -95,24 +90,22 @@ export async function renderFacultyManagement() {
                   const fb = submissions.filter(sub => sub.facultyId === f.id);
                   let avgScore = 0;
                   if (fb.length > 0) {
-                      let sumAvgs = 0;
+                      let totalS = 0; let countS = 0;
                       fb.forEach(sub => {
-                          let mSum = 0; let mCount = 0;
                           if (Array.isArray(sub.ratings)) {
                                sub.ratings.forEach(v => {
-                                    const score = Number(v.score);
-                                    if (!isNaN(score)) { mSum += score; mCount++; }
+                                    const s = Number(v.score);
+                                    if (!isNaN(s)) { totalS += s; countS++; }
                                });
                           }
-                          sumAvgs += (mCount > 0 ? (mSum / mCount) : 0);
                       });
-                      avgScore = +(sumAvgs / fb.length).toFixed(1);
+                      avgScore = countS > 0 ? (totalS / countS) * 20 : 0;
                   }
                   return {
                        "Faculty Name": f.name,
                        "Employee ID": f.id,
                        "Total Responses": fb.length,
-                       "Overall Aggregate Average (0-100 scale)": avgScore
+                       "Overall Performance Score (0-100)": avgScore.toFixed(1)
                   };
              });
              exportToCSV(`Dept_${user.department}_Faculty_Trends.csv`, exportRows);

@@ -25,7 +25,6 @@ export declare class DataStoreService implements OnModuleInit {
     private actionReports;
     private reviewCheckins;
     private cycleState;
-    private systemSettings;
     onModuleInit(): void;
     private _seedAll;
     getCourses(): any[];
@@ -54,8 +53,6 @@ export declare class DataStoreService implements OnModuleInit {
     setActionReports(r: any[]): void;
     getReviewCheckins(): any[];
     setReviewCheckins(r: any[]): void;
-    getSystemSettings(): any;
-    setSystemSettings(s: any): void;
     getAuditLogs(): AuditLog[];
     appendAuditLog(entry: Omit<AuditLog, 'id' | 'timestamp'>): void;
     genId(prefix?: string): string;

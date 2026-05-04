@@ -125,8 +125,10 @@ export async function advanceCyclePhase() {
         // Validate all dept params add up to 100%
         let statusMap = {};
         try { statusMap = await GET('/evaluation-parameters/status'); } catch { }
-        const notApproved = Object.entries(statusMap).filter(([, s]) => s !== 'APPROVED').map(([d]) => d);
-        if (notApproved.length > 0 && !confirm(`Some departments are not fully approved (${notApproved.join(', ')}). Launch anyway?`)) return;
+        const notApproved = Object.entries(statusMap)
+            .filter(([, s]) => s === 'SUBMITTED' || s === 'REVISION_REQUESTED')
+            .map(([d]) => d);
+        if (notApproved.length > 0 && !confirm(`Some departments have parameters under review or pending revision: (${notApproved.join(', ')}). Launch anyway?`)) return;
     }
 
     const nextPhase = currentIndex < PHASES.length - 1 ? PHASES[currentIndex + 1] : null;

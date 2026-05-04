@@ -23,7 +23,6 @@ let DataStoreService = class DataStoreService {
     actionReports = [];
     reviewCheckins = [];
     cycleState = { phase: 'PREPARATION' };
-    systemSettings = {};
     onModuleInit() {
         this._seedAll();
     }
@@ -43,16 +42,6 @@ let DataStoreService = class DataStoreService {
         this.feedbackResponses = [];
         this.selfReflections = [];
         this.actionReports = [];
-        this.systemSettings = {
-            instName: 'IIIT Sricity',
-            instCode: 'IIITS',
-            acadYear: '2025–2026',
-            semester: 'Odd Semester',
-            domain: '@iiits.in',
-            timezone: 'Asia/Kolkata (IST)',
-            minResp: 5,
-            scale: '1 – 5',
-        };
     }
     getCourses() { return this.courses; }
     setCourses(c) { this.courses = c; }
@@ -82,8 +71,6 @@ let DataStoreService = class DataStoreService {
     setActionReports(r) { this.actionReports = r; }
     getReviewCheckins() { return this.reviewCheckins; }
     setReviewCheckins(r) { this.reviewCheckins = r; }
-    getSystemSettings() { return this.systemSettings; }
-    setSystemSettings(s) { this.systemSettings = { ...this.systemSettings, ...s }; }
     getAuditLogs() { return this.auditLogs; }
     appendAuditLog(entry) {
         this.auditLogs.unshift({

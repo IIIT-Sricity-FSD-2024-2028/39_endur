@@ -123,6 +123,17 @@ export class FeedbackCyclesService {
     cycles.unshift(entry);
     this.store.setFeedbackCycles(cycles);
 
+    // Seed draft parameters so HODs can see & edit them during PREPARATION
+    this.store.setDraftParameters(JSON.parse(JSON.stringify(finalParams)));
+
+    // Set the global cycle state so other services (e.g. eval params) can detect the active cycle
+    this.store.setCycleState({
+      id: entry.cycleId,
+      cycleName: dto.cycleName,
+      phase: 'PREPARATION',
+      status: 'active',
+    });
+
     // Reset parameter approval statuses for the new cycle
     const newStatuses: Record<string, string> = {};
     for (const d of depts) {
@@ -190,7 +201,25 @@ export class FeedbackCyclesService {
     }
 
     cycles[idx].status = dto.status;
-    if (dto.phase) cycles[idx].phase = dto.phase;
+    if (dto.phase) {
+      cycles[idx].phase = dto.phase;
+      
+      // Update deadlines to match manual override so dynamic calculation holds
+      const now = new Date().toISOString();
+      if (dto.phase === 'STUDENT_FEEDBACK') {
+        cycles[idx].prepDeadline = now;
+      } else if (dto.phase === 'FACULTY_REFLECTION') {
+        if (!cycles[idx].prepDeadline) cycles[idx].prepDeadline = now;
+        cycles[idx].studentDeadline = now;
+      } else if (dto.phase === 'ACTION_REPORT') {
+        if (!cycles[idx].prepDeadline) cycles[idx].prepDeadline = now;
+        if (!cycles[idx].studentDeadline) cycles[idx].studentDeadline = now;
+        cycles[idx].reflectionDeadline = now;
+      } else if (dto.phase === 'COMPLETED') {
+        cycles[idx].endTimestamp = now;
+      }
+    }
+    
     this.store.setFeedbackCycles(cycles);
 
     // Also update global cycle state if activating

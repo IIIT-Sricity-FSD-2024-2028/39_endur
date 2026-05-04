@@ -113,6 +113,13 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         };
         cycles.unshift(entry);
         this.store.setFeedbackCycles(cycles);
+        this.store.setDraftParameters(JSON.parse(JSON.stringify(finalParams)));
+        this.store.setCycleState({
+            id: entry.cycleId,
+            cycleName: dto.cycleName,
+            phase: 'PREPARATION',
+            status: 'active',
+        });
         const newStatuses = {};
         for (const d of depts) {
             newStatuses[d.name] = 'DRAFT';
@@ -177,8 +184,28 @@ let FeedbackCyclesService = class FeedbackCyclesService {
             cycles[idx].departmentParameters = finalParams;
         }
         cycles[idx].status = dto.status;
-        if (dto.phase)
+        if (dto.phase) {
             cycles[idx].phase = dto.phase;
+            const now = new Date().toISOString();
+            if (dto.phase === 'STUDENT_FEEDBACK') {
+                cycles[idx].prepDeadline = now;
+            }
+            else if (dto.phase === 'FACULTY_REFLECTION') {
+                if (!cycles[idx].prepDeadline)
+                    cycles[idx].prepDeadline = now;
+                cycles[idx].studentDeadline = now;
+            }
+            else if (dto.phase === 'ACTION_REPORT') {
+                if (!cycles[idx].prepDeadline)
+                    cycles[idx].prepDeadline = now;
+                if (!cycles[idx].studentDeadline)
+                    cycles[idx].studentDeadline = now;
+                cycles[idx].reflectionDeadline = now;
+            }
+            else if (dto.phase === 'COMPLETED') {
+                cycles[idx].endTimestamp = now;
+            }
+        }
         this.store.setFeedbackCycles(cycles);
         if (dto.status === 'active' && dto.phase) {
             this.store.setCycleState({ id, phase: dto.phase, ...cycles[idx] });
