@@ -54,8 +54,8 @@ __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
     (0, swagger_1.ApiOperation)({ summary: 'List all courses' }),
-    (0, swagger_1.ApiQuery)({ name: 'department', required: false }),
-    (0, swagger_1.ApiQuery)({ name: 'facultyId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'department', required: false, example: 'Physics' }),
+    (0, swagger_1.ApiQuery)({ name: 'facultyId', required: false, example: 'F001' }),
     __param(0, (0, common_1.Query)('department')),
     __param(1, (0, common_1.Query)('facultyId')),
     __metadata("design:type", Function),
@@ -66,6 +66,7 @@ __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a single course by ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'The course code/ID', example: 'CS101' }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -136,7 +137,6 @@ __decorate([
 ], CoursesController.prototype, "autoAssignAll", null);
 exports.CoursesController = CoursesController = __decorate([
     (0, swagger_1.ApiTags)('Courses'),
-    (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),
     (0, common_1.UseGuards)(role_guard_1.RoleGuard),
     (0, common_1.Controller)('courses'),
     __metadata("design:paramtypes", [courses_service_1.CoursesService])

@@ -18,6 +18,7 @@ import {
   ApiHeader,
   ApiQuery,
   ApiResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -27,7 +28,6 @@ import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Users')
-@ApiHeader({ name: 'x-role', description: 'Caller role for RBAC', required: true })
 @UseGuards(RoleGuard)
 @Controller('users')
 export class UsersController {
@@ -36,8 +36,8 @@ export class UsersController {
   @Get()
   @Roles('superuser', 'admin', 'dean', 'hod')
   @ApiOperation({ summary: 'List all users (filterable by role / department)' })
-  @ApiQuery({ name: 'role', required: false })
-  @ApiQuery({ name: 'department', required: false })
+  @ApiQuery({ name: 'role', required: false, example: 'student' })
+  @ApiQuery({ name: 'department', required: false, example: 'Physics' })
   @ApiResponse({ status: 200, description: 'Array of user objects (no passwords)' })
   findAll(
     @Query('role') role?: string,
@@ -65,6 +65,7 @@ export class UsersController {
   @Get(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Get a single user by ID' })
+  @ApiParam({ name: 'id', example: 'U001' })
   @ApiResponse({ status: 200, description: 'User object (no password)' })
   @ApiResponse({ status: 404, description: 'User not found' })
   findOne(@Param('id') id: string) {
@@ -95,6 +96,7 @@ export class UsersController {
   @Patch(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Update a user (restricted self-service for non-SU)' })
+  @ApiParam({ name: 'id', example: 'U001' })
   @ApiResponse({ status: 200, description: 'Updated user object' })
   @ApiResponse({ status: 404, description: 'User not found' })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Request() req: any) {
@@ -107,6 +109,7 @@ export class UsersController {
   @Delete(':id')
   @Roles('superuser')
   @ApiOperation({ summary: 'Delete a user (superuser only)' })
+  @ApiParam({ name: 'id', example: 'U001' })
   @ApiResponse({ status: 200, description: 'Deletion confirmation' })
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id') id: string, @Request() req: any) {

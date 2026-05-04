@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DepartmentsController = void 0;
 const common_1 = require("@nestjs/common");
+const swagger_1 = require("@nestjs/swagger");
 const departments_service_1 = require("./departments.service");
 const department_dto_1 = require("./dto/department.dto");
 let DepartmentsController = class DepartmentsController {
@@ -47,12 +48,14 @@ let DepartmentsController = class DepartmentsController {
 exports.DepartmentsController = DepartmentsController;
 __decorate([
     (0, common_1.Get)(),
+    (0, swagger_1.ApiOperation)({ summary: 'List all departments' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], DepartmentsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)('bulk'),
+    (0, swagger_1.ApiOperation)({ summary: 'Bulk create departments (superuser/admin only)' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Headers)('x-role')),
     __param(2, (0, common_1.Headers)('x-user-id')),
@@ -62,6 +65,7 @@ __decorate([
 ], DepartmentsController.prototype, "bulkCreate", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Create a single department (superuser/admin only)' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Headers)('x-role')),
     __param(2, (0, common_1.Headers)('x-user-id')),
@@ -71,6 +75,8 @@ __decorate([
 ], DepartmentsController.prototype, "create", null);
 __decorate([
     (0, common_1.Delete)(':id'),
+    (0, swagger_1.ApiOperation)({ summary: 'Delete a department (superuser/admin only)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'Physics' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Headers)('x-role')),
     __param(2, (0, common_1.Headers)('x-user-id')),
@@ -79,6 +85,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], DepartmentsController.prototype, "remove", null);
 exports.DepartmentsController = DepartmentsController = __decorate([
+    (0, swagger_1.ApiTags)('Departments'),
     (0, common_1.Controller)('departments'),
     __metadata("design:paramtypes", [departments_service_1.DepartmentsService])
 ], DepartmentsController);

@@ -17,8 +17,13 @@ export async function renderHodDashboard() {
     let activeCycleId = cycleState.id;
 
     let allSubmissions = [];
-    try { allSubmissions = await GET(`/feedback-responses`); }
-    catch { allSubmissions = []; }
+    let cycles = [];
+    try { 
+        [allSubmissions, cycles] = await Promise.all([
+            GET('/feedback-responses'),
+            GET('/feedback-cycles').catch(() => [])
+        ]);
+    } catch { allSubmissions = []; cycles = []; }
 
     let allActionReports = [];
     try { allActionReports = await GET('/faculty-reports/action-reports'); }
@@ -29,12 +34,11 @@ export async function renderHodDashboard() {
 
     const myFaculty = allUsers.filter(u => u.role === 'faculty' && u.department === user.department);
     const facultyIds = myFaculty.map(f => f.id);
+    const deptCourses = allCourses.filter(c => facultyIds.includes(c.facultyId) || (c.facultyIds && c.facultyIds.some(fid => facultyIds.includes(fid))));
+    const deptCourseIds = new Set(deptCourses.map(c => c.id));
 
     // Department-wide stats (Satisfaction across ALL cycles)
-    const historicalDeptFeedback = allSubmissions.filter(f => {
-        const course = allCourses.find(c => c.id === f.courseId);
-        return course && (facultyIds.includes(course.facultyId) || (course.facultyIds && course.facultyIds.some(fid => facultyIds.includes(fid))));
-    });
+    const historicalDeptFeedback = allSubmissions.filter(f => deptCourseIds.has(f.courseId));
     
     let totalDeptScore = 0, deptMetricCount = 0;
     historicalDeptFeedback.forEach(f => {
@@ -47,20 +51,19 @@ export async function renderHodDashboard() {
     const deptAverage = deptMetricCount > 0 ? (totalDeptScore / deptMetricCount) : 0;
     const deptSatisfaction = deptAverage > 0 ? (deptAverage / 5) * 100 : 0;
 
-    const deptCourses = allCourses.filter(c => facultyIds.includes(c.facultyId) || (c.facultyIds && c.facultyIds.some(fid => facultyIds.includes(fid))));
-    const currentDeptFeedback = currentSubmissions.filter(f => deptCourses.some(c => c.id === f.courseId));
-    
-    // Response rate based on students in department's courses (using unique submitters for those courses)
-    const uniqueDeptSubmitters = new Set(currentDeptFeedback.map(f => f.studentId || f.userId)).size;
-    const estimatedStudents = (deptCourses.length * 40) || 1; 
-    const responseRate = (uniqueDeptSubmitters / estimatedStudents) * 100;
+    // Response rate: Use historical data for 'Avg Response Rate' to match Dean's Participation logic
+    // and avoid 0.0% when a cycle is just starting.
+    const completedCycles = cycles.filter(c => c.status === 'completed' || c.status === 'active').length || 1;
+    const totalResponsesCount = historicalDeptFeedback.length;
+    const totalExpectedResponses = deptCourses.length * completedCycles * 40;
+    const responseRate = totalExpectedResponses > 0 ? (totalResponsesCount / totalExpectedResponses) * 100 : 0;
 
     const deptSatEl = document.getElementById('deptSatisfaction');
     if (deptSatEl) deptSatEl.innerText = `${deptSatisfaction.toFixed(1)}%`;
     const satBar = document.getElementById('satProgressBar');
     if (satBar) satBar.style.width = `${deptSatisfaction}%`;
     const respRateEl = document.getElementById('deptResponseRate');
-    if (respRateEl) respRateEl.innerText = `${responseRate.toFixed(1)}%`;
+    if (respRateEl) respRateEl.innerText = `${Math.min(responseRate, 100).toFixed(1)}%`;
     const respBar = document.getElementById('respProgressBar');
     if (respBar) respBar.style.width = `${Math.min(responseRate, 100)}%`;
 

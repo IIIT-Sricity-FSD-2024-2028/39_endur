@@ -8,7 +8,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -18,23 +19,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -67,19 +73,11 @@
         "operationId": "UsersController_findAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "role",
             "required": false,
             "in": "query",
             "schema": {
+              "example": "student",
               "type": "string"
             }
           },
@@ -88,13 +86,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -104,23 +104,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -138,18 +143,10 @@
         "operationId": "UsersController_create",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -159,23 +156,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -208,18 +210,10 @@
         "operationId": "UsersController_getMe",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -229,23 +223,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -265,18 +264,10 @@
         "operationId": "UsersController_getMyCourses",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -286,23 +277,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -322,26 +318,19 @@
         "operationId": "UsersController_findOne",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "U001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -351,23 +340,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -388,26 +382,19 @@
         "operationId": "UsersController_update",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "U001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -417,23 +404,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -464,26 +456,19 @@
         "operationId": "UsersController_remove",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "U001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -493,23 +478,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -532,18 +522,10 @@
         "operationId": "UsersController_bulkImport",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -553,23 +535,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -599,19 +586,11 @@
         "operationId": "CoursesController_findAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": false,
             "in": "query",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
@@ -620,13 +599,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "F001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -636,23 +617,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -670,18 +656,10 @@
         "operationId": "CoursesController_create",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -691,23 +669,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -737,26 +720,20 @@
         "operationId": "CoursesController_findOne",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "The course code/ID",
             "schema": {
+              "example": "CS101",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -766,23 +743,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -800,15 +782,6 @@
         "operationId": "CoursesController_update",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
@@ -819,7 +792,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -829,23 +803,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -873,15 +852,6 @@
         "operationId": "CoursesController_remove",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
@@ -892,7 +862,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -902,23 +873,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -938,15 +914,6 @@
         "operationId": "CoursesController_enroll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
@@ -957,7 +924,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -967,23 +935,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1013,18 +986,10 @@
         "operationId": "CoursesController_bulkImport",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1034,23 +999,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1080,18 +1050,10 @@
         "operationId": "CoursesController_autoAssignAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1101,23 +1063,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1137,18 +1104,10 @@
         "operationId": "FeedbackCyclesController_findAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1158,23 +1117,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1192,18 +1156,10 @@
         "operationId": "FeedbackCyclesController_create",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1213,23 +1169,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1259,18 +1220,10 @@
         "operationId": "FeedbackCyclesController_findActive",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1280,23 +1233,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1316,18 +1274,10 @@
         "operationId": "FeedbackCyclesController_getCycleState",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1337,23 +1287,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1373,26 +1328,19 @@
         "operationId": "FeedbackCyclesController_findOne",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1402,23 +1350,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1436,26 +1389,19 @@
         "operationId": "FeedbackCyclesController_update",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1465,23 +1411,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1509,26 +1460,19 @@
         "operationId": "FeedbackCyclesController_remove",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1538,23 +1482,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1574,26 +1523,19 @@
         "operationId": "FeedbackCyclesController_updateStatus",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1603,23 +1545,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1649,18 +1596,10 @@
         "operationId": "FeedbackCyclesController_bulkImport",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1670,23 +1609,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1716,26 +1660,19 @@
         "operationId": "EvaluationParametersController_findAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": false,
             "in": "query",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1745,23 +1682,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1779,18 +1721,10 @@
         "operationId": "EvaluationParametersController_create",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1800,23 +1734,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1846,18 +1785,10 @@
         "operationId": "EvaluationParametersController_getDeptStatus",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1867,23 +1798,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1903,26 +1839,19 @@
         "operationId": "EvaluationParametersController_getDraftsByDept",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1932,23 +1861,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -1968,18 +1902,10 @@
         "operationId": "EvaluationParametersController_getDeptNotes",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -1989,23 +1915,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2025,19 +1956,11 @@
         "operationId": "EvaluationParametersController_update",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "P001",
               "type": "string"
             }
           },
@@ -2046,13 +1969,15 @@
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2062,23 +1987,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2106,19 +2036,11 @@
         "operationId": "EvaluationParametersController_remove",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "P001",
               "type": "string"
             }
           },
@@ -2127,13 +2049,15 @@
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2143,23 +2067,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2179,26 +2108,19 @@
         "operationId": "EvaluationParametersController_revert",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2208,23 +2130,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2244,26 +2171,19 @@
         "operationId": "EvaluationParametersController_approve",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2273,23 +2193,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2309,26 +2234,19 @@
         "operationId": "EvaluationParametersController_submit",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2338,23 +2256,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2374,26 +2297,19 @@
         "operationId": "EvaluationParametersController_reject",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "department",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2403,23 +2319,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2439,18 +2360,10 @@
         "operationId": "EvaluationParametersController_bulkImport",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2460,23 +2373,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2506,19 +2424,11 @@
         "operationId": "FeedbackResponsesController_findAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "cycleId",
             "required": false,
             "in": "query",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
@@ -2527,6 +2437,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "CS101",
               "type": "string"
             }
           },
@@ -2535,6 +2446,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "S001",
               "type": "string"
             }
           },
@@ -2543,13 +2455,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "F001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2559,23 +2473,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2593,18 +2512,10 @@
         "operationId": "FeedbackResponsesController_submit",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2614,23 +2525,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2660,19 +2576,11 @@
         "operationId": "FeedbackResponsesController_getSummary",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "courseId",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "CS101",
               "type": "string"
             }
           },
@@ -2681,13 +2589,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2697,23 +2607,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2733,19 +2648,11 @@
         "operationId": "FeedbackResponsesController_checkSubmitted",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "courseId",
             "required": true,
             "in": "query",
             "schema": {
+              "example": "CS101",
               "type": "string"
             }
           },
@@ -2754,6 +2661,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "example": "S001",
               "type": "string"
             }
           },
@@ -2762,13 +2670,15 @@
             "required": true,
             "in": "query",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2778,23 +2688,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2814,19 +2729,11 @@
         "operationId": "AuditLogsController_findAll",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "page",
             "required": false,
             "in": "query",
             "schema": {
+              "example": 1,
               "type": "number"
             }
           },
@@ -2835,6 +2742,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": 10,
               "type": "number"
             }
           },
@@ -2843,6 +2751,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "Courses",
               "type": "string"
             }
           },
@@ -2851,13 +2760,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "U001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2867,23 +2778,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2901,18 +2817,10 @@
         "operationId": "AuditLogsController_create",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -2922,23 +2830,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -2958,19 +2871,11 @@
         "operationId": "FacultyReportsController_findReflections",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "cycleId",
             "required": false,
             "in": "query",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
@@ -2979,6 +2884,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "CS101",
               "type": "string"
             }
           },
@@ -2987,13 +2893,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "F001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3003,23 +2911,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3037,18 +2950,10 @@
         "operationId": "FacultyReportsController_submitReflection",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3058,23 +2963,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3104,19 +3014,11 @@
         "operationId": "FacultyReportsController_findActionReports",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "cycleId",
             "required": false,
             "in": "query",
             "schema": {
+              "example": "C001",
               "type": "string"
             }
           },
@@ -3125,6 +3027,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "CS101",
               "type": "string"
             }
           },
@@ -3133,13 +3036,15 @@
             "required": false,
             "in": "query",
             "schema": {
+              "example": "F001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3149,23 +3054,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3183,18 +3093,10 @@
         "operationId": "FacultyReportsController_submitActionReport",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3204,23 +3106,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3250,18 +3157,10 @@
         "operationId": "FacultyReportsController_triggerActionReport",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3271,23 +3170,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3317,26 +3221,19 @@
         "operationId": "FacultyReportsController_reviewCheckin",
         "parameters": [
           {
-            "name": "x-role",
-            "in": "header",
-            "description": "Caller role for RBAC",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "id",
             "required": true,
             "in": "path",
             "schema": {
+              "example": "REPT001",
               "type": "string"
             }
           },
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3346,23 +3243,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3394,7 +3296,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3404,23 +3307,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3429,6 +3337,7 @@
             "description": ""
           }
         },
+        "summary": "List all departments",
         "tags": [
           "Departments"
         ]
@@ -3455,7 +3364,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3465,23 +3375,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3500,6 +3415,7 @@
             "description": ""
           }
         },
+        "summary": "Create a single department (superuser/admin only)",
         "tags": [
           "Departments"
         ]
@@ -3528,7 +3444,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3538,23 +3455,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3576,6 +3498,7 @@
             "description": ""
           }
         },
+        "summary": "Bulk create departments (superuser/admin only)",
         "tags": [
           "Departments"
         ]
@@ -3590,6 +3513,7 @@
             "required": true,
             "in": "path",
             "schema": {
+              "example": "Physics",
               "type": "string"
             }
           },
@@ -3612,7 +3536,8 @@
           {
             "in": "header",
             "name": "X-Role",
-            "required": false,
+            "required": true,
+            "description": "Caller role for RBAC (required for protected endpoints)",
             "schema": {
               "type": "string",
               "enum": [
@@ -3622,23 +3547,28 @@
                 "hod",
                 "faculty",
                 "student"
-              ]
+              ],
+              "example": "hod"
             }
           },
           {
             "in": "header",
             "name": "X-User-Id",
             "required": false,
+            "description": "The ID of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "H001"
             }
           },
           {
             "in": "header",
             "name": "X-User-Name",
             "required": false,
+            "description": "The name of the user performing the action (for audit logs)",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "Prof. Alan Turing"
             }
           }
         ],
@@ -3647,6 +3577,7 @@
             "description": ""
           }
         },
+        "summary": "Delete a department (superuser/admin only)",
         "tags": [
           "Departments"
         ]

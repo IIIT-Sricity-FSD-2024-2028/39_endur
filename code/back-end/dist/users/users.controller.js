@@ -63,8 +63,8 @@ __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod'),
     (0, swagger_1.ApiOperation)({ summary: 'List all users (filterable by role / department)' }),
-    (0, swagger_1.ApiQuery)({ name: 'role', required: false }),
-    (0, swagger_1.ApiQuery)({ name: 'department', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'role', required: false, example: 'student' }),
+    (0, swagger_1.ApiQuery)({ name: 'department', required: false, example: 'Physics' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Array of user objects (no passwords)' }),
     __param(0, (0, common_1.Query)('role')),
     __param(1, (0, common_1.Query)('department')),
@@ -94,6 +94,7 @@ __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a single user by ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'U001' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'User object (no password)' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'User not found' }),
     __param(0, (0, common_1.Param)('id')),
@@ -129,6 +130,7 @@ __decorate([
     (0, common_1.Patch)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a user (restricted self-service for non-SU)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'U001' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Updated user object' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'User not found' }),
     __param(0, (0, common_1.Param)('id')),
@@ -142,6 +144,7 @@ __decorate([
     (0, common_1.Delete)(':id'),
     (0, roles_decorator_1.Roles)('superuser'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a user (superuser only)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'U001' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Deletion confirmation' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'User not found' }),
     __param(0, (0, common_1.Param)('id')),
@@ -152,7 +155,6 @@ __decorate([
 ], UsersController.prototype, "remove", null);
 exports.UsersController = UsersController = __decorate([
     (0, swagger_1.ApiTags)('Users'),
-    (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),
     (0, common_1.UseGuards)(role_guard_1.RoleGuard),
     (0, common_1.Controller)('users'),
     __metadata("design:paramtypes", [users_service_1.UsersService])

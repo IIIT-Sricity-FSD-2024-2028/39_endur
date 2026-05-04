@@ -2,14 +2,13 @@ import {
   Controller, Get, Post, Body, Param, Query, Request,
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { FeedbackResponsesService } from './feedback-responses.service';
 import { SubmitFeedbackDto } from './dto/feedback-response.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Feedback Responses')
-@ApiHeader({ name: 'x-role', description: 'Caller role for RBAC', required: true })
 @UseGuards(RoleGuard)
 @Controller('feedback-responses')
 export class FeedbackResponsesController {
@@ -18,10 +17,10 @@ export class FeedbackResponsesController {
   @Get()
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'List feedback responses (filterable by cycle/course/student/faculty)' })
-  @ApiQuery({ name: 'cycleId',   required: false })
-  @ApiQuery({ name: 'courseId',  required: false })
-  @ApiQuery({ name: 'studentId', required: false })
-  @ApiQuery({ name: 'facultyId', required: false })
+  @ApiQuery({ name: 'cycleId',   required: false, example: 'C001' })
+  @ApiQuery({ name: 'courseId',  required: false, example: 'CS101' })
+  @ApiQuery({ name: 'studentId', required: false, example: 'S001' })
+  @ApiQuery({ name: 'facultyId', required: false, example: 'F001' })
   findAll(
     @Query('cycleId')   cycleId?:   string,
     @Query('courseId')  courseId?:  string,
@@ -42,7 +41,8 @@ export class FeedbackResponsesController {
   @Get('summary/:courseId')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty')
   @ApiOperation({ summary: 'Get aggregated feedback summary for a course' })
-  @ApiQuery({ name: 'cycleId', required: false })
+  @ApiParam({ name: 'courseId', example: 'CS101' })
+  @ApiQuery({ name: 'cycleId', required: false, example: 'C001' })
   getSummary(@Param('courseId') courseId: string, @Query('cycleId') cycleId?: string) {
     return this.svc.getSummary(courseId, cycleId);
   }
@@ -50,9 +50,9 @@ export class FeedbackResponsesController {
   @Get('check')
   @Roles('student')
   @ApiOperation({ summary: 'Check if student has submitted feedback for a course+cycle' })
-  @ApiQuery({ name: 'courseId', required: true })
-  @ApiQuery({ name: 'studentId', required: true })
-  @ApiQuery({ name: 'cycleId', required: true })
+  @ApiQuery({ name: 'courseId', required: true, example: 'CS101' })
+  @ApiQuery({ name: 'studentId', required: true, example: 'S001' })
+  @ApiQuery({ name: 'cycleId', required: true, example: 'C001' })
   checkSubmitted(
     @Query('courseId') courseId: string,
     @Query('studentId') studentId: string,

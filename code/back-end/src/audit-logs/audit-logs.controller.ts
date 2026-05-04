@@ -5,7 +5,6 @@ import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Audit Logs')
-@ApiHeader({ name: 'x-role', description: 'Caller role for RBAC', required: true })
 @UseGuards(RoleGuard)
 @Controller('audit-logs')
 export class AuditLogsController {
@@ -14,10 +13,10 @@ export class AuditLogsController {
   @Get()
   @Roles('superuser', 'admin')
   @ApiOperation({ summary: 'Get paginated audit logs (superuser/admin only)' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'module', required: false })
-  @ApiQuery({ name: 'actor', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({ name: 'module', required: false, example: 'Courses' })
+  @ApiQuery({ name: 'actor', required: false, example: 'U001' })
   findAll(
     @Query('page') page?: number,
     @Query('limit') limit?: number,

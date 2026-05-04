@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Patch, Delete, Body, Param, Request,
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { FeedbackCyclesService } from './feedback-cycles.service';
 import {
   CreateFeedbackCycleDto,
@@ -14,7 +14,6 @@ import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Feedback Cycles')
-@ApiHeader({ name: 'x-role', description: 'Caller role for RBAC', required: true })
 @UseGuards(RoleGuard)
 @Controller('feedback-cycles')
 export class FeedbackCyclesController {
@@ -38,6 +37,7 @@ export class FeedbackCyclesController {
   @Get(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Get a single feedback cycle by ID' })
+  @ApiParam({ name: 'id', example: 'C001' })
   findOne(@Param('id') id: string) { return this.svc.findOne(id); }
 
   @Post()
@@ -51,6 +51,7 @@ export class FeedbackCyclesController {
   @Patch(':id')
   @Roles('superuser', 'admin', 'dean')
   @ApiOperation({ summary: 'Update a feedback cycle (superuser/admin only)' })
+  @ApiParam({ name: 'id', example: 'C001' })
   update(@Param('id') id: string, @Body() dto: UpdateFeedbackCycleDto, @Request() req: any) {
     return this.svc.update(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -58,6 +59,7 @@ export class FeedbackCyclesController {
   @Patch(':id/status')
   @Roles('superuser', 'admin', 'dean')
   @ApiOperation({ summary: 'Update cycle status/phase (superuser/admin only)' })
+  @ApiParam({ name: 'id', example: 'C001' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateCycleStatusDto, @Request() req: any) {
     return this.svc.updateStatus(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -65,6 +67,7 @@ export class FeedbackCyclesController {
   @Delete(':id')
   @Roles('superuser', 'admin')
   @ApiOperation({ summary: 'Delete a feedback cycle (superuser/admin only)' })
+  @ApiParam({ name: 'id', example: 'C001' })
   remove(@Param('id') id: string, @Request() req: any) {
     return this.svc.remove(id, req.headers['x-user-id'], req.headers['x-user-name']);
   }

@@ -2,14 +2,13 @@ import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query, Request,
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader, ApiQuery, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, UpdateCourseDto, EnrollStudentsDto, BulkImportCoursesDto } from './dto/course.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Courses')
-@ApiHeader({ name: 'x-role', description: 'Caller role for RBAC', required: true })
 @UseGuards(RoleGuard)
 @Controller('courses')
 export class CoursesController {
@@ -18,8 +17,8 @@ export class CoursesController {
   @Get()
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'List all courses' })
-  @ApiQuery({ name: 'department', required: false })
-  @ApiQuery({ name: 'facultyId', required: false })
+  @ApiQuery({ name: 'department', required: false, example: 'Physics' })
+  @ApiQuery({ name: 'facultyId', required: false, example: 'F001' })
   findAll(@Query('department') dept?: string, @Query('facultyId') fid?: string) {
     return this.svc.findAll(dept, fid);
   }
@@ -27,6 +26,7 @@ export class CoursesController {
   @Get(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Get a single course by ID' })
+  @ApiParam({ name: 'id', description: 'The course code/ID', example: 'CS101' })
   findOne(@Param('id') id: string) {
     return this.svc.findOne(id);
   }

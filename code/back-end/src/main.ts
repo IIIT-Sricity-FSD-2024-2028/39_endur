@@ -50,23 +50,33 @@ async function bootstrap() {
     .addGlobalParameters({
       in: 'header',
       name: 'X-Role',
-      required: false,
+      required: true,
+      description: 'Caller role for RBAC (required for protected endpoints)',
       schema: {
         type: 'string',
         enum: ['superuser', 'admin', 'dean', 'hod', 'faculty', 'student'],
+        example: 'hod',
       },
     })
     .addGlobalParameters({
       in: 'header',
       name: 'X-User-Id',
       required: false,
-      schema: { type: 'string' },
+      description: 'The ID of the user performing the action (for audit logs)',
+      schema: { 
+        type: 'string',
+        example: 'H001'
+      },
     })
     .addGlobalParameters({
       in: 'header',
       name: 'X-User-Name',
       required: false,
-      schema: { type: 'string' },
+      description: 'The name of the user performing the action (for audit logs)',
+      schema: { 
+        type: 'string',
+        example: 'Prof. Alan Turing'
+      },
     })
     .build();
 

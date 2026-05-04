@@ -73,6 +73,7 @@ __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean', 'hod', 'faculty', 'student'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a single feedback cycle by ID' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'C001' }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -93,6 +94,7 @@ __decorate([
     (0, common_1.Patch)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean'),
     (0, swagger_1.ApiOperation)({ summary: 'Update a feedback cycle (superuser/admin only)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'C001' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Request)()),
@@ -104,6 +106,7 @@ __decorate([
     (0, common_1.Patch)(':id/status'),
     (0, roles_decorator_1.Roles)('superuser', 'admin', 'dean'),
     (0, swagger_1.ApiOperation)({ summary: 'Update cycle status/phase (superuser/admin only)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'C001' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Request)()),
@@ -115,6 +118,7 @@ __decorate([
     (0, common_1.Delete)(':id'),
     (0, roles_decorator_1.Roles)('superuser', 'admin'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a feedback cycle (superuser/admin only)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'C001' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
@@ -134,7 +138,6 @@ __decorate([
 ], FeedbackCyclesController.prototype, "bulkImport", null);
 exports.FeedbackCyclesController = FeedbackCyclesController = __decorate([
     (0, swagger_1.ApiTags)('Feedback Cycles'),
-    (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),
     (0, common_1.UseGuards)(role_guard_1.RoleGuard),
     (0, common_1.Controller)('feedback-cycles'),
     __metadata("design:paramtypes", [feedback_cycles_service_1.FeedbackCyclesService])

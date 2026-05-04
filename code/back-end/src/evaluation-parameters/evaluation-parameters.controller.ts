@@ -2,14 +2,13 @@ import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query, Request,
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { EvaluationParametersService } from './evaluation-parameters.service';
 import { CreateEvalParamDto, UpdateEvalParamDto, BulkImportEvalParamsDto } from './dto/eval-param.dto';
 import { RoleGuard } from '../common/guards/role.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('Evaluation Parameters')
-@ApiHeader({ name: 'x-role', description: 'Caller role for RBAC', required: true })
 @UseGuards(RoleGuard)
 @Controller('evaluation-parameters')
 export class EvaluationParametersController {
@@ -18,7 +17,7 @@ export class EvaluationParametersController {
   @Get()
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'List all evaluation parameters (optionally filtered by department)' })
-  @ApiQuery({ name: 'department', required: false })
+  @ApiQuery({ name: 'department', required: false, example: 'Physics' })
   findAll(@Query('department') dept?: string) {
     return this.svc.findAll(dept);
   }
@@ -33,6 +32,7 @@ export class EvaluationParametersController {
   @Get('dept/:department')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty')
   @ApiOperation({ summary: 'Get draft parameters for a department' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   getDraftsByDept(@Param('department') dept: string) {
     return this.svc.getDraftsByDept(dept);
   }
@@ -60,6 +60,8 @@ export class EvaluationParametersController {
   @Patch(':id/dept/:department')
   @Roles('superuser', 'admin', 'hod')
   @ApiOperation({ summary: 'Update a parameter by ID and department' })
+  @ApiParam({ name: 'id', example: 'P001' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   update(
     @Param('id') id: string,
     @Param('department') dept: string,
@@ -72,6 +74,8 @@ export class EvaluationParametersController {
   @Delete(':id/dept/:department')
   @Roles('superuser', 'admin', 'hod')
   @ApiOperation({ summary: 'Delete a parameter (superuser/admin/hod)' })
+  @ApiParam({ name: 'id', example: 'P001' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   remove(
     @Param('id') id: string,
     @Param('department') dept: string,
@@ -83,6 +87,7 @@ export class EvaluationParametersController {
   @Post('dept/:department/revert')
   @Roles('hod')
   @ApiOperation({ summary: 'Revert dept params from SUBMITTED back to DRAFT (hod only)' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   revert(@Param('department') dept: string, @Request() req: any) {
     return this.svc.revertToDraft(dept, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -90,6 +95,7 @@ export class EvaluationParametersController {
   @Post('dept/:department/approve')
   @Roles('superuser', 'dean')
   @ApiOperation({ summary: 'Approve dept params if total weight = 100% (superuser/dean only)' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   approve(@Param('department') dept: string, @Request() req: any) {
     return this.svc.approve(dept, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -97,6 +103,7 @@ export class EvaluationParametersController {
   @Post('dept/:department/submit')
   @Roles('hod')
   @ApiOperation({ summary: 'Submit dept params for approval (hod only)' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   submit(@Param('department') dept: string, @Request() req: any) {
     return this.svc.submit(dept, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -104,6 +111,7 @@ export class EvaluationParametersController {
   @Post('dept/:department/reject')
   @Roles('superuser', 'dean')
   @ApiOperation({ summary: 'Reject dept params to request revision (superuser/dean only)' })
+  @ApiParam({ name: 'department', example: 'Physics' })
   reject(@Param('department') dept: string, @Body('note') note: string, @Request() req: any) {
     return this.svc.reject(dept, note, req.headers['x-user-id'], req.headers['x-user-name']);
   }

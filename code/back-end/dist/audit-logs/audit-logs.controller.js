@@ -43,10 +43,10 @@ __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('superuser', 'admin'),
     (0, swagger_1.ApiOperation)({ summary: 'Get paginated audit logs (superuser/admin only)' }),
-    (0, swagger_1.ApiQuery)({ name: 'page', required: false, type: Number }),
-    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, type: Number }),
-    (0, swagger_1.ApiQuery)({ name: 'module', required: false }),
-    (0, swagger_1.ApiQuery)({ name: 'actor', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, type: Number, example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, type: Number, example: 10 }),
+    (0, swagger_1.ApiQuery)({ name: 'module', required: false, example: 'Courses' }),
+    (0, swagger_1.ApiQuery)({ name: 'actor', required: false, example: 'U001' }),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),
     __param(2, (0, common_1.Query)('module')),
@@ -67,7 +67,6 @@ __decorate([
 ], AuditLogsController.prototype, "create", null);
 exports.AuditLogsController = AuditLogsController = __decorate([
     (0, swagger_1.ApiTags)('Audit Logs'),
-    (0, swagger_1.ApiHeader)({ name: 'x-role', description: 'Caller role for RBAC', required: true }),
     (0, common_1.UseGuards)(role_guard_1.RoleGuard),
     (0, common_1.Controller)('audit-logs'),
     __metadata("design:paramtypes", [audit_logs_service_1.AuditLogsService])
