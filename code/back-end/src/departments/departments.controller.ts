@@ -54,7 +54,7 @@ export class DepartmentsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a department (superuser/admin only)' })
-  @ApiParam({ name: 'id', example: 'Physics' })
+  @ApiParam({ name: 'id', example: 'DEPT-PHYSICS' })
   remove(
     @Param('id') id: string,
     @Headers('x-role') role: string,

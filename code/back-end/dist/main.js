@@ -76,7 +76,7 @@ async function bootstrap() {
         schema: {
             type: 'string',
             enum: ['superuser', 'admin', 'dean', 'hod', 'faculty', 'student'],
-            example: 'hod',
+            example: 'superuser',
         },
     })
         .addGlobalParameters({

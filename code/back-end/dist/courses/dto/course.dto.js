@@ -77,31 +77,31 @@ class UpdateCourseDto {
 }
 exports.UpdateCourseDto = UpdateCourseDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ example: 'Data Structures Advanced' }),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Data Structures & Algorithms (Advanced)', description: 'Updated course title' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateCourseDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ type: [String] }),
+    (0, swagger_1.ApiPropertyOptional)({ example: ['F001', 'F002'], type: [String], description: 'Updated list of assigned Faculty IDs' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
     __metadata("design:type", Array)
 ], UpdateCourseDto.prototype, "facultyIds", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ type: [String] }),
+    (0, swagger_1.ApiPropertyOptional)({ example: ['Dr. Liam Rodriguez', 'Dr. Olivia Johnson'], type: [String] }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
     __metadata("design:type", Array)
 ], UpdateCourseDto.prototype, "facultyNames", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Computer Science' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateCourseDto.prototype, "department", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'img_backtoschool.jpg' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

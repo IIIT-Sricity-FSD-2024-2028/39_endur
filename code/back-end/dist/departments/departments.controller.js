@@ -76,7 +76,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'Delete a department (superuser/admin only)' }),
-    (0, swagger_1.ApiParam)({ name: 'id', example: 'Physics' }),
+    (0, swagger_1.ApiParam)({ name: 'id', example: 'DEPT-PHYSICS' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Headers)('x-role')),
     __param(2, (0, common_1.Headers)('x-user-id')),

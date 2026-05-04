@@ -65,25 +65,25 @@ class UpdateEvalParamDto {
 }
 exports.UpdateEvalParamDto = UpdateEvalParamDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Pedagogical Clarity', description: 'Updated parameter name' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateEvalParamDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Measures how effectively the instructor delivers complex material.', description: 'Updated description' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateEvalParamDto.prototype, "description", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Instructional Design' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateEvalParamDto.prototype, "category", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 30, description: 'Updated weight percentage' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0),
@@ -91,7 +91,7 @@ __decorate([
     __metadata("design:type", Number)
 ], UpdateEvalParamDto.prototype, "weight", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)(),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'APPROVED', enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REVISION_REQUESTED'] }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

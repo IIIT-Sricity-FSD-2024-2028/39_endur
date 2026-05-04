@@ -41,27 +41,27 @@ export class CreateCourseDto {
 }
 
 export class UpdateCourseDto {
-  @ApiPropertyOptional({ example: 'Data Structures Advanced' })
+  @ApiPropertyOptional({ example: 'Data Structures & Algorithms (Advanced)', description: 'Updated course title' })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({ example: ['F001', 'F002'], type: [String], description: 'Updated list of assigned Faculty IDs' })
   @IsOptional()
   @IsArray()
   facultyIds?: string[];
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({ example: ['Dr. Liam Rodriguez', 'Dr. Olivia Johnson'], type: [String] })
   @IsOptional()
   @IsArray()
   facultyNames?: string[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Computer Science' })
   @IsOptional()
   @IsString()
   department?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'img_backtoschool.jpg' })
   @IsOptional()
   @IsString()
   thumbnail?: string;

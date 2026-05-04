@@ -33,29 +33,29 @@ export class CreateEvalParamDto {
 }
 
 export class UpdateEvalParamDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Pedagogical Clarity', description: 'Updated parameter name' })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Measures how effectively the instructor delivers complex material.', description: 'Updated description' })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Instructional Design' })
   @IsOptional()
   @IsString()
   category?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 30, description: 'Updated weight percentage' })
   @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(100)
   weight?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'APPROVED', enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REVISION_REQUESTED'] })
   @IsOptional()
   @IsString()
   status?: string;

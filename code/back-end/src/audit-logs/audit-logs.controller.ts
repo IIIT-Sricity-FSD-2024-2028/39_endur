@@ -16,7 +16,7 @@ export class AuditLogsController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'module', required: false, example: 'Courses' })
-  @ApiQuery({ name: 'actor', required: false, example: 'U001' })
+  @ApiQuery({ name: 'actor', required: false, example: 'SU001' })
   findAll(
     @Query('page') page?: number,
     @Query('limit') limit?: number,

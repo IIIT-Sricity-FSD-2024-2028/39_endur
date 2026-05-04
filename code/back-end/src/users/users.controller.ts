@@ -65,7 +65,7 @@ export class UsersController {
   @Get(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Get a single user by ID' })
-  @ApiParam({ name: 'id', example: 'U001' })
+  @ApiParam({ name: 'id', example: 'S001' })
   @ApiResponse({ status: 200, description: 'User object (no password)' })
   @ApiResponse({ status: 404, description: 'User not found' })
   findOne(@Param('id') id: string) {
@@ -96,7 +96,7 @@ export class UsersController {
   @Patch(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Update a user (restricted self-service for non-SU)' })
-  @ApiParam({ name: 'id', example: 'U001' })
+  @ApiParam({ name: 'id', example: 'S001' })
   @ApiResponse({ status: 200, description: 'Updated user object' })
   @ApiResponse({ status: 404, description: 'User not found' })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Request() req: any) {
@@ -109,7 +109,7 @@ export class UsersController {
   @Delete(':id')
   @Roles('superuser')
   @ApiOperation({ summary: 'Delete a user (superuser only)' })
-  @ApiParam({ name: 'id', example: 'U001' })
+  @ApiParam({ name: 'id', example: 'S001' })
   @ApiResponse({ status: 200, description: 'Deletion confirmation' })
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id') id: string, @Request() req: any) {

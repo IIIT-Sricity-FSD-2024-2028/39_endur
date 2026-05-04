@@ -37,7 +37,7 @@ export class FeedbackCyclesController {
   @Get(':id')
   @Roles('superuser', 'admin', 'dean', 'hod', 'faculty', 'student')
   @ApiOperation({ summary: 'Get a single feedback cycle by ID' })
-  @ApiParam({ name: 'id', example: 'C001' })
+  @ApiParam({ name: 'id', example: 'CYC-2025-01' })
   findOne(@Param('id') id: string) { return this.svc.findOne(id); }
 
   @Post()
@@ -51,7 +51,7 @@ export class FeedbackCyclesController {
   @Patch(':id')
   @Roles('superuser', 'admin', 'dean')
   @ApiOperation({ summary: 'Update a feedback cycle (superuser/admin only)' })
-  @ApiParam({ name: 'id', example: 'C001' })
+  @ApiParam({ name: 'id', example: 'CYC-2025-01' })
   update(@Param('id') id: string, @Body() dto: UpdateFeedbackCycleDto, @Request() req: any) {
     return this.svc.update(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -59,7 +59,7 @@ export class FeedbackCyclesController {
   @Patch(':id/status')
   @Roles('superuser', 'admin', 'dean')
   @ApiOperation({ summary: 'Update cycle status/phase (superuser/admin only)' })
-  @ApiParam({ name: 'id', example: 'C001' })
+  @ApiParam({ name: 'id', example: 'CYC-2025-01' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateCycleStatusDto, @Request() req: any) {
     return this.svc.updateStatus(id, dto, req.headers['x-user-id'], req.headers['x-user-name']);
   }
@@ -67,7 +67,7 @@ export class FeedbackCyclesController {
   @Delete(':id')
   @Roles('superuser', 'admin')
   @ApiOperation({ summary: 'Delete a feedback cycle (superuser/admin only)' })
-  @ApiParam({ name: 'id', example: 'C001' })
+  @ApiParam({ name: 'id', example: 'CYC-2025-01' })
   remove(@Param('id') id: string, @Request() req: any) {
     return this.svc.remove(id, req.headers['x-user-id'], req.headers['x-user-name']);
   }

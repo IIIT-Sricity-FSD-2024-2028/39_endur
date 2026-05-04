@@ -46,7 +46,7 @@ __decorate([
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, type: Number, example: 1 }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, type: Number, example: 10 }),
     (0, swagger_1.ApiQuery)({ name: 'module', required: false, example: 'Courses' }),
-    (0, swagger_1.ApiQuery)({ name: 'actor', required: false, example: 'U001' }),
+    (0, swagger_1.ApiQuery)({ name: 'actor', required: false, example: 'SU001' }),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),
     __param(2, (0, common_1.Query)('module')),

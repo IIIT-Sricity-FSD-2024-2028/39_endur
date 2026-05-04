@@ -48,42 +48,42 @@ export class CreateFeedbackCycleDto {
 }
 
 export class UpdateFeedbackCycleDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Spring 2026 - Final Review', description: 'Updated cycle name' })
   @IsOptional()
   @IsString()
   cycleName?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'endterm', enum: ['weekly', 'monthly', 'midterm', 'endterm'] })
   @IsOptional()
   @IsString()
   type?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-05-01T08:00:00Z' })
   @IsOptional()
   @IsDateString()
   startTimestamp?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-05-15T23:59:59Z' })
   @IsOptional()
   @IsDateString()
   endTimestamp?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-05-02T23:59:59Z' })
   @IsOptional()
   @IsDateString()
   prepDeadline?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-05-10T23:59:59Z' })
   @IsOptional()
   @IsDateString()
   studentDeadline?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-05-12T23:59:59Z' })
   @IsOptional()
   @IsDateString()
   reflectionDeadline?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-05-14T23:59:59Z' })
   @IsOptional()
   @IsDateString()
   actionReportDeadline?: string;
