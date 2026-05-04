@@ -19,6 +19,7 @@ export declare class UpdateFeedbackCycleDto {
     studentDeadline?: string;
     reflectionDeadline?: string;
     actionReportDeadline?: string;
+    departmentParameters?: Record<string, any[]>;
 }
 export declare class UpdateCycleStatusDto {
     status: string;

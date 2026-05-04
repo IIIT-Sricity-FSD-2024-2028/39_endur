@@ -88,6 +88,7 @@ class UpdateFeedbackCycleDto {
     studentDeadline;
     reflectionDeadline;
     actionReportDeadline;
+    departmentParameters;
 }
 exports.UpdateFeedbackCycleDto = UpdateFeedbackCycleDto;
 __decorate([
@@ -138,6 +139,10 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], UpdateFeedbackCycleDto.prototype, "actionReportDeadline", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Object)
+], UpdateFeedbackCycleDto.prototype, "departmentParameters", void 0);
 class UpdateCycleStatusDto {
     status;
     phase;

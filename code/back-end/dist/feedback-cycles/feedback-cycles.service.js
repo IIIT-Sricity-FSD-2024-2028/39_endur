@@ -141,7 +141,8 @@ let FeedbackCyclesService = class FeedbackCyclesService {
         const idx = cycles.findIndex((c) => c.cycleId === id);
         if (idx === -1)
             throw new common_1.NotFoundException(`Cycle ${id} not found`);
-        cycles[idx] = { ...cycles[idx], ...dto };
+        const cleanedDto = Object.fromEntries(Object.entries(dto).filter(([_, v]) => v !== undefined));
+        cycles[idx] = { ...cycles[idx], ...cleanedDto };
         this.store.setFeedbackCycles(cycles);
         this.store.appendAuditLog({
             actor: actorId || 'SU001',
@@ -253,9 +254,18 @@ let FeedbackCyclesService = class FeedbackCyclesService {
             if (!params || typeof params !== 'object') {
                 params = this.generateDefaultParameters();
             }
-            const entry = { cycleId, ...dto, status: 'closed', phase: 'COMPLETED', departmentParameters: params };
-            delete entry.responses;
-            delete entry.parametersJson;
+            const d = dto;
+            const entry = {
+                cycleId,
+                cycleName: d.cycleName || d.Name || d.name || 'Untitled Cycle',
+                type: d.type || d.Type || 'weekly',
+                startTimestamp: d.startTimestamp || d.Start || new Date().toISOString(),
+                endTimestamp: d.endTimestamp || d.End || new Date().toISOString(),
+                studentDeadline: d.studentDeadline || d.StudentDeadline || d.endTimestamp || d.End || '',
+                status: 'closed',
+                phase: 'COMPLETED',
+                departmentParameters: params
+            };
             cycles.unshift(entry);
             success.push(entry);
             if (dto.responses && Array.isArray(dto.responses)) {

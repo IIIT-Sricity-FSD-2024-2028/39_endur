@@ -87,6 +87,9 @@ export class UpdateFeedbackCycleDto {
   @IsOptional()
   @IsDateString()
   actionReportDeadline?: string;
+
+  @IsOptional()
+  departmentParameters?: Record<string, any[]>;
 }
 
 export class UpdateCycleStatusDto {
