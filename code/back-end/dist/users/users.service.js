@@ -45,6 +45,7 @@ let UsersService = class UsersService {
         }
         users.push({ ...dto });
         this.seedService.setUsers(users);
+        this._syncCourseEnrollments();
         this.store.appendAuditLog({
             actor: 'SU001',
             actorName: 'Super User',
@@ -71,6 +72,7 @@ let UsersService = class UsersService {
             success.push(safe);
         }
         this.seedService.setUsers(existing);
+        this._syncCourseEnrollments();
         if (success.length > 0) {
             this.store.appendAuditLog({
                 actor: actorId || 'SU001',
@@ -111,6 +113,7 @@ let UsersService = class UsersService {
         }
         users[idx] = { ...users[idx], ...dto };
         this.seedService.setUsers(users);
+        this._syncCourseEnrollments();
         this.store.appendAuditLog({
             actor: actorId || 'SU001',
             actorName: actorName || 'Super User',
@@ -167,6 +170,22 @@ let UsersService = class UsersService {
         const enrollmentIds = user.enrolledCourses || [];
         const allCourses = this.store.getCourses();
         return allCourses.filter((c) => enrollmentIds.includes(c.id));
+    }
+    _syncCourseEnrollments() {
+        const users = this.seedService.getUsers();
+        const courses = this.store.getCourses();
+        const counts = {};
+        users.forEach(u => {
+            if (u.role === 'student' && u.enrolledCourses) {
+                u.enrolledCourses.forEach(cid => {
+                    counts[cid] = (counts[cid] || 0) + 1;
+                });
+            }
+        });
+        courses.forEach(c => {
+            c.enrolled = counts[c.id] || 0;
+        });
+        this.store.setCourses(courses);
     }
 };
 exports.UsersService = UsersService;

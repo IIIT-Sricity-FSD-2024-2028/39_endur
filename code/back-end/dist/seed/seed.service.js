@@ -14,7 +14,7 @@ let SeedService = class SeedService {
         this.users = [
             {
                 id: 'SU001',
-                password: 'superuser123',
+                password: 'password123',
                 name: 'SuperUser',
                 role: 'superuser',
                 department: 'System',

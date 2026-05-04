@@ -6,13 +6,12 @@ export function exportCycles() {
     const rows = cycles.map(c => ({
         CycleID: c.cycleId,
         Name: c.cycleName || c.name || 'Untitled',
-        Type: c.type || 'weekly',
         Start: c.startTimestamp,
         End: c.endTimestamp,
         StudentDeadline: c.studentDeadline || '',
         Status: c.status
     }));
-    exportToCSV(`Endur_Cycles_${new Date().toISOString().slice(0,10)}.csv`, rows);
+    exportToCSV(`Endur_Cycles_${new Date().toISOString().slice(0, 10)}.csv`, rows);
     showToast(`Exported ${rows.length} cycles.`, 'success');
 }
 
@@ -37,9 +36,9 @@ function renderCycleTable(filter = '') {
     if (!tbody) return;
 
     const list = filter
-        ? cycles.filter(c => 
-            (c.cycleName || '').toLowerCase().includes(filter) || 
-            (c.name || '').toLowerCase().includes(filter) || 
+        ? cycles.filter(c =>
+            (c.cycleName || '').toLowerCase().includes(filter) ||
+            (c.name || '').toLowerCase().includes(filter) ||
             (c.cycleId || '').toLowerCase().includes(filter)
         )
         : cycles;
@@ -52,7 +51,7 @@ function renderCycleTable(filter = '') {
     tbody.innerHTML = list.map(c => `
         <tr>
             <td><code style="background:rgba(59,130,246,0.1);padding:2px 8px;border-radius:4px;font-size:0.85rem">${c.cycleId}</code></td>
-            <td><strong>${c.cycleName || c.name || 'Untitled Cycle'}</strong></td>
+            <td><strong>${c.cycleName || c.name || c.cycleId || 'Untitled Cycle'}</strong></td>
             <td>${formatDate(c.startTimestamp)} → ${formatDate(c.endTimestamp)}</td>
             <td><span class="badge ${c.status === 'active' ? 'success' : 'neutral'}">${c.status}</span></td>
             <td>
@@ -205,10 +204,203 @@ export async function suViewCycleResponsesAsync(cycleId) {
     }
 }
 
-window.suManageCycleParams = (id) => {
-    sessionStorage.setItem('manageCycleId', id);
-    window.location.href = `manage-parameters.html?cycleId=${encodeURIComponent(id)}`;
+export async function suManageCycleParams(cycleId) {
+    let modal = document.getElementById('suParamsModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'suParamsModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-card" style="max-width:900px;width:95%">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 id="suParamsTitle">Cycle Parameters</h3>
+                <button class="btn-primary btn-small" onclick="suAddParamToCycle()">+ Add Parameter</button>
+            </div>
+            <div style="margin-bottom:16px;display:flex;gap:12px;">
+                <input type="text" id="suParamSearch" class="search-bar" placeholder="Search parameters..." style="margin:0;flex:1">
+            </div>
+            <div style="overflow-x:auto;max-height:60vh;overflow-y:auto">
+                <table class="data-table">
+                    <thead><tr><th>Name / Dept</th><th>Weight</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody id="suParamsBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="document.getElementById('suParamsModal').classList.remove('active')">Close</button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+
+        // Add the Add/Edit Modal
+        const editModal = document.createElement('div');
+        editModal.id = 'suParamEditModal';
+        editModal.className = 'modal-overlay';
+        editModal.innerHTML = `<div class="modal-card" style="max-width:500px">
+            <h3 id="suParamEditTitle">Edit Parameter</h3>
+            <form id="suParamEditForm">
+                <div class="form-group"><label>Name</label><input type="text" id="suPName" required></div>
+                <div class="form-group"><label>Description</label><textarea id="suPDesc" rows="2"></textarea></div>
+                <div class="form-group"><label>Weight (%)</label><input type="number" id="suPWeight" min="0" max="100" required></div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <select id="suPDept" required></select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline" onclick="document.getElementById('suParamEditModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Parameter</button>
+                </div>
+            </form>
+        </div>`;
+        document.body.appendChild(editModal);
+    }
+
+    const cycle = cycles.find(c => c.cycleId === cycleId);
+    if (!cycle) { showToast('Cycle not found.', 'error'); return; }
+
+    window.__currentCycleId = cycleId;
+    window.__currentCycleStatus = cycle.status;
+    window.__currentCyclePhase = cycle.phase;
+    window.__cycleParams = cycle.departmentParameters || {};
+
+    // Hide add button if closed or past Phase 1
+    const isLocked = cycle.status === 'closed' || (cycle.phase && cycle.phase !== 'PREPARATION');
+    const addBtn = document.querySelector('#suParamsModal .btn-primary.btn-small');
+    if (addBtn) addBtn.style.display = isLocked ? 'none' : 'block';
+
+    document.getElementById('suParamsTitle').textContent = `Parameters — ${cycle.cycleName || cycle.name || cycleId} ${isLocked ? '(View Only)' : ''}`;
+    modal.classList.add('active');
+    renderParamsInModal();
+}
+
+function renderParamsInModal(filter = '') {
+    const tbody = document.getElementById('suParamsBody');
+    const configs = window.__cycleParams;
+    const isLocked = window.__currentCycleStatus === 'closed' || (window.__currentCyclePhase && window.__currentCyclePhase !== 'PREPARATION');
+    
+    let flatList = [];
+    Object.entries(configs).forEach(([dept, params]) => {
+        params.forEach(p => { flatList.push({ ...p, department: dept }); });
+    });
+
+    const list = filter ? flatList.filter(p => p.name.toLowerCase().includes(filter) || p.department.toLowerCase().includes(filter)) : flatList;
+
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">No parameters defined for this cycle.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = list.map(p => {
+        const deptParams = configs[p.department] || [];
+        const totalWeight = deptParams.reduce((sum, item) => sum + (item.weight || 0), 0);
+        const weightStatus = totalWeight === 100 ? '✅ 100%' : `⚠️ ${totalWeight}%`;
+        const weightColor = totalWeight === 100 ? 'var(--success)' : 'var(--danger)';
+
+        const actionButtons = isLocked ? '' : `
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-small" onclick="suEditParamInCycle('${p.id}', '${p.department}')">Edit</button>
+                    <button class="btn-small btn-danger-soft" onclick="suDeleteParamFromCycle('${p.id}', '${p.department}')">Delete</button>
+                </div>`;
+
+        return `<tr>
+            <td>
+                <strong>${p.name}</strong><br>
+                <small style="color:var(--text-muted);font-size:0.8rem">${p.description || ''}</small><br>
+                <span style="font-size:0.7rem;color:var(--primary);font-weight:600;">${p.department}</span>
+                <span style="font-size:0.7rem;color:${weightColor};font-weight:700;margin-left:8px;">(${weightStatus})</span>
+            </td>
+            <td><strong>${p.weight}%</strong></td>
+            <td><span class="badge success">CYCLE BOUND</span> ${isLocked ? '<span class="badge neutral">LOCKED</span>' : ''}</td>
+            <td>${actionButtons}</td>
+        </tr>`;
+    }).join('');
+
+    // Bind search
+    const search = document.getElementById('suParamSearch');
+    search.oninput = () => renderParamsInModal(search.value.toLowerCase());
+}
+
+window.suAddParamToCycle = async () => {
+    const form = document.getElementById('suParamEditForm');
+    form.reset();
+    delete form.dataset.editId;
+    delete form.dataset.editDept;
+
+    // Populate departments
+    const deptSelect = document.getElementById('suPDept');
+    deptSelect.innerHTML = '<option value="">Select Department...</option>';
+    try {
+        const sysDepts = await GET('/departments');
+        sysDepts.sort((a, b) => a.name.localeCompare(b.name)).forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.name; opt.textContent = d.name; deptSelect.appendChild(opt);
+        });
+    } catch (e) { }
+
+    document.getElementById('suParamEditTitle').textContent = 'Add Parameter to Cycle';
+    document.getElementById('suParamEditModal').classList.add('active');
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('suPName').value.trim();
+        const desc = document.getElementById('suPDesc').value.trim();
+        const weight = parseInt(document.getElementById('suPWeight').value) || 0;
+        const dept = document.getElementById('suPDept').value;
+
+        if (!name || !dept) return;
+
+        if (!window.__cycleParams[dept]) window.__cycleParams[dept] = [];
+        window.__cycleParams[dept].push({ id: 'P_' + Date.now(), name, description: desc, weight });
+
+        await suSaveCycleParams();
+        document.getElementById('suParamEditModal').classList.remove('active');
+    };
 };
+
+window.suEditParamInCycle = async (id, dept) => {
+    const p = (window.__cycleParams[dept] || []).find(x => x.id === id);
+    if (!p) return;
+
+    const form = document.getElementById('suParamEditForm');
+    form.reset();
+    document.getElementById('suPName').value = p.name;
+    document.getElementById('suPDesc').value = p.description || '';
+    document.getElementById('suPWeight').value = p.weight;
+
+    const deptSelect = document.getElementById('suPDept');
+    deptSelect.innerHTML = `<option value="${dept}">${dept}</option>`;
+
+    document.getElementById('suParamEditTitle').textContent = 'Edit Parameter';
+    document.getElementById('suParamEditModal').classList.add('active');
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        p.name = document.getElementById('suPName').value.trim();
+        p.description = document.getElementById('suPDesc').value.trim();
+        p.weight = parseInt(document.getElementById('suPWeight').value) || 0;
+
+        await suSaveCycleParams();
+        document.getElementById('suParamEditModal').classList.remove('active');
+    };
+};
+
+window.suDeleteParamFromCycle = async (id, dept) => {
+    if (!confirm('Are you sure you want to remove this parameter from the cycle?')) return;
+    window.__cycleParams[dept] = (window.__cycleParams[dept] || []).filter(x => x.id !== id);
+    await suSaveCycleParams();
+};
+
+async function suSaveCycleParams() {
+    try {
+        const updated = await PATCH(`/feedback-cycles/${window.__currentCycleId}`, { departmentParameters: window.__cycleParams });
+        const idx = cycles.findIndex(c => c.cycleId === window.__currentCycleId);
+        if (idx > -1) cycles[idx] = { ...cycles[idx], ...updated };
+        showToast('Parameters updated.', 'success');
+        renderCycleTable(document.getElementById('cycleSearch')?.value.toLowerCase() || '');
+        updateCycleCount();
+        renderParamsInModal(document.getElementById('suParamSearch').value.toLowerCase());
+    } catch (e) {
+        showToast(e.message || 'Failed to update parameters.', 'error');
+    }
+}
 
 function updateCycleCount() {
     const el = document.getElementById('statTotalCycles');
@@ -303,15 +495,18 @@ function parseCSV(text) {
 
     const cycleMap = {};
     parsedRows.forEach(row => {
-        if (!row.cycleName) return;
-        if (!cycleMap[row.cycleName]) {
-            cycleMap[row.cycleName] = {
-                cycleName: row.cycleName,
-                type: row.type || 'weekly',
-                startTimestamp: row.startTimestamp,
-                endTimestamp: row.endTimestamp,
-                reflectionDeadline: row.reflectionDeadline || undefined,
-                actionReportDeadline: row.actionReportDeadline || undefined,
+        const cName = row.cycleName || row.Name || row.name || '';
+        if (!cName) return;
+
+        if (!cycleMap[cName]) {
+            cycleMap[cName] = {
+                cycleName: cName,
+                type: row.type || row.Type || 'weekly',
+                startTimestamp: row.startTimestamp || row.Start || '',
+                endTimestamp: row.endTimestamp || row.End || '',
+                studentDeadline: row.studentDeadline || row.StudentDeadline || '',
+                reflectionDeadline: row.reflectionDeadline || '',
+                actionReportDeadline: row.actionReportDeadline || '',
                 parametersJson: row.parametersJson || undefined,
                 responses: []
             };
@@ -353,7 +548,7 @@ export async function previewCycleBulkFile() {
     if (missing.length) { showToast(`${missing.length} rows missing required fields (cycleName, startTimestamp, endTimestamp).`, 'error'); return; }
     window.__bulkCycleData = parsed;
     const preview = document.getElementById('cycleBulkPreviewBody');
-    if (preview) preview.innerHTML = parsed.slice(0, 20).map(c => `<tr><td>${c.cycleName}</td><td>${c.type || 'weekly'}</td><td>${formatDate(c.startTimestamp)}</td><td>${formatDate(c.endTimestamp)}</td></tr>`).join('');
+    if (preview) preview.innerHTML = parsed.slice(0, 20).map(c => `<tr><td>${c.cycleName}</td><td>${formatDate(c.startTimestamp)}</td><td>${formatDate(c.endTimestamp)}</td></tr>`).join('');
     const section = document.getElementById('cycleBulkPreviewSection');
     if (section) { section.style.display = 'block'; document.getElementById('cycleBulkPreviewCount').textContent = `${parsed.length} cycles to import`; }
 }

@@ -8,11 +8,11 @@ import {
 
 @Injectable()
 export class FeedbackCyclesService {
-  constructor(private readonly store: DataStoreService) {}
+  constructor(private readonly store: DataStoreService) { }
 
   private _calculatePhase(cycle: any): string {
     if (cycle.status === 'closed') return 'COMPLETED';
-    
+
     const now = new Date();
     const prepDl = cycle.prepDeadline ? new Date(cycle.prepDeadline) : null;
     const studentDl = cycle.studentDeadline ? new Date(cycle.studentDeadline) : null;
@@ -71,7 +71,7 @@ export class FeedbackCyclesService {
     const cycles = this.store.getFeedbackCycles();
     const active = cycles.find(c => c.status === 'active');
     if (!active) return this.store.getCycleState();
-    
+
     return {
       id: active.cycleId,
       cycleName: active.cycleName,
@@ -87,20 +87,20 @@ export class FeedbackCyclesService {
     const activeParams = this.store.getActiveParameters();
     const depts = this.store.getDepartments();
     const finalParams: Record<string, any[]> = {};
-    
+
     // Predicatable IDs for institutional defaults to ensure student form & backend match
     const defaultParams = [
-      { id: 'delivery',   name: 'Course Delivery & Clarity',     weight: 25 },
-      { id: 'relevance',  name: 'Course Relevance',               weight: 25 },
-      { id: 'support',    name: 'Faculty Support & Availability', weight: 25 },
-      { id: 'assessment', name: 'Fairness of Assessments',        weight: 25 },
+      { id: 'delivery', name: 'Course Delivery & Clarity', weight: 25 },
+      { id: 'relevance', name: 'Course Relevance', weight: 25 },
+      { id: 'support', name: 'Faculty Support & Availability', weight: 25 },
+      { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
     ];
 
     for (const d of depts) {
       // Priority 1: Keyed by Name (e.g., 'Computer Science')
       if (activeParams[d.name]) {
         finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.name]));
-      } 
+      }
       // Priority 2: Keyed by ID (e.g., 'CS')
       else if (activeParams[d.id]) {
         finalParams[d.name] = JSON.parse(JSON.stringify(activeParams[d.id]));
@@ -157,7 +157,11 @@ export class FeedbackCyclesService {
     const cycles = this.store.getFeedbackCycles();
     const idx = cycles.findIndex((c) => c.cycleId === id);
     if (idx === -1) throw new NotFoundException(`Cycle ${id} not found`);
-    cycles[idx] = { ...cycles[idx], ...dto };
+    // Clean DTO to avoid overwriting existing fields with undefined
+    const cleanedDto = Object.fromEntries(
+      Object.entries(dto).filter(([_, v]) => v !== undefined),
+    );
+    cycles[idx] = { ...cycles[idx], ...cleanedDto };
     this.store.setFeedbackCycles(cycles);
 
     this.store.appendAuditLog({
@@ -182,10 +186,10 @@ export class FeedbackCyclesService {
       const depts = this.store.getDepartments();
       const finalParams: Record<string, any[]> = {};
       const defaultParams = [
-        { id: 'delivery',   name: 'Course Delivery & Clarity',     weight: 25 },
-        { id: 'relevance',  name: 'Course Relevance',               weight: 25 },
-        { id: 'support',    name: 'Faculty Support & Availability', weight: 25 },
-        { id: 'assessment', name: 'Fairness of Assessments',        weight: 25 },
+        { id: 'delivery', name: 'Course Delivery & Clarity', weight: 25 },
+        { id: 'relevance', name: 'Course Relevance', weight: 25 },
+        { id: 'support', name: 'Faculty Support & Availability', weight: 25 },
+        { id: 'assessment', name: 'Fairness of Assessments', weight: 25 },
       ];
       for (const d of depts) {
         if (activeParams[d.name]) {
@@ -203,7 +207,7 @@ export class FeedbackCyclesService {
     cycles[idx].status = dto.status;
     if (dto.phase) {
       cycles[idx].phase = dto.phase;
-      
+
       // Update deadlines to match manual override so dynamic calculation holds
       const now = new Date().toISOString();
       if (dto.phase === 'STUDENT_FEEDBACK') {
@@ -219,7 +223,7 @@ export class FeedbackCyclesService {
         cycles[idx].endTimestamp = now;
       }
     }
-    
+
     this.store.setFeedbackCycles(cycles);
 
     // Also update global cycle state if activating
@@ -265,16 +269,24 @@ export class FeedbackCyclesService {
 
     for (const dto of cyclesToImport) {
       const cycleId = this.store.genId('CYCLE');
-      
       let params: any = null;
-      try { params = dto.parametersJson ? JSON.parse(dto.parametersJson) : null; } catch (e) {}
+      try { params = dto.parametersJson ? JSON.parse(dto.parametersJson) : null; } catch (e) { }
       if (!params || typeof params !== 'object') {
-         params = this.generateDefaultParameters();
+        params = this.generateDefaultParameters();
       }
 
-      const entry = { cycleId, ...dto, status: 'closed', phase: 'COMPLETED', departmentParameters: params };
-      delete entry.responses; // don't store raw responses in cycle object
-      delete entry.parametersJson;
+      const d = dto as any;
+      const entry = { 
+        cycleId, 
+        cycleName: d.cycleName || d.Name || d.name || 'Untitled Cycle',
+        type: d.type || d.Type || 'weekly',
+        startTimestamp: d.startTimestamp || d.Start || new Date().toISOString(),
+        endTimestamp: d.endTimestamp || d.End || new Date().toISOString(),
+        studentDeadline: d.studentDeadline || d.StudentDeadline || d.endTimestamp || d.End || '',
+        status: 'closed', 
+        phase: 'COMPLETED', 
+        departmentParameters: params 
+      };
       
       cycles.unshift(entry);
       success.push(entry);
@@ -305,7 +317,7 @@ export class FeedbackCyclesService {
             let rawRatings: any = {};
             try {
               rawRatings = r.ratingsJson ? JSON.parse(r.ratingsJson) : r.ratings || {};
-            } catch (e) {}
+            } catch (e) { }
 
             Object.entries(rawRatings).forEach(([key, val], idx) => {
               if (val === undefined || val === null || val === '') return;
@@ -342,7 +354,7 @@ export class FeedbackCyclesService {
     }
     this.store.setFeedbackCycles(cycles);
     this.store.setFeedbackResponses(responsesStore);
-    
+
     if (success.length > 0) {
       this.store.appendAuditLog({ actor: actorId || 'SU001', actorName: actorName || 'Super User', actorRole: 'superuser', action: 'BULK_CREATE', module: 'Feedback Cycles', target: `${success.length} cycles`, details: `Bulk import: ${success.length} historical cycles imported.` });
     }
