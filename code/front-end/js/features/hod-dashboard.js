@@ -40,16 +40,23 @@ export async function renderHodDashboard() {
     // Department-wide stats (Satisfaction across ALL cycles)
     const historicalDeptFeedback = allSubmissions.filter(f => deptCourseIds.has(f.courseId));
     
-    let totalDeptScore = 0, deptMetricCount = 0;
-    historicalDeptFeedback.forEach(f => {
-        if (Array.isArray(f.ratings)) f.ratings.forEach(val => {
-            const score = Number(val.score);
-            if (!isNaN(score)) { totalDeptScore += score; deptMetricCount++; }
+    const individualResponseScores = historicalDeptFeedback.map(f => {
+        if (!Array.isArray(f.ratings) || f.ratings.length === 0) return null;
+        let rSum = 0;
+        let rWeight = 0;
+        f.ratings.forEach(rt => {
+            let s = Number(rt.score ?? 0);
+            if (s > 5) s = s / 20;
+            const w = rt.weight ?? 25;
+            rSum += (s * 20) * w;
+            rWeight += w;
         });
-    });
+        return rWeight > 0 ? rSum / rWeight : null;
+    }).filter(s => s !== null);
 
-    const deptAverage = deptMetricCount > 0 ? (totalDeptScore / deptMetricCount) : 0;
-    const deptSatisfaction = deptAverage > 0 ? (deptAverage / 5) * 100 : 0;
+    const deptSatisfaction = individualResponseScores.length > 0 
+        ? individualResponseScores.reduce((a, b) => a + b, 0) / individualResponseScores.length 
+        : 0;
 
     // Response rate: Use historical data for 'Avg Response Rate' to match Dean's Participation logic
     // and avoid 0.0% when a cycle is just starting.
@@ -86,17 +93,27 @@ export async function renderHodDashboard() {
         tableBody.innerHTML = '';
         myFaculty.slice(0, 5).forEach(faculty => {
             const fCourses = deptCourses.filter(c => c.facultyId === faculty.id || (c.facultyIds && c.facultyIds.includes(faculty.id)));
-            let totalScore = 0, metricCount = 0;
+            let totalScore = 0;
             const facultyFeedback = allSubmissions.filter(f => f.facultyId === faculty.id);
             
-            facultyFeedback.forEach(f => {
-                if (Array.isArray(f.ratings)) f.ratings.forEach(val => {
-                    const score = Number(val.score);
-                    if (!isNaN(score)) { totalScore += score; metricCount++; }
+            const individualScores = facultyFeedback.map(f => {
+                if (!Array.isArray(f.ratings) || f.ratings.length === 0) return null;
+                let rSum = 0;
+                let rWeight = 0;
+                f.ratings.forEach(rt => {
+                    let s = Number(rt.score ?? 0);
+                    if (s > 5) s = s / 20;
+                    const w = rt.weight ?? 25;
+                    rSum += (s * 20) * w;
+                    rWeight += w;
                 });
-            });
+                return rWeight > 0 ? rSum / rWeight : null;
+            }).filter(s => s !== null);
 
-            const finalScore = metricCount > 0 ? (totalScore / metricCount) * 20 : 0;
+            const finalScore = individualScores.length > 0 
+                ? individualScores.reduce((a, b) => a + b, 0) / individualScores.length 
+                : 0;
+            const metricCount = individualScores.length;
             let statusBadge = `<span class="badge success">On Track</span>`;
             if (finalScore < 60 && metricCount > 0) {
                 statusBadge = `<span class="badge danger">Performance Alert</span>`;
