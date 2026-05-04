@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluation Parameters — Admin — Endur</title>
+    <link rel="stylesheet" href="../../css/base.css">
+    <link rel="stylesheet" href="../../css/layout.css">
+    <link rel="stylesheet" href="../../css/utilities.css">
+    <link rel="stylesheet" href="../../css/components/button.css">
+    <link rel="stylesheet" href="../../css/components/sidebar.css">
+    <link rel="stylesheet" href="../../css/components/table.css">
+    <link rel="stylesheet" href="../../css/components/badge.css">
+    <link rel="stylesheet" href="../../css/components/stats.css">
+    <link rel="stylesheet" href="../../css/components/modal.css">
+    <link rel="stylesheet" href="../../css/pages/dashboard.css">
+    <style>
+        .sidebar-menu a.active { background:var(--primary-light); color:var(--primary-active); }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="../../assets/logos/endur-logo.svg" alt="Endur">
+            <div><strong>Endur</strong><p>Admin Portal</p></div>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="dashboard.html">📊 Dashboard</a>
+            <a href="manage-cycles.html">🔄 Feedback Cycles</a>
+            <a class="active" href="manage-parameters.html">⚙️ Eval. Parameters</a>
+            <a href="audit-logs.html">📋 Audit Logs</a>
+        </nav>
+        <a href="profile.html" class="sidebar-user">
+            <div class="avatar" id="avatar"></div>
+            <div><strong id="userName"></strong><p id="userDept">Admin</p></div>
+        </a>
+    </aside>
+
+    <main class="dashboard-content">
+        <div class="form-header" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+            <div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+                    <button class="btn-small btn-outline" onclick="window.location.href='manage-cycles.html'" style="padding:4px 12px;display:flex;align-items:center;gap:4px">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        Back
+                    </button>
+                    <h2 class="section-title" style="margin:0">Cycle Evaluation Parameters</h2>
+                </div>
+                <p class="subtitle" style="margin:0">Define and manage evaluation criteria by department. <span id="cycleNameDisplay" style="color:var(--primary);font-weight:600;margin-left:8px;"></span></p>
+            </div>
+            <span class="badge primary">ADMIN</span>
+        </div>
+
+        <div class="page-actions">
+            <input id="paramSearch" class="search-bar" type="search" placeholder="Search parameters…" style="margin:0">
+        </div>
+
+        <div class="card-panel">
+            <table class="data-table">
+                <thead><tr><th>Parameter</th><th>Weight</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="paramsTableBody"><tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<script type="module">
+    import { requireAuth } from '../../js/core/session.js';
+    import { renderSuperuserParameters, openEditParam, openDeleteParam, closeParamModal, closeDeleteModal } from '../../js/features/superuser-parameters.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const user = requireAuth('admin');
+        if (!user) return;
+        document.getElementById('userName').textContent = user.name;
+        document.getElementById('userDept').textContent = user.department || 'Admin';
+        const av = document.getElementById('avatar');
+        if (av) av.textContent = user.name.split(' ').map(n => n[0]).join('');
+        await renderSuperuserParameters();
+    });
+
+    window.openEditParam = openEditParam;
+    window.openDeleteParam = openDeleteParam;
+    window.closeParamModal = closeParamModal;
+    window.closeDeleteModal = closeDeleteModal;
+</script>
+</body>
+</html>

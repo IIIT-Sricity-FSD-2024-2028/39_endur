@@ -87,10 +87,11 @@ function renderParamsTable(filter = '') {
             <td>${p.weight > 0 ? `<strong>${p.weight}%</strong>` : '—'}</td>
             <td><span class="badge success">CYCLE BOUND</span></td>
             <td>
+                ${session?.role === 'superuser' ? `
                 <div style="display:flex;gap:8px;">
                     <button class="btn-small" onclick="openEditParam('${p.id}', '${p.department}')">Edit</button>
                     <button class="btn-small btn-danger-soft" onclick="openDeleteParam('${p.id}', '${p.department}')">Delete</button>
-                </div>
+                </div>` : '<span style="color:var(--text-muted);font-size:0.8rem italic">Read-only</span>'}
             </td>
         </tr>`;
     }).join('');

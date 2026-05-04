@@ -18,7 +18,6 @@ const feedback_responses_module_1 = require("./feedback-responses/feedback-respo
 const audit_logs_module_1 = require("./audit-logs/audit-logs.module");
 const faculty_reports_module_1 = require("./faculty-reports/faculty-reports.module");
 const departments_module_1 = require("./departments/departments.module");
-const settings_module_1 = require("./settings/settings.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,7 +34,6 @@ exports.AppModule = AppModule = __decorate([
             audit_logs_module_1.AuditLogsModule,
             faculty_reports_module_1.FacultyReportsModule,
             departments_module_1.DepartmentsModule,
-            settings_module_1.SettingsModule,
         ],
     })
 ], AppModule);

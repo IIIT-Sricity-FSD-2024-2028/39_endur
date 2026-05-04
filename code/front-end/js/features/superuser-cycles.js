@@ -49,7 +49,7 @@ function renderCycleTable(filter = '') {
             : `<button class="btn-small" style="color:var(--accent)" onclick="suReopenCycle('${c.cycleId}')">Reopen</button>`
         }
                     <button class="btn-small" style="background:#5b21b6;color:#fff;" onclick="suManageCycleParams('${c.cycleId}')">Parameters</button>
-                    <button class="btn-small btn-danger-soft" onclick="suDeleteCycle('${c.cycleId}')">Delete</button>
+                    ${session?.role === 'superuser' ? `<button class="btn-small btn-danger-soft" onclick="suDeleteCycle('${c.cycleId}')">Delete</button>` : ''}
                 </div>
             </td>
         </tr>
