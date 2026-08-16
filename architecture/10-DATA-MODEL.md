@@ -1,0 +1,564 @@
+# 10 — Data model
+
+Phase: P1 · Milestone: M0 · Owns: `apps/api/prisma/**`, `apps/api/src/db/**`
+Decisions: `_MEMORY.md` DEC-002, DEC-006, DEC-007 · Invariants: INV-002, INV-005, INV-006, INV-010
+
+---
+
+## 1. The shape of the model
+
+Two halves, deliberately different in character.
+
+| Half | Tables | Character |
+|---|---|---|
+| **The org graph** | `nodes`, `edges`, `grants` | Three generic primitives. Never grows. A new organisation type is data, never a migration. |
+| **The feedback domain** | `subjects`, `templates`, `questions`, `campaigns`, `responses`, `answers` | Ordinary relational tables. Concrete because the shapes genuinely are concrete. |
+
+The generality lives entirely in the first half. Resisting the urge to make the second half
+generic too is what keeps the thing buildable — `customization.md` §13 names this trap
+directly ("a feature per organisation type" is the failure, but so is abstracting what is
+not varying).
+
+Everything is scoped by `org_id` (INV-010).
+
+---
+
+## 2. The org graph
+
+### 2.1 `nodes`
+
+```sql
+CREATE TYPE node_kind AS ENUM ('role', 'unit', 'group', 'person', 'position');
+
+CREATE TABLE nodes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  kind        node_kind NOT NULL,
+  name        TEXT NOT NULL,
+
+  level       INT,          -- roles only. 1 = highest. ordering only, nothing else.
+  role_id     UUID REFERENCES nodes(id) ON DELETE CASCADE,  -- positions only
+  unit_id     UUID REFERENCES nodes(id) ON DELETE CASCADE,  -- positions only
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,  -- person nodes only
+
+  is_temporary BOOLEAN NOT NULL DEFAULT false,  -- units: children get end dates
+  ends_at      TIMESTAMPTZ,
+  derived      BOOLEAN NOT NULL DEFAULT false,  -- generated from a placement rule
+  meta         JSONB NOT NULL DEFAULT '{}',
+
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT node_level_only_on_role
+    CHECK ((kind = 'role') = (level IS NOT NULL)),
+  CONSTRAINT node_position_refs
+    CHECK ((kind = 'position') = (role_id IS NOT NULL AND unit_id IS NOT NULL))
+);
+```
+
+**`position` is a deliberate addition to `customization.md` §3's four kinds.** That document
+says an assignment is "an EDGE from a person node to a role-at-unit node" but never names
+the role-at-unit thing. Naming it is worth it: it is what the `→ creates 7 positions`
+counter counts (`customization.md` §9 screen 3), it is what a grant is usually attached to,
+and it is what makes INV-005 expressible — *powers are scoped to the unit of the assignment*
+— because the unit is a column on the position, not a lookup through the person.
+
+`derived` matters more than it looks. One placement rule — "a Supervisor exists in every
+Department" — generates seven positions and seven edges. They render greyed out, and they
+regenerate when the unit tree changes. Roughly ten declared answers produce two hundred
+stored rows, and that ratio is why setup takes minutes rather than days.
+
+### 2.2 `edges`
+
+```sql
+CREATE TYPE edge_type AS ENUM ('reports', 'contains', 'member', 'delegates');
+
+CREATE TABLE edges (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  dimension   TEXT NOT NULL DEFAULT 'primary',   -- 'academic', 'reporting', 'project', …
+  type        edge_type NOT NULL,
+  parent_id   UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  child_id    UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+
+  is_primary  BOOLEAN NOT NULL DEFAULT false,    -- for a person's main position
+  valid_from  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_to    TIMESTAMPTZ,                       -- NULL = open ended
+  derived     BOOLEAN NOT NULL DEFAULT false,
+  meta        JSONB NOT NULL DEFAULT '{}',       -- delegation recurrence lives here
+
+  UNIQUE (org_id, dimension, type, parent_id, child_id)
+);
+```
+
+What each edge type expresses:
+
+| Type | Parent → Child | Meaning |
+|---|---|---|
+| `contains` | unit → unit | The structure tree |
+| `reports` | position → position | A reporting line, within one dimension |
+| `member` | person → position | **An assignment.** Person holds this role at this unit |
+| `member` | person → group | Committee / team membership |
+| `delegates` | position → position | Stand-in, with a mandatory validity window |
+
+**There is never one global tree.** Each dimension is its own tree (`customization.md` §4).
+Within one dimension a node has exactly one parent; across dimensions it may have many. This
+is what lets a head of department report to the dean academically and the registrar
+administratively without a special case.
+
+**"Dean who is also a Professor" is two `member` edges from one person node.** No
+duplication, no workaround. The entire multi-hat problem dissolves here, and every later
+feature — committees, delegation, multi-project crews — is a variation on the same idea.
+
+### 2.3 `grants`
+
+```sql
+CREATE TYPE grant_scope  AS ENUM ('self', 'own_unit', 'subtree', 'all');
+CREATE TYPE grant_effect AS ENUM ('allow', 'deny');
+
+CREATE TABLE grants (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  subject_id   UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  capability   TEXT NOT NULL,       -- from the catalogue, 11-PERMISSION-ENGINE §3
+  scope        grant_scope  NOT NULL DEFAULT 'own_unit',
+  effect       grant_effect NOT NULL DEFAULT 'allow',
+  params       JSONB NOT NULL DEFAULT '{}',   -- { "maxAmount": 25000 }, { "maxDays": 3 }
+  valid_from   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_to     TIMESTAMPTZ,
+  derived      BOOLEAN NOT NULL DEFAULT false,
+  created_by   UUID REFERENCES users(id),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (org_id, subject_id, capability, scope, effect)
+);
+```
+
+`subject_id` points at a **role**, **position**, **group**, or **person** node. Role grants
+are the common case and are what the powers grid edits (`33-PAGE-roles-and-powers-grid.md`);
+person grants are per-individual overrides and should be rare.
+
+`params` is what lets one capability have different strength at different levels — a
+supervisor approving up to ₹5,000 and a department head up to ₹25,000 — instead of inventing
+five artificial roles to encode limits (`customization.md` §5).
+
+Resolution semantics, including deny-beats-allow (INV-004) and narrower-scope-wins, are
+specified in `11-PERMISSION-ENGINE.md` §4. They are **not** re-stated here; the schema only
+stores.
+
+### 2.4 The level rule, demoted to a seed
+
+`BUILD_PLAN_EVAL1.md` §2 makes "a user sees data below their role level, within their unit's
+subtree" *the* enforcement mechanism. Here it is only a **derived default** (CONF-002): at
+org creation the preset writes `derived: true` grants that reproduce exactly that behaviour,
+and the administrator can then edit them.
+
+This matters for the viva. The level rule is a good default and a bad ceiling — it cannot
+express a student on a committee who can book a hall, or a vendor who must never see
+footage. The GRANT layer can, and it still produces the level rule for free on day one.
+
+---
+
+## 3. Tenancy and identity
+
+```sql
+CREATE TABLE organizations (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  slug        TEXT NOT NULL UNIQUE,
+  industry    TEXT NOT NULL,             -- university | hotel | hospital | company | custom
+  labels      JSONB NOT NULL,            -- the vocabulary system. see 22.
+  settings    JSONB NOT NULL DEFAULT '{}',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE users (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id         UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  email          CITEXT NOT NULL,
+  password_hash  TEXT,                   -- NULL for invited-not-yet-activated
+  name           TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'active',  -- active | invited | disabled
+  last_login_at  TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (org_id, email)
+);
+```
+
+`organizations.labels` is the vocabulary system and the visible product claim. Shape:
+
+```json
+{
+  "unit":       { "one": "Department",     "many": "Departments" },
+  "subject":    { "one": "Course",         "many": "Courses" },
+  "respondent": { "one": "Student",        "many": "Students" },
+  "reviewee":   { "one": "Faculty",        "many": "Faculty" },
+  "campaign":   { "one": "Feedback cycle", "many": "Feedback cycles" }
+}
+```
+
+Every user-facing domain noun in the UI reads from here (INV-001, `22-VOCABULARY-SYSTEM.md`).
+
+**`users` are staff. Respondents are not users** (DEC-009). This is not only a privacy
+decision — it is also why billing can count seats honestly (`16`): a college with 4,000
+students has perhaps 200 `users` rows.
+
+---
+
+## 4. The feedback domain
+
+### 4.1 `subjects` — the thing being reviewed
+
+```sql
+CREATE TABLE subjects (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id         UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  unit_id        UUID REFERENCES nodes(id) ON DELETE SET NULL,
+  name           TEXT NOT NULL,
+  type           TEXT NOT NULL DEFAULT 'general',
+  linked_user_id UUID REFERENCES users(id) ON DELETE SET NULL,  -- set when the subject IS a person
+  meta           JSONB NOT NULL DEFAULT '{}',
+  archived_at    TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The single biggest unlock in the model. A course, a restaurant, a room, a ward, a trainer, an
+event, a bus route. `linked_user_id` is what turns "review the thing" into "review the
+person" without two code paths — and it is also the billing meter (`16`).
+
+### 4.2 `templates` and `questions`
+
+```sql
+CREATE TYPE question_kind AS ENUM ('rating','single','multi','text','yesno','nps');
+
+CREATE TABLE templates (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id            UUID REFERENCES organizations(id) ON DELETE CASCADE,  -- NULL = library
+  name              TEXT NOT NULL,
+  category          TEXT NOT NULL,
+  industry          TEXT,
+  description       TEXT,
+  cloned_from_id    UUID REFERENCES templates(id) ON DELETE SET NULL,
+  estimated_seconds INT NOT NULL DEFAULT 0,     -- DERIVED from questions, never entered
+  published_at      TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE questions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+  kind        question_kind NOT NULL,
+  text        TEXT NOT NULL,
+  config      JSONB NOT NULL DEFAULT '{}',   -- scale bounds, anchors, options, multiline
+  required    BOOLEAN NOT NULL DEFAULT false,
+  position    INT NOT NULL,
+  UNIQUE (template_id, position) DEFERRABLE INITIALLY DEFERRED
+);
+```
+
+`org_id IS NULL` means library template. Cloning copies the template and its questions into
+the org and records `cloned_from_id`.
+
+**Six kinds, frozen** (DEC-010). `config` shapes per kind are specified in
+`14-DTO-AND-VALIDATION.md` §4 as discriminated Zod unions, which is what stops `config` from
+becoming an untyped bag.
+
+**A poll is a one-question template.** There is no poll entity, ever. Build the form engine
+once and polling comes free.
+
+`position` is deferrable-unique so a reorder can be written as one `UPDATE` statement inside
+a transaction rather than a shuffle through a temporary value.
+
+### 4.3 `campaigns`
+
+```sql
+CREATE TYPE campaign_status AS ENUM ('draft','scheduled','open','closed');
+
+CREATE TABLE campaigns (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  template_id   UUID NOT NULL REFERENCES templates(id),
+  name          TEXT NOT NULL,
+  status        campaign_status NOT NULL DEFAULT 'draft',
+  audience_rule JSONB NOT NULL DEFAULT '{}',   -- { unitId, includeSubtree, roleIds[] }
+  starts_at     TIMESTAMPTZ,
+  ends_at       TIMESTAMPTZ,
+  anonymous     BOOLEAN NOT NULL DEFAULT true,
+  public_token  TEXT UNIQUE,                   -- the /r/:token link. NULL until launched.
+  created_by    UUID REFERENCES users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE campaign_subjects (
+  campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  subject_id  UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  PRIMARY KEY (campaign_id, subject_id)
+);
+```
+
+`anonymous` is **immutable once `status` leaves `draft`.** Enforced by a trigger, not only in
+the service layer. Respondents were promised anonymity at submission time; letting an admin
+flip it afterwards would retroactively break that promise (INV-006, `52`).
+
+### 4.4 `responses` and `answers`
+
+```sql
+CREATE TABLE responses (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id   UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  subject_id    UUID REFERENCES subjects(id) ON DELETE SET NULL,
+  submitted_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  channel       TEXT NOT NULL DEFAULT 'link',   -- link | qr | kiosk | api
+  duration_ms   INT,
+  meta          JSONB NOT NULL DEFAULT '{}'     -- NEVER identity. see below.
+);
+
+CREATE TABLE answers (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  response_id   UUID NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
+  question_id   UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  value         JSONB NOT NULL,      -- typed by question kind
+  numeric_value NUMERIC,             -- denormalised for rating/nps aggregation
+  UNIQUE (response_id, question_id)
+);
+```
+
+**There is no respondent column on `responses`, and there will never be one** (INV-006). Not
+a user id, not a hashed email, not an IP. The table cannot identify a respondent because it
+has nothing to identify them with — anonymity is a property of the schema, not a setting the
+application respects.
+
+Duplicate submission is prevented without breaking that, via a separate table:
+
+```sql
+CREATE TABLE invitations (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id  UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  token        TEXT NOT NULL UNIQUE,
+  used_at      TIMESTAMPTZ,
+  meta         JSONB NOT NULL DEFAULT '{}'
+);
+```
+
+`invitations` records **that** a token was used. `responses` records **what** was said.
+Nothing joins them. So the system can say "312 of 400 invited people responded" and still
+cannot say which response is whose. This separation is the whole privacy architecture and is
+worth stating explicitly under questioning.
+
+`numeric_value` exists because every results query aggregates rating and NPS answers, and
+`(value->>'n')::numeric` on every row is the difference between a fast page and a slow one.
+It is written by the service layer alongside `value`, never independently.
+
+---
+
+## 5. Cross-cutting tables
+
+```sql
+CREATE TABLE audit_log (
+  id            BIGSERIAL PRIMARY KEY,
+  org_id        UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  actor_user_id UUID REFERENCES users(id),
+  action        TEXT NOT NULL,          -- the capability string
+  target_type   TEXT,
+  target_id     UUID,
+  decided_by    JSONB,                  -- WHICH GRANT decided it. INV-007.
+  request_id    TEXT,
+  ip            INET,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE api_keys (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  key_hash     TEXT NOT NULL UNIQUE,    -- the key itself is shown once, never stored
+  prefix       TEXT NOT NULL,           -- first 8 chars, for display
+  scopes       TEXT[] NOT NULL DEFAULT '{}',
+  last_used_at TIMESTAMPTZ,
+  revoked_at   TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE subscriptions (
+  org_id       UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+  tier         TEXT NOT NULL DEFAULT 'bronze',   -- bronze|silver|gold|enterprise
+  seats        INT  NOT NULL DEFAULT 0,          -- reviewees + staff. never respondents.
+  period_start DATE NOT NULL,
+  period_end   DATE NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'trialing'
+);
+```
+
+`audit_log.decided_by` stores the decision trace from the resolver. It is what turns "access
+denied" from an assertion into evidence, and it is what the simulator replays (`42`).
+
+---
+
+## 6. Recursive queries — the raw-SQL seam
+
+Prisma cannot express recursive CTEs. These live in **`apps/api/src/db/graph.ts`, the only
+file in the app permitted to use `$queryRaw`** (DEC-007). Each is wrapped in a typed function
+so callers never see SQL.
+
+```ts
+// apps/api/src/db/graph.ts
+export async function unitSubtree(orgId: string, rootId: string): Promise<string[]>
+export async function unitAncestors(orgId: string, unitId: string): Promise<string[]>
+export async function positionsInSubtree(orgId: string, rootId: string): Promise<Position[]>
+export async function wouldCreateCycle(orgId: string, dimension: string,
+                                       parentId: string, childId: string): Promise<boolean>
+```
+
+The subtree query, which is the one everything else depends on:
+
+```sql
+WITH RECURSIVE subtree AS (
+  SELECT n.id, 0 AS depth
+    FROM nodes n
+   WHERE n.id = $2 AND n.org_id = $1 AND n.kind = 'unit'
+  UNION ALL
+  SELECT c.id, s.depth + 1
+    FROM subtree s
+    JOIN edges e ON e.parent_id = s.id
+                AND e.type = 'contains'
+                AND e.org_id = $1
+                AND (e.valid_to IS NULL OR e.valid_to > now())
+    JOIN nodes c ON c.id = e.child_id
+   WHERE s.depth < 32                  -- hard depth guard, see below
+)
+SELECT id FROM subtree;
+```
+
+Two guards that are not optional:
+
+- **`depth < 32`.** Cycle prevention is enforced on write (`wouldCreateCycle`), but a
+  recursive query with no depth bound turns a data bug into a hung connection. Belt and
+  braces.
+- **`org_id = $1` on every join.** Tenant isolation must hold inside the CTE too (INV-010);
+  a recursive query that escapes its tenant is the worst possible bug in a multi-tenant app.
+
+**If this file grows past ~8 functions, revisit the ORM choice** (DEC-007, REVISIT
+2026-10-01). A large raw-SQL surface is the signal that Prisma is the wrong fit and Drizzle
+would have been better.
+
+---
+
+## 7. Indexes
+
+Written from the actual query patterns, not speculatively.
+
+```sql
+-- tenant scoping: every table that has org_id
+CREATE INDEX ON nodes      (org_id, kind);
+CREATE INDEX ON edges      (org_id, dimension, type);
+CREATE INDEX ON grants     (org_id, capability);
+
+-- graph traversal, both directions
+CREATE INDEX ON edges (parent_id, type) WHERE valid_to IS NULL;
+CREATE INDEX ON edges (child_id,  type) WHERE valid_to IS NULL;
+
+-- the resolver's hot path: grants for a set of subject nodes
+CREATE INDEX ON grants (subject_id, capability) WHERE valid_to IS NULL;
+
+-- positions by unit — INV-005 asks this on every capability check
+CREATE INDEX ON nodes (unit_id) WHERE kind = 'position';
+
+-- results aggregation
+CREATE INDEX ON responses (campaign_id, submitted_at DESC);
+CREATE INDEX ON answers   (question_id) INCLUDE (numeric_value);
+
+-- the respondent link. single most latency-visible lookup in the demo.
+CREATE UNIQUE INDEX ON campaigns (public_token) WHERE public_token IS NOT NULL;
+
+-- audit, read by time within a tenant
+CREATE INDEX ON audit_log (org_id, created_at DESC);
+
+-- jsonb search: campaign audience rules, node meta
+CREATE INDEX ON campaigns USING GIN (audience_rule);
+CREATE INDEX ON nodes     USING GIN (meta);
+```
+
+The partial indexes on `valid_to IS NULL` matter: almost every read wants currently-valid
+rows only, and expired rows accumulate forever because history is retained for audit.
+
+---
+
+## 8. Tenant isolation
+
+`org_id` is **injected by `tenantResolver` middleware and never read from a request body**
+(INV-010, `12-MIDDLEWARE-STACK.md` §4). A body-supplied `orgId` is an attack, not an input.
+
+Two layers of defence:
+
+1. **Application** — every Prisma call goes through a per-request client wrapper that injects
+   `where: { orgId }`. Services never construct a bare `prisma.x.findMany()`.
+2. **Database** — Postgres row-level security policies on the tenant tables, with the session
+   variable set at connection checkout. This is deliberately redundant with layer 1. If the
+   application ever forgets, the database still refuses.
+
+RLS is a **P1 stretch** — layer 1 is required for M0, layer 2 lands before P1 closes. It is
+worth doing, and it is a strong answer to "how do you know tenants cannot see each other?"
+
+---
+
+## 9. Versioning and history
+
+Organisations change, and audit requires the past to survive.
+
+- **Assignments carry date ranges** (`edges.valid_from` / `valid_to`). A wrapped project or a
+  departed staff member remains in history while their access is already gone.
+- **Temporary units cascade end dates.** A unit marked `is_temporary` gives every child an
+  `ends_at`; when the date passes every position inside expires automatically. Nobody has to
+  remember to revoke anything (`customization.md` §9 screen 2).
+- **Nothing structural is hard-deleted while it has responses attached.** Templates,
+  campaigns and subjects are archived, not dropped.
+- **Grants are never edited in place when they were `derived`.** Editing a derived grant
+  clears its `derived` flag, which stops the next regeneration from silently reverting the
+  administrator's change. This is the schema half of the round-trip rule
+  (`customization.md` §7).
+
+---
+
+## 10. Validation enforced at the data layer
+
+These belong in the database because the UI is not the only writer — seeds, the API and
+imports all write too (`customization.md` §6).
+
+| Rule | Where |
+|---|---|
+| Cycle detection per dimension | `wouldCreateCycle()` before any `contains`/`reports` insert |
+| One level per role | `CHECK` + the `node_level_only_on_role` constraint |
+| Single parent per dimension | Unique index on `(org_id, dimension, type, child_id)` for `contains`/`reports` |
+| Campaign anonymity immutable after draft | Trigger on `campaigns` |
+| Answer type matches question kind | Service layer, via the discriminated DTO union (`14` §4) |
+| Response only while campaign is `open` | Service layer + `CHECK` on the write path |
+
+Softer checks — orphan capability, duplicate role, self-approval loop, vacancy, expiry — are
+**warnings surfaced in the UI**, not constraints. They are judgement calls, and blocking a
+save on a judgement call is how administrators learn to fight the tool. Self-approval loop
+detection is the highest-value of these (`customization.md` §6) and is specified in
+`33-PAGE-roles-and-powers-grid.md`.
+
+---
+
+## 11. Acceptance
+
+- [ ] `prisma migrate dev` runs clean from an empty database
+- [ ] Seed produces four orgs across industries, each with historical responses (`50`)
+- [ ] `unitSubtree` returns correct ids for a 4-level tree and terminates on a cycle
+- [ ] A cross-tenant read is impossible: attempting one with a forged `orgId` in a body has
+      no effect, because the body value is never consulted
+- [ ] `responses` has no column referencing a person, verified by inspecting the schema
+- [ ] A campaign's `anonymous` flag cannot be changed after launch — trigger test
+- [ ] Deleting a unit with children is either refused or reparents them, and the
+      confirmation states the real number affected
+- [ ] `grep -rn '\$queryRaw' apps/api/src` returns hits only in `db/graph.ts`
+
+## 12. Out of scope
+
+| Not modelling | Why |
+|---|---|
+| Attendance, marks, payroll, timetables | Not an HR or LMS system (`01` §10) |
+| Semester / academic year | Education-specific. Campaigns carry their own date windows |
+| Threaded discussion, posts, messages | Communities are P3 stretch; modelling them now is thrown-away work |
+| Per-question conditional logic | Contradicts the short-forms constraint (DEC-010) |
+| Soft-delete on every table | Only where history is genuinely required — §9. Universal soft-delete makes every query wrong by default |
