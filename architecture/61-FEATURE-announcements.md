@@ -39,10 +39,10 @@ work. That relationship should shape its design when it is written.
   is what "self-maintaining" means, and it is the whole feature
 - Broadcast permission derived from the hierarchy, expressed as capabilities in `11` §3
 - Read state per recipient, without breaking anonymity guarantees elsewhere
-- Delivery channels, which are `49`'s problem, not this one's
+- Delivery channels, which are `63`'s problem, not this one's
 
 ## Write this when
 
-- [ ] After communities (`46`), since a community is the most natural audience for a broadcast
+- [ ] After communities (`60`), since a community is the most natural audience for a broadcast
 - [ ] Only if P3 has room after Redux, analysis and the improve loop — it is a **stretch**,
       and the three graded phases come first

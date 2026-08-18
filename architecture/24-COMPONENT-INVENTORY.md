@@ -3,7 +3,7 @@
 Phase: P2 · Milestone: M0 · Owns: `apps/web/src/components/**`
 Design ref: `design_specs/design/09-COMPONENTS-AND-PATTERNS.md` — **authoritative for anatomy**
 
-Twenty components. **A page doc may not invent a component** — if a screen needs something
+Twenty-one components. **A page doc may not invent a component** — if a screen needs something
 not listed here, that is a design decision and it gets added here first
 (`design_specs/design/09` preamble).
 
@@ -204,6 +204,20 @@ The QR renders locally on canvas — no external image service, which would fail
 the network does. `url` comes from `PUBLIC_BASE_URL`; if it says `localhost` the code does not
 scan from a phone (OPEN-002).
 
+### `<FileUpload>`
+```ts
+{ current: string | null;
+  onUpload: (file: File) => Promise<void>;
+  onRemove: () => Promise<void>;
+  shape: 'circle' | 'square';        // avatar | logo
+  maxBytes?: number; disabled?: boolean }
+```
+Org logo and user avatar. Full spec, including the validation rules that make an upload
+endpoint safe, in `48-FEATURE-file-upload.md`.
+
+A real `<input type="file">` underneath — the drop zone is an enhancement, never the only
+path, or the control is unusable by keyboard.
+
 ### `<EmptyState>`
 ```ts
 { icon: IconName; title: string; body: string; action?: ReactNode }
@@ -251,7 +265,7 @@ may see, and the UI trusts it.
 | Track | Builds |
 |---|---|
 | **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, RoleRow, PersonChip, PowersGrid, ResponsiveTable |
-| **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip |
+| **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip, FileUpload |
 | **Shared** | EmptyState, Toast, ConfirmDialog — whoever needs one first, then announced |
 
 Track B ships AppShell and PageHeader before starting the wizard, or track C is blocked or
@@ -259,7 +273,7 @@ builds a second shell.
 
 ## 9. Acceptance
 
-- [ ] Twenty components exist with the documented prop types
+- [ ] Twenty-one components exist with the documented prop types
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
 - [ ] `<QuestionInput>` is shared by the preview and the live respondent form (INV-008)

@@ -29,6 +29,7 @@ Sections the caller cannot read are **absent**, not greyed (INV-003).
 | Action | Endpoint | DTO |
 |---|---|---|
 | Load | `GET /api/v1/org` | → `OrgDetail` |
+| Logo | `POST`/`DELETE` `/api/v1/org/logo` | multipart (`48`) |
 | Profile | `PATCH /api/v1/org` | `UpdateOrgBody { name?, industry? }` |
 | Vocabulary | `PATCH /api/v1/org/labels` | `UpdateLabelsBody { labels: LabelSet }` |
 | Billing | `GET /api/v1/billing`, `GET /api/v1/billing/usage` | → tier, seats, breakdown |
@@ -45,11 +46,12 @@ point.
 
 ## Components
 
-`<PageHeader>` · `<ConfirmDialog>` · `<Toast>` · the live-preview pattern (`24` §7).
+`<PageHeader>` · `<ConfirmDialog>` · `<Toast>` · `<FileUpload>` (`48`) · the live-preview
+pattern (`24` §7).
 
 ## Interactions
 
-**Profile.** Org name and industry. Changing industry does **not** re-seed roles, units or
+**Profile.** Org name, org logo (`<FileUpload>`, spec in `48`), and industry. Changing industry does **not** re-seed roles, units or
 labels — it only affects which templates are suggested. Re-seeding would destroy a configured
 organisation, and the copy says so: *"This only changes which templates we suggest."*
 
@@ -84,6 +86,7 @@ courses, 6 feedback cycles and 3,204 responses."*
 ## Acceptance
 
 - [ ] `#words` from the vocabulary chips lands on the right card
+- [ ] Logo upload follows every validation rule in `48`, including server-side re-encode
 - [ ] Saving labels updates every open screen without a reload
 - [ ] Label validation rejects blanks and over-length values with an inline message
 - [ ] The plural override persists for "Staff / Staff"

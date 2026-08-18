@@ -42,7 +42,7 @@ namespaces, so `import { CreateCampaignBody }` gives you whichever you need at t
 ```
 packages/shared/src/dto/
   common.ts       Id, Cursor, Pagination, LabelSet, primitives reused everywhere
-  auth.ts         Register, Login, Refresh, Me
+  auth.ts         Register, Login, Me            (no Refresh — DEC-014)
   org.ts          UpdateOrg, UpdateLabels, SetupOrg
   unit.ts         CreateUnit, UpdateUnit, Reparent
   role.ts         CreateRole, ReorderRoles
@@ -53,6 +53,9 @@ packages/shared/src/dto/
   campaign.ts     CreateCampaign, LaunchCampaign, AudienceRule
   response.ts     SubmitResponse, AnswerValue                   ← §4
   results.ts      ResultsView, QuestionSummary
+  home.ts         HomeView                                   (46)
+  profile.ts      ProfileView, UpdateProfile, ChangePassword  (47)
+  upload.ts       UploadResult                                (48)
   authz.ts        SimulateRequest, Decision
   index.ts
 ```
@@ -154,7 +157,7 @@ const Env = z.object({
   NODE_ENV:        z.enum(['development', 'test', 'production']),
   PORT:            z.coerce.number().default(4000),
   DATABASE_URL:    z.string().url(),
-  JWT_SECRET:      z.string().min(32),
+  SESSION_SECRET:  z.string().min(32),
   PUBLIC_BASE_URL: z.string().url(),
   K_ANON_THRESHOLD: z.coerce.number().int().min(1).default(5),
 });
@@ -162,7 +165,7 @@ const Env = z.object({
 export const config = Env.parse(process.env);   // throws at boot, not at 3am
 ```
 
-A missing `JWT_SECRET` should kill the process on startup, not surface as a confusing 500
+A missing `SESSION_SECRET` should kill the process on startup, not surface as a confusing 500
 during the demo.
 
 ## 6. Error mapping

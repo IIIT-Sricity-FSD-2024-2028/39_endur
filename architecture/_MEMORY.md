@@ -50,8 +50,10 @@ DEC-004  ACTIVE  2026-08-16  origin:U
   note     dates are estimates; the PHASE ORDER is the fixed part.
   see      02-PHASES-AND-EVALUATION.md
 
-DEC-005  ACTIVE  2026-08-16  origin:U
+DEC-005  AMENDED-BY:DEC-015  2026-08-16  origin:U
   M0 = 2026-08-26 is a live graded checkpoint (demo 27 Aug).
+  AMENDED 2026-08-18: the "React for M0 is deliberately thin" clause below is SUPERSEDED by
+  DEC-015. the SPA is built in full. everything else in this entry still stands.
   tension  M0 needs React screens, but React is P2. ACCEPTED AND EXPLICIT:
            M0 is a VERTICAL SLICE. the React built for it is deliberately thin and is
            re-deepened in P2. do not treat M0 React as finished work.
@@ -106,6 +108,41 @@ DEC-012  ACTIVE  2026-08-16  origin:A
   driver   design_specs/design/01-DESIGN-SYSTEM.md is the single source; duplication is
            guaranteed drift.
   verify   DRIFT-003
+
+DEC-013  ACTIVE  2026-08-18  origin:U
+  React SPA ONLY. no EJS, no MPA, no islands, no second frontend.
+  context  the react course (already started) expects students to bring an EXISTING
+           multi-page app and convert it to a SPA in class. we will have nothing to convert.
+  offered  EJS MPA in P1 -> convert in P2. then: islands (EJS shell + react components
+           growing into a SPA, matching the teacher's own "React Components => React SPA").
+  decided  user rejected both. SPA only, built in full for M0.
+  status   the tension is ACCEPTED KNOWINGLY. do not re-litigate. do not "helpfully" add an
+           EJS baseline later.
+  mitigat  54-COURSE-DELIVERABLE.md - the teacher's checklist mapped to our routes, plus a
+           per-page MPA-vs-SPA contrast. one doc, not a second frontend.
+  see      CONF-009
+
+DEC-014  ACTIVE  2026-08-18  origin:U
+  cookie sessions for STAFF auth. replaces JWT access+refresh.
+  impl     express-session + connect-pg-simple. httpOnly Secure SameSite=Lax, rolling.
+  why      same-origin SPA. no silent-refresh dance, no in-memory token, closes the whole
+           XSS token-theft class. and it makes CSRF real -> a genuine extra link in the P1
+           middleware chain instead of a line in its out-of-scope table.
+  unchang  respondent opaque tokens (DEC-009) · API-key JWT (45) · argon2id · uniform login
+           failure · per-IP+email rate limit
+  KEEP     permissions resolved PER REQUEST from grants, never from a session claim.
+           this property survives the auth change and is the reason it was safe to make.
+  supersed 15 §2 token table · 20 §5 · 13 auth routes · 30 data contract
+  consequ  + csrfProtection middleware (12) · session fixation regenerate-on-login
+           - /auth/refresh endpoint deleted
+
+DEC-015  ACTIVE  2026-08-18  origin:U  AMENDS:DEC-005
+  the React SPA is built IN FULL for M0 (2026-08-26). not a thin slice.
+  supersed DEC-005's "the React built for M0 is deliberately thin and is re-deepened in P2".
+  note     M0 is still a vertical slice in the sense that it cuts all layers; what changed is
+           that the React is not deliberately provisional. P2 deepens, it does not rebuild.
+  risk     10 days. the M0 cut-list in 02 §2 is now load-bearing, not advisory.
+
 ```
 
 ---
@@ -204,6 +241,23 @@ CONF-008  customization.md §14 says "build the board (Tier 2) before the wizard
   the Tier-2 board itself is P3.
 ```
 
+CONF-009  react course vs our stack. teacher's pre-preparation message (2026-08-18) requires
+  an EXISTING MULTI-PAGE APP to convert to a SPA in class; course objective is literally that
+  conversion. our architecture builds a SPA directly -> nothing to convert.
+  RESOLVED -> SPA only. see DEC-013. user decided after being offered an EJS MPA and an
+  islands path, both declined.
+  WHY NOT A PROBLEM (user, 2026-08-18):
+    1. the project is being rebuilt FROM SCRATCH. there is no pre-existing app of any kind to
+       bring, MPA or otherwise. the course accepts a from-scratch project.
+    2. react/SPA are not graded until P2. building them in P1 is work done EARLY, not work
+       done out of order.
+    -> the conversion is a teaching device we skip, not a deliverable we miss.
+  RESIDUAL  low. every other teacher requirement is met and met strongly (express backend,
+  working API+DB, page inventory, git). mention it to the teacher as a courtesy; it is not a
+  risk to manage. talking points in 54-COURSE-DELIVERABLE.md §1.
+  NOTE      an earlier draft framed this as urgent and time-sensitive. that was overweighted;
+  corrected here so the framing is not re-inherited.
+
 ---
 
 ## OPEN — unresolved
@@ -268,8 +322,19 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 25..29                           -> PLACEHOLDERS. 29 is unassigned. no paths owned.
 30..45 page docs                 -> apps/web/src/pages/<world>/<Page>/**
                                     + apps/api/src/features/<feature>/**
-46..49                           -> PLACEHOLDERS, P3 stretch. no paths owned.
+46-PAGE-home-dashboard.md        -> apps/web/src/pages/console/Home/**
+47-PAGE-profile.md               -> apps/web/src/pages/console/Profile/**
+48-FEATURE-file-upload.md        -> apps/api/src/features/uploads/**
+                                    apps/web/src/components/form/FileUpload*
+54-COURSE-DELIVERABLE.md         -> docs only. hand to the react teacher.
+55-BUILD-ORDER.md                -> docs only. the T-### task backlog. PLAN.
+/PROGRESS.md                     -> repo root. THE LIVE STATE. every session updates it.
+                                    board + session log + open decisions + debt.
+                                    stale PROGRESS is worse than none - sessions trust it.
+60..63                           -> PLACEHOLDERS, P3 stretch. no paths owned.
                                     these are the 4 disabled "Soon" sidebar items. CONF-006.
+                                    RENUMBERED from 46..49 on 2026-08-18 to free the page
+                                    block. do not renumber back.
 50-SEED-AND-DEMO.md              -> apps/api/prisma/seed/** apps/api/src/presets/**
 51-TESTING-STRATEGY.md           -> **/*.test.ts apps/api/test/** e2e/**
 52-SECURITY-AND-PRIVACY.md       -> cross-cutting; owns no path, constrains all
@@ -353,6 +418,43 @@ N-007  NAMING COLLISION, deliberate: capabilities are present-tense verbs (campa
        campaign.close); webhook events are past-tense (campaign.launched, campaign.closed,
        response.submitted). they share a namespace shape and are NOT the same list.
        never resolve a webhook event name against the capability catalogue. see 45.
+N-010  PRE-BUILD AUDIT 2026-08-18 found 7 buildability gaps the structural greps could not
+       see. pattern worth remembering: a DECISION CHANGE (DEC-014 auth) propagated to the
+       docs that DISCUSS it but not to the ones that IMPLEMENT it — schema, env, config
+       example, and the auto-loaded CLAUDE.md stack table.
+       WHEN A DEC CHANGES, GREP FOR THE OLD MECHANISM, NOT THE TOPIC.
+       also found: 11 §8 <-> 50 §1 grant matrix was a CIRCULAR reference, each pointing at
+       the other, neither holding the table. 50 §1 now holds it and is authoritative.
+       lesson: "specified in X" is only true if X actually contains it. check both ends.
+N-009  WORKING MODEL for multi-session builds, set 2026-08-18:
+       /PROGRESS.md          live state. read first, update last, same commit as the work.
+       55-BUILD-ORDER.md     the plan. T-### ids are permanent, never reused.
+       _MEMORY.md            decisions. PROGRESS records THAT one was made and links here.
+       three catalogues are authoritative and additions go in them BEFORE code:
+         capabilities -> 11 §3   components -> 24   endpoints -> 13
+       that rule is what kept 52 docs consistent across three revisions. an audit on
+       2026-08-18 found the ONE place it was skipped: docs 46/47/48 added endpoints without
+       registering them in 13. fixed. do not skip it again.
+N-011  LOCAL DEV DATABASE, 2026-08-18. 03 §5 specifies Postgres 16 via docker compose and
+       docker-compose.yml is committed and still correct. but the machine this was built on
+       has NO DOCKER, so postgres 16.14 is installed natively via
+       scripts/install-postgres.sh (same version, same endur/endur credentials, same
+       DATABASE_URL — nothing downstream can tell which one it is talking to).
+       WSL DOES NOT START SERVICES AT BOOT: `sudo service postgresql start` after a restart,
+       or every db command fails with a connection error that looks like a config problem
+       and is not.
+N-012  prisma.config.ts exists in apps/api and is NOT in any doc. two reasons it had to:
+       prisma reads .env from its OWN directory and ours lives once at the repo root, and
+       package.json#prisma is deprecated in prisma 7. it deliberately lets a REAL env var
+       win over the .env file, so `DATABASE_URL=... prisma migrate` against a scratch
+       database is not silently redirected at the main one.
+N-013  the init migration is prisma-generated PLUS ~90 lines of hand-written SQL appended
+       to the same file: CHECK constraints, partial indexes, INCLUDE and GIN indexes, the
+       DEFERRABLE unique on questions(template_id, position), and the anonymity trigger.
+       PRISMA CANNOT EXPRESS ANY OF THESE. if the schema is ever regenerated from
+       schema.prisma alone, all of it silently disappears and the app still runs — which is
+       exactly what makes it dangerous. 10 §11 has acceptance items for them; they were all
+       verified against a live database on 2026-08-18.
 N-008  DRIFT-003/004 must be implemented in scripts/audit-drift.mjs and NOT restated as
        literal grep patterns inside architecture/, or the check matches its own definition.
        this already bit once on 2026-08-16.

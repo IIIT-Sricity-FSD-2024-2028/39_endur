@@ -45,6 +45,72 @@ export type Preset = {
 | reviewee | Faculty | Staff member | Clinician | Manager | Reviewee |
 | campaign | Feedback cycle | Guest survey | Patient survey | Review cycle | Campaign |
 
+### The seeded grant matrix — authoritative
+
+`11` §8 gives the *rule*; this is the *table*, and it is what `GrantSeed[]` compiles to. Every
+preset uses the same matrix — only the role **names** differ, which is the whole point of the
+generic model.
+
+All grants are written `derived: true`. Editing one in the powers grid clears that flag so
+regeneration never silently reverts an administrator's change (`10` §9).
+
+| Capability | L1 | L2 | L3 | L4 |
+|---|---|---|---|---|
+| `org.read` | all | all | all | all |
+| `org.update` | all | — | — | — |
+| `org.delete` | all | — | — | — |
+| `unit.read` | subtree | subtree | own_unit | — |
+| `unit.create` `unit.update` | subtree | subtree | — | — |
+| `unit.delete` `unit.reparent` | subtree | — | — | — |
+| `role.read` | all | all | all | — |
+| `role.create` `role.update` `role.delete` | all | — | — | — |
+| `grant.read` | all | all | — | — |
+| `grant.update` | all | — | — | — |
+| `person.read` | subtree | subtree | own_unit | — |
+| `person.create` `person.update` | subtree | subtree | — | — |
+| `person.delete` `person.import` | subtree | — | — | — |
+| `assignment.create` `assignment.delete` | subtree | own_unit | — | — |
+| `group.*` `delegation.*` | subtree | — | — | — |
+| `subject.read` | subtree | subtree | own_unit | — |
+| `subject.create` `subject.update` `subject.archive` | subtree | subtree | — | — |
+| `template.read` `template.clone` | all | all | all | — |
+| `template.create` `template.update` | all | all | — | — |
+| `template.delete` | all | — | — | — |
+| `campaign.read` `campaign.create` `campaign.launch` `campaign.close` | subtree | subtree | own_unit | — |
+| `campaign.update` | subtree | subtree | own_unit | — |
+| `campaign.delete` | subtree | — | — | — |
+| `response.read` `results.read` | subtree | subtree | own_unit | — |
+| `response.export` `results.export` | subtree | subtree | — | — |
+| `simulator.run` | all | subtree | — | — |
+| `audit.read` | all | — | — | — |
+| `billing.read` `billing.update` | all | — | — | — |
+
+**Plus, for every role without exception:**
+
+```
+person.read    scope: self   allow
+person.update  scope: self   allow
+```
+
+Those two back `/app/profile` (`47`). A default-deny model silently produces an unopenable
+profile page if `self` is forgotten, so the seed must never omit them — and `11` §10 has an
+acceptance test for exactly this.
+
+Notes on three rows that look surprising:
+
+- **`template.*` is `all`, not `subtree`.** Templates are org-wide artefacts with no unit, so
+  a unit scope would mean nobody could read them. Scope is about the org graph; templates are
+  not in it.
+- **L3 gets `results.read own_unit`.** A reviewee seeing their own feedback is the product
+  working. In P3 the improve loop adds a gate on top — results stay locked until the
+  self-reflection is submitted (`44`) — but that is an additional check, not a different grant.
+- **L4 gets `org.read` and nothing else.** L4 is the respondent-level role. Respondents are
+  not `users` (DEC-009), so this row only matters for the rare case of someone at that level
+  who *does* hold an account.
+
+Presets ship **no deny grants**. A `deny` is a deliberate administrator act, and seeding one
+would teach the wrong lesson about a rule that is absolute (INV-004).
+
 **Custom is not blank.** Even the custom path seeds a working four-level structure — a blank
 start is the enemy, and someone who picks Custom and presses Continue four times must still
 end with a functioning organisation (`customization.md` §8).

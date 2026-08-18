@@ -3,6 +3,21 @@
 Feedback management and performance analysis platform. Multi-tenant, generic across
 organisation types. This file is auto-loaded; keep it short and stable.
 
+## Every session starts here
+
+1. **`PROGRESS.md`** (repo root) — the live state: current phase, what is done, what is next,
+   which decisions are outstanding. Read it before doing anything.
+2. **`architecture/_MEMORY.md`** — the decision ledger. Read before changing anything
+   architectural.
+3. Pick up the topmost unblocked task from `PROGRESS.md` § Board, read the spec doc it names,
+   and build that.
+
+**Before you finish a session, update `PROGRESS.md`** — the board, the session log, and any
+decision you made. The next session trusts it, so a stale one is worse than none.
+
+Work is tracked as stable task ids (`T-001`…) defined in `architecture/55-BUILD-ORDER.md`.
+Reference them in commits: `feat: T-010 grant resolver`.
+
 ## Before you change anything architectural
 
 Read **`architecture/_MEMORY.md`**. It is the decision ledger — every architectural
@@ -11,6 +26,10 @@ contradicts a `DEC-` entry, you must supersede it explicitly in that file, not s
 diverge.
 
 Then read **`architecture/README.md`** for the doc index and reading order.
+
+Three catalogues are authoritative and additions go in them **first**, before any code:
+capabilities in `11` §3, components in `24`, endpoints in `13`. That rule is what has kept
+52 docs consistent across three revisions.
 
 ## Stack
 
@@ -21,7 +40,7 @@ Then read **`architecture/README.md`** for the doc index and reading order.
 | Backend | **Express 5 + TypeScript** | Phase-1 evaluation grades the middleware chain |
 | Validation | Zod schemas as DTOs, in `packages/shared` | One source of truth across client and server |
 | Database | **PostgreSQL** + Prisma | Recursive CTEs for the org graph; JSONB for labels/params |
-| Auth | JWT (staff) · opaque tokens (respondents) | Respondents never hold accounts |
+| Auth | **Cookie sessions** (staff) · opaque tokens (respondents) | Respondents never hold accounts; CSRF is therefore a real middleware concern |
 
 Do not introduce NestJS, Mongo, GraphQL, or a component library. Each was considered and
 rejected; see `_MEMORY.md`.
@@ -68,5 +87,7 @@ DTO inside `design_specs/`. When the two disagree, `_MEMORY.md` records the reso
   file, check the `MAP` section of `_MEMORY.md` — it is the lock table for which doc owns
   which path.
 - Commit messages: `feat|fix|code|docs: <lowercase summary>`, matching existing history.
+  Include the task id where one applies, and cite the `DEC-` id when a commit changes an
+  architectural decision.
 - The old v1.0 codebase was deleted deliberately. Do not restore it from git history; it is
   education-shaped and fights the generic model.

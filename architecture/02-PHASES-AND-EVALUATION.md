@@ -1,6 +1,6 @@
 # 02 — Phases and evaluation
 
-Phase: all · Decisions: `_MEMORY.md` DEC-004, DEC-005
+Phase: all · Decisions: `_MEMORY.md` DEC-004, DEC-005, DEC-013, DEC-015
 
 ---
 
@@ -12,7 +12,7 @@ estimates and should be corrected here as the real evaluation dates land.
 | | Phase | Window | Graded artifact |
 |---|---|---|---|
 | **P1** | **MIDDLEWARE** | 16 Aug → ~20 Sep 2026 | The Express middleware chain — `12-MIDDLEWARE-STACK.md` |
-| **P2** | **REACT** | ~21 Sep → ~1 Nov 2026 | The console + respondent screens — docs `30`–`42` |
+| **P2** | **REACT** | ~21 Sep → ~1 Nov 2026 | The console + respondent screens — docs `30`–`42`, `46`–`47` |
 | **P3** | **REDUX** | ~2 Nov → ~13 Dec 2026 | The store, custom store middleware — `23-STATE-AND-REDUX.md` |
 
 Every doc carries a `Phase:` tag. **Do not build P3 work early**, and do not skip P1
@@ -26,12 +26,16 @@ marked first, and it is also what everything else sits on.
 
 ### The honest tension, stated once
 
-M0 needs React screens, but React is P2. This is accepted and explicit (DEC-005):
+M0 needs React screens, but React is P2. This is accepted and explicit (DEC-005, amended by
+DEC-015):
 
-> **M0 is a vertical slice, not a phase.** It cuts through middleware, API and React at
-> once. The React written for M0 is deliberately thin and gets re-deepened in P2. Do not
-> treat M0 screens as finished work, and do not let M0's time pressure set the quality bar
-> for P2.
+> **M0 is a vertical slice, not a phase.** It cuts through middleware, API and React at once,
+> and **the React is built in full** — not as a provisional sketch. P2 deepens it; P2 does not
+> rebuild it.
+
+The consequence of DEC-015 is that **the M0 cut-list in §2 below is load-bearing rather than
+advisory.** With ten days and no permission to ship a throwaway frontend, the only lever left
+is scope.
 
 ### What M0 must prove
 
@@ -51,8 +55,8 @@ Docs tagged `Milestone: M0`:
 
 | Layer | In M0 |
 |---|---|
-| Backend | Postgres + Prisma, migrations, JWT auth, org/unit/role/subject CRUD, template + campaign + response APIs, public token endpoint, **the middleware chain end to end** |
-| Frontend | Console shell, setup wizard (5 steps), form builder (6 types), campaign creation, share sheet + QR, respondent flow, results |
+| Backend | Postgres + Prisma, migrations, cookie-session auth (DEC-014), org/unit/role/subject CRUD, template + campaign + response APIs, public token endpoint, **the middleware chain end to end** |
+| Frontend | Console shell, org home, setup wizard (5 steps), form builder (6 types), campaign creation, share sheet + QR, respondent flow, results |
 | Data | Four seeded orgs across industries, **with historical responses** |
 
 ### M0 cut-list, in strict order
@@ -101,6 +105,7 @@ flow. Those four *are* the demo.
 ### Deliverables
 
 - [ ] The full ordered chain in `12-MIDDLEWARE-STACK.md`, every link implemented
+- [ ] `csrfProtection`, live because auth is cookie-based (DEC-014) — cookie principals only
 - [ ] `validate(Dto)` driving all input validation from shared Zod schemas (`14`)
 - [ ] `requireCapability()` backed by the GRANT resolver, returning a **decision trace** on
       403 (`11`)
@@ -128,12 +133,39 @@ flow. Those four *are* the demo.
 **What is graded:** component composition, state discipline, routing, and that the UI
 genuinely re-skins per organisation.
 
+### The course situation
+
+The React course's framing is converting an existing multi-page app into a SPA. **We build the
+SPA directly** (DEC-013, CONF-009), for two reasons that make this a non-issue rather than a
+gap:
+
+1. **We are building from scratch anyway** — that was the premise of the rebuild, and the
+   course accepts a from-scratch project. There is no pre-existing app of any kind to bring.
+2. **React and the SPA are not graded until this phase.** Building them during P1 is simply
+   work done early, not work done out of order. It costs nothing to be ahead.
+
+So the MPA-to-SPA conversion is a teaching device we skip, not a deliverable we miss. Building
+the interface once beats building an MPA and then converting it.
+
+An EJS baseline and an incremental-islands path were both considered and declined. **Do not
+re-open it, and do not "helpfully" add an EJS layer later.**
+
+Every other requirement on the teacher's list is met, and more strongly than most projects
+will manage — Express backend, working API and database, a complete page/feature inventory,
+git with backups. The teacher's own framing — *"you will learn React concepts while applying
+them directly to your own project"* — we satisfy fully, because we are building **during** the
+course rather than before it.
+
+`54-COURSE-DELIVERABLE.md` is the artefact to hand over. Worth mentioning to the teacher in
+passing that the project is already a SPA, but that is a courtesy, not a risk to manage.
+
 ### Deliverables
 
 - [ ] The three worlds and their shells (`20-FRONTEND-ARCHITECTURE.md`)
 - [ ] The component inventory, with real prop contracts (`24`)
 - [ ] `useLabels()` wired through every screen, verified by the nonsense audit (`22`)
-- [ ] All console pages, docs `30`–`42`
+- [ ] All console pages, docs `30`–`42`, plus `46` home, `47` profile, `48` file upload
+- [ ] `54-COURSE-DELIVERABLE.md` kept current as pages land
 - [ ] Responsive down to 390px; the respondent flow is phone-first
 - [ ] Empty, loading, error and 403 states everywhere (`design_specs/design/10`)
 

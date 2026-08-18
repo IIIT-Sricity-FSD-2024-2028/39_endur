@@ -1,0 +1,5 @@
+node_modules
+dist
+apps/api/storage
+apps/api/prisma/migrations
+design_specs

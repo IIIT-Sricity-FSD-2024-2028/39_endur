@@ -131,5 +131,5 @@ frustration.
 | Bulk edit of positions | Import covers bulk; a bulk position editor is a permission change at scale with no undo story |
 | Org-chart view of people | The tree holds units; people are the leaves. Person-centric visualisation is P3 (`customization.md` §10) |
 | Deactivation workflows / offboarding | `status` exists; a workflow around it is P3 |
-| Profile photos | Initials avatars only |
+| Bulk avatar upload | Single avatar upload is specified in `48`; a bulk path has no demand |
 | Direct password setting by an admin | Invite links only — an admin who sets passwords can impersonate |

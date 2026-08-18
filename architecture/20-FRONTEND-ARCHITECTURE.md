@@ -1,8 +1,8 @@
 # 20 — Frontend architecture
 
-Phase: P2 · Milestone: M0 (thin slice) · Owns: `apps/web/src/main.tsx`, `router/**`, `lib/api.ts`
+Phase: P2 · Milestone: **M0 (in full)** · Owns: `apps/web/src/main.tsx`, `router/**`, `lib/api.ts`
 Design ref: `design_specs/design/02-IA-AND-NAVIGATION.md`
-Decisions: `_MEMORY.md` DEC-003, DEC-005, DEC-008
+Decisions: `_MEMORY.md` DEC-003, DEC-013, DEC-014, DEC-015
 
 ---
 
@@ -14,7 +14,7 @@ fastest way to a muddled product.
 | World | Who | Auth | Shell |
 |---|---|---|---|
 | **Public** | Anyone | None | Marketing nav — brand, two links, one button |
-| **Console** | Staff | JWT session | Sidebar + top bar |
+| **Console** | Staff | Cookie session | Sidebar + top bar |
 | **Respond** | Anyone with a token link | **None, ever** | No chrome at all — just the form |
 
 The respondent world having no account and no navigation is both a simplification and the
@@ -53,6 +53,7 @@ CONSOLE  (/app, requires session)
   /app/campaigns/new         Create campaign, 3 steps         [M0]
   /app/campaigns/:id         Campaign detail + share + QR     [M0]
   /app/campaigns/:id/results Results                          [M0]
+  /app/profile               My account                       [P2]
   /app/simulator             Permission simulator             [P2]
   /app/settings              Org profile, vocabulary, danger  [P2]
 
@@ -93,7 +94,7 @@ apps/web/src/
     public/   Landing Login Start
     console/  Home Setup Structure Roles People Subjects Templates
               Builder Campaigns CampaignNew CampaignDetail Results
-              Simulator Settings
+              Profile Simulator Settings
     respond/  Fill Done States
   store/                 thin in P1-P2                            (23)
   lib/
@@ -117,9 +118,13 @@ export async function apiGet<T>(path: string, init?: RequestInit): Promise<T>;
 export async function apiPost<TIn, TOut>(path: string, body: TIn): Promise<TOut>;
 ```
 
-The wrapper handles: base URL, `Authorization`, `X-Request-Id`, JSON encode/decode, the
-silent-refresh-on-401 dance (`15` §6), and turning an error envelope into a typed
-`ApiError` carrying `code`, `message`, `details` and `requestId`.
+The wrapper handles: base URL, `credentials: 'include'` so the session cookie rides along,
+the `X-CSRF-Token` header on unsafe methods (`12` §4.8), `X-Request-Id`, JSON
+encode/decode, and turning an error envelope into a typed `ApiError` carrying `code`,
+`message`, `details` and `requestId`.
+
+There is **no token to manage and no refresh dance** (DEC-014) — a 401 simply means the
+session is gone, so route to `/login`.
 
 Types come from `@endur/shared` (DEC-003) — never re-declared locally. A DTO change breaks the
 client at compile time, which is the entire reason for the shared package.
@@ -133,13 +138,17 @@ the thing that is actually being graded.
 
 ## 5. Session
 
-`authSlice` holds `{ status, user, org, capabilities }`. The access token lives in a
-module-scoped variable in `lib/api.ts`, **not in the store and not in `localStorage`**
-(`15` §2) — putting it in the store risks it reaching devtools and any future persistence.
+`authSlice` holds `{ status, user, org, capabilities }`. **There is no credential in the
+client at all** — the session is an `httpOnly` cookie the browser manages (`15` §2), so there
+is nothing to store, nothing to leak to devtools, and nothing to persist by accident.
 
-Boot sequence: `/auth/refresh` → `/auth/me` → hydrate `authSlice` and `vocabularySlice` →
-render. Until that resolves, the console renders a full-page loading state rather than
-flashing a login screen at an already-signed-in user.
+Boot sequence: `GET /auth/me` → hydrate `authSlice` and `vocabularySlice` → render. One call.
+Until it resolves, the console renders a full-page loading state rather than flashing a login
+screen at an already-signed-in user.
+
+The CSRF token is a readable cookie (`endur.csrf`), read on demand by `lib/api.ts`. It is not
+a secret — it only has to be unguessable by another origin — so it does not belong in the
+store either.
 
 ## 6. Capability-aware UI
 
@@ -187,7 +196,8 @@ Modest and specific — this is an admin tool, not a landing page.
 - [ ] Three route trees with three layouts and three error boundaries
 - [ ] The respondent bundle contains no console code — verified by bundle analysis
 - [ ] A signed-in user reloading `/app/campaigns` never sees a login flash
-- [ ] A 401 triggers one silent refresh; a second ends the session cleanly
+- [ ] A 401 routes cleanly to `/login`; there is no token or refresh logic anywhere
+- [ ] No credential is readable from JavaScript
 - [ ] P3 routes render disabled with a "Soon" tag and no stub page behind them
 - [ ] Every page's server data flows through a `use*` hook, not a bare `fetch` in a component
 - [ ] No API response type is declared in `apps/web` — all come from `@endur/shared`

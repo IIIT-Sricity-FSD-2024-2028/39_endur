@@ -32,14 +32,14 @@ npm workspaces. No Turborepo, no Nx — one more tool to explain is not worth it
     api/                       Express + TypeScript
       prisma/
         schema.prisma
-        migrations/
+        migrations/          incl. a plain-SQL one for `sessions` (10 §5)
         seed/                  presets + demo orgs          (50-SEED-AND-DEMO)
       src/
         app.ts                 the middleware chain assembled (12)
         server.ts              bootstrap, graceful shutdown
         middleware/            one file per link in the chain (12)
         authz/                 the GRANT resolver             (11)
-        auth/                  jwt, tokens, api keys          (15)
+        auth/                  sessions, respondent tokens, api keys (15)
         billing/               entitlements, metering         (16)
         db/
           client.ts            prisma singleton
@@ -47,6 +47,8 @@ npm workspaces. No Turborepo, no Nx — one more tool to explain is not worth it
         features/<name>/       router + handlers + service, one folder per feature
         presets/               industry presets              (50)
         lib/                   logger, errors, ids, config
+      storage/                 uploaded binaries (48). gitignored.
+                               <orgId>/<fileId>.webp
       test/
 
     web/                       React + Vite + TypeScript
@@ -142,9 +144,11 @@ PORT=4000
 
 DATABASE_URL=postgresql://endur:endur@localhost:5432/endur
 
-JWT_SECRET=                 # >=32 chars. required.
-JWT_ACCESS_TTL=15m
-JWT_REFRESH_TTL=7d
+SESSION_SECRET=             # >=32 chars. required. DEC-014 — staff auth is a cookie session.
+SESSION_TTL_DAYS=7          # rolling: active use extends it
+COOKIE_SECURE=false         # true everywhere except local dev
+
+API_KEY_SECRET=             # >=32 chars. signs integration keys only (45, P3)
 
 PUBLIC_BASE_URL=http://localhost:5173   # what the QR code encodes — see OPEN-002
 API_BASE_URL=http://localhost:4000
@@ -156,13 +160,28 @@ K_ANON_THRESHOLD=5          # results hidden below this many responses (52)
 LOG_LEVEL=info
 ```
 
+There is deliberately **no JWT secret for staff** — that auth model was replaced (DEC-014).
+`API_KEY_SECRET` is the only remaining token secret and it is P3.
+
 `PUBLIC_BASE_URL` is the single most demo-critical variable. If it says `localhost`, the QR
 code does not scan from a phone (`_MEMORY.md` OPEN-002).
 
 ## 5. Database, locally
 
-Postgres 16 via Docker Compose. Committed at the root so nobody spends an afternoon on
-installation differences.
+**Postgres 16. Two ways to get one, and they produce an identical database** — same version,
+same `endur`/`endur` credentials, same `DATABASE_URL`. Nothing downstream can tell which one
+it is talking to.
+
+| | When |
+|---|---|
+| `scripts/install-postgres.sh` | Linux / WSL. **The path actually in use** (`_MEMORY.md` N-011) |
+| `docker compose up -d db` | Anyone who already has Docker. Kept because it is the only one-command path on macOS and Windows |
+
+Compose is **not** the primary path any more, and the file is kept for portability rather
+than preference. WSL does not start services at boot: `sudo service postgresql start` after
+a restart, or every db command fails with something that reads like a config error.
+
+CI uses neither — GitHub Actions provides its own Postgres service container (§8).
 
 ```yaml
 services:

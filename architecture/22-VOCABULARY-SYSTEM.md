@@ -105,7 +105,7 @@ is the first thing to re-render** — that is the ten-second proof
 (`design_specs/design/01` §1, `_MEMORY.md` N-003).
 
 Spend boldness there; everything else stays quiet. Anatomy and spacing are in
-`design_specs/design/02` §4 and `09` §2.2.
+`design_specs/design/02` §4 and `design_specs/design/09` §2.2.
 
 ## 5. The audit — how we prove it
 

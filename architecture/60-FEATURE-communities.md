@@ -20,7 +20,7 @@ This slot exists so the intent is recorded and so nobody re-derives it from scra
 
 Spaces where people raise issues, discuss them, and organise a response — a mess committee, a
 hostel group, a departmental forum. Each is run by **an elected representative**, elected using
-Endur's own voting feature (`48`). Members raise complaints; the representative escalates on
+Endur's own voting feature (`62`). Members raise complaints; the representative escalates on
 the group's behalf rather than leaving individuals to complain alone.
 
 ## Why the schema already anticipates it

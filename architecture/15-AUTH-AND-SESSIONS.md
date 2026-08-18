@@ -1,7 +1,7 @@
 # 15 — Auth and sessions
 
 Phase: P1 · Milestone: M0 · Owns: `apps/api/src/auth/**`
-Decisions: `_MEMORY.md` DEC-009 · Invariants: INV-006, INV-010
+Decisions: `_MEMORY.md` DEC-009, DEC-014 · Invariants: INV-006, INV-010
 
 ---
 
@@ -12,7 +12,7 @@ Decisions: `_MEMORY.md` DEC-009 · Invariants: INV-006, INV-010
 
 | Principal | Credential | Who | Phase |
 |---|---|---|---|
-| `user` | JWT bearer token | Staff of an organisation | P1 |
+| `user` | **Cookie session** | Staff of an organisation | P1 |
 | `respondent` | Opaque campaign token in the URL | Anyone with a link or a QR code | P1 |
 | `apiKey` | `X-API-Key` header | An integration | P3, Enterprise only |
 
@@ -25,20 +25,48 @@ whether the system knows which feedback was theirs.
 
 ## 2. Staff sessions
 
-### Tokens
+### The session
 
-| Token | TTL | Storage | Contents |
-|---|---|---|---|
-| Access | 15 min | Memory in the React app (never `localStorage`) | `sub`, `orgId`, `jti`, `iat`, `exp` |
-| Refresh | 7 days | `httpOnly` `Secure` `SameSite=Lax` cookie, path-scoped to `/api/v1/auth/refresh` | Opaque, hashed in the database |
+DEC-014. `express-session` with `connect-pg-simple`, so sessions live in the database we
+already run rather than in a second piece of infrastructure.
 
-Access tokens are deliberately short-lived and carry **no capability claims**. Permissions
-are resolved per request from the grant tables (`11`), never read from a token — because a
-permission revoked at 10:00 must stop working at 10:00, not fifteen minutes later.
+| | |
+|---|---|
+| Cookie | `endur.sid` — `httpOnly`, `Secure`, `SameSite=Lax`, `Path=/` |
+| Lifetime | 7 days, **rolling** — active use extends it, idleness expires it |
+| Contents | A session id and nothing else. No user data, no org, no capabilities |
+| Store | `sessions` table; revocable server-side by deleting the row |
 
-The access token in memory means a page refresh needs a silent refresh call. That is a small
-amount of frontend work in exchange for closing the whole class of XSS token-theft bugs that
-`localStorage` opens.
+Two properties carried over from the JWT design because they were the valuable parts, and
+neither depends on JWT:
+
+**No capability claims anywhere.** Permissions are resolved per request from the grant tables
+(`11`), never read from a credential — because a permission revoked at 10:00 must stop working
+at 10:00, not whenever a token happens to expire.
+
+**Nothing sensitive in the client.** The cookie is `httpOnly`, so no script can read it. This
+is strictly better than the previous in-memory access token: it closes the same XSS
+token-theft class *and* removes the silent-refresh dance on every page load.
+
+### Session hygiene
+
+- **Regenerate the session id on login.** Without this, an attacker who can set a cookie
+  before login owns the session after it — session fixation. One line, and it is the single
+  most commonly forgotten step in cookie auth.
+- **Destroy server-side on logout**, not just clear the cookie. A cleared cookie on a
+  still-valid session is not a logout.
+- Regenerate on privilege change — specifically when a user's own assignments change.
+- `Secure` is unconditional outside development; the demo tunnel is HTTPS (OPEN-002).
+
+### Why not JWT for staff
+
+Considered and rejected (DEC-014). JWT would mean an in-memory access token plus a refresh
+token plus a silent-refresh call on every boot — real frontend complexity — to solve a
+cross-origin problem we do not have, since the SPA and API are same-origin. JWT is retained
+where it earns its place: API keys for integrations (`45`).
+
+The cost of this choice is that **CSRF becomes real**, and that cost is paid explicitly in
+`12` §4.8 rather than waved away.
 
 ### Password handling
 
@@ -56,11 +84,12 @@ amount of frontend work in exchange for closing the whole class of XSS token-the
 well as per-IP, because a campus NAT means per-IP alone would either lock out a building or
 protect nobody.
 
-### Refresh rotation
+### Session revocation
 
-Each refresh issues a new refresh token and invalidates the old one. A reused old token means
-theft: the whole family is revoked and the event is audited. This is cheap and it is the only
-mechanism that detects a stolen refresh token at all.
+Because sessions are rows, revocation is a delete — immediate, with no window where an
+already-issued credential still works. That is the concrete advantage over stateless tokens
+and it is worth stating: an administrator disabling a user's account ends their session on the
+next request, not up to fifteen minutes later.
 
 ---
 
@@ -147,10 +176,10 @@ the first thing to add in P2 — it is the first support request any real deploy
 
 Specified fully in `20-FRONTEND-ARCHITECTURE.md` §5; the contract:
 
-- Access token in a module-scoped variable, in `authSlice` (`23`).
-- On boot, `/auth/refresh` then `/auth/me` — which returns the session, the org, **the
-  labels** (`22`), and the caller's capability set.
-- A 401 triggers one silent refresh; a second 401 ends the session and routes to `/login`.
+- **No token handling at all.** The cookie is `httpOnly`; the client never sees a credential.
+- On boot, one call: `GET /auth/me` — returns the session, the org, **the labels** (`22`), and
+  the caller's capability set. If it 401s, route to `/login`.
+- Every request sends `credentials: 'include'` and echoes the CSRF token (`12` §4.8).
 - The capability set hides actions the caller cannot perform. **Usability only** — the API
   still enforces (INV-003). The UI never decides authorisation, and a capability set that is
   wrong causes a confusing button, not a security hole.
@@ -161,13 +190,14 @@ Specified fully in `20-FRONTEND-ARCHITECTURE.md` §5; the contract:
 
 | Threat | Response |
 |---|---|
-| Token theft via XSS | Access token in memory, refresh in `httpOnly` cookie. No token in `localStorage` |
-| CSRF | Bearer header auth, not cookie auth, for everything except the refresh endpoint — which is `SameSite=Lax` and path-scoped. **Revisit the whole section if auth ever moves to cookies** (`12` §9) |
+| Credential theft via XSS | `httpOnly` cookie — no script can read it. Nothing in `localStorage`, nothing in the store |
+| **CSRF** | The real cost of cookie auth. Double-submit token on unsafe methods for cookie principals only, plus `SameSite=Lax`. Specified in `12` §4.8 |
+| Session fixation | Session id regenerated on login |
 | Credential stuffing | Per-IP+email rate limit, argon2id, uniform failure response |
 | Account enumeration | Identical response and timing for unknown email and wrong password |
 | Token guessing on `/r/:token` | 131 bits of entropy; uniform 404 for every failure mode |
-| Stolen refresh token | Rotation with reuse detection; family revocation, audited |
-| Cross-tenant access via a forged JWT `orgId` | Signature verified, and `orgId` is taken from the verified claim only — never from a body (INV-010) |
+| Stolen session cookie | Server-side revocation by deleting the row; immediate, no expiry window |
+| Cross-tenant access via a forged `orgId` | `orgId` comes from the server-side session record only — never from a body or a client-supplied claim (INV-010) |
 | Privilege escalation via self-granting | Allowed only if a rule permits it, audited loudly, and surfaced by the self-approval-loop warning (`33`) |
 
 ---
@@ -175,9 +205,12 @@ Specified fully in `20-FRONTEND-ARCHITECTURE.md` §5; the contract:
 ## 8. Acceptance
 
 - [ ] Login with a wrong email and a wrong password are indistinguishable in body and timing
-- [ ] An access token contains no capability claims
-- [ ] A revoked permission stops working on the **next request**, not after token expiry
-- [ ] Reusing a rotated refresh token revokes the family and writes an audit row
+- [ ] The session cookie is `httpOnly`, `Secure` and `SameSite=Lax`, and carries only an id
+- [ ] No credential is readable from JavaScript — verified in the browser console
+- [ ] A revoked permission stops working on the **next request**
+- [ ] The session id changes on login (fixation test)
+- [ ] Logout destroys the server-side row, and replaying the old cookie fails
+- [ ] A mutation without a CSRF token returns `403 CSRF_FAILED` (`12`)
 - [ ] `password_hash` never appears in any API response — asserted by a response-shape test
 - [ ] A draft campaign has no `public_token` and no reachable `/r/` URL
 - [ ] Invalid, unlaunched, closed and expired tokens return byte-identical 404s

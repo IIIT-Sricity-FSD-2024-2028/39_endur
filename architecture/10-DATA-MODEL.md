@@ -165,8 +165,9 @@ CREATE TABLE organizations (
   name        TEXT NOT NULL,
   slug        TEXT NOT NULL UNIQUE,
   industry    TEXT NOT NULL,             -- university | hotel | hospital | company | custom
-  labels      JSONB NOT NULL,            -- the vocabulary system. see 22.
-  settings    JSONB NOT NULL DEFAULT '{}',
+  labels        JSONB NOT NULL,          -- the vocabulary system. see 22.
+  settings      JSONB NOT NULL DEFAULT '{}',   -- incl. authzVersion (11 §7), paramMode (11 §5)
+  logo_file_id  UUID REFERENCES files(id) ON DELETE SET NULL,   -- 48
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -176,12 +177,17 @@ CREATE TABLE users (
   email          CITEXT NOT NULL,
   password_hash  TEXT,                   -- NULL for invited-not-yet-activated
   name           TEXT NOT NULL,
-  status         TEXT NOT NULL DEFAULT 'active',  -- active | invited | disabled
-  last_login_at  TIMESTAMPTZ,
+  status          TEXT NOT NULL DEFAULT 'active', -- active | invited | disabled
+  avatar_file_id  UUID REFERENCES files(id) ON DELETE SET NULL,  -- 48
+  last_login_at   TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (org_id, email)
 );
 ```
+
+`files` is declared in §5 but referenced here, so the migration must create `files` before
+adding these two foreign keys — or add them in a follow-up statement. Prisma orders this
+correctly on its own; a hand-written migration does not.
 
 `organizations.labels` is the vocabulary system and the visible product claim. Shape:
 
@@ -353,6 +359,30 @@ It is written by the service layer alongside `value`, never independently.
 ## 5. Cross-cutting tables
 
 ```sql
+-- Staff sessions. DEC-014. Managed by connect-pg-simple, NOT by Prisma —
+-- the library owns this shape, so do not model it in schema.prisma.
+-- Create it in a plain SQL migration and leave it alone.
+CREATE TABLE sessions (
+  sid     TEXT PRIMARY KEY,
+  sess    JSONB NOT NULL,
+  expire  TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX ON sessions (expire);
+
+-- Uploaded binaries: org logos and user avatars only (48).
+-- The bytes live on disk; this row is the metadata and the id in the URL.
+CREATE TABLE files (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL,          -- 'logo' | 'avatar'
+  mime        TEXT NOT NULL,          -- always the RE-ENCODED type, never the uploaded one
+  bytes       INT  NOT NULL,
+  width       INT,
+  height      INT,
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE audit_log (
   id            BIGSERIAL PRIMARY KEY,
   org_id        UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -472,6 +502,9 @@ CREATE UNIQUE INDEX ON campaigns (public_token) WHERE public_token IS NOT NULL;
 -- audit, read by time within a tenant
 CREATE INDEX ON audit_log (org_id, created_at DESC);
 
+-- uploads
+CREATE INDEX ON files (org_id, kind);
+
 -- jsonb search: campaign audience rules, node meta
 CREATE INDEX ON campaigns USING GIN (audience_rule);
 CREATE INDEX ON nodes     USING GIN (meta);
@@ -552,6 +585,8 @@ detection is the highest-value of these (`customization.md` §6) and is specifie
 - [ ] Deleting a unit with children is either refused or reparents them, and the
       confirmation states the real number affected
 - [ ] `grep -rn '\$queryRaw' apps/api/src` returns hits only in `db/graph.ts`
+- [ ] `sessions` exists and is created by a plain SQL migration, not modelled in Prisma
+- [ ] Deleting a `files` row nulls the referencing column rather than cascading a user away
 
 ## 12. Out of scope
 

@@ -18,8 +18,9 @@ can be inserted next to related ones instead of being appended at the end where 
 | `00`–`09` | Foundations — product, phases, tooling | `04`–`09` |
 | `10`–`19` | Backend and API | `19` |
 | `20`–`29` | Frontend | **`29`** |
-| `30`–`49` | Pages and features | — |
-| `50`–`59` | Cross-cutting | `54`–`59` |
+| `30`–`49` | Pages and features | `49` |
+| `50`–`59` | Cross-cutting | `56`–`59` |
+| `60`–`69` | P3 stretch features | `64`–`69` |
 
 ## If you use this slot
 

@@ -28,9 +28,9 @@ None. These are the only console-adjacent screens with no capability check.
 
 | Action | Endpoint | DTO in | DTO out |
 |---|---|---|---|
-| Sign in | `POST /api/v1/auth/login` | `LoginBody { email, password }` | `{ accessToken, user, org }` |
-| Boot session | `POST /api/v1/auth/refresh` → `GET /api/v1/auth/me` | — | `MeResponse { user, org, labels, capabilities }` |
-| Create org | `POST /api/v1/auth/register` | `RegisterBody { orgName, industry, name, email, password }` | `{ accessToken, user, org }` |
+| Sign in | `POST /api/v1/auth/login` | `LoginBody { email, password }` | `{ user, org }` + `Set-Cookie: endur.sid` |
+| Boot session | `GET /api/v1/auth/me` | — | `MeResponse { user, org, labels, capabilities }` |
+| Create org | `POST /api/v1/auth/register` | `RegisterBody { orgName, industry, name, email, password }` | `{ user, org }` + `Set-Cookie: endur.sid` |
 | Preset list | `GET /api/v1/org/presets` | — | `Preset[]` |
 
 `POST /register` is atomic — org, owner, preset seed, subscription, audit, one transaction
@@ -40,7 +40,8 @@ like a broken product.
 ## State
 
 Local component state for all three forms. `authSlice` is written only on success
-(`23` §2). The access token goes to the module variable in `lib/api.ts`, never the store.
+(`23` §2). **No credential is handled by the client** — the server sets an `httpOnly` cookie
+(DEC-014), so there is nothing for these pages to store.
 
 After `/register` succeeds, redirect straight to `/app/setup` with the chosen industry
 preselected — do not make the user pick it twice.
@@ -91,6 +92,8 @@ Errors appear where the problem is, never in a toast (`design_specs/design/10` �
 - [ ] Signing in to an unconfigured org lands on `/app/setup`, not an empty console
 - [ ] Demo credentials cannot render in a production build
 - [ ] Password minimum 10 characters, enforced server-side and mirrored client-side
+- [ ] Login sets an `httpOnly` session cookie and **regenerates the session id** (fixation)
+- [ ] No token appears in any response body, `localStorage`, or the store
 - [ ] Works at 390px
 - [ ] Keyboard: tab order follows visual order, `Enter` submits, focus ring visible
 
@@ -99,7 +102,8 @@ Errors appear where the problem is, never in a toast (`design_specs/design/10` �
 | Not building | Why |
 |---|---|
 | Password reset, email verification | P2. Auth surface stays small while middleware is graded (`15` §5) |
+| Token / refresh handling | There is none — cookie sessions (DEC-014) |
 | SSO | Enterprise, P3 |
-| "Remember me" | The refresh token already does this |
+| "Remember me" | The rolling session already does this (`15` §2) |
 | Social login | No demand, and it complicates the tenancy model |
 | A marketing site | Landing is thin and first on the cut-list |

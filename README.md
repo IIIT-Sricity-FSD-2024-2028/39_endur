@@ -1,165 +1,109 @@
 # 🟦 Endur
-### Performance Review & Feedback Management System
+
+### Feedback management and performance analysis
+
 #### [Jira Link](https://endur.atlassian.net/jira/software/projects/END/boards/1)
 
-## 🟥 Problem Statement
-Academic institutions rely on student feedback to evaluate teaching effectiveness and improve learning outcomes. However, traditional performance review systems suffer from structural and behavioral limitations that reduce their impact and credibility.
-
-
---- 
-
-## 🟨 Key Challenges
-
-- **Low Student Participation:**
-The primary challenge, as lengthy and repetitive feedback forms result in participation rates reaching a ceiling of just 30%.
-
-- **Delayed Feedback:**
-Feedback is typically collected only at the end of the semester, making it ineffective for improving teaching for the current batch of students.
-
-- **Bias & Revenge Ratings:**
-Feedback submitted after grade publication is often influenced by grades rather than actual teaching quality.
-
-- **Lack of Structured Follow-Through:**
-Faculty receive scores but lack formal mechanisms for reflection and analysis attuned to their batches.
-
-- **Limited Administrative Insight:**
-Existing systems do not support long-term or institution-wide performance analysis.
+Endur collects structured feedback about **anything an organisation wants to improve** — a
+course, a restaurant, a hospital ward, a bus route, a manager — and turns it into results
+the people responsible can act on.
 
 ---
 
-## 🟩 System Objective
+## 🟥 The problem
 
-### Endur aims to provide a continuous, anonymized, and role-based feedback system that enables:
+Feedback systems fail in the same three ways regardless of who runs them.
 
-- Timely and lightweight feedback collection
+- **Nobody fills them in.** Long forms at the end of a term, when it is too late to change
+  anything for the people answering.
+- **Nobody trusts them.** If a respondent suspects their name is attached, they write
+  nothing useful.
+- **They only fit one organisation.** A tool built for a college cannot be used by a hotel
+  without a rewrite, because its vocabulary and its hierarchy are hardcoded.
 
-- Meaningful faculty reflection and improvement planning
+The third is the interesting one, and it is what Endur is actually about.
 
-- Department-level and institution-wide oversight
+## 🟩 The idea
 
---- 
+> **The organisation is data, not code.**
 
-## 🟪 Identified Actors & Planned Features
+There is no `Course` table, no `Student` role, no `Semester`. There is a graph of **nodes**
+(units, roles, people, positions, groups) joined by **edges**, and a set of **grants** that
+say who may do what, where. A university, a hotel and a hospital are the *same rows* with
+different names.
 
-### 🧑‍🎓 Student
+Two consequences worth seeing in action:
 
-**Role:** Primary provider of feedback and participant in evaluating the feedback process.
+- **Every domain noun on screen is a label read from the database.** Switch organisation and
+  the entire interface re-skins into hotel language with no code change. "Department" becomes
+  "Property", "Course" becomes "Restaurant".
+- **Permissions are grants, not levels.** An integer rank cannot express "a student on a
+  committee who may book a hall" or "a vendor who must never see footage". A capability plus
+  a scope plus an effect can.
 
-#### **Planned Features:** 
+Anonymity is a property of the schema rather than a setting: the `responses` table has no
+column that could identify a respondent, and it never will. A separate `invitations` table
+records *that* a token was used; nothing joins the two. So Endur can report "312 of 400
+responded" and still not know whose answer is whose.
 
-- Submit multiple engaging feedbacks during active FeedbackCycles.
+## 🟨 Architecture
 
-- Participate in multiple FeedbackCycles within a semester for continuous improvement.
+| Layer | Choice |
+|---|---|
+| Frontend | React 18 · Vite · TypeScript · React Router · Redux Toolkit |
+| Backend | Express 5 · TypeScript · an explicit, ordered middleware chain |
+| Contracts | Zod schemas as DTOs in `packages/shared`, inferred by **both** sides |
+| Database | PostgreSQL 16 · Prisma, with a raw-SQL seam for recursive graph queries |
+| Auth | Cookie sessions for staff · opaque tokens for respondents, who never hold accounts |
 
-- Guaranteed anonymity; student identity is never exposed or inferable.
+Documentation lives in [`architecture/`](architecture/) — 53 documents covering the data
+model, the permission engine, the middleware chain, every page and every feature. Start with
+[`architecture/README.md`](architecture/README.md).
 
-- View history of personal feedback submissions for transparency.
+The live build state is in [`PROGRESS.md`](PROGRESS.md).
 
-- Submit feedback for Review of Reviews to evaluate the feedback system itself.
+## 🟪 Repository
 
-- Restricted from submitting feedback outside active FeedbackCycles.
+```
+apps/api/           Express + Prisma. The middleware chain is src/app.ts
+apps/web/           React SPA
+packages/shared/    Zod DTOs, the capability catalogue, error codes, labels
+architecture/       contracts: schema, routes, capabilities, acceptance criteria
+design_specs/       visual authority: tokens, type, colour, component anatomy
+scripts/            invariant audits that run in CI
+```
 
----
+## 🟫 Running it
 
-### 🧑‍🏫 Faculty Member
+Requires **Node 20+** and **PostgreSQL 16**.
 
-**Role:** Subject of feedback and participant in continuous improvement.
+```bash
+npm install
 
-#### **Planned Features:**
+# Postgres — either one, they produce an identical database:
+sudo bash scripts/install-postgres.sh    # native install (Linux / WSL)
+npm run db:up                            # docker compose, if you have Docker
 
-- Submit Self-Reflection before viewing student feedback.
+cp .env.example .env                     # then set SESSION_SECRET (32+ chars)
+npm run db:migrate
+npm run db:seed
 
-- View Anonymized Reports after FeedbackCycle closure.
+npm run dev                              # api :4000 · web :5173
+```
 
-- Submit Action Reports when performance gaps exceed defined thresholds.
+On WSL, services do not start at boot: `sudo service postgresql start` after a restart.
 
-- Participate in ReviewCheckIns with the Head of Department.
+Useful checks:
 
-- Track long-term improvement trends across semesters.
+```bash
+npm run typecheck
+npm run lint          # includes rules enforcing the project's invariants
+npm run audit:drift   # docs and code cannot silently disagree about a capability
+npm run audit:vocab   # no hardcoded domain noun in a component
+```
 
-- All submitted reflections, reports, and action plans are immutable once finalized.
+## 🟧 Team
 
-**Analyze through:**
-
-- PerformanceScores
-
-- GapAnalysis
-
-- FeedbackTrends across cycles
-
----
-
-### 🧑‍💼 Head of Department (HOD)
-
-**Role:** Department-level reviewer and academic supervisor.
-
-#### **Planned Features:**
-
-- View aggregated performance reports for faculty in their department.
-
-- Conduct ReviewCheckIns with faculty members.
-
-- Define and manage EvaluationParameters for each FeedbackCycle.
-
-- Monitor department-wide performance trends over time.
-
-- Are automatically restricted from reviewing their own performance if also a faculty member.
-
-**Review through:**
-
-- FeedbackTrends
-
-- GapAnalysis
-
-- ActionReports
-
----
-
-### 🧑‍⚖️ Dean
-
-**Role:** Institutional oversight and conflict-resolution authority.
-
-#### **Planned Features:**
-
-- View institution-wide aggregated performance reports.
-
-- Track long-term FeedbackTrends across academic years.
-
-- Review ActionReports and ReviewCheckIn records from any department.
-
-- Act as approving authority in conflict-of-interest scenarios.
-
-- Freeze or invalidate FeedbackCycles in exceptional cases.
-
-- Access ComplianceAudit logs while preserving student anonymity.
-
----
-
-### 🛠️ System Administrator (Admin)
-
-**Role:** Technical and operational manager of the system.
-
-#### **Planned Features:**
-
-**Configure:**
-
-- FeedbackCycles
-
-- EvaluationParameters
-
-- Attendance-based weighting rules
-
-- Manage user roles and access permissions.
-
-**Enforce:**
-
-- Immutability
-
-- Auditability
-
-- Privacy constraints
-
-- Ensure system scalability and availability during peak usage.
-
----
-
+Three members. Work is tracked as stable task ids (`T-001`…) defined in
+[`architecture/55-BUILD-ORDER.md`](architecture/55-BUILD-ORDER.md) and referenced in commit
+messages.

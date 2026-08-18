@@ -64,7 +64,7 @@ file must agree (`DRIFT-004`).
 | **Roles** | `role.read` `role.create` `role.update` `role.delete` | | P1 |
 | **Powers** | `grant.read` | view the powers grid | P2 |
 | | `grant.update` | **edit who can do what.** The most dangerous capability in the system | P2 |
-| **People** | `person.read` `person.create` `person.update` `person.delete` | | P1 |
+| **People** | `person.read` `person.create` `person.update` `person.delete` | `self`-scoped variants of the first two are seeded to **every** role — they are what make `/app/profile` (`47`) openable | P1 |
 | | `person.import` | CSV | P2 |
 | | `assignment.create` `assignment.delete` | give / remove a position | P1 |
 | **Groups** | `group.read` `group.create` `group.update` `group.delete` | committees, teams | P2 |
@@ -285,8 +285,16 @@ campaign.*    scope:subtree   allow      (levels 1..3)
 grant.update  scope:all       allow      (level 1 only)
 ```
 
-plus `self`-scoped reads for the lowest level. The exact matrix per preset is in
-`50-SEED-AND-DEMO.md`.
+plus **`self`-scoped `person.read` and `person.update` for every role without exception** —
+these back `/app/profile` (`47`). A default-deny model silently produces an unopenable profile
+page if `self` is forgotten, so it is called out here rather than left implicit.
+
+> **The concrete, authoritative table is `50-SEED-AND-DEMO.md` §1 § "The seeded grant
+> matrix".** This section states the rule; that table states every row. Do not re-derive the
+> matrix from this prose — implement the table.
+
+The same matrix serves every preset; only the role *names* differ, which is the generic model
+doing its job.
 
 The administrator edits these in the powers grid. Editing a derived grant clears its
 `derived` flag so regeneration never silently reverts them (`10` §9).
@@ -322,6 +330,7 @@ The administrator edits these in the powers grid. Editing a derived grant clears
       a property test over random org fixtures
 - [ ] A production 403 body contains `reason` and `decidedBy` but never `considered`
 - [ ] Default-deny: a fresh capability nobody has been granted is refused for every principal
+- [ ] Every seeded role can read and update **itself** — the `/app/profile` precondition
 
 ## 11. Out of scope
 

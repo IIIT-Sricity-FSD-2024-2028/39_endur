@@ -1,7 +1,7 @@
 # 12 — The middleware stack
 
 Phase: P1 · Milestone: M0 · Owns: `apps/api/src/middleware/**`, `apps/api/src/app.ts`
-Decisions: `_MEMORY.md` DEC-001, DEC-011 · Invariants: INV-003, INV-007, INV-010
+Decisions: `_MEMORY.md` DEC-001, DEC-011, DEC-014 · Invariants: INV-003, INV-007, INV-010
 
 **This is the Phase-1 graded artifact.** Everything in it should be defensible as
 *cross-cutting concern expressed once*, rather than logic that happened to be factored out.
@@ -40,21 +40,22 @@ per endpoint and eventually got wrong.
 │  5  rateLimit          coarse global bucket                             │
 └──────────────────────────────────────────────────────────────────────────┘
 ┌─ per-router ────────────────────────────────────────────────────────────┐
-│  6  tenantResolver     org from host / JWT / API key  → req.ctx.orgId    │
-│  7  authenticate       JWT | API key | respondent token → req.ctx.principal │
+│  6  tenantResolver     org from host / session / API key → req.ctx.orgId │
+│  7  authenticate       session | API key | respondent token → principal  │
+│  8  csrfProtection     unsafe methods, cookie-auth principals only       │
 └──────────────────────────────────────────────────────────────────────────┘
 ┌─ per-route ─────────────────────────────────────────────────────────────┐
-│  8  validate(Dto)      zod over body/query/params → typed req.data       │
-│  9  requireCapability  the GRANT resolver         → req.ctx.decision     │
-│ 10  requireEntitlement subscription tier gate                            │
-│ 11  rateLimit(scoped)  tighter bucket for expensive or abusable routes   │
-│ 12  idempotency        only where a double POST would be harmful         │
+│  9  validate(Dto)      zod over body/query/params → typed req.data       │
+│ 10  requireCapability  the GRANT resolver         → req.ctx.decision     │
+│ 11  requireEntitlement subscription tier gate                            │
+│ 12  rateLimit(scoped)  tighter bucket for expensive or abusable routes   │
+│ 13  idempotency        only where a double POST would be harmful         │
 │ ── handler ──                                                            │
 └──────────────────────────────────────────────────────────────────────────┘
 ┌─ terminal ──────────────────────────────────────────────────────────────┐
-│ 13  auditWriter        runs inside the handler's transaction, not after  │
-│ 14  notFound           unmatched route → typed error                     │
-│ 15  errorFunnel        the single exit. typed error → envelope.          │
+│ 14  auditWriter        runs inside the handler's transaction, not after  │
+│ 15  notFound           unmatched route → typed error                     │
+│ 16  errorFunnel        the single exit. typed error → envelope.          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -142,7 +143,7 @@ Coarse, per IP, from `RATE_LIMIT_*` config. Skipped for `/health`.
 Resolves `orgId` in strict priority:
 
 1. API key → its `org_id`
-2. JWT claim → `orgId`
+2. Session → the signed-in user's `orgId`
 3. Respondent token → the campaign's `org_id`
 4. Subdomain / `X-Org-Slug`, **only** on unauthenticated routes like login
 
@@ -162,14 +163,42 @@ one it got (`15-AUTH-AND-SESSIONS.md`):
 
 | Credential | Header / source | Principal |
 |---|---|---|
-| Staff session | `Authorization: Bearer <jwt>` | `{ kind: 'user' }` |
+| Staff session | `endur.sid` cookie (`httpOnly`) | `{ kind: 'user' }` |
 | Integration | `X-API-Key: <key>` | `{ kind: 'apiKey', scopes }` |
 | Respondent | `:token` in the path | `{ kind: 'respondent', campaignId }` |
 
 Variants: `authenticate` (required, 401 on failure) and `authenticateOptional` (attaches if
 present — for the landing page and template library preview).
 
-### 8 · `validate(Dto)` — the DTO pipe
+### 8 · `csrfProtection`
+
+New as of DEC-014. Staff auth is a cookie, so the browser attaches it automatically to any
+request any page can trigger — which is exactly the condition CSRF exploits.
+
+```ts
+csrfProtection({ ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] })
+```
+
+Scope it precisely, or it breaks the two surfaces that must stay open:
+
+| Principal | Checked? | Why |
+|---|---|---|
+| `user` (cookie session) | **Yes**, on unsafe methods | The browser sends the cookie unbidden |
+| `apiKey` (explicit header) | No | A header is never attached automatically |
+| `respondent` (token in path) | No | No cookie, no ambient authority — and a QR scan from any origin must work |
+
+Double-submit cookie: a non-`httpOnly` `endur.csrf` cookie the SPA reads and echoes in
+`X-CSRF-Token`. Chosen over a synchroniser token because it needs no server-side state and no
+token-fetch round trip on boot.
+
+Failure → `403 CSRF_FAILED`, distinct from an authorisation `403` so the two are separable in
+logs.
+
+**This link exists because of an auth decision, not despite one.** Bearer tokens would have
+made it unnecessary; cookies make it mandatory. That trade is the honest answer to why it is
+in the chain.
+
+### 9 · `validate(Dto)` — the DTO pipe
 
 ```ts
 export const validate = <B, Q, P>(schema: DtoSchema<B, Q, P>): RequestHandler =>
@@ -193,7 +222,7 @@ Three properties that matter:
 Failure → `422 VALIDATION_FAILED` with per-field errors, which is what the UI renders inline
 (`design_specs/design/10` §4 "field level").
 
-### 9 · `requireCapability` — the guard
+### 10 · `requireCapability` — the guard
 
 The richest link, and the one that earns the phase.
 
@@ -226,7 +255,7 @@ principal's **scope set** — the unit ids their grants cover — and filters th
 The API returns only what the caller may see, and the UI never filters for permission reasons
 (INV-003). Out-of-scope rows are absent, not greyed.
 
-### 10 · `requireEntitlement` — separate on purpose (DEC-011)
+### 11 · `requireEntitlement` — separate on purpose (DEC-011)
 
 ```ts
 requireEntitlement('analysis.read')   // 402 PAYMENT_REQUIRED + { requiredTier: 'silver' }
@@ -239,7 +268,7 @@ grant table with billing concerns.
 
 Entitlement **never gates permission correctness**. Access control is in every tier (`01` §6).
 
-### 11 · `rateLimit` (scoped)
+### 12 · `rateLimit` (scoped)
 
 Tighter buckets where the global one is too loose:
 
@@ -250,13 +279,13 @@ Tighter buckets where the global one is too loose:
 | `POST /api/v1/*` (API key) | per-tier quota | Metering, `16` |
 | `POST /simulator/run` | 30 / min | Several graph queries each |
 
-### 12 · `idempotency`
+### 13 · `idempotency`
 
 Only on routes where a double POST is harmful: `campaign.launch`, `template.clone`,
 `person.import`. Client sends `Idempotency-Key`; the first response is cached for 24 h and
 replayed on a repeat. Everything else is naturally idempotent or harmless to repeat.
 
-### 13 · `auditWriter` — INV-007
+### 14 · `auditWriter` — INV-007
 
 The subtle requirement: an audit row must be written **in the same transaction as the
 mutation**. A post-response middleware writing its own transaction can succeed when the
@@ -281,12 +310,12 @@ request which mutated state produced at least one audit row, and logs loudly if 
 development that assertion throws — which is how a forgotten audit call gets caught on the
 day it is written.
 
-### 14 · `notFound`
+### 15 · `notFound`
 
 Unmatched routes become a typed `NotFoundError` so they leave through the same funnel as
 everything else. No default Express HTML error page ever reaches a client.
 
-### 15 · `errorFunnel` — the single exit
+### 16 · `errorFunnel` — the single exit
 
 ```ts
 export const errorFunnel: ErrorRequestHandler = (err, req, res, _next) => {
@@ -320,6 +349,8 @@ These are the reason the chain is a chain. Each is worth being able to state out
 | `requestId` → everything | Correlation must exist even for a failure in the next link |
 | `bodyParser` → `validate` | Nothing to validate otherwise |
 | `tenantResolver` → `authenticate` | An API key resolves the tenant *and* the principal; the tenant-bound db client must exist before any lookup |
+| `authenticate` → `csrfProtection` | The check depends on *which kind* of principal it got — cookie principals only |
+| `csrfProtection` → any mutation | A forged request must die before it reaches a handler, not after |
 | `authenticate` → `requireCapability` | Cannot ask "may they" before knowing who |
 | `validate` → `requireCapability` | The target id must be read from **validated** input |
 | `requireCapability` → `requireEntitlement` | 403 outranks 402: never tell someone to buy an upgrade for something they would not be allowed to use anyway |
@@ -341,6 +372,7 @@ apps/api/src/middleware/
   security.ts         helmet + the two cors policies
   tenantResolver.ts   INV-010, tenant-bound prisma client
   authenticate.ts     three principal kinds
+  csrfProtection.ts   cookie-auth principals only
   validate.ts         the DTO pipe
   requireCapability.ts
   requireEntitlement.ts
@@ -382,6 +414,8 @@ Detailed in `51-TESTING-STRATEGY.md`. The chain-specific ones:
 - [ ] The route-enumeration test passes (§7)
 - [ ] A 403 body contains `reason` and `decidedBy`; in production it omits `considered`
 - [ ] A 402 is returned for an entitlement failure and is distinguishable from a 403
+- [ ] A cookie-session mutation without a valid CSRF token returns `403 CSRF_FAILED`
+- [ ] An API-key request and a respondent submit both succeed with **no** CSRF token
 - [ ] A validation failure returns 422 with per-field errors the UI can render inline
 - [ ] Every mutation produces an audit row with `decidedBy` populated, in the same
       transaction — verified by forcing a rollback and asserting no audit row survives
@@ -397,4 +431,4 @@ Detailed in `51-TESTING-STRATEGY.md`. The chain-specific ones:
 | Distributed tracing (OpenTelemetry) | `requestId` correlation is enough at this size |
 | A circuit breaker / retry layer | No outbound dependencies yet |
 | Response caching middleware | Premature. Fix the query first |
-| CSRF tokens | Bearer tokens in a header, not cookie auth — CSRF does not apply. **Revisit immediately if auth ever moves to cookies** |
+| ~~CSRF tokens~~ | **No longer out of scope.** Auth moved to cookies (DEC-014), which is exactly the revisit condition this row used to name. Now specified in §4.8 |

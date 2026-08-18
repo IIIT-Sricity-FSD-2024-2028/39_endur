@@ -14,7 +14,7 @@ which is why the slot is worth reserving with a note rather than left blank.
 
 ## What it is meant to be
 
-Formal elections and committee decisions. Its first internal consumer is `46` — a community's
+Formal elections and committee decisions. Its first internal consumer is `60` — a community's
 elected representative is elected using this.
 
 ## Why it may be nearly free
@@ -45,6 +45,6 @@ different answer, and choosing it is a design decision, not an implementation de
 
 ## Write this when
 
-- [ ] Communities (`46`) are being built and need elected representatives
+- [ ] Communities (`60`) are being built and need elected representatives
 - [ ] After confirming how much genuinely falls out of the campaign model — that investigation
       should come first and may shrink this document to a page

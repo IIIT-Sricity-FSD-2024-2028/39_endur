@@ -12,6 +12,7 @@ link to it rather than restating it.
 | Colour, type, spacing, component anatomy, copy, empty states | `design_specs/design/` |
 | Schema, routes, DTOs, capabilities, state, acceptance criteria | `architecture/` |
 | Which decision won, and why | `architecture/_MEMORY.md` |
+| What is built and what is next | `/PROGRESS.md` — **read first every session** |
 
 ---
 
@@ -35,7 +36,7 @@ link to it rather than restating it.
 | 12 | [`12-MIDDLEWARE-STACK.md`](12-MIDDLEWARE-STACK.md) | **The Phase-1 graded artifact.** The ordered chain, each link specified |
 | 13 | [`13-API-CONTRACT.md`](13-API-CONTRACT.md) | Every endpoint, the error envelope, pagination, the public API |
 | 14 | [`14-DTO-AND-VALIDATION.md`](14-DTO-AND-VALIDATION.md) | Zod-as-DTO conventions, the shared package, error mapping |
-| 15 | [`15-AUTH-AND-SESSIONS.md`](15-AUTH-AND-SESSIONS.md) | Staff JWT, respondent tokens, API keys, the anonymity guarantee |
+| 15 | [`15-AUTH-AND-SESSIONS.md`](15-AUTH-AND-SESSIONS.md) | Staff cookie sessions, respondent tokens, API keys, the anonymity guarantee |
 | 16 | [`16-TENANCY-BILLING-ENTITLEMENTS.md`](16-TENANCY-BILLING-ENTITLEMENTS.md) | Tiers → entitlements, metering, tenant isolation |
 | 17 | [`17-BACKGROUND-JOBS.md`](17-BACKGROUND-JOBS.md) | ⚠️ **Placeholder — covers a real gap.** Campaign open/close, expiry, webhook retry |
 | 18 | [`18-OBSERVABILITY-AND-OPS.md`](18-OBSERVABILITY-AND-OPS.md) | *Placeholder* — deploy, logs, backup |
@@ -75,14 +76,19 @@ link to it rather than restating it.
 | 43 | [`43-PAGE-analysis.md`](43-PAGE-analysis.md) | P3 |
 | 44 | [`44-FEATURE-improve-loop.md`](44-FEATURE-improve-loop.md) | P3 |
 | 45 | [`45-FEATURE-public-api.md`](45-FEATURE-public-api.md) | P3 |
-| 46 | [`46-FEATURE-communities.md`](46-FEATURE-communities.md) | *Placeholder* · P3 stretch |
-| 47 | [`47-FEATURE-announcements.md`](47-FEATURE-announcements.md) | *Placeholder* · P3 stretch |
-| 48 | [`48-FEATURE-voting.md`](48-FEATURE-voting.md) | *Placeholder* · P3 stretch |
-| 49 | [`49-FEATURE-notifications.md`](49-FEATURE-notifications.md) | *Placeholder* · P3 stretch |
+| 46 | [`46-PAGE-home-dashboard.md`](46-PAGE-home-dashboard.md) | P2 · M0 |
+| 47 | [`47-PAGE-profile.md`](47-PAGE-profile.md) | P2 |
+| 48 | [`48-FEATURE-file-upload.md`](48-FEATURE-file-upload.md) | P2 |
 
-Docs `46`–`49` are the four `SCOPE.md` layers currently shown as **disabled "Soon" items in
-the sidebar** (`20` §2). They are reserved, not designed — designing them now would be work
-thrown away (`_MEMORY.md` CONF-006).
+**P3 stretch** — the four `SCOPE.md` layers shown as disabled "Soon" items in the sidebar
+(`20` §2). Reserved, not designed; designing them now would be work thrown away (CONF-006).
+
+| # | File | Phase |
+|---|---|---|
+| 60 | [`60-FEATURE-communities.md`](60-FEATURE-communities.md) | *Placeholder* · P3 stretch |
+| 61 | [`61-FEATURE-announcements.md`](61-FEATURE-announcements.md) | *Placeholder* · P3 stretch |
+| 62 | [`62-FEATURE-voting.md`](62-FEATURE-voting.md) | *Placeholder* · P3 stretch |
+| 63 | [`63-FEATURE-notifications.md`](63-FEATURE-notifications.md) | *Placeholder* · P3 stretch |
 
 **Cross-cutting**
 
@@ -92,6 +98,8 @@ thrown away (`_MEMORY.md` CONF-006).
 | 51 | [`51-TESTING-STRATEGY.md`](51-TESTING-STRATEGY.md) | What is tested where, and what must never ship untested |
 | 52 | [`52-SECURITY-AND-PRIVACY.md`](52-SECURITY-AND-PRIVACY.md) | Anonymity, k-anonymity, audit, the confidentiality limit |
 | 53 | [`53-NOVELTY-CLAIMS.md`](53-NOVELTY-CLAIMS.md) | What is genuinely novel and how to defend it under questioning |
+| 54 | [`54-COURSE-DELIVERABLE.md`](54-COURSE-DELIVERABLE.md) | **Hand this to the React teacher.** Their checklist → our routes, MPA-vs-SPA per page |
+| 55 | [`55-BUILD-ORDER.md`](55-BUILD-ORDER.md) | **The task backlog.** 45 ids, lanes, dependencies. Companion to `/PROGRESS.md` |
 
 ---
 
@@ -105,8 +113,9 @@ instead of being appended where nobody looks.
 | `00`–`09` | Foundations | `04`–`09` |
 | `10`–`19` | Backend and API | `19` |
 | `20`–`29` | Frontend | — |
-| `30`–`49` | Pages and features | — |
-| `50`–`59` | Cross-cutting | `54`–`59` |
+| `30`–`49` | Pages and features | `49` |
+| `50`–`59` | Cross-cutting | `56`–`59` |
+| `60`–`69` | P3 stretch features | `64`–`69` |
 
 A file marked *Placeholder* has a reserved number, a stated purpose, and a **"write this
 when"** trigger — but no decided content. Do not treat one as a specification, and do not feed
@@ -124,8 +133,12 @@ than repeats. Include `11` for anything behind auth, and `24` for anything that 
 
 ## The page/feature doc template
 
-Every file numbered 30+ follows this exactly. If a section is empty, it says `None`, so a
-missing section always means an incomplete doc.
+Every **specified** file numbered 30+ follows this exactly. If a section is empty, it says
+`None`, so a missing section always means an incomplete doc.
+
+**Placeholders are exempt** and use their own shape — `Why this slot is reserved` / `What will
+go here` / `Write this when`. That difference is deliberate: a placeholder wearing the spec
+template would read as a specification, and someone would build from it.
 
 ```
 # <n> — <Page name>
