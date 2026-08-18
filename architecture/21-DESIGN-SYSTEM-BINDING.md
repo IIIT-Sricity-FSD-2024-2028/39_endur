@@ -1,6 +1,6 @@
 # 21 — Design system binding
 
-Phase: P2 · Milestone: M0 · Owns: `apps/web/src/design-system/**`
+Phase: P2 · Milestone: M0 · Owns: `src/frontend/design-system/**`
 Design ref: `design_specs/design/01-DESIGN-SYSTEM.md` — **authoritative for all values**
 Decisions: `_MEMORY.md` DEC-012
 
@@ -21,7 +21,7 @@ family names, spacing tokens — and must return nothing (DRIFT-003).
 ## 2. Three files, one direction of dependency
 
 ```
-apps/web/src/design-system/
+src/frontend/design-system/
   tokens.css      the :root block, copied verbatim from design_specs/design/01 §2 + §2b
   organic.css     the base component layer, from _ds/organic-*/styles.css, UNMODIFIED
   endur.css       Endur-only additions that sit on top
@@ -79,7 +79,7 @@ declaration and its consumer cannot drift apart.
 
 | Rule | Enforced by |
 |---|---|
-| No literal colour value in `apps/web/src/**` outside `design-system/` | ESLint `no-restricted-syntax` (`03` §6) |
+| No literal colour value in `src/frontend/**` outside `design-system/` | ESLint `no-restricted-syntax` (`03` §6) |
 | No literal font family or size — use the type scale classes | Review + the same lint rule |
 | No literal spacing px — use `--space-*` | Review |
 | Icons are Lucide at the specified stroke weight, never emoji | `audit-drift` grep for emoji in JSX |
@@ -133,7 +133,7 @@ From `design_specs/design/01` §9, non-negotiable and cheap while building:
 - [ ] `organic.css` is byte-identical to the vendored source
 - [ ] `endur.css` contains exactly one override of a base class, documented inline
 - [ ] Fonts render correctly with the network disabled
-- [ ] `grep -rE '#[0-9a-fA-F]{6}' apps/web/src --exclude-dir=design-system` returns nothing
+- [ ] `grep -rE '#[0-9a-fA-F]{6}' src/frontend --exclude-dir=design-system` returns nothing
 - [ ] No emoji appears in any `.tsx` file
 - [ ] Every interactive element shows a visible focus ring
 - [ ] Every valence indicator carries a number, label, or icon alongside the colour

@@ -160,7 +160,7 @@ INV-001  every user-facing domain noun resolves via useLabels(). zero hardcoded.
 INV-002  no education-specific identifier anywhere in code.
   banned   Course Faculty Student Semester Batch CourseOffering FacultyMember Marks
   allowed  ONLY as seed DATA values inside the university preset.
-  verify   grep -riE '\b(course|faculty|student|semester)\b' apps/ packages/ --include=*.ts
+  verify   grep -riE '\b(course|faculty|student|semester)\b' src/ packages/ --include=*.ts
            --include=*.tsx  ->  hits must all be in seed/presets/university.ts
   source   BUILD_PLAN_EVAL1.md §1
 
@@ -305,27 +305,27 @@ owning doc. One doc owns a path; a second doc may read it but must not restructu
 CLAUDE.md                        -> /CLAUDE.md
 _MEMORY.md                       -> architecture/_MEMORY.md
 03-REPO-AND-TOOLING.md           -> /package.json /tsconfig*.json /.env.example /.github
-10-DATA-MODEL.md                 -> apps/api/prisma/** apps/api/src/db/**
-11-PERMISSION-ENGINE.md          -> apps/api/src/authz/**
-12-MIDDLEWARE-STACK.md           -> apps/api/src/middleware/** apps/api/src/app.ts
-13-API-CONTRACT.md               -> apps/api/src/routes/** (router wiring only)
+10-DATA-MODEL.md                 -> src/backend/database/** src/backend/db/**
+11-PERMISSION-ENGINE.md          -> src/backend/authz/**
+12-MIDDLEWARE-STACK.md           -> src/backend/middleware/** src/backend/app.ts
+13-API-CONTRACT.md               -> src/backend/routes/** (router wiring only)
 14-DTO-AND-VALIDATION.md         -> packages/shared/src/dto/**
-15-AUTH-AND-SESSIONS.md          -> apps/api/src/auth/**
-16-TENANCY-BILLING-ENTITLEMENTS  -> apps/api/src/billing/**
+15-AUTH-AND-SESSIONS.md          -> src/backend/auth/**
+16-TENANCY-BILLING-ENTITLEMENTS  -> src/backend/billing/**
 17-BACKGROUND-JOBS.md            -> PLACEHOLDER. no path owned yet. see OPEN-005.
 18-OBSERVABILITY-AND-OPS.md      -> PLACEHOLDER. no path owned yet.
-20-FRONTEND-ARCHITECTURE.md      -> apps/web/src/main.tsx router/** lib/api.ts
-21-DESIGN-SYSTEM-BINDING.md      -> apps/web/src/design-system/**
-22-VOCABULARY-SYSTEM.md          -> apps/web/src/lib/labels.ts
-23-STATE-AND-REDUX.md            -> apps/web/src/store/**
-24-COMPONENT-INVENTORY.md        -> apps/web/src/components/**
+20-FRONTEND-ARCHITECTURE.md      -> src/frontend/main.tsx router/** lib/api.ts
+21-DESIGN-SYSTEM-BINDING.md      -> src/frontend/design-system/**
+22-VOCABULARY-SYSTEM.md          -> src/frontend/lib/labels.ts
+23-STATE-AND-REDUX.md            -> src/frontend/store/**
+24-COMPONENT-INVENTORY.md        -> src/frontend/components/**
 25..29                           -> PLACEHOLDERS. 29 is unassigned. no paths owned.
-30..45 page docs                 -> apps/web/src/pages/<world>/<Page>/**
-                                    + apps/api/src/features/<feature>/**
-46-PAGE-home-dashboard.md        -> apps/web/src/pages/console/Home/**
-47-PAGE-profile.md               -> apps/web/src/pages/console/Profile/**
-48-FEATURE-file-upload.md        -> apps/api/src/features/uploads/**
-                                    apps/web/src/components/form/FileUpload*
+30..45 page docs                 -> src/frontend/pages/<world>/<Page>/**
+                                    + src/backend/features/<feature>/**
+46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/**
+47-PAGE-profile.md               -> src/frontend/pages/console/Profile/**
+48-FEATURE-file-upload.md        -> src/backend/features/uploads/**
+                                    src/frontend/components/form/FileUpload*
 54-COURSE-DELIVERABLE.md         -> docs only. hand to the react teacher.
 55-BUILD-ORDER.md                -> docs only. the T-### task backlog. PLAN.
 /PROGRESS.md                     -> repo root. THE LIVE STATE. every session updates it.
@@ -335,12 +335,12 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     these are the 4 disabled "Soon" sidebar items. CONF-006.
                                     RENUMBERED from 46..49 on 2026-08-18 to free the page
                                     block. do not renumber back.
-50-SEED-AND-DEMO.md              -> apps/api/prisma/seed/** apps/api/src/presets/**
-51-TESTING-STRATEGY.md           -> **/*.test.ts apps/api/test/** e2e/**
+50-SEED-AND-DEMO.md              -> src/backend/database/seed/** src/backend/presets/**
+51-TESTING-STRATEGY.md           -> **/*.test.ts src/backend/test/** e2e/**
 52-SECURITY-AND-PRIVACY.md       -> cross-cutting; owns no path, constrains all
 53-NOVELTY-CLAIMS.md             -> docs only
 
-CONTESTED  apps/web/src/components/** is written by 24 but consumed by every page doc.
+CONTESTED  src/frontend/components/** is written by 24 but consumed by every page doc.
            rule: a page doc may NOT add a component. it requests one in 24 first.
            source: design_specs/design/09 preamble.
 ```
@@ -435,6 +435,19 @@ N-009  WORKING MODEL for multi-session builds, set 2026-08-18:
        that rule is what kept 52 docs consistent across three revisions. an audit on
        2026-08-18 found the ONE place it was skipped: docs 46/47/48 added endpoints without
        registering them in 13. fixed. do not skip it again.
+N-015  FOLDER RENAME 2026-08-19, on the user's instruction: apps/ -> src/,
+       api -> backend, web -> frontend, prisma -> database, and the inner src/ of each app
+       was flattened away. All 19 affected docs, the MAP table, every tsconfig, eslint,
+       vitest, prisma.config.ts and the audit scripts were updated in the SAME pass, so
+       nothing should still say apps/. If you find one, it is a miss, not a survivor.
+       package names are unchanged (@endur/api, @endur/web) because they appear in every
+       -w flag. lib/config.ts now WALKS UP to find .env instead of counting ../../../.. —
+       the fixed depth broke on this rename and looked like a missing env var.
+N-014  CHAIN ORDERING, found by running it 2026-08-19: 12 §5's "tenantResolver ->
+       authenticate" is right, but SESSION LOADING is not authentication and must happen
+       EARLIER — tenantResolver reads req.session.orgId, so cookieParser + sessionMiddleware
+       go ABOVE it. Getting this wrong makes every authenticated request 401 with
+       UNRESOLVED_TENANT, which looks like a tenancy bug and is not.
 N-011  LOCAL DEV DATABASE, 2026-08-18. 03 §5 specifies Postgres 16 via docker compose and
        docker-compose.yml is committed and still correct. but the machine this was built on
        has NO DOCKER, so postgres 16.14 is installed natively via
@@ -443,7 +456,7 @@ N-011  LOCAL DEV DATABASE, 2026-08-18. 03 §5 specifies Postgres 16 via docker c
        WSL DOES NOT START SERVICES AT BOOT: `sudo service postgresql start` after a restart,
        or every db command fails with a connection error that looks like a config problem
        and is not.
-N-012  prisma.config.ts exists in apps/api and is NOT in any doc. two reasons it had to:
+N-012  prisma.config.ts exists in src/backend and is NOT in any doc. two reasons it had to:
        prisma reads .env from its OWN directory and ours lives once at the repo root, and
        package.json#prisma is deprecated in prisma 7. it deliberately lets a REAL env var
        win over the .env file, so `DATABASE_URL=... prisma migrate` against a scratch

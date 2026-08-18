@@ -1,6 +1,6 @@
 # 50 — Seed data and the demo
 
-Phase: P1 · Milestone: **M0** · Owns: `apps/api/prisma/seed/**`, `apps/api/src/presets/**`
+Phase: P1 · Milestone: **M0** · Owns: `src/backend/database/seed/**`, `src/backend/presets/**`
 Source: `design_specs/BUILD_PLAN_EVAL1.md` §3, §6, §7
 
 > **Seed data lands 22 Aug, not 26 Aug.** A seeded demo alone can pass. An unseeded live build
@@ -21,7 +21,7 @@ A preset is **data, not code**. Adding a sixth must never require a migration
 (`01` §7).
 
 ```ts
-// apps/api/src/presets/types.ts
+// src/backend/presets/types.ts
 export type Preset = {
   key: Industry;
   displayName: string;
@@ -218,7 +218,7 @@ cannot do something (`42`). It is the strongest answer available to a permission
 - [ ] One org has an under-subscribed open campaign, so suppression is demonstrable
 - [ ] `db:reset` completes in under 30 seconds
 - [ ] Seeded credentials are printed and match the dev login affordance
-- [ ] `grep -riE '\b(course|faculty|student)\b' apps/ packages/ --include=*.ts` hits only the
+- [ ] `grep -riE '\b(course|faculty|student)\b' src/ packages/ --include=*.ts` hits only the
       university preset (INV-002)
 - [ ] The full demo script has been rehearsed three times before 26 Aug
 

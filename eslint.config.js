@@ -24,10 +24,11 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/dist-config/**',
+      '**/dist-types/**',
       '**/node_modules/**',
       '**/*.tsbuildinfo',
-      'apps/api/storage/**',
-      'apps/api/prisma/migrations/**',
+      'src/backend/storage/**',
+      'src/backend/database/migrations/**',
       'design_specs/**',
       'architecture/**',
     ],
@@ -52,14 +53,14 @@ export default tseslint.config(
 
   // INV-002, everywhere that ships.
   {
-    files: ['apps/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
     rules: { 'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS] },
   },
 
   // DEC-007 — raw SQL lives in exactly one file.
   {
-    files: ['apps/api/src/**/*.ts'],
-    ignores: ['apps/api/src/db/graph.ts'],
+    files: ['src/backend/**/*.ts'],
+    ignores: ['src/backend/db/graph.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -75,7 +76,7 @@ export default tseslint.config(
 
   // 14 §3 — handlers read req.data, never req.body.
   {
-    files: ['apps/api/src/features/**/*.ts'],
+    files: ['src/backend/features/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -91,14 +92,26 @@ export default tseslint.config(
 
   // DEC-012 — the design system is the only place colour values exist.
   {
-    files: ['apps/web/src/**/*.{ts,tsx}'],
-    ignores: ['apps/web/src/design-system/**'],
+    files: ['src/frontend/**/*.{ts,tsx}'],
+    ignores: ['src/frontend/design-system/**'],
     rules: { 'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS, NO_INLINE_HEX] },
+  },
+
+  // Tests assert on supertest's `res.body`, which its types declare as `any`. Typed-lint
+  // noise there buys no safety: a wrong assumption about the shape fails the test loudly,
+  // which is the entire purpose of the file.
+  {
+    files: ['src/*/test/**/*.ts', '**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+    },
   },
 
   // The seed is the one place a preset may name real-world roles — they are data there.
   {
-    files: ['apps/api/prisma/seed/**/*.ts', 'apps/api/src/presets/**/*.ts'],
+    files: ['src/backend/database/seed/**/*.ts', 'src/backend/presets/**/*.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
 

@@ -1,6 +1,6 @@
 # 12 — The middleware stack
 
-Phase: P1 · Milestone: M0 · Owns: `apps/api/src/middleware/**`, `apps/api/src/app.ts`
+Phase: P1 · Milestone: M0 · Owns: `src/backend/middleware/**`, `src/backend/app.ts`
 Decisions: `_MEMORY.md` DEC-001, DEC-011, DEC-014 · Invariants: INV-003, INV-007, INV-010
 
 **This is the Phase-1 graded artifact.** Everything in it should be defensible as
@@ -81,7 +81,7 @@ You can audit that route by reading it. That property is the whole point.
 One object, built up by the chain, never mutated by handlers.
 
 ```ts
-// apps/api/src/middleware/context.ts
+// src/backend/middleware/context.ts
 declare global {
   namespace Express {
     interface Request {
@@ -365,7 +365,7 @@ registered before a route never sees that route's errors.
 ## 6. File layout
 
 ```
-apps/api/src/middleware/
+src/backend/middleware/
   context.ts          RequestContext type, ctx bootstrap
   requestId.ts
   requestLogger.ts

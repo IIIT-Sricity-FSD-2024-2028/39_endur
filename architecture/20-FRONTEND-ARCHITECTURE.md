@@ -1,6 +1,6 @@
 # 20 — Frontend architecture
 
-Phase: P2 · Milestone: **M0 (in full)** · Owns: `apps/web/src/main.tsx`, `router/**`, `lib/api.ts`
+Phase: P2 · Milestone: **M0 (in full)** · Owns: `src/frontend/main.tsx`, `router/**`, `lib/api.ts`
 Design ref: `design_specs/design/02-IA-AND-NAVIGATION.md`
 Decisions: `_MEMORY.md` DEC-003, DEC-013, DEC-014, DEC-015
 
@@ -78,7 +78,7 @@ boundary, so a crash in the console cannot take down the respondent flow.
 ## 3. Layout
 
 ```
-apps/web/src/
+src/frontend/
   main.tsx
   router/
     index.tsx            createBrowserRouter, the three trees
@@ -113,7 +113,7 @@ components used by exactly one page do not pollute the shared inventory.
 and pages own their loading state.
 
 ```ts
-// apps/web/src/lib/api.ts
+// src/frontend/lib/api.ts
 export async function apiGet<T>(path: string, init?: RequestInit): Promise<T>;
 export async function apiPost<TIn, TOut>(path: string, body: TIn): Promise<TOut>;
 ```
@@ -200,7 +200,7 @@ Modest and specific — this is an admin tool, not a landing page.
 - [ ] No credential is readable from JavaScript
 - [ ] P3 routes render disabled with a "Soon" tag and no stub page behind them
 - [ ] Every page's server data flows through a `use*` hook, not a bare `fetch` in a component
-- [ ] No API response type is declared in `apps/web` — all come from `@endur/shared`
+- [ ] No API response type is declared in `src/frontend` — all come from `@endur/shared`
 - [ ] Fonts load from `public/fonts` with the network offline
 - [ ] The app is usable end to end at 390px
 

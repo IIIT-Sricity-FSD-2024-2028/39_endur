@@ -1,6 +1,6 @@
 # 11 — Permission engine
 
-Phase: P1 · Milestone: M0 · Owns: `apps/api/src/authz/**`
+Phase: P1 · Milestone: M0 · Owns: `src/backend/authz/**`
 Decisions: `_MEMORY.md` DEC-002 · Invariants: INV-003, INV-004, INV-005
 Source: `design_specs/customization.md` §5
 
@@ -225,7 +225,7 @@ actionable, not enough to map the org's permission structure from outside.
 ## 6. Implementation
 
 ```
-apps/api/src/authz/
+src/backend/authz/
   catalogue.ts      re-exports @endur/shared capabilities + module grouping
   resolve.ts        resolve(principal, capability, target, at): Promise<Decision>
   collect.ts        step 1 — gather grants with anchors

@@ -1,6 +1,6 @@
 # 16 — Tenancy, billing and entitlements
 
-Phase: P1 (tenancy) · P2 (entitlements) · P3 (metering UI) · Owns: `apps/api/src/billing/**`
+Phase: P1 (tenancy) · P2 (entitlements) · P3 (metering UI) · Owns: `src/backend/billing/**`
 Decisions: `_MEMORY.md` DEC-011 · Invariants: INV-010
 Source: `design_specs/SCOPE.md` § "What we sell"
 
@@ -46,7 +46,7 @@ Enterprise is priced individually: a base platform plus chosen services.
 ## 3. The entitlement map
 
 ```ts
-// apps/api/src/billing/entitlements.ts
+// src/backend/billing/entitlements.ts
 export const TIER_ENTITLEMENTS: Record<Tier, readonly Capability[]> = {
   bronze: [
     'org.*', 'unit.*', 'role.*', 'grant.*', 'person.*', 'assignment.*',

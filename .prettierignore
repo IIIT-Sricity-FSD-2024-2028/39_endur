@@ -1,5 +1,5 @@
 node_modules
 dist
-apps/api/storage
-apps/api/prisma/migrations
+src/backend/storage
+src/backend/database/migrations
 design_specs

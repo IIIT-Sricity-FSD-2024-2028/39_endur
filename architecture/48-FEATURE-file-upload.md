@@ -76,7 +76,7 @@ the limit is 2 MB"*, not *"Invalid file"*.
 
 ## Storage
 
-Local disk under `apps/api/storage/<orgId>/<fileId>.webp` for P1–P3, behind a thin interface
+Local disk under `src/backend/storage/<orgId>/<fileId>.webp` for P1–P3, behind a thin interface
 so S3 is a swap rather than a rewrite. No object store yet — one more service to run and
 explain, for no marks.
 

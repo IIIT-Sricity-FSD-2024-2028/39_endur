@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch server.ts",
     "build": "tsc -b",
     "start": "node dist/server.js",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed/index.ts",
+    "db:seed": "tsx database/seed/index.ts",
     "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {

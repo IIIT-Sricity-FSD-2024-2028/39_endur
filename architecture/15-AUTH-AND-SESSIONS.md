@@ -1,6 +1,6 @@
 # 15 — Auth and sessions
 
-Phase: P1 · Milestone: M0 · Owns: `apps/api/src/auth/**`
+Phase: P1 · Milestone: M0 · Owns: `src/backend/auth/**`
 Decisions: `_MEMORY.md` DEC-009, DEC-014 · Invariants: INV-006, INV-010
 
 ---

@@ -9,3 +9,8 @@ export * from './validate.js';
 export * from './notFound.js';
 export * from './errorFunnel.js';
 export * from "./tenantResolver.js";
+export * from "./requireCapability.js";
+export * from "./requireEntitlement.js";
+export * from "./authenticate.js";
+export * from "./csrfProtection.js";
+export * from "./auditWriter.js";

@@ -5,13 +5,42 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-18  (T-010 + T-011 — the GRANT resolver works)
+UPDATED   2026-08-19  (Stage 1 complete + FOLDERS RENAMED — read the note below)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  8 days  ·  demo 27 Aug  ·  GRADED
-STATUS    9/45. The engine is done: chain 0-6/9/15/16 + the GRANT resolver + graph CTEs.
-NEXT      T-007 sessions + argon2id (tenantResolver already reads req.session.orgId), then
-          T-012 requireCapability — which is now a thin wrapper, since resolve() exists.
+STATUS    14/45. STAGE 1 DONE and fully tested — 20 tests across 4 files.
+          !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
+          src/frontend, prisma -> database, and neither app has an inner src/ any
+          more. If you had a branch open, rebase before doing anything else.
+NEXT      T-015 org + presets + POST /org/setup. Two lanes are free — see the hand-off
+          note at the top of the session log for who can take what without colliding.
 ```
+
+---
+
+## Read this first if you have been away
+
+**The folder layout changed on 19 Aug.** Every doc, config and path reference was updated in
+the same pass, so the docs are correct — but your muscle memory is not:
+
+| Was | Is |
+|---|---|
+| `apps/api/src/middleware/` | `src/backend/middleware/` |
+| `apps/api/prisma/` | `src/backend/database/` |
+| `apps/web/src/` | `src/frontend/` |
+| `packages/shared/` | unchanged |
+
+Package names are still `@endur/api` and `@endur/web`, so every `npm run … -w @endur/api`
+still works.
+
+**Setup on a fresh machine:** `npm install`, then Postgres 16 either via
+`sudo bash scripts/install-postgres.sh` or `npm run db:up` if you have Docker, then
+`cp .env.example .env` and set `SESSION_SECRET` to 32+ characters, then `npm run db:migrate`.
+On WSL, `sudo service postgresql start` after every Windows restart.
+
+**Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
+and `npx vitest run` inside `src/backend`. All four are green right now, so anything red is
+yours.
 
 ---
 
@@ -43,14 +72,14 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ```
 [x] T-005  A  context, requestId, logger, security, bodyParser, rateLimit
 [x] T-006  A  tenantResolver + tenant-bound prisma
-[ ] T-007  A  sessions, argon2id, login/logout/me, atomic register
-[ ] T-008  A  csrfProtection
+[x] T-007  A  sessions, argon2id, login/logout/me, atomic register
+[x] T-008  A  csrfProtection
 [x] T-009  A  validate(Dto) + errorFunnel + envelope
 [x] T-010  A  GRANT resolver  ← largest single task
 [x] T-011  A  db/graph.ts recursive CTEs
-[ ] T-012  A  requireCapability + requireEntitlement
-[ ] T-013  A  auditWriter + ctx.tx
-[ ] T-014  A  route-enumeration test + chain integration tests
+[x] T-012  A  requireCapability + requireEntitlement
+[x] T-013  A  auditWriter + ctx.tx
+[x] T-014  A  route-enumeration test + chain integration tests
 ```
 ### Stage 2 — API features
 ```
@@ -96,7 +125,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 9 / 45 done.**
+**Progress: 14 / 45 done. Stage 1 complete.**
 
 ---
 
@@ -132,6 +161,163 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-19 · HAND-OFF NOTE — start here
+Vishv finished for the day. **Everything below is committed and pushed.** State:
+
+**What works end to end right now.** Register an organisation, sign in, get a session, have
+the tenant resolved from it, pass CSRF, be validated, and be authorised by the GRANT
+resolver — with the decision traced and the audit row written in the mutation's own
+transaction. `npx vitest run` in `src/backend` proves it: 20 tests, 4 files.
+
+**What to build next, and how to split it.** Lanes A and C are both free:
+
+| Task | Lane | Why it is startable |
+|---|---|---|
+| **T-015** org + presets + `POST /org/setup` | A | Guards and the grant matrix exist; `presets/grant-matrix.ts` already holds `50` §1 |
+| **T-025** SEED — 5 presets + 4 demo orgs | A | **DUE 22 AUG.** `02` §2 is blunt: a seeded demo alone can pass, an unseeded live build cannot |
+| **T-026–T-029** frontend foundation | X | `src/frontend` is a bare Vite scaffold. Nothing in it conflicts with backend work |
+
+If two people work at once, **one takes `src/backend/features/**`, the other takes
+`src/frontend/**`.** They share only `packages/shared`, and only additively.
+
+**Three things waiting in `app.ts`:**
+1. `POST /api/v1/_echo` is a temporary probe. **Delete it at T-015**, and drop its entries
+   from `PUBLIC_ROUTES` in `test/routes.test.ts` and from `TENANTLESS` in `tenantResolver.ts`
+2. The first real router is mounted with `mount(app, prefix, router)` from `lib/mount.ts` —
+   use that, not `app.use`, or the route-enumeration test cannot see the routes
+3. Links 12 (scoped rate limits) and 13 (idempotency) are written or specced but not yet
+   applied to any route; they attach per route in Stage 2
+
+**Two decisions still need the team** — `OPEN-005` (campaign status, due 22 Aug) and
+`OPEN-002` (the QR's public URL, due 24 Aug). Both block Stage-4 work and neither has moved.
+
+**Read before touching the chain:** `_MEMORY.md` `N-014`. Session loading must precede
+`tenantResolver`, and there is a test that fails loudly if that is undone.
+
+### 2026-08-19 · T-014 finished — the ordering and isolation tests
+`test/ordering.test.ts` and `test/tenant.test.ts` close the two open items. **20 tests
+across 4 files, all passing.**
+
+The ordering tests build deliberately WRONG chains and assert they break — which is what
+makes `12` §5 a requirement rather than a comment. If one ever starts passing, the
+constraint it protects has quietly stopped being real:
+
+| Mis-ordering | Asserted failure |
+|---|---|
+| `errorFunnel` registered before the route | Express's HTML handler answers; no envelope |
+| `errorFunnel` registered last | envelope, requestId, **no stack** |
+| No `bodyParser` before `validate` | 422 — loud, not a silent pass |
+| `tenantResolver` before the session loads | `401 UNRESOLVED_TENANT` — pins `N-014` |
+
+Tenant isolation is asserted mechanically now, including the forged-`orgId` case INV-010
+exists for, and the raw-client case that documents *why* lint confines it.
+
+**One behavioural change made while writing these.** `tenantResolver` demanded a tenant on
+EVERY path, so a mistyped `/nope` returned `401 UNRESOLVED_TENANT` rather than a 404. It is
+now scoped to `/api/v1/**`: an API route with no resolvable tenant is still 401 (INV-010
+runs before routing, deliberately), but anything else falls through to `notFound`. "That
+page does not exist" is the honest answer to a typo.
+
+Also: typed-lint is relaxed for `no-unsafe-*` inside test files only. supertest types
+`res.body` as `any`; asserting on it is the file's whole purpose, and a wrong assumption
+fails the test loudly anyway.
+
+### 2026-08-19 · T-013 audit + T-014 route enumeration — Stage 1 complete
+**`ctx.tx` writes the audit row inside the mutation's own transaction** (`db/tx.ts`). That is
+the whole of INV-007: a post-response writer with its own transaction can succeed when the
+mutation rolled back, and an audit log that disagrees with reality is worse than none.
+`auditWriter` is only the safety net — it asserts after the response that a mutating request
+produced a row, and **throws in development**, so a forgotten audit call is caught by whoever
+wrote it rather than months later.
+
+**The route-enumeration test passes, AND it was proved to fail.** Adding an unguarded
+`GET /api/v1/secrets` produced exactly the intended failure; removing it went back to green.
+A test that cannot fail proves nothing, so this check should be repeated whenever the
+enumeration logic changes.
+
+`requireCapability` now tags its handler with a symbol, so the test reads the router stack
+rather than parsing source — source-parsing checks rot.
+
+**`lib/mount.ts` is new and not in any doc.** Express 5 removed the `regexp` that v4 put on
+a router layer, so a mount path cannot be recovered by walking internals any more. `mount()`
+records the prefix explicitly; it costs one line per router and makes T-014 independent of
+framework internals that change between majors.
+
+`PUBLIC_ROUTES` in the test is an allowlist where **every entry carries its reason**. When a
+new route makes this fail, the fix is almost never a new allowlist entry — it is the guard.
+
+Still outstanding on T-014 (marked `~`): the ordering tests (deliberately mis-order two links
+and assert a loud failure) and the tenant-isolation integration test. The enumeration test —
+the highest-value one — is done.
+
+### 2026-08-19 · T-007 auth + T-008 CSRF — the chain works end to end
+Sessions (`express-session` + `connect-pg-simple`), argon2id, `/register` `/login`
+`/logout` `/me` `/csrf`, and the double-submit CSRF check. Verified live:
+
+| | Result |
+|---|---|
+| `/register` | 201, and the org is built in ONE transaction |
+| `/me` | user + organization + **resolved labels** |
+| Wrong password vs unknown email | **byte-identical** responses |
+| `POST /logout` with no CSRF token | `403 CSRF_FAILED` |
+| `POST /logout` with the token | `{"ok":true}`, session destroyed server-side |
+| `endur.sid` · `endur.csrf` | HttpOnly · readable, as the double-submit pattern requires |
+
+The founder's real powers, resolved through the engine after registering:
+`campaign.launch → Owner subtree` · `grant.update → Owner all` · `audit.read → Owner all` ·
+`person.read self → self`. That last one is the row `50` §1 warns about — without the
+universal self grants, a default-deny model silently produces an unopenable profile page.
+
+**ORDERING FINDING, worth reading before touching `app.ts`.** `12` §5 says
+`tenantResolver → authenticate`, and that still holds — but tenantResolver resolves the org
+*from* `req.session.orgId`, so the session record must already be LOADED when it runs.
+Putting `sessionMiddleware` where `authenticate` sits made every authenticated request fail
+`UNRESOLVED_TENANT`. The distinction that resolves it: **loading a session is not
+authenticating.** `cookieParser` + `sessionMiddleware` go above tenantResolver; principal
+selection stays at link 7. Documented in `app.ts` at the call site.
+
+`/register` builds org + root unit + Owner role + user + person + position + membership edge
++ the level-1 grants in a single transaction. A half-created org is the worst failure
+available here: a user who exists, can see nothing, and cannot retry because their email is
+taken.
+
+`presets/grant-matrix.ts` now holds the `50` §1 matrix as data. T-015/T-025 build the five
+presets on top of it rather than restating it.
+
+**Known rough edge:** `/me` without a session returns `401 UNRESOLVED_TENANT` rather than
+`401 UNAUTHENTICATED`, because tenantResolver runs first and legitimately cannot find an org.
+Same status, less precise code. Harmless for the SPA (any 401 routes to `/login`); tidy it
+when the auth routes get their final pass.
+
+### 2026-08-19 · T-012 the guards
+`requireCapability` and `requireEntitlement`, plus the tier map in `billing/entitlements.ts`.
+Both are thin, which is the point — the thinking lives in `resolve()`.
+
+`requireCapability` reads the target id from `req.data`, the **validated** request. That is
+why `validate` must run first (`12` §5): reading raw input here would let a caller point the
+permission check at one resource and the handler at another.
+
+403 bodies carry `reason` and `decidedBy` always, and `considered` only outside production —
+a series of 403s carrying the full trace would let an outsider map the org's permission
+structure from outside.
+
+`requireEntitlement` verified against `16` §3:
+
+| | Result |
+|---|---|
+| Bronze includes `grant.update`, `person.delete`, `simulator.run`, `campaign.launch` | **all true** |
+| Bronze includes `analysis.read` / `audit.read` | false → upgrade to silver / enterprise |
+| Gold includes a silver feature · Silver includes an enterprise one | true · false |
+
+The first row is the one that matters: **the entire permission surface is in the cheapest
+tier.** Correct handling of who-can-see-what is never an upgrade (`01` §6), and `simulator.run`
+is Bronze too — gating it would mean the customers least able to configure permissions are
+the ones who cannot check their work.
+
+Also fixed: `context.ts` carried a placeholder `Decision` type from before `authz/` existed.
+It now imports the real one — two definitions of one shape is exactly the drift the shared-DTO
+approach exists to prevent.
 
 ### 2026-08-18 · T-010 GRANT resolver + T-011 graph CTEs
 The largest task in the build. `authz/` is `collect` → `scope` → `params` → `resolve`, with

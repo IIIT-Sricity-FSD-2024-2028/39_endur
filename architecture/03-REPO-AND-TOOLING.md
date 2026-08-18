@@ -9,6 +9,14 @@ Decisions: `_MEMORY.md` DEC-003, DEC-007
 
 npm workspaces. No Turborepo, no Nx — one more tool to explain is not worth it at this size.
 
+**Backend, frontend, database and shared contracts each get their own folder, named for what
+they are.** `src/backend` and `src/frontend` are npm workspaces (`@endur/api`, `@endur/web`);
+the package names kept their short forms because they appear in every `-w` flag.
+
+**Neither app has an inner `src/`.** The outer `src/` already says "this is source", and a
+second one only made every path longer. `tsconfig.json` therefore names the compiled
+folders explicitly rather than relying on a single `src/**` glob.
+
 ```
 39_endur/
   CLAUDE.md                    auto-loaded project instructions
@@ -28,42 +36,41 @@ npm workspaces. No Turborepo, no Nx — one more tool to explain is not worth it
         labels.ts              LabelSet type + defaults      (22-VOCABULARY-SYSTEM)
         index.ts
 
-  apps/
-    api/                       Express + TypeScript
-      prisma/
+  src/
+    backend/                   Express + TypeScript
+      database/
         schema.prisma
         migrations/          incl. a plain-SQL one for `sessions` (10 §5)
         seed/                  presets + demo orgs          (50-SEED-AND-DEMO)
-      src/
-        app.ts                 the middleware chain assembled (12)
-        server.ts              bootstrap, graceful shutdown
-        middleware/            one file per link in the chain (12)
-        authz/                 the GRANT resolver             (11)
-        auth/                  sessions, respondent tokens, api keys (15)
-        billing/               entitlements, metering         (16)
-        db/
-          client.ts            prisma singleton
-          graph.ts             THE ONLY raw SQL in the app   (DEC-007)
-        features/<name>/       router + handlers + service, one folder per feature
-        presets/               industry presets              (50)
-        lib/                   logger, errors, ids, config
+      app.ts                   the middleware chain assembled (12)
+      server.ts                bootstrap, graceful shutdown
+      middleware/              one file per link in the chain (12)
+      authz/                   the GRANT resolver             (11)
+      auth/                    sessions, respondent tokens, api keys (15)
+      billing/                 entitlements, metering         (16)
+      db/
+        client.ts              prisma singleton
+        graph.ts               THE ONLY raw SQL in the app   (DEC-007)
+      features/<name>/         router + handlers + service, one folder per feature
+      presets/                 industry presets              (50)
+      lib/                     logger, errors, ids, config
       storage/                 uploaded binaries (48). gitignored.
                                <orgId>/<fileId>.webp
       test/
 
-    web/                       React + Vite + TypeScript
+    frontend/                  React + Vite + TypeScript
       public/fonts/            self-hosted faces — see design_specs/design/01 §2
-      src/
-        main.tsx
-        router/                                              (20)
-        design-system/         tokens.css organic.css endur.css (21)
-        components/            the inventory                 (24)
-        pages/
-          public/  console/  respond/                        (30-42)
-        store/                 thin in P1-P2                 (23)
-        lib/
-          api.ts               typed fetch wrapper
-          labels.ts            useLabels()                   (22)
+      index.html
+      main.tsx
+      router/                                                (20)
+      design-system/           tokens.css organic.css endur.css (21)
+      components/              the inventory                 (24)
+      pages/
+        public/  console/  respond/                          (30-42)
+      store/                   thin in P1-P2                 (23)
+      lib/
+        api.ts                 typed fetch wrapper
+        labels.ts              useLabels()                   (22)
 ```
 
 **Why `packages/shared` exists at all:** a DTO defined once and inferred on both sides is the
@@ -77,7 +84,7 @@ shape twice and they would drift within a week.
 {
   "name": "endur",
   "private": true,
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": ["packages/*", "src/*"],
   "engines": { "node": ">=20" },
   "scripts": {
     "dev":          "npm run dev -w @endur/api & npm run dev -w @endur/web",
@@ -206,15 +213,15 @@ the recovery path during a live demo (`50-SEED-AND-DEMO.md`).
 
 | Rule | Enforces |
 |---|---|
-| `no-restricted-syntax` on banned identifiers `Course|Faculty|Student|Semester` in `apps/`, `packages/` | INV-002 |
+| `no-restricted-syntax` on banned identifiers `Course|Faculty|Student|Semester` in `src/`, `packages/` | INV-002 |
 | `no-restricted-imports` — nothing outside `db/graph.ts` may import `$queryRaw` | DEC-007 |
-| `no-restricted-syntax` — no literal hex colour in `apps/web/src/**` outside `design-system/` | DEC-012 |
+| `no-restricted-syntax` — no literal hex colour in `src/frontend/**` outside `design-system/` | DEC-012 |
 
 ## 7. Scripts that enforce invariants
 
 Two node scripts in `/scripts`. Both run in CI and both are cheap.
 
-**`audit-vocab.mjs`** (INV-001) — greps `apps/web/src/pages` and `components` for the banned
+**`audit-vocab.mjs`** (INV-001) — greps `src/frontend/pages` and `components` for the banned
 domain nouns outside `useLabels()` calls. Complements, does not replace, the manual
 nonsense-label walkthrough on 24 Aug.
 

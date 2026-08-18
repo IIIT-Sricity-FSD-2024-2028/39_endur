@@ -1,6 +1,6 @@
 # 13 — API contract
 
-Phase: P1 · Milestone: M0 · Owns: `apps/api/src/routes/**` (router wiring)
+Phase: P1 · Milestone: M0 · Owns: `src/backend/routes/**` (router wiring)
 Related: `12-MIDDLEWARE-STACK.md`, `14-DTO-AND-VALIDATION.md`, `11-PERMISSION-ENGINE.md`
 
 ---

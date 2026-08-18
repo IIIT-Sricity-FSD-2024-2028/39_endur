@@ -4,14 +4,29 @@
 // The point of parsing here rather than reading process.env at each use site is that a
 // missing SESSION_SECRET becomes a startup crash with a readable message, instead of a
 // confusing 500 in the middle of a demo.
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 // Node 20+ reads the file natively; no dotenv dependency. Absent .env is fine —
 // in CI and in production the variables come from the environment itself.
-try {
-  process.loadEnvFile(new URL('../../../../.env', import.meta.url).pathname);
-} catch {
-  /* no .env on disk — fall through to the real environment */
+// Walk up for the repo-root .env rather than counting directories. A fixed `../../../..`
+// silently breaks the moment a folder is renamed, and the failure looks like a missing
+// variable rather than a wrong path.
+{
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  for (let up = 0; up < 6; up += 1) {
+    const candidate = path.join(dir, '.env');
+    if (existsSync(candidate)) {
+      process.loadEnvFile(candidate);
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // No .env on disk is fine: in CI and production the variables come from the environment.
 }
 
 const Env = z.object({

@@ -1,6 +1,6 @@
 # 22 — The vocabulary system
 
-Phase: P2 · Milestone: M0 · Owns: `apps/web/src/lib/labels.ts`
+Phase: P2 · Milestone: M0 · Owns: `src/frontend/lib/labels.ts`
 Design ref: `design_specs/design/02-IA-AND-NAVIGATION.md` §4
 Invariants: INV-001, INV-002
 
@@ -75,7 +75,7 @@ export type LabelSet = z.infer<typeof LabelSet>;
 ## 3. Implementation
 
 ```ts
-// apps/web/src/lib/labels.ts
+// src/frontend/lib/labels.ts
 export const useLabels = (): LabelSet =>
   useAppSelector(s => s.vocabulary.labels) ?? DEFAULT_LABELS;
 ```
@@ -114,7 +114,7 @@ Spend boldness there; everything else stays quiet. Anatomy and spacing are in
 
 Two halves, both required.
 
-**Mechanical — `npm run audit:vocab`** (`03` §7). Greps `apps/web/src/pages` and `components`
+**Mechanical — `npm run audit:vocab`** (`03` §7). Greps `src/frontend/pages` and `components`
 for the banned nouns outside a `useLabels()` expression. Runs in CI. Catches the common case
 cheaply.
 

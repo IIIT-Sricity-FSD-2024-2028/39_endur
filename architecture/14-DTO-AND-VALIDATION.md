@@ -96,7 +96,7 @@ const launchCampaign: Handler<typeof LaunchCampaignDto> = async (req, res) => {
 ```
 
 **Handlers read `req.data`, never `req.body`.** A handler touching `req.body` is reading
-unvalidated input, and `grep -rn 'req\.body' apps/api/src/features` returning anything is a
+unvalidated input, and `grep -rn 'req\.body' src/backend/features` returning anything is a
 finding. This is enforced by an ESLint `no-restricted-syntax` rule.
 
 ## 4. Discriminated unions — where this pays off most
@@ -152,7 +152,7 @@ exactly the friction DEC-010 intends.
 `process.env` is untrusted input like any other, so it gets the same treatment:
 
 ```ts
-// apps/api/src/lib/config.ts
+// src/backend/lib/config.ts
 const Env = z.object({
   NODE_ENV:        z.enum(['development', 'test', 'production']),
   PORT:            z.coerce.number().default(4000),
@@ -194,7 +194,7 @@ errors land in the right place rather than at the top of the page.
 The same schema types the client (DEC-003):
 
 ```ts
-// apps/web/src/lib/api.ts
+// src/frontend/lib/api.ts
 export async function createCampaign(input: CreateCampaignBody): Promise<Campaign> {
   return post('/api/v1/campaigns', input);
 }
@@ -219,7 +219,7 @@ because the client is not trustworthy (INV-003 applies to input as well as autho
 ## 9. Acceptance
 
 - [ ] Every route in `13-API-CONTRACT.md` has a DTO in `packages/shared/src/dto`
-- [ ] `grep -rn 'req\.body' apps/api/src/features` returns nothing
+- [ ] `grep -rn 'req\.body' src/backend/features` returns nothing
 - [ ] No request DTO accepts `orgId`
 - [ ] `QuestionConfig` and `AnswerValue` are discriminated unions over the same six kinds
 - [ ] Submitting an answer whose kind mismatches its question returns 422, not 500

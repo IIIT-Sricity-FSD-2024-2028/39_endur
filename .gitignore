@@ -10,7 +10,7 @@ build/
 .env.*
 !.env.example
 
-apps/api/storage/
+src/backend/storage/
 coverage/
 .vite/
 .eslintcache
@@ -19,3 +19,4 @@ coverage/
 *.log
 npm-debug.log*
 dist-config/
+dist-types/

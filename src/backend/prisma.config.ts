@@ -15,9 +15,9 @@ process.loadEnvFile(path.join(import.meta.dirname, '../../.env'));
 Object.assign(process.env, fromEnvironment);
 
 export default defineConfig({
-  schema: path.join(import.meta.dirname, 'prisma', 'schema.prisma'),
+  schema: path.join(import.meta.dirname, 'database', 'schema.prisma'),
   migrations: {
-    path: path.join(import.meta.dirname, 'prisma', 'migrations'),
-    seed: 'tsx prisma/seed/index.ts',
+    path: path.join(import.meta.dirname, 'database', 'migrations'),
+    seed: 'tsx database/seed/index.ts',
   },
 });

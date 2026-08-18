@@ -65,8 +65,8 @@ The live build state is in [`PROGRESS.md`](PROGRESS.md).
 ## 🟪 Repository
 
 ```
-apps/api/           Express + Prisma. The middleware chain is src/app.ts
-apps/web/           React SPA
+src/backend/           Express + Prisma. The middleware chain is src/app.ts
+src/frontend/           React SPA
 packages/shared/    Zod DTOs, the capability catalogue, error codes, labels
 architecture/       contracts: schema, routes, capabilities, acceptance criteria
 design_specs/       visual authority: tokens, type, colour, component anatomy

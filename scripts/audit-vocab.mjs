@@ -8,7 +8,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ROOTS = ['apps/web/src/pages', 'apps/web/src/components'];
+const ROOTS = ['src/frontend/pages', 'src/frontend/components'];
 
 // Words that describe THE CUSTOMER'S WORLD. If a word describes Endur itself
 // (Save, Cancel, Settings, Question, Response) it is correctly literal — 22 §1.

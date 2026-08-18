@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "rootDir": "./",
+    "outDir": "./dist",
+    "noEmit": false
+  },
+  // Source sits directly in the workspace root, so the compiled set is named explicitly.
+  // Tests, the database folder and the config files belong to tsconfig.node.json.
+  "include": ["*.ts", "auth/**/*.ts", "authz/**/*.ts", "billing/**/*.ts", "db/**/*.ts",
+              "features/**/*.ts", "lib/**/*.ts", "middleware/**/*.ts", "presets/**/*.ts"],
+  "exclude": ["dist", "dist-config", "node_modules", "*.config.ts"],
+  "references": [{ "path": "../../packages/shared" }, { "path": "./tsconfig.node.json" }]
+}

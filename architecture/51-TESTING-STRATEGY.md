@@ -1,6 +1,6 @@
 # 51 — Testing strategy
 
-Phase: P1 onward · Owns: `**/*.test.ts`, `apps/api/test/**`, `e2e/**`
+Phase: P1 onward · Owns: `**/*.test.ts`, `src/backend/test/**`, `e2e/**`
 
 Testing is proportional to consequence. Three areas carry real consequence in this codebase,
 and the rest is ordinary.
@@ -22,7 +22,7 @@ and RLS are exactly what needs testing and none of them exist in a fake.
 
 ## 2. Unit — the resolver
 
-`apps/api/src/authz/**` is the most heavily tested code in the project. Every case in `11` §9
+`src/backend/authz/**` is the most heavily tested code in the project. Every case in `11` §9
 and §10 is a test:
 
 - Deny beats allow, from a role, a group, a delegation, and a person override — four tests,
@@ -54,7 +54,7 @@ codebase.
 | `grep`: `$queryRaw` appears only in `db/graph.ts` | DEC-007 |
 | `grep`: `req.body` appears in no feature handler | `14` §9 |
 | `grep`: no education-specific identifier outside the university preset | INV-002 |
-| `grep`: no hex colour in `apps/web/src` outside `design-system/` | DEC-012 |
+| `grep`: no hex colour in `src/frontend` outside `design-system/` | DEC-012 |
 | `grep`: no emoji in any `.tsx` | `21` §5 |
 | Schema inspection: `responses` has no person-referencing column | INV-006 |
 | No seeded template exceeds 10 questions | `01` §5 |

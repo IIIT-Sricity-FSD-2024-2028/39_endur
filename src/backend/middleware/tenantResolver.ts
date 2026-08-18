@@ -23,7 +23,18 @@ declare global {
  * Routes that legitimately have no tenant yet: signing in, registering, health. Only these
  * may fall through to the slug header, and only these may proceed without an org.
  */
-const TENANTLESS = [/^\/healthz$/, /^\/api\/v1\/auth\/(login|register)$/, /^\/api\/v1\/auth\/csrf$/];
+const TENANTLESS = [
+  /^\/healthz$/,
+  /^\/api\/v1\/auth\//,
+  /^\/api\/v1\/_echo$/, // temporary pipe probe, deleted at T-015
+];
+
+/**
+ * Only API routes need a tenant. Anything else that reaches here matched no route, so it
+ * must fall through to `notFound` and leave as a 404 — demanding a tenant first would turn
+ * every mistyped URL into a 401, which is a confusing answer to "that page does not exist".
+ */
+const NEEDS_TENANT = /^\/api\/v1\//;
 
 export const tenantResolver: RequestHandler = (req, _res, next) => {
   void resolve(req)
@@ -33,6 +44,7 @@ export const tenantResolver: RequestHandler = (req, _res, next) => {
         req.db = tenantClient(orgId);
         return next();
       }
+      if (!NEEDS_TENANT.test(req.path)) return next();
       if (TENANTLESS.some((pattern) => pattern.test(req.path))) return next();
       next(new AppError('UNRESOLVED_TENANT', 'No organisation could be determined.'));
     })

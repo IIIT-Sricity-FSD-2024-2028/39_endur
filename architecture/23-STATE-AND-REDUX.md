@@ -1,6 +1,6 @@
 # 23 — State and Redux
 
-Phase: P1–P2 thin · **P3 is the graded phase** · Owns: `apps/web/src/store/**`
+Phase: P1–P2 thin · **P3 is the graded phase** · Owns: `src/frontend/store/**`
 Decisions: `_MEMORY.md` DEC-008 · Open: **OPEN-001 — the P3 shape is not decided**
 
 ---
@@ -17,7 +17,7 @@ P3 is **additive rather than a rewrite**.
 ## 2. P1–P2: two slices, and no more
 
 ```
-apps/web/src/store/
+src/frontend/store/
   index.ts          configureStore, typed hooks
   authSlice.ts      { status, user, org, capabilities }
   vocabularySlice.ts{ labels }                              (22)

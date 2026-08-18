@@ -1,6 +1,6 @@
 # 10 — Data model
 
-Phase: P1 · Milestone: M0 · Owns: `apps/api/prisma/**`, `apps/api/src/db/**`
+Phase: P1 · Milestone: M0 · Owns: `src/backend/database/**`, `src/backend/db/**`
 Decisions: `_MEMORY.md` DEC-002, DEC-006, DEC-007 · Invariants: INV-002, INV-005, INV-006, INV-010
 
 ---
@@ -425,12 +425,12 @@ denied" from an assertion into evidence, and it is what the simulator replays (`
 
 ## 6. Recursive queries — the raw-SQL seam
 
-Prisma cannot express recursive CTEs. These live in **`apps/api/src/db/graph.ts`, the only
+Prisma cannot express recursive CTEs. These live in **`src/backend/db/graph.ts`, the only
 file in the app permitted to use `$queryRaw`** (DEC-007). Each is wrapped in a typed function
 so callers never see SQL.
 
 ```ts
-// apps/api/src/db/graph.ts
+// src/backend/db/graph.ts
 export async function unitSubtree(orgId: string, rootId: string): Promise<string[]>
 export async function unitAncestors(orgId: string, unitId: string): Promise<string[]>
 export async function positionsInSubtree(orgId: string, rootId: string): Promise<Position[]>
@@ -584,7 +584,7 @@ detection is the highest-value of these (`customization.md` §6) and is specifie
 - [ ] A campaign's `anonymous` flag cannot be changed after launch — trigger test
 - [ ] Deleting a unit with children is either refused or reparents them, and the
       confirmation states the real number affected
-- [ ] `grep -rn '\$queryRaw' apps/api/src` returns hits only in `db/graph.ts`
+- [ ] `grep -rn '\$queryRaw' src/backend` returns hits only in `db/graph.ts`
 - [ ] `sessions` exists and is created by a plain SQL migration, not modelled in Prisma
 - [ ] Deleting a `files` row nulls the referencing column rather than cascading a user away
 

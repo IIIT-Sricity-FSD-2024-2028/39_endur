@@ -22,7 +22,14 @@ import {
   notFound,
   errorFunnel,
   tenantResolver,
+  authenticateOptional,
+  csrfProtection,
+  auditWriter,
 } from './middleware/index.js';
+import cookieParser from 'cookie-parser';
+import { sessionMiddleware } from './auth/session.js';
+import { authRouter } from './features/auth/router.js';
+import { mount } from './lib/mount.js';
 import { z } from 'zod';
 
 export function createApp() {
@@ -58,11 +65,29 @@ export function createApp() {
   //  5 · rateLimit (global, per IP)
   app.use(globalRateLimit);
 
+  // Cookie parsing and the SESSION LOAD sit above tenantResolver. That refines 12 §5
+  // rather than contradicting it: the table says tenantResolver precedes `authenticate`,
+  // and it still does — but tenantResolver resolves the org FROM req.session.orgId, so
+  // the session record has to be loaded by the time it runs.
+  //
+  // The distinction that makes both true: LOADING a session is not AUTHENTICATING.
+  // Loading happens here; deciding who the principal is happens at link 7, once the
+  // tenant and its db client exist.
+  app.use(cookieParser());
+  app.use(sessionMiddleware);
+
   //  6 · tenantResolver — INV-010. Must precede authenticate: an API key resolves the
   //      tenant AND the principal, and the db client must exist before any lookup.
   app.use(tenantResolver);
-  //  7 · authenticate       T-007
-  //  8 · csrfProtection     T-008
+  //  7 · authenticate — attaches the principal. Optional globally; individual routers
+  //      use `authenticate` where a principal is required.
+  app.use(authenticateOptional);
+
+  //  8 · csrfProtection — cookie principals only, unsafe methods only.
+  app.use(csrfProtection);
+
+  mount(app, '/api/v1/auth', authRouter);
+
   //      per-route: validate -> requireCapability -> requireEntitlement -> rateLimit -> idempotency
   // 14 · auditWriter        T-013
 
@@ -75,6 +100,9 @@ export function createApp() {
       res.json({ data: req.data });
     },
   );
+
+  // 14 · auditWriter — the safety net (the write itself happens in ctx.tx)
+  app.use(auditWriter);
 
   // 15 · notFound
   app.use(notFound);

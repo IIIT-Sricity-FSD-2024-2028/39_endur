@@ -1,6 +1,6 @@
 # 24 — Component inventory
 
-Phase: P2 · Milestone: M0 · Owns: `apps/web/src/components/**`
+Phase: P2 · Milestone: M0 · Owns: `src/frontend/components/**`
 Design ref: `design_specs/design/09-COMPONENTS-AND-PATTERNS.md` — **authoritative for anatomy**
 
 Twenty-one components. **A page doc may not invent a component** — if a screen needs something

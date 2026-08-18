@@ -4,23 +4,18 @@
 // makes the chain readable top to bottom — you can point at any link and say exactly what
 // it contributed.
 import type { RequestHandler } from 'express';
-import type { Capability, Scope, Effect } from '@endur/shared';
+// The resolver owns Decision. This file used to declare a placeholder copy, from before
+// authz/ existed; two definitions of the same shape is exactly the drift the DTO approach
+// is meant to prevent.
+import type { Decision } from '../authz/types.js';
+
+export type { Decision };
 
 /** Set by authenticate (T-007). Three kinds, so downstream links need not care which. */
 export type Principal =
   | { kind: 'user'; id: string; orgId: string }
   | { kind: 'apiKey'; id: string; orgId: string; scopes: string[] }
   | { kind: 'respondent'; campaignId: string; orgId: string };
-
-/** Produced by the GRANT resolver (T-010). Carried forward deliberately — see below. */
-export type Decision = {
-  allowed: boolean;
-  capability: Capability;
-  reason: string;
-  decidedBy?: { via: string; subjectName?: string; scope?: Scope; effect?: Effect };
-  /** Omitted in production: enough to be actionable, not enough to map an org from outside. */
-  considered?: unknown[];
-};
 
 export type AuditIntent = {
   action: string;
@@ -42,6 +37,10 @@ export type RequestContext = {
   decision?: Decision;
   /** Appended by handlers, flushed by ctx.tx inside the mutation's own transaction. */
   audit: AuditIntent[];
+  /** Per-request resolver memo (11 §7). Correct by construction: a request is a snapshot. */
+  authzMemo?: Map<string, Promise<Decision>>;
+  /** Set by ctx.tx once the audit rows are flushed; read by the auditWriter safety net. */
+  auditWritten?: boolean;
 };
 
 declare global {
