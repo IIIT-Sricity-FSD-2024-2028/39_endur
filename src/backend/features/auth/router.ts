@@ -10,6 +10,7 @@ import { validate } from '../../middleware/validate.js';
 import { scopedRateLimits } from '../../middleware/rateLimit.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { AppError, ConflictError, UnauthenticatedError } from '../../lib/errors.js';
+import { heldCapabilities } from '../../authz/held.js';
 import { register } from './service.js';
 
 export const authRouter: Router = Router();
@@ -96,6 +97,7 @@ authRouter.get('/me', authenticate, (req, res, next) => {
         id: user.org.id, name: user.org.name, slug: user.org.slug, industry: user.org.industry,
       },
       labels: resolveLabels(user.org.labels as never),
+      capabilities: await heldCapabilities(user.org.id, user.id),
     };
     res.json(body);
   })().catch(next);

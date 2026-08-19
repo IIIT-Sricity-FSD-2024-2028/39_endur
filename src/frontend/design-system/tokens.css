@@ -1,0 +1,103 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   tokens.css — the :root block, copied VERBATIM from
+   design_specs/design/01-DESIGN-SYSTEM.md §2 and §2b (21 §3, DEC-012).
+
+   This file may contain nothing but `:root` and `@font-face`. When §2 changes,
+   this file is RE-COPIED WHOLESALE, never patched (DRIFT-001).
+
+   The canonical accent is the form-builder set, not the analysis dashboard's
+   (CONF-003). The vendored organic.css ships its own warm :root; that block is
+   dropped when vendoring, precisely so this one is the only token source.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Ground & ink ───────────────────────────────────────── */
+  --color-bg:        #eef5fb;   /* page ground — pale blue, never white */
+  --color-surface:   #e2edf7;   /* chrome: nav bar, inputs, collapsed rows */
+  --color-text:      #17232e;   /* ink */
+  --color-divider:   color-mix(in srgb, #17232e 14%, transparent);
+  --color-card:      #ffffff;   /* content cards lift OFF the ground */
+
+  /* ── Accent — "the product" ─────────────────────────────── */
+  --color-accent:    #3f86e6;
+  --color-accent-100:#eaf2fd;  --color-accent-200:#d3e6fb;
+  --color-accent-300:#a8cdf7;  --color-accent-400:#6fabf0;
+  --color-accent-500:#3f86e6;  --color-accent-600:#2f6fd0;
+  --color-accent-700:#2559a8;  --color-accent-800:#1b4180;
+  --color-accent-900:#122c57;
+
+  /* ── Accent 2 — the second voice, and "good" ────────────── */
+  --color-accent-2:    #48a99f;
+  --color-accent-2-100:#e6f7f6; --color-accent-2-200:#c9edea;
+  --color-accent-2-300:#a0dbd6; --color-accent-2-400:#6ec2ba;
+  --color-accent-2-500:#48a99f; --color-accent-2-600:#368a81;
+  --color-accent-2-700:#296d66; --color-accent-2-800:#1e4f4a;
+  --color-accent-2-900:#143432;
+
+  /* ── Neutral ────────────────────────────────────────────── */
+  --color-neutral-100:#f4f8fb; --color-neutral-200:#e6eef5;
+  --color-neutral-300:#d3e0ea; --color-neutral-400:#aec3d4;
+  --color-neutral-500:#8aa3b8; --color-neutral-600:#67808f;
+  --color-neutral-700:#4e6270; --color-neutral-800:#37454f;
+  --color-neutral-900:#212a30;
+
+  /* ── Type ───────────────────────────────────────────────── */
+  --font-heading: "Caprasimo", system-ui, sans-serif;   /* weight 400 only */
+  --font-heading-weight: 400;
+  --font-body:    "Figtree", system-ui, sans-serif;      /* 400 / 600 / 700 */
+
+  /* ── Space — density 1.10× ──────────────────────────────── */
+  --space-1: 4.4px;  --space-2: 8.8px;  --space-3: 13.2px;
+  --space-4: 17.6px; --space-6: 26.4px; --space-8: 35.2px;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm: 8px; --radius-md: 16px; --radius-lg: 28px;
+  /* cards & dialogs: calc(var(--radius-lg) * 1.15) = 32.2px
+     buttons, tags, inputs, seg controls, bar tracks: 999px */
+
+  /* ── Elevation ──────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px  color-mix(in srgb, #212a30 12%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #212a30 14%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #212a30 20%, transparent);
+}
+
+/* ── The status ramp — §2b. STRICTLY SEMANTIC ──────────────────────────────
+   Never used for brand, navigation or decoration. It exists because the base
+   system is two-accent, and blue cannot simultaneously mean "the product" and
+   "a respondent is unhappy" (CONF-004).                                      */
+:root {
+  /* success — reuses accent-2, which is already the "good" voice */
+  --status-good-100:#e6f7f6; --status-good-500:#48a99f; --status-good-800:#1e4f4a;
+
+  /* caution / neutral-leaning-low */
+  --status-warn-100:#fdf3e0; --status-warn-500:#dfa03a; --status-warn-800:#7a5311;
+
+  /* risk / negative */
+  --status-bad-100: #fdecea; --status-bad-500: #d95c4a; --status-bad-800: #7d2a1e;
+}
+
+/* ── Faces ────────────────────────────────────────────────────────────────
+   SELF-HOSTED (21 §4). The declaration lives beside the family custom property
+   so the two cannot drift apart.
+
+   The woff2 files are NOT yet vendored — see public/fonts/README.md. Until they
+   are, both stacks fall back to system-ui and the product still renders; the
+   deadline for vendoring is 24 Aug, not demo day.
+
+   There is deliberately no @import of fonts.googleapis.com. A venue network that
+   blocks it would drop the whole product to system-ui mid-presentation, and a
+   remote font that works in dev and not on the projector is the worst of both.  */
+@font-face {
+  font-family: 'Caprasimo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/caprasimo-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400 700;   /* variable: 400 / 600 / 700 all come from one file */
+  font-display: swap;
+  src: url('/fonts/figtree-variable.woff2') format('woff2');
+}

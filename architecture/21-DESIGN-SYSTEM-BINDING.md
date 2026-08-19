@@ -32,8 +32,13 @@ Imported in exactly that order in `main.tsx`. The order is the cascade and is no
 | File | May contain | May not contain |
 |---|---|---|
 | `tokens.css` | Custom-property declarations only | Any selector other than `:root` |
-| `organic.css` | The vendored design-system component layer, unchanged | Any Endur edit whatsoever |
-| `endur.css` | The status ramp, Endur component classes, the `.card` background override | New raw values that are not derived from tokens |
+| `organic.css` | The vendored design-system **component layer**, unchanged — the source file from `body {` onward | Any Endur edit whatsoever. Also not its `:root` block or its font `@import`, which belong to `tokens.css` (CONF-010) |
+| `endur.css` | The status-ramp **classes**, Endur component classes, the `.card` background override | New raw values that are not derived from tokens. The ramp's custom properties are tokens and live in `tokens.css` (§3) |
+
+The vendored file ships its own `:root` carrying the original warm palette. That block is
+dropped when vendoring — `design_specs/design/01` §2 instructs exactly that, and this file is
+defined above as the *component* layer, so the token block was never its to own. Keeping it
+would let the warm palette win the cascade and repaint the product terracotta (CONF-010).
 
 **`organic.css` is vendored, not authored.** Editing it means the next time the design system
 is regenerated, the edit is lost or silently conflicts. Everything Endur needs to change goes
@@ -130,7 +135,7 @@ From `design_specs/design/01` §9, non-negotiable and cheap while building:
 
 - [ ] Three CSS files exist, imported in the documented order
 - [ ] `tokens.css` contains only `:root` and `@font-face`
-- [ ] `organic.css` is byte-identical to the vendored source
+- [ ] `organic.css` is byte-identical to the vendored source from `body {` onward — verify with `tail -n +66 <source> | diff - <(tail -n +21 organic.css)`
 - [ ] `endur.css` contains exactly one override of a base class, documented inline
 - [ ] Fonts render correctly with the network disabled
 - [ ] `grep -rE '#[0-9a-fA-F]{6}' src/frontend --exclude-dir=design-system` returns nothing
