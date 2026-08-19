@@ -5,18 +5,19 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (Stage 3 foundation — T-026, T-028, T-029 done; T-027 partial)
+UPDATED   2026-08-19  (Stage 3 done — T-026, T-028, T-029, T-030; T-027 partial)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
-STATUS    28/45. STAGES 0-2 DONE, STAGE 3 ALL BUT THE FONTS.
-          199 tests across 20 files, all green (149 backend + 50 frontend).
+STATUS    29/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
+          214 tests across 23 files, all green (149 backend + 65 frontend).
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      T-030 AppShell (lane B) — it is a HAND-OFF, ship it before starting the
-          wizard or lane C is blocked. Then Stage 4 screens. Every page route already
-          exists as a placeholder; replace the file, do not add a route.
+NEXT      Stage 4 screens. LANE C IS UNBLOCKED — the shell is done, so T-035..T-040
+          can start alongside lane B's T-031..T-034. Every page route already exists
+          as a placeholder; replace the file, do not add a route.
+          Open a page with <PageHeader>; do not hand-roll a title.
           ALSO DUE 24 AUG: vendor the two woff2 files (see src/frontend/public/fonts).
 ```
 
@@ -55,8 +56,8 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **199 tests
-across 20 files**, 149 backend + 50 frontend. All five are green right now, so anything red
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **214 tests
+across 23 files**, 149 backend + 65 frontend. All five are green right now, so anything red
 is yours.
 
 The backend tests need Postgres running and they **write into the dev database** (`D-004`),
@@ -121,7 +122,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [~] T-027  X  design system css + self-hosted fonts  ← CSS done, WOFF2 NOT VENDORED
 [x] T-028  X  labels.ts + store            ← before any page
 [x] T-029  X  lib/api.ts (cookies + CSRF)
-[ ] T-030  B  AppShell, Sidebar, TopBar, PageHeader, VocabularyChips  ← hand-off to lane C
+[x] T-030  B  AppShell, Sidebar, TopBar, PageHeader, VocabularyChips  ← lane C UNBLOCKED
 ```
 ### Stage 4 — M0 screens
 ```
@@ -145,7 +146,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 28 / 45 done (T-027 partial). Stages 0-2 complete; Stage 3 all but the fonts.**
+**Progress: 29 / 45 done (T-027 partial). Stage 3 complete but for the font files.**
 
 ---
 
@@ -182,6 +183,59 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-19 · T-030 — the console shell. LANE C IS UNBLOCKED
+
+`AppShell`, `Sidebar`, `TopBar`, `PageHeader`, `VocabularyChips`, plus `<Icon>`. Every
+Stage-4 screen renders inside this, which is why it was the hand-off.
+
+**Open a page with `<PageHeader>`.** Title, optional subtitle, the vocabulary chip row, the
+scope chip, filter chips, one primary action. Hand-rolling a title is how differently-shaped
+screens stop feeling like one product. The scope chip is a **dropdown for a top-level role
+and a plain tag for a constrained one** — a disabled dropdown would imply the choice exists
+and is being withheld, which is the opposite of legible.
+
+**The sidebar is where two invariants meet.** Its `Subjects` and `Campaigns` items read
+`useLabels()`, so Northfield's sidebar says *Courses* and *Feedback cycles* — verified live.
+Items the caller lacks the capability for are **absent, not greyed**; the three "Soon" items
+are a different thing entirely and say so, as inert `<span>`s with a hover hint and no page
+behind them.
+
+**`<Icon>` is new and is in `24` §1.** `design_specs/design/01` §5 fixes stroke-width 2.75
+and a closed concept → icon vocabulary, and neither survives being remembered eighteen times.
+`IconName` is that vocabulary as a union, so a concept nobody has agreed an icon for does not
+compile. Never emoji.
+
+**A real gap, now `OPEN-006`: the org switcher has no data behind it.** `24` §2 gives
+`<TopBar>` an `orgs[]` prop and `design_specs/design/02` §3 calls it the second most important
+control in the demo — but **a user belongs to exactly one organisation**. `users.org_id` is
+non-null, `(org_id, email)` is the unique key, there is no membership table, and `13` has no
+endpoint that could list switchable orgs. The four demo orgs are four separate accounts.
+
+What is built is honest rather than a stand-in: the switcher lists the seeded demo orgs and
+**switches by re-authenticating**, gated at *build time* exactly as `30`'s login prefill is.
+`DEMO_ORGS` is `[]` in a production bundle, so the branch and its credentials vanish as dead
+code. Where there is nowhere to switch to, it renders as plain text — not a chevron that
+opens an empty menu. `OPEN-006` lists the three real fixes for whoever picks one.
+
+**Worth keeping:** the first attempt at that gating left the password behind. `import.meta.env.PROD`
+did eliminate the org array, but `export const DEMO_PASSWORD` next to it was reachable,
+therefore kept by the minifier — a credential string sitting in `dist/` with no accounts
+attached. Moving it *inside* each array entry made it vanish with the array. **A build-time
+guard only covers what is inside it**, and the way to know is to grep the bundle, which is
+now `21`-style acceptance in `lib/demo.ts`.
+
+`test-utils.tsx` now exists — `28`'s stated trigger was three component test files with
+visible setup duplication, which this reached. It carries `renderWithProviders()` and the
+**nonsense-label fixture** that makes INV-001 testable at component level rather than only by
+the manual walk (`22` §5).
+
+Not screenshotted — there is no browser or Playwright cache on this machine, and the user
+chose to look themselves rather than install one. **`51` §6 still needs Playwright for four
+E2E flows before M0**, so that install is coming regardless; it is not yet scheduled.
+
+New dependency: `lucide-react`. Green: typecheck · lint · audit:drift · audit:vocab · build ·
+**214 tests across 23 files**.
 
 ### 2026-08-19 · STAGE 3 FOUNDATION — T-026, T-028, T-029 (T-027 partial)
 
