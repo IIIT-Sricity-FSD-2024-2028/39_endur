@@ -368,6 +368,26 @@ OPEN-005  RESOLVED-BY:DEC-016  2026-08-19
   windows, seat recompute, webhook retry. each of those is either P3 or degrades to a
   stale row rather than a broken demo, and each can be derived on read the same way if it
   ever needs to be. see 17-BACKGROUND-JOBS.md.
+
+OPEN-006  REVISIT:2026-08-24  blocks:nothing-for-M0  found 2026-08-19 building T-030
+  THE ORG SWITCHER HAS NO DATA BEHIND IT. 24 §2 gives <TopBar> `orgs: OrgSummary[]` and
+  design_specs/design/02 §3 calls it the second most important control in the demo — "how
+  you go from University to Hotel in one click". but a user belongs to exactly ONE
+  organisation: users.org_id is non-null and (org_id, email) is the unique key (10), there
+  is no membership join table, and 13 has no endpoint that could list switchable orgs. the
+  four demo orgs are four separate accounts.
+  DONE FOR NOW, and it is honest rather than a stand-in: the switcher lists the seeded demo
+  orgs and switches by RE-AUTHENTICATING, gated at BUILD TIME the same way 30's login
+  prefill is — DEMO_ORGS is [] in a production bundle, so the branch and its credentials are
+  eliminated as dead code. verified by grepping dist/. when there is nowhere to switch to it
+  renders as plain text, not a dropdown that opens an empty menu.
+  THE REAL CHOICES, for whoever picks one:
+    a. leave it. one account per org is a defensible product statement, and the demo works.
+    b. a memberships table (user, org, role) — the correct multi-tenant answer, and a schema
+       change plus a session-scoped current_org. too big before M0.
+    c. one demo super-account with positions in all four orgs. cheapest of the real fixes,
+       but it makes the demo path differ from the product's.
+  see  src/frontend/lib/demo.ts, components/layout/TopBar.tsx, 24 §2
 ```
 
 ---
@@ -406,6 +426,11 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 22-VOCABULARY-SYSTEM.md          -> src/frontend/lib/labels.ts store/vocabularySlice.ts
 23-STATE-AND-REDUX.md            -> src/frontend/store/**
 24-COMPONENT-INVENTORY.md        -> src/frontend/components/**
+                                    components/Icon.tsx owns the closed icon vocabulary
+                                    (design_specs/design/01 §5). a concept without an
+                                    agreed icon must be added THERE before it is used.
+                                    lib/demo.ts is the build-time-stripped stage
+                                    affordance — see OPEN-006 and 30 § Sign in.
 25..29                           -> PLACEHOLDERS. 29 is unassigned. no paths owned.
 30..45 page docs                 -> src/frontend/pages/<world>/<Page>/**
                                     + src/backend/features/<feature>/**

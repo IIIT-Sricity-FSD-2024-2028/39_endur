@@ -21,6 +21,18 @@ lives in the design spec and is not repeated (DEC-012).
 forwards props to `<button className="btn">` is indirection without benefit. Wrap only when
 there is real behaviour: `<Toggle>` and `<ConfirmDialog>` qualify; a button does not.
 
+### `<Icon>`
+```ts
+{ name: IconName; size?: 16 | 18 | 20 | 24; className?: string; label?: string }
+```
+The one exception to the rule above, and it earns it: `design_specs/design/01` §5 fixes both
+the stroke weight and a **closed vocabulary** of concept → icon, and neither survives being
+remembered eighteen times. `IconName` is that vocabulary as a union, so a concept without an
+agreed icon does not compile.
+
+Decorative by default (`aria-hidden`); pass `label` only when the icon is the *only* thing
+carrying the meaning. Added by T-030 — the sidebar is the first consumer.
+
 ## 2. Layout
 
 ### `<AppShell>`

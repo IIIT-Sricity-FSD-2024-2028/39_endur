@@ -4,6 +4,7 @@
 // differently for three audiences accumulates `if`s until nobody can say what a
 // respondent actually sees — and that is a privacy risk, not only a code smell.
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { AppShell } from '../components/layout/AppShell.js';
 import { RequireSession } from './guards.js';
 
 /** Marketing chrome: brand, two links, one button (20 §1). Nothing else earns its place. */
@@ -21,18 +22,16 @@ export function PublicLayout(): JSX.Element {
 }
 
 /**
- * The console frame. T-030 (lane B) replaces the inside of this with
- * <AppShell> — Sidebar, TopBar, PageHeader, VocabularyChips (24 §2). Until then it is a
- * skip link and a landmark, so the routes are navigable and the accessibility floor holds
- * from the first commit rather than being retrofitted.
+ * The console frame. The session gate is OUTSIDE the shell on purpose: a signed-out user
+ * should never see chrome flash before the redirect, and the boot hold should not render a
+ * sidebar with nobody's name in it.
  */
 export function ConsoleLayout(): JSX.Element {
   return (
     <RequireSession>
-      <a className="skip-link" href="#main">Skip to content</a>
-      <main id="main" className="page">
+      <AppShell>
         <Outlet />
-      </main>
+      </AppShell>
     </RequireSession>
   );
 }

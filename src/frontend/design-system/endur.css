@@ -114,3 +114,154 @@
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CONSOLE SHELL — T-030. Anatomy and every state come from
+   design_specs/design/02 §3 and §6. Values are transcribed from there, never
+   invented here; where a number appears it is that document's number.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+.shell-body { flex: 1; display: flex; align-items: flex-start; min-height: 0; }
+.shell-content { flex: 1; min-width: 0; }
+
+/* ── Top bar — 56px, sticky, chrome, hairline under ───────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  height: 56px; flex: none;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding-inline: var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+}
+.topbar-brand {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 19px; color: inherit; text-decoration: none;
+}
+.topbar-mark {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  background: var(--color-accent); color: #fff;
+  font-family: var(--font-heading); font-size: 16px; line-height: 1;
+}
+/* The org switcher. Second-most-important control in the demo, so it sits next
+   to the brand and stays in the bar on mobile rather than moving into a menu. */
+.topbar-org {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 15px; max-width: 42vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+.topbar-menu { display: none; }
+
+.avatar {
+  display: grid; place-items: center; flex: none;
+  width: 28px; height: 28px; border-radius: 999px;
+  background: var(--color-accent-200); color: var(--color-accent-800);
+  font-family: var(--font-heading); font-size: 12px; line-height: 1;
+}
+.user-chip { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* ── Menus — the org switcher and the user chip share one anatomy ─────── */
+.menu-anchor { position: relative; }
+.menu {
+  position: absolute; top: calc(100% + var(--space-2)); left: 0; z-index: 30;
+  min-width: 232px; padding: var(--space-2);
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--color-card); border-radius: var(--radius-md);
+}
+.menu-right { left: auto; right: 0; }
+.menu-heading { margin: 0; padding: var(--space-1) var(--space-2); }
+.menu-note { margin: 0; padding: 0 var(--space-2) var(--space-2); }
+.menu-item {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%;
+  padding: var(--space-2); border: 0; border-radius: var(--radius-md);
+  background: transparent; color: inherit; font: inherit; font-size: 14px;
+  text-align: left; text-decoration: none; cursor: pointer;
+}
+.menu-item:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.menu-item[aria-current='true'] { background: var(--color-accent-100); color: var(--color-accent-700); }
+.menu-tag { margin-left: auto; }
+
+/* ── Sidebar — 232px, chrome, 40px pilled items inset 8px ─────────────── */
+.shell-rail { flex: none; width: 232px; align-self: stretch; background: var(--color-surface); }
+.sidebar { position: sticky; top: 56px; padding: var(--space-3) var(--space-2); }
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar-group + .sidebar-group { margin-top: var(--space-4); }
+.sidebar-heading { margin: 0 0 var(--space-1); padding-inline: var(--space-2); }
+.sidebar-item {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 40px; padding-inline: var(--space-2); border-radius: 999px;
+  font-size: 14px; text-decoration: none;
+  color: color-mix(in srgb, var(--color-text) 75%, transparent);
+}
+.sidebar-item svg { color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.sidebar-item:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.sidebar-item.is-active {
+  background: var(--color-accent-100); color: var(--color-accent-700); font-weight: 600;
+}
+.sidebar-item.is-active svg { color: var(--color-accent-700); }
+/* Roadmap items. Inert by construction — a <span> with no href — so this styling is
+   describing the state, not enforcing it (design_specs/design/02 §7). */
+.sidebar-item.is-soon { opacity: 0.4; cursor: not-allowed; }
+.sidebar-item.is-soon:hover { background: transparent; }
+.sidebar-soon { margin-left: auto; }
+
+/* ── Drawer — the sidebar below 640px ─────────────────────────────────── */
+.drawer-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.drawer {
+  width: 232px; height: 100%; overflow-y: auto;
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+}
+.drawer .sidebar { position: static; }
+
+/* ── Page header — every console page opens with this ─────────────────── */
+.page-header { margin-bottom: var(--space-6); }
+.page-header-top { display: flex; align-items: flex-start; gap: var(--space-4); }
+.page-header-top h2 { margin: 0; }
+.page-header-sub {
+  margin: var(--space-1) 0 0; font-size: 14px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.page-header-action { margin-left: auto; flex: none; }
+.page-header-chips {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-2); margin-top: var(--space-3);
+}
+
+/* The vocabulary chip row — the signature element (22 §4). Nothing else ever
+   occupies this position, so the eye learns it fast. */
+.chip-row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.chip-row-scroll {
+  display: flex; gap: var(--space-2); list-style: none; margin: 0; padding: 0;
+  overflow-x: auto; scrollbar-width: none;
+  /* No wrap on a phone: it scrolls, with the edges faded so it reads as scrollable. */
+  flex-wrap: nowrap;
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--space-2),
+                              #000 calc(100% - var(--space-2)), transparent 100%);
+}
+.chip-row-scroll::-webkit-scrollbar { display: none; }
+.chip-row-edit { flex: none; }
+
+.tag-clear {
+  margin-left: 6px; padding: 0; border: 0; background: transparent;
+  color: inherit; font: inherit; line-height: 1; cursor: pointer;
+}
+.scope-select select { height: 30px; padding-block: 0; font-size: 13px; }
+
+/* ── Below 640px: rail out, hamburger in, action goes full width ──────── */
+@media (max-width: 639px) {
+  .shell-rail { display: none; }
+  .topbar-menu { display: inline-flex; }
+  .topbar { padding-inline: var(--space-3); gap: var(--space-2); }
+  .topbar-brand span:last-child { display: none; }   /* mark only — the bar is crowded */
+  .user-chip-name { display: none; }
+  .page-header-top { flex-direction: column; gap: var(--space-2); }
+  .page-header-action { margin-left: 0; width: 100%; }
+  .page-header-action .btn { width: 100%; }
+}
