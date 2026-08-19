@@ -520,6 +520,13 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     components/org/UnitTree.tsx, owned by 24 — read N-025
                                     before touching it. T-033 also took the range grammar
                                     in packages/shared/src/dto/unit.ts (N-027).
+35-PAGE-subjects.md              -> src/frontend/pages/console/Subjects/** lib/subjects.ts
+                                    + src/backend/features/subjects/**
+                                    T-034 also created lib/people.ts (the linked-person
+                                    picker) and took usePeopleIn there out of lib/units.ts.
+                                    34-PAGE-people.md OWNS lib/people.ts when it is built.
+                                    components/data/** (ResponsiveTable, StatCard, BarRow)
+                                    was built here but belongs to 24, like every component.
 46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/**
 47-PAGE-profile.md               -> src/frontend/pages/console/Profile/**
 48-FEATURE-file-upload.md        -> src/backend/features/uploads/**
@@ -773,4 +780,23 @@ N-028  /app/structure IS THE SECOND ROUTE-LEVEL CAPABILITY GATE. 32 § States re
        has NOT changed: everywhere else, out-of-scope data is absent rather than gated
        (INV-003). These two are gated because on them the page IS the action, so somebody
        without the capability would otherwise get an empty screen that looks broken.
+N-029  THE PAGINATED ENVELOPE WAS DECLARED TWICE, DIFFERENTLY, AND THE WRONG ONE WAS THE
+       SHARED ONE. `Page<T>` in packages/shared said `{ items }` from T-003; every list
+       handler returned `Paged<T>` from src/backend/lib/paginate.ts, which says
+       `{ data, page, meta }` — and 13 §4 agrees with the backend. Nothing consumed the
+       shared type for sixteen days, so nothing noticed.
+       T-033's people list was the first caller to trust it. It read `.items`, got
+       undefined, and its TEST PASSED because the mock repeated the same wrong shape. Found
+       by T-034 only because the subjects list is paginated and the envelope had to be read
+       properly. Fixed by correcting the shared type to 13 §4 and making the backend's
+       `Paged<T>` an ALIAS of it — one declaration, so they cannot drift again.
+       The lesson worth keeping: a shared type nobody imports is not a contract, it is a
+       guess, and a mock written from the same guess will confirm it.
+N-030  THE SUBJECT DETAIL CARRIES CYCLES BUT NEVER SCORES. `GET /subjects/:id` returns the
+       summary plus every campaign the subject appeared in, with the responses that came
+       back ABOUT THAT SUBJECT in each — 35 § Interactions' "first hint of the Improve
+       layer". It deliberately carries no averages: aggregates live behind the results
+       endpoints, which is where the k-anonymity gate is (INV-007). A per-subject average
+       on a page with no gate in front of it would be a second, ungated path to the same
+       numbers, and it would look completely innocent in review.
 ```

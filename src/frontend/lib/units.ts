@@ -13,8 +13,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CreateUnitBody,
   DeleteUnitBody,
-  Page,
-  PersonSummary,
   ReparentBody,
   UnitImpact,
   UnitNode,
@@ -127,35 +125,3 @@ export function useUnits(): UnitsController {
  */
 export const unitImpact = (id: string): Promise<UnitImpact> =>
   apiGet<{ data: UnitImpact }>(`/units/${id}/impact`).then((response) => response.data);
-
-/**
- * The first few people anchored in a unit, for the detail panel
- * (design_specs/design/04 §4.2). Scope-filtered by the API like every list — this never
- * filters for permission reasons (INV-003).
- */
-export function usePeopleIn(unitId: string | null): Loadable<Page<PersonSummary>> {
-  const [state, setState] = useState<Loadable<Page<PersonSummary>>>({
-    data: null, loading: false, error: null,
-  });
-
-  useEffect(() => {
-    if (!unitId) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    let cancelled = false;
-    setState({ data: null, loading: true, error: null });
-    void apiGet<Page<PersonSummary>>(`/people?unitId=${encodeURIComponent(unitId)}&limit=5`)
-      .then((page) => {
-        if (!cancelled) setState({ data: page, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [unitId]);
-
-  return state;
-}

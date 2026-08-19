@@ -5,11 +5,11 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (T-033 — the structure page)
+UPDATED   2026-08-19  (T-034 — subjects, the vocabulary showcase)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
-STATUS    32/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
-          369 tests across 37 files, all green (182 backend + 187 frontend).
+STATUS    33/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
+          408 tests across 40 files, all green (185 backend + 223 frontend).
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! READ CONF-013 IN _MEMORY.md BEFORE TOUCHING AUTH. A cross-tenant account
           lockout was found and closed on 19 Aug; the schema question behind it is
@@ -17,9 +17,11 @@ STATUS    32/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      T-034 (subjects, doc 35). LANE C IS UNBLOCKED AND IDLE: T-035..T-040 can
-          run alongside. Every page route already exists as a placeholder; replace
-          the file, do not add a route.
+NEXT      LANE C: T-035 (template library, doc 36) then T-036..T-040. T-041 (home
+          dashboard, doc 46) is lane B and also unblocked. Every page route already
+          exists as a placeholder; replace the file, do not add a route.
+          !! LISTS RETURN { data, page, meta } — 13 §4. The shared Page<T> said
+          `items` until T-034 and lied to one caller for 16 days (N-029).
           !! <UnitTree> IS EXTENDED, NEVER FORKED. T-032 built it, T-033 extended it
           (five optional props), and the campaign audience picker is its third
           placement — see _MEMORY.md N-025 and INV-009.
@@ -62,8 +64,8 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **369 tests
-across 37 files**, 182 backend + 187 frontend. All five are green right now, so anything red
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **408 tests
+across 40 files**, 185 backend + 223 frontend. All five are green right now, so anything red
 is yours.
 
 **Claude does not commit.** The user commits, always — stated 19 Aug and written into
@@ -138,7 +140,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [x] T-031  B  landing, sign in, create org
 [x] T-032  B  setup wizard 5 steps          ← never cut
 [x] T-033  B  UnitTree + structure page
-[ ] T-034  B  subjects
+[x] T-034  B  subjects
 [ ] T-035  C  template library
 [ ] T-036  C  QuestionEditor ×6 + QuestionInput ×6
 [ ] T-037  C  form builder + autosave + preview
@@ -155,8 +157,8 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 32 / 45 done (T-027 partial). Stage 3 complete but for the font files;
-Stage 4 open at T-034.**
+**Progress: 33 / 45 done (T-027 partial). Stage 3 complete but for the font files;
+Stage 4 open at T-035 — lane C, which has been idle since T-030.**
 
 ---
 
@@ -195,6 +197,42 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-19 · T-034 — subjects, and a shared type that had been lying since T-003
+
+`/app/subjects` and `/app/subjects/:id` are real: `pages/console/Subjects/`,
+`lib/subjects.ts`, `lib/people.ts`, and the three data components from `24` §3 —
+`<ResponsiveTable>`, `<StatCard>`, `<BarRow>`. The create form picks its unit with
+`<UnitTree mode="select">`, which is the tree's **third placement** and the first use of
+that mode (INV-009 holds: one implementation, three pages).
+
+**Read this before writing another list page.** `Page<T>` in `packages/shared` said
+`{ items }`; every list endpoint returns `{ data, page, meta }`, and `13` §4 agrees with the
+endpoints. Nothing had imported the shared type since T-003, so nothing noticed — until
+T-033's people list read `.items` off it, got `undefined`, and **passed its test anyway**,
+because the mock repeated the same wrong shape. Fixed by correcting the shared type and
+making the backend's `Paged<T>` an alias of it, so there is one declaration. `N-029`.
+
+Also worth knowing:
+
+- **`GET /subjects/:id` now returns `SubjectDetail`** — the summary plus `cycles[]`, every
+  campaign the subject was in with the responses that came back *about that subject*. Doc 35
+  specified it in revision one; nothing had implemented it. It carries **no scores** on
+  purpose (`N-030`): aggregates live behind the results endpoints where the k-anonymity gate
+  is, and an average here would be a second path with no gate in front of it.
+- **Doc 35 was wrong about billing and now says so.** It read as though linking a person
+  makes a subject billable. `16` §5 is the other way round: a linked subject IS a user and is
+  already counted; an UNLINKED one is the seat. The create form states the correct rule.
+- **`<PersonChip>` was deliberately not built.** Its contract needs a `PersonSummary` with a
+  role level; the subjects API carries a name and an id. Half a person rendered through it
+  would invent the level or drop it silently, so the linked person is a plain link until `34`.
+
+Two acceptance boxes are not ticked. "Collapses to cards at 390px" is a device check — the
+contract underneath it is tested. **`billable_seats` does not exist**: `16` §5 gives the
+formula, `subscriptions.seats` is a column defaulting to 0, and nothing computes it. That is
+`16`'s P3 metering work, not this page's.
+
+Tests 369 → **408** (backend 182 → 185, frontend 187 → 223), across 40 files.
 
 ### 2026-08-19 · T-033 — the structure page. The tree got extended, not forked
 

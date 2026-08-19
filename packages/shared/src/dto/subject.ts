@@ -5,6 +5,7 @@
 // second code path — which is why there is no separate reviewee entity anywhere.
 import { z } from 'zod';
 import { dto, Id, PageQuery, SearchQuery } from './common.js';
+import type { CampaignStatus } from './campaign.js';
 
 export const CreateSubjectBody = z.object({
   name: z.string().min(1).max(120),
@@ -55,4 +56,31 @@ export type SubjectSummary = {
   lastResponseAt: string | null;
   archivedAt: string | null;
   createdAt: string;
+};
+
+/** One feedback cycle this subject was part of, with what came back. */
+export type SubjectCycle = {
+  campaignId: string;
+  campaignName: string;
+  /** Derived from the dates on read, never stored (DEC-016). */
+  status: CampaignStatus;
+  startsAt: string | null;
+  endsAt: string | null;
+  closedAt: string | null;
+  /** Responses about THIS subject in that campaign — not the campaign's total. */
+  responseCount: number;
+};
+
+/**
+ * What `GET /subjects/:id` returns. The summary plus the history, because "did anything
+ * actually change?" is the question the whole product is for, and the cheapest honest
+ * version of it is response counts across cycles in order (35 § Interactions).
+ *
+ * Scores are deliberately NOT here. They live behind the results endpoints, where the
+ * k-anonymity gate is (INV-007); a per-subject average on this screen would be a second
+ * path to aggregate numbers with no gate in front of it.
+ */
+export type SubjectDetail = SubjectSummary & {
+  /** Oldest first — a trend reads left to right. */
+  cycles: SubjectCycle[];
 };

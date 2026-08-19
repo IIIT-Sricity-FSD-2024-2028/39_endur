@@ -1,6 +1,8 @@
 // Subjects. 13 § Subjects, 35, 10 §9.
 import type {
   CreateSubjectBody,
+  SubjectCycle,
+  SubjectDetail,
   SubjectListQuery,
   SubjectSummary,
   UpdateSubjectBody,
@@ -11,6 +13,7 @@ import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { seesNothing, visibleUnits } from '../../authz/index.js';
+import { statusOf } from '../campaigns/status.js';
 
 export async function listSubjects(
   orgId: string,
@@ -44,14 +47,56 @@ export async function listSubjects(
   return pageOf(rows, query.limit, total, toSummary);
 }
 
+/**
+ * The summary plus its history. 35 § Interactions.
+ *
+ * The history is what "did anything actually change?" looks like in miniature, and it is
+ * worth having now even though the Improve loop is P3 — a subject with three cycles and a
+ * falling response count is a story an evaluator can read off the screen.
+ *
+ * Two queries, never one per row: the campaigns, then one grouped count across all of
+ * them. A subject with twelve cycles must not cost thirteen round trips.
+ */
 export async function readSubject(
   orgId: string,
   userId: string,
   authzVersion: number,
   subjectId: string,
-): Promise<SubjectSummary> {
+): Promise<SubjectDetail> {
   const subject = await assertVisible(orgId, userId, authzVersion, subjectId, 'subject.read');
-  return toSummary(subject);
+
+  const campaigns = await prisma.campaign.findMany({
+    where: { orgId, subjects: { some: { subjectId } } },
+    select: {
+      id: true, name: true, publicToken: true,
+      closedAt: true, startsAt: true, endsAt: true, createdAt: true,
+    },
+    // Oldest first: a trend reads left to right, and `startsAt` is null for a draft, so
+    // `createdAt` is the tiebreak that keeps unlaunched cycles in a sensible place.
+    orderBy: [{ startsAt: 'asc' }, { createdAt: 'asc' }],
+  });
+
+  const counts = campaigns.length
+    ? await prisma.response.groupBy({
+        by: ['campaignId'],
+        where: { subjectId, campaignId: { in: campaigns.map((campaign) => campaign.id) } },
+        _count: true,
+      })
+    : [];
+  const countOf = new Map(counts.map((row) => [row.campaignId, row._count]));
+
+  const cycles: SubjectCycle[] = campaigns.map((campaign) => ({
+    campaignId: campaign.id,
+    campaignName: campaign.name,
+    // The one place status is computed, asked for here rather than reimplemented (DEC-016).
+    status: statusOf(campaign),
+    startsAt: campaign.startsAt?.toISOString() ?? null,
+    endsAt: campaign.endsAt?.toISOString() ?? null,
+    closedAt: campaign.closedAt?.toISOString() ?? null,
+    responseCount: countOf.get(campaign.id) ?? 0,
+  }));
+
+  return { ...toSummary(subject), cycles };
 }
 
 export async function createSubject(

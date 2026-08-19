@@ -7,7 +7,7 @@
 import { Link } from 'react-router-dom';
 import type { ResolvedLabels, UnitNode } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
-import { usePeopleIn } from '../../../lib/units.js';
+import { usePeopleIn } from '../../../lib/people.js';
 import { pluralise } from '../../../lib/format.js';
 
 export function DetailPanel({
@@ -73,11 +73,11 @@ export function DetailPanel({
           <h4 className="section-kicker">People here</h4>
           {people.loading && <p className="text-meta">Loading…</p>}
           {people.error && <p className="text-meta">Could not load people.</p>}
-          {people.data?.items.length === 0 && !people.loading && (
+          {people.data?.data.length === 0 && !people.loading && (
             <p className="text-meta">Nobody is placed here yet.</p>
           )}
           <ul className="unit-people-list">
-            {people.data?.items.map((person) => (
+            {people.data?.data.map((person) => (
               <li key={person.id}>
                 <Link to={`/app/people/${person.id}`}>{person.name}</Link>
                 <span className="text-meta">
@@ -86,7 +86,7 @@ export function DetailPanel({
               </li>
             ))}
           </ul>
-          {node.peopleCount > (people.data?.items.length ?? 0) && (
+          {node.peopleCount > (people.data?.data.length ?? 0) && (
             <Link className="text-meta" to={`/app/people?unit=${node.id}`}>
               View all {pluralise(node.peopleCount, 'person', 'people')} →
             </Link>

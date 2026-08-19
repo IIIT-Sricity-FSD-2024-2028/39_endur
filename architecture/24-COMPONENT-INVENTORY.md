@@ -83,14 +83,19 @@ labels, and there is only ever one correct source.
 { kicker: string; value: string | number; delta?: { value: number; valence: Valence };
   context?: string; breakdown?: BarRowProps[] }
 ```
+Built at T-034 for the subject detail, ahead of its track — `35` needs it and one component
+built early beats two built in parallel. `Valence` is the shared `results.ts` enum
+(`positive | neutral | negative`), not a fourth spelling of the same idea.
 
 ### `<BarRow>` — the workhorse
 ```ts
 { label: string; value: number; total: number;
   tone?: 'accent' | 'good' | 'neutral' | 'bad' }
 ```
-Used in stat breakdowns, results distributions, per-subject shares, theme scores. Default
-tone is `accent` — single colour. **Valence tones only when the meaning is genuinely
+Built at T-034. Used in stat breakdowns, results distributions, per-subject shares, theme
+scores — and the subject detail's per-cycle response counts, which is what a trend looks like
+before there is a chart. Never colour alone (`21` §8): the number renders beside the bar.
+Default tone is `accent` — single colour. **Valence tones only when the meaning is genuinely
 valenced**; do not rainbow a single question's options.
 
 ### `<StackedBar>`
@@ -114,13 +119,19 @@ readable for colour-blind users and in print.
 ### `<ResponsiveTable>`
 ```ts
 { columns: Column<T>[]; rows: T[]; rowKey: (r: T) => string;
-  onRowClick?: (r: T) => void; empty: ReactNode }
+  onRowClick?: (r: T) => void; empty: ReactNode; caption?: string }
 type Column<T> = { key: string; header: string; render: (r: T) => ReactNode;
                    primary?: boolean; hideBelow?: 'sm' | 'md' };
 ```
 Collapses to stacked cards below 640px; the `primary` column becomes the card title. **Build
 it once** — there are four tables in the app, and doing the collapse four times is exactly
 where the mobile experience rots (`design_specs/design/09` §3.1).
+
+Built at T-034, first used by `/app/subjects`. **One DOM in both shapes**, not two: the cards
+are the same `<table>` with each cell carrying `data-label`, because a second markup tree for
+small screens is how the two versions start disagreeing about which columns exist. `caption`
+(added T-034) names the table for a screen reader — sighted readers have the page header, and
+a `<table>` with no accessible name is one a screen reader announces as nothing at all.
 
 ## 4. Organisation
 

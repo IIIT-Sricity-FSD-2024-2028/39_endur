@@ -18,9 +18,22 @@ export const PageQuery = z.object({
 });
 export type PageQuery = z.infer<typeof PageQuery>;
 
+/**
+ * The paginated envelope, exactly as `13` §4 specifies it.
+ *
+ * This type said `{ items }` from T-003 until T-034 found it, because NOTHING consumed it:
+ * the backend had its own `Paged<T>` in lib/paginate.ts and every list handler used that.
+ * The first caller to trust it — T-033's people list in the structure detail panel — read
+ * `.items` off a response that has `.data`, and its tests passed because the mock repeated
+ * the same wrong shape. A shared type nobody imports is not a contract, it is a guess.
+ *
+ * `src/backend/lib/paginate.ts` now aliases this, so the two cannot drift again.
+ */
 export type Page<T> = {
-  items: T[];
+  data: T[];
   page: { nextCursor: string | null; hasMore: boolean };
+  /** Scope-filtered: it counts what the caller may see, not what exists (INV-003). */
+  meta: { total: number };
 };
 
 /** Free-text search box. Bounded like every string — an unbounded string is an unbounded row. */

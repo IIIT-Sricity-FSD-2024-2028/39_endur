@@ -8,14 +8,16 @@
 // The cursor encodes the sort key of the last row returned, so the next page asks for
 // "everything after this exact row" rather than "skip 50". Rows inserted meanwhile shift
 // nothing.
+import type { Page } from '@endur/shared';
 import { AppError } from './errors.js';
 
-/** What every cursor-paginated list returns. `meta.total` is scope-filtered (INV-003). */
-export type Paged<T> = {
-  data: T[];
-  page: { nextCursor: string | null; hasMore: boolean };
-  meta: { total: number };
-};
+/**
+ * What every cursor-paginated list returns. `meta.total` is scope-filtered (INV-003).
+ *
+ * An ALIAS of the shared type, not a second declaration: this shape is a contract the
+ * client reads, and it was declared twice — differently — until T-034 (N-029).
+ */
+export type Paged<T> = Page<T>;
 
 export type CursorPoint = { createdAt: Date; id: string };
 
