@@ -329,6 +329,70 @@ CONF-010  the vendored organic styles.css carries its OWN :root — the original
                    ramp that 21 §3 puts in tokens.css. properties are tokens; the classes
                    that consume them are components.
 
+CONF-011  /start's field list. 30 § Create organization says "org name, industry picker,
+          owner name, email, password" and to redirect to /app/setup "with the chosen
+          industry preselected". design_specs/design/03 §3.3 says the opposite in the same
+          number of words: "two fields and nothing else. Everything about the org itself is
+          decided in the wizard; this screen only creates the account."
+          Both are chasing the SAME sentence — 30's own "do not make the user pick it
+          twice".
+          RESOLVED 2026-08-19 (T-031) -> DESIGN WINS, no industry picker on /start.
+          Reasons, in order of weight:
+            1. asking on /start means asking BLIND. wizard step 1 shows each preset's role
+               chain and vocabulary pair, which is what makes the choice take four seconds
+               (design_specs/design/03 §3.4). a bare select before that is a worse question
+               asked earlier.
+            2. step 1 is THE CENTREPIECE of the 90-second demo. it cannot be skipped, so
+               anything asked on /start is asked twice by construction.
+            3. 30's data contract could not be implemented as written anyway: it has /start
+               calling `GET /org/presets`, and that route is behind `authenticate` +
+               requireCapability('org.read'). nobody on /start has a session. loosening
+               that endpoint to satisfy a marketing screen would have been the wrong fix.
+          RegisterBody.industry has `.default('custom')`, so the wire shape is unchanged
+          and step 1 overwrites it. amended 30 § Create organization and § Data contract.
+
+CONF-012  password minimum. design_specs/design/03 §3.3 helper copy says "At least 8
+          characters."; `Credentials` in packages/shared says `.min(10)` and 30 §
+          Acceptance says ten, mirrored client-side.
+          RESOLVED 2026-08-19 (T-031) -> TEN. This is not a visual-vs-contract split of
+          the usual kind: the design file is quoting a CONTRACT VALUE inside display copy,
+          and architecture owns contracts (CLAUDE.md § Where design lives). The "8" is
+          stale from before the DTO was written. The UI now renders the number from a
+          single `MIN_PASSWORD` const that mirrors the DTO, so the two cannot drift by
+          hand-editing a string.
+
+CONF-013  IS AN EMAIL ADDRESS GLOBAL OR PER-TENANT? The schema and the login contract
+          disagree, and the disagreement was exploitable.
+          10 makes `users` unique on `(org_id, email)` — the same address may exist in two
+          organisations. 15 §2 and 13 § Auth define login as email + password with NO
+          organisation hint, which only works if an address identifies exactly one account.
+          FOUND 2026-08-19 (T-031), reproduced end to end, not theorised:
+            1. Amara registers Org A with amara@x. Login: 200.
+            2. ANY user holding `person.create` in ANY other organisation posts
+               /people { email: "amara@x" }. Legal under the schema; no special privilege;
+               people/service.ts guards `{ orgId, email }`, deliberately org-scoped.
+            3. That writes an `invited` row with passwordHash NULL. Login's
+               findFirst({ where: { email } }) — no order, no org — matched it, argon2
+               compared against null, and Amara was locked out of her own account.
+               Login: 401. One request, cross-tenant, from a stranger.
+          MITIGATED, NOT RESOLVED (features/auth/router.ts, T-031): login now filters
+          `passwordHash: { not: null }` and orders `createdAt asc`. The lockout is closed
+          and the choice is deterministic — oldest real account wins, and an invited row
+          can never be matched. Regression: src/backend/test/cross-tenant-login.test.ts,
+          which asserts the victim lands in THEIR org, not the stranger's.
+          STILL OPEN, and it is a schema/product decision, not a bug fix:
+            a) make users.email globally unique — matches 15's login shape, but forbids one
+               person legitimately belonging to two organisations, which the model allows
+               today and DEC-009 does not forbid. Needs a migration plus guards in
+               people/service.ts (invite AND csv import).
+            b) keep it per-tenant and give login an organisation — a slug field, or a
+               disambiguation step when an address matches more than one. Honest about the
+               model, worse on stage.
+            c) keep it per-tenant and keep the mitigation as the rule, documented.
+          -> whoever picks must supersede this entry. Do NOT leave it as (c) by silence.
+          BLAST RADIUS if left as-is: two activated accounts on one address remain
+          ambiguous. The adversarial case is closed; the honest collision is not.
+
 ---
 
 ## OPEN — unresolved
@@ -434,6 +498,28 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 25..29                           -> PLACEHOLDERS. 29 is unassigned. no paths owned.
 30..45 page docs                 -> src/frontend/pages/<world>/<Page>/**
                                     + src/backend/features/<feature>/**
+31-PAGE-setup-wizard.md          -> src/frontend/pages/console/Setup/** lib/org.ts
+                                    the wizard owns its own state (useWizard.ts) and it
+                                    is NOT in redux — 23 §2, one route's transient state.
+                                    it also drove components/org/**, components/flow/**,
+                                    components/form/Toggle, components/feedback/** — all
+                                    catalogued in 24 first. see N-025.
+30-PAGE-landing-auth.md          -> src/frontend/pages/public/** lib/auth.ts
+                                    lib/auth.ts is the sign-in / register seam (23 §3):
+                                    pages call it, it calls lib/api.ts, nothing else does.
+                                    T-031 also took packages/shared/src/vocabularies.ts —
+                                    the landing pitch's preset labels, DATA, drift-tested
+                                    against src/backend/presets/** by
+                                    src/backend/test/vocabularies.test.ts. see CONF-011.
+32-PAGE-org-structure.md         -> src/frontend/pages/console/Structure/** lib/units.ts
+                                    + src/backend/features/units/**
+                                    lib/units.ts is the units read/write seam (23 §3):
+                                    the page calls it, it calls lib/api.ts, nothing else
+                                    does. the DETAIL PANEL is page-local and deliberately
+                                    not a catalogue component. the TREE is
+                                    components/org/UnitTree.tsx, owned by 24 — read N-025
+                                    before touching it. T-033 also took the range grammar
+                                    in packages/shared/src/dto/unit.ts (N-027).
 46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/**
 47-PAGE-profile.md               -> src/frontend/pages/console/Profile/**
 48-FEATURE-file-upload.md        -> src/backend/features/uploads/**
@@ -482,6 +568,11 @@ DRIFT-004  capability strings. every `capability:` line in a page doc must exist
 DRIFT-005  customization.md changed -> re-verify 11-PERMISSION-ENGINE.md resolution
            algorithm and 33-PAGE-roles-and-powers-grid.md grid semantics.
 DRIFT-006  a new question type is proposed -> it violates DEC-010. reject or supersede.
+DRIFT-007  a preset's `labels` block changed in src/backend/presets/** -> the landing
+           page advertises those exact nouns from packages/shared/src/vocabularies.ts.
+           src/backend/test/vocabularies.test.ts fails until the copy is updated. do not
+           "fix" it by loosening the test; the point is that `/` cannot promise a word the
+           product no longer uses. see CONF-011.
 ```
 
 ---
@@ -636,4 +727,50 @@ N-018  BUILD ENVIRONMENT, 2026-08-19. this repo cannot be npm-installed in place
        has no symlinks, so install dies with EISDIR on src/frontend -> node_modules/@endur/web.
        junctions fail too ("Local NTFS volumes are required"), as does ln -s from WSL against
        /mnt/<drive>. build on an NTFS path and keep the exFAT copy source-only.
+N-023  A CHECK THAT FAILS ON ITS OWN EXPLANATION GETS ROUTED AROUND. audit-vocab.mjs used to
+       scan comments, so T-032 failed the build on four lines that were DESCRIBING INV-001 —
+       'the button label uses the vocabulary: "Add a Department" here'. It now strips
+       comments before scanning, preserving line numbers, exactly as seed.test.ts's INV-002
+       scan has since T-025. INV-001 is about what RENDERS, and a comment renders nothing.
+       The strip was proved not to blind the check: a real `<p>Departments</p>` still fails.
+       This is the third time this lesson has been learned in this repo (T-003 audit-drift,
+       T-025 seed.test, T-032 audit-vocab). Write new checks with it already applied.
+N-024  A HOOK THAT RETURNS A FUNCTION HAS REGISTERED A TEARDOWN. `beforeEach(() =>
+       mock.mockReset())` in vitest: mockReset() returns the mock, the concise arrow returns
+       it, and vitest calls it after every test. With mockRejectedValue set, that is an
+       unhandled rejection reported against whichever test built the error — an hour on
+       19 Aug. Always brace the body of a hook.
+N-025  <UnitTree> WAS BUILT BY T-032, NOT T-033. 55-BUILD-ORDER lists it under T-033
+       (structure page), but wizard step 3 needs it first and INV-009 says there is exactly
+       ONE of it — "assign it to one person; it is the component most likely to be rewritten
+       three times" (24 §4). It exists at src/frontend/components/org/UnitTree.tsx with all
+       three modes. **T-033 EXTENDS IT, DOES NOT WRITE IT.** Same for <InlineName>, which
+       24 §7 describes as a pattern rather than a component; it is a component now, because
+       three callers needed identical Enter-commits / Esc-reverts behaviour and that is the
+       part everybody gets subtly wrong.
+       The tree also has a keyboard/touch re-parent path ("Move", then choose a destination)
+       alongside HTML5 drag. Not decoration: drag does not exist on touch, and 31 §
+       Acceptance requires the tree to be usable there.
+N-026  THE WIZARD RUNS IN A FOCUSED CONSOLE FRAME. design_specs/design/03 §3.4 draws it with
+       its own shell — brand, org name, "Skip setup" — and no sidebar. Rather than a fourth
+       layout, AppShell gained `focused` (no rail, no drawer, no hamburger) and ConsoleLayout
+       turns it on for /app/setup. The reason is not aesthetic: during setup every sidebar
+       item leads to a page that is empty BECAUSE setup has not happened, so offering them
+       invites the one click that makes the product look broken.
+N-027  THE RANGE GRAMMAR LIVES BESIDE THE SCHEMA, AND BOTH SIDES READ IT. `Floor 1..8` and
+       `Wing A..F` are parsed and expanded by parseUnitRange() / expandUnitNames() in
+       packages/shared/src/dto/unit.ts, next to the RepeatRange schema that caps them at 50.
+       The server expands inside the create transaction; the client uses the same functions
+       to preview and to say WHY `1..10000` is refused before asking. Two reasons it is not
+       client-side: a loop in the browser would fire ten thousand requests before anyone
+       noticed, and a second parser is how a preview and a write quietly stop agreeing.
+       `A..F` needed a `letters` flag on RepeatRange — additive, so the numeric form and its
+       existing tests were untouched.
+N-028  /app/structure IS THE SECOND ROUTE-LEVEL CAPABILITY GATE. 32 § States requires a
+       full-page 403 for direct navigation without `unit.read`, so the route wraps
+       <RequireCapability>. router/index.tsx used to say setup was "the ONE console route
+       with a capability gate"; that comment is now wrong and has been corrected. The rule
+       has NOT changed: everywhere else, out-of-scope data is absent rather than gated
+       (INV-003). These two are gated because on them the page IS the action, so somebody
+       without the capability would otherwise get an empty screen that looks broken.
 ```

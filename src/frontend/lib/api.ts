@@ -28,6 +28,12 @@ export class ApiError extends Error {
   readonly fields: FieldError[];
   readonly decidedBy: DecidedBy | undefined;
   readonly details: Record<string, unknown>;
+  /**
+   * Seconds until the caller may retry, on a 429. Read from the response rather than the
+   * envelope because the limiter sets headers and `errorFunnel` writes the body — neither
+   * knows about the other (12 §4.16).
+   */
+  readonly retryAfter: number | undefined;
 
   constructor(init: {
     code: ErrorCode;
@@ -35,6 +41,7 @@ export class ApiError extends Error {
     message: string;
     requestId: string;
     details?: Record<string, unknown>;
+    retryAfter?: number;
   }) {
     super(init.message);
     this.name = 'ApiError';
@@ -44,6 +51,7 @@ export class ApiError extends Error {
     this.details = init.details ?? {};
     this.fields = (init.details?.['fields'] as FieldError[] | undefined) ?? [];
     this.decidedBy = init.details?.['decidedBy'] as DecidedBy | undefined;
+    this.retryAfter = init.retryAfter;
   }
 
   /** The message for one form field, or undefined. Paths are dotted: "body.name". */
@@ -87,10 +95,19 @@ export function setUnauthenticatedHandler(handler: () => void): void {
 type Options = Omit<RequestInit, 'body' | 'method'> & {
   /** Replays safely: the server returns the FIRST response rather than acting twice (12 §4.15). */
   idempotencyKey?: string;
+  /**
+   * Handle a 401 here instead of firing the global session handler.
+   *
+   * Exactly one call needs this: `POST /auth/login`. A 401 there is the ANSWER — "that
+   * email and password don't match" — not an expired session, and letting it reach the
+   * global handler would make a typo look like a logout. Every other 401 in the app means
+   * what the handler assumes it means, so this stays opt-in per call.
+   */
+  suppress401Handler?: boolean;
 };
 
 async function request<T>(method: string, path: string, body?: unknown, opts: Options = {}): Promise<T> {
-  const { idempotencyKey, headers: extraHeaders, ...init } = opts;
+  const { idempotencyKey, suppress401Handler, headers: extraHeaders, ...init } = opts;
   const headers = new Headers(extraHeaders);
 
   if (body !== undefined) headers.set('Content-Type', 'application/json');
@@ -118,7 +135,7 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Op
 
   if (!response.ok) {
     const error = toError(response, payload);
-    if (error instanceof SessionExpiredError) onUnauthenticated?.();
+    if (error instanceof SessionExpiredError && !suppress401Handler) onUnauthenticated?.();
     throw error;
   }
   return payload as T;
@@ -134,9 +151,24 @@ async function parse(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * How long to wait after a 429. `Retry-After` is the conventional header, but the limiter
+ * runs with `standardHeaders: 'draft-7'` and hands the response off to `errorFunnel`, so
+ * what actually arrives is `RateLimit: limit=10, remaining=0, reset=842`. Read both, in
+ * that order, and give up quietly rather than guessing a number to show the user.
+ */
+function retryAfterSeconds(response: Response): number | undefined {
+  const header = response.headers.get('Retry-After');
+  if (header && /^\d+$/.test(header.trim())) return Number(header.trim());
+
+  const reset = /(?:^|[,;\s])reset\s*=\s*(\d+)/.exec(response.headers.get('RateLimit') ?? '');
+  return reset?.[1] ? Number(reset[1]) : undefined;
+}
+
 function toError(response: Response, payload: unknown): ApiError {
   const envelope = (payload as ErrorEnvelope | undefined)?.error;
   const requestId = envelope?.requestId ?? response.headers.get('X-Request-Id') ?? 'unknown';
+  const retryAfter = response.status === 429 ? retryAfterSeconds(response) : undefined;
 
   const init: ConstructorParameters<typeof ApiError>[0] = {
     // A non-JSON failure means a proxy or a crash answered instead of the app. Report it
@@ -146,6 +178,7 @@ function toError(response: Response, payload: unknown): ApiError {
     message: envelope?.message ?? 'Something went wrong. Please try again.',
     requestId,
     ...(envelope?.details ? { details: envelope.details } : {}),
+    ...(retryAfter !== undefined ? { retryAfter } : {}),
   };
 
   return response.status === 401 ? new SessionExpiredError(init) : new ApiError(init);
@@ -163,5 +196,13 @@ export const apiPatch = <TIn, TOut>(path: string, body: TIn, opts?: Options): Pr
 export const apiPut = <TIn, TOut>(path: string, body: TIn, opts?: Options): Promise<TOut> =>
   request<TOut>('PUT', path, body, opts);
 
-export const apiDelete = <T = void>(path: string, opts?: Options): Promise<T> =>
-  request<T>('DELETE', path, undefined, opts);
+/**
+ * DELETE carries a body here, which is unusual enough to be worth a line: deleting a unit
+ * needs `{ reassignChildrenTo }` (32), and putting "where do the children go" in a query
+ * string would make a destructive instruction look like a filter.
+ */
+export const apiDelete = <TOut = void, TIn = undefined>(
+  path: string,
+  body?: TIn,
+  opts?: Options,
+): Promise<TOut> => request<TOut>('DELETE', path, body, opts);

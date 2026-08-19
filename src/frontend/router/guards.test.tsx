@@ -9,7 +9,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import type { Capability, MeResponse } from '@endur/shared';
 import { authReducer, signedIn, signedOut } from '../store/authSlice.js';
 import { vocabularyReducer } from '../store/vocabularySlice.js';
-import { RequireCapability, RequireSession } from './guards.js';
+import { RedirectIfSignedIn, RequireCapability, RequireSession } from './guards.js';
 
 const me = (capabilities: Capability[]): MeResponse => ({
   user: { id: 'u1', name: 'Amara Rao', email: 'a@example.test' },
@@ -68,5 +68,46 @@ describe('RequireCapability', () => {
       'in', ['subject.read']);
     expect(screen.queryByText('Campaigns')).toBeNull();
     expect(screen.getByText('You do not have access to this')).toBeTruthy();
+  });
+});
+
+/**
+ * The mirror case, added at T-031. `/` and `/login` are the two screens where the WRONG
+ * flash is the sign-in form: someone who is already signed in should never watch a login
+ * card appear and then vanish (30 § Acceptance).
+ */
+describe('RedirectIfSignedIn', () => {
+  const mountPublic = (session?: 'in' | 'out') => {
+    const store = configureStore({ reducer: { auth: authReducer, vocabulary: vocabularyReducer } });
+    if (session === 'in') store.dispatch(signedIn(me([])));
+    if (session === 'out') store.dispatch(signedOut());
+
+    return render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<RedirectIfSignedIn><p>Sign in form</p></RedirectIfSignedIn>} />
+            <Route path="/app" element={<p>Console</p>} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+  };
+
+  it('holds while boot is in flight rather than rendering a form it will take away', () => {
+    mountPublic();
+    expect(screen.getByText('Loading…')).toBeTruthy();
+    expect(screen.queryByText('Sign in form')).toBeNull();
+  });
+
+  it('sends a signed-in user straight to the console', () => {
+    mountPublic('in');
+    expect(screen.getByText('Console')).toBeTruthy();
+    expect(screen.queryByText('Sign in form')).toBeNull();
+  });
+
+  it('shows the form to a signed-out user, which is the whole point of the page', () => {
+    mountPublic('out');
+    expect(screen.getByText('Sign in form')).toBeTruthy();
   });
 });

@@ -28,10 +28,20 @@ None. These are the only console-adjacent screens with no capability check.
 
 | Action | Endpoint | DTO in | DTO out |
 |---|---|---|---|
-| Sign in | `POST /api/v1/auth/login` | `LoginBody { email, password }` | `{ user, org }` + `Set-Cookie: endur.sid` |
-| Boot session | `GET /api/v1/auth/me` | — | `MeResponse { user, org, labels, capabilities }` |
-| Create org | `POST /api/v1/auth/register` | `RegisterBody { orgName, industry, name, email, password }` | `{ user, org }` + `Set-Cookie: endur.sid` |
-| Preset list | `GET /api/v1/org/presets` | — | `Preset[]` |
+| Sign in | `POST /api/v1/auth/login` | `LoginBody { email, password }` | `{ ok: true }` + `Set-Cookie: endur.sid`, `endur.csrf` |
+| Boot session | `GET /api/v1/auth/me` | — | `MeResponse { user, organization, labels, capabilities }` |
+| Where to land | `GET /api/v1/home` | — | `HomeView`, read for `configured` only |
+| Create org | `POST /api/v1/auth/register` | `RegisterBody { orgName, name, email, password }` | `{ organization: { id, slug } }` + `Set-Cookie` |
+
+**Amended 2026-08-19 (T-031), against what shipped.** Three corrections:
+
+1. Neither `/login` nor `/register` returns the user and org. Both answer minimally and
+   `/auth/me` is the single source for a session — a second, slightly different copy in the
+   login response is how the two drift. One extra round trip buys one definition.
+2. `GET /org/presets` is **not** called here and could not be: it sits behind
+   `authenticate` + `requireCapability('org.read')`, and nobody on `/start` has a session.
+   The industry picker moved to wizard step 1 — see § Create organization and `CONF-011`.
+3. `GET /home` is read after sign-in for one boolean. See § Interactions.
 
 `POST /register` is atomic — org, owner, preset seed, subscription, audit, one transaction
 (`15` §5). A half-seeded org has no roles, so nobody can do anything, which looks exactly
@@ -57,16 +67,42 @@ no wrapper components (`24` §1).
 `/login`. `[M0 · thin]` — this is **first on the cut-list** and a redirect to `/login` is an
 acceptable shipped state (`02` §2).
 
-**Sign in.** Email + password, one submit. On success: hydrate `authSlice` and
-`vocabularySlice`, then route to `/app` — or to `/app/setup` if the org has no roles yet,
-because an unconfigured org's console is empty and confusing.
+Plus the vocabulary switcher from `design_specs/design/03` §3.1, which is the one thing here
+that is not filler: four segments, and the noun row cross-fades to that industry's
+vocabulary. It auto-advances every 3.5s until the first click and then stops for good — a
+control that keeps moving after you have used it reads as a bug on a projector — and it does
+not auto-advance at all under `prefers-reduced-motion` (WCAG 2.2.2).
+
+The nouns come from `PRESET_VOCABULARIES` in `packages/shared`, not from JSX. There is no
+organisation on `/`, so `useLabels()` has nothing to resolve; writing the words into the
+component would break INV-001 and `audit:vocab` fails the build for it. In `shared` they are
+what they actually are — advertising copy about the presets — and
+`src/backend/test/vocabularies.test.ts` asserts they still match the presets they advertise.
+See `CONF-011` and `DRIFT-007`.
+
+**Sign in.** Email + password, one submit. On success: `GET /auth/me` hydrates `authSlice`
+and `vocabularySlice`, then `GET /home` is read for `configured` and decides the target —
+`/app`, or `/app/setup` when the org is not set up yet, because an unconfigured org's
+console is empty and confusing. If `/home` fails, land on `/app` anyway: a sparse dashboard
+beats a sign-in that appears to hang.
+
+A pending deep link (`location.state.from`, set by `RequireSession`) is honoured **only**
+when the org is configured. Sending someone back to a page that cannot render yet is worse
+than losing their place.
 
 A **demo affordance** is specified in `design_specs/design/03` §3.2: prefilled credentials for
 the seeded orgs, visible only when `NODE_ENV !== 'production'`. It removes a typing beat on
 stage. It must be impossible to render in production — a build-time check, not a runtime flag.
 
-**Create organization.** Org name, industry picker, owner name, email, password. The industry
-picker is the same card grid as wizard step 1, so the pattern is learned once.
+**Create organization.** Org name, owner name, work email, password. **Four fields, no
+industry picker** (`CONF-011`, amended 2026-08-19): asking here means asking blind, and the
+wizard's step 1 — which shows each preset's role chain and vocabulary pair, and is the
+demo's centrepiece — asks the same question better a moment later. `RegisterBody.industry`
+defaults to `custom` and step 1 overwrites it, so the wire shape is unchanged.
+
+The password helper states **ten** characters, from a single const mirroring the DTO.
+`design_specs/design/03` §3.3 says eight; that is stale copy quoting a contract value, and
+architecture owns contracts (`CONF-012`).
 
 ## States
 
@@ -84,18 +120,22 @@ Errors appear where the problem is, never in a toast (`design_specs/design/10` �
 
 ## Acceptance
 
-- [ ] A signed-in user hitting `/` or `/login` is redirected to `/app` without a flash
-- [ ] Unknown email and wrong password produce identical bodies and comparable timing
-- [ ] Login is rate limited per IP **and** per email (`12` §4.11)
-- [ ] A failed registration leaves no organisation behind — forced-failure test
-- [ ] Registration lands on `/app/setup` with the industry preselected
-- [ ] Signing in to an unconfigured org lands on `/app/setup`, not an empty console
-- [ ] Demo credentials cannot render in a production build
-- [ ] Password minimum 10 characters, enforced server-side and mirrored client-side
-- [ ] Login sets an `httpOnly` session cookie and **regenerates the session id** (fixation)
-- [ ] No token appears in any response body, `localStorage`, or the store
+- [x] A signed-in user hitting `/` or `/login` is redirected to `/app` without a flash
+- [x] Unknown email and wrong password produce identical bodies and comparable timing
+- [x] Login is rate limited per IP **and** per email (`12` §4.11)
+- [x] A failed registration leaves no organisation behind — forced-failure test
+      (`src/backend/test/register-rollback.test.ts`; the failure is a real slug collision,
+      not an injected one — `uniqueSlug()` runs outside the transaction, see `D-006`)
+- [x] Registration lands on `/app/setup` — nothing to preselect, step 1 asks (`CONF-011`)
+- [x] Signing in to an unconfigured org lands on `/app/setup`, not an empty console
+- [x] Demo credentials cannot render in a production build
+- [x] Password minimum 10 characters, enforced server-side and mirrored client-side
+- [x] The vocabulary switcher reads every noun from shared preset data, and a renamed
+      preset fails a test rather than shipping a landing page that promises the old word
+- [x] Login sets an `httpOnly` session cookie and **regenerates the session id** (fixation)
+- [x] No token appears in any response body, `localStorage`, or the store
 - [ ] Works at 390px
-- [ ] Keyboard: tab order follows visual order, `Enter` submits, focus ring visible
+- [x] Keyboard: tab order follows visual order, `Enter` submits, focus ring visible
 
 ## Out of scope
 

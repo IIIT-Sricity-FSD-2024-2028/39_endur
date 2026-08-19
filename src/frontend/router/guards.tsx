@@ -23,6 +23,22 @@ export function SessionLoading(): JSX.Element {
   );
 }
 
+/**
+ * The mirror of `RequireSession`, for the two public screens a signed-in user has no
+ * business seeing (30 § Acceptance: "redirected to /app without a flash").
+ *
+ * The `unknown` branch is the whole point. Rendering the sign-in form while boot is still
+ * in flight, then yanking it away a beat later, is the flash the acceptance criterion
+ * names — and it is worse than a short hold, because the user has usually started typing
+ * by then.
+ */
+export function RedirectIfSignedIn({ children }: { children?: ReactNode }): JSX.Element {
+  const status = useAppSelector((s) => s.auth.status);
+  if (status === 'unknown') return <SessionLoading />;
+  if (status === 'authenticated') return <Navigate to="/app" replace />;
+  return <>{children ?? <Outlet />}</>;
+}
+
 export function RequireSession({ children }: { children?: ReactNode }): JSX.Element {
   const status = useAppSelector((s) => s.auth.status);
   const location = useLocation();

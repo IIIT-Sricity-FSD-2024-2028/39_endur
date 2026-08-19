@@ -126,3 +126,85 @@ describe('errors', () => {
     expect(told).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * T-031. Both of these exist for one page: the sign-in form. A 401 there is the ANSWER,
+ * and a 429 there is the only place in the product where the user needs to be told how
+ * long to wait.
+ */
+describe('the two things sign-in needs from the transport', () => {
+  it('keeps a 401 local when the caller says it owns one', async () => {
+    const told = vi.fn();
+    setUnauthenticatedHandler(told);
+    stubFetch(json(401, {
+      error: { code: 'UNAUTHENTICATED', message: 'Nope.', requestId: 'req-4' },
+    }));
+
+    const error = await apiPost('/auth/login', { email: 'a@b.test' }, { suppress401Handler: true })
+      .catch((e: unknown) => e);
+
+    // Still the right class — the page catches it and renders a message.
+    expect(error).toBeInstanceOf(SessionExpiredError);
+    // But the app was NOT told it had been logged out of a session it never had.
+    expect(told).not.toHaveBeenCalled();
+  });
+
+  it('still fires the handler for every other 401, which is the common case', async () => {
+    const told = vi.fn();
+    setUnauthenticatedHandler(told);
+    stubFetch(json(401, {
+      error: { code: 'UNAUTHENTICATED', message: 'Nope.', requestId: 'req-5' },
+    }));
+
+    await apiGet('/campaigns').catch(() => undefined);
+    expect(told).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads Retry-After when the server sends one', async () => {
+    stubFetch(new Response(JSON.stringify({
+      error: { code: 'RATE_LIMITED', message: 'Slow down.', requestId: 'req-6' },
+    }), {
+      status: 429,
+      headers: { 'content-type': 'application/json', 'Retry-After': '90' },
+    }));
+
+    const error = (await apiGet('/campaigns').catch((e: unknown) => e)) as ApiError;
+    expect(error.retryAfter).toBe(90);
+  });
+
+  it('falls back to the draft-7 RateLimit header, which is what our limiter actually sends', async () => {
+    stubFetch(new Response(JSON.stringify({
+      error: { code: 'RATE_LIMITED', message: 'Slow down.', requestId: 'req-7' },
+    }), {
+      status: 429,
+      headers: {
+        'content-type': 'application/json',
+        RateLimit: 'limit=10, remaining=0, reset=842',
+      },
+    }));
+
+    const error = (await apiGet('/campaigns').catch((e: unknown) => e)) as ApiError;
+    expect(error.retryAfter).toBe(842);
+  });
+
+  it('leaves it undefined rather than guessing a number to show someone', async () => {
+    stubFetch(json(429, {
+      error: { code: 'RATE_LIMITED', message: 'Slow down.', requestId: 'req-8' },
+    }));
+
+    const error = (await apiGet('/campaigns').catch((e: unknown) => e)) as ApiError;
+    expect(error.retryAfter).toBeUndefined();
+  });
+
+  it('does not invent a retry hint on a status that is not 429', async () => {
+    stubFetch(new Response(JSON.stringify({
+      error: { code: 'INTERNAL', message: 'Boom.', requestId: 'req-9' },
+    }), {
+      status: 500,
+      headers: { 'content-type': 'application/json', 'Retry-After': '30' },
+    }));
+
+    const error = (await apiGet('/campaigns').catch((e: unknown) => e)) as ApiError;
+    expect(error.retryAfter).toBeUndefined();
+  });
+});

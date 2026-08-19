@@ -26,7 +26,7 @@ export function PageHeader({
   action,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: string | undefined;
   /** The chip row is on by default. Turn it off only where it would be noise — the
    *  wizard, which is teaching the vocabulary rather than reporting it. */
   vocabulary?: boolean;

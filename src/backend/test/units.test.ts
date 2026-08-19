@@ -125,6 +125,29 @@ describe('POST /units', () => {
     ]);
   });
 
+  it('expands `Wing A..F` into six lettered siblings', async () => {
+    const parentId = await unitIdByName(founder.orgId, 'Section A');
+    const res = await withCsrf(founder, 'post', '/api/v1/units').send({
+      name: 'Wing',
+      parentId,
+      repeat: { from: 0, to: 5, letters: true },
+    });
+
+    expect(res.status).toBe(201);
+    const names = (res.body.data as Array<{ name: string }>).map((unit) => unit.name);
+    expect(names).toEqual(['Wing A', 'Wing B', 'Wing C', 'Wing D', 'Wing E', 'Wing F']);
+  });
+
+  it('refuses a letter range past Z', async () => {
+    const parentId = await unitIdByName(founder.orgId, 'Section A');
+    const res = await withCsrf(founder, 'post', '/api/v1/units').send({
+      name: 'Wing',
+      parentId,
+      repeat: { from: 0, to: 26, letters: true },
+    });
+    expect(res.status).toBe(422);
+  });
+
   it('refuses `1..10000` — the cap is server-side, where it cannot be skipped', async () => {
     const parentId = await unitIdByName(founder.orgId, 'Section A');
     const res = await withCsrf(founder, 'post', '/api/v1/units').send({

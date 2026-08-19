@@ -34,7 +34,7 @@ absent.
 | Action | Endpoint | DTO |
 |---|---|---|
 | Load | `GET /api/v1/units` | → `UnitNode[]` — a scoped tree |
-| Create | `POST /api/v1/units` | `CreateUnitBody { name, parentId, isTemporary?, endsAt? }` |
+| Create | `POST /api/v1/units` | `CreateUnitBody { name, parentId, isTemporary?, endsAt?, repeat? }` |
 | Rename | `PATCH /api/v1/units/:id` | `UpdateUnitBody { name?, isTemporary?, endsAt? }` |
 | Move | `POST /api/v1/units/:id/reparent` | `ReparentBody { newParentId }` |
 | Delete | `DELETE /api/v1/units/:id` | `DeleteUnitBody { reassignChildrenTo?: string }` |
@@ -59,7 +59,16 @@ depends on it feeling instant.
 `<ConfirmDialog>` · `<EmptyState>`.
 
 `<UnitTree>` is the same component as the wizard and the audience picker (INV-009). Assign it
-to one person — it is the component most likely to be rewritten three times.
+to one person — it is the component most likely to be rewritten three times. **T-032 built
+it; T-033 EXTENDED it** with the temporary badge, vocabulary counts, the inline refusal and
+the placeholder row, all optional, so the wizard's call site did not change (`N-025`).
+
+**Detail panel** (`design_specs/design/04` §4.2), page-local, not a catalogue component: the
+selected unit's name, where it sits, three counts, the first few people in it, and the three
+actions. Its third count is **Inside** — how many units are directly below — where the
+mockup shows RESP. There is no per-unit response count in the API and inventing one would
+mean a query nobody specified; the number that is there is true and useful. When `<StatCard>`
+lands with T-041 the three counts should adopt it.
 
 ## Interactions
 
@@ -72,7 +81,10 @@ renaming three units must not open three dialogs.
 **Move.** Drag to reparent, with a dashed accent outline on the drop target. Dropping onto a
 descendant is refused with an inline message, not a dialog.
 
-**Delete.** Always through `<ConfirmDialog>` with the real number:
+**Delete.** Always through `<ConfirmDialog>` with the real number. Children go to the
+**parent** — `reassignChildrenTo` is filled in by the page rather than asked about, because
+the answer is obvious in every real case and a picker here would be a second decision inside
+a destructive one. That is also why the page offers delete only where the parent is visible.
 
 > *"Deleting Computer Science moves 64 people and 12 courses to School of Engineering."*
 
@@ -89,6 +101,11 @@ and hospitals are full of numbered repetition, and this turns eight actions into
 (`customization.md` §11). Supported forms: `1..8`, `A..F`. Capped at 50 to prevent an
 accidental `1..10000`.
 
+The grammar is `parseUnitRange()` / `expandUnitNames()` in `packages/shared/src/dto/unit.ts`,
+next to the schema that caps it. Both sides read the same two functions: the client to
+preview and to say *why* 10000 is refused, the server to expand inside the transaction. A
+second parser on the client is how a preview and a write start disagreeing.
+
 ## States
 
 | State | Behaviour |
@@ -101,16 +118,22 @@ accidental `1..10000`.
 
 ## Acceptance
 
-- [ ] The tree is scope-filtered by the API; out-of-scope units are absent, not greyed
-- [ ] A level-2 user sees their subtree rooted at their own unit
-- [ ] Reparenting into a descendant is refused with a clear message and no data change
-- [ ] Delete confirmation states real numbers, fetched before the dialog is actionable
-- [ ] Deleting with the impact call failing is impossible
-- [ ] `Floor 1..8` creates eight siblings; `1..10000` is refused
-- [ ] Inline rename commits on `Enter` and reverts on `Esc`
-- [ ] A temporary unit's children carry end dates and expire positions on schedule
-- [ ] Every noun comes from `useLabels()`, including the add button (INV-001)
-- [ ] `<UnitTree>` has one implementation across three pages (INV-009)
+- [x] The tree is scope-filtered by the API; out-of-scope units are absent, not greyed
+- [x] A level-2 user sees their subtree rooted at their own unit
+- [x] Reparenting into a descendant is refused with a clear message and no data change —
+      twice over: the tree refuses the gesture inline, and the server's cycle check is the
+      authority behind it
+- [x] Delete confirmation states real numbers, fetched before the dialog is actionable
+- [x] Deleting with the impact call failing is impossible — the confirm button is disabled
+      and focus goes to Cancel
+- [x] `Floor 1..8` creates eight siblings; `1..10000` is refused. `Wing A..F` too — the
+      grammar and the cap live in `packages/shared` so client and server cannot disagree
+- [x] Inline rename commits on `Enter` and reverts on `Esc`
+- [ ] A temporary unit's children carry end dates and expire positions on schedule — the row
+      badges it and warns inside 30 days, but the **scheduled expiry itself is unowned**
+      (`17` is still a placeholder). Not this page's to close
+- [x] Every noun comes from `useLabels()`, including the add button (INV-001)
+- [x] `<UnitTree>` has one implementation across three pages (INV-009)
 - [ ] Usable with touch at 390px
 
 ## Out of scope

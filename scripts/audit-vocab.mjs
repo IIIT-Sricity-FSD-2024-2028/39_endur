@@ -14,6 +14,24 @@ const ROOTS = ['src/frontend/pages', 'src/frontend/components'];
 // (Save, Cancel, Settings, Question, Response) it is correctly literal — 22 §1.
 const BANNED = /\b(Course|Faculty|Student|Semester|Department|Professor|Teacher|Pupil)s?\b/;
 
+/**
+ * Comments are stripped before the scan, and that is not a loophole.
+ *
+ * INV-001 is about what RENDERS. A comment renders nothing, and the comments most likely
+ * to name these words are the ones EXPLAINING the invariant — "the button label uses the
+ * vocabulary: Add a Department here, Add a Property in the hotel org". A check that fails
+ * on its own explanation is a check people learn to route around, and then it stops
+ * catching the real thing (the same lesson audit-drift learned at T-003, and the reason
+ * seed.test.ts's INV-002 scan has stripped comments since T-025).
+ *
+ * Line numbers are preserved so a genuine hit still points at the right line: block
+ * comments become the same number of blank lines rather than disappearing.
+ */
+const stripComments = (source) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+    .replace(/^(\s*)\/\/.*$/gm, '$1');
+
 let failures = 0;
 
 function* walk(dir) {
@@ -34,7 +52,7 @@ let scanned = 0;
 for (const root of ROOTS) {
   for (const file of walk(root)) {
     scanned += 1;
-    readFileSync(file, 'utf8')
+    stripComments(readFileSync(file, 'utf8'))
       .split('\n')
       .forEach((line, i) => {
         if (!BANNED.test(line)) return;

@@ -265,3 +265,462 @@
   .page-header-action { margin-left: 0; width: 100%; }
   .page-header-action .btn { width: 100%; }
 }
+
+/* ══ T-031 · THE PUBLIC WORLD ══════════════════════════════════════════════
+   Three screens with no session, no sidebar and no vocabulary. They share the
+   tokens and the base layer and nothing else, so everything below is scoped
+   under .landing or .auth and cannot reach the console.
+   design_specs/design/03 §3.1-3.3 · 30.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.nav-mark {
+  display: inline-block; width: 14px; height: 14px; margin-right: 8px;
+  vertical-align: -1px; border-radius: 4px; background: var(--color-accent);
+}
+.nav-brand { display: inline-flex; align-items: center; }
+
+.public-main {
+  max-width: var(--width-reading); margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-8);
+}
+/* The two form screens centre a card on the ground rather than filling a page.
+   `min-height` is measured from the nav, not the viewport, or the card sits
+   half a nav-height below true centre — visible, and it looks like a mistake. */
+.public-main-form {
+  display: grid; place-items: start center;
+  min-height: calc(100dvh - 140px); padding-top: var(--space-6);
+}
+
+/* ── landing ─────────────────────────────────────────────────────────────── */
+
+.landing { display: flex; flex-direction: column; gap: var(--space-8); }
+.landing-hero { padding-top: var(--space-6); }
+.landing-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: clamp(32px, 6vw, 42px); line-height: 1.12; margin: 0;
+}
+.landing-lede {
+  max-width: 46ch; margin: var(--space-3) 0 0; font-size: 18px; line-height: 1.55;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.landing-actions {
+  display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4);
+}
+
+.landing-switch { gap: var(--space-3); padding: var(--space-4); }
+.landing-switch .seg { align-self: flex-start; }
+.landing-nouns {
+  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: clamp(19px, 3.4vw, 25px); line-height: 1.3;
+  animation: noun-swap var(--dur-base) var(--ease);
+}
+.landing-dot { color: var(--color-accent); }
+@keyframes noun-swap {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.landing-steps {
+  display: grid; gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.landing-steps p { margin: 0; }
+.landing-steps .utility { margin-bottom: 4px; }
+.landing-footer { border-top: 1px solid var(--color-divider); padding-top: var(--space-3); }
+
+/* ── the two auth cards ──────────────────────────────────────────────────── */
+
+.auth { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: var(--space-3); }
+.auth-card { gap: var(--space-2); padding: var(--space-4); }
+.auth-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 22px; margin: 0;
+}
+.auth-sub { margin: -4px 0 var(--space-1); }
+.auth-card form { display: flex; flex-direction: column; gap: var(--space-3); }
+.auth-alt { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.auth-alt .btn { font-size: 13px; }
+
+/* Development only — `DEMO_ORGS` is [] in a production build, so this never renders
+   there and the credentials are not in the bundle at all (lib/demo.ts). */
+.auth-demo { display: flex; flex-direction: column; gap: 6px; padding-inline: var(--space-1); }
+.auth-demo-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.auth-demo-row .tag { border: 0; cursor: pointer; font: inherit; font-size: 11px; padding: 3px 10px; }
+.auth-demo-row .tag:hover { background: var(--color-accent-100); color: var(--color-accent-800); }
+
+/* ── form feedback, shared by both ───────────────────────────────────────── */
+
+/* The password reveal sits INSIDE the input's box rather than beside it, so the
+   field keeps one silhouette and the layout does not shift when it appears. */
+.input-reveal { position: relative; display: block; }
+.input-reveal .input { padding-right: 40px; }
+.reveal-toggle {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  width: 30px; height: 30px; min-height: 0; padding: 0;
+  background: none; border: 0; color: inherit;
+  opacity: .55; cursor: pointer;
+}
+.reveal-toggle:hover { opacity: 1; background: none; }
+
+.field-help, .field-error { margin: 5px 0 0; font-size: 12px; }
+.field-help { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.field-error { color: var(--status-bad-800); }
+.field-error a { color: inherit; }
+
+/* One line, above the button, never a toast (design_specs/design/10 §4). */
+.form-error {
+  margin: 0; padding: 8px 12px; font-size: 13px; border-radius: var(--radius-md);
+  background: var(--status-bad-100); color: var(--status-bad-800);
+}
+
+/* Inline in the button, and the label never changes — swapping "Sign in" for
+   "Signing in…" reflows the button width mid-click and reads as a glitch. */
+.spinner {
+  display: inline-block; width: 13px; height: 13px; margin-right: 8px;
+  vertical-align: -1px; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 639px) {
+  .public-main { padding: var(--space-3) var(--space-3) var(--space-6); }
+  .landing { gap: var(--space-6); }
+  .landing-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ══ T-032 · THE SETUP WIZARD ══════════════════════════════════════════════
+   design_specs/design/03 §3.4 · 31. Plus the four shared components 24 asks
+   for, which live here rather than beside their .tsx because DEC-012 puts
+   every declaration in the design system.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* The focused console frame: no sidebar during setup, so the well is wider. */
+.page-focused { max-width: var(--width-builder); }
+
+.wizard { display: flex; flex-direction: column; gap: var(--space-4); }
+.wizard-top { display: flex; align-items: center; gap: var(--space-3); }
+.wizard-top .utility { margin-right: auto; }
+.wizard-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+}
+.wizard-error { margin-bottom: calc(var(--space-2) * -1); }
+
+.step { display: flex; flex-direction: column; gap: var(--space-3); }
+.step-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: clamp(22px, 3.5vw, 27px); margin: 0;
+}
+.step-lede {
+  margin: -6px 0 0; max-width: 60ch; font-size: 15px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.step-note { max-width: 60ch; }
+
+/* ── <ProgressRail> — 24 §6 ──────────────────────────────────────────────── */
+
+.rail { display: flex; list-style: none; margin: 0; padding: 0; }
+.rail-step {
+  position: relative; flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; min-width: 0;
+}
+/* The 3px track, drawn behind the dots and stopping at the last one. */
+.rail-track {
+  position: absolute; top: 8px; left: 50%; right: -50%; height: 3px;
+  background: var(--color-neutral-200);
+}
+.rail-step:last-child .rail-track { display: none; }
+.rail-step.is-done .rail-track { background: var(--color-accent); }
+.rail-dot {
+  position: relative; width: 19px; height: 19px; padding: 0;
+  display: grid; place-items: center;
+  border: 3px solid var(--color-neutral-300); border-radius: 50%;
+  background: var(--color-bg); color: transparent;
+}
+.rail-step.is-current .rail-dot { border-color: var(--color-accent); }
+.rail-step.is-done .rail-dot {
+  border-color: var(--color-accent); background: var(--color-accent);
+  color: var(--color-bg); cursor: pointer;
+}
+.rail-label {
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
+.rail-step.is-pending .rail-label { opacity: .5; }
+
+/* ── step 1 · industry ──────────────────────────────────────────────────── */
+
+.preset-grid {
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+}
+.preset-card {
+  position: relative; display: flex; flex-direction: column; gap: 6px;
+  padding: var(--space-3); cursor: pointer;
+  background: var(--color-card); border: 2px solid transparent;
+  border-radius: calc(var(--radius-lg) * 1.15); box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.preset-card input { position: absolute; opacity: 0; width: 0; height: 0; }
+.preset-card:hover { box-shadow: var(--shadow-md); }
+.preset-card.is-selected {
+  border-color: var(--color-accent); background: var(--color-accent-100);
+  box-shadow: var(--shadow-md);
+}
+.preset-card:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.preset-check {
+  position: absolute; top: 10px; right: 10px; display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--color-accent); color: var(--color-bg);
+}
+.preset-name {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 19px;
+}
+.preset-chain, .preset-words { line-height: 1.45; }
+.preset-words { color: var(--color-accent-700); }
+
+/* ── inline rename — 24 §7. Plain text until hovered or focused. ─────────── */
+
+.inline-name {
+  flex: 1; min-width: 0; font: inherit; font-size: 14px; color: inherit;
+  padding: 5px 10px; border: 1px solid transparent; border-radius: 999px;
+  background: transparent;
+}
+.inline-name:hover { border-color: var(--color-divider); }
+.inline-name:focus {
+  background: var(--color-surface); border-color: var(--color-accent); outline: none;
+}
+
+/* ── step 2 · roles ─────────────────────────────────────────────────────── */
+
+.role-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.role-list li.is-dragging { opacity: .4; }
+.role-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  min-height: 52px; padding: 0 var(--space-2);
+  background: var(--color-surface); border-radius: var(--radius-md);
+}
+.role-grip { opacity: .35; cursor: grab; flex: none; }
+.role-level {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 13px;
+  color: var(--color-bg); background: var(--color-accent); border-radius: 50%;
+}
+/* The generated visibility rule. When somebody asks how permissions work, this is the
+   answer, so it is not allowed to be the thing that gets truncated first. */
+.role-sees { flex: none; min-width: 12ch; text-align: right; }
+.role-move { display: inline-flex; gap: 2px; flex: none; }
+.role-add { align-self: flex-start; }
+
+/* ── <UnitTree> — 24 §4 ─────────────────────────────────────────────────── */
+
+.tree-card { padding: var(--space-2); gap: 2px; }
+.unit-tree ul { list-style: none; margin: 0; padding: 0; }
+/* The only hairline in the product, and it earns the exception: a tree without guides
+   is unreadable (design_specs/design/03 §3.3). */
+.unit-children { margin-left: 18px; border-left: 1px solid var(--color-divider); }
+.unit-row {
+  display: flex; align-items: center; gap: 6px; min-height: 38px;
+  padding-right: var(--space-2); border-radius: var(--radius-md);
+}
+.unit-row:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+.unit-row.is-selected { background: var(--color-accent-100); }
+.unit-row.is-moving { opacity: .45; }
+.unit-row.is-droppable { outline: 1px dashed transparent; }
+.unit-row.is-drop { outline: 2px dashed var(--color-accent-300); outline-offset: -2px; }
+.unit-twist {
+  flex: none; width: 22px; height: 22px; display: grid; place-items: center;
+  padding: 0; border: 0; background: none; color: inherit; opacity: .55; cursor: pointer;
+}
+.unit-icon { flex: none; opacity: .55; }
+.unit-name { flex: 1; min-width: 0; font-size: 14px; }
+.unit-pick {
+  text-align: left; padding: 5px 10px; border: 0; background: none;
+  font: inherit; font-size: 14px; color: inherit; cursor: pointer; border-radius: 999px;
+}
+.unit-count { flex: none; }
+.unit-actions { display: inline-flex; align-items: center; gap: 2px; flex: none; opacity: 0; }
+.unit-row:hover .unit-actions,
+.unit-row:focus-within .unit-actions { opacity: 1; }
+/* While a move is in progress EVERY destination has to be visible without hovering it —
+   that is the whole point of the keyboard and touch path. This must live on the tree, not
+   on `.unit-here`: opacity is not a cascade a child can win, so `.unit-here { opacity: 1 }`
+   inside an `opacity: 0` parent renders nothing at all. jsdom cannot see that. */
+.unit-tree.is-relocating .unit-actions { opacity: 1; }
+.unit-moving-hint { padding: 6px 10px; }
+.tree-add { align-self: flex-start; margin-left: 26px; }
+
+/* Touch and keyboard have no hover, so the actions must not be hover-only there. */
+@media (hover: none) {
+  .unit-actions { opacity: 1; }
+}
+
+/* T-033 additions. A row can carry a badge, a count and a refusal; all three are optional
+   and none of them may push the name out of the row (32). */
+.unit-temp, .unit-ends { flex: none; }
+/* A refused drop target is outlined like a valid one but in the bad ramp, so the gesture
+   is answered rather than ignored — silence reads as "did the drag even register?". */
+.unit-row.is-refused { outline: 2px dashed var(--status-bad-500); outline-offset: -2px; }
+.unit-row-message {
+  margin: 2px 0 6px; padding: 4px 10px; font-size: 12px;
+  color: var(--status-bad-800); background: var(--status-bad-100);
+  border-radius: var(--radius-sm);
+}
+
+/* ── /app/structure — 32, design_specs/design/04 §4.2 ───────────────────── */
+
+.structure {
+  display: grid; gap: var(--space-3); align-items: start;
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+.structure-tree { min-width: 0; }
+
+.unit-detail {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); box-shadow: var(--shadow-sm);
+}
+.unit-detail-name { margin: 0; }
+.unit-detail-where { margin: -8px 0 0; }
+
+.unit-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: 0; }
+.unit-stat {
+  padding: var(--space-2); border-radius: var(--radius-md); background: var(--color-surface);
+}
+.unit-stat dt {
+  font-family: var(--font-body); font-weight: 600;
+  font-size: 11px; line-height: 1; text-transform: uppercase; letter-spacing: .08em;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.unit-stat dd {
+  margin: 6px 0 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums;
+}
+
+.section-kicker {
+  margin: 0 0 var(--space-2); font-family: var(--font-body); font-weight: 600;
+  font-size: 11px; line-height: 1; text-transform: uppercase; letter-spacing: .08em;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.unit-people-list { list-style: none; margin: 0 0 var(--space-2); padding: 0; }
+.unit-people-list li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2);
+  padding: 4px 0; border-bottom: 1px solid var(--color-divider);
+}
+.unit-detail-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.btn-danger-ghost { color: var(--status-bad-800); }
+
+/* Skeleton rows at the TREE's shape, not a centred spinner: the page keeps its layout
+   while it loads, so nothing jumps when the data lands (32 § States). */
+.tree-skeleton { display: flex; flex-direction: column; gap: 6px; padding: var(--space-2); }
+.skeleton-row {
+  display: block; height: 26px; max-width: 260px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+
+/* ── <EmptyState> — 24 §6, design_specs/design/10 §3 ────────────────────── */
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: var(--space-8) var(--space-4); text-align: center;
+}
+.empty-icon { opacity: .45; }
+.empty-title { margin: 0; }
+.empty-body {
+  margin: 0; max-width: 46ch;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.empty-action { margin-top: var(--space-2); }
+
+/* Below the two-pane breakpoint the detail panel goes UNDER the tree rather than beside
+   it. design_specs/design/04 §4.2 asks for a bottom sheet; stacking is the honest version
+   of that until a sheet primitive exists, and it keeps both halves reachable at 390px. */
+@media (max-width: 899px) {
+  .structure { grid-template-columns: minmax(0, 1fr); }
+  .unit-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ── step 4 · words + the live preview ──────────────────────────────────── */
+
+.words-card { gap: var(--space-2); }
+.word-row {
+  display: grid; align-items: center; gap: var(--space-2);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr);
+}
+.word-prompt { font-size: 13px; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.word-input { min-width: 0; }
+.word-plural { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.word-input-plural.is-overridden { border-color: var(--color-accent-300); }
+.word-hint { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+
+/* A miniature, non-interactive render of the real nav. It is the customization claim
+   proven rather than asserted, and it updates on every keystroke. */
+.preview {
+  padding: var(--space-3); border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--color-neutral-900) 8%, transparent);
+}
+.preview-kicker { margin: 0 0 var(--space-2); }
+.preview-inner {
+  pointer-events: none; transform: scale(.9); transform-origin: left top;
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.preview-nav { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: 14px; }
+.preview-nav span { display: inline-flex; align-items: center; gap: 6px; }
+.preview-sentence {
+  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 17px;
+}
+
+/* ── step 5 · review ────────────────────────────────────────────────────── */
+
+.review-grid {
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.review-card { gap: 6px; }
+.review-head { display: flex; align-items: center; gap: var(--space-2); }
+.review-head .utility { margin-right: auto; }
+.review-figure {
+  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 17px;
+}
+.review-words { font-size: 15px; line-height: 1.4; }
+
+/* ── <Toggle> — 24 §5 ───────────────────────────────────────────────────── */
+
+.toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+.toggle.is-disabled { opacity: .5; cursor: not-allowed; }
+.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  flex: none; width: 38px; height: 22px; padding: 3px; border-radius: 999px;
+  background: var(--color-neutral-300); transition: background var(--dur-fast) var(--ease);
+}
+.toggle-knob {
+  display: block; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--color-bg); transition: transform var(--dur-fast) var(--ease);
+}
+.toggle:has(input:checked) .toggle-track { background: var(--color-accent); }
+.toggle:has(input:checked) .toggle-knob { transform: translateX(16px); }
+.toggle:has(input:focus-visible) .toggle-track { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.toggle-text { display: flex; flex-direction: column; }
+.toggle-hint { margin-top: 1px; }
+
+/* ── destructive button, for <ConfirmDialog> ────────────────────────────── */
+
+.btn-danger { background: var(--status-bad-500); color: var(--color-bg); }
+.btn-danger:hover { background: var(--status-bad-800); }
+
+@media (max-width: 639px) {
+  .rail-label { font-size: 10px; }
+  .word-row { grid-template-columns: 1fr; gap: 4px; }
+  .wizard-actions .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* The row wraps and "Sees…" moves to its own line. It does NOT get hidden: it is the
+     answer to "how do permissions work?", so it is the last thing that may go, not the
+     first. */
+  .role-row { flex-wrap: wrap; padding-block: 8px; }
+  .role-sees {
+    order: 9; flex: 1 0 100%; min-width: 0; text-align: left;
+    padding-left: calc(24px + var(--space-2) * 2);
+  }
+}

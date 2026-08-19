@@ -13,6 +13,7 @@ import { COMMENT_POOLS } from '../database/seed/comments.js';
 import { Rng, skewedRating } from '../database/seed/random.js';
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const sharedRoot = path.resolve(backendRoot, '../../packages/shared/src');
 
 describe('presets — 50 §1, §2', () => {
   it('ships exactly five', () => {
@@ -90,27 +91,36 @@ describe('INV-002 — nothing is education-specific outside the university prese
     // appearing in strings, keys and paths outside the two directories allowed to hold
     // them as DATA — `presets/**` and `database/seed/**`, both owned by 50-SEED-AND-DEMO
     // in the MAP table.
+    //
+    // `packages/shared` is scanned too, and was not until T-031. It is imported by BOTH
+    // apps, so a noun leaking in there leaks into every screen — the widest blast radius
+    // in the repo and, until this line, the only source tree nobody was checking.
     const banned = /\b(course|faculty|student|semester)s?\b/i;
     const stripComments = (source: string) =>
       source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-    const walk = (dir: string) => {
+    const walk = (dir: string, root: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           // Build output is generated FROM the sources being checked, so scanning it only
           // ever reports the same finding twice.
           if (/^(node_modules|dist|dist-config|dist-types)$/.test(entry.name)) continue;
-          walk(full);
+          walk(full, root);
           continue;
         }
         if (!entry.name.endsWith('.ts')) continue;
 
-        const relative = path.relative(backendRoot, full).replace(/\\/g, '/');
+        const relative = path.relative(root, full).replace(/\\/g, '/');
         if (relative.startsWith('presets/')) continue;
         if (relative.startsWith('database/seed/')) continue;
         // This file has to name them in order to look for them.
         if (relative.startsWith('test/')) continue;
+        // The fourth DATA location, and the newest: the landing page's vocabulary
+        // switcher advertises the presets to someone with no organisation yet, so
+        // `useLabels()` cannot serve it. Same category as `presets/**`, and the test
+        // below proves the two agree. 30 § Landing, CONF-011.
+        if (relative === 'vocabularies.ts') continue;
 
         const source = stripComments(readFileSync(full, 'utf8'));
         for (const [index, line] of source.split('\n').entries()) {
@@ -118,7 +128,8 @@ describe('INV-002 — nothing is education-specific outside the university prese
         }
       }
     };
-    walk(backendRoot);
+    walk(backendRoot, backendRoot);
+    walk(sharedRoot, sharedRoot);
 
     // The generic model is the whole product claim. A `Course` type or a `student_id`
     // column anywhere would make "nothing is education-specific" a slogan rather than a

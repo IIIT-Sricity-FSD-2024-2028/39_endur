@@ -15,15 +15,15 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { ConsoleLayout, PublicLayout, RespondLayout } from './layouts.js';
 import { ConsoleBoundary, PublicBoundary, RespondBoundary } from './boundaries.js';
-import { SessionLoading } from './guards.js';
+import { RedirectIfSignedIn, RequireCapability, SessionLoading } from './guards.js';
 
 const Landing = lazy(() => import('../pages/public/Landing.js'));
 const Login = lazy(() => import('../pages/public/Login.js'));
 const Start = lazy(() => import('../pages/public/Start.js'));
 
 const Home = lazy(() => import('../pages/console/Home.js'));
-const Setup = lazy(() => import('../pages/console/Setup.js'));
-const Structure = lazy(() => import('../pages/console/Structure.js'));
+const Setup = lazy(() => import('../pages/console/Setup/index.js'));
+const Structure = lazy(() => import('../pages/console/Structure/index.js'));
 const Roles = lazy(() => import('../pages/console/Roles.js'));
 const People = lazy(() => import('../pages/console/People.js'));
 const PersonDetail = lazy(() => import('../pages/console/PersonDetail.js'));
@@ -67,9 +67,12 @@ export const routes: RouteObject[] = [
     element: <PublicLayout />,
     errorElement: <PublicBoundary />,
     children: [
-      { path: '/', element: hold(<Landing />) },
-      { path: '/login', element: hold(<Login />) },
-      { path: '/start', element: hold(<Start />) },
+      // All three bounce a signed-in user to /app. The guard is OUTSIDE `hold`, so the
+      // redirect happens before the page chunk is fetched at all — a sign-in form that
+      // downloads and then vanishes is the flash 30 § Acceptance rules out.
+      { path: '/', element: <RedirectIfSignedIn>{hold(<Landing />)}</RedirectIfSignedIn> },
+      { path: '/login', element: <RedirectIfSignedIn>{hold(<Login />)}</RedirectIfSignedIn> },
+      { path: '/start', element: <RedirectIfSignedIn>{hold(<Start />)}</RedirectIfSignedIn> },
       // An unmatched path is a PUBLIC 404. Answering it inside the console would leak
       // that a console exists, and would bounce a stranger to /login for a typo.
       { path: '*', element: <NotFound /> },
@@ -81,8 +84,12 @@ export const routes: RouteObject[] = [
     errorElement: <ConsoleBoundary />,
     children: [
       { index: true, element: hold(<Home />) },
-      { path: 'setup', element: hold(<Setup />) },
-      { path: 'structure', element: hold(<Structure />) },
+      // The two console routes with a capability gate on the route itself (31 § States,
+      // 32 § States). Everywhere else out-of-scope data is simply absent; on these two the
+      // page IS the action, so somebody without the capability has nothing to look at and
+      // gets a full-page 403 rather than an empty screen that looks broken.
+      { path: 'setup', element: hold(<RequireCapability capability="org.update"><Setup /></RequireCapability>) },
+      { path: 'structure', element: hold(<RequireCapability capability="unit.read"><Structure /></RequireCapability>) },
       { path: 'roles', element: hold(<Roles />) },
       { path: 'people', element: hold(<People />) },
       { path: 'people/:id', element: hold(<PersonDetail />) },
