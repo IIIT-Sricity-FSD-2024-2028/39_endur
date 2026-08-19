@@ -76,6 +76,7 @@ enum QuestionKind {
   @@map("question_kind")
 }
 
+<<<<<<< HEAD
 enum CampaignStatus {
   draft
   scheduled
@@ -85,6 +86,8 @@ enum CampaignStatus {
   @@map("campaign_status")
 }
 
+=======
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 // ---------------------------------------------------------------------------
 // Tenancy and identity
 // ---------------------------------------------------------------------------
@@ -114,8 +117,14 @@ model Organization {
   templates     Template[]
   campaigns     Campaign[]
   files         File[]        @relation("FileOrganization")
+<<<<<<< HEAD
   auditLog      AuditLog[]
   apiKeys       ApiKey[]
+=======
+  auditLog        AuditLog[]
+  apiKeys         ApiKey[]
+  idempotencyKeys IdempotencyKey[]
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   subscription  Subscription?
 
   @@map("organizations")
@@ -351,8 +360,12 @@ model Campaign {
   templateId String   @map("template_id") @db.Uuid
   template   Template @relation(fields: [templateId], references: [id])
 
+<<<<<<< HEAD
   name   String
   status CampaignStatus @default(draft)
+=======
+  name String
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   /// { unitId, includeSubtree, roleIds[] }
   audienceRule Json @default("{}") @map("audience_rule")
 
@@ -363,9 +376,21 @@ model Campaign {
   /// service layer. Respondents were promised anonymity at submission time (INV-006).
   anonymous Boolean @default(true)
 
+<<<<<<< HEAD
   /// The /r/:token link. NULL until launched; minting it is irreversible.
   publicToken String? @unique @map("public_token")
 
+=======
+  /// The /r/:token link. NULL until launched; minting it is irreversible — and it is what
+  /// "has left draft" means, now that status is derived (DEC-016). 8 characters from an
+  /// unambiguous alphabet (DEC-017).
+  publicToken String? @unique @map("public_token")
+
+  /// The ONLY stored status transition. Everything else about status is read off the dates
+  /// by features/campaigns/status.ts; a scheduler is a failure mode we chose not to have.
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
+
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   createdById String?  @map("created_by") @db.Uuid
   createdBy   User?    @relation("CampaignCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -374,6 +399,10 @@ model Campaign {
   responses   Response[]
   invitations Invitation[]
 
+<<<<<<< HEAD
+=======
+  @@index([orgId, startsAt, endsAt])
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   @@map("campaigns")
 }
 
@@ -476,6 +505,34 @@ model File {
   @@map("files")
 }
 
+<<<<<<< HEAD
+=======
+/// 13 §7. The first response to a keyed request, replayed for 24 h. The respondent submit
+/// is the case that matters: a phone on a flaky venue network retries, and a duplicate
+/// response corrupts the demo's numbers in front of the evaluator.
+model IdempotencyKey {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// NULL for respondent submits — a public caller has a campaign, not an organisation.
+  orgId String?       @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  key      String
+  endpoint String
+  /// Same key, different body, is a client bug. Answering it with the cached response of a
+  /// different request would be worse than an error, so the hash is compared.
+  requestHash String @map("request_hash")
+
+  status Int
+  body   Json
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
+
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 model AuditLog {
   id    BigInt  @id @default(autoincrement())
   orgId String? @map("org_id") @db.Uuid

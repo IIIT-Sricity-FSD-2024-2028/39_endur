@@ -28,6 +28,17 @@ export type RequestContext = {
   startedAt: number;
   /** Set by tenantResolver (T-006). NEVER read from a request body — INV-010. */
   orgId?: string;
+<<<<<<< HEAD
+=======
+  /**
+   * organizations.settings.authzVersion, read alongside the tenant. It is part of the
+   * grant cache key, so a permission change invalidates every cached decision for this
+   * tenant instantly — the 30-second TTL is only a backstop (11 §7). Resolving it per
+   * request is what makes that true; a constant here would leave a revoked permission
+   * working for the length of the TTL, which is a security bug and not a trade-off.
+   */
+  authzVersion?: number;
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   /** Set by authenticate (T-007). */
   principal?: Principal;
   /**
@@ -39,6 +50,15 @@ export type RequestContext = {
   audit: AuditIntent[];
   /** Per-request resolver memo (11 §7). Correct by construction: a request is a snapshot. */
   authzMemo?: Map<string, Promise<Decision>>;
+<<<<<<< HEAD
+=======
+  /**
+   * The list-side equivalent, for visibleUnits(). Separate from authzMemo because it
+   * answers a different question and caches a different shape — a list handler asks it
+   * twice, once for the rows and once for the scope-filtered count.
+   */
+  visibilityMemo?: Map<string, Promise<unknown>>;
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   /** Set by ctx.tx once the audit rows are flushed; read by the auditWriter safety net. */
   auditWritten?: boolean;
 };

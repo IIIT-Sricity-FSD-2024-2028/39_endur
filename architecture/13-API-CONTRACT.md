@@ -149,7 +149,11 @@ size limit (`12` §4.4); they stream with their own cap.
 
 | Method | Path | C |
 |---|---|---|
+<<<<<<< HEAD
 | GET | `/library` | — (auth optional) — `orgId IS NULL` templates |
+=======
+| GET | `/library` | `template.read` — `orgId IS NULL` templates (DEC-018) |
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 | GET | `/` | `template.read` — the org's own |
 | GET | `/:id` | `template.read` |
 | POST | `/` | `template.create` |
@@ -181,7 +185,11 @@ not a stream of field edits, and reordering is one operation on the array.
 | Method | Path | C |
 |---|---|---|
 | POST | `/authz/simulate` | `simulator.run` — full `Decision` incl. `considered` |
+<<<<<<< HEAD
 | GET | `/authz/capabilities` | — the catalogue, for the grid |
+=======
+| GET | `/authz/capabilities` | `org.read` — the catalogue, for the grid (DEC-018) |
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 | GET | `/audit` | `audit.read` |
 
 ### Public respondent — `/api/v1/public`

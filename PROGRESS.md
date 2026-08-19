@@ -5,15 +5,16 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (Stage 1 complete + FOLDERS RENAMED — read the note below)
+UPDATED   2026-08-19  (Stage 2 complete — the whole API surface exists, and is seeded)
 PHASE     P1 MIDDLEWARE
-MILESTONE M0 = 2026-08-26  ·  8 days  ·  demo 27 Aug  ·  GRADED
-STATUS    14/45. STAGE 1 DONE and fully tested — 20 tests across 4 files.
+MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
+STATUS    25/45. STAGES 0-2 DONE. 141 tests across 15 files, all green.
+          60 endpoints · 4 seeded demo orgs · 3,250 responses · migrate+seed ~14 s.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      T-015 org + presets + POST /org/setup. Two lanes are free — see the hand-off
-          note at the top of the session log for who can take what without colliding.
+NEXT      T-026..T-029 frontend foundation (lane X), then T-030. The backend is done
+          for M0 — every screen in Stage 4 now has a real endpoint to call.
 ```
 
 ---
@@ -35,12 +36,24 @@ still works.
 
 **Setup on a fresh machine:** `npm install`, then Postgres 16 either via
 `sudo bash scripts/install-postgres.sh` or `npm run db:up` if you have Docker, then
-`cp .env.example .env` and set `SESSION_SECRET` to 32+ characters, then `npm run db:migrate`.
-On WSL, `sudo service postgresql start` after every Windows restart.
+`cp .env.example .env` and set `SESSION_SECRET` to 32+ characters, then `npm run db:migrate`,
+then `npm run db:seed`. On WSL, `sudo service postgresql start` after every Windows restart.
+
+**The checkout has to sit on a filesystem that supports symlinks.** npm workspaces link
+each package into `node_modules`, so an exFAT drive fails the install outright with
+`EISDIR: illegal operation on a directory, symlink src/frontend -> node_modules/@endur/web`.
+NTFS, ext4 and APFS are all fine; `--install-links` does not help, and neither does WSL if
+the repo is under `/mnt/<letter>`. Build on a supported volume and keep the other copy
+source-only (`_MEMORY.md` `N-018`).
+
+**Seeded logins**, printed at the end of `npm run db:seed` and the same ones the
+development login affordance prefills: `admin@northfield.endur.test`,
+`admin@grand-palace.endur.test`, `admin@riverside.endur.test`, `admin@meridian.endur.test`
+ — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-and `npx vitest run` inside `src/backend`. All four are green right now, so anything red is
-yours.
+&& `npm run audit:vocab`, and `npx vitest run` inside `src/backend` (141 tests). All five
+are green right now, so anything red is yours.
 
 ---
 
@@ -83,17 +96,17 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ```
 ### Stage 2 — API features
 ```
-[ ] T-015  A  org, presets, /org/setup
-[ ] T-016  A  units CRUD, reparent, impact
-[ ] T-017  A  roles, grants matrix, warnings
-[ ] T-018  A  people, assignments, CSV import
-[ ] T-019  A  subjects
-[ ] T-020  A  templates, clone, bulk questions
-[ ] T-021  A  campaigns, launch, audience
-[ ] T-022  A  public respondent endpoints
-[ ] T-023  A  results + k-anonymity gate
-[ ] T-024  A  GET /home
-[ ] T-025  A  SEED — 5 presets + 4 demo orgs        ← due 22 Aug
+[x] T-015  A  org, presets, /org/setup
+[x] T-016  A  units CRUD, reparent, impact
+[x] T-017  A  roles, grants matrix, warnings
+[x] T-018  A  people, assignments, CSV import
+[x] T-019  A  subjects
+[x] T-020  A  templates, clone, bulk questions
+[x] T-021  A  campaigns, launch, audience        ← DEC-016 resolved OPEN-005
+[x] T-022  A  public respondent endpoints
+[x] T-023  A  results + k-anonymity gate
+[x] T-024  A  GET /home
+[x] T-025  A  SEED — 5 presets + 4 demo orgs        ← landed 19 Aug, 3 days early
 ```
 ### Stage 3 — frontend foundation
 ```
@@ -119,13 +132,13 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ```
 ### Stage 5 — M0 hardening
 ```
-[ ] T-042  A  resolve OPEN-005 (campaign status)   ← decision, do early
+[x] T-042  A  resolve OPEN-005 (campaign status)   ← DEC-016, derived on read
 [ ] T-043  X  resolve OPEN-002 (public URL / QR)   ← decision, do early
 [ ] T-044  X  vocabulary nonsense audit            ← 24 Aug
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 14 / 45 done. Stage 1 complete.**
+**Progress: 25 / 45 done. Stages 0-2 complete — the API surface is finished.**
 
 ---
 
@@ -135,7 +148,6 @@ Blocking or dated. Move to `_MEMORY.md` as a `DEC-` entry once resolved, and tic
 
 | Ref | Question | Needed by | Blocks |
 |---|---|---|---|
-| `OPEN-005` | Campaign status: derived-on-read, or a scheduler? Leading answer is derived-on-read — no timer, no stuck state, nothing extra to fail on stage | **22 Aug** | T-021, T-042 |
 | `OPEN-002` | What public URL does the QR encode? `localhost` will not scan from a phone | **24 Aug** | T-038, T-043 |
 | `OPEN-001` | Phase-3 Redux shape (`23` §4). Recommendation on file: RTK Query + hand-written slices | 15 Oct | nothing before P3 |
 | `OPEN-003` | Analysis engine: rule-based or LLM-assisted (`43`) | 1 Nov | nothing before P3 |
@@ -153,7 +165,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | id | What | Why | Repay by |
 |---|---|---|---|
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
-| `D-002` | `db:reset` never actually run end to end | Prisma requires interactive consent to drop data. Migrations were proved clean against a throwaway database instead (1.2 s) | before the first rehearsal — `50` §4 wants it under 30 s |
+| `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
 
 ---
 
@@ -162,7 +174,94 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-19 · HAND-OFF NOTE — start here
+### 2026-08-19 · STAGE 2 COMPLETE — the whole API surface, T-015 to T-025
+
+**60 endpoints, 141 tests across 15 files, four seeded demo organisations.** Every screen in
+Stage 4 now has a real endpoint to call, and `02` §2's "a seeded demo alone can pass" is
+satisfied three days before its 22 Aug deadline.
+
+**Three decisions were taken before any code, and they are in `_MEMORY.md`:**
+
+| | |
+|---|---|
+| `DEC-016` | **Campaign status is derived on read.** Resolves `OPEN-005`. The column and the `campaign_status` enum are dropped; `closed_at` is the only stored transition. No scheduler, no timer, nothing to be stuck |
+| `DEC-017` | Public token is **8 characters** from a 31-letter alphabet with `0 O 1 I L` removed. Doc `38` said six; six is ~30 bits for a link that needs no credential |
+| `DEC-018` | `/templates/library` and `/authz/capabilities` are guarded rather than added to the route-enumeration allowlist. No M0 screen reaches either without a session |
+
+**Two migrations.** `campaign_status_derived` drops the column and **re-keys the anonymity
+trigger onto `public_token`** — the same statement said against the column that now carries
+the truth, because minting the token *is* leaving draft. `idempotency_keys` backs `13` §7.
+Both verified against the live database: 19 tables, the trigger's new body read back out of
+`pg_proc`.
+
+**The one genuinely new piece of authorisation logic is `authz/visibility.ts`.** `resolve()`
+answers *"may this caller act on THIS target"*; every list asks the inverse, *"WHICH targets
+may they see"*. Guarding a list with a target-based check 403s every scoped role — a
+`subtree` grant cannot reach an org-level target by design (`11` §4) — so list routes carry
+`requireCapability(..., { target: 'any' })` and the handler filters through `visibleUnits()`.
+Out-of-scope rows are absent and `meta.total` counts only what the caller may see. Deny still
+wins: a deny at scope `all` empties the visibility entirely.
+
+**`requireCapability` grew the 404-versus-403 rule `13` §5 always specified.** A denial with
+reason `out_of_scope` on a target the caller cannot even read is now a 404 — a 403 would
+confirm the resource exists. A denial on something they *can* see stays a 403 with the trace,
+because that is actionable.
+
+**Three bugs found by building on top of Stage 1, all pre-existing:**
+
+1. **`authzVersion` was never passed to the resolver**, so the grant cache key was a constant
+   and a permission change stayed invisible for the TTL. `tenantResolver` now reads it
+   alongside the tenant. `roles.test.ts` proves it: a grant removed in one request makes the
+   next request 403 with no sleep and no cache clear.
+2. **`tenantResolver`'s public-token pattern captured the literal word `campaigns`** — it
+   matched the segment after `/api/v1/public/`, not after `/campaigns/`. Invisible until a
+   public route existed. `N-017`.
+3. **ESLint flat config REPLACES rule options rather than merging them**, so the
+   `features/**` block had silently switched off DEC-007's `$queryRaw` confinement for every
+   file under it since T-001. Found by writing a probe file to prove the rule fired and
+   watching it not fire. Both rules re-proved by probe afterwards. `N-019`.
+
+**Three specs disagreed with themselves and were amended, not worked around:**
+
+- `50` §2 gave university and hospital no one-question form while `50` §7 required every
+  preset to ship one. The acceptance list wins; both gained a `Quick pulse`.
+- `50` §7's INV-002 check was a bare `grep` for the banned words, which flags the sentences
+  that *explain* the invariant. Now scoped to identifiers, strings and paths, with comments
+  stripped — the same lesson the drift script learned at T-003.
+- `rateLimit.ts` said respondent submits were "deliberately NOT tight" and then set 5/minute
+  per IP. A lecture hall behind one NAT is the SUCCESS case; raised to 120.
+
+**k-anonymity is enforced by absence.** Below `K_ANON_THRESHOLD` the results body carries no
+`questions` key at all — not an empty array, not zeroes. The same gate covers the comments,
+the CSV export and every number on `/home`, so the dashboard cannot become a way to read a
+suppressed campaign one aggregate at a time.
+
+**The seed is real.** `npm run db:seed` builds 4 orgs, 48 subjects, 12 campaigns and **3,250
+responses in ~8 s**; migrate + seed from an empty database is **~14 s**, inside `50` §4's 30 s
+target. Ratings use order statistics rather than a blended uniform — the first attempt gave
+every subject an average near 2.5, which is exactly the flat distribution `50` §3 warns reads
+as fake. Now the mode sits at 4 with a tail to 1, and `Databases` averages 2.28 against
+3.6-4.25 for everything else, so the results screen has something to show. Each org also
+carries a `Live pulse` campaign left open with 1-2 responses, so **k-anon suppression is
+reachable during the demo** rather than only described in a doc.
+
+**`D-002` is discharged** — drop, migrate and seed were run end to end against a database
+created for the measurement, so the working database was never destroyed. `D-003` is new and
+takes its place: eleven services check `orgId` by hand because the tenant client cannot scope
+a by-id `where`, and one forgotten call is a cross-tenant read. RLS is what makes that
+structural.
+
+**Read before touching the chain:** `visibleUnits()` and `resolve()` must keep reading the
+same grants through the same `collectGrants()`. Two permission models that agree today is a
+coincidence; one model asked two questions is a design (`N-005`, `N-016`).
+
+### 2026-08-19 · hand-off note — SUPERSEDED by the Stage 2 entry above
+
+Kept for the record. Everything it lists as "next" is now done, and the three things it
+left waiting in `app.ts` were all handled at T-015 and T-022: the `_echo` probe is
+deleted, every router is mounted through `mount()`, and scoped rate limits and
+idempotency are attached per route.
+
 Vishv finished for the day. **Everything below is committed and pushed.** State:
 
 **What works end to end right now.** Register an organisation, sign in, get a session, have

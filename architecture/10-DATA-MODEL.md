@@ -277,19 +277,34 @@ a transaction rather than a shuffle through a temporary value.
 ### 4.3 `campaigns`
 
 ```sql
+<<<<<<< HEAD
 CREATE TYPE campaign_status AS ENUM ('draft','scheduled','open','closed');
+=======
+-- There is no campaign_status type and no status column. Status is DERIVED ON READ from
+-- closed_at / public_token / starts_at / ends_at (DEC-016). A stored status needs something
+-- to write it, and that something is a scheduler that can be late, be down, or leave a row
+-- stuck between states on the one morning it matters.
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 
 CREATE TABLE campaigns (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   template_id   UUID NOT NULL REFERENCES templates(id),
   name          TEXT NOT NULL,
+<<<<<<< HEAD
   status        campaign_status NOT NULL DEFAULT 'draft',
+=======
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   audience_rule JSONB NOT NULL DEFAULT '{}',   -- { unitId, includeSubtree, roleIds[] }
   starts_at     TIMESTAMPTZ,
   ends_at       TIMESTAMPTZ,
   anonymous     BOOLEAN NOT NULL DEFAULT true,
   public_token  TEXT UNIQUE,                   -- the /r/:token link. NULL until launched.
+<<<<<<< HEAD
+=======
+                                              -- 8 chars, unambiguous alphabet (DEC-017).
+  closed_at     TIMESTAMPTZ,                  -- set by /close. the only stored transition.
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   created_by    UUID REFERENCES users(id),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -301,9 +316,27 @@ CREATE TABLE campaign_subjects (
 );
 ```
 
+<<<<<<< HEAD
 `anonymous` is **immutable once `status` leaves `draft`.** Enforced by a trigger, not only in
 the service layer. Respondents were promised anonymity at submission time; letting an admin
 flip it afterwards would retroactively break that promise (INV-006, `52`).
+=======
+**Status is derived, never stored** (DEC-016):
+
+```
+closed_at IS NOT NULL   ->  closed
+public_token IS NULL    ->  draft
+starts_at > now()       ->  scheduled
+ends_at   < now()       ->  closed
+otherwise               ->  open
+```
+
+`anonymous` is **immutable once the campaign leaves draft**, and leaving draft is exactly
+`public_token IS NOT NULL` — minting the token is the irreversible act, so the trigger is
+keyed on the column that carries the truth. Enforced by a trigger, not only in the service
+layer. Respondents were promised anonymity at submission time; letting an admin flip it
+afterwards would retroactively break that promise (INV-006, `52`).
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 
 ### 4.4 `responses` and `answers`
 

@@ -18,7 +18,10 @@ import {
   security,
   consoleCors,
   globalRateLimit,
+<<<<<<< HEAD
   validate,
+=======
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   notFound,
   errorFunnel,
   tenantResolver,
@@ -29,8 +32,22 @@ import {
 import cookieParser from 'cookie-parser';
 import { sessionMiddleware } from './auth/session.js';
 import { authRouter } from './features/auth/router.js';
+<<<<<<< HEAD
 import { mount } from './lib/mount.js';
 import { z } from 'zod';
+=======
+import { orgRouter } from './features/org/router.js';
+import { unitsRouter } from './features/units/router.js';
+import { authzRouter, grantsRouter, rolesRouter } from './features/roles/router.js';
+import { peopleRouter } from './features/people/router.js';
+import { subjectsRouter } from './features/subjects/router.js';
+import { templatesRouter } from './features/templates/router.js';
+import { campaignsRouter } from './features/campaigns/router.js';
+import { publicRouter } from './features/public/router.js';
+import { resultsRouter } from './features/results/router.js';
+import { homeRouter } from './features/home/router.js';
+import { mount } from './lib/mount.js';
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 
 export function createApp() {
   const app = express();
@@ -86,6 +103,7 @@ export function createApp() {
   //  8 · csrfProtection — cookie principals only, unsafe methods only.
   app.use(csrfProtection);
 
+<<<<<<< HEAD
   mount(app, '/api/v1/auth', authRouter);
 
   //      per-route: validate -> requireCapability -> requireEntitlement -> rateLimit -> idempotency
@@ -100,6 +118,31 @@ export function createApp() {
       res.json({ data: req.data });
     },
   );
+=======
+  // Feature routers. mount() rather than app.use() records the prefix, which is what
+  // lets the route-enumeration test see every route without walking Express internals
+  // (lib/mount.ts). A router added with app.use() is a route the test cannot check.
+  //
+  // Per route, inside each router: validate -> requireCapability -> requireEntitlement
+  // -> scoped rateLimit -> idempotency.
+  mount(app, '/api/v1/auth', authRouter);
+  mount(app, '/api/v1/org', orgRouter);
+  mount(app, '/api/v1/units', unitsRouter);
+  mount(app, '/api/v1/roles', rolesRouter);
+  mount(app, '/api/v1/grants', grantsRouter);
+  mount(app, '/api/v1/authz', authzRouter);
+  mount(app, '/api/v1/people', peopleRouter);
+  mount(app, '/api/v1/subjects', subjectsRouter);
+  mount(app, '/api/v1/templates', templatesRouter);
+  mount(app, '/api/v1/campaigns', campaignsRouter);
+  // Results hang off a campaign's path but live in their own feature: the k-anonymity gate
+  // is what they are actually about, and it should be findable in one look (52 §2).
+  mount(app, '/api/v1/campaigns', resultsRouter);
+  // The respondent surface. No session, no capability, its own CORS policy and its own
+  // rate limit — the only routes a stranger's phone ever touches (13 §6, DEC-009).
+  mount(app, '/api/v1/public', publicRouter);
+  mount(app, '/api/v1/home', homeRouter);
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 
   // 14 · auditWriter — the safety net (the write itself happens in ctx.tx)
   app.use(auditWriter);

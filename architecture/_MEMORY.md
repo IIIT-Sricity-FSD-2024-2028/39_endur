@@ -143,6 +143,49 @@ DEC-015  ACTIVE  2026-08-18  origin:U  AMENDS:DEC-005
            that the React is not deliberately provisional. P2 deepens, it does not rebuild.
   risk     10 days. the M0 cut-list in 02 §2 is now load-bearing, not advisory.
 
+<<<<<<< HEAD
+=======
+DEC-016  ACTIVE  2026-08-19  origin:U  RESOLVES:OPEN-005
+  campaign status is DERIVED ON READ. there is no scheduler and no stored status column.
+  rule     closed_at set          -> closed
+           public_token null      -> draft
+           starts_at in future    -> scheduled
+           ends_at in past        -> closed
+           otherwise              -> open
+  driver   a scheduler is a timer that can be down, be late, or leave a campaign stuck
+           between states. the M0 demo cannot afford a failure mode whose symptom is
+           "the QR code 404s and nobody knows why". derivation cannot drift from the
+           dates because it IS the dates.
+  consequ  campaigns.status column DROPPED, campaign_status enum dropped.
+           + campaigns.closed_at added.
+           the anonymity trigger keyed on status is re-keyed on public_token: a campaign
+           holding a minted token has left draft, which is the same statement against the
+           column that now carries the truth.
+           status is computed in ONE place, features/campaigns/status.ts, and every read
+           path calls it. a second copy of these five lines is the drift this avoids.
+  supersed 10 §4.3 stored status · 38 status handling · 17's campaign section
+  see      17-BACKGROUND-JOBS.md, 38-PAGE-campaigns.md
+
+DEC-017  ACTIVE  2026-08-19  origin:U
+  the campaign public token is 8 characters from a 31-character unambiguous alphabet:
+  23456789ABCDEFGHJKMNPQRSTUVWXYZ  (no 0 O 1 I L).
+  driver   38 asked for "6 characters and typeable aloud", but tenantResolver already
+           required 8-128 in its path pattern, and 6 characters of this alphabet is ~30
+           bits — guessable often enough to matter for a link that needs no credential.
+           8 characters is ~40 bits and still reads aloud without spelling corrections.
+  supersed 38 § Acceptance "the URL token is 6 characters"
+
+DEC-018  ACTIVE  2026-08-19  origin:A
+  GET /templates/library requires template.read; GET /authz/capabilities requires org.read.
+  driver   13 §3 lists both with no capability, which would force an entry in the
+           route-enumeration test's PUBLIC_ROUTES allowlist. that allowlist exists to be
+           hard to add to — every entry is a route no guard protects forever.
+  fact     no M0 screen reaches either without a session: the wizard, the library browser
+           and the powers grid are all inside the console. org.read is seeded to every
+           role including L4, so the catalogue stays readable by everyone who can log in.
+  supersed 13 §3 "—" on those two rows
+
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ```
 
 ---
@@ -283,7 +326,11 @@ OPEN-003  REVISIT:2026-11-01
 OPEN-004  team member 3 does not use Claude. their work split is unassigned in
   02-PHASES-AND-EVALUATION.md §work-split. fill in when known.
 
+<<<<<<< HEAD
 OPEN-005  REVISIT:2026-08-22  blocks:M0
+=======
+OPEN-005  RESOLVED-BY:DEC-016  2026-08-19
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
   NOTHING OWNS SCHEDULED WORK. found 2026-08-16 while filling reserved slots.
   affected: campaign scheduled->open->closed (M0-CRITICAL, a campaign that never opens has
   no working QR), temporary unit + position expiry, delegation windows, seat recompute,
@@ -291,7 +338,15 @@ OPEN-005  REVISIT:2026-08-22  blocks:M0
   leading answer: derive campaign status ON READ from starts_at/ends_at/closed_at instead of
   running a scheduler. no timer, no stuck state, no new demo-day failure mode.
   IF ADOPTED: campaign_status stops being a stored column -> amends 10 §4.3 and 38.
+<<<<<<< HEAD
   record as a DEC when decided. see 17-BACKGROUND-JOBS.md.
+=======
+  RESOLVED 2026-08-19 -> DEC-016. campaign status is derived on read; the column is gone.
+  STILL UNOWNED, and deliberately so for M0: temporary unit + position expiry, delegation
+  windows, seat recompute, webhook retry. each of those is either P3 or degrades to a
+  stale row rather than a broken demo, and each can be derived on read the same way if it
+  ever needs to be. see 17-BACKGROUND-JOBS.md.
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ```
 
 ---
@@ -307,8 +362,19 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 03-REPO-AND-TOOLING.md           -> /package.json /tsconfig*.json /.env.example /.github
 10-DATA-MODEL.md                 -> src/backend/database/** src/backend/db/**
 11-PERMISSION-ENGINE.md          -> src/backend/authz/**
+<<<<<<< HEAD
 12-MIDDLEWARE-STACK.md           -> src/backend/middleware/** src/backend/app.ts
 13-API-CONTRACT.md               -> src/backend/routes/** (router wiring only)
+=======
+                                    incl. authz/visibility.ts, the list-side inverse of
+                                    resolve(). see N-016.
+12-MIDDLEWARE-STACK.md           -> src/backend/middleware/** src/backend/app.ts
+13-API-CONTRACT.md               -> src/backend/routes/** (router wiring only)
+                                    NOTE: routes/ was never created. routers live beside
+                                    their service in src/backend/features/<name>/router.ts
+                                    and are mounted by lib/mount.ts. 13 still owns the
+                                    CONTRACT; the folder name differs from the doc.
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 14-DTO-AND-VALIDATION.md         -> packages/shared/src/dto/**
 15-AUTH-AND-SESSIONS.md          -> src/backend/auth/**
 16-TENANCY-BILLING-ENTITLEMENTS  -> src/backend/billing/**
@@ -336,6 +402,14 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     RENUMBERED from 46..49 on 2026-08-18 to free the page
                                     block. do not renumber back.
 50-SEED-AND-DEMO.md              -> src/backend/database/seed/** src/backend/presets/**
+<<<<<<< HEAD
+=======
+                                    the ONLY two directories where an education noun may
+                                    appear, and then only as DATA (INV-002). Both are
+                                    exempt in eslint.config.js and in test/seed.test.ts.
+lib/paginate.ts                  -> owned by 13 §4 (cursor pagination)
+middleware/idempotency.ts        -> owned by 13 §7
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 51-TESTING-STRATEGY.md           -> **/*.test.ts src/backend/test/** e2e/**
 52-SECURITY-AND-PRIVACY.md       -> cross-cutting; owns no path, constrains all
 53-NOVELTY-CLAIMS.md             -> docs only
@@ -468,7 +542,52 @@ N-013  the init migration is prisma-generated PLUS ~90 lines of hand-written SQL
        schema.prisma alone, all of it silently disappears and the app still runs — which is
        exactly what makes it dangerous. 10 §11 has acceptance items for them; they were all
        verified against a live database on 2026-08-18.
+<<<<<<< HEAD
 N-008  DRIFT-003/004 must be implemented in scripts/audit-drift.mjs and NOT restated as
        literal grep patterns inside architecture/, or the check matches its own definition.
        this already bit once on 2026-08-16.
+=======
+N-019  ESLINT FLAT CONFIG REPLACES RULE OPTIONS, IT DOES NOT MERGE THEM. Found 2026-08-19
+       by adding a probe file to prove the DEC-007 rule fired, and discovering it did not:
+       the `src/backend/features/**` block set no-restricted-syntax for req.body and in
+       doing so REPLACED the raw-SQL selector for every file under it. $queryRaw had been
+       unguarded inside features/** since T-001. Every block that sets a rule now lists
+       every selector that should apply, and both were re-proved by probe.
+       THE GENERAL LESSON, which is the T-001 note coming true: a rule that is configured
+       and silent is worse than no rule, and the only way to know is to make it fire.
+N-020  STATUS FILTERING COSTS ONE DUPLICATION. DEC-016 removed the stored campaign status,
+       which means a list filtered BY status has to restate the derivation in SQL —
+       features/campaigns/status.ts holds statusOf() and whereStatus() side by side for
+       that reason, and campaigns.test.ts compares them against each other over a fixture
+       of all four states rather than trusting they were written together.
+N-021  THE LIST SIDE OF A CAPABILITY IS A DIFFERENT QUESTION. requireCapability answers
+       "may you act on this target"; a list needs "which targets may you see". Guarding a
+       list with a target-based check fails for every scoped role — a subtree grant cannot
+       reach an org-level target by design (11 §4) — so list routes pass
+       `{ target: 'any' }` and the handler scope-filters through visibleUnits(). Rows the
+       caller cannot see are absent, which is INV-003 stated as code.
+       A PERSON IS NOT ANCHORED TO A UNIT in the request — their POSITIONS are — so person
+       routes additionally re-check visibility after reading the row.
+N-008  DRIFT-003/004 must be implemented in scripts/audit-drift.mjs and NOT restated as
+       literal grep patterns inside architecture/, or the check matches its own definition.
+       this already bit once on 2026-08-16.
+N-016  THE RESOLVER HAS TWO SIDES AND ONLY ONE EXISTED UNTIL 2026-08-19.
+       resolve() answers "may this caller act on THIS target". every list endpoint asks the
+       inverse — "WHICH targets may this caller see" — because INV-003 requires out-of-scope
+       rows to be ABSENT and meta.total to count only what the caller may see. that inverse
+       is authz/visibility.ts, built on the same collectGrants() so the two sides cannot
+       disagree. deny still wins there: a deny at scope all empties the visibility, a deny
+       anchored at a unit subtracts that subtree.
+N-017  TENANT RESOLUTION FROM A PUBLIC PATH, fixed 2026-08-19. the respondent-token pattern
+       in tenantResolver was ^/(?:r|api/v1/public)/([A-Za-z0-9_-]{8,128}) which, against the
+       real path /api/v1/public/campaigns/<token>, captured the literal word "campaigns" and
+       resolved no tenant. the segment after the prefix is not always the token — the pattern
+       must name the full prefix including /campaigns/. it was invisible until T-022 because
+       nothing had ever called a public route.
+N-018  BUILD ENVIRONMENT, 2026-08-19. this repo cannot be npm-installed in place when it sits
+       on an exFAT volume: npm workspaces symlink each workspace into node_modules and exFAT
+       has no symlinks, so install dies with EISDIR on src/frontend -> node_modules/@endur/web.
+       junctions fail too ("Local NTFS volumes are required"), as does ln -s from WSL against
+       /mnt/<drive>. build on an NTFS path and keep the exFAT copy source-only.
+>>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ```

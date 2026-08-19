@@ -1,0 +1,150 @@
+// Role, grant and capability routes. 13 § Roles and powers, 33.
+//
+// Roles and grants are mounted separately (`/roles`, `/grants`, `/authz`) but share one
+// router file, because they are one screen and one mental model: the powers grid.
+import { Router } from 'express';
+import {
+  CreateRoleDto,
+  DeleteRoleDto,
+  PutGrantsDto,
+  ReorderRolesDto,
+  UpdateRoleDto,
+} from '@endur/shared';
+import type {
+  CreateRoleBody,
+  DeleteRoleBody,
+  PutGrantsBody,
+  ReorderRolesBody,
+  UpdateRoleBody,
+} from '@endur/shared';
+import { validate } from '../../middleware/validate.js';
+import { requireCapability } from '../../middleware/requireCapability.js';
+import { requireEntitlement } from '../../middleware/requireEntitlement.js';
+import { authenticate } from '../../middleware/authenticate.js';
+import { UnauthenticatedError } from '../../lib/errors.js';
+import {
+  capabilityCatalogue,
+  createRole,
+  deleteRole,
+  grantWarnings,
+  listRoles,
+  readMatrix,
+  reorderRoles,
+  updateRole,
+  writeMatrix,
+} from './service.js';
+
+export const rolesRouter: Router = Router();
+export const grantsRouter: Router = Router();
+export const authzRouter: Router = Router();
+
+const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
+  const principal = req.ctx.principal;
+  if (principal?.kind !== 'user' || !principal.id) throw new UnauthenticatedError();
+  return principal.id;
+};
+
+/* ------------------------------------------------------------------ roles */
+
+rolesRouter.get('/', authenticate, requireCapability('role.read', { target: 'any' }), (req, res, next) => {
+  void listRoles(req.ctx.orgId as string)
+    .then((roles) => res.json({ data: roles }))
+    .catch(next);
+});
+
+rolesRouter.post(
+  '/',
+  authenticate,
+  validate(CreateRoleDto),
+  requireCapability('role.create'),
+  (req, res, next) => {
+    const { body } = req.data as { body: CreateRoleBody };
+    void createRole(req, req.ctx.orgId as string, body)
+      .then((role) => res.status(201).json({ data: role }))
+      .catch(next);
+  },
+);
+
+// Reorder is registered BEFORE /:id so that "reorder" is never read as a role id. Express
+// matches in registration order, and this is the classic way to lose an hour.
+rolesRouter.post(
+  '/reorder',
+  authenticate,
+  validate(ReorderRolesDto),
+  requireCapability('role.update'),
+  (req, res, next) => {
+    const { body } = req.data as { body: ReorderRolesBody };
+    void reorderRoles(req, req.ctx.orgId as string, body)
+      .then((roles) => res.json({ data: roles }))
+      .catch(next);
+  },
+);
+
+rolesRouter.patch(
+  '/:id',
+  authenticate,
+  validate(UpdateRoleDto),
+  requireCapability('role.update'),
+  (req, res, next) => {
+    const { body, params } = req.data as { body: UpdateRoleBody; params: { id: string } };
+    void updateRole(req, req.ctx.orgId as string, params.id, body)
+      .then((role) => res.json({ data: role }))
+      .catch(next);
+  },
+);
+
+rolesRouter.delete(
+  '/:id',
+  authenticate,
+  validate(DeleteRoleDto),
+  requireCapability('role.delete'),
+  (req, res, next) => {
+    const { body, params } = req.data as { body: DeleteRoleBody; params: { id: string } };
+    void deleteRole(req, req.ctx.orgId as string, params.id, body)
+      .then((result) => res.json({ data: result }))
+      .catch(next);
+  },
+);
+
+/* ----------------------------------------------------------------- grants */
+
+grantsRouter.get('/', authenticate, requireCapability('grant.read'), (req, res, next) => {
+  void readMatrix(req.ctx.orgId as string)
+    .then((cells) => res.json({ data: cells }))
+    .catch(next);
+});
+
+// Registered before nothing in particular, but kept above the bulk PUT so the two are read
+// together: the warnings are what the grid shows next to the save button.
+grantsRouter.get('/warnings', authenticate, requireCapability('grant.read'), (req, res, next) => {
+  void grantWarnings(req.ctx.orgId as string)
+    .then((warnings) => res.json({ data: warnings }))
+    .catch(next);
+});
+
+grantsRouter.put(
+  '/',
+  authenticate,
+  validate(PutGrantsDto),
+  requireCapability('grant.update'),
+  // Entitlements answer a different question from capabilities: "has this org paid for
+  // it", not "may this person" (DEC-011). grant.update is Bronze — correct handling of
+  // who-can-see-what is never an upgrade (01 §6) — so this passes for every tier, and it
+  // is here to keep the two checks visibly separate.
+  requireEntitlement('grant.update'),
+  (req, res, next) => {
+    const { body } = req.data as { body: PutGrantsBody };
+    void writeMatrix(req, req.ctx.orgId as string, userOf(req), body)
+      .then((cells) => res.json({ data: cells }))
+      .catch(next);
+  },
+);
+
+/* ------------------------------------------------------------------ authz */
+
+// The catalogue the grid renders its rows from. Guarded by org.read rather than left open
+// (DEC-018): org.read is seeded to every role, so everyone who can sign in can read it,
+// and the route-enumeration allowlist stays as small as it was built to be.
+authzRouter.get('/capabilities', authenticate, requireCapability('org.read'), (_req, res) => {
+  res.json({ data: capabilityCatalogue() });
+});
