@@ -41,7 +41,11 @@ const impactOf = (over: Partial<UnitImpact> = {}): UnitImpact => ({
   gained: [], lost: [], ...over,
 });
 
-const emptyPeople: Page<PersonSummary> = { items: [], page: { nextCursor: null, hasMore: false } };
+// The real envelope from 13 §4 — `data`, not `items`. The first version of this fixture
+// repeated the shared type's wrong shape and made the panel's bug invisible (N-029).
+const emptyPeople: Page<PersonSummary> = {
+  data: [], page: { nextCursor: null, hasMore: false }, meta: { total: 0 },
+};
 
 const reload = vi.fn();
 const create = vi.fn();
@@ -56,6 +60,8 @@ let people: { data: Page<PersonSummary> | null; loading: boolean; error: Error |
 vi.mock('../../../lib/units.js', () => ({
   useUnits: () => ({ ...tree, reload, create, rename, reparent, remove }),
   unitImpact: (id: string): Promise<UnitImpact> => impact(id) as Promise<UnitImpact>,
+}));
+vi.mock('../../../lib/people.js', () => ({
   usePeopleIn: (id: string | null) => (id ? people : { data: null, loading: false, error: null }),
 }));
 
@@ -312,6 +318,33 @@ describe('the detail panel', () => {
     const panel = screen.getByRole('complementary', { name: 'Engineering details' });
     expect(within(panel).getByText('Quaxels')).toBeTruthy();
     expect(within(panel).getByText('People')).toBeTruthy();
+  });
+
+  it('lists the people the API returned, and offers the rest', () => {
+    // The envelope here is the real one from 13 §4. When this fixture said `items` the
+    // panel read `undefined` and rendered nothing — and the test still passed (N-029).
+    people = {
+      data: {
+        data: [
+          {
+            id: 'p1', userId: 'u9', name: 'Meera Iyer', email: 'meera@example.test',
+            status: 'active', createdAt: '2026-08-01T00:00:00.000Z',
+            positions: [{ edgeId: 'e1', roleName: 'Head', unitName: 'Engineering', isPrimary: true }],
+          },
+        ],
+        page: { nextCursor: null, hasMore: true },
+        meta: { total: 4 },
+      },
+      loading: false,
+      error: null,
+    };
+    mount();
+    fireEvent.click(rowFor('Engineering'));
+
+    const panel = screen.getByRole('complementary', { name: 'Engineering details' });
+    expect(within(panel).getByRole('link', { name: 'Meera Iyer' })).toBeTruthy();
+    expect(within(panel).getByText('Head')).toBeTruthy();
+    expect(within(panel).getByRole('link', { name: 'View all 4 people →' })).toBeTruthy();
   });
 
   it('starts a move from the panel, for a reader with no hover', async () => {

@@ -105,9 +105,15 @@ request per cell would make undo incoherent and the warnings recomputed dozens o
 | Method | Path | C |
 |---|---|---|
 | GET | `/` | `subject.read` |
+| GET | `/:id` | `subject.read` — `SubjectDetail` |
 | POST | `/` | `subject.create` |
 | PATCH | `/:id` | `subject.update` |
 | POST | `/:id/archive` | `subject.archive` |
+
+`SubjectDetail` is the summary **plus `cycles[]`** — every campaign this subject appeared in,
+oldest first, with the responses that came back *about this subject* in each. It carries no
+scores: aggregate numbers live behind the results endpoints, where the k-anonymity gate is
+(INV-007), and a second path to them here would have no gate in front of it.
 
 ### Home — `/api/v1/home`
 

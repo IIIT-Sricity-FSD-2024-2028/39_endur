@@ -1,6 +1,11 @@
 // T-019 — subjects. 13 § Subjects, 35, 10 §9.
+//
+// T-034 added the detail payload: `GET /:id` answers with the summary PLUS the cycles this
+// subject has been through. That history is what 35 § Interactions calls "the first hint of
+// the Improve layer" — and the property worth pinning is that the counts are per SUBJECT,
+// not per campaign.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { addStaff, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
+import { addStaff, setUpOrg, unique, unitIdByName, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 
 describe('subjects', () => {
@@ -117,6 +122,71 @@ describe('subjects', () => {
     const path = `/api/v1/subjects/${created.body.data.id}/archive`;
     expect((await withCsrf(founder, 'post', path).send({})).status).toBe(200);
     expect((await withCsrf(founder, 'post', path).send({})).status).toBe(409);
+  });
+
+  it('answers the detail with its cycles, oldest first, counted per subject', async () => {
+    const created = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Cycle Subject',
+      unitId: sectionA,
+    });
+    const subjectId = created.body.data.id as string;
+
+    // A second subject in the same campaigns. Its responses must NOT be counted here —
+    // that is the difference between "responses about this subject" and "responses to the
+    // campaign", and it is the one a per-campaign count would get wrong.
+    const other = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Other Subject',
+      unitId: sectionA,
+    });
+    const otherId = other.body.data.id as string;
+
+    const template = await prisma.template.create({
+      data: { orgId: founder.orgId, name: unique('tpl'), category: 'general' },
+      select: { id: true },
+    });
+
+    const spring = await prisma.campaign.create({
+      data: {
+        orgId: founder.orgId, templateId: template.id, name: 'Spring cycle',
+        publicToken: unique('T').slice(0, 12), closedAt: new Date('2026-03-31T00:00:00Z'),
+        startsAt: new Date('2026-03-01T00:00:00Z'),
+        subjects: { create: [{ subjectId }, { subjectId: otherId }] },
+      },
+      select: { id: true },
+    });
+    const autumn = await prisma.campaign.create({
+      data: {
+        orgId: founder.orgId, templateId: template.id, name: 'Autumn cycle',
+        startsAt: new Date('2026-09-01T00:00:00Z'),
+        subjects: { create: [{ subjectId }] },
+      },
+      select: { id: true },
+    });
+
+    await prisma.response.createMany({
+      data: [
+        { campaignId: spring.id, subjectId },
+        { campaignId: spring.id, subjectId },
+        { campaignId: spring.id, subjectId: otherId },
+        { campaignId: autumn.id, subjectId },
+      ],
+    });
+
+    const read = await founder.agent.get(`/api/v1/subjects/${subjectId}`);
+    expect(read.status).toBe(200);
+
+    const cycles = read.body.data.cycles as Array<{
+      campaignName: string; responseCount: number; status: string;
+    }>;
+    expect(cycles.map((cycle) => cycle.campaignName)).toEqual(['Spring cycle', 'Autumn cycle']);
+    // Two of the three spring responses were about this subject; the third was not.
+    expect(cycles[0]?.responseCount).toBe(2);
+    expect(cycles[0]?.status).toBe('closed');
+    // Never launched, so it is a draft however its dates read (DEC-016).
+    expect(cycles[1]?.responseCount).toBe(1);
+    expect(cycles[1]?.status).toBe('draft');
+    // The summary half is still there.
+    expect(read.body.data.totalResponses).toBe(3);
   });
 
   it('refuses to create in a unit the caller cannot reach', async () => {

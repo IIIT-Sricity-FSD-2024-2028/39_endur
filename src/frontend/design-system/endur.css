@@ -724,3 +724,119 @@
     padding-left: calc(24px + var(--space-2) * 2);
   }
 }
+
+/* ══ T-034 · SUBJECTS, AND THE THREE DATA COMPONENTS ═══════════════════════
+   The vocabulary showcase (35). Nothing here names a domain noun — every word
+   on the screen comes from useLabels(), and these classes only decide shape.  */
+
+/* ── <ResponsiveTable> — 24 §3 ──────────────────────────────────────────── */
+
+.table-wrap { overflow-x: auto; }
+.rtable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rtable th {
+  text-align: left; padding: var(--space-2); white-space: nowrap;
+  font-family: var(--font-body); font-weight: 600;
+  font-size: 11px; line-height: 1; text-transform: uppercase; letter-spacing: .08em;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  border-bottom: 1px solid var(--color-divider);
+}
+.rtable td { padding: var(--space-2); border-bottom: 1px solid var(--color-divider); }
+.rtable tr.is-clickable { cursor: pointer; }
+.rtable tr.is-clickable:hover td { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+.rtable .cell-primary { font-weight: 600; }
+
+/* ── <BarRow> and <StatCard> — 24 §3 ────────────────────────────────────── */
+
+.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 2fr auto; align-items: center; gap: var(--space-2); }
+.bar-label { font-size: 13px; min-width: 0; }
+.bar-track {
+  height: 8px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.bar-fill { display: block; height: 100%; border-radius: 999px; }
+/* The accent fill is the default tone; the valence fills already exist above. */
+.fill-accent { background: var(--color-accent); }
+.bar-value { font-size: 13px; }
+
+.stat-row {
+  display: grid; gap: var(--space-3); margin-bottom: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.stat-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: var(--space-4); border-radius: calc(var(--radius-lg) * 1.15);
+  background: var(--color-card); box-shadow: var(--shadow-sm);
+}
+.stat-kicker { margin: 0; }
+.stat-value { margin: 0; overflow-wrap: anywhere; }
+.stat-delta { align-self: flex-start; }
+.stat-context { margin: 0; }
+.stat-breakdown { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-2); }
+
+/* ── the list screen ────────────────────────────────────────────────────── */
+
+.list-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.list-search { display: flex; gap: var(--space-2); flex: 1 1 260px; }
+.list-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.list-filter select { width: auto; }
+.pager { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
+
+.subject-name { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.subject-name .inline-name { min-width: 12ch; }
+.subject-name-text { font-weight: 600; }
+.page-actions { display: inline-flex; gap: var(--space-2); }
+.skeleton-row.wide { max-width: none; }
+
+/* ── the create / edit form ─────────────────────────────────────────────── */
+
+.dialog-wide { width: min(560px, 100%); }
+.subject-form { display: flex; flex-direction: column; gap: var(--space-3); }
+/* A fieldset's legend needs the same treatment as a field's label, or the unit picker
+   looks like it belongs to the field above it. */
+.field > legend {
+  display: block; font-size: 12px; margin-bottom: 5px; padding: 0;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.subject-unit-picker { max-height: 220px; overflow-y: auto; padding: var(--space-2); }
+.person-results { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.person-results li { display: block; }
+.linked-person { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+
+/* ── the detail screen ──────────────────────────────────────────────────── */
+
+.cycles-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
+.cycles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.cycle { display: flex; flex-direction: column; gap: 6px; }
+.cycle-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+/* ── the collapse. ONE DOM, two shapes (24 §3) ──────────────────────────────
+   Below 640px each row becomes a card and each cell carries its own header,
+   which is what keeps four tables from rotting into four different mobile
+   experiences (design_specs/design/09 §3.1).                                */
+
+@media (max-width: 639px) {
+  .rtable thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .rtable, .rtable tbody, .rtable tr, .rtable td { display: block; width: 100%; }
+  .rtable tr {
+    margin-bottom: var(--space-3); padding: var(--space-2);
+    border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  }
+  .rtable td { border: 0; display: flex; align-items: baseline; gap: var(--space-2); padding: 4px var(--space-2); }
+  .rtable td::before {
+    content: attr(data-label); flex: none; min-width: 9ch;
+    font-family: var(--font-body); font-weight: 600;
+    font-size: 11px; line-height: 1.4; text-transform: uppercase; letter-spacing: .08em;
+    color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  }
+  .rtable td.cell-primary { display: block; font-size: 16px; }
+  .rtable td.cell-primary::before { content: none; }
+  .hide-below-sm { display: none !important; }
+  .list-search { flex: 1 1 100%; }
+}
+
+@media (max-width: 899px) {
+  .hide-below-md { display: none !important; }
+}

@@ -87,7 +87,7 @@ async function campaignWithResponses(founder: Session, count: number) {
     expect(res.status).toBe(201);
   }
 
-  return { campaignId, token, questions };
+  return { campaignId, token, questions, subjectId: subject.body.data.id as string };
 }
 
 describe('the k-anonymity gate — 52 §2', () => {
@@ -234,6 +234,53 @@ describe('aggregation', () => {
     // There is no respondent column to export, which is the point (INV-006). A CSV that
     // could name people would undo the schema guarantee at the last step.
     expect(res.text).not.toMatch(/email|respondent|user_id/i);
+  });
+});
+
+describe('an archived subject keeps its history — 35 § Acceptance, 10 §9', () => {
+  let founder: Session;
+
+  beforeAll(async () => {
+    founder = await setUpOrg();
+  });
+
+  it('still appears in the results of a campaign that already ran', async () => {
+    const { campaignId, subjectId } = await campaignWithResponses(founder, 6);
+    const before = await founder.agent.get(`/api/v1/campaigns/${campaignId}/results`);
+    const count = before.body.data.responseCount as number;
+
+    const archived = await withCsrf(founder, 'post', `/api/v1/subjects/${subjectId}/archive`).send({});
+    expect(archived.status).toBe(200);
+
+    // Archiving is not deleting. The numbers somebody looked at last term are the same
+    // numbers today, which is the entire reason there is no DELETE for a subject.
+    const after = await founder.agent.get(`/api/v1/campaigns/${campaignId}/results`);
+    expect(after.status).toBe(200);
+    expect(after.body.data.responseCount).toBe(count);
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it('cannot be put into a NEW campaign', async () => {
+    const sectionA = await unitIdByName(founder.orgId, 'Section A');
+    const subject = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Retired Course',
+      unitId: sectionA,
+    });
+    const subjectId = subject.body.data.id as string;
+    await withCsrf(founder, 'post', `/api/v1/subjects/${subjectId}/archive`).send({});
+
+    const templates = await founder.agent.get('/api/v1/templates');
+    const templateId = (templates.body.data as Array<{ id: string; name: string }>)[0]?.id as string;
+    const res = await withCsrf(founder, 'post', '/api/v1/campaigns').send({
+      name: 'Next cycle',
+      templateId,
+      subjectIds: [subjectId],
+      audience: { kind: 'anyone' },
+    });
+
+    // 404 rather than a silent drop: a campaign that quietly reviews fewer subjects than
+    // it was asked to is worse than one that refuses to be created.
+    expect(res.status).toBe(404);
   });
 });
 
