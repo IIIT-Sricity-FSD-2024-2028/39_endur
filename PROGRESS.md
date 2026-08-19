@@ -5,16 +5,19 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (Stage 2 complete, and the broken merge is repaired)
+UPDATED   2026-08-19  (Stage 3 foundation — T-026, T-028, T-029 done; T-027 partial)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
-STATUS    25/45. STAGES 0-2 DONE. 141 tests across 15 files, all green.
-          60 endpoints · 4 seeded demo orgs · 3,250 responses · migrate+seed ~14 s.
+STATUS    28/45. STAGES 0-2 DONE, STAGE 3 ALL BUT THE FONTS.
+          199 tests across 20 files, all green (149 backend + 50 frontend).
+          60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      T-026..T-029 frontend foundation (lane X), then T-030. The backend is done
-          for M0 — every screen in Stage 4 now has a real endpoint to call.
+NEXT      T-030 AppShell (lane B) — it is a HAND-OFF, ship it before starting the
+          wizard or lane C is blocked. Then Stage 4 screens. Every page route already
+          exists as a placeholder; replace the file, do not add a route.
+          ALSO DUE 24 AUG: vendor the two woff2 files (see src/frontend/public/fonts).
 ```
 
 ---
@@ -52,8 +55,12 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab`, and `npx vitest run` inside `src/backend` (141 tests). All five
-are green right now, so anything red is yours.
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **199 tests
+across 20 files**, 149 backend + 50 frontend. All five are green right now, so anything red
+is yours.
+
+The backend tests need Postgres running and they **write into the dev database** (`D-004`),
+so if the demo logins stop working, `npm run db:seed` — it is idempotent and takes ~4 s.
 
 ---
 
@@ -110,10 +117,10 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ```
 ### Stage 3 — frontend foundation
 ```
-[ ] T-026  X  vite + react + TS, three route trees
-[ ] T-027  X  design system css + self-hosted fonts
-[ ] T-028  X  labels.ts + store            ← before any page
-[ ] T-029  X  lib/api.ts (cookies + CSRF)
+[x] T-026  X  vite + react + TS, three route trees
+[~] T-027  X  design system css + self-hosted fonts  ← CSS done, WOFF2 NOT VENDORED
+[x] T-028  X  labels.ts + store            ← before any page
+[x] T-029  X  lib/api.ts (cookies + CSRF)
 [ ] T-030  B  AppShell, Sidebar, TopBar, PageHeader, VocabularyChips  ← hand-off to lane C
 ```
 ### Stage 4 — M0 screens
@@ -138,7 +145,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 25 / 45 done. Stages 0-2 complete — the API surface is finished.**
+**Progress: 28 / 45 done (T-027 partial). Stages 0-2 complete; Stage 3 all but the fonts.**
 
 ---
 
@@ -166,6 +173,8 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 |---|---|---|---|
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
+| `D-004` | Integration tests write into the **dev** database | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo | before `T-045` |
+| `D-005` | The two woff2 faces are not vendored | `tokens.css` declares both; the files are absent, so the product renders in `system-ui`. Nothing breaks, but nothing looks right either. `src/frontend/public/fonts/README.md` names the two files | **24 Aug** (`21` §4) |
 
 ---
 
@@ -173,6 +182,82 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-19 · STAGE 3 FOUNDATION — T-026, T-028, T-029 (T-027 partial)
+
+The frontend stopped being a scaffold. `src/frontend` now boots, routes, styles itself and
+talks to the API.
+
+**T-026 — three route trees.** `router/index.tsx` carries public / console / respond as
+three sibling trees with **three layouts and three error boundaries**, not one shell with
+conditionals. Every page is `React.lazy`, so the respondent bundle does not contain the
+console — the build emits 25 page chunks around a shared core. Every M0 route from `20` §2
+exists; the four P3 routes deliberately do **not**, because a stub page behind a "Soon" item
+is worse than a link that visibly does not navigate.
+
+Each route resolves to a placeholder naming the task that replaces it. **Replace the file;
+do not add a route** — `router/routes.test.tsx` asserts the path set against `20` §2, and a
+renamed path breaks a printed QR code, which is the one failure nobody can fix on demo day.
+
+**T-027 — design system, with one thing outstanding.** `tokens.css` is `design_specs/design/01`
+§2 + §2b copied verbatim; `organic.css` is the vendored component layer; `endur.css` holds
+Endur's layer and the single documented `.card` override.
+
+The vendored file ships its **own `:root`** — the original warm palette — and the documented
+import order would have let it win and repaint the product terracotta. Resolved as
+**`CONF-010`**: vendor the component layer only, from `body {` onward, since `21` §2 defines
+that file as the component layer and `21` §4 gives `tokens.css` ownership of `@font-face`.
+The import order in `21` §2 is untouched. Re-vendoring stays one command.
+
+**The two woff2 files are NOT vendored** — `T-027` is `~`, not `x`. Both faces fall back to
+`system-ui` and nothing breaks, but the product does not look like itself. The deadline is
+**24 Aug**, and `src/frontend/public/fonts/README.md` says exactly which two files and where
+they go. There is deliberately no `fonts.googleapis.com` import anywhere: a font that works
+in dev and not on the projector is the worst of both.
+
+**T-028 — store, before any page exists.** `authSlice` + `vocabularySlice` and nothing else,
+per `DEC-008`. `lib/labels.ts` is four lines and is the most important file in the frontend:
+no component ever gets the chance to hardcode a domain noun. `audit:vocab` caught a hardcoded
+one **in a comment** in the placeholder file during this session, which is a fair advert for
+the check.
+
+**T-029 — `lib/api.ts`.** Same-origin, `credentials: 'include'`, the `X-CSRF-Token` echo on
+unsafe methods only, and the error envelope unpacked into an `ApiError` that carries the
+field errors a form renders inline and the decision trace that makes a 403 actionable. No
+token, no refresh dance. A 401 raises `SessionExpiredError` and fires one registered handler,
+so an expired session routes to `/login` from wherever the user was rather than stranding one
+page on a spinner.
+
+**Backend change: `/auth/me` now returns the capability set.** `13` § Auth has always
+specified it and it was never implemented, so `useCan()` had nothing to read. `authz/held.ts`
+derives it — and is **deliberately not the resolver**, recorded as `DEC-019`. The rule and
+its honest cost are written at the top of that file; the short version is that a
+unit-anchored deny is not subtracted, because doing so would hide a button the person can
+legitimately use in the unit next door. `test/me.test.ts` closes with a test proving the
+route still 403s regardless of what the list says — if that one ever fails, the bug is in the
+route, not in the list.
+
+**Verified against a live server, not just a compiler.** Signed in through the Vite proxy as
+each of the four demo orgs: `endur.sid` arrives `httpOnly` and `endur.csrf` readable, and the
+same code renders Department/Course/Student, Property/Restaurant/Guest, Ward/Service/Patient
+and Team/Project/Employee. That is the ten-second proof (`N-003`) working end to end before a
+single screen exists.
+
+**Two things the next session should know.**
+
+1. **The integration tests write into the dev database.** It held 249 junk users and 168
+   throwaway orgs from previous runs, and the demo seed was not present at all — the logins
+   `PROGRESS` advertises did not work until re-seeded this session. The seed is idempotent
+   and takes ~4 s, so re-run it rather than wondering. A separate test database is worth
+   doing before `T-045`; logged under Debt.
+2. `router/layouts.tsx` holds the console frame **only until `T-030`**. Taking it over with
+   `AppShell` is the intended move, not a conflict.
+
+Green: typecheck · lint · audit:drift · audit:vocab · frontend build · **199 tests across 20
+files** (149 backend + 50 frontend).
+
+New devDependencies in `@endur/web`: `jsdom`, `@testing-library/react`, `@testing-library/dom`,
+`@testing-library/user-event` — `51` §5 already names Vitest + Testing Library as the choice.
 
 ### 2026-08-19 · merge repair — READ IF YOU PULLED BEFORE THIS
 `3312cdf6`, the merge of `mithil-patidar` into `vishv`, **was committed with its conflicts
@@ -193,7 +278,7 @@ deletions. Nothing from either branch was lost.
 
 **The lesson worth keeping:** a conflict scan over `*.ts` and `*.md` reported the repo clean
 while `schema.prisma` was still broken. Scan every tracked file, not the extensions you
-expect. That is `N-016`.
+expect. That is `N-022`.
 
 Verified green after the repair: typecheck · lint · audit:drift · audit:vocab · frontend
 build · **141 tests across 15 files**.

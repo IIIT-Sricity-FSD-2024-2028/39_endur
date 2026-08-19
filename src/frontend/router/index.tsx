@@ -1,0 +1,115 @@
+// The three route trees. 20 §2.
+//
+// Two properties are load-bearing here and are worth stating before the code:
+//
+//  1. THREE TREES, THREE LAYOUTS, THREE ERROR BOUNDARIES. A crash in the console cannot
+//     take down the respondent flow.
+//  2. EVERY PAGE IS LAZY. Route-level code splitting per world is what keeps the console
+//     out of the respondent bundle — which is loaded on a phone, on a venue network, by
+//     someone with no patience (20 §8).
+//
+// P3 routes are NOT here. The sidebar shows them disabled with a "Soon" tag and they never
+// navigate. A stub page behind a dead link is worse than a disabled item
+// (design_specs/design/02 §7).
+import { lazy, Suspense } from 'react';
+import { createBrowserRouter, type RouteObject } from 'react-router-dom';
+import { ConsoleLayout, PublicLayout, RespondLayout } from './layouts.js';
+import { ConsoleBoundary, PublicBoundary, RespondBoundary } from './boundaries.js';
+import { SessionLoading } from './guards.js';
+
+const Landing = lazy(() => import('../pages/public/Landing.js'));
+const Login = lazy(() => import('../pages/public/Login.js'));
+const Start = lazy(() => import('../pages/public/Start.js'));
+
+const Home = lazy(() => import('../pages/console/Home.js'));
+const Setup = lazy(() => import('../pages/console/Setup.js'));
+const Structure = lazy(() => import('../pages/console/Structure.js'));
+const Roles = lazy(() => import('../pages/console/Roles.js'));
+const People = lazy(() => import('../pages/console/People.js'));
+const PersonDetail = lazy(() => import('../pages/console/PersonDetail.js'));
+const Subjects = lazy(() => import('../pages/console/Subjects.js'));
+const SubjectDetail = lazy(() => import('../pages/console/SubjectDetail.js'));
+const Templates = lazy(() => import('../pages/console/Templates.js'));
+const TemplateDetail = lazy(() => import('../pages/console/TemplateDetail.js'));
+const Builder = lazy(() => import('../pages/console/Builder.js'));
+const BuilderPreview = lazy(() => import('../pages/console/BuilderPreview.js'));
+const Campaigns = lazy(() => import('../pages/console/Campaigns.js'));
+const CampaignNew = lazy(() => import('../pages/console/CampaignNew.js'));
+const CampaignDetail = lazy(() => import('../pages/console/CampaignDetail.js'));
+const Results = lazy(() => import('../pages/console/Results.js'));
+const Profile = lazy(() => import('../pages/console/Profile.js'));
+const Simulator = lazy(() => import('../pages/console/Simulator.js'));
+const Settings = lazy(() => import('../pages/console/Settings.js'));
+
+const Fill = lazy(() => import('../pages/respond/Fill.js'));
+const Done = lazy(() => import('../pages/respond/Done.js'));
+
+/** One Suspense per route, so a chunk still downloading in the console never blanks the
+ *  respondent's form. */
+const hold = (element: JSX.Element): JSX.Element => (
+  <Suspense fallback={<SessionLoading />}>{element}</Suspense>
+);
+
+function NotFound(): JSX.Element {
+  return (
+    <div className="fullpage">
+      <div>
+        <h3>Page not found</h3>
+        <p className="text-muted">That address does not match anything here.</p>
+        <a className="btn btn-secondary" href="/">Back to the start</a>
+      </div>
+    </div>
+  );
+}
+
+export const routes: RouteObject[] = [
+  {
+    element: <PublicLayout />,
+    errorElement: <PublicBoundary />,
+    children: [
+      { path: '/', element: hold(<Landing />) },
+      { path: '/login', element: hold(<Login />) },
+      { path: '/start', element: hold(<Start />) },
+      // An unmatched path is a PUBLIC 404. Answering it inside the console would leak
+      // that a console exists, and would bounce a stranger to /login for a typo.
+      { path: '*', element: <NotFound /> },
+    ],
+  },
+  {
+    path: '/app',
+    element: <ConsoleLayout />,
+    errorElement: <ConsoleBoundary />,
+    children: [
+      { index: true, element: hold(<Home />) },
+      { path: 'setup', element: hold(<Setup />) },
+      { path: 'structure', element: hold(<Structure />) },
+      { path: 'roles', element: hold(<Roles />) },
+      { path: 'people', element: hold(<People />) },
+      { path: 'people/:id', element: hold(<PersonDetail />) },
+      { path: 'subjects', element: hold(<Subjects />) },
+      { path: 'subjects/:id', element: hold(<SubjectDetail />) },
+      { path: 'templates', element: hold(<Templates />) },
+      { path: 'templates/:id', element: hold(<TemplateDetail />) },
+      { path: 'forms/:id/build', element: hold(<Builder />) },
+      { path: 'forms/:id/preview', element: hold(<BuilderPreview />) },
+      { path: 'campaigns', element: hold(<Campaigns />) },
+      { path: 'campaigns/new', element: hold(<CampaignNew />) },
+      { path: 'campaigns/:id', element: hold(<CampaignDetail />) },
+      { path: 'campaigns/:id/results', element: hold(<Results />) },
+      { path: 'profile', element: hold(<Profile />) },
+      { path: 'simulator', element: hold(<Simulator />) },
+      { path: 'settings', element: hold(<Settings />) },
+    ],
+  },
+  {
+    path: '/r',
+    element: <RespondLayout />,
+    errorElement: <RespondBoundary />,
+    children: [
+      { path: ':token', element: hold(<Fill />) },
+      { path: ':token/done', element: hold(<Done />) },
+    ],
+  },
+];
+
+export const router = createBrowserRouter(routes);

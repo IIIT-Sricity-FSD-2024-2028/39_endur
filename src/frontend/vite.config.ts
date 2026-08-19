@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -14,5 +15,14 @@ export default defineConfig({
         changeOrigin: false,
       },
     },
+  },
+  test: {
+    // Real DOM. Testing behaviour rather than rendering (51 §5) still needs somewhere for
+    // the behaviour to happen — focus, cookies, and keyboard events all live here.
+    environment: 'jsdom',
+    globals: true,
+    css: false,
+    include: ['**/*.test.ts', '**/*.test.tsx'],
+    exclude: ['node_modules', 'dist', 'dist-types', 'dist-config'],
   },
 });

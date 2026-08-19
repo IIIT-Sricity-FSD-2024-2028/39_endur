@@ -183,6 +183,21 @@ DEC-018  ACTIVE  2026-08-19  origin:A
            role including L4, so the catalogue stays readable by everyone who can log in.
   supersed 13 §3 "—" on those two rows
 
+DEC-019  ACTIVE  2026-08-19  origin:A
+  the capability set on GET /auth/me is "held ANYWHERE in the org", not "held on a target".
+  a capability is listed when the caller has >=1 live allow grant for it, minus any
+  capability denied ORG-WIDE (scope=all, no anchor unit). authz/held.ts.
+  driver   the UI's question is weaker than the resolver's. useCan() asks "is this button
+           worth rendering at all"; resolve() asks "may you act on THIS row". computing the
+           strong answer per capability would be ~60 resolver calls per boot for a cosmetic
+           result.
+  fact     a UNIT-ANCHORED deny is deliberately NOT subtracted. subtracting it would hide a
+           button the person can legitimately use in the unit next door.
+  cost     the caller can occasionally see an action the server then refuses with a 403 and
+           its trace. that is a confusing button, not a hole: INV-003 holds because
+           requireCapability() decides on every route and this list decides nothing.
+  see      13 § Auth, 20 §6, src/backend/authz/held.ts, src/backend/test/me.test.ts
+
 ```
 
 ---
@@ -298,9 +313,26 @@ CONF-009  react course vs our stack. teacher's pre-preparation message (2026-08-
   NOTE      an earlier draft framed this as urgent and time-sensitive. that was overweighted;
   corrected here so the framing is not re-inherited.
 
+CONF-010  the vendored organic styles.css carries its OWN :root — the original WARM
+          palette — and 21 §2 orders tokens.css FIRST, which would let the warm block
+          win the cascade and repaint the entire product terracotta.
+          design_specs/design/01 §2 already says the answer: "when porting, swap its
+          :root block for this one."
+          RESOLVED 2026-08-19: design-system/organic.css vendors the COMPONENT LAYER only
+          — the source file from `body {` onward. Its :root block and its
+          fonts.googleapis.com @import are dropped, because 21 §2 defines this file as
+          "the base component layer" and 21 §4 gives tokens.css ownership of @font-face.
+          The documented import order is therefore kept intact and the palette is correct.
+          Re-vendoring stays mechanical: `tail -n +66 <source> >> organic.css`.
+          amended  21 §9's "byte-identical to the vendored source" -> "byte-identical from
+                   `body {` onward", and 21 §2's endur.css row, which listed the status
+                   ramp that 21 §3 puts in tokens.css. properties are tokens; the classes
+                   that consume them are components.
+
 ---
 
 ## OPEN — unresolved
+
 
 ```
 OPEN-001  REVISIT:2026-10-15  blocks:nothing-before-P3
@@ -364,9 +396,14 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 16-TENANCY-BILLING-ENTITLEMENTS  -> src/backend/billing/**
 17-BACKGROUND-JOBS.md            -> PLACEHOLDER. no path owned yet. see OPEN-005.
 18-OBSERVABILITY-AND-OPS.md      -> PLACEHOLDER. no path owned yet.
-20-FRONTEND-ARCHITECTURE.md      -> src/frontend/main.tsx router/** lib/api.ts
+20-FRONTEND-ARCHITECTURE.md      -> src/frontend/main.tsx App.tsx router/** lib/api.ts
+                                    lib/session.ts lib/capabilities.ts pages/**
+                                    pages/*/ are PLACEHOLDERS from T-026 until the page
+                                    task named inside each one replaces it wholesale.
+                                    router/layouts.tsx holds the console frame ONLY until
+                                    T-030 lands AppShell (24 §2). taking it then is correct.
 21-DESIGN-SYSTEM-BINDING.md      -> src/frontend/design-system/**
-22-VOCABULARY-SYSTEM.md          -> src/frontend/lib/labels.ts
+22-VOCABULARY-SYSTEM.md          -> src/frontend/lib/labels.ts store/vocabularySlice.ts
 23-STATE-AND-REDUX.md            -> src/frontend/store/**
 24-COMPONENT-INVENTORY.md        -> src/frontend/components/**
 25..29                           -> PLACEHOLDERS. 29 is unassigned. no paths owned.
@@ -390,6 +427,8 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     appear, and then only as DATA (INV-002). Both are
                                     exempt in eslint.config.js and in test/seed.test.ts.
 lib/paginate.ts                  -> owned by 13 §4 (cursor pagination)
+authz/held.ts                    -> owned by 13 § Auth + DEC-019. the UI capability set.
+                                    NOT the resolver and must not grow into one.
 middleware/idempotency.ts        -> owned by 13 §7
 51-TESTING-STRATEGY.md           -> **/*.test.ts src/backend/test/** e2e/**
 52-SECURITY-AND-PRIVACY.md       -> cross-cutting; owns no path, constrains all
@@ -490,7 +529,7 @@ N-009  WORKING MODEL for multi-session builds, set 2026-08-18:
        that rule is what kept 52 docs consistent across three revisions. an audit on
        2026-08-18 found the ONE place it was skipped: docs 46/47/48 added endpoints without
        registering them in 13. fixed. do not skip it again.
-N-016  MERGE HAZARD, 2026-08-19: the mithil-patidar merge was committed with conflicts
+N-022  MERGE HAZARD, 2026-08-19: the mithil-patidar merge was committed with conflicts
        unresolved. two files were damaged with NO conflict markers — authz/index.ts came
        out empty, and schema.prisma kept both sides of a dropped enum. a grep for
        '<<<<<<<' over *.ts and *.md said clean while the build was broken.
