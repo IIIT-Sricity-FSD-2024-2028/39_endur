@@ -105,6 +105,14 @@ export type TemplateSummary = {
   /** Both DERIVED, never entered by hand — a template cannot claim to be shorter than it is. */
   questionCount: number;
   estimatedSeconds: number;
+  /**
+   * How many campaigns use this template. Derived too, and it does two jobs: the library
+   * card says "Used in 2 campaigns" rather than "Never used" (design_specs/design/05
+   * §5.1), and the delete dialog can state a real consequence BEFORE the button is pressed
+   * instead of the reader discovering the 409 afterwards. Always 0 on a library template —
+   * nothing campaigns against `orgId IS NULL`.
+   */
+  campaignCount: number;
   isLibrary: boolean;
   clonedFromId: string | null;
   createdAt: string;

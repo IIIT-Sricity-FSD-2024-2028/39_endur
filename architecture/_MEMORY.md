@@ -361,6 +361,58 @@ CONF-012  password minimum. design_specs/design/03 §3.3 helper copy says "At le
           single `MIN_PASSWORD` const that mirrors the DTO, so the two cannot drift by
           hand-editing a string.
 
+CONF-015  39 CONTRADICTS ITSELF ABOUT THE EDGE STATES, and the two halves cannot both
+          be built.
+          39 § States (and design_specs/design/07 §7.6) draw FOUR screens, two of which
+          name facts about the campaign: "Not open yet — {Campaign} opens on 1 Sep at
+          09:00" and "Closed — it ran from 11 to 26 August".
+          39 § Data contract, 13 §6 and the service say the opposite: invalid, unlaunched,
+          closed and expired tokens all return the SAME 404, because a difference between
+          them is an existence oracle — try a token, and the wording tells you whether that
+          campaign exists and what state it is in. tenantResolver was written for this too
+          (TENANTLESS includes /api/v1/public/ specifically so a bad token cannot 401 where
+          a closed one 404s), and 39 § Acceptance asks for byte-identical 404s.
+          RESOLVED -> the data contract wins, and it is not close. The client cannot render
+          what the server refuses to say, and making the server say it would break a
+          security property that has its own acceptance line, its own middleware exemption
+          and its own test. Building the two screens would mean asking for a status the
+          endpoint deliberately does not return.
+          T-039 therefore ships THREE screens, not four. The three server-indistinguishable
+          cases share one honest screen that names all three possibilities rather than
+          claiming the link is broken ("It may have closed, it may not have opened yet, or
+          the code may be wrong") — because "This link doesn't work" is a lie in two of the
+          three cases and the reader's next action differs. "Already responded" stays
+          separate because the CLIENT knows it: the localStorage marker (39 § State) is
+          local knowledge, not something the server was asked.
+          A fourth screen exists that neither source draws: a load FAILURE that is not a
+          404. A phone on a venue network is the stated risk of this page, and a transient
+          failure rendered as "this link isn't active" would send the reader away from a
+          form that is fine. It offers Try again; the 404 screen offers nothing, because
+          there is nothing to retry.
+          status   ACTIVE. revisit only if the 404 policy changes, which is a 13 §6 DEC.
+
+CONF-014  PUBLISH. design_specs/design/05 §5.2 says the builder has NO Save button and
+          that "the only explicit commit is Publish, which locks the structure and makes
+          the form usable by a campaign". Its top bar also draws four tabs:
+          Build · Preview · Responses · Settings.
+          ARCHITECTURE HAS NEITHER. 13 lists no publish endpoint; 37's data contract is
+          load / PATCH meta / PUT questions and nothing else; 38 lets a campaign use any
+          template the org owns, published or not; and 37 § Route names exactly two
+          routes, /build and /preview. `templates.published_at` exists as a column and
+          nothing reads or writes it.
+          RESOLVED: architecture wins, because this is a CONTRACT question and not a
+          visual one — the doc split in CLAUDE.md is explicit about which authority owns
+          which. Building Publish would mean inventing an endpoint, a state machine and a
+          rule about what a campaign may use; building the two extra tabs would mean two
+          routes 20 §2's route test does not know about, and that test exists because a
+          renamed path breaks a printed QR code.
+          T-037 therefore ships autosave with a save indicator and no explicit commit at
+          all. The lock that design attributes to Publish already exists and is real:
+          a template used by a LAUNCHED campaign is read-only (37 § States), enforced
+          server-side by assertEditable(). If Publish is wanted later it needs a DEC and
+          an endpoint first, not a button.
+          status   ACTIVE. revisit only with a DEC.
+
 CONF-013  IS AN EMAIL ADDRESS GLOBAL OR PER-TENANT? The schema and the login contract
           disagree, and the disagreement was exploitable.
           10 makes `users` unique on `(org_id, email)` — the same address may exist in two
@@ -411,6 +463,14 @@ OPEN-002  REVISIT:2026-09-20
   hosting / deploy target for the M0 demo QR code. localhost will not scan from a phone.
   candidates: cloudflare tunnel, ngrok, LAN IP + hotspot. must be decided by 2026-08-24.
   risk carried in BUILD_PLAN_EVAL1.md §7 "venue network failure".
+  NARROWED BY T-038, 2026-08-19: it never blocked the BUILD and it does not block it now.
+  The URL is not a client decision at all — `POST /campaigns/:id/launch` returns it,
+  computed from `config.PUBLIC_BASE_URL` by `publicUrlFor()` (T-021), and the share sheet
+  renders what it is given. Deciding this is one environment variable, not a code change.
+  What T-038 added is that the failure can no longer be silent: the share sheet inspects
+  its own URL and says, in place, that a localhost address will not scan from a phone.
+  A checklist item nobody reads on the morning is how this risk actually lands.
+  STILL OPEN, and still the team's: somebody has to pick the tunnel and set the variable.
 
 OPEN-003  REVISIT:2026-11-01
   analysis engine: themes/sentiment. rule-based vs LLM-assisted. affects 43-PAGE-analysis.md
@@ -527,6 +587,54 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     34-PAGE-people.md OWNS lib/people.ts when it is built.
                                     components/data/** (ResponsiveTable, StatCard, BarRow)
                                     was built here but belongs to 24, like every component.
+38-PAGE-campaigns.md             -> src/frontend/pages/console/Campaigns/** lib/campaigns.ts
+                                    + src/backend/features/campaigns/**
+                                    T-038 also took components/feedback/ShareSheet.tsx
+                                    (owned by 24) — THE DEMO MOMENT, read 38 § The share
+                                    sheet before touching it; every rule in that file is a
+                                    scanning requirement, not a style. new dependency:
+                                    `qrcode`, rendered to canvas locally, never through an
+                                    image service. see N-037 and N-038.
+39-PAGE-respondent-flow.md       -> src/frontend/pages/respond/** lib/respond.ts
+                                    + src/backend/features/public/**
+                                    THE HERO SCREEN, and the only world with no store, no
+                                    chrome and no capability check. It renders through
+                                    components/form/QuestionInput.tsx (owned by 24) and
+                                    must never grow a second set — INV-008.
+                                    ANYTHING IMPORTED HERE SHIPS TO A PHONE ON A VENUE
+                                    NETWORK. pages/respond/bundle.test.ts walks the import
+                                    graph out of these pages AND out of main.tsx, and
+                                    fails on console code, on the store, or on a new
+                                    dependency. It found a real leak — read N-040 before
+                                    adding an import anywhere near router/layouts.tsx.
+                                    answers.ts and copy.ts are pure page-local modules,
+                                    like 32's and 38's, and are not 24's business.
+37-PAGE-form-builder.md          -> src/frontend/pages/console/Builder/**
+                                    T-036 built the AUTHORING components ahead of the
+                                    page: components/form/QuestionEditor.tsx (six, one
+                                    file, mirroring QuestionInput.tsx), QuestionCard.tsx
+                                    and kinds.ts. all three are owned by 24 like every
+                                    component. kinds.ts holds the frozen kind map with NO
+                                    default branch — a seventh kind fails to compile
+                                    (DEC-010) — and changeKind() is the whole of
+                                    "change type", so the builder must not restate it.
+                                    T-037 built the page: useBuilder.ts (draft + autosave,
+                                    page-local per 23 §2, and written as ONE immutable
+                                    draft so P3's builderSlice is a move rather than an
+                                    untangling), SaveIndicator.tsx, Preview.tsx.
+                                    it also took components/form/FormPreview.tsx, which
+                                    36's page now uses too — see N-035 — and NO Publish
+                                    button or extra tabs, see CONF-014.
+36-PAGE-templates-library.md     -> src/frontend/pages/console/Templates/** lib/templates.ts
+                                    + src/backend/features/templates/**
+                                    lib/templates.ts is the template read/write seam
+                                    (23 §3). the CARD, the blank-form dialog and the
+                                    delete sentence are page-local by design, like 32's
+                                    detail panel — 24 §10 rules out a generic card.
+                                    T-035 also built components/form/QuestionInput.tsx
+                                    (owned by 24, shared with 37 and 39 — read N-031
+                                    before touching it) and components/feedback/Toast.tsx.
+                                    it narrowed scripts/audit-vocab.mjs too: N-032.
 46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/**
 47-PAGE-profile.md               -> src/frontend/pages/console/Profile/**
 48-FEATURE-file-upload.md        -> src/backend/features/uploads/**
@@ -799,4 +907,197 @@ N-030  THE SUBJECT DETAIL CARRIES CYCLES BUT NEVER SCORES. `GET /subjects/:id` r
        endpoints, which is where the k-anonymity gate is (INV-007). A per-subject average
        on a page with no gate in front of it would be a second, ungated path to the same
        numbers, and it would look completely innocent in review.
+
+N-031  <QuestionInput> x6 WAS BUILT BY T-035, NOT T-036. 55-BUILD-ORDER pairs the six
+       inputs with the six editors because both are "the form engine", but the template
+       PREVIEW is their first caller and INV-008 forbids a stand-in: "preview a template
+       exactly as respondents will see it" is either one implementation or it is
+       marketing. So T-035 built the inputs; T-036 is now editors-only, and
+       components/form/QuestionInput.tsx says so at the top.
+       Two consequences worth knowing:
+         - T-039, THE HERO SCREEN, NO LONGER WAITS ON T-036. Its dependency was the input
+           set, not the editors, and 55-BUILD-ORDER now reads T-035.
+         - the six are one dispatcher plus six renderers in one file, with <Scale> shared
+           by rating/NPS and <Choices> by single/multi. design_specs/design/05 §5.3
+           defines each of those pairs as the SAME control with one difference; written
+           twice, that one difference quietly becomes three.
+       Exactly the shape of N-025, where the wizard built <UnitTree> a task early.
+
+N-032  audit-vocab NO LONGER SCANS TEST FILES, and this is the FOURTH narrowing of a check
+       that fired outside its own subject (after audit-drift's px values at T-003,
+       audit-vocab's comments at T-032/N-023, and seed.test.ts's INV-002 scan at T-025).
+       INV-001 is about what a component RENDERS. A .test.tsx renders nothing: its strings
+       are fixtures standing in for CUSTOMER DATA, and customer data is legitimately
+       English — a university really does own a template called "Course feedback", the same
+       way src/backend/presets/** really does say "Department". T-035's page tests produced
+       18 findings that were all the check's fault.
+       Nothing is lost, and this was proved rather than assumed: a real hardcoded noun was
+       added to TemplateCard.tsx and the narrowed check still failed on it. A noun in a
+       component is caught IN THE COMPONENT; a test could only ever have echoed it. The
+       output now prints the skipped count, so the narrowing is visible rather than silent.
+       The standing rule this keeps re-teaching: a check that cries wolf gets routed
+       around, and then it stops catching the real thing.
+
+N-033  A DESIGN LINE WITH NO CONTRACT BEHIND IT GETS A CONTRACT, NOT A FAKE.
+       design_specs/design/05 §5.1 has drawn "Used in 2 campaigns" / "Never used" on the
+       template card since revision one, and 13 carried nothing that could answer it.
+       T-035 added `campaignCount` to TemplateSummary — derived in the same query as the
+       row, catalogued in 13 and 36 BEFORE the page was written.
+       The alternative was the T-033 move (substitute a number the API does have, record
+       the substitution — the "Inside" count where the mockup said RESP), and the reason
+       this one went the other way is that the count is not decoration: without it the
+       delete dialog cannot state a consequence and the reader discovers the 409 by
+       pressing the button, which is the "are you sure?" 24 §6 exists to abolish.
+       The rule to take from the pair: substitute when the number is informational;
+       extend the contract when a REQUIRED BEHAVIOUR depends on it. Either way it is
+       written down before the code.
+
+N-037  THE QR'S TWO COLOURS ARE THE ONLY HEX LITERALS OUTSIDE design-system/, AND DEC-012
+       WAS RIGHT TO FLAG THEM. They stay because they are not brand colours: a QR is
+       decoded by thresholding luminance, and the margin a phone camera has under a
+       projector, at an angle, in a lit room, IS the contrast between the two values
+       design_specs/design/06 §6.3 names (this ledger does not restate them — see DRIFT).
+       Routing them through a token would mean the code changes colour when somebody
+       re-themes the product — correct for every other pixel in that file, wrong for these
+       two. design_specs/design/06 §6.3 specifies both literally for the same reason.
+       Both the component and its TEST carry an eslint-disable with the reason, and the
+       test PINS the literals on purpose: anybody who later tokenises them breaks a test
+       rather than the demo.
+
+N-038  T-038's DEPARTURES FROM design_specs/design/06, all recorded in 38 before the code:
+         - NO responses-over-time sparkline, NO average completion time, NO per-subject
+           breakdown on the campaign detail (§6.4 draws all three). There is no endpoint
+           for any of them, and per-subject numbers are 40's — behind the k-anonymity gate.
+           A second, ungated path to per-subject aggregates is precisely what INV-007
+           exists to prevent, so this one is not merely unbuilt, it is REFUSED.
+         - NO `Duplicate` on the campaign detail (§6.4). No endpoint, and it is not in 38.
+         - NO "show a progress bar" toggle in step 3 (§6.2). No field in CreateCampaignBody
+           and no respondent behaviour attached to it.
+         - the AUDIENCE COUNT in step 2 is computed from the org tree already in memory,
+           not from GET /:id/audience — because that endpoint needs a campaign id and the
+           campaign does not exist until step 3 commits. It is labelled as an estimate and
+           the authoritative number is the one the API returns afterwards.
+       Nothing here is a shortcut: each is a design line whose contract does not exist, and
+       the rule from N-033 applies — extend the contract when a required behaviour depends
+       on it, substitute when it is informational. All four are informational.
+
+N-035  TWO SCREENS PREVIEW A FORM, SO THE PREVIEW IS A COMPONENT. INV-008 says the six
+       inputs have one implementation because the preview must not drift from the live
+       form. T-037 found the same argument one level up: 36's template page and 37's
+       builder both render "the form as a respondent sees it", and T-035 had written that
+       shell inline on the template page. A second copy in the builder would have made
+       "exactly as respondents will see it" true on one screen and approximate on the
+       other — which is the failure INV-008 describes, wearing a different hat.
+       Lifted to components/form/FormPreview.tsx (the three width frames, the "nothing is
+       saved" banner, the disabled Submit) and the template page rewired to it. Its 15
+       tests passed unchanged through the refactor, which is what made it safe to do.
+       Catalogued in 24 §5 first.
+
+N-036  A ROW OF CONTROLS CANNOT ITSELF BE A CONTROL. The collapsed question card was
+       role="button" with tabIndex and its own Enter/Space handling — and then T-037 hung
+       the two reorder buttons inside it. That is nested interactive content: invalid ARIA,
+       and assistive tech collapses it into one control whose accessible name is every
+       label inside concatenated.
+       FOUND BY A TEST, not by reading: getByRole('button', { name: /Was the pace right/ })
+       matched three elements — the row and both of its Move buttons — and the ambiguity
+       was the bug reporting itself. Fixed by making the row a plain div that keeps its
+       click handler for the mouse (the whole 52px stays the target, which is the
+       ergonomic the mockup draws) and putting the NAME in a real <button>. Enter and Space
+       then come free from the platform, which is the point of using one.
+       The lesson generalises: when a query cannot tell two things apart, neither can a
+       screen reader.
+
+N-034  T-036's DEPARTURES FROM 24 §5, all recorded in 24 itself before the code:
+         - ONE FILE, NOT SIX. §5's six-file layout existed so two people could take three
+           editors each. That never happened, and the live risk is the six editors
+           drifting from the six INPUTS they author — so QuestionEditor.tsx mirrors
+           QuestionInput.tsx line for line. Twelve files hide that drift; two show it.
+         - NpsEditor does NOT reuse YesNoEditor's "No settings for this type." Both have
+           an empty config, but for opposite reasons: yes/no has nothing TO configure,
+           NPS has something deliberately withheld. It says what is fixed and points at
+           the rating scale, which is the question the reader is about to ask.
+         - <QuestionCard> gained `index` and `readOnly`. `index` names a card whose text
+           is still empty ("Question 3"); without it a blank new question is unreachable
+           by name, for a reader and for a test.
+         - the editors take a DRAFT (packages/shared's QuestionInput DTO, re-exported as
+           QuestionDraft), not the API's question row. `position` is derived on save and
+           `id` is absent until the first one, so a card holding a row would hold two
+           fields it must never send.
+         - multi choice has a `maxSelections` editor. 37's table lists the field;
+           design_specs/design/05 §5.3 draws no control for it. A config field with no way
+           to set it is a field nobody can use, so the toggle-plus-number was added rather
+           than the field being quietly ignored.
+         - NO QUESTION IMAGES, though 05 §5.2 draws the button. QuestionConfig has nowhere
+           to put one and the union is frozen (DEC-010): adding a field is a decision, not
+           a card-header button. Not built and not stubbed.
+
+N-039  T-039's DEPARTURES FROM SPEC, and there are only three because 39 is unusually
+       complete about this screen.
+         - A SUBJECT PICKER, which neither 39 nor design_specs/design/07 draws. Both assume
+           one subject; 38 step 2 lets a campaign carry many, and public/service.ts's
+           resolveSubject() 422s on `body.subjectId` when it does and the submission does
+           not name one. A form that could not be submitted was the alternative. Rendered
+           as a required question card, in the org's own noun ("Which Course is this
+           about?"), and ABSENT when there is exactly one — asking somebody to choose from
+           a list of one is noise, and the server resolves that case itself.
+         - THE ANONYMITY LINES ARE SILENT WHEN THE CAMPAIGN IS NOT ANONYMOUS. Rule 6 says
+           anonymity is stated twice; it is written for the anonymous case and neither
+           source gives copy for the other one. The two things this page could invent are
+           both wrong — a promise it cannot keep, or a warning about a linkage the schema
+           does not make (a response row has no respondent column at all, INV-006). Saying
+           nothing is the only honest option without a contract, and copy.test.ts pins it.
+         - PublicCampaign.labels IS NOW ResolvedLabels, not Record<string, Label>. The
+           server already sends every key (resolveLabels fills the gaps); the loose type
+           only meant the respond world had to guard each noun against undefined, and one
+           forgotten guard renders "undefined" on the demo phone. Type precision, not a
+           contract change — 13 §6 already said "org display name + labels".
+
+N-040  "THE RESPONDENT BUNDLE MUST NOT INCLUDE THE CONSOLE" WAS FALSE, AND THE PAGES WERE
+       NEVER THE LEAK. 20 §8 has said it since revision one with nothing checking it.
+       T-039 wrote pages/respond/bundle.test.ts, a static import-graph walk out of the two
+       respondent pages — and it passed immediately. The build did not agree: the ENTRY
+       chunk, which every route downloads, contained lucide-react.
+       CAUSE: router/index.tsx imports router/layouts.tsx statically (it must — the three
+       layouts are route elements), layouts.tsx imported <AppShell> statically, and
+       <AppShell> pulls the sidebar, the top bar and <Icon>'s thirty glyphs. Route-level
+       lazy loading of PAGES cannot help with anything the entry itself imports.
+       FIXED by making <AppShell> lazy inside layouts.tsx, with a Suspense that reuses the
+       session-loading fallback. Entry chunk 322.9 kB -> 308.5 kB (101.5 -> 96.5 kB gzip).
+       The test now walks main.tsx's STATIC graph too — `lazy(() => import(...))` has no
+       `from` clause, so the same regex naturally sees only what cannot be split out — and
+       reverting the fix makes it fail, which was checked both ways.
+       STILL IN THE ENTRY AND NOT FIXED HERE: @reduxjs/toolkit, react-redux, immer and zod,
+       because main.tsx wraps the router in <Provider> for all three worlds. Roughly 40 kB
+       gzip a respondent never uses. Moving the Provider into the console layout is a
+       20 §3 / 23 §2 decision, not a page task — recorded so somebody decides it rather
+       than inherits it. A respondent today downloads ~102 kB gzip of JS and 9 kB of CSS.
+       qrcode is already correctly confined to the campaigns chunk (T-038).
+
+N-041  THE RESPONDENT IDEMPOTENCY KEY IS PER FILL, NOT PER TOKEN. 13 §7 says respondent
+       submit is "keyed on the invitation token", which is exactly right for an invitation
+       — one token, one person, so a retry is unambiguous. An OPEN LINK inverts it: every
+       phone in the room holds the same token, so a key derived from it would replay the
+       first person's 201 to the second, and the campaign would collect exactly one
+       response in front of the evaluator.
+       lib/respond.ts's submitKey() mints one uuid-suffixed key per FILL, held in a ref and
+       reused by every retry of that fill. A failed submit stores nothing (the middleware
+       caches successes only), so editing an answer after a 422 and pressing again is a
+       fresh request rather than a conflict. A 409 on this key therefore means one thing —
+       the first attempt landed and its reply was lost — and the form says so instead of
+       "try again", because trying again is the one thing that would produce a duplicate.
+
+N-042  A CUSTOM PROPERTY THAT WAS NEVER DEFINED, and eight CSS rules asked for it.
+       endur.css named a "display face" variable that tokens.css does not declare; the
+       real one is the heading-face variable, and the two names differ by one word. Five
+       of the eight rules came from T-037 and T-038 — including the 42px line that goes on
+       the PROJECTOR in presentation mode.
+       An undefined custom property makes font-family invalid at computed-value time, so
+       every one of those elements silently inherited the body face.
+       INVISIBLE TODAY, and that is the part worth keeping: the two woff2 files are not
+       vendored (D-005), so both faces fall back to the system stack and the bug looks
+       like nothing at all. It would have appeared the moment somebody repaid D-005 —
+       which is due 24 Aug, two days before the demo. Fixed in the same pass.
+       The names themselves are deliberately not written here; they live in the design
+       system, which is the only place that owns them (DEC-012). Read the declarations
+       before adding a rule rather than copying the nearest line.
 ```

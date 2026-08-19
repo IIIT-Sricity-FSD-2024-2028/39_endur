@@ -840,3 +840,491 @@
 @media (max-width: 899px) {
   .hide-below-md { display: none !important; }
 }
+
+/* ══ T-035 · THE TEMPLATE LIBRARY AND THE SIX INPUTS ═══════════════════════
+   36 and design_specs/design/05 §5.1, §5.3, §5.4. The six inputs are shared
+   with the respondent form (INV-008), so nothing below may assume a console
+   context: no sidebar offsets, no chrome, no console-only tokens.        */
+
+/* ── segmented control — 05 §5.1, §5.2 ──────────────────────────────────── */
+
+.segmented {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px;
+  background: var(--color-bg); border: 1px solid var(--color-divider);
+  border-radius: 999px; margin-bottom: var(--space-3);
+}
+.segment {
+  position: relative; display: inline-flex; align-items: center; cursor: pointer;
+  padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+/* The radio itself carries focus and keyboard behaviour; only its box is hidden, never
+   the input, or the arrow keys and the focus ring go with it. */
+.segment input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segment:hover { background: var(--color-accent-100); }
+.segment.is-active { background: var(--color-accent); color: var(--color-bg); }
+.segment:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.chip-row .tag { cursor: pointer; border: 1px solid var(--color-divider); background: none; }
+.chip-row .tag.is-active { background: var(--color-accent); color: var(--color-bg); border-color: transparent; }
+
+/* ── the card grid ──────────────────────────────────────────────────────── */
+
+.tsection { margin-bottom: var(--space-5); }
+.tsection-head {
+  font-family: var(--font-body); font-weight: 600;
+  font-size: 11px; line-height: 1; text-transform: uppercase; letter-spacing: .08em;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  margin: 0 0 var(--space-3);
+}
+.tgrid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+.tcard { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); }
+/* Library cards are visibly not yours: a tinted head strip, per 05 §5.1. */
+.tcard.is-library { border-top: 4px solid var(--color-accent-100); }
+.tcard-name { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 16px; }
+.tcard-icon { flex: none; }
+.tcard-category { align-self: flex-start; }
+.tcard-desc { margin: 0; font-size: 13px; }
+/* The cost line is never optional and never smaller than the description — it is the
+   product's argument against a forty-question form (01 §5). */
+.tcard-cost { margin: 0; font-size: 13px; font-weight: 600; }
+.tcard-usage { margin: 0; }
+.tcard-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); }
+.tcard.is-skeleton { gap: var(--space-2); }
+
+/* ── preview — 05 §5.4 ──────────────────────────────────────────────────── */
+
+.preview-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.preview-bar .segmented { margin-bottom: 0; }
+.preview-note {
+  margin: 0; padding: 6px 12px; border-radius: var(--radius-md); font-size: 13px;
+  background: var(--color-accent-100); color: var(--color-accent-800);
+}
+.preview-stage { display: flex; justify-content: center; }
+.preview-frame {
+  width: 100%; display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-card); box-shadow: var(--shadow-sm);
+}
+.preview-title { margin: 0; }
+.preview-submit { align-self: stretch; }
+.related-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+/* ── <QuestionInput> × 6 — 05 §5.3, 39 § Input specifications ───────────────
+   One question per card with generous padding: the same eight questions in a
+   single bordered list read as a chore, in eight cards as eight small tasks
+   (39, rule 2).                                                            */
+
+.q-card {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin: 0; padding: var(--space-4);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-lg);
+  background: var(--color-card);
+}
+.q-card.is-invalid { border-color: var(--status-bad-500); }
+.q-text { font-size: 16px; font-weight: 600; padding: 0; }
+/* The required marker is the ACCENT, never red. Nothing on a respondent screen is red
+   until something is actually wrong (39, rule 4). */
+.q-star { color: var(--color-accent); margin-left: 2px; }
+.q-error { margin: 0; font-size: 13px; color: var(--status-bad-800); }
+.q-help { margin: 0; }
+
+/* Every hit target is at least 44px, and every input is 16px — anything smaller makes iOS
+   Safari zoom on focus, which visibly breaks the layout in front of the room (39). */
+.q-scale { display: flex; flex-direction: column; gap: 6px; }
+.q-scale-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.q-point {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 999px; cursor: pointer; font-size: 15px;
+  border: 1.5px solid var(--color-divider); background: var(--color-bg);
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.q-point input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.q-point:hover { border-color: var(--color-accent); }
+.q-point.is-picked { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-bg); }
+.q-point:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.q-point:has(input:disabled) { cursor: default; }
+/* NPS only: a quiet hint at how the score is read, without pre-judging the answer. */
+.is-banded .band-bad:hover { background: var(--status-bad-100); }
+.is-banded .band-mid:hover { background: var(--color-neutral-100); }
+.is-banded .band-good:hover { background: var(--status-good-100); }
+.q-anchors {
+  display: flex; justify-content: space-between; gap: var(--space-3);
+  font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+.q-options { display: flex; flex-direction: column; gap: var(--space-2); }
+/* The WHOLE ROW is the tap target, not the dot (39). */
+.q-option {
+  position: relative; display: flex; align-items: center; gap: var(--space-3);
+  min-height: 48px; padding: 0 var(--space-3); cursor: pointer; font-size: 16px;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.q-option input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.q-option:hover { border-color: var(--color-accent); }
+.q-option:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.q-option:has(input:disabled) { cursor: default; opacity: .6; }
+.q-dot {
+  flex: none; width: 20px; height: 20px; border-radius: 999px;
+  border: 1.5px solid var(--color-divider); background: var(--color-bg);
+}
+/* Multi choice is single choice with a square dot — the DS has no checkbox variant and
+   this is the mockup's treatment: same size, same rhythm, different shape (05 §5.3). */
+.q-dot-square { border-radius: 6px; }
+.q-option:has(input:checked) { border-color: var(--color-accent); }
+.q-option:has(input:checked) .q-dot { background: var(--color-accent); border-color: var(--color-accent); }
+.q-other-text { flex: 1 1 auto; position: relative; z-index: 1; }
+
+.q-yesno { display: flex; gap: var(--space-3); }
+.q-pill {
+  position: relative; flex: 1 1 0; display: flex; align-items: center; justify-content: center;
+  min-height: 48px; cursor: pointer; font-size: 16px; font-weight: 600;
+  border: 1px solid var(--color-divider); border-radius: 999px;
+}
+.q-pill input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.q-pill.is-picked { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-bg); }
+.q-pill:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.q-pill:has(input:disabled) { cursor: default; }
+
+/* 16px is MANDATORY here and is not a style preference (39). */
+.q-text-input { font-size: 16px; min-height: 48px; }
+textarea.q-text-input { min-height: 90px; }
+
+/* ── <Toast> — 24 §6 ────────────────────────────────────────────────────── */
+
+.toast {
+  position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
+  z-index: 60; display: flex; align-items: center; gap: var(--space-3);
+  padding: 10px var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-text); color: var(--color-bg);
+  box-shadow: var(--shadow-md); font-size: 14px;
+}
+.toast .btn-ghost { color: var(--color-bg); text-decoration: underline; }
+.toast-close { background: none; border: 0; color: inherit; cursor: pointer; font-size: 18px; line-height: 1; }
+
+@media (max-width: 639px) {
+  /* Ten points wrap to two rows rather than shrinking below the 44px floor. */
+  .q-scale.is-wide .q-point { width: 17%; }
+  .segmented { width: 100%; justify-content: flex-start; }
+  .toast { left: var(--space-3); right: var(--space-3); transform: none; }
+}
+
+/* ══ T-036 · THE SIX EDITORS AND THE QUESTION CARD ═════════════════════════
+   24 §5, design_specs/design/05 §5.2-5.3. The AUTHORING half of the form
+   engine; the respondent half is the .q-* block above and the two share
+   .q-dot on purpose — an option's dot must look the same in the editor and
+   in the form, or the author is designing something they cannot see.     */
+
+.qe { display: flex; flex-direction: column; gap: var(--space-3); }
+.qe-field { display: flex; align-items: center; gap: var(--space-3); font-size: 13px; }
+.qe-field > span { flex: none; min-width: 11ch; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+.qe-field .input { flex: 1 1 auto; }
+.qe-number { max-width: 6rem; }
+/* "No settings for this type." and its siblings. Muted 13px rather than an empty body:
+   an empty body reads as a control that failed to render (24 §5). */
+.qe-none { margin: 0; font-size: 13px; }
+
+.qe-options { display: flex; flex-direction: column; gap: var(--space-2); }
+.qe-option { display: flex; align-items: center; gap: var(--space-3); }
+.qe-option .input { flex: 1 1 auto; }
+/* A real affordance sitting where the new row will appear, not a button beside the list —
+   straight from the mockup (05 §5.3). */
+.qe-add {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 8px 0; border: 0; background: none; cursor: pointer;
+  font-family: var(--font-body); font-size: 15px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.qe-add .q-dot { border-style: dashed; }
+.qe-add:hover { color: var(--color-accent-800); }
+.qe-add:hover .q-dot { border-color: var(--color-accent); }
+
+/* ── <QuestionCard> — 05 §5.2 ───────────────────────────────────────────── */
+
+.qcard { border-radius: var(--radius-lg); }
+.qcard-grip { flex: none; color: color-mix(in srgb, var(--color-text) 40%, transparent); cursor: grab; }
+
+/* Collapsed: 52px, surface, one line. Clicking anywhere opens it and closes the last one,
+   which is what keeps a ten-question form scannable. */
+.qcard.is-collapsed {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 52px; padding: 0 var(--space-3); cursor: pointer;
+  background: var(--color-surface);
+}
+.qcard.is-collapsed:hover { background: var(--color-neutral-200); }
+.qcard.is-collapsed:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* The name IS the control (see QuestionCard): a plain-looking button, so the row reads as
+   one thing while the keyboard and the accessibility tree get a real target. */
+.qcard-open {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: left; border: 0; background: none; cursor: pointer; padding: 0;
+  font-family: var(--font-body); font-size: 15px; color: inherit;
+}
+.qcard-open:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.qcard.is-expanded {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); background: var(--color-card); box-shadow: var(--shadow-md);
+  /* The focused card carries the accent LEFT edge — one of the only two accent edges the
+     product has (21 §6), and the other is the header card's top border. */
+  border-left: 4px solid var(--color-accent);
+}
+.qcard-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.qcard-text { flex: 1 1 14rem; background: var(--color-surface); }
+.qcard-type { flex: none; }
+.qcard-type select { width: 180px; border-radius: 999px; }
+.qcard-foot { display: flex; align-items: center; gap: var(--space-2); }
+.qcard-spacer { flex: 1 1 auto; }
+
+/* The one-time cost of a type change, stated before it is paid. Accent rather than the bad
+   ramp: nothing has gone wrong, and this is a question, not an error. */
+.qcard-warning {
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-accent-100); color: var(--color-accent-800);
+}
+.qcard-warning p { margin: 0 0 var(--space-2); font-size: 13px; }
+.qcard-warning-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+@media (max-width: 639px) {
+  .qcard-type, .qcard-type select { width: 100%; }
+  .qe-field { flex-wrap: wrap; gap: 4px; }
+  .qe-field > span { min-width: 0; flex: 1 0 100%; }
+}
+
+/* ══ T-037 · THE FORM BUILDER ══════════════════════════════════════════════
+   37, design_specs/design/05 §5.2. Column max 1100px: the form column flexes,
+   the 44px tool rail is pinned right with a 20px gap. Below 640px the rail
+   becomes a sticky bottom bar — 37 § Acceptance, and the same reasoning as
+   every other touch affordance in this product.                           */
+
+.builder { display: flex; gap: var(--space-4); align-items: flex-start; max-width: 1100px; }
+.builder-column { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* The header card carries the OTHER accent edge the product allows (21 §6): 6px on top,
+   where the question card takes 4px on the left. */
+.builder-header {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4); border-top: 6px solid var(--color-accent);
+}
+/* Borderless until focused — the title reads as a title, not as a form field (05 §5.2). */
+.builder-title, .builder-desc {
+  border-color: transparent; background: transparent; padding-left: 0; padding-right: 0;
+}
+.builder-title { font-family: var(--font-heading); font-size: 26px; height: auto; }
+.builder-desc { font-size: 15px; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+.builder-title:focus, .builder-desc:focus { background: var(--color-surface); padding-inline: var(--space-2); }
+
+.builder-first {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: var(--space-4); cursor: pointer;
+  border: 1.5px dashed var(--color-divider); border-radius: var(--radius-lg);
+  background: none; font-family: var(--font-body); font-size: 15px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.builder-first:hover { border-color: var(--color-accent); color: var(--color-accent-800); }
+
+.builder-rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: var(--space-2); }
+.rail-tool {
+  width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-bg); border: 1px solid var(--color-divider); color: var(--color-accent-800);
+}
+.rail-tool:hover { background: var(--color-accent-100); }
+
+.qcard-move { display: inline-flex; }
+
+/* The lock. Accent rather than the bad ramp: nothing has gone wrong, the form is simply
+   in use, and the sentence says what to do instead. */
+.builder-lock {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); margin-bottom: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-accent-100); color: var(--color-accent-800);
+}
+.builder-lock p { margin: 0; flex: 1 1 20rem; font-size: 14px; }
+
+/* 12px at 50% ink, per 05 §5.2. It is the ONLY feedback that a save happened, so it never
+   claims more than is true — see useBuilder. */
+.save-state { font-size: 12px; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.save-state.is-error { color: var(--status-bad-800); }
+
+@media (max-width: 639px) {
+  .builder { flex-direction: column; }
+  .builder-rail {
+    position: sticky; bottom: 0; top: auto; z-index: 20;
+    flex-direction: row; justify-content: center; width: 100%;
+    padding: var(--space-2); background: var(--color-bg);
+    border-top: 1px solid var(--color-divider);
+  }
+}
+
+/* ══ T-038 · CAMPAIGNS AND THE SHARE SHEET ═════════════════════════════════
+   38, design_specs/design/06. The share sheet is the demo's decisive artifact
+   and every rule in its block is a scanning requirement, not a style.      */
+
+.cgrid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.ccard { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); }
+.ccard-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.ccard-name { margin: 0; font-size: 17px; }
+.ccard-meta, .ccard-count { margin: 0; font-size: 13px; }
+.ccard-count { font-weight: 600; }
+.ccard-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+/* A draft is a campaign that is not yet anything. 60% opacity, per 06 §6.1. */
+.tag.is-draft { opacity: .6; }
+
+.subject-picker { max-height: 280px; overflow-y: auto; padding: var(--space-2); display: flex; flex-direction: column; gap: 6px; }
+.subject-list { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.when-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.tpick { align-items: flex-start; text-align: left; cursor: pointer; border: 1px solid transparent; }
+.tpick.is-picked { border-color: var(--color-accent); }
+/* The number that moves when a dropdown changes — the visible proof the org graph is real. */
+.audience-count {
+  margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-surface); font-weight: 600;
+}
+.summary-card { display: flex; flex-direction: column; gap: 4px; padding: var(--space-4); margin-top: var(--space-3); }
+.summary-name { margin: 0; font-family: var(--font-heading); font-size: 20px; }
+.summary-card p { margin: 0; }
+
+/* ── the share sheet — 06 §6.3. THE DEMO MOMENT ─────────────────────────── */
+
+.share-sheet { width: min(640px, 100%); text-align: center; }
+.share-head { display: flex; align-items: flex-start; gap: var(--space-2); }
+.share-head .dialog-title { flex: 1 1 auto; text-align: left; }
+/* PURE white behind the code, always — not --color-card, not a tint. A background that is
+   nearly white still costs contrast, and contrast is what a phone camera is working with. */
+.share-qr {
+  display: inline-block; margin: var(--space-3) auto; padding: 0;
+  background: #ffffff; border-radius: var(--radius-md); line-height: 0;
+}
+.share-qr canvas { display: block; }
+/* Readable from the back of the room, and typeable by somebody who cannot scan. */
+.share-url {
+  margin: 0; font-family: var(--font-heading); font-size: 20px; letter-spacing: .02em;
+  overflow-wrap: anywhere; user-select: all;
+}
+.share-warn {
+  margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-md);
+  text-align: left; font-size: 13px;
+  background: var(--status-bad-100); color: var(--status-bad-800);
+}
+.share-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-3); }
+.share-meta { margin: 0; }
+
+/* Presentation mode: this is what goes on the projector. Nothing else on the screen. */
+.present {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-4); background: #ffffff; color: #17232e;
+}
+.present-name { margin: 0; font-family: var(--font-heading); font-size: 32px; text-align: center; }
+.present-qr { line-height: 0; background: #ffffff; }
+.present-qr canvas { display: block; width: min(60vh, 90vw); height: auto; }
+.present-url { margin: 0; font-family: var(--font-heading); font-size: 42px; letter-spacing: .02em; }
+.present-exit { position: absolute; top: var(--space-4); right: var(--space-4); }
+
+@media (max-width: 639px) {
+  .when-row { flex-direction: column; }
+  .share-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .present-url { font-size: 24px; }
+  .present-name { font-size: 22px; }
+}
+
+/* ══ T-039 · THE RESPONDENT FLOW ═══════════════════════════════════════════
+   39, design_specs/design/07. The only screen an evaluator touches with their
+   own hands, on their own phone — authored at 390px and widened, never the
+   other way round. There is exactly ONE layout; desktop is the same column,
+   wider (07 §7.1).                                                        */
+
+.rf { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Sticky, and it counts QUESTIONS rather than scroll: scroll percentage lies
+   on a form whose last question is a long text answer (39, rule 3). */
+.rf-progress {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0;
+  background: var(--color-bg);
+}
+.rf-progress-track {
+  flex: 1 1 auto; height: 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  overflow: hidden;
+}
+.rf-progress-fill {
+  height: 100%; border-radius: 999px; background: var(--color-accent);
+  transition: width var(--dur-base) var(--ease);
+}
+.rf-progress-count { flex: none; font-size: 13px; font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+
+.rf-form { display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-8); }
+
+/* The header card carries the 6px accent edge the mockup draws, and the cost
+   line — `8 questions · about 2 minutes · anonymous` — before they scroll. The
+   honest number is what buys the completion (rule 1). */
+.rf-head {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-card); border-top: 6px solid var(--color-accent);
+}
+.rf-title { margin: 0; font-family: var(--font-heading); font-size: 25px; line-height: 1.15; }
+.rf-about { margin: 0; font-size: 15px; color: var(--color-accent-700); }
+.rf-cost { margin: var(--space-2) 0 0; font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+
+.rf-failure {
+  margin: 0; padding: var(--space-3); border-radius: var(--radius-md);
+  font-size: 14px; background: var(--status-bad-100); color: var(--status-bad-800);
+}
+
+/* Full width, 52px, and it stays live even while it carries the "2 questions
+   left" count — pressing it again walks to the next unanswered question. */
+.rf-submit { width: 100%; min-height: 52px; justify-content: center; margin-top: var(--space-2); }
+.rf-anon { margin: 0; text-align: center; font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+
+/* One skeleton, not one per question: the form arrives in a single payload, so
+   there is no moment where part of it is known (rule 7). */
+.rf-skeleton {
+  height: 60vh; border-radius: var(--radius-lg);
+  background: var(--color-card); opacity: .6;
+}
+
+/* ── the dead ends and the thank-you — 07 §7.5, §7.6 ─────────────────────── */
+
+.rf-end {
+  min-height: 70vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--space-3);
+  text-align: center; padding: var(--space-6) var(--space-4);
+}
+.rf-end-mark { color: color-mix(in srgb, var(--color-text) 45%, transparent); line-height: 0; }
+.rf-end-title { margin: 0; font-family: var(--font-heading); font-size: 25px; }
+.rf-done .rf-end-title { font-size: 32px; }
+.rf-end-body { margin: 0; max-width: 34ch; font-size: 15px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.rf-count { margin: 0; max-width: 34ch; font-size: 13px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.rf-brand { margin-top: var(--space-6); font-family: var(--font-heading); font-size: 18px; opacity: .6; }
+
+/* THE APPLAUSE. The one place a 320ms animation is allowed (01 §7); the global
+   prefers-reduced-motion rule above already neutralises it. */
+.rf-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 64px; height: 64px; border-radius: 999px;
+  background: var(--color-accent-2); color: var(--color-card);
+  animation: rf-pop var(--dur-slow) var(--ease) both;
+}
+@keyframes rf-pop {
+  from { transform: scale(.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+@media (min-width: 640px) {
+  .rf-title { font-size: 32px; }
+}

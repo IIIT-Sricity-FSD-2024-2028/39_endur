@@ -39,6 +39,23 @@ export const minutes = (seconds: number): string => {
 };
 
 /**
+ * The compact form for a template card — `~40 sec`, `~90 sec`, `~3 min`
+ * (design_specs/design/05 §5.1). Shorter than `minutes()` because it sits inside a
+ * `8 questions · ~2 min` line rather than a sentence, and it keeps seconds up to two
+ * minutes because "~40 sec" is the number that sells a short form and "~1 min" throws it
+ * away.
+ *
+ * Returns null below one second, and that is the point: a template with no questions takes
+ * no time, and `~0 sec` on a card is noise the reader has to decode. The caller renders the
+ * question count alone.
+ */
+export function approxDuration(seconds: number): string | null {
+  if (seconds <= 0) return null;
+  if (seconds < 120) return `~${Math.max(10, Math.round(seconds / 10) * 10)} sec`;
+  return `~${Math.round(seconds / 60)} min`;
+}
+
+/**
  * Derive a plural from a singular. Wizard step 4, and settings (`22` §2, 31 § Interactions).
  *
  * Deliberately shallow: `+s`, `y → ies`, `+es` after a sibilant. It is a convenience, not a

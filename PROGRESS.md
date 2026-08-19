@@ -5,11 +5,11 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (T-034 — subjects, the vocabulary showcase)
+UPDATED   2026-08-20  (T-039 — the respondent flow, the hero screen)
 PHASE     P1 MIDDLEWARE
-MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
-STATUS    33/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
-          408 tests across 40 files, all green (185 backend + 223 frontend).
+MILESTONE M0 = 2026-08-26  ·  6 days  ·  demo 27 Aug  ·  GRADED
+STATUS    38/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
+          705 tests across 62 files, all green (186 backend + 519 frontend).
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! READ CONF-013 IN _MEMORY.md BEFORE TOUCHING AUTH. A cross-tenant account
           lockout was found and closed on 19 Aug; the schema question behind it is
@@ -17,9 +17,21 @@ STATUS    33/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      LANE C: T-035 (template library, doc 36) then T-036..T-040. T-041 (home
-          dashboard, doc 46) is lane B and also unblocked. Every page route already
-          exists as a placeholder; replace the file, do not add a route.
+NEXT      LANE C: T-040 (results). T-041 (home dashboard, doc 46) is lane B and also
+          unblocked. Every page route already exists as a placeholder; replace the
+          file, do not add a route.
+          !! OPEN-002 IS STILL OPEN AND STILL YOURS. The build never needed it — the
+          URL comes from the API — but somebody has to set PUBLIC_BASE_URL to an
+          address a phone can reach. The share sheet SAYS SO on screen when it is
+          localhost, so it cannot fail silently. Due 24 Aug. THE WHOLE FLOW BEHIND
+          THAT URL NOW EXISTS — scan it and you get a form, not a placeholder.
+          !! ANYTHING YOU IMPORT NEAR router/layouts.tsx SHIPS TO A PHONE. The
+          console shell was in the ENTRY chunk until T-039 measured the build;
+          <AppShell> is lazy now and pages/respond/bundle.test.ts fails if it comes
+          back. Read N-040 before adding an import there.
+          !! THE WHOLE FORM ENGINE IS BUILT AND IN USE by three screens: the template
+          preview, the builder preview and the live respondent form. One
+          <QuestionInput> set, INV-008 — never write a second.
           !! LISTS RETURN { data, page, meta } — 13 §4. The shared Page<T> said
           `items` until T-034 and lied to one caller for 16 days (N-029).
           !! <UnitTree> IS EXTENDED, NEVER FORKED. T-032 built it, T-033 extended it
@@ -64,9 +76,13 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **408 tests
-across 40 files**, 185 backend + 223 frontend. All five are green right now, so anything red
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **705 tests
+across 62 files**, 186 backend + 519 frontend. All five are green right now, so anything red
 is yours.
+
+`audit:vocab` prints how many files it scanned **and how many test files it skipped**. It
+stopped scanning `*.test.tsx` at T-035, on purpose and with the proof written down — see
+`N-032` before assuming that is a hole.
 
 **Claude does not commit.** The user commits, always — stated 19 Aug and written into
 `CLAUDE.md` § Working conventions. Finish, run the checks, report, stop.
@@ -141,11 +157,11 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [x] T-032  B  setup wizard 5 steps          ← never cut
 [x] T-033  B  UnitTree + structure page
 [x] T-034  B  subjects
-[ ] T-035  C  template library
-[ ] T-036  C  QuestionEditor ×6 + QuestionInput ×6
-[ ] T-037  C  form builder + autosave + preview
-[ ] T-038  C  campaigns + ShareSheet + QR    ← due 22 Aug, never cut
-[ ] T-039  C  respondent flow + 4 edge states ← never cut
+[x] T-035  C  template library    ← also built <QuestionInput> ×6 (N-031)
+[x] T-036  C  QuestionEditor ×6   ← + <QuestionCard> + kinds.ts
+[x] T-037  C  form builder + autosave + preview  ← + <FormPreview>
+[x] T-038  C  campaigns + ShareSheet + QR    ← landed 19 Aug, 3 days early
+[x] T-039  C  respondent flow + 3 edge states ← CONF-015: three, not four
 [ ] T-040  C  results
 [ ] T-041  B  home dashboard
 ```
@@ -157,8 +173,9 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 33 / 45 done (T-027 partial). Stage 3 complete but for the font files;
-Stage 4 open at T-035 — lane C, which has been idle since T-030.**
+**Progress: 38 / 45 done (T-027 partial). Stage 3 complete but for the font files;
+Stage 4 open at T-040. The hero screen is built — the demo now runs end to end from a
+scan to a number that moves.**
 
 ---
 
@@ -186,7 +203,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 |---|---|---|---|
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
-| `D-004` | Integration tests write into the **dev** database | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo | before `T-045` |
+| `D-004` | Integration tests write into the **dev** database — **THIS NOW FAILS THE BUILD** | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo. **On 19 Aug it stopped being theoretical**: `chain.test.ts` registered a fixed org name every run, `uniqueSlug()` gives up after twenty variants, and the twenty-first run of the suite failed — a test about stripping unknown keys, failing with a conflict about slugs. That test was made independent of history; the next one to depend on it will not be found as quickly | before `T-045` |
 | `D-006` | `uniqueSlug()` runs **outside** register's transaction | Two registrations naming the same organisation in the same second both read "that slug is free"; the loser then collides on the unique index and gets a 500. The rollback is correct — `register-rollback.test.ts` proves nothing is left behind — but the caller deserves a retry, not an error page. Fix: retry the transaction on a P2002 against `slug` | before `T-045` |
 | `D-007` | `CONF-013` is **mitigated, not resolved** | Login filters `passwordHash: not null` and orders by `createdAt`, which closes the cross-tenant lockout. It does not answer whether an email address is global or per-tenant, and two *activated* accounts on one address are still ambiguous. Three options are written out in `CONF-013`; pick one and supersede it | **24 Aug** |
 | `D-005` | The two woff2 faces are not vendored | `tokens.css` declares both; the files are absent, so the product renders in `system-ui`. Nothing breaks, but nothing looks right either. `src/frontend/public/fonts/README.md` names the two files | **24 Aug** (`21` §4) |
@@ -197,6 +214,234 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-20 · T-039 — the respondent flow. **THE HERO SCREEN IS BUILT**
+
+`/r/:token` and `/r/:token/done` are real: `pages/respond/` (`Fill.tsx`, `Done.tsx`,
+`Unavailable.tsx`, and the two pure modules `answers.ts` and `copy.ts`) plus `lib/respond.ts`.
+**The demo now runs end to end** — scan the QR, fill in a form, and the count on the thank-you
+is the same number the results screen will show, because the server reads it inside the
+transaction that wrote the row.
+
+**Read this before touching `router/layouts.tsx`.** *"The respondent bundle must not include
+the console"* (`20` §8) was **false**, and the pages were never the leak. I wrote a static
+import-graph walk out of the two respondent pages — `pages/respond/bundle.test.ts` — and it
+passed immediately. Then I built, and the **entry chunk** contained `lucide-react`:
+`router/index.tsx` imports `layouts.tsx` statically, because the three layouts are route
+elements, and `layouts.tsx` imported `<AppShell>` statically, which pulls the sidebar, the top
+bar and `<Icon>`'s thirty glyphs. Route-level splitting of *pages* cannot help with anything
+the entry itself imports. `<AppShell>` is lazy now; the entry chunk went 322.9 → 308.5 kB
+(101.5 → 96.5 kB gzip) and the test walks `main.tsx` too. Reverting the fix fails it — checked
+both ways. `N-040`.
+
+**Still in that entry chunk and NOT fixed here:** redux, immer and zod, roughly 40 kB gzip a
+respondent never uses, because `main.tsx` wraps all three worlds in one `<Provider>`. Moving
+it into the console layout is a `20` §3 / `23` §2 decision, not a page task. A respondent
+today downloads ~102 kB gzip of JS and 9 kB of CSS. `qrcode` was already confined correctly.
+
+**`39` contradicted itself and only one half could be built — `CONF-015`.** § States and
+`design_specs/design/07` §7.6 draw four screens, two of which name facts about the campaign
+(*"opens on 1 Sep at 09:00"*, *"it ran from 11 to 26 August"*). § Data contract, `13` §6,
+`tenantResolver`'s `TENANTLESS` list and § Acceptance all require invalid, unlaunched,
+not-yet-open and closed tokens to return **one identical 404**, because a difference is an
+existence oracle. The data contract wins — the client cannot render what the server refuses to
+say. Three screens ship, and the merged one names all three possibilities rather than claiming
+the link is broken, because *"this link doesn't work"* is a lie in two of the three cases. A
+fourth exists that neither source drew: a load **failure**, which offers Try again, because a
+phone on a venue network is this page's stated risk and rendering that as "not active" sends
+somebody away from a form that is fine.
+
+Also worth knowing:
+
+- **The idempotency key is per FILL, not per token** (`N-041`). `13` §7 says "keyed on the
+  invitation token", which is right for an invitation and exactly wrong for an open link:
+  everyone in the room holds the same token, so that key would replay the first person's 201
+  to the second and the campaign would collect **one** response in front of the evaluator.
+- **A subject picker that neither source draws** (`N-039`). A campaign may carry many subjects
+  (`38` step 2) and the submit endpoint 422s without one. Absent when there is exactly one —
+  the server resolves that case, and choosing from a list of one is noise.
+- **The anonymity lines are silent when the campaign is not anonymous.** Rule 6 is written for
+  the anonymous case; inventing either a promise or a warning would be wrong, and the schema
+  has no respondent column either way. A test pins the silence.
+- **`var(--font-display)` was never defined** (`N-042`) — the token is `--font-heading`. Eight
+  rules in `endur.css` asked for the wrong name, five of them mine from T-037 and T-038,
+  including the 42px line that goes on the **projector**. Undefined custom property → invalid
+  at computed-value time → silently inherits the body face. Invisible only because the woff2
+  files are still not vendored; it would have appeared the day somebody repays `D-005`, which
+  is due **24 Aug**.
+- **No `<Icon>` in the respond world** — thirty glyphs to draw two shapes. Inline SVG instead.
+- Both respondent tests mount with **no `<Provider>` at all**, which is what makes "the
+  vocabulary comes from the payload, not the store" a property rather than an intention.
+
+Tests 641 → **705** (frontend 455 → 519), across 62 files. Backend untouched.
+
+### 2026-08-19 · T-038 — campaigns, and the QR the whole demo rests on
+
+`/app/campaigns`, `/app/campaigns/new` and `/app/campaigns/:id` are real, plus
+`components/feedback/ShareSheet.tsx` — **the highest-risk component in the build**, landed
+three days before its 22 Aug deadline.
+
+**`OPEN-002` never blocked this and does not block anything now.** The URL is not a client
+decision: `POST /:id/launch` returns it, computed server-side from `PUBLIC_BASE_URL`, and the
+sheet renders what it is handed. Deciding it is one environment variable. What changed is that
+**the failure can no longer be silent** — the sheet inspects its own URL and says, on screen,
+that a `localhost` address resolves to the phone and nobody can scan it. A LAN address passes.
+Somebody still has to set the variable, and that is still due 24 Aug.
+
+**The share sheet's tests assert the things a screenshot cannot show**: error-correction level
+M, the quiet zone, ≥ 280px, and pure ink on pure white. Those four decide whether a phone
+decodes it, and none of them are visible by looking. The scan itself needs two phones and is
+`T-045`.
+
+Also worth knowing:
+
+- **New dependency: `qrcode`**, rendered locally to a canvas. An external image service would
+  fail exactly when the network does.
+- **The QR's two colours are the only hex literals outside `design-system/`** and DEC-012 was
+  right to flag them. They are not brand colours: a QR is decoded by thresholding luminance,
+  so re-theming the product must not change the contrast a camera works with. `N-037`, and
+  the test PINS the literals so anybody who later tokenises them breaks a test, not the demo.
+- **A test found a real gap in the launch path.** The sheet was rendering from the refetched
+  campaign, so "the QR is on screen within one second" depended on a second round trip
+  landing. It now uses the URL the launch response itself carries.
+- **Five things design_specs draws are not built** (`N-038`): the sparkline, average
+  completion time, per-subject breakdown, `Duplicate`, and the progress-bar toggle. None have
+  a contract. The per-subject one is **refused** rather than deferred — those numbers live
+  behind the k-anonymity gate on `40`, and a second ungated path is what INV-007 exists to
+  prevent.
+- **The subject picker is not `<UnitTree mode="select">`**, which `38` § Components named.
+  Subjects belong to units but are not in the tree, so the tree cannot answer "which
+  subjects". `38` records the correction.
+
+**`D-004` stopped being theoretical while running this.** `chain.test.ts` registered the
+fixed org name "Strip Test Org" on every run; `uniqueSlug()` tries twenty variants and then
+409s; the suite has now run twenty-one times against the dev database. A test about stripping
+unknown keys failed with a conflict about slugs. Its name is generated per run now — but a
+test that depends on how many times it has been run before is not a test, and the real repair
+is the separate test database.
+
+Tests 574 → **641** (frontend 388 → 455), across 56 files.
+
+### 2026-08-19 · T-037 — the form builder. Autosave, and a preview that is a component
+
+`/app/forms/:id/build` and `/app/forms/:id/preview` are real: `pages/console/Builder/`
+(`index.tsx`, `useBuilder.ts`, `SaveIndicator.tsx`, `Preview.tsx`) plus
+`components/form/FormPreview.tsx`.
+
+**`useBuilder.ts` is the file to read before touching this screen.** Its whole reason to
+exist is one acceptance line — *autosave never loses typed input* — and the case that needed
+care is a keystroke arriving mid-request: the dirty flags are cleared BEFORE the request, so a
+late success cannot swallow it, and the indicator then says `Unsaved changes` rather than
+`Saved`. A failed save retries once silently, then hands over a button, and never touches the
+draft. It is written as one immutable draft object so P3's `builderSlice` is a move rather
+than an untangling of a dozen `useState`s.
+
+**Two things this page deliberately does not have, and it is a real source conflict:
+`CONF-014`.** design_specs draws a **Publish** button and **Responses / Settings** tabs;
+architecture has no publish endpoint, no campaign rule that consults a published flag, and
+exactly two routes for this screen. Building them would mean inventing a contract. The lock
+design attributes to Publish already exists and is enforced server-side: a template used by a
+launched campaign is read-only.
+
+Also worth knowing:
+
+- **`<FormPreview>` is new (`N-035`).** Two screens preview a form — the template library and
+  the builder — and INV-008's argument applies one level up. T-035 had written that shell
+  inline on the template page; it is now a component and that page uses it. Its 15 tests
+  passed unchanged through the refactor, which is what made the move safe.
+- **A row of controls cannot itself be a control (`N-036`).** The collapsed question card was
+  `role="button"` and T-037 hung the reorder buttons inside it — nested interactive content,
+  invalid ARIA. **A test found it**: one query matched three elements, and the ambiguity was
+  the bug reporting itself. When a query cannot tell two things apart, neither can a screen
+  reader.
+- **Reorder works without a mouse.** Same rule as `<UnitTree>` and `<RoleRow>`: HTML5 drag
+  does not exist on touch, and `37` § Acceptance asks for 390px. `onMove` is catalogued in
+  `24`.
+- **Every derivation from spec across T-035 – T-037 is written down**: `N-031`, `N-033`,
+  `N-034`, `N-035`, `N-036` and `CONF-014`, plus the doc each one amends.
+
+Tests 540 → **574** (frontend 354 → 388), across 52 files. Backend untouched.
+
+### 2026-08-19 · T-036 — the six editors, and the rules behind the type select
+
+`components/form/` now holds the whole form engine except the page: `QuestionEditor.tsx`
+(six, one file), `QuestionCard.tsx`, and `kinds.ts`. **Nothing imports them yet** — T-037 is
+their first caller — so they are tested but in no bundle.
+
+**Read `kinds.ts` before starting T-037.** "Change type" is a rule, not a select handler:
+`changeKind()` keeps the text always, carries options across single ↔ multi, and returns one
+sentence when something cannot survive. The card holds that sentence with `Keep it as it is` /
+`Change anyway` and calls `onChange` **only** if accepted — warning after the options are gone
+is not a warning. The builder must not restate any of it.
+
+It warns about one thing `37` does not name: replacing hand-written rating anchors on the way
+to NPS. Same class of loss, and hand-written anchors are hand-written work. It stays quiet
+when the anchors are still the defaults — warning about losing a default is how people learn
+to click through warnings.
+
+Also worth knowing:
+
+Every departure from `24` §5 and `37` is written up as **`N-034`** in `_MEMORY.md`, and the
+one from T-035 — extending the contract rather than faking a number — is **`N-033`**. Short
+version of the pair: substitute when the missing number is informational, extend the contract
+when a required behaviour depends on it, and write it down before the code either way.
+
+- **The editors are ONE file, mirroring `QuestionInput.tsx` line for line.** `24` §5 wanted
+  six files so two people could take three each; that never happened, and the real risk is
+  the editors drifting from the inputs they author. Twelve files would make that drift
+  harder to see, not easier. `24` records the change.
+- **`NpsEditor` does not say "No settings for this type."** It says what is fixed and why,
+  and points at the rating scale — which is the question the reader is about to ask. `24` §5
+  only fixes that copy for `YesNoEditor`.
+- **`<QuestionCard>` gained `index` and `readOnly`**, both catalogued in `24` first. `index`
+  gives a card with no text yet an accessible name; without it a blank new question is
+  unreachable by name, for a reader and for a test.
+- **No question images.** `design_specs/design/05` §5.2 draws an image button in the card
+  header; `QuestionConfig` has nowhere to put one, and adding a field to the frozen union is
+  a DEC-010 conversation rather than a button. Not built, not stubbed.
+- **The option list refuses to build a 422.** Two is the DTO's floor and ten its ceiling, so
+  the remove button disables at two and the add row disappears at ten with a line saying why.
+
+Tests 493 → **540** (frontend 307 → 354), across 50 files. Backend untouched.
+
+### 2026-08-19 · T-035 — the template library, and the six inputs it could not fake
+
+`/app/templates` and `/app/templates/:id` are real: `pages/console/Templates/` (library,
+preview, the card, the blank-form dialog, and the delete sentence as a pure module),
+`lib/templates.ts`, and **`components/form/QuestionInput.tsx` — all six of them**.
+
+**Read this before starting T-036.** `55-BUILD-ORDER` pairs the six inputs with the six
+editors; T-035 built the inputs anyway, because the whole job of the preview is to be
+*exactly* what a respondent gets and INV-008 allows one implementation, not a read-only
+lookalike. **T-036 is now editors-only, and T-039 — the hero screen — no longer waits on
+it**, since what it needed was the input set. `N-031`, and the file says so at the top.
+
+Also worth knowing:
+
+- **`TemplateSummary` gained `campaignCount`** (`N-033`), derived like the other two counts. It gives
+  the card the *"Used in 2 campaigns"* line `design_specs/design/05` §5.1 has always drawn,
+  and — the half that matters more — it lets the delete dialog state a real consequence
+  **before** the button is pressed instead of the reader discovering the `409` by pressing
+  it. An in-use template opens the dialog with `confirmDisabled`; the 409 path is still
+  handled, because the count can be stale by the time somebody presses.
+- **`audit:vocab` no longer scans test files** (`N-032`). Every one of the 18 findings it
+  produced against this task was a template NAME in a fixture — customer data, in a file
+  that renders nothing. That is the fourth narrowing of a check firing outside its subject,
+  and it was proved rather than assumed: a real hardcoded noun added to `TemplateCard.tsx`
+  still fails it. The output now prints the skipped count.
+- **`<Toast>` is built** and only the delete uses it. There is no app-level toast host, so a
+  success that navigates away — clone, blank form — shows nothing; and it carries no
+  `undo`, because undoing a delete needs a restore endpoint.
+- **Clone lands on T-037's placeholder for now.** `/app/forms/:id/build` is correct and does
+  not change; the page behind it is still the one that says "not built yet".
+
+Two acceptance boxes in `36` are `[~]` rather than ticked. "Preview uses the same
+`<QuestionInput>` as the respondent form" is half-provable — there is exactly one
+implementation and the preview uses it, but the respondent form does not exist until T-039.
+"Preview renders correctly at three widths" has its frames (390 / 720 / unbounded) and its
+toggle tested; whether the content reads right at 390 is the same device check as everywhere.
+
+Tests 408 → **493** (backend 185 → 186, frontend 223 → 307), across 47 files.
 
 ### 2026-08-19 · T-034 — subjects, and a shared type that had been lying since T-003
 

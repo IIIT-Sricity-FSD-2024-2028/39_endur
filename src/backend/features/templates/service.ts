@@ -313,7 +313,10 @@ const templateSelect = {
   clonedFromId: true,
   estimatedSeconds: true,
   createdAt: true,
-  _count: { select: { questions: true } },
+  // Both counts in the same query as the row. `campaignCount` is what the delete dialog
+  // states before it is pressed, and fetching it per card would turn a 20-card library
+  // into 21 requests (36).
+  _count: { select: { questions: true, campaigns: true } },
 };
 
 const questionSelect = {
@@ -335,7 +338,7 @@ type TemplateRow = {
   clonedFromId: string | null;
   estimatedSeconds: number;
   createdAt: Date;
-  _count: { questions: number };
+  _count: { questions: number; campaigns: number };
 };
 
 function toSummary(template: TemplateRow): TemplateSummary {
@@ -349,6 +352,7 @@ function toSummary(template: TemplateRow): TemplateSummary {
     // form the moment anyone edited it (36).
     questionCount: template._count.questions,
     estimatedSeconds: template.estimatedSeconds,
+    campaignCount: template._count.campaigns,
     isLibrary: template.orgId === null,
     clonedFromId: template.clonedFromId,
     createdAt: template.createdAt.toISOString(),

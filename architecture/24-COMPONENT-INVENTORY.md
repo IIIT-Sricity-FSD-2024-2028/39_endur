@@ -217,20 +217,54 @@ role is a visibly dark column and an orphan capability is a visibly empty row �
 
 ### `<QuestionCard>`
 ```ts
-{ question: Question; expanded: boolean; onExpand: () => void;
-  onChange: (q: Question) => void; onDuplicate: () => void; onDelete: () => void }
+{ question: Question; index: number; expanded: boolean; onExpand: () => void;
+  onChange: (q: Question) => void; onDuplicate: () => void; onDelete: () => void;
+  readOnly?: boolean }
 ```
-Exactly one is expanded at a time, controlled at the parent's level.
+Exactly one is expanded at a time, controlled at the parent's level. Built at T-036 with the
+editors it hosts — they have no other home, and the type select that drives them lives here.
+
+Two props beyond the original contract, both recorded here first. `index` gives a card whose
+text is still empty an accessible name (*"Question 3"*); without it a blank new question is
+unreachable by name, for a reader and for a test. `readOnly` is the launched-campaign case
+(`37` § States) — the banner is the builder's, this is the half that stops the controls.
+
+T-037 added `onMove?: (direction: -1 | 1) => void`, and it is the same rule `<UnitTree>` and
+`<RoleRow>` already follow: **HTML5 drag does not exist on touch at all**, and `37`
+§ Acceptance requires the builder to be usable at 390px. The grip stays draggable; the two
+buttons beside it do the same job by click and by keyboard, calling the same handler.
+
+The card **holds a pending type change**: a change that would drop options renders its cost
+inline with `Keep it as it is` / `Change anyway`, and calls `onChange` only when accepted.
+Warning after the fact is not a warning.
 
 ### `<QuestionEditor>` × 6
 ```ts
-{ question: Question; onChange: (q: Question) => void }
+{ question: Question; onChange: (q: Question) => void; readOnly?: boolean }
 ```
 `RatingEditor` `SingleChoiceEditor` `MultiChoiceEditor` `TextEditor` `YesNoEditor`
-`NpsEditor`. Same file structure so two people can build three each without collision.
+`NpsEditor`. Built at T-036.
+
+**One file, not six.** The original reason for six was two people taking three each; that did
+not happen, and the real risk turned out to be the opposite one — these six drifting from the
+six INPUTS they author. `QuestionEditor.tsx` mirrors `QuestionInput.tsx` line for line (one
+dispatcher on `config.kind`, six named renderers under it), and one pair of parallel files is
+far easier to keep in step than twelve.
+
+`question` is the **draft** shape — `packages/shared`'s `QuestionInput` DTO, re-exported as
+`QuestionDraft` — not the API's question row. `position` is derived from array order on save
+(`37`) and `id` is absent until the first save, so a card holding an API row would be holding
+two fields it must not send.
 
 `YesNoEditor` has nothing to configure and renders "No settings for this type." rather than an
-empty body.
+empty body. `NpsEditor` has nothing to configure either, and says **what is fixed and why**
+rather than repeating that line: 0–10 with those two anchors is what makes a score comparable
+to anybody else's, and pointing at the rating scale is the answer to the question the reader
+is about to ask.
+
+The type-change rules are `components/form/kinds.ts` — a pure module with `KIND_LABELS`,
+`KIND_GROUPS`, `defaultConfig()` and `changeKind()`. The kind map is exhaustive with no
+default branch, so a seventh kind fails to compile rather than falling through (DEC-010).
 
 ### `<QuestionInput>` × 6
 ```ts
@@ -240,6 +274,33 @@ empty body.
 **These are the components the builder preview also uses.** One implementation, parameterised
 by `readOnly`, never two (INV-008). Two implementations means the preview eventually lies
 about what respondents see, and the first time you find out is on stage.
+
+**Built at T-035, not T-036.** `36` § Components requires the template preview to render
+through these, and INV-008 forbids a second set — so the library's preview is the call site
+that forced them into existence. `55-BUILD-ORDER` pairs them with the six editors because
+both are "the form engine"; the editors have no earlier caller and stay at T-036, which is
+now editors-only. Same shape as `N-025`. See `N-031`.
+
+`<QuestionInput>` is the exported dispatcher — one component, switching on `question.kind` —
+with the six renderers beside it as named exports. Two internals are shared on purpose:
+`<Scale>` under rating and NPS, `<Choices>` under single and multi, because
+`design_specs/design/05` §5.3 defines each of those pairs as *the same control with one
+difference*, and writing them twice is how the difference silently becomes three.
+
+### `<FormPreview>`
+```ts
+{ title: string; description?: string | null; questions: Question[];
+  width?: 'phone' | 'tablet' | 'desktop'; onWidth?: (w) => void; respondentWord: string }
+```
+The respondent view, framed. Added at T-037 and not in the original inventory, for a reason
+that is the same one INV-008 exists for: **two screens preview a form** — the template library
+(`36`) and the builder (`37` §5.4) — and they must show the identical thing. T-035 wrote the
+first one inline on the template page; T-037 lifted it here and rewired that page to it rather
+than writing a second, which would have made "exactly as respondents will see it" true on one
+screen and approximate on the other.
+
+It owns the three width frames (390 / 720 / unbounded), the *"Preview — nothing is saved"*
+banner, and the disabled Submit. It renders questions **only** through `<QuestionInput>`.
 
 ### `<Toggle>`
 ```ts
@@ -257,14 +318,25 @@ Completed steps are clickable; future ones are not.
 
 ### `<ShareSheet>`
 ```ts
-{ url: string; campaignName: string; onClose: () => void }
+{ url: string; campaignName: string; status: CampaignStatus;
+  endsAt?: string | null; anonymous?: boolean; onClose: () => void }
 ```
-QR canvas, short URL, three actions, presentation mode.
+QR canvas, short URL, three actions, presentation mode. Built at T-038.
 
 **Highest-risk component in the build. Write it on 22 Aug, not 26 Aug** (`_MEMORY.md` N-004).
 The QR renders locally on canvas — no external image service, which would fail exactly when
 the network does. `url` comes from `PUBLIC_BASE_URL`; if it says `localhost` the code does not
 scan from a phone (OPEN-002).
+
+Three props beyond the original contract, all in service of the footer line the design draws
+(`design_specs/design/06` §6.3): *"Open until 26 Aug, 23:59 · anonymous"*. `status` also
+decides whether the sheet says the campaign is collecting or has closed — a sheet that says
+"is collecting" over a closed campaign is worse than no sheet.
+
+**It warns when the URL will not scan.** `PUBLIC_BASE_URL` defaulting to `localhost` is the
+single failure that ends the demo, so the sheet checks its own URL and says so in place
+rather than leaving it to a checklist. That is `OPEN-002`'s operational half made visible; the
+value itself is still the team's to set.
 
 ### `<FileUpload>`
 ```ts
@@ -293,6 +365,11 @@ Built at T-033, first used by `/app/structure`.
 ```
 **Success only. Errors never use a toast** — they appear where the problem is
 (`design_specs/design/10` §4).
+
+Built at T-035. It self-dismisses and is `role="status"`, never `alert` — an alert
+interrupts a screen reader mid-sentence to say something went *right*. `undo` is rendered
+when given and is **not** used by the template library: undoing a delete needs a restore
+endpoint, and offering an undo that cannot undo is worse than not offering one.
 
 ### `<ConfirmDialog>`
 ```ts
@@ -351,7 +428,9 @@ builds a second shell.
 - [ ] Twenty-one components exist with the documented prop types
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
-- [ ] `<QuestionInput>` is shared by the preview and the live respondent form (INV-008)
+- [x] `<QuestionInput>` is shared by the preview and the live respondent form (INV-008) —
+      closed at T-039, and asserted by an import-graph walk (`pages/respond/bundle.test.ts`)
+      rather than by reading the imports
 - [ ] `<ConfirmDialog>` cannot be rendered without a `consequence` — it is a required prop
 - [ ] `<TrendChip>` always renders an arrow
 - [ ] `<ResponsiveTable>` collapses correctly for all four tables at 390px

@@ -197,6 +197,40 @@ describe('a template in use by a launched campaign is read-only', () => {
     const remove = await withCsrf(founder, 'delete', `/api/v1/templates/${templateId}`).send({});
     expect(remove.status).toBe(409);
   });
+
+  it('reports campaignCount, so the delete dialog can say so BEFORE it is pressed', async () => {
+    const founder = await setUpOrg();
+    const templates = await founder.agent.get('/api/v1/templates');
+    const rows = templates.body.data as Array<{ id: string; campaignCount: number }>;
+    const templateId = rows[0]?.id as string;
+
+    // T-035 added the count. Without it the library card cannot say "Used in 2 campaigns"
+    // and the delete dialog has to discover the 409 by pressing the button, which is
+    // exactly the "are you sure?" the consequence rule exists to replace (36, 24 §6).
+    expect(rows.every((template) => template.campaignCount === 0)).toBe(true);
+
+    for (const name of ['One', 'Two']) {
+      await prisma.campaign.create({
+        data: {
+          orgId: founder.orgId,
+          templateId,
+          name,
+          publicToken: `C${Date.now().toString(36).toUpperCase().slice(-6)}${name[0] as string}`,
+        },
+      });
+    }
+
+    const after = await founder.agent.get('/api/v1/templates');
+    const used = (after.body.data as Array<{ id: string; campaignCount: number }>).find(
+      (template) => template.id === templateId,
+    );
+    expect(used?.campaignCount).toBe(2);
+
+    // And the count agrees with what DELETE actually does. A number that disagrees with
+    // the refusal behind it would be worse than no number.
+    const remove = await withCsrf(founder, 'delete', `/api/v1/templates/${templateId}`).send({});
+    expect(remove.status).toBe(409);
+  });
 });
 
 describe('the shared library', () => {

@@ -19,6 +19,19 @@ const REGISTER = '/api/v1/auth/register';
 const freshEmail = (tag: string) =>
   `chain-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
+/**
+ * The ORG NAME has to be fresh too, and it took twenty runs to find out.
+ *
+ * `uniqueSlug()` derives a slug from the name and tries twenty variants before giving up
+ * with a 409. This test used the fixed name "Strip Test Org", and because the suite writes
+ * into the DEV database and never cleans up (`D-004`), the twenty-first run of the suite
+ * failed — on a test about stripping unknown keys, with a conflict about slugs.
+ *
+ * A test that depends on how many times it has been run before is not a test. Fixed here;
+ * `D-004` is the real repair and is now demonstrably not optional.
+ */
+const freshOrgName = (tag: string) => `Chain ${tag} ${Date.now()}${Math.floor(Math.random() * 1e4)}`;
+
 describe('the error envelope', () => {
   it('X-Request-Id round-trips and appears in the envelope', async () => {
     const res = await request(app).get('/nope').set('X-Request-Id', 'trace-abc');
@@ -52,7 +65,7 @@ describe('the error envelope', () => {
       email: freshEmail('strip'),
       password: 'a-long-enough-password',
       name: 'Ada',
-      orgName: 'Strip Test Org',
+      orgName: freshOrgName('strip'),
       industry: 'custom',
       // The forgery INV-010 exists for. If it were merged rather than stripped, the new
       // organisation would carry an id somebody else chose.

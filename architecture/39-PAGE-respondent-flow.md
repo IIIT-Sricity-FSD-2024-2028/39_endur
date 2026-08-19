@@ -50,7 +50,17 @@ Local component state only. No store — the respond world does not mount the co
 providers.
 
 `localStorage` holds a submitted marker per token, for the best-effort duplicate prevention on
-open links (`15` §3). It is honestly best-effort and the product does not overclaim it.
+open links (`15` §3). It is honestly best-effort and the product does not overclaim it — every
+access is wrapped, because iOS Safari in private mode throws on write and a form that threw
+there would lose a response the server had already accepted.
+
+**The idempotency key is one per FILL, not one per token.** `13` §7 says respondent submit is
+keyed on the invitation token, which is right for an invitation — one token, one person. An
+open link inverts it: every phone in the room holds the same token, so a key derived from it
+would replay the first person's `201` to the second and the campaign would collect exactly one
+response in front of the evaluator. Minted at the first press and reused by every retry of
+that fill; a `409` on it therefore means the first attempt landed and its reply was lost, and
+the form says so rather than inviting a second press. `N-041`.
 
 ## Components
 
@@ -60,6 +70,23 @@ respondents see, and you find out on stage.
 
 Plus a sticky progress bar and a submit button. No `<AppShell>`, no `<PageHeader>`, no
 `<VocabularyChips>` — this world has no chrome.
+
+Everything else on the screen is page-local and deliberately not in `24`: the progress bar,
+the three dead-end screens, and the two pure modules that hold the rules (`answers.ts` for
+what counts as answered, `copy.ts` for the four sentences). Same treatment as `32`'s detail
+panel and `38`'s close consequence — a component used by one page is not an inventory entry.
+
+**No `<Icon>` here.** It imports thirty glyphs from `lucide-react` to draw the two shapes
+this flow needs, and putting the icon library on a phone on a venue network is exactly what
+§8 of `20` rules out. The two glyphs are inline SVG in `Unavailable.tsx`, at the design
+system's own stroke weight.
+
+**A subject picker**, which this doc and `design_specs/design/07` both omit because both
+assume one subject. `38` step 2 lets a campaign carry many, and the submit endpoint returns
+a `422` on `body.subjectId` when it does and the submission does not name one — so the form
+has to ask. It renders as a required question card in the org's own noun, and it is absent
+when there is exactly one, because the server resolves that case itself and choosing from a
+list of one is noise. `N-039`.
 
 ## The seven rules
 
@@ -117,40 +144,75 @@ agreeing is what makes it feel like a real system rather than a mockup.
 No "submit another" unless repeats are allowed. **No account prompt, ever.** Closing the tab
 is the correct end of the flow; do not fight it.
 
-## States — all four break the demo if missing
+## States — every one of them breaks the demo if missing
+
+**Three screens, not the four this section used to draw, and the reason is a conflict inside
+this document — `CONF-015`.** § Data contract above (and `13` §6, and `tenantResolver`'s
+`TENANTLESS` list, and § Acceptance below) require invalid, unlaunched, not-yet-open and
+closed tokens to produce one identical `404`, because a difference between them is an
+existence oracle. A screen that says *"{Campaign} opens on 1 Sep at 09:00"* needs a status the
+endpoint deliberately refuses to return. The data contract wins; the client cannot render what
+the server will not say.
 
 | State | Title | Body |
 |---|---|---|
-| Not open yet | This isn't open yet | *{Campaign} opens on 1 Sep at 09:00.* |
-| Closed | This {campaign} has closed | *It ran from 11 to 26 August. Thanks if you took part.* |
-| Bad token | This link doesn't work | *Check the link, or scan the code again.* |
+| Not available — the uniform 404 | This link isn't active | *It may have closed, it may not have opened yet, or the code may be wrong. Check the link, or scan the code again.* |
 | Already responded | You've already responded | *Thanks — one response per person on this cycle.* |
+| Load failed | We couldn't load this | *Check your connection and try again.* — the only one with an action |
 
-Same layout, no primary action. **A dead white screen after a scan is the worst possible
-outcome on stage**, and bad-token is the most likely case if someone mistypes from the back of
-the room.
+The first screen names all three possibilities rather than claiming the link is broken:
+*"This link doesn't work"* is a lie in two of the three cases, and the reader's next move
+differs between them. **Already responded** stays separate because the *client* knows it —
+the `localStorage` marker is local knowledge, not something the server was asked, and it costs
+no round trip.
+
+**Load failed** is drawn by neither source and is built anyway. A phone on a venue network is
+the stated risk of this page, and rendering a transient failure as *"this link isn't active"*
+would send somebody away from a form that is perfectly fine.
+
+Same layout throughout, no primary action except the retry. **A dead white screen after a scan
+is the worst possible outcome on stage**, and a mistyped URL from the back of the room is the
+likeliest way to get one.
 
 Plus: loading (a single skeleton, since the form arrives in one payload), and submit failure
 (inline above the button, answers preserved, retry available).
 
 ## Acceptance
 
-- [ ] Tested on **real iOS Safari and real Android Chrome**, not desktop responsive mode
-- [ ] Every input is ≥ 16px — no zoom-on-focus
-- [ ] Someone who has never seen it completes the flow in **under 60 seconds**
-- [ ] Works on a phone hotspot with the laptop as server
-- [ ] The QR resolves to a URL reachable from a phone — not `localhost`
-- [ ] A submission appears in results within one refresh
-- [ ] All four edge states are reachable and correct
-- [ ] The public payload contains no org internals — key-allowlist test
-- [ ] Invalid, closed and expired tokens are byte-identical 404s
-- [ ] The respondent bundle contains no console code
-- [ ] `<QuestionInput>` is shared with the preview (INV-008)
-- [ ] Nothing is validated before submit is pressed
-- [ ] The thank-you count matches the results count
-- [ ] Completes with the keyboard alone, top to bottom, submit included
-- [ ] Rating scales are `radiogroup`s with anchors announced
-- [ ] A duplicate submit with the same idempotency key creates one response
+- [ ] Tested on **real iOS Safari and real Android Chrome**, not desktop responsive mode —
+      `T-045`, and it needs two phones
+- [x] Every input is ≥ 16px — no zoom-on-focus. Carried by the `.q-*` layer, which is the
+      same one the preview renders through, so it cannot drift on one screen only
+- [ ] Someone who has never seen it completes the flow in **under 60 seconds** — a stopwatch
+      and a stranger, `T-045`
+- [ ] Works on a phone hotspot with the laptop as server — `T-045`
+- [~] The QR resolves to a URL reachable from a phone — not `localhost`. The share sheet
+      says so on screen when it is not (`38`); somebody still has to set the variable
+      (`OPEN-002`)
+- [x] A submission appears in results within one refresh — the count the thank-you shows is
+      read inside the transaction that wrote the row (`13` §6), so the two agree by
+      construction rather than by timing
+- [x] Every edge state is reachable and correct — **three, not four**, and `CONF-015` says
+      why. Each has a test
+- [x] The public payload contains no org internals — key-allowlist test (T-022)
+- [x] Invalid, closed and expired tokens are byte-identical 404s (T-022), and the client
+      reads them as one state rather than guessing between them
+- [x] The respondent bundle contains no console code — **and it did, until this was
+      measured.** `pages/respond/bundle.test.ts` walks the import graph out of both
+      respondent pages *and* out of `main.tsx`, which is the half that found the leak
+      (`N-040`). Reverting the fix fails it; that was checked both ways
+- [x] `<QuestionInput>` is shared with the preview (INV-008) — asserted by the same graph
+      walk, not only by reading the imports
+- [x] Nothing is validated before submit is pressed, and each error clears the instant its
+      own question is answered
+- [x] The thank-you count matches the results count — same transaction, and the count is
+      carried from the submit response rather than refetched
+- [x] Completes with the keyboard alone, top to bottom, submit included — every control is a
+      real `<input>` inside a `<fieldset>`, so this comes from the platform
+- [x] Rating scales are `radiogroup`s with anchors announced — `<QuestionInput>`, T-035
+- [x] A duplicate submit with the same idempotency key creates one response (T-022), and the
+      key is per fill rather than per token so two people are never one (`N-041`)
+- [ ] Works at 390px on a real device — the same device check as every other screen, `T-045`
 
 ## Out of scope
 

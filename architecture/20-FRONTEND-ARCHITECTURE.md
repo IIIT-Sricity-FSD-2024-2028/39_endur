@@ -185,6 +185,20 @@ Modest and specific — this is an admin tool, not a landing page.
 
 - Route-level code splitting per world. The respondent bundle must not include the console:
   it is loaded on a phone, on a venue network, by someone with no patience.
+
+  **Splitting the pages is not enough, and T-039 found that out by measuring rather than by
+  reading.** `router/index.tsx` imports `router/layouts.tsx` statically — it must, the three
+  layouts are route elements — and `layouts.tsx` imported `<AppShell>` statically, so the
+  sidebar, the top bar and `<Icon>`'s whole glyph set sat in the entry chunk that every route
+  downloads. `<AppShell>` is lazy now. `src/frontend/pages/respond/bundle.test.ts` walks the
+  static import graph out of both respondent pages *and* out of `main.tsx` and fails on
+  console code, on the store, or on a new dependency; the second half is the one that caught
+  this. `N-040` carries the measurements.
+
+  **Still true and not fixed there:** `main.tsx` wraps all three worlds in one `<Provider>`,
+  so the store and its dependencies are in the entry chunk a respondent downloads. Moving the
+  provider into the console layout is a decision for this doc and `23` §2, not for a page
+  task.
 - Self-hosted fonts in `public/fonts` (`design_specs/design/01` §2). A venue that blocks
   `fonts.googleapis.com` would otherwise drop the whole product to system-ui mid-demo.
 - The QR canvas renders locally. No external image service — it would fail exactly when the
