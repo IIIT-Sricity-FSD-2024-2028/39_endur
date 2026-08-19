@@ -490,6 +490,13 @@ N-009  WORKING MODEL for multi-session builds, set 2026-08-18:
        that rule is what kept 52 docs consistent across three revisions. an audit on
        2026-08-18 found the ONE place it was skipped: docs 46/47/48 added endpoints without
        registering them in 13. fixed. do not skip it again.
+N-016  MERGE HAZARD, 2026-08-19: the mithil-patidar merge was committed with conflicts
+       unresolved. two files were damaged with NO conflict markers — authz/index.ts came
+       out empty, and schema.prisma kept both sides of a dropped enum. a grep for
+       '<<<<<<<' over *.ts and *.md said clean while the build was broken.
+       ALWAYS scan every tracked file (git ls-files), never a chosen set of extensions,
+       and always run typecheck + the suite before trusting a merge. a green grep is not
+       a green build.
 N-015  FOLDER RENAME 2026-08-19, on the user's instruction: apps/ -> src/,
        api -> backend, web -> frontend, prisma -> database, and the inner src/ of each app
        was flattened away. All 19 affected docs, the MAP table, every tsconfig, eslint,

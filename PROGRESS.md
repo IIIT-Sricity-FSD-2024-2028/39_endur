@@ -5,7 +5,7 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (Stage 2 complete — the whole API surface exists, and is seeded)
+UPDATED   2026-08-19  (Stage 2 complete, and the broken merge is repaired)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
 STATUS    25/45. STAGES 0-2 DONE. 141 tests across 15 files, all green.
@@ -173,6 +173,30 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-19 · merge repair — READ IF YOU PULLED BEFORE THIS
+`3312cdf6`, the merge of `mithil-patidar` into `vishv`, **was committed with its conflicts
+unresolved.** If you pulled between that commit and `1fb0656b`, you have a tree that does not
+build: 92 typecheck errors, 14 of 15 test files failing to load. Pull again.
+
+20 files carried conflict markers. Two were mangled with **no markers at all**, which is the
+half that actually hurt:
+
+- `authz/index.ts` was **emptied**, so every `from '../authz/index.js'` import failed with
+  "not a module" — an error that points nowhere near the cause
+- `database/schema.prisma` kept **both** sides: the `CampaignStatus` enum and
+  `campaigns.status` came back alongside `closed_at`, directly contradicting `DEC-016`
+
+Everything resolved to `95a69183`. That side already contained the Stage-1 work
+byte-for-byte, so it is a strict superset — `git diff 7b8e09db 95a69183` reports no
+deletions. Nothing from either branch was lost.
+
+**The lesson worth keeping:** a conflict scan over `*.ts` and `*.md` reported the repo clean
+while `schema.prisma` was still broken. Scan every tracked file, not the extensions you
+expect. That is `N-016`.
+
+Verified green after the repair: typecheck · lint · audit:drift · audit:vocab · frontend
+build · **141 tests across 15 files**.
 
 ### 2026-08-19 · STAGE 2 COMPLETE — the whole API surface, T-015 to T-025
 
