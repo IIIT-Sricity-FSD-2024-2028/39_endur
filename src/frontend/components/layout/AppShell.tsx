@@ -7,7 +7,20 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
 
-export function AppShell({ children }: { children: ReactNode }): JSX.Element {
+export function AppShell({
+  children,
+  focused = false,
+}: {
+  children: ReactNode;
+  /**
+   * No sidebar, no drawer, no hamburger — the frame design_specs/design/03 §3.4 draws for
+   * the setup wizard. During setup every sidebar item leads to a page that is empty
+   * *because setup has not happened yet*, so offering them invites the one click that
+   * makes the product look broken. It is still the console: same session, same top bar,
+   * same capability gate.
+   */
+  focused?: boolean;
+}): JSX.Element {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
 
@@ -29,15 +42,17 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
       {/* First focusable element on the page. 26 — and it is cheap now, expensive later. */}
       <a className="skip-link" href="#main">Skip to content</a>
 
-      <TopBar onOpenMenu={() => setDrawerOpen(true)} />
+      <TopBar {...(focused ? {} : { onOpenMenu: () => setDrawerOpen(true) })} />
 
       <div className="shell-body">
         {/* Desktop: a column. Below 640px this is hidden and the drawer takes over. */}
-        <div className="shell-rail">
-          <Sidebar />
-        </div>
+        {!focused && (
+          <div className="shell-rail">
+            <Sidebar />
+          </div>
+        )}
 
-        {drawerOpen && (
+        {!focused && drawerOpen && (
           <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)}>
             <div
               className="drawer"
@@ -52,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
         )}
 
         <main id="main" className="shell-content">
-          <div className="page">{children}</div>
+          <div className={focused ? 'page page-focused' : 'page'}>{children}</div>
         </main>
       </div>
     </div>

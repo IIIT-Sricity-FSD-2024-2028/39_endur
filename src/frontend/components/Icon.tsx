@@ -10,7 +10,8 @@
 // Never emoji. The mockups use them as placeholders; they render differently on the
 // projector machine and read as unfinished. audit-drift greps for them in JSX.
 import {
-  BarChart3, Building2, ChevronDown, Copy, GripVertical, Home, Inbox, LayoutTemplate,
+  BarChart3, Building2, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, GripVertical, Home,
+  Inbox, LayoutTemplate, Pencil,
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles,
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
   type LucideIcon,
@@ -44,6 +45,19 @@ const ICONS = {
   chevron: ChevronDown,
   menu: Menu,
   close: X,
+  // The password reveal (design_specs/design/03 §3.2 draws it as 👁, which §5's "never
+  // emoji" rule turns into these two). Named for the ACTION the button performs, not for
+  // the state it is in — `show` when the password is hidden — because that is what the
+  // button's accessible name has to say.
+  show: Eye,
+  hide: EyeOff,
+  // T-032. `edit` is the pencil that jumps back to a wizard step and the one that opens a
+  // plural override — one concept, "change this", so one icon. `check` marks a chosen
+  // card. `disclosure` is the collapsed twist in a tree; `chevron` stays the DOWN one used
+  // by menus, because a tree row that points down when collapsed is backwards.
+  edit: Pencil,
+  check: Check,
+  disclosure: ChevronRight,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

@@ -1,4 +1,5 @@
 // Units — the org graph's structural half. 13 § Structure, 32, 10 §6.
+import { expandUnitNames } from '@endur/shared';
 import type {
   CreateUnitBody,
   DeleteUnitBody,
@@ -95,14 +96,10 @@ export async function createUnit(
 ): Promise<UnitNode[]> {
   if (body.parentId) await assertUnitInOrg(orgId, body.parentId);
 
-  // `Floor 1..8` — one request, one transaction, eight siblings. Expanded here rather than
-  // in the client so the cap is enforced where it cannot be skipped (32).
-  const names = body.repeat
-    ? Array.from(
-        { length: body.repeat.to - body.repeat.from + 1 },
-        (_, index) => `${body.name} ${body.repeat!.from + index}`,
-      )
-    : [body.name];
+  // `Floor 1..8` — one request, one transaction, eight siblings. The grammar and the cap
+  // live in the shared DTO so the client's preview and this loop cannot disagree, and so
+  // the cap is enforced where it cannot be skipped (32).
+  const names = expandUnitNames(body.name, body.repeat);
 
   return runInTransaction(req, async (tx) => {
     const created: UnitNode[] = [];

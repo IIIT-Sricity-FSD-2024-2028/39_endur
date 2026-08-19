@@ -2,6 +2,9 @@
 import { z } from 'zod';
 import { dto, Id } from './common.js';
 
+/** The cap, in units created per request. Shared so the client can say why before it asks. */
+export const MAX_REPEAT = 50;
+
 /**
  * `Floor 1..8` creates eight siblings in one request (32). The expansion is server-side
  * and capped, because the interesting half of that acceptance item is the second half —
@@ -12,15 +15,76 @@ export const RepeatRange = z
   .object({
     from: z.number().int().min(0).max(9999),
     to: z.number().int().min(0).max(9999),
+    /**
+     * `Wing A..F` — the index is rendered as a letter rather than a number, 0 = A. Kept as
+     * a flag over a numeric pair rather than a second shape, so the cap and the ordering
+     * refinements below apply to both forms without being written twice.
+     */
+    letters: z.boolean().default(false),
   })
   .refine((range) => range.to >= range.from, {
     message: 'The range must end at or after it starts',
     path: ['to'],
   })
-  .refine((range) => range.to - range.from < 50, {
+  .refine((range) => range.to - range.from < MAX_REPEAT, {
     message: 'That range would create more than 50 units at once',
     path: ['to'],
+  })
+  .refine((range) => !range.letters || range.to <= 25, {
+    message: 'A letter range stops at Z',
+    path: ['to'],
   });
+export type RepeatRange = z.infer<typeof RepeatRange>;
+
+/* --------------------------------------------------------------- range syntax
+ * `Floor 1..8` in a name field creates eight siblings (32 § Range syntax). Hotels,
+ * colleges and hospitals are full of numbered repetition, and this turns eight actions
+ * into one.
+ *
+ * The grammar lives HERE, beside the schema, because two implementations of it is the
+ * failure mode: the client would preview "Floor 1..Floor 8" while the server wrote
+ * something else, and nobody would notice until a demo.
+ */
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const RANGE = /^(.*?)\s*(?:(\d{1,6})\.\.(\d{1,6})|([A-Za-z])\.\.([A-Za-z]))$/;
+
+/**
+ * `"Floor 1..8"` → `{ name: 'Floor', repeat: { from: 1, to: 8, letters: false } }`.
+ * A plain name comes back with no `repeat`, so callers can hand the result straight to
+ * `CreateUnitBody` either way.
+ *
+ * Out-of-cap ranges parse rather than fail — `1..10000` produces a repeat whose count the
+ * caller can report as "that would create 10000" before the server refuses it. Refusing
+ * here with `null` would leave the client unable to say WHY.
+ */
+export function parseUnitRange(input: string): { name: string; repeat?: RepeatRange } {
+  const trimmed = input.trim();
+  const match = RANGE.exec(trimmed);
+  const stem = match?.[1]?.trim();
+  if (!match || !stem) return { name: trimmed };
+
+  if (match[2] !== undefined && match[3] !== undefined) {
+    return { name: stem, repeat: { from: Number(match[2]), to: Number(match[3]), letters: false } };
+  }
+  const from = LETTERS.indexOf((match[4] ?? '').toUpperCase());
+  const to = LETTERS.indexOf((match[5] ?? '').toUpperCase());
+  if (from < 0 || to < 0) return { name: trimmed };
+  return { name: stem, repeat: { from, to, letters: true } };
+}
+
+/** How many units a repeat would create. Negative ranges count as zero, not as a crash. */
+export const repeatCount = (repeat: RepeatRange): number => Math.max(repeat.to - repeat.from + 1, 0);
+
+/** The names a repeat expands to, in order. One definition, both sides. */
+export function expandUnitNames(name: string, repeat?: RepeatRange): string[] {
+  if (!repeat) return [name];
+  return Array.from({ length: repeatCount(repeat) }, (_, index) =>
+    repeat.letters
+      ? `${name} ${LETTERS[repeat.from + index] ?? ''}`.trim()
+      : `${name} ${repeat.from + index}`,
+  );
+}
 
 export const CreateUnitBody = z.object({
   name: z.string().min(1).max(80),

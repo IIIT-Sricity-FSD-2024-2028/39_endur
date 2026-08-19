@@ -126,11 +126,41 @@ where the mobile experience rots (`design_specs/design/09` §3.1).
 
 ### `<UnitTree>`
 ```ts
-{ nodes: UnitNode[]; selectedId?: string; mode: 'browse' | 'edit' | 'select';
+{ nodes: UnitTreeNode[]; selectedId?: string; mode: 'browse' | 'edit' | 'select';
+  addLabel?: string; subjectWord?: string; focusId?: string;
+  request?: { id: string; action: 'rename' | 'move'; nonce: number };
+  rowMessage?: { id: string; text: string };
   onSelect?: (id: string) => void; onRename?: (id: string, name: string) => void;
+  onCancelEdit?: (id: string) => void;
   onAddChild?: (parentId: string) => void; onDelete?: (id: string) => void;
   onReparent?: (id: string, newParentId: string) => void }
+
+type UnitTreeNode = { id: string; name: string; children: UnitTreeNode[];
+                      peopleCount?: number; subjectCount?: number; isTemporary?: boolean;
+                      endsAt?: string | null; placeholder?: string }
 ```
+
+**Built at T-032, not T-033** (`_MEMORY.md` `N-025`) — wizard step 3 needed it first, and
+there is only ever one. `UnitTreeNode` asks for the least it needs rather than the API's
+`UnitNode`, so the wizard's draft satisfies it without inventing counts that do not exist
+yet, and `UnitNode` satisfies it without adaptation.
+
+`addLabel` carries the vocabulary in from the caller ("Add a Department" / "Add a Property")
+— the component must not reach for `useLabels()` itself, because the wizard's draft is not
+the saved org's. `subjectWord` does the same for row counts, and its absence hides them
+rather than inventing "Subjects". `focusId` is what makes `+` then type a two-click beat.
+
+**The five props T-033 added are all optional**, which is why extending beat forking:
+`subjectWord`, `endsAt` and `placeholder` on the node, `rowMessage` (a server refusal shown
+under its own row, never a dialog), `onCancelEdit` (Escape or an empty blur — the structure
+page drops the placeholder row `+` created), and `request`, which is how a control OUTSIDE
+the tree — the detail panel's Rename and Move — reaches a row. `request` carries a `nonce`
+because asking twice for the same row is a real thing a reader does, and an unchanged
+`{id, action}` would be a no-op the second time.
+
+Re-parenting has **two paths**: HTML5 drag, and a Move control that works by click and by
+keyboard. Not a nicety — drag does not exist on touch, and `31` § Acceptance requires the
+tree to be usable there.
 Recursive. **One component, three placements** — wizard step 3, `/app/structure`, and the
 campaign audience picker. Do not fork it (INV-009). The `mode` prop is what makes one
 component serve all three; a second implementation is how the three drift apart.
@@ -139,10 +169,19 @@ Assign it to one person. It is the component most likely to be rewritten three t
 
 ### `<RoleRow>`
 ```ts
-{ role: Role; onRename: (name: string) => void; onDelete: () => void; dragHandleProps?: object }
+{ name: string; level: number; total: number; autoFocus?: boolean;
+  onRename: (name: string) => void; onDelete: (() => void) | undefined;
+  onMove?: (direction: -1 | 1) => void }
+
+export function seesText(level: number, total: number): string
 ```
 **Level is derived from row order, never entered.** The "Sees…" description is generated from
-the level, not stored.
+the level, not stored — `seesText` is exported so `33`'s grid states the rule the same way.
+
+Amended at T-032 from `{ role: Role; …; dragHandleProps? }`: the row cannot compute its own
+level (only the list knows the order), and `onDelete: undefined` is how the bottom row is
+made undeletable — a disabled state the type system hands you rather than a flag to
+remember. `onMove` is the keyboard and touch path; the list that owns order handles drag.
 
 ### `<PersonChip>`
 ```ts
@@ -235,6 +274,7 @@ path, or the control is unusable by keyboard.
 { icon: IconName; title: string; body: string; action?: ReactNode }
 ```
 Never an illustration, never more than one action. Copy from `design_specs/design/10` §3.
+Built at T-033, first used by `/app/structure`.
 
 ### `<Toast>`
 ```ts
@@ -246,8 +286,14 @@ Never an illustration, never more than one action. Copy from `design_specs/desig
 ### `<ConfirmDialog>`
 ```ts
 { title: string; consequence: string; verb: string; destructive?: boolean;
-  onConfirm: () => void; onCancel: () => void }
+  confirmDisabled?: boolean; onConfirm: () => void; onCancel: () => void }
 ```
+
+`confirmDisabled` (T-033) exists because `32` requires that confirming a destructive action
+whose consequence is **unknown** be impossible, not merely discouraged: the delete dialog
+opens while `GET /units/:id/impact` is still in flight. While it is disabled the dialog
+focuses Cancel instead — `focus()` on a disabled button is a no-op, and a modal that opens
+with focus behind it traps nobody.
 `consequence` is required and must state **real numbers**. Never "Are you sure?" — always
 "Deleting Computer Science moves 64 people to School of Engineering."
 
@@ -256,9 +302,15 @@ only thing that reliably stops "Are you sure?" from reappearing.
 
 ## 7. Patterns
 
-**Inline rename.** Name fields in the tree, role rows and subject cards look like plain text
-until hovered or focused. `Enter` commits, `Esc` reverts, blur commits. **This is why the live
-demo is fast** — renaming three roles must not open three dialogs.
+**Inline rename** — a real component since T-032: `<InlineName>` in `components/org/`.
+Props: `{ value; onCommit; onCancel?; ariaLabel; autoFocus?; placeholder? }`, where
+`onCancel` (T-033) fires on Escape or a blur with the field empty.
+Name fields in the tree, role rows and subject cards look like plain text until hovered or
+focused. `Enter` commits, `Esc` reverts, blur commits, and an emptied field reverts rather
+than erroring — an empty name is a slip, not an instruction. **This is why the live demo is
+fast**: renaming three roles must not open three dialogs. It is shared rather than repeated
+because Esc-reverts is the part everyone gets subtly wrong, and it is invisible until
+somebody uses it on stage.
 
 **Live preview.** Wizard step 4 and settings render a scaled-down, `pointer-events: none`
 mini-UI updating on keystroke. It is what turns "customizable" from a claim into something

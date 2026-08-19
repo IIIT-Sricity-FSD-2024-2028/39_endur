@@ -42,8 +42,26 @@ authRouter.post('/register', validate(RegisterDto), (req, res, next) => {
 authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res, next) => {
   const { body } = req.data as { body: LoginBody };
   void (async () => {
+    // `users` is unique on (org_id, email), NOT on email alone (10), so this lookup can
+    // legitimately match rows in more than one organisation. Until CONF-013 is decided,
+    // two clauses make the choice deterministic and close a live cross-tenant lockout:
+    //
+    //   passwordHash: not null  — an INVITED row has no hash and can never be signed in
+    //     to. Without this, anyone holding `person.create` in any organisation could lock
+    //     any user of any other organisation out of their own account, just by inviting
+    //     their email address: the invited row was matched first and the real one was
+    //     never reached. Reproduced end-to-end on 2026-08-19 (200 -> 401 after one
+    //     unrelated POST /people).
+    //   orderBy createdAt asc  — `findFirst` with no order is whatever Postgres hands
+    //     back, which is not a security property. Oldest wins: the account that existed
+    //     first cannot be displaced by one created later.
+    //
+    // Neither clause DECIDES the question — whether an email address is global or
+    // per-tenant is a schema decision and it is still open. They make the current schema
+    // behave safely in the meantime.
     const user = await prisma.user.findFirst({
-      where: { email: body.email },
+      where: { email: body.email, passwordHash: { not: null } },
+      orderBy: { createdAt: 'asc' },
       select: { id: true, orgId: true, passwordHash: true, status: true },
     });
 

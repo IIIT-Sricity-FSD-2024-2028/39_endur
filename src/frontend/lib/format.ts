@@ -37,3 +37,18 @@ export const minutes = (seconds: number): string => {
   const m = Math.max(1, Math.ceil(seconds / 60));
   return `${m} minute${m === 1 ? '' : 's'}`;
 };
+
+/**
+ * Derive a plural from a singular. Wizard step 4, and settings (`22` §2, 31 § Interactions).
+ *
+ * Deliberately shallow: `+s`, `y → ies`, `+es` after a sibilant. It is a convenience, not a
+ * linguistics engine, and it is ALWAYS overridable — because the hotel org needs
+ * "Staff / Staff" and a clever rule would be wrong exactly where somebody is watching.
+ */
+export function derivePlural(one: string): string {
+  const word = one.trim();
+  if (!word) return '';
+  if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
+  if (/(s|x|z|ch|sh)$/i.test(word)) return `${word}es`;
+  return `${word}s`;
+}

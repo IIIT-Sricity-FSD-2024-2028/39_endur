@@ -7,20 +7,28 @@ import { useAppSelector } from '../../store/index.js';
 import { signOut, switchToDemoOrg } from '../../lib/session.js';
 import { DEMO_ORGS, isDemoBuild } from '../../lib/demo.js';
 
-export function TopBar({ onOpenMenu }: { onOpenMenu: () => void }): JSX.Element {
+export function TopBar({
+  onOpenMenu,
+}: {
+  /** Absent means there is no navigation to open — the setup wizard's focused shell. A
+   *  hamburger that opens an empty drawer is worse than no hamburger. */
+  onOpenMenu?: (() => void) | undefined;
+}): JSX.Element {
   const user = useAppSelector((s) => s.auth.user);
   const org = useAppSelector((s) => s.auth.org);
 
   return (
     <header className="topbar">
-      <button
-        type="button"
-        className="btn btn-icon topbar-menu"
-        onClick={onOpenMenu}
-        aria-label="Open navigation"
-      >
-        <Icon name="menu" size={20} />
-      </button>
+      {onOpenMenu && (
+        <button
+          type="button"
+          className="btn btn-icon topbar-menu"
+          onClick={onOpenMenu}
+          aria-label="Open navigation"
+        >
+          <Icon name="menu" size={20} />
+        </button>
+      )}
 
       <Link to="/app" className="topbar-brand">
         <span className="topbar-mark" aria-hidden="true">E</span>

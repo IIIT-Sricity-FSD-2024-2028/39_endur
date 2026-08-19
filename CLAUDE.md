@@ -86,8 +86,12 @@ DTO inside `design_specs/`. When the two disagree, `_MEMORY.md` records the reso
 - Two team members drive Claude in parallel. Before creating or heavily editing a source
   file, check the `MAP` section of `_MEMORY.md` — it is the lock table for which doc owns
   which path.
-- Commit messages: `feat|fix|code|docs: <lowercase summary>`, matching existing history.
-  Include the task id where one applies, and cite the `DEC-` id when a commit changes an
-  architectural decision.
+- **Never run `git commit`, `git push`, or any other history-writing git command.** The user
+  commits their own work, always. Stage nothing, commit nothing, push nothing — finish the
+  change, run the checks, report what you did, and stop. If a commit seems warranted, say so
+  and let them make it.
+- Commit messages, for when *they* write one: `feat|fix|code|docs: <lowercase summary>`,
+  matching existing history. Include the task id where one applies, and cite the `DEC-` id
+  when a commit changes an architectural decision.
 - The old v1.0 codebase was deleted deliberately. Do not restore it from git history; it is
   education-shaped and fights the generic model.

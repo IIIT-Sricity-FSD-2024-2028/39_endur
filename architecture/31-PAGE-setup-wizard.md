@@ -16,6 +16,12 @@ cut, and this is the first of them.
 `/app/setup?step=industry|roles|structure|words|review` — console world, session required.
 The step is in the query string so Back works and a step is linkable during a rehearsal.
 
+**Focused frame** (T-032, `_MEMORY.md` `N-026`): `AppShell` takes `focused`, and
+`ConsoleLayout` turns it on here — no sidebar, no drawer, no hamburger, matching
+`design_specs/design/03` §3.4. During setup every sidebar item leads to a page that is empty
+*because setup has not happened yet*, so offering them invites the one click that makes the
+product look broken. It is still the console: same session, same capability gate.
+
 `Skip setup →` in the top bar drops into the console with the Custom preset applied. **It is
 the emergency exit for a stage failure and it must work.**
 
@@ -77,11 +83,13 @@ before overwriting.
 
 ## Components
 
-`<ProgressRail>` · `<RoleRow>` · `<UnitTree>` (mode `edit`) · `<Toggle>` · `<ConfirmDialog>`
-and the live-preview pattern (`24` §7).
+`<ProgressRail>` · `<RoleRow>` · `<UnitTree>` (mode `edit`) · `<InlineName>` · `<Toggle>` ·
+`<ConfirmDialog>` and the live-preview pattern (`24` §7).
 
 `<UnitTree>` here is the **same component** as `/app/structure` and the audience picker
-(INV-009).
+(INV-009). **All six were built by T-032**, not by the tasks that catalogue them — the
+wizard needed them first, and a second implementation later is exactly what INV-009 exists
+to prevent. `T-033` extends the tree; it does not write one (`N-025`).
 
 ## Interactions
 
@@ -133,16 +141,17 @@ seeds starter templates and lands on `/app` with a one-time banner and a primary
 
 - [ ] Industry → Finish completes in **under 100 seconds** with a stopwatch. If over, cut a
       field, not a step
-- [ ] Pressing Continue four times from a preset produces a working org in ~8 seconds
-- [ ] Back and forward preserve every edit, including a rename made three steps earlier
-- [ ] Role levels renumber live on drag and are never typed
-- [ ] The "Sees…" text updates as rows are dragged
-- [ ] The lowest role cannot be deleted
-- [ ] Step 4's preview updates on keystroke, with no save
-- [ ] Plural override persists for "Staff / Staff"
-- [ ] Finish is one request; a forced failure leaves the org untouched
-- [ ] `Skip setup` produces a usable console with the Custom preset
-- [ ] Every noun on every step comes from the draft labels, including button labels (INV-001)
+- [x] Pressing Continue four times from a preset produces a working org in ~8 seconds
+- [x] Back and forward preserve every edit, including a rename made three steps earlier
+- [x] Role levels renumber live on drag and are never typed — and on the keyboard/touch
+      Move buttons, which is the path drag cannot serve
+- [x] The "Sees…" text updates as rows are dragged
+- [x] The lowest role cannot be deleted
+- [x] Step 4's preview updates on keystroke, with no save
+- [x] Plural override persists for "Staff / Staff"
+- [x] Finish is one request; a forced failure leaves the org untouched
+- [x] `Skip setup` produces a usable console with the Custom preset
+- [x] Every noun on every step comes from the draft labels, including button labels (INV-001)
 - [ ] Works at 390px; the tree is usable with touch
 - [ ] Rehearsed end to end at least three times before 26 Aug
 

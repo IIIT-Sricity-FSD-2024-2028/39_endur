@@ -5,18 +5,24 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-19  (Stage 3 done — T-026, T-028, T-029, T-030; T-027 partial)
+UPDATED   2026-08-19  (T-033 — the structure page)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  7 days  ·  demo 27 Aug  ·  GRADED
-STATUS    29/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
-          214 tests across 23 files, all green (149 backend + 65 frontend).
+STATUS    32/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
+          369 tests across 37 files, all green (182 backend + 187 frontend).
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
+          !! READ CONF-013 IN _MEMORY.md BEFORE TOUCHING AUTH. A cross-tenant account
+          lockout was found and closed on 19 Aug; the schema question behind it is
+          still open and somebody has to decide it.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      Stage 4 screens. LANE C IS UNBLOCKED — the shell is done, so T-035..T-040
-          can start alongside lane B's T-031..T-034. Every page route already exists
-          as a placeholder; replace the file, do not add a route.
+NEXT      T-034 (subjects, doc 35). LANE C IS UNBLOCKED AND IDLE: T-035..T-040 can
+          run alongside. Every page route already exists as a placeholder; replace
+          the file, do not add a route.
+          !! <UnitTree> IS EXTENDED, NEVER FORKED. T-032 built it, T-033 extended it
+          (five optional props), and the campaign audience picker is its third
+          placement — see _MEMORY.md N-025 and INV-009.
           Open a page with <PageHeader>; do not hand-roll a title.
           ALSO DUE 24 AUG: vendor the two woff2 files (see src/frontend/public/fonts).
 ```
@@ -56,9 +62,12 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **214 tests
-across 23 files**, 149 backend + 65 frontend. All five are green right now, so anything red
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **369 tests
+across 37 files**, 182 backend + 187 frontend. All five are green right now, so anything red
 is yours.
+
+**Claude does not commit.** The user commits, always — stated 19 Aug and written into
+`CLAUDE.md` § Working conventions. Finish, run the checks, report, stop.
 
 The backend tests need Postgres running and they **write into the dev database** (`D-004`),
 so if the demo logins stop working, `npm run db:seed` — it is idempotent and takes ~4 s.
@@ -126,9 +135,9 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ```
 ### Stage 4 — M0 screens
 ```
-[ ] T-031  B  landing, sign in, create org
-[ ] T-032  B  setup wizard 5 steps          ← never cut
-[ ] T-033  B  UnitTree + structure page
+[x] T-031  B  landing, sign in, create org
+[x] T-032  B  setup wizard 5 steps          ← never cut
+[x] T-033  B  UnitTree + structure page
 [ ] T-034  B  subjects
 [ ] T-035  C  template library
 [ ] T-036  C  QuestionEditor ×6 + QuestionInput ×6
@@ -146,7 +155,8 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 29 / 45 done (T-027 partial). Stage 3 complete but for the font files.**
+**Progress: 32 / 45 done (T-027 partial). Stage 3 complete but for the font files;
+Stage 4 open at T-034.**
 
 ---
 
@@ -175,6 +185,8 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
 | `D-004` | Integration tests write into the **dev** database | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo | before `T-045` |
+| `D-006` | `uniqueSlug()` runs **outside** register's transaction | Two registrations naming the same organisation in the same second both read "that slug is free"; the loser then collides on the unique index and gets a 500. The rollback is correct — `register-rollback.test.ts` proves nothing is left behind — but the caller deserves a retry, not an error page. Fix: retry the transaction on a P2002 against `slug` | before `T-045` |
+| `D-007` | `CONF-013` is **mitigated, not resolved** | Login filters `passwordHash: not null` and orders by `createdAt`, which closes the cross-tenant lockout. It does not answer whether an email address is global or per-tenant, and two *activated* accounts on one address are still ambiguous. Three options are written out in `CONF-013`; pick one and supersede it | **24 Aug** |
 | `D-005` | The two woff2 faces are not vendored | `tokens.css` declares both; the files are absent, so the product renders in `system-ui`. Nothing breaks, but nothing looks right either. `src/frontend/public/fonts/README.md` names the two files | **24 Aug** (`21` §4) |
 
 ---
@@ -183,6 +195,180 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-19 · T-033 — the structure page. The tree got extended, not forked
+
+`/app/structure` is real: `pages/console/Structure/` (page, detail panel, and the delete
+sentence as a pure module), `lib/units.ts`, `<EmptyState>`, and `<UnitTree>` **extended**
+with five optional props rather than a second tree (`N-025`, INV-009). The wizard's call
+site did not change by one character, which is the test of whether extending was the right
+call.
+
+What is worth knowing next session:
+
+- **The range grammar moved into `packages/shared`** (`N-027`). `parseUnitRange()` and
+  `expandUnitNames()` sit next to the schema that caps them, and the server now expands
+  through the same function the client previews with. `Wing A..F` works too — it needed a
+  `letters` flag on `RepeatRange`, added additively so the numeric form and its tests were
+  untouched.
+- **The delete sentence is a pure function with its own test file.** "Never *are you sure?*"
+  is an acceptance criterion, and a sentence assembled inside a component is one nobody can
+  check without rendering a dialog. Writing the tests found a real bug in it: *"1 Quaxel
+  **are** left without a unit"*. Verb agreement is not a detail on a projector.
+- **`confirmDisabled` on `<ConfirmDialog>`** (catalogued in `24` first). Doc `32` requires
+  that confirming a delete with unknown consequences be *impossible*, not discouraged — the
+  dialog opens while `GET /units/:id/impact` is in flight. It also focuses Cancel while
+  disabled, because `focus()` on a disabled button is a no-op and a modal that opens with
+  focus behind it traps nobody.
+- **`/app/structure` is the second route-level capability gate** (`N-028`). `32` § States
+  asks for a full-page 403 on direct navigation without `unit.read`. The comment in
+  `router/index.tsx` claiming setup was the only one is corrected.
+
+Two acceptance boxes in `32` are deliberately unticked. "Usable with touch at 390px" needs a
+device. **"A temporary unit's children carry end dates and expire positions on schedule" is
+not built**: the row badges it and warns inside 30 days, but the scheduled expiry has no
+owner — `17-BACKGROUND-JOBS.md` is still a placeholder. That is a real gap, and it is not
+this page's to close.
+
+Also substituted, and recorded in `32`: the detail panel's third stat is **Inside** (units
+directly below) where `design_specs/design/04` §4.2 shows RESP. There is no per-unit
+response count in the API, and inventing a query nobody specified is worse than showing a
+true number.
+
+Tests 311 → **369** (backend 165 → 182, frontend 146 → 187), across 37 files.
+
+### 2026-08-19 · read-back over T-031/T-032 — three real bugs, all in what I had just written
+
+No new features. A pass over the two screens looking for defects, and three were there. All
+three had a comment above them claiming the opposite, which is the useful part: a comment is
+not evidence.
+
+1. **`Esc` in an inline rename COMMITTED instead of reverting.** `setDraft(value)` is async
+   and `blur()` is not, so the blur handler ran first with the draft the user had just asked
+   to throw away. Renaming a role, changing your mind and pressing Esc saved the wrong name.
+   Fixed with a ref the blur handler reads. **The first test of it passed for the wrong
+   reason** — `.blur()` on an element that was never focused is a no-op, so the bug only
+   appears once the test calls `input.focus()`. `components/org/InlineName.test.tsx`, 7 tests.
+2. **Every "Move here" target in the unit tree was invisible.** `.unit-here { opacity: 1 }`
+   was nested inside `.unit-actions { opacity: 0 }`, and a child cannot out-opacity a zero
+   parent — opacity is a compositing group, not a cascade. The keyboard and touch re-parent
+   path, the one built *because* drag does not exist on touch, was decorative. The tree now
+   carries `.is-relocating` and the Setup test asserts the class, because jsdom has no
+   computed opacity and could never have caught it directly.
+3. **Enter advanced the wizard behind the confirm dialog.** The global Enter handler kept
+   firing while the modal was up, so the dialog stayed open over a screen that was no longer
+   the one it was asking about. A modal owns the keyboard.
+
+**One gap left deliberately, not fixed:** step 2's Continue greys out for a duplicate or
+empty role name and says nothing about why. Doc `31` specifies the validation and not a
+message, so this is a judgement call rather than a bug — but "why is Continue grey?" is
+exactly the kind of stall that page exists to prevent. Worth a line of copy before `T-045`.
+
+Frontend tests 138 → 146.
+
+### 2026-08-19 · T-032 — the setup wizard. **THE M0 CENTREPIECE IS BUILT**
+
+Five steps, one atomic `POST /org/setup`, and it works against the live server. Verified end
+to end with curl, not only in jsdom:
+
+| Checked live | Result |
+|---|---|
+| Levels derived from array order | `Provost 1 · Head 2 · Tutor 3 · Learner 4` |
+| Three-deep tree from flat `tempId`/`parentTempId` | `Northfield → Engineering → Physics` |
+| Vocabulary applied, and `/auth/me` returns it | `Studios · Courses · Students · Staff` |
+| Starter templates seeded | 4 |
+| `configured` flips | `false → true`, so T-031's login redirect lands right |
+| **Forced failure leaves the org untouched** | orphan `parentTempId` → 409, still `configured: false`, still only the `Owner` scaffolding row |
+| `Skip setup` afterwards | 201 — the emergency exit works even after a failed finish |
+
+**Six components were built here that other tasks catalogue.** `<UnitTree>`, `<InlineName>`,
+`<RoleRow>`, `<ProgressRail>`, `<Toggle>`, `<ConfirmDialog>`. The tree is the one that
+matters: `55-BUILD-ORDER` lists it under **T-033**, but step 3 needs it and INV-009 says
+there is exactly one of it. **T-033 extends it; T-033 does not write one.** `N-025`.
+
+It has a keyboard/touch re-parent path — press Move, then choose a destination — beside
+HTML5 drag. That is not polish: drag does not exist on touch at all, and `31` § Acceptance
+requires the tree to be usable there. Same reasoning put Move-up/Move-down buttons on the
+role rows.
+
+`AppShell` gained `focused`: no sidebar during setup (`N-026`). Every sidebar item during
+setup leads to a page that is empty *because setup has not happened*, so offering them
+invites the one click that makes the product look broken.
+
+**`audit:vocab` now strips comments before scanning** — it was failing the build on four
+lines that were *explaining* INV-001 ("the button label uses the vocabulary: Add a
+Department here"). INV-001 is about what renders, and a comment renders nothing. Proved the
+strip did not blind it: a real `<p>Departments</p>` still fails. Third time this repo has
+learned that lesson (`N-023`), so write the next check with it already applied.
+
+**Still open on this page, and only a stopwatch can close them:** the under-100-seconds run
+and the three rehearsals. Both are `T-045`. `Works at 390px` needs a real phone or a browser,
+which this session did not have.
+
+**Next:** `T-033` structure page, then `T-034` subjects. Lane C has been unblocked since
+T-030 and is still idle — `T-035`..`T-040` can run in parallel with nothing to coordinate
+except the tree.
+
+### 2026-08-19 · T-031 — landing, sign in, create org. **AND A CROSS-TENANT LOCKOUT**
+
+The three public screens are real pages now, not placeholders. `/` has the vocabulary
+switcher from `design_specs/design/03` §3.1 — four segments, the noun row cross-fades,
+auto-advance stops for good at the first click and never starts under
+`prefers-reduced-motion`. `/login` and `/start` are 400px cards with an inline reveal, an
+inline spinner that never relabels the button, and errors placed where the problem is.
+
+**Read this if you touch auth.** While working through 30's acceptance list I found, and
+reproduced end to end, a cross-tenant account lockout:
+
+> Amara registers Org A with `amara@x` and can sign in. **Any** user holding
+> `person.create` in **any** other organisation posts `/people { email: "amara@x" }` — no
+> special privilege, and legal under the schema, because `users` is unique on
+> `(org_id, email)`. That writes an `invited` row with a null password hash. Login's
+> `findFirst({ where: { email } })` matched it, and Amara was locked out of her own
+> account. Measured 200 → 401 on one unrelated request.
+
+Closed in `features/auth/router.ts`: login now filters `passwordHash: { not: null }` and
+orders `createdAt asc`. Verified live against the running server, 200 → 200. Regression:
+`test/cross-tenant-login.test.ts`, which asserts the victim lands in **their** org, not the
+stranger's. **This is a mitigation, not a resolution** — whether an email address is global
+or per-tenant is a schema decision nobody has made. `CONF-013` writes out three options;
+`D-007` says pick one by 24 Aug. Do not let silence choose.
+
+Two more findings, both from checking rather than from reading:
+
+- **Login was rate limited per IP only**, though `15` § Rate limiting has specified
+  `IP + email` since revision one. Per-IP alone is broken in both directions on a campus:
+  ten sign-ins behind one NAT lock out the eleventh person, and raising the ceiling lets a
+  stuffing run through. Now keyed on the pair, lowercased, with `ipKeyGenerator` for IPv6.
+  Four tests in `test/login-rate-limit.test.ts`, including the campus-NAT case.
+- **`uniqueSlug()` runs outside register's transaction**, so simultaneous registrations of
+  the same organisation name collide inside it. That turned out to be a free forced-failure
+  test — `register-rollback.test.ts` proves a failed registration leaves nothing behind,
+  using a real collision rather than an injected one. The 500 the loser gets is `D-006`.
+
+Two spec conflicts resolved rather than papered over, both in `_MEMORY.md`:
+
+- `CONF-011` — **`/start` has no industry picker.** 30 asked for one; design_specs §3.3
+  says four fields and nothing else. Design wins: asking on `/start` means asking blind,
+  and wizard step 1 asks the same question better a moment later with the presets' contents
+  visible. It also removed a contract that could not have been implemented — 30 had `/start`
+  calling `GET /org/presets`, which is behind `authenticate` + `org.read`.
+- `CONF-012` — the password minimum is **ten**, not the eight in design_specs' helper copy.
+  That string is quoting a contract value, and architecture owns contracts.
+
+`PRESET_VOCABULARIES` moved into `packages/shared` so the landing pitch reads the same data
+the presets do, with `test/vocabularies.test.ts` failing if the two drift (`DRIFT-007`).
+`packages/shared` is now scanned by the INV-002 education-noun check in `seed.test.ts` —
+it is imported by both apps and was the one source tree nobody was checking.
+
+**Cost an hour:** `beforeEach(() => mock.mockReset())`. `mockReset()` returns the mock, and
+vitest treats a function returned from a hook as a *teardown callback* — so the concise
+arrow form registered the rejecting mock to be **called after every test**, and the
+unhandled rejection was reported against whichever test built the error. Use braces.
+
+**Next:** `T-032`, the setup wizard. Lane C is unblocked and idle — `T-035`..`T-040` can run
+in parallel. Still open from before: the woff2 files (`D-005`, **24 Aug**), which is why
+every screen still renders in `system-ui`.
 
 ### 2026-08-19 · T-030 — the console shell. LANE C IS UNBLOCKED
 

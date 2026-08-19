@@ -3,4 +3,5 @@
 export * from './capabilities.js';
 export * from './errors.js';
 export * from './labels.js';
+export * from './vocabularies.js';
 export * from './dto/index.js';
