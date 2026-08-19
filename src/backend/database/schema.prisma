@@ -1,0 +1,560 @@
+// The data model. Authoritative spec: architecture/10-DATA-MODEL.md.
+//
+// Two halves, deliberately different in character:
+//   - the ORG GRAPH (nodes, edges, grants) — three generic primitives that never grow.
+//     A new organisation type is data, never a migration.
+//   - the FEEDBACK DOMAIN (subjects, templates, questions, campaigns, responses, answers)
+//     — ordinary relational tables, concrete because the shapes genuinely are concrete.
+//
+// What Prisma CANNOT express, and so lives in hand-written SQL appended to the migrations:
+//   CHECK constraints · partial indexes · INCLUDE indexes · GIN indexes ·
+//   DEFERRABLE unique · the anonymity trigger · the `sessions` table (owned by
+//   connect-pg-simple, DEC-014) · recursive CTEs (db/graph.ts, DEC-007).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, pgcrypto]
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// `position` is a deliberate fifth kind: the role-at-unit thing an assignment points at.
+/// Naming it is what makes INV-005 expressible — the unit is a COLUMN on the position,
+/// not a lookup through the person.
+enum NodeKind {
+  role
+  unit
+  group
+  person
+  position
+
+  @@map("node_kind")
+}
+
+enum EdgeType {
+  reports
+  contains
+  member
+  delegates
+
+  @@map("edge_type")
+}
+
+enum GrantScope {
+  self
+  own_unit
+  subtree
+  all
+
+  @@map("grant_scope")
+}
+
+enum GrantEffect {
+  allow
+  deny
+
+  @@map("grant_effect")
+}
+
+/// Six kinds, frozen (DEC-010). A poll is a one-question template; there is no poll entity.
+enum QuestionKind {
+  rating
+  single
+  multi
+  text
+  yesno
+  nps
+
+  @@map("question_kind")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy and identity
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name     String
+  slug     String @unique
+  /// university | hotel | hospital | company | custom
+  industry String
+
+  /// The vocabulary system and the visible product claim (INV-001, doc 22).
+  labels   Json
+  /// incl. authzVersion (11 §7), paramMode (11 §5)
+  settings Json   @default("{}")
+
+  logoFileId String? @map("logo_file_id") @db.Uuid
+  logo       File?   @relation("OrganizationLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users         User[]
+  nodes         Node[]
+  edges         Edge[]
+  grants        Grant[]
+  subjects      Subject[]
+  templates     Template[]
+  campaigns     Campaign[]
+  files         File[]        @relation("FileOrganization")
+  auditLog        AuditLog[]
+  apiKeys         ApiKey[]
+  idempotencyKeys IdempotencyKey[]
+  subscription  Subscription?
+
+  @@map("organizations")
+}
+
+/// Staff. **Respondents are NOT users** (DEC-009) — that is a privacy decision first and a
+/// billing one second: a college with 4,000 respondents has perhaps 200 rows here.
+model User {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId  String @map("org_id") @db.Uuid
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// Case-insensitive: nobody should fail to sign in over a capital letter.
+  email        String  @db.Citext
+  /// NULL for invited-not-yet-activated.
+  passwordHash String? @map("password_hash")
+  name         String
+  /// active | invited | disabled
+  status       String  @default("active")
+
+  avatarFileId String? @map("avatar_file_id") @db.Uuid
+  avatar       File?   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  personNodes      Node[]
+  grantsCreated    Grant[]     @relation("GrantCreatedBy")
+  subjectsLinked   Subject[]   @relation("SubjectLinkedUser")
+  campaignsCreated Campaign[]  @relation("CampaignCreatedBy")
+  filesUploaded    File[]      @relation("FileCreatedBy")
+  auditEntries     AuditLog[]
+
+  @@unique([orgId, email])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// The org graph — three primitives, and the whole generality of the product
+// ---------------------------------------------------------------------------
+
+model Node {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  kind NodeKind
+  name String
+
+  /// Roles only. 1 = highest. **Ordering only, nothing else** — the level rule is a
+  /// seeded default (§2.4, CONF-002), never the enforcement mechanism.
+  level Int?
+
+  roleId String? @map("role_id") @db.Uuid
+  role   Node?   @relation("PositionRole", fields: [roleId], references: [id], onDelete: Cascade)
+  unitId String? @map("unit_id") @db.Uuid
+  unit   Node?   @relation("PositionUnit", fields: [unitId], references: [id], onDelete: Cascade)
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Units: children get end dates, so nobody has to remember to revoke anything (§9).
+  isTemporary Boolean   @default(false) @map("is_temporary")
+  endsAt      DateTime? @map("ends_at") @db.Timestamptz(6)
+
+  /// Generated from a placement rule. ~10 declared answers produce ~200 stored rows,
+  /// and that ratio is why setup takes minutes rather than days.
+  derived Boolean @default(false)
+  meta    Json    @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  positionsWithRole Node[] @relation("PositionRole")
+  positionsInUnit   Node[] @relation("PositionUnit")
+
+  edgesAsParent Edge[]    @relation("EdgeParent")
+  edgesAsChild  Edge[]    @relation("EdgeChild")
+  grants        Grant[]   @relation("GrantSubject")
+  subjectsInUnit Subject[] @relation("SubjectUnit")
+
+  @@index([orgId, kind])
+  @@map("nodes")
+}
+
+/// **There is never one global tree.** Each dimension is its own tree; within a dimension a
+/// node has one parent, across dimensions it may have many. That is what lets a head of
+/// department report to the dean academically and the registrar administratively.
+model Edge {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// 'academic', 'reporting', 'project', …
+  dimension String   @default("primary")
+  type      EdgeType
+
+  parentId String @map("parent_id") @db.Uuid
+  parent   Node   @relation("EdgeParent", fields: [parentId], references: [id], onDelete: Cascade)
+  childId  String @map("child_id") @db.Uuid
+  child    Node   @relation("EdgeChild", fields: [childId], references: [id], onDelete: Cascade)
+
+  /// For a person's main position.
+  isPrimary Boolean   @default(false) @map("is_primary")
+  validFrom DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  /// NULL = open ended. History is retained, so access expires without the row vanishing.
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+  derived   Boolean   @default(false)
+  /// Delegation recurrence lives here.
+  meta      Json      @default("{}")
+
+  @@unique([orgId, dimension, type, parentId, childId])
+  @@index([orgId, dimension, type])
+  @@map("edges")
+}
+
+/// Resolution semantics — deny-beats-allow (INV-004), narrower-scope-wins — are specified
+/// in 11 §5. They are NOT re-stated here: this table only stores.
+model Grant {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// A role, position, group or person node. Role grants are the common case.
+  subjectId String @map("subject_id") @db.Uuid
+  subject   Node   @relation("GrantSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  /// From the catalogue in packages/shared/src/capabilities.ts (11 §3).
+  capability String
+  scope      GrantScope  @default(own_unit)
+  effect     GrantEffect @default(allow)
+  /// { "maxAmount": 25000 } — one capability at different strengths, instead of
+  /// inventing five artificial roles to encode limits.
+  params     Json        @default("{}")
+
+  validFrom DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+
+  /// Editing a derived grant CLEARS this flag, so the next regeneration cannot silently
+  /// revert an administrator's change (§9).
+  derived Boolean @default(false)
+
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("GrantCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([orgId, subjectId, capability, scope, effect])
+  @@index([orgId, capability])
+  @@map("grants")
+}
+
+// ---------------------------------------------------------------------------
+// The feedback domain
+// ---------------------------------------------------------------------------
+
+/// The single biggest unlock in the model. A course, a restaurant, a ward, a bus route.
+/// `linkedUserId` turns "review the thing" into "review the person" with no second code path.
+model Subject {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  unitId String? @map("unit_id") @db.Uuid
+  unit   Node?   @relation("SubjectUnit", fields: [unitId], references: [id], onDelete: SetNull)
+
+  name String
+  type String @default("general")
+
+  linkedUserId String? @map("linked_user_id") @db.Uuid
+  linkedUser   User?   @relation("SubjectLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  meta Json @default("{}")
+  /// Archived, never hard-deleted while responses exist (§9).
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  campaigns CampaignSubject[]
+  responses Response[]
+
+  @@map("subjects")
+}
+
+model Template {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// NULL = library template, cloned into orgs on demand.
+  orgId String? @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name        String
+  category    String
+  industry    String?
+  description String?
+
+  clonedFromId String?    @map("cloned_from_id") @db.Uuid
+  clonedFrom   Template?  @relation("TemplateClone", fields: [clonedFromId], references: [id], onDelete: SetNull)
+  clones       Template[] @relation("TemplateClone")
+
+  /// DERIVED from the questions, never entered by hand.
+  estimatedSeconds Int       @default(0) @map("estimated_seconds")
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  questions Question[]
+  campaigns Campaign[]
+
+  @@map("templates")
+}
+
+model Question {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  kind QuestionKind
+  text String
+  /// Shape per kind is a discriminated Zod union (14 §4) — that is what stops this
+  /// column from becoming an untyped bag.
+  config   Json    @default("{}")
+  required Boolean @default(false)
+  /// DEFERRABLE unique on (template_id, position), added in SQL: a reorder is then one
+  /// UPDATE inside a transaction rather than a shuffle through a temporary value.
+  position Int
+
+  answers Answer[]
+
+  @@map("questions")
+}
+
+model Campaign {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  templateId String   @map("template_id") @db.Uuid
+  template   Template @relation(fields: [templateId], references: [id])
+
+  name String
+  /// { unitId, includeSubtree, roleIds[] }
+  audienceRule Json @default("{}") @map("audience_rule")
+
+  startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt   DateTime? @map("ends_at") @db.Timestamptz(6)
+
+  /// **Immutable once status leaves draft**, enforced by a trigger and not only in the
+  /// service layer. Respondents were promised anonymity at submission time (INV-006).
+  anonymous Boolean @default(true)
+
+  /// The /r/:token link. NULL until launched; minting it is irreversible — and it is what
+  /// "has left draft" means, now that status is derived (DEC-016). 8 characters from an
+  /// unambiguous alphabet (DEC-017).
+  publicToken String? @unique @map("public_token")
+
+  /// The ONLY stored status transition. Everything else about status is read off the dates
+  /// by features/campaigns/status.ts; a scheduler is a failure mode we chose not to have.
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
+
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subjects    CampaignSubject[]
+  responses   Response[]
+  invitations Invitation[]
+
+  @@index([orgId, startsAt, endsAt])
+  @@map("campaigns")
+}
+
+model CampaignSubject {
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subjectId  String   @map("subject_id") @db.Uuid
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, subjectId])
+  @@map("campaign_subjects")
+}
+
+/// **There is no respondent column here, and there never will be one** (INV-006). Not a
+/// user id, not a hashed email, not an IP. The table cannot identify a respondent because
+/// it has nothing to identify them with — anonymity is a property of the schema, not a
+/// setting the application respects.
+model Response {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  subjectId String?  @map("subject_id") @db.Uuid
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  submittedAt DateTime @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  /// link | qr | kiosk | api
+  channel     String   @default("link")
+  durationMs  Int?     @map("duration_ms")
+  /// NEVER identity.
+  meta        Json     @default("{}")
+
+  answers Answer[]
+
+  @@index([campaignId, submittedAt(sort: Desc)])
+  @@map("responses")
+}
+
+model Answer {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  responseId String   @map("response_id") @db.Uuid
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId String   @map("question_id") @db.Uuid
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  /// Typed by question kind (14 §4).
+  value Json
+  /// Denormalised for rating/NPS aggregation. Written by the service layer alongside
+  /// `value`, never independently — `(value->>'n')::numeric` on every row is the
+  /// difference between a fast results page and a slow one.
+  numericValue Decimal? @map("numeric_value") @db.Decimal
+
+  @@unique([responseId, questionId])
+  @@map("answers")
+}
+
+/// Records **that** a token was used. `responses` records **what** was said. Nothing joins
+/// them — so the system can report "312 of 400 responded" and still not know whose is whose.
+/// This separation is the entire privacy architecture.
+model Invitation {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  token  String    @unique
+  usedAt DateTime? @map("used_at") @db.Timestamptz(6)
+  meta   Json      @default("{}")
+
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Cross-cutting
+// ---------------------------------------------------------------------------
+
+/// Uploaded binaries: org logos and user avatars only (48). Bytes live on disk; this row
+/// is the metadata and the id in the URL.
+model File {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation("FileOrganization", fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// 'logo' | 'avatar'
+  kind String
+  /// Always the RE-ENCODED type, never the uploaded one — re-encoding is what strips
+  /// metadata such as EXIF GPS (48, INV-006).
+  mime   String
+  bytes  Int
+  width  Int?
+  height Int?
+
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("FileCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organizationLogos Organization[] @relation("OrganizationLogo")
+  userAvatars       User[]         @relation("UserAvatar")
+
+  @@index([orgId, kind])
+  @@map("files")
+}
+
+/// 13 §7. The first response to a keyed request, replayed for 24 h. The respondent submit
+/// is the case that matters: a phone on a flaky venue network retries, and a duplicate
+/// response corrupts the demo's numbers in front of the evaluator.
+model IdempotencyKey {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// NULL for respondent submits — a public caller has a campaign, not an organisation.
+  orgId String?       @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  key      String
+  endpoint String
+  /// Same key, different body, is a client bug. Answering it with the cached response of a
+  /// different request would be worse than an error, so the hash is compared.
+  requestHash String @map("request_hash")
+
+  status Int
+  body   Json
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
+
+model AuditLog {
+  id    BigInt  @id @default(autoincrement())
+  orgId String? @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actor       User?   @relation(fields: [actorUserId], references: [id])
+
+  /// The capability string.
+  action     String
+  targetType String? @map("target_type")
+  targetId   String? @map("target_id") @db.Uuid
+
+  /// WHICH GRANT decided it (INV-007). This is what turns "access denied" from an
+  /// assertion into evidence, and it is what the simulator replays (42).
+  decidedBy Json?   @map("decided_by")
+  requestId String? @map("request_id")
+  ip        String? @db.Inet
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("audit_log")
+}
+
+model ApiKey {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name String
+  /// The key itself is shown once and never stored.
+  keyHash String @unique @map("key_hash")
+  /// First 8 chars, for display.
+  prefix String
+  scopes String[] @default([])
+
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("api_keys")
+}
+
+model Subscription {
+  orgId String @id @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// bronze | silver | gold | enterprise
+  tier String @default("bronze")
+  /// Reviewees + staff. **Never respondents** — that is what makes seat counting honest.
+  seats Int @default(0)
+
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+  status      String   @default("trialing")
+
+  @@map("subscriptions")
+}

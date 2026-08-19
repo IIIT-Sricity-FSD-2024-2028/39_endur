@@ -1,0 +1,39 @@
+{
+  "name": "endur",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "src/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @endur/api & npm run dev -w @endur/web",
+    "dev:api": "npm run dev -w @endur/api",
+    "dev:web": "npm run dev -w @endur/web",
+    "build": "npm run build -w @endur/shared && npm run build -w @endur/api && npm run build -w @endur/web",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "npm run test --workspaces --if-present",
+
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w @endur/api",
+    "db:seed": "npm run db:seed -w @endur/api",
+    "db:reset": "npm run db:reset -w @endur/api",
+
+    "audit:vocab": "node scripts/audit-vocab.mjs",
+    "audit:drift": "node scripts/audit-drift.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "eslint": "^9.33.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0"
+  }
+}
