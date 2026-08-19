@@ -167,6 +167,14 @@ size limit (`12` §4.4); they stream with their own cap.
 `PUT /:id/questions` is bulk for the same reason as grants: the builder autosaves a document,
 not a stream of field edits, and reordering is one operation on the array.
 
+`TemplateSummary` carries three DERIVED counts and stores none of them: `questionCount`,
+`estimatedSeconds`, and — added by **T-035** — `campaignCount`, how many campaigns use the
+template. The third is what lets the library card say *"Used in 2 campaigns"* rather than
+*"Never used"* (`design_specs/design/05` §5.1) and, more usefully, what lets the delete
+dialog state a real consequence before the button is pressed instead of discovering the
+`409` afterwards. `DELETE /:id` still refuses an in-use template — the count informs the
+reader, it does not replace the check.
+
 ### Campaigns — `/api/v1/campaigns`
 
 | Method | Path | C |

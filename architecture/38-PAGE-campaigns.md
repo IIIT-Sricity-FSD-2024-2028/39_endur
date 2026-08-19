@@ -74,8 +74,26 @@ The audience count is fetched on every rule change, debounced 300 ms.
 
 ## Components
 
-`<ProgressRail>` · `<UnitTree>` in `mode="select"` · `<ResponsiveTable>` ·
-**`<ShareSheet>`** · `<Toggle>` · `<ConfirmDialog>` · `<EmptyState>` · `<StatCard>`.
+`<ProgressRail>` · `<ResponsiveTable>` · **`<ShareSheet>`** · `<Toggle>` · `<ConfirmDialog>` ·
+`<EmptyState>` · `<StatCard>`.
+
+T-038 built `<ShareSheet>` and catalogued three props beyond the original contract in `24`
+first — `status`, `endsAt`, `anonymous` — for the footer line §6.3 draws, and because a sheet
+saying *"is collecting"* over a closed campaign is worse than no sheet. It is reachable
+forever, so it will be opened after the fact.
+
+**New dependency: `qrcode`.** The code is rendered locally to a canvas; an external image
+service would fail exactly when the network does. The two colours it is given are the only
+hex literals outside `design-system/` in the codebase, and `N-037` records why they are not
+tokens: a QR is decoded by thresholding luminance, so re-theming the product must not change
+the contrast a phone camera has to work with.
+
+The subject picker is a checkbox list rather than **`<UnitTree>` in `mode="select"`**, which
+this section previously named. The two questions in step 2 are *which subjects* and *which
+audience*; the tree answers the second (a unit) and cannot answer the first — subjects belong
+to units but are not in the tree (`32` § Out of scope: "subjects belong to units; units are
+the tree"). The unit picker in the audience half is a flattened select for the same reason it
+is elsewhere: one unit, from a list, with indentation carrying the shape.
 
 ## Interactions — creation
 
@@ -126,6 +144,20 @@ The sheet is reachable forever from the campaign card's `Share`. It is never one
 **`PUBLIC_BASE_URL` must not be `localhost`** or the code does not scan from a phone
 (OPEN-002, decide by 24 Aug).
 
+**T-038 made that failure impossible to miss rather than leaving it on a checklist.** The
+URL is not a client decision at all — `POST /:id/launch` returns it, computed server-side
+from `PUBLIC_BASE_URL` — so the sheet inspects what it was handed and says, in place, that a
+`localhost` address resolves to the *phone* and nobody can scan it. A LAN address passes,
+because a phone on the same wifi reaches it, and that is a legitimate answer to `OPEN-002`.
+Deciding this is one environment variable; nothing here needs to change.
+
+**Not built, and each has no contract behind it** — `design_specs/design/06` §6.4 draws a
+responses-over-time sparkline, an average completion time, a per-subject breakdown and a
+`Duplicate` action; §6.2 draws a "show a progress bar" toggle. None exist in `13`, and the
+per-subject numbers are `40`'s, behind the k-anonymity gate — a second ungated path to them
+is what INV-007 exists to prevent, so that one is refused rather than merely deferred.
+`N-038` records all five.
+
 ## States
 
 | State | Behaviour |
@@ -141,19 +173,32 @@ The sheet is reachable forever from the campaign card's `Share`. It is never one
 
 ## Acceptance
 
-- [ ] The audience count recomputes live and matches the org graph
-- [ ] A draft has no `public_token` and no reachable `/r/` URL
-- [ ] A double-clicked launch produces one token
-- [ ] The share sheet appears within one second of launch
-- [ ] The QR is ≥ 280px, untinted, with a quiet zone, and scans on **two different phones**
-- [ ] The URL token is 8 characters from an unambiguous alphabet and typeable aloud (DEC-017)
-- [ ] Presentation mode fills the screen and exits on `Esc`
-- [ ] `anonymous` cannot change after launch — trigger test
-- [ ] A campaign cannot be edited once open; the attempt returns 409
-- [ ] The share sheet is reachable again from the campaign card
-- [ ] `PUBLIC_BASE_URL` is verified non-localhost before the demo
-- [ ] Every noun from `useLabels()`, including the launch button (INV-001)
-- [ ] Works at 390px
+- [~] The audience count recomputes live and matches the org graph — it recomputes live and
+      it is computed FROM the org graph, but from the copy already in memory rather than
+      from `GET /:id/audience`, which needs an id the campaign does not have until step 3
+      commits. Labelled an estimate; the authoritative number is the one the API returns
+      after launch. `N-038`
+- [x] A draft has no `public_token` and no reachable `/r/` URL — and no Share button either,
+      because offering one would be offering a dead link
+- [x] A double-clicked launch produces one token — twice over: the button stops accepting
+      the second press, and the idempotency key covers the retry a button cannot
+- [x] The share sheet appears within one second of launch — it renders from the URL the
+      launch call itself returned, not from a refetch. Hanging the demo's decisive artifact
+      on a second round trip was a real gap, found by a test
+- [~] The QR is ≥ 280px, untinted, with a quiet zone, and scans on **two different phones** —
+      the first three are asserted against the encoder options, which is where they actually
+      live; the scan is `T-045` and needs two phones
+- [x] The URL token is 8 characters from an unambiguous alphabet and typeable aloud
+      (DEC-017) — minted server-side at T-021; the sheet shows it without the scheme
+- [x] Presentation mode fills the screen and exits on `Esc` — and `Esc` leaves presentation
+      before it closes the sheet, so one key never dumps the reader two screens back
+- [x] `anonymous` cannot change after launch — trigger test (T-004)
+- [x] A campaign cannot be edited once open; the attempt returns 409 (T-021)
+- [x] The share sheet is reachable again from the campaign card, and from the detail page
+- [~] `PUBLIC_BASE_URL` is verified non-localhost before the demo — the product now checks
+      itself and says so in the sheet. Somebody still has to set the variable (`OPEN-002`)
+- [x] Every noun from `useLabels()`, including the launch button (INV-001)
+- [ ] Works at 390px — device check with `T-045`
 
 ## Out of scope
 

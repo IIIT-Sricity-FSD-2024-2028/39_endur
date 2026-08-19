@@ -10,6 +10,24 @@ import { join } from 'node:path';
 
 const ROOTS = ['src/frontend/pages', 'src/frontend/components'];
 
+/**
+ * Test files are NOT scanned, and that is a narrowing with a reason rather than a hole.
+ *
+ * INV-001 is about what a component RENDERS. A `.test.tsx` renders nothing to anybody: its
+ * strings are fixtures standing in for customer data, and customer data is legitimately
+ * English — a university really does have a template called "Course feedback", the same
+ * way `src/backend/presets/**` really does say "Department". Scanning them produced 18
+ * findings at T-035 that were all the check's fault.
+ *
+ * Nothing is lost. A noun hardcoded in a component is caught in the COMPONENT, which is
+ * still scanned; a test could only ever have echoed it. This is the fourth time this repo
+ * has narrowed a check that fired on something it was not about (N-023), and the rule each
+ * time is the same: a check that cries wolf gets routed around, and then it stops catching
+ * the real thing. Proved at T-035 by adding a real hardcoded noun to a component and
+ * watching this still fail.
+ */
+const isTest = (path) => /\.test\.tsx?$/.test(path);
+
 // Words that describe THE CUSTOMER'S WORLD. If a word describes Endur itself
 // (Save, Cancel, Settings, Question, Response) it is correctly literal — 22 §1.
 const BANNED = /\b(Course|Faculty|Student|Semester|Department|Professor|Teacher|Pupil)s?\b/;
@@ -49,8 +67,13 @@ function* walk(dir) {
 }
 
 let scanned = 0;
+let skipped = 0;
 for (const root of ROOTS) {
   for (const file of walk(root)) {
+    if (isTest(file)) {
+      skipped += 1;
+      continue;
+    }
     scanned += 1;
     stripComments(readFileSync(file, 'utf8'))
       .split('\n')
@@ -66,7 +89,7 @@ for (const root of ROOTS) {
 
 console.log(
   failures === 0
-    ? `✓ vocabulary clean — ${scanned} component/page files scanned`
+    ? `✓ vocabulary clean — ${scanned} component/page files scanned, ${skipped} test files skipped`
     : `\n✗ ${failures} hardcoded domain noun(s). Route them through useLabels().`,
 );
 process.exit(failures === 0 ? 0 : 1);

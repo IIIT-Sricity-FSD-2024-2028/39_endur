@@ -1,6 +1,7 @@
 // Respondent DTOs — the only payloads a stranger's phone touches. 13 §6, 39, 14 §4.
 import { z } from 'zod';
 import { dto } from './common.js';
+import type { ResolvedLabels } from '../labels.js';
 import type { QuestionConfig, QuestionKind } from './template.js';
 
 /**
@@ -56,7 +57,14 @@ export const SubmitResponseDto = dto({ body: SubmitResponseBody, params: PublicT
 export type PublicCampaign = {
   campaignName: string;
   organizationName: string;
-  labels: Record<string, { one: string; many: string }>;
+  /**
+   * EVERY key present, not the org's partial override set. The respond world has no store
+   * and therefore no `useLabels()` — this object IS the vocabulary for that world, and a
+   * form that has to guard every noun against `undefined` is a form that will render one
+   * of them as "undefined" on the demo phone. The server already sends exactly this;
+   * saying so is what lets the page read `labels.respondent.many` and be right.
+   */
+  labels: ResolvedLabels;
   anonymous: boolean;
   estimatedSeconds: number;
   subjects: Array<{ id: string; name: string }>;

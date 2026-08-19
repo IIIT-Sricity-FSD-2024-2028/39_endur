@@ -3,9 +3,26 @@
 // Three components rather than one shell with conditionals. A shell that renders
 // differently for three audiences accumulates `if`s until nobody can say what a
 // respondent actually sees — and that is a privacy risk, not only a code smell.
+import { lazy, Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { AppShell } from '../components/layout/AppShell.js';
-import { RequireSession } from './guards.js';
+import { RequireSession, SessionLoading } from './guards.js';
+
+/**
+ * LAZY, and it is not a micro-optimisation — it is 20 §8's "the respondent bundle must not
+ * include the console", enforced.
+ *
+ * This module is imported statically by `router/index.tsx`, so anything it imports lands in
+ * the ENTRY chunk that every route downloads. <AppShell> pulls in the sidebar, the top bar
+ * and <Icon>'s thirty lucide glyphs — and a static import put all of it on the phone of
+ * somebody scanning a QR code, before the first question rendered. Measured at T-039: the
+ * entry chunk carried lucide-react.
+ *
+ * `pages/respond/bundle.test.ts` walks the graph out of the respondent PAGES and was clean
+ * while this was still wrong, which is worth remembering — the pages were never the leak.
+ */
+const AppShell = lazy(() =>
+  import('../components/layout/AppShell.js').then((module) => ({ default: module.AppShell })),
+);
 
 /** The two screens that are a form and nothing else (design_specs/design/03 §3.2, §3.3). */
 const FORM_ONLY = new Set(['/login', '/start']);
@@ -58,9 +75,11 @@ export function ConsoleLayout(): JSX.Element {
 
   return (
     <RequireSession>
-      <AppShell focused={focused}>
-        <Outlet />
-      </AppShell>
+      <Suspense fallback={<SessionLoading />}>
+        <AppShell focused={focused}>
+          <Outlet />
+        </AppShell>
+      </Suspense>
     </RequireSession>
   );
 }

@@ -110,10 +110,10 @@ blocked or builds a second shell.
 | T-033 | B | T-030,T-016 | `<UnitTree>` component + structure page | `32`, `24` §4 |
 | T-034 | B | T-030,T-019 | Subjects | `35` |
 | T-035 | C | T-030,T-020 | Template library | `36` |
-| T-036 | C | T-027 | `<QuestionEditor>` ×6 + `<QuestionInput>` ×6 — **one input set** (INV-008) | `24` §5, `37` §The six types |
-| T-037 | C | T-036,T-020 | Form builder + autosave + preview | `37` |
+| T-036 | C | T-027 | `<QuestionEditor>` ×6 + `<QuestionCard>` + `kinds.ts` — **the inputs landed at T-035** (`N-031`); departures in `N-034` | `24` §5, `37` §The six types |
+| T-037 | C | T-036,T-020 | Form builder page — **every component it needs exists**; stack, reorder, autosave, preview | `37` |
 | T-038 | C | T-030,T-021 | Campaigns 3-step + **`<ShareSheet>` + QR** | `38`, `24` §6 |
-| T-039 | C | T-036,T-022 | **Respondent flow** + all four edge states — never cut | `39` |
+| T-039 | C | T-035,T-022 | **Respondent flow** — **three** edge states, not four (`CONF-015`); never cut. Departures in `N-039`–`N-041` | `39` |
 | T-040 | C | T-023 | Results (cut-down table first, then full) | `40` |
 | T-041 | B | T-024 | Home dashboard | `46` |
 
