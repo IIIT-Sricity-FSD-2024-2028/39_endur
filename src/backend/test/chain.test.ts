@@ -1,7 +1,5 @@
 // Chain integration tests. 12 §7, 51 §4.
 // Every error type produces the envelope; no route can produce a body outside it.
-<<<<<<< HEAD
-=======
 //
 // These used to run against a temporary `/api/v1/_echo` probe. It was deleted when the
 // first real router mounted (T-015), so they run against `/api/v1/auth/register` instead —
@@ -9,22 +7,18 @@
 // honest place to prove the pipe. The unknown-key test got stronger in the move: instead
 // of reading a stripped key back out of an echo, it now asserts that a forged `orgId`
 // produced an organisation with a different id (INV-010).
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 
 const app = createApp();
 
-<<<<<<< HEAD
-=======
 const REGISTER = '/api/v1/auth/register';
 
 /** Registration refuses a duplicate address, so each test that writes needs its own. */
 const freshEmail = (tag: string) =>
   `chain-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 describe('the error envelope', () => {
   it('X-Request-Id round-trips and appears in the envelope', async () => {
     const res = await request(app).get('/nope').set('X-Request-Id', 'trace-abc');
@@ -46,26 +40,6 @@ describe('the error envelope', () => {
   });
 
   it('a validation failure is 422 with a renderable field path', async () => {
-<<<<<<< HEAD
-    const res = await request(app).post('/api/v1/_echo').send({});
-    expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe('VALIDATION_FAILED');
-    expect(res.body.error.details.fields[0]).toMatchObject({ path: 'body.name' });
-  });
-
-  it('strips unknown keys rather than ignoring them — INV-010', async () => {
-    const res = await request(app).post('/api/v1/_echo').send({ name: 'Ada', orgId: 'forged' });
-    expect(res.body.data.body).toEqual({ name: 'Ada' });
-  });
-
-  it('malformed JSON and oversized bodies leave through the funnel', async () => {
-    const bad = await request(app).post('/api/v1/_echo')
-      .set('Content-Type', 'application/json').send('{oops');
-    expect(bad.body.error.code).toBe('BAD_REQUEST');
-
-    const big = await request(app).post('/api/v1/_echo')
-      .set('Content-Type', 'application/json').send(`{"name":"${'x'.repeat(300_000)}"}`);
-=======
     const res = await request(app).post(REGISTER).send({});
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
@@ -100,7 +74,6 @@ describe('the error envelope', () => {
       .post(REGISTER)
       .set('Content-Type', 'application/json')
       .send(`{"name":"${'x'.repeat(300_000)}"}`);
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
     expect(big.body.error.code).toBe('PAYLOAD_TOO_LARGE');
   });
 

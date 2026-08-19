@@ -121,16 +121,6 @@ gracefully instead of freezing (`31` § Step 1).
 
 ## 2. Starter templates
 
-<<<<<<< HEAD
-Three per preset, and **none exceeds 10 questions** — enforced by a seed test, because short
-forms are the product thesis and not a preference (`01` §5, `36`).
-
-| Preset | Templates |
-|---|---|
-| University | Course feedback (8q) · Facilities pulse (3q) · Semester review (6q) |
-| Hotel | Stay experience (6q) · Restaurant feedback (4q) · Quick pulse (1q) |
-| Hospital | Patient experience (7q) · Ward facilities (4q) · Discharge pulse (3q) |
-=======
 Three or four per preset, and **none exceeds 10 questions** — enforced by a seed test,
 because short forms are the product thesis and not a preference (`01` §5, `36`).
 
@@ -145,7 +135,6 @@ actually ships.
 | University | Course feedback (8q) · Facilities pulse (3q) · Semester review (6q) · Quick pulse (1q) |
 | Hotel | Stay experience (6q) · Restaurant feedback (4q) · Quick pulse (1q) |
 | Hospital | Patient experience (7q) · Ward facilities (4q) · Discharge pulse (3q) · Quick pulse (1q) |
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 | Company | Manager feedback (8q) · Team health (5q) · Quick pulse (1q) |
 | Custom | General feedback (5q) · Quick pulse (1q) |
 
@@ -235,10 +224,6 @@ cannot do something (`42`). It is the strongest answer available to a permission
 - [ ] One org has an under-subscribed open campaign, so suppression is demonstrable
 - [ ] `db:reset` completes in under 30 seconds
 - [ ] Seeded credentials are printed and match the dev login affordance
-<<<<<<< HEAD
-- [ ] `grep -riE '\b(course|faculty|student)\b' src/ packages/ --include=*.ts` hits only the
-      university preset (INV-002)
-=======
 - [ ] Those four words appear outside `presets/**` and `database/seed/**` only in prose —
       never as an identifier, a string key or a path (INV-002).
 
@@ -247,7 +232,6 @@ cannot do something (`42`). It is the strongest answer available to a permission
       invariant as though they broke it. A check that cries wolf gets ignored — the same
       lesson the drift script learned at T-003. The identifier half is now enforced
       continuously by an ESLint rule, and `test/seed.test.ts` covers the rest.
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 - [ ] The full demo script has been rehearsed three times before 26 Aug
 
 ## 8. Out of scope

@@ -12,8 +12,6 @@ const BANNED_DOMAIN_NOUNS = {
     'INV-002: no education-specific noun as an identifier. Use Unit, Subject, Respondent, Reviewee. Domain words are data (organization.labels), not code.',
 };
 
-<<<<<<< HEAD
-=======
 /** DEC-007 — raw SQL lives in exactly one file. */
 const NO_RAW_SQL = {
   selector: "MemberExpression > Identifier[name=/^\\$query(Raw|RawUnsafe)$/]",
@@ -28,7 +26,6 @@ const NO_REQ_BODY = {
     "14 §3: read req.data (validated) — req.body is unvalidated input and bypasses validate(Dto).",
 };
 
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 /** DEC-012 — design values live in design_specs, never inline. */
 const NO_INLINE_HEX = {
   selector: 'Literal[value=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b/]',
@@ -74,8 +71,6 @@ export default tseslint.config(
     rules: { 'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS] },
   },
 
-<<<<<<< HEAD
-=======
   // IMPORTANT: flat config REPLACES a rule's options, it does not merge them. Every block
   // that sets `no-restricted-syntax` therefore has to list EVERY selector that should apply
   // to those files. Getting this wrong is silent — the rule stays configured and quietly
@@ -83,39 +78,10 @@ export default tseslint.config(
   // Found 2026-08-19: DEC-007 had been unenforced inside features/** since T-001, because
   // the req.body block below replaced it.
 
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   // DEC-007 — raw SQL lives in exactly one file.
   {
     files: ['src/backend/**/*.ts'],
     ignores: ['src/backend/db/graph.ts'],
-<<<<<<< HEAD
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        BANNED_DOMAIN_NOUNS,
-        {
-          selector: "MemberExpression > Identifier[name=/^\\$query(Raw|RawUnsafe)$/]",
-          message:
-            'DEC-007: $queryRaw is confined to db/graph.ts. Add the query there and export a typed function.',
-        },
-      ],
-    },
-  },
-
-  // 14 §3 — handlers read req.data, never req.body.
-  {
-    files: ['src/backend/features/**/*.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        BANNED_DOMAIN_NOUNS,
-        {
-          selector: "MemberExpression[object.name='req'][property.name='body']",
-          message:
-            '14 §3: read req.data (validated) — req.body is unvalidated input and bypasses validate(Dto).',
-        },
-      ],
-=======
     rules: { 'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS, NO_RAW_SQL] },
   },
 
@@ -125,7 +91,6 @@ export default tseslint.config(
     files: ['src/backend/features/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS, NO_RAW_SQL, NO_REQ_BODY],
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
     },
   },
 
@@ -139,8 +104,6 @@ export default tseslint.config(
   // Tests assert on supertest's `res.body`, which its types declare as `any`. Typed-lint
   // noise there buys no safety: a wrong assumption about the shape fails the test loudly,
   // which is the entire purpose of the file.
-<<<<<<< HEAD
-=======
   //
   // DEC-007's $queryRaw confinement is relaxed here for one specific reason: some
   // invariants are about the PHYSICAL table and cannot be checked through the ORM at all.
@@ -148,17 +111,13 @@ export default tseslint.config(
   // respondent" is a claim about the columns themselves, and asking Prisma would only ever
   // return the columns Prisma was told about. The rule protects production code from
   // scattering SQL; a test reading information_schema is the opposite of that risk.
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   {
     files: ['src/*/test/**/*.ts', '**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
-<<<<<<< HEAD
-=======
       'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS],
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
     },
   },
 

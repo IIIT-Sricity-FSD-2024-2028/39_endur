@@ -1,15 +1,3 @@
-<<<<<<< HEAD
-// Presets, library templates and the four demo orgs. Spec: architecture/50-SEED-AND-DEMO.md.
-// Filled by T-025, which is due 22 Aug — earlier than M0, because a seeded demo alone can
-// pass the evaluation and an unseeded live build cannot (02 §2).
-//
-// Deterministic, never randomised: the demo must be identical every run (50 §8).
-function main() {
-  console.log('seed: nothing to do yet — T-025 fills this (see architecture/50).');
-}
-
-main();
-=======
 // Presets, library templates and the four demo organisations. Spec: 50-SEED-AND-DEMO.md.
 //
 // Seed data lands 22 Aug, not 26 Aug. A seeded demo alone can pass the evaluation; an
@@ -120,4 +108,3 @@ main()
     console.error(error);
     return prisma.$disconnect().then(() => process.exit(1));
   });
->>>>>>> 95a69183487c1f29e2422c760433704d08948484

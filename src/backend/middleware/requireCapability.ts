@@ -4,14 +4,6 @@
 // (INV-003). The API returns only what the caller may see; the UI trusts it.
 import type { Request, RequestHandler } from 'express';
 import type { Capability } from '@endur/shared';
-<<<<<<< HEAD
-import { resolve, type Decision, type Target } from '../authz/index.js';
-import { AppError, ForbiddenError, UnauthenticatedError } from '../lib/errors.js';
-import { isProd } from '../lib/config.js';
-
-export type CapabilityOptions = {
-  target?: Target['kind'];
-=======
 import {
   resolve,
   seesNothing,
@@ -31,7 +23,6 @@ export type CapabilityOptions = {
    * cannot reach, and every scoped role would get a 403 for their own department.
    */
   target?: Target['kind'] | 'any';
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   /** Where the target id lives in the VALIDATED request: 'params.id', 'body.unitId'. */
   from?: string;
 };
@@ -62,8 +53,6 @@ async function guard(req: Request, capability: Capability, opts: CapabilityOptio
     throw new ForbiddenError('This credential cannot perform console actions.');
   }
 
-<<<<<<< HEAD
-=======
   const authzVersion = req.ctx.authzVersion ?? 0;
 
   if (opts.target === 'any') {
@@ -80,17 +69,13 @@ async function guard(req: Request, capability: Capability, opts: CapabilityOptio
     return;
   }
 
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   const decision = await resolve({
     orgId,
     userId: principal.id,
     capability,
-<<<<<<< HEAD
-=======
     // Part of the grant cache key: any permission change bumps it, and every cached
     // decision for this tenant stops being trusted immediately (11 §7).
     authzVersion,
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
     target: buildTarget(req, opts, principal.id),
     // Per-request memo: a list handler often asks the same question repeatedly (11 §7).
     memo: (req.ctx.authzMemo ??= new Map()),
@@ -98,9 +83,6 @@ async function guard(req: Request, capability: Capability, opts: CapabilityOptio
 
   // Carried forward so the audit row can record WHICH GRANT decided it (INV-007).
   req.ctx.decision = decision;
-<<<<<<< HEAD
-  if (!decision.allowed) throw forbidden(decision);
-=======
   if (decision.allowed) return;
 
   // 404 versus 403, decided deliberately (13 §5).
@@ -147,7 +129,6 @@ async function invisible(
   });
   if (visibility.all) return false;
   return !visibility.unitIds.includes(unitId);
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 }
 
 function forbidden(decision: Decision): AppError {
@@ -174,11 +155,7 @@ const messageFor = (decision: Decision): string =>
  * caller point the check at one resource and the handler at another.
  */
 function buildTarget(req: Request, opts: CapabilityOptions, userId: string): Target {
-<<<<<<< HEAD
-  const kind = opts.target ?? 'org';
-=======
   const kind = opts.target === 'any' ? 'org' : (opts.target ?? 'org');
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   if (kind === 'org') return { kind: 'org' };
   if (kind === 'self') return { kind: 'self', userId };
 
@@ -187,15 +164,10 @@ function buildTarget(req: Request, opts: CapabilityOptions, userId: string): Tar
     return { kind: 'person', userId: id ?? userId };
   }
   if (kind === 'unit') {
-<<<<<<< HEAD
-    if (!id) throw new AppError('BAD_REQUEST', 'No unit was identified for this request.');
-    return { kind: 'unit', unitId: id };
-=======
     // No unit id means the action is org-level — creating a root unit, for instance. That
     // is not an error: an org-level target is one a unit-scoped grant deliberately cannot
     // reach (11 §4), so only an `all` scope satisfies it and the default stays deny.
     return id ? { kind: 'unit', unitId: id } : { kind: 'org' };
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   }
   return id ? { kind, unitId: id } : { kind };
 }

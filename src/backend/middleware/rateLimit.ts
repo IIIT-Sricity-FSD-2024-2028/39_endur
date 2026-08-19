@@ -32,16 +32,6 @@ export const globalRateLimit = bucket({
 /**
  * Scoped buckets (12 §4.12). Declared here, applied per route by the feature routers.
  *
-<<<<<<< HEAD
- * `respondentSubmit` is deliberately NOT tight: a whole campus behind one NAT shares an
- * IP, and a strict limit would silently block real respondents during the demo.
- */
-export const scopedRateLimits = {
-  login: bucket({ windowMs: 15 * 60_000, max: 10 }),
-  respondentSubmit: bucket({ windowMs: 60_000, max: 5 }),
-  simulator: bucket({ windowMs: 60_000, max: 30 }),
-};
-=======
  * `respondentSubmit` is deliberately NOT tight, and the number has to match that sentence.
  * A whole campus behind one NAT shares an IP, and a lecture hall answering a QR code at the
  * same moment is the SUCCESS case — a limit that mistakes it for abuse silently blocks real
@@ -55,4 +45,3 @@ export const scopedRateLimits = {
 
 /** Exported so a test can build a tight bucket and prove the 429 path still works. */
 export { bucket };
->>>>>>> 95a69183487c1f29e2422c760433704d08948484

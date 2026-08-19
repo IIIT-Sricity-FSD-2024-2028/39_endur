@@ -14,10 +14,6 @@ import { config } from '../lib/config.js';
  */
 const consoleOrigins = [config.PUBLIC_BASE_URL, 'http://localhost:5173'];
 
-<<<<<<< HEAD
-/** `credentials: true` is required: the staff session is a cookie (DEC-014). */
-export const consoleCors = cors({
-=======
 /**
  * `credentials: true` is required: the staff session is a cookie (DEC-014).
  *
@@ -28,7 +24,6 @@ export const consoleCors = cors({
  * where nobody can read it.
  */
 const consoleCorsPolicy = cors({
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   origin: consoleOrigins,
   credentials: true,
   allowedHeaders: ['Content-Type', 'X-Request-Id', 'X-CSRF-Token', 'X-API-Key', 'X-Org-Slug'],
@@ -36,8 +31,6 @@ const consoleCorsPolicy = cors({
 });
 
 /**
-<<<<<<< HEAD
-=======
  * The console policy, skipped for the respondent surface, which brings its own (publicCors,
  * mounted inside the public router). Two policies that never both apply to one request.
  */
@@ -47,20 +40,15 @@ export const consoleCors: RequestHandler = (req, res, next) => {
 };
 
 /**
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
  * Respondent routes: any origin, and deliberately NO credentials. There is no cookie and
  * no ambient authority to protect — the token in the path is the entire credential — so
  * `origin: true` costs nothing and lets a phone on any network submit.
  */
 export const publicCors = cors({
-<<<<<<< HEAD
-  origin: true,
-=======
   // `*`, not a reflected origin. There is no credential to protect here and never will be
   // (DEC-009), and a wildcard is what makes the preflight cacheable for a phone that has
   // just scanned a code on a network we have never seen.
   origin: '*',
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   credentials: false,
   allowedHeaders: ['Content-Type', 'X-Request-Id'],
 });

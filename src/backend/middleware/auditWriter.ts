@@ -14,11 +14,7 @@ import { isDev } from '../lib/config.js';
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Routes that legitimately mutate without an audit row: authentication is its own log. */
-<<<<<<< HEAD
-const EXEMPT = [/^\/api\/v1\/auth\//, /^\/api\/v1\/_echo$/];
-=======
 const EXEMPT = [/^\/api\/v1\/auth\//];
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 
 export const auditWriter: RequestHandler = (req, res, next) => {
   res.on('finish', () => {

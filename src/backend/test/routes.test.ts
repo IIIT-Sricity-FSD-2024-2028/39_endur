@@ -22,10 +22,6 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
   { pattern: /^\/api\/v1\/auth\//, why: 'authentication itself cannot require a principal' },
   { pattern: /^\/r\//, why: 'respondent flow — a QR scan has no account (DEC-009)' },
   { pattern: /^\/api\/v1\/public\//, why: 'respondent payloads, allowlisted in 13 §6' },
-<<<<<<< HEAD
-  { pattern: /^\/api\/v1\/_echo$/, why: 'temporary pipe probe — delete at T-015' },
-=======
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ];
 
 type Route = { method: string; path: string; guarded: boolean };

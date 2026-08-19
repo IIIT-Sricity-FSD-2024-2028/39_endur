@@ -20,10 +20,6 @@ declare global {
 }
 
 /**
-<<<<<<< HEAD
- * Routes that legitimately have no tenant yet: signing in, registering, health. Only these
- * may fall through to the slug header, and only these may proceed without an org.
-=======
  * Routes that legitimately have no tenant yet: signing in, registering, health, and the
  * respondent surface. Only these may fall through to the slug header, and only these may
  * proceed without an org.
@@ -33,16 +29,11 @@ declare global {
  * would answer differently from the 404 a closed campaign produces at the handler. That
  * difference is an existence oracle: try a token, and the status code tells you whether
  * that campaign exists (13 §6). Falling through lets one uniform 404 answer every case.
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
  */
 const TENANTLESS = [
   /^\/healthz$/,
   /^\/api\/v1\/auth\//,
-<<<<<<< HEAD
-  /^\/api\/v1\/_echo$/, // temporary pipe probe, deleted at T-015
-=======
   /^\/api\/v1\/public\//,
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ];
 
 /**
@@ -54,18 +45,11 @@ const NEEDS_TENANT = /^\/api\/v1\//;
 
 export const tenantResolver: RequestHandler = (req, _res, next) => {
   void resolve(req)
-<<<<<<< HEAD
-    .then((orgId) => {
-      if (orgId) {
-        req.ctx.orgId = orgId;
-        req.db = tenantClient(orgId);
-=======
     .then(async (orgId) => {
       if (orgId) {
         req.ctx.orgId = orgId;
         req.db = tenantClient(orgId);
         req.ctx.authzVersion = await authzVersionOf(orgId);
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
         return next();
       }
       if (!NEEDS_TENANT.test(req.path)) return next();
@@ -75,8 +59,6 @@ export const tenantResolver: RequestHandler = (req, _res, next) => {
     .catch(next);
 };
 
-<<<<<<< HEAD
-=======
 /**
  * The tenant's current authz version. One small read per authenticated request, and it is
  * what makes the grant cache safe: without it the cache key is a constant, and a revoked
@@ -91,7 +73,6 @@ async function authzVersionOf(orgId: string): Promise<number> {
   return typeof settings.authzVersion === 'number' ? settings.authzVersion : 0;
 }
 
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 /** Strict priority. Each source is a credential the caller could not have forged. */
 async function resolve(req: Request): Promise<string | undefined> {
   // 1 · API key  — T-007 attaches the parsed key; its org_id wins.
@@ -100,14 +81,10 @@ async function resolve(req: Request): Promise<string | undefined> {
   if (session?.orgId) return session.orgId;
 
   // 3 · Respondent token — the campaign's org. The token is in the PATH, never a body.
-<<<<<<< HEAD
-  const token = /^\/(?:r|api\/v1\/public)\/([A-Za-z0-9_-]{8,128})\b/.exec(req.path)?.[1];
-=======
   // The FULL prefix, including /campaigns/. The earlier pattern matched the segment after
   // /api/v1/public/ and so captured the literal word "campaigns" as the token, resolving no
   // tenant at all — invisible until the first public route existed (N-017).
   const token = /^\/(?:r\/|api\/v1\/public\/campaigns\/)([A-Za-z0-9_-]{6,128})/.exec(req.path)?.[1];
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   if (token) {
     const campaign = await prisma.campaign.findUnique({
       where: { publicToken: token },

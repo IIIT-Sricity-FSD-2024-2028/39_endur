@@ -143,8 +143,6 @@ DEC-015  ACTIVE  2026-08-18  origin:U  AMENDS:DEC-005
            that the React is not deliberately provisional. P2 deepens, it does not rebuild.
   risk     10 days. the M0 cut-list in 02 §2 is now load-bearing, not advisory.
 
-<<<<<<< HEAD
-=======
 DEC-016  ACTIVE  2026-08-19  origin:U  RESOLVES:OPEN-005
   campaign status is DERIVED ON READ. there is no scheduler and no stored status column.
   rule     closed_at set          -> closed
@@ -185,7 +183,6 @@ DEC-018  ACTIVE  2026-08-19  origin:A
            role including L4, so the catalogue stays readable by everyone who can log in.
   supersed 13 §3 "—" on those two rows
 
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ```
 
 ---
@@ -326,11 +323,7 @@ OPEN-003  REVISIT:2026-11-01
 OPEN-004  team member 3 does not use Claude. their work split is unassigned in
   02-PHASES-AND-EVALUATION.md §work-split. fill in when known.
 
-<<<<<<< HEAD
-OPEN-005  REVISIT:2026-08-22  blocks:M0
-=======
 OPEN-005  RESOLVED-BY:DEC-016  2026-08-19
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
   NOTHING OWNS SCHEDULED WORK. found 2026-08-16 while filling reserved slots.
   affected: campaign scheduled->open->closed (M0-CRITICAL, a campaign that never opens has
   no working QR), temporary unit + position expiry, delegation windows, seat recompute,
@@ -338,15 +331,11 @@ OPEN-005  RESOLVED-BY:DEC-016  2026-08-19
   leading answer: derive campaign status ON READ from starts_at/ends_at/closed_at instead of
   running a scheduler. no timer, no stuck state, no new demo-day failure mode.
   IF ADOPTED: campaign_status stops being a stored column -> amends 10 §4.3 and 38.
-<<<<<<< HEAD
-  record as a DEC when decided. see 17-BACKGROUND-JOBS.md.
-=======
   RESOLVED 2026-08-19 -> DEC-016. campaign status is derived on read; the column is gone.
   STILL UNOWNED, and deliberately so for M0: temporary unit + position expiry, delegation
   windows, seat recompute, webhook retry. each of those is either P3 or degrades to a
   stale row rather than a broken demo, and each can be derived on read the same way if it
   ever needs to be. see 17-BACKGROUND-JOBS.md.
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ```
 
 ---
@@ -362,10 +351,6 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 03-REPO-AND-TOOLING.md           -> /package.json /tsconfig*.json /.env.example /.github
 10-DATA-MODEL.md                 -> src/backend/database/** src/backend/db/**
 11-PERMISSION-ENGINE.md          -> src/backend/authz/**
-<<<<<<< HEAD
-12-MIDDLEWARE-STACK.md           -> src/backend/middleware/** src/backend/app.ts
-13-API-CONTRACT.md               -> src/backend/routes/** (router wiring only)
-=======
                                     incl. authz/visibility.ts, the list-side inverse of
                                     resolve(). see N-016.
 12-MIDDLEWARE-STACK.md           -> src/backend/middleware/** src/backend/app.ts
@@ -374,7 +359,6 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     their service in src/backend/features/<name>/router.ts
                                     and are mounted by lib/mount.ts. 13 still owns the
                                     CONTRACT; the folder name differs from the doc.
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 14-DTO-AND-VALIDATION.md         -> packages/shared/src/dto/**
 15-AUTH-AND-SESSIONS.md          -> src/backend/auth/**
 16-TENANCY-BILLING-ENTITLEMENTS  -> src/backend/billing/**
@@ -402,14 +386,11 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     RENUMBERED from 46..49 on 2026-08-18 to free the page
                                     block. do not renumber back.
 50-SEED-AND-DEMO.md              -> src/backend/database/seed/** src/backend/presets/**
-<<<<<<< HEAD
-=======
                                     the ONLY two directories where an education noun may
                                     appear, and then only as DATA (INV-002). Both are
                                     exempt in eslint.config.js and in test/seed.test.ts.
 lib/paginate.ts                  -> owned by 13 §4 (cursor pagination)
 middleware/idempotency.ts        -> owned by 13 §7
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 51-TESTING-STRATEGY.md           -> **/*.test.ts src/backend/test/** e2e/**
 52-SECURITY-AND-PRIVACY.md       -> cross-cutting; owns no path, constrains all
 53-NOVELTY-CLAIMS.md             -> docs only
@@ -542,11 +523,6 @@ N-013  the init migration is prisma-generated PLUS ~90 lines of hand-written SQL
        schema.prisma alone, all of it silently disappears and the app still runs — which is
        exactly what makes it dangerous. 10 §11 has acceptance items for them; they were all
        verified against a live database on 2026-08-18.
-<<<<<<< HEAD
-N-008  DRIFT-003/004 must be implemented in scripts/audit-drift.mjs and NOT restated as
-       literal grep patterns inside architecture/, or the check matches its own definition.
-       this already bit once on 2026-08-16.
-=======
 N-019  ESLINT FLAT CONFIG REPLACES RULE OPTIONS, IT DOES NOT MERGE THEM. Found 2026-08-19
        by adding a probe file to prove the DEC-007 rule fired, and discovering it did not:
        the `src/backend/features/**` block set no-restricted-syntax for req.body and in
@@ -589,5 +565,4 @@ N-018  BUILD ENVIRONMENT, 2026-08-19. this repo cannot be npm-installed in place
        has no symlinks, so install dies with EISDIR on src/frontend -> node_modules/@endur/web.
        junctions fail too ("Local NTFS volumes are required"), as does ln -s from WSL against
        /mnt/<drive>. build on an NTFS path and keep the exFAT copy source-only.
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 ```

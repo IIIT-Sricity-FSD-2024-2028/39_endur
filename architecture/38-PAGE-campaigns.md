@@ -56,9 +56,6 @@ export const AudienceRule = z.discriminatedUnion('kind', [
 double-click on stage must not create two links, because the QR already on screen would then
 point at the wrong one.
 
-<<<<<<< HEAD
-`anonymous` is immutable once the campaign leaves draft, enforced by a database trigger
-=======
 Status is **derived on read** from `closed_at` / `public_token` / `starts_at` / `ends_at`
 (`DEC-016`). There is no stored status column and nothing on a timer: a campaign is open
 because the clock says so. `Cancel schedule` therefore clears `starts_at` rather than moving
@@ -66,7 +63,6 @@ a state machine backwards.
 
 `anonymous` is immutable once the campaign leaves draft — which is exactly "a token has been
 minted" — enforced by a database trigger
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 (`10` §4.3). Respondents were promised anonymity at submission time.
 
 ## State
@@ -150,11 +146,7 @@ The sheet is reachable forever from the campaign card's `Share`. It is never one
 - [ ] A double-clicked launch produces one token
 - [ ] The share sheet appears within one second of launch
 - [ ] The QR is ≥ 280px, untinted, with a quiet zone, and scans on **two different phones**
-<<<<<<< HEAD
-- [ ] The URL token is 6 characters and typeable aloud
-=======
 - [ ] The URL token is 8 characters from an unambiguous alphabet and typeable aloud (DEC-017)
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
 - [ ] Presentation mode fills the screen and exits on `Esc`
 - [ ] `anonymous` cannot change after launch — trigger test
 - [ ] A campaign cannot be edited once open; the attempt returns 409

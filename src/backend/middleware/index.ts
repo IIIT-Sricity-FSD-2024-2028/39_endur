@@ -14,7 +14,4 @@ export * from "./requireEntitlement.js";
 export * from "./authenticate.js";
 export * from "./csrfProtection.js";
 export * from "./auditWriter.js";
-<<<<<<< HEAD
-=======
 export * from "./idempotency.js";
->>>>>>> 95a69183487c1f29e2422c760433704d08948484
