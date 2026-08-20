@@ -7,7 +7,7 @@
 // claim the whole product rests on is false in the one place somebody is looking.
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { SubjectSummary, UnitNode } from '@endur/shared';
+import type { SubjectSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
@@ -18,17 +18,10 @@ import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
 import { useUnits } from '../../../lib/units.js';
+import { flattenUnits } from '../../../lib/tree.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { formatRelative, pluralise } from '../../../lib/format.js';
 import { SubjectForm, type SubjectDraft } from './SubjectForm.js';
-
-/** The tree, flattened for a `<select>`. Indentation carries the shape a tree would show. */
-function flatten(nodes: UnitNode[], depth = 0): Array<{ id: string; label: string }> {
-  return nodes.flatMap((node) => [
-    { id: node.id, label: `${'  '.repeat(depth)}${node.name}` },
-    ...flatten(node.children, depth + 1),
-  ]);
-}
 
 export default function Subjects(): JSX.Element {
   const labels = useLabels();
@@ -42,7 +35,7 @@ export default function Subjects(): JSX.Element {
 
   const list = useSubjectList({ q, unitId, archived, cursor });
   const units = useUnits();
-  const unitOptions = useMemo(() => flatten(units.data ?? []), [units.data]);
+  const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
 
   const [term, setTerm] = useState(q);
   const [creating, setCreating] = useState(false);

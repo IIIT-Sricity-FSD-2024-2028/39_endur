@@ -230,10 +230,61 @@ describe('aggregation', () => {
 
     const lines = res.text.trim().split('\n');
     expect(lines).toHaveLength(7);
-    expect(lines[0]).toMatch(/^Submitted at,Subject,/);
+    // THE ORG'S OWN NOUN — this org calls a subject a "Module" (22 §6, 40 § Acceptance).
+    // It said "Subject" until T-040. A CSV header that says "Course" for a hotel is the
+    // vocabulary leak nobody thinks to check, because audit-vocab only scans the frontend.
+    expect(lines[0]).toMatch(/^Submitted at,Module,/);
+    expect(lines[0]).not.toMatch(/Subject/);
     // There is no respondent column to export, which is the point (INV-006). A CSV that
     // could name people would undo the schema guarantee at the last step.
     expect(res.text).not.toMatch(/email|respondent|user_id/i);
+  });
+});
+
+describe('the response rate needs a denominator that exists — 40', () => {
+  let founder: Session;
+
+  beforeAll(async () => {
+    founder = await setUpOrg();
+  });
+
+  it('reports NO rate for an open link, because a link has no roll', async () => {
+    const { campaignId } = await campaignWithResponses(founder, config.K_ANON_THRESHOLD);
+    const res = await founder.agent.get(`/api/v1/campaigns/${campaignId}/results`);
+
+    // This returned the SUBJECT COUNT until T-040, which made the rate
+    // responses-per-subject: every seeded demo campaign rendered a RESPONSE RATE between
+    // 1750% and 4675%, on the screen the evaluator opens straight after scanning.
+    expect(res.body.data.audienceEstimate).toBeNull();
+    expect(res.body.data.responseRate).toBeNull();
+    expect(res.body.data.responseCount).toBe(config.K_ANON_THRESHOLD);
+  });
+
+  it('computes a real rate when the audience is a real set of people', async () => {
+    const sectionA = await unitIdByName(founder.orgId, 'Section A');
+    const subject = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Thermodynamics',
+      unitId: sectionA,
+    });
+    const templates = await founder.agent.get('/api/v1/templates');
+    const templateId = (templates.body.data as Array<{ id: string; name: string }>).find(
+      (template) => template.name === 'Course feedback',
+    )?.id as string;
+
+    const campaign = await withCsrf(founder, 'post', '/api/v1/campaigns').send({
+      name: 'Section A only',
+      templateId,
+      subjectIds: [subject.body.data.id],
+      audience: { kind: 'unit', unitId: sectionA, includeSubtree: true },
+    });
+    const res = await founder.agent.get(
+      `/api/v1/campaigns/${campaign.body.data.id}/results`,
+    );
+
+    // Zero responses, so the number is 0 — but it is a real 0 out of a real headcount,
+    // which is a different statement from "there is no such thing as a rate here".
+    expect(res.body.data.audienceEstimate).not.toBeNull();
+    expect(typeof res.body.data.audienceEstimate).toBe('number');
   });
 });
 

@@ -12,13 +12,24 @@ export type BarRowProps = {
   value: number;
   total: number;
   tone?: 'accent' | 'good' | 'neutral' | 'bad';
+  /**
+   * The results distribution shows count AND percent in separate columns
+   * (design_specs/design/08 §8.1). Off by default: a four-item stat breakdown does not need
+   * two numbers per row, and the second one would be the one nobody reads.
+   */
+  showPercent?: boolean;
 };
 
-export function BarRow({ label, value, total, tone = 'accent' }: BarRowProps): JSX.Element {
+export function BarRow({
+  label, value, total, tone = 'accent', showPercent = false,
+}: BarRowProps): JSX.Element {
+  // Derived here rather than taken as a prop, even though `ResultsView` also carries a
+  // `percent` the server computed. One source means the bar's width and the number beside
+  // it cannot disagree — and a bar that disagrees with its own label is worse than no bar.
   const percent = total > 0 ? Math.round((value / total) * 100) : 0;
 
   return (
-    <div className="bar-row">
+    <div className={`bar-row${showPercent ? ' has-percent' : ''}`}>
       <span className="bar-label">{label}</span>
       {/* Never colour alone (21 §8): the number is always rendered beside the bar. */}
       <span className="bar-track">
@@ -28,6 +39,7 @@ export function BarRow({ label, value, total, tone = 'accent' }: BarRowProps): J
         />
       </span>
       <span className="bar-value num">{value}</span>
+      {showPercent && <span className="bar-percent num">{percent}%</span>}
     </div>
   );
 }

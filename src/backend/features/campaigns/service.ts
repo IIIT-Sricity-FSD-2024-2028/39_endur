@@ -1,7 +1,6 @@
 // Campaigns. 13 § Campaigns, 38, DEC-016, DEC-017.
 import type {
   AudiencePreview,
-  AudienceRule,
   CampaignDetail,
   CampaignListQuery,
   CampaignSummary,
@@ -13,6 +12,7 @@ import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { unitSubtree } from '../../db/graph.js';
+import { ruleOf } from './audience.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { seesNothing, visibleUnits } from '../../authz/index.js';
@@ -69,7 +69,10 @@ export async function readCampaign(
   const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.read');
   return {
     ...toSummary(campaign),
-    audience: campaign.audienceRule as AudienceRule,
+    // Through ruleOf, not a bare cast: the column is JSONB and holds `{}` on rows that
+    // predate the discriminated union. A client switching on `audience.kind` renders
+    // nothing at all for those.
+    audience: ruleOf(campaign.audienceRule),
     subjects: campaign.subjects.map(({ subject }) => ({
       id: subject.id,
       name: subject.name,
@@ -260,9 +263,13 @@ export async function audiencePreview(
   campaignId: string,
 ): Promise<AudiencePreview> {
   const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.read');
-  const rule = campaign.audienceRule as AudienceRule;
+  const rule = ruleOf(campaign.audienceRule);
 
   if (rule.kind === 'anyone') {
+    // countAudience() returns null here, correctly — a link has no roll. THIS screen still
+    // needs a number, because "0" beside an open audience reads as a broken rule rather
+    // than an unbounded one, so the substitution stays and stays visible. 40's response
+    // RATE does not get the same courtesy; see countAudience.
     return {
       estimatedCount: campaign.subjects.length,
       sample: campaign.subjects.slice(0, 5).map(({ subject }) => ({

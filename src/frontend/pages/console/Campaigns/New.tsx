@@ -20,6 +20,7 @@ import { approxDuration, pluralise } from '../../../lib/format.js';
 import { useTemplates } from '../../../lib/templates.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { useUnits } from '../../../lib/units.js';
+import { flattenUnits } from '../../../lib/tree.js';
 import { launchCampaign, launchKey, useCampaignList } from '../../../lib/campaigns.js';
 import { summarise } from './summary.js';
 
@@ -246,7 +247,7 @@ export default function CampaignNew(): JSX.Element {
                     setAudience({ kind: 'unit', unitId: event.target.value, includeSubtree: true })
                   }
                 >
-                  {flatten(units.data ?? []).map((option) => (
+                  {flattenUnits(units.data ?? []).map((option) => (
                     <option key={option.id} value={option.id}>{option.label}</option>
                   ))}
                 </select>
@@ -342,14 +343,6 @@ export default function CampaignNew(): JSX.Element {
       )}
     </>
   );
-}
-
-/** The tree, flattened for a `<select>`; indentation carries the shape. */
-function flatten(nodes: UnitNode[], depth = 0): Array<{ id: string; label: string }> {
-  return nodes.flatMap((node) => [
-    { id: node.id, label: `${'  '.repeat(depth)}${node.name}` },
-    ...flatten(node.children, depth + 1),
-  ]);
 }
 
 /**

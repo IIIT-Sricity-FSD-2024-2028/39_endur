@@ -6,7 +6,9 @@
 //
 // Suppression is the promise being kept when it is inconvenient, which is the only time a
 // privacy promise means anything.
+import { resolveLabels } from '@endur/shared';
 import type {
+  LabelSet,
   QuestionConfig,
   QuestionKind,
   QuestionSummary,
@@ -21,6 +23,7 @@ import { NotFoundError } from '../../lib/errors.js';
 import { afterCursorOn, orderOn, pageOf, type Paged } from '../../lib/paginate.js';
 import { visibleUnits } from '../../authz/index.js';
 import { unitSubtree } from '../../db/graph.js';
+import { countAudience, ruleOf } from '../campaigns/audience.js';
 
 export async function readResults(
   orgId: string,
@@ -39,7 +42,13 @@ export async function readResults(
 
   const [responseCount, audienceEstimate, latest] = await Promise.all([
     prisma.response.count({ where: responseWhere }),
-    Promise.resolve(campaign.subjects.length || null),
+    // FROM THE AUDIENCE RULE, not from the subject count. Until T-040 this was
+    // `campaign.subjects.length`, which made the response rate responses-per-SUBJECT and
+    // rendered it as a percentage: every seeded demo campaign showed a rate between 1750%
+    // and 4675%, on the screen the evaluator opens straight after scanning.
+    // `anyone` has no denominator at all and now says so by returning null (40's DTO has
+    // typed both fields `| null` since revision one, anticipating exactly this).
+    countAudience(orgId, ruleOf(campaign.audienceRule)),
     prisma.response.findFirst({
       where: responseWhere,
       orderBy: { submittedAt: 'desc' },
@@ -188,7 +197,15 @@ export async function exportResults(
     },
   });
 
-  const header = ['Submitted at', 'Subject', ...questions.map((question) => question.text)];
+  // THE ORG'S OWN NOUN, not the word "Subject" (22 §6, 40 § Acceptance). A CSV whose header
+  // column says "Course" for a hotel is exactly the leak the manual vocabulary audit exists
+  // for, and it is the one nobody thinks to check — audit-vocab only scans the frontend.
+  const labels = resolveLabels(campaign.org.labels as LabelSet);
+  const header = [
+    'Submitted at',
+    labels.subject.one,
+    ...questions.map((question) => question.text),
+  ];
   const lines = [header.map(csvCell).join(',')];
 
   for (const response of responses) {
@@ -346,6 +363,8 @@ async function assertVisible(
       id: true,
       name: true,
       templateId: true,
+      audienceRule: true,
+      org: { select: { labels: true } },
       subjects: { select: { subject: { select: { id: true, unitId: true } } } },
     },
   });

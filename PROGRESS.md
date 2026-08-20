@@ -5,11 +5,11 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-20  (T-039 — the respondent flow, the hero screen)
+UPDATED   2026-08-20  (T-041 — home dashboard. **STAGE 4 IS COMPLETE**)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  6 days  ·  demo 27 Aug  ·  GRADED
-STATUS    38/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
-          705 tests across 62 files, all green (186 backend + 519 frontend).
+STATUS    40/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
+          797 tests across 69 files, all green (191 backend + 606 frontend).
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! READ CONF-013 IN _MEMORY.md BEFORE TOUCHING AUTH. A cross-tenant account
           lockout was found and closed on 19 Aug; the schema question behind it is
@@ -17,9 +17,21 @@ STATUS    38/45. STAGES 0-3 DONE BUT FOR THE FONT FILES.
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      LANE C: T-040 (results). T-041 (home dashboard, doc 46) is lane B and also
-          unblocked. Every page route already exists as a placeholder; replace the
-          file, do not add a route.
+NEXT      STAGE 5 ONLY. T-043 (OPEN-002), T-044 (vocabulary audit, 24 Aug), T-045
+          (three rehearsals + the 390px checks). No screen work is left: every route
+          in 20 §2 renders a real page, and no placeholder remains behind an M0 path.
+          !! THE DEMO NOW RUNS END TO END. Scan -> fill -> submit -> the results
+          number moves, and the two counts agree because they are the same COUNT
+          read in the same transaction. Rehearse it (T-045).
+          !! ONE SEED DECISION IS YOURS, AND IT NOW AFFECTS TWO SCREENS. All four demo
+          orgs use audience `anyone`, which has no denominator, so the RESPONSE RATE
+          card is a dash on BOTH the home page and the results page — correctly, see
+          N-043 and N-046. Giving ONE seeded campaign a `unit` audience makes both
+          show a real number. That is 50's data, not 40's or 46's page.
+          !! IF YOU FIX A NUMBER, GREP FOR THE ARITHMETIC AND NOT FOR THE FUNCTION.
+          N-043 fixed the response rate at the results service; features/home held its
+          own copy and rendered 2610-4675% on the FIRST SCREEN AFTER SIGN-IN until
+          T-041 read it. `_count.subjects` as a divisor was greppable. N-046.
           !! OPEN-002 IS STILL OPEN AND STILL YOURS. The build never needed it — the
           URL comes from the API — but somebody has to set PUBLIC_BASE_URL to an
           address a phone can reach. The share sheet SAYS SO on screen when it is
@@ -76,8 +88,8 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **705 tests
-across 62 files**, 186 backend + 519 frontend. All five are green right now, so anything red
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **797 tests
+across 69 files**, 191 backend + 606 frontend. All five are green right now, so anything red
 is yours.
 
 `audit:vocab` prints how many files it scanned **and how many test files it skipped**. It
@@ -162,8 +174,8 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [x] T-037  C  form builder + autosave + preview  ← + <FormPreview>
 [x] T-038  C  campaigns + ShareSheet + QR    ← landed 19 Aug, 3 days early
 [x] T-039  C  respondent flow + 3 edge states ← CONF-015: three, not four
-[ ] T-040  C  results
-[ ] T-041  B  home dashboard
+[x] T-040  C  results        ← full view, not the cut-down table. N-043, N-044
+[x] T-041  B  home dashboard  ← STAGE 4 DONE. N-046, N-047, CONF-017
 ```
 ### Stage 5 — M0 hardening
 ```
@@ -173,9 +185,9 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-045  X  three demo rehearsals
 ```
 
-**Progress: 38 / 45 done (T-027 partial). Stage 3 complete but for the font files;
-Stage 4 open at T-040. The hero screen is built — the demo now runs end to end from a
-scan to a number that moves.**
+**Progress: 40 / 45 done (T-027 partial). Stages 0-4 complete but for the font files —
+every M0 screen is built. What is left is Stage 5: one decision, one audit, and three
+rehearsals. The demo runs end to end: scan, fill, submit, and the results count moves.**
 
 ---
 
@@ -214,6 +226,108 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-20 · T-041 — the home dashboard. **STAGE 4 IS COMPLETE**
+
+`/app` is real: `pages/console/Home/` (`index.tsx`, `cards.ts`, `CampaignCard.tsx`,
+`Recent.tsx`) and `lib/home.ts`. **Every M0 screen is now built.** No placeholder remains
+behind any route in `20` §2, and what is left before the demo is one decision, one audit and
+three rehearsals.
+
+**Read this before touching `features/home/service.ts` or `features/results/service.ts`.**
+`N-043` fixed the response rate at the results service on 20 Aug. It did not know that
+`readStats` in the home service held **its own copy** of the same substitution — sum the
+campaigns' subject counts, divide the responses by it, render as a percentage. Measured
+against the seeded demo before changing anything: **Northfield 3161%, Grand Palace 2654%,
+Meridian 2610%, Riverside 4675%** — on the *first screen after sign-in*. Verified against the
+same data afterwards: all four now report no denominator. `N-046`.
+
+The generalisation is the part to keep: **a fix applied at the call site is not a fix.**
+`countAudience()` already existed, was correct, and was documented as the honest counter, and
+a second caller three files away still divided by the wrong thing. When a wrong number is
+corrected, grep for the **arithmetic** — `_count.subjects` as a divisor was greppable and
+nobody grepped it.
+
+Also worth knowing:
+
+- **`<TrendChip>` is refused, not deferred** (`CONF-017`). `46` § Components put one on the
+  "today" card; `46` § Out of scope rules trends off this page by name (*"that is `43`, and
+  it is P3"*), § Purpose forbids the page becoming an analysis surface, and the payload
+  carries no yesterday to point an arrow at. `<StatCard>` says the same in one line — a delta
+  *"only ever appears where a direction is real"*. **Second time a P2 page has borrowed a
+  component from `24` that its own document forbids**, after `<ScoreBadge>`; `24`'s list was
+  written from `43`'s needs, so check what the rest of a page doc says before building one.
+- **The QR is in the payload** (`N-047`). A campaign card's Share opens `<ShareSheet>`, which
+  cannot render without the URL — so `HomeView` carries `url` and `anonymous`, two fields off
+  columns the query already read, rather than firing a second request on the click, on venue
+  wifi, while somebody holds a phone up. `status` is deliberately **not** carried: every
+  campaign here is open by definition.
+- **Two things design draws are deliberately absent.** The campaign card's `612 / 800`
+  progress bar — the 800 is the same invented denominator `N-046` just removed — and the
+  recent strip's *"View all →"*, because those comments come from several campaigns, the
+  payload does not say which, and a cross-campaign inbox is P3 by name.
+- **`undefined` and `[]` say different things, and this page is where it pays.** A withheld
+  section arrives as a missing key; an empty one arrives as an empty array. So *"Nothing
+  assigned to you yet"* and *"Add your first {subject}"* land on the right readers, and
+  neither is a wall of greyed-out cards.
+- **A new org never sees four zeroes.** The test asserts the RESPONSE RATE card is not on the
+  page at all — zeroes look broken, an empty state looks intentional.
+
+Tests 761 → **797** (backend 188 → 191, frontend 573 → 606), across 69 files. Entry chunk
+unchanged at 308.6 kB / 96.5 kB gzip.
+
+### 2026-08-20 · T-040 — results, and a response rate of 4675%
+
+`/app/campaigns/:id/results` is real: `pages/console/Results/` (`index.tsx`,
+`QuestionResult.tsx`, `Comments.tsx`, `stats.ts`), `lib/results.ts`, and
+`components/data/StackedBar.tsx`. **Stage 4 has one screen left.**
+
+**The demo's decisive beat now closes.** Scan the QR, fill in the form, submit — and the count
+on this page moves. The two numbers agree because they are the same `COUNT`, read inside the
+transaction that wrote the response.
+
+**Read this before touching the campaigns or results service.** `readResults` took
+`audienceEstimate` from `campaign.subjects.length`, which made the response rate
+responses-per-**subject** and rendered it as a percentage. Measured against the seeded demo
+*before* changing anything: Northfield's Spring term feedback **3517%**, Riverside's patient
+survey **4675%**, all eight seeded campaigns with real data between 1750% and 4675% — on the
+screen an evaluator opens straight after scanning.
+
+The cause was two different questions sharing one answer. `audiencePreview` substitutes the
+subject count for an `anyone` rule **on purpose**, and says so: the create screen needs a
+number, and `0` beside an open audience reads as a broken rule. `readResults` reused it as a
+divisor, where the honest answer is that there is no such number. `countAudience()` now returns
+`null` for an open link, and the card renders a dash **and the reason**. `N-043`.
+
+**One seed decision is yours.** All four demo orgs use `anyone`, so that card is a dash for the
+whole demo — correctly. Giving **one** seeded campaign a `unit` audience makes it show a real
+number. That is `50`'s data, not this page's, so it has not been changed.
+
+Also worth knowing:
+
+- **The CSV header said "Subject"** (`N-044`). `22` §6 warns in as many words that an export
+  header is "the one nobody thinks to check" — and it shipped at T-023 saying the English
+  noun. Nobody checked it for exactly the reason the doc predicted: `audit:vocab` only scans
+  the frontend. The generalisation is the useful part — `22` §6 lists three kinds of
+  server-produced string and **only one of the three has ever been audited.**
+- **`<ScoreBadge>` is refused, not deferred** (`CONF-016`). `40` § Components lists it; `40`
+  § Purpose and § Interactions forbid exactly what it does, and `design_specs/design/08` sides
+  with the prohibition. A threshold colour on an average is the interpretation this page
+  exists to refuse. Catalogued in `24` as not built, with the reason.
+- **A pure function inside a mocked module is a function every mock reimplements** (`N-045`).
+  `flattenUnits` existed twice already; lifting it into `lib/units.ts` turned two suites red
+  with *"No flattenUnits export is defined on the mock"*. It lives in `lib/tree.ts` now, which
+  nothing mocks. The failing mock was the signal, not the obstacle.
+- **Export is fetched, not linked.** An `<a href>` would answer a `402` — export is a Silver
+  feature — by showing the reader a page of raw JSON instead of the plan message.
+- **The comment flash has a baseline.** Only comments that arrived while somebody was watching
+  light up; without that, opening a campaign with 287 of them flashes all 287, which reads as
+  a rendering bug rather than as news.
+- `audience_rule` is JSONB and the dev database holds `{}` in it on old rows. Both readers go
+  through `ruleOf()` now — a results page that 500s because of a pre-union row is worse than
+  one that assumes the open case and stays up.
+
+Tests 705 → **761** (backend 186 → 188, frontend 519 → 573), across 66 files.
 
 ### 2026-08-20 · T-039 — the respondent flow. **THE HERO SCREEN IS BUILT**
 

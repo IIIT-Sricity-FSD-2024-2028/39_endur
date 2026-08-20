@@ -114,8 +114,8 @@ blocked or builds a second shell.
 | T-037 | C | T-036,T-020 | Form builder page — **every component it needs exists**; stack, reorder, autosave, preview | `37` |
 | T-038 | C | T-030,T-021 | Campaigns 3-step + **`<ShareSheet>` + QR** | `38`, `24` §6 |
 | T-039 | C | T-035,T-022 | **Respondent flow** — **three** edge states, not four (`CONF-015`); never cut. Departures in `N-039`–`N-041` | `39` |
-| T-040 | C | T-023 | Results (cut-down table first, then full) | `40` |
-| T-041 | B | T-024 | Home dashboard | `46` |
+| T-040 | C | T-023 | Results — full view, not the cut-down table. Fixed a 4675% response rate (`N-043`) and a CSV header that said the English noun (`N-044`) | `40` |
+| T-041 | B | T-024 | Home dashboard — **STAGE 4 COMPLETE**. Found the response rate of `N-043` in a second reader, on the first screen after sign-in (`N-046`); `<TrendChip>` refused (`CONF-017`) | `46` |
 
 > **T-038's share sheet lands 22 Aug, before T-039.** Highest-risk component in the build:
 > canvas rendering, tunnel URL, phone reachability (`_MEMORY.md` N-004).

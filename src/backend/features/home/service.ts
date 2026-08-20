@@ -11,6 +11,8 @@ import { prisma } from '../../db/client.js';
 import { config } from '../../lib/config.js';
 import { seesNothing, visibleUnits, type Visibility } from '../../authz/index.js';
 import { whereStatus } from '../campaigns/status.js';
+import { countAudience, ruleOf } from '../campaigns/audience.js';
+import { publicUrlFor } from '../campaigns/token.js';
 
 export async function readHome(
   orgId: string,
@@ -51,6 +53,8 @@ export async function readHome(
           id: true,
           name: true,
           endsAt: true,
+          anonymous: true,
+          publicToken: true,
           _count: { select: { subjects: true, responses: true } },
         },
       });
@@ -66,6 +70,12 @@ export async function readHome(
       subjectCount: campaign._count.subjects,
       responseCount: campaign._count.responses,
       endsAt: campaign.endsAt?.toISOString() ?? null,
+      // Carried here so the card's Share opens a QR on the click rather than after a
+      // request (46 § Data contract). It is one column the query already had to read.
+      url: campaign.publicToken
+        ? publicUrlFor(config.PUBLIC_BASE_URL, campaign.publicToken)
+        : null,
+      anonymous: campaign.anonymous,
     }));
   }
 
@@ -104,7 +114,7 @@ async function readStats(
     prisma.response.count({ where: { ...scoped, submittedAt: { gte: midnight } } }),
     prisma.campaign.findMany({
       where: { orgId, ...scopeToCampaigns(visibility) },
-      select: { _count: { select: { subjects: true, responses: true } } },
+      select: { audienceRule: true, _count: { select: { subjects: true, responses: true } } },
     }),
   ]);
 
@@ -114,15 +124,43 @@ async function readStats(
   const countable = campaignsWithCounts.filter(
     (campaign) => campaign._count.responses >= config.K_ANON_THRESHOLD,
   );
-  const audience = countable.reduce((sum, campaign) => sum + campaign._count.subjects, 0);
-  const responses = countable.reduce((sum, campaign) => sum + campaign._count.responses, 0);
 
   return {
     responsesTotal: total,
     responsesToday: today,
     activeCampaigns,
-    responseRate: audience > 0 ? Math.round((responses / audience) * 100) / 100 : null,
+    responseRate: await orgResponseRate(orgId, countable),
   };
+}
+
+/**
+ * Responses over people asked, across the campaigns where "people asked" is a real number.
+ *
+ * **This summed `_count.subjects` until T-041** — the same substitution `N-043` found in
+ * `readResults`, in a second reader nobody knew existed, on the FIRST screen after sign-in.
+ * Measured against the seeded demo before the fix: Northfield 3161%, Grand Palace 2654%,
+ * Meridian 2610%, Riverside 4675%.
+ *
+ * A campaign whose audience is `anyone` is dropped from **both** sides rather than having
+ * its responses counted against everybody else's audience — that would be a third wrong
+ * number rather than a compromise. When no campaign has an audience, there is no rate, and
+ * the card says so instead of showing one.
+ */
+async function orgResponseRate(
+  orgId: string,
+  campaigns: Array<{ audienceRule: unknown; _count: { responses: number } }>,
+): Promise<number | null> {
+  let audience = 0;
+  let responses = 0;
+
+  for (const campaign of campaigns) {
+    const size = await countAudience(orgId, ruleOf(campaign.audienceRule));
+    if (size === null || size === 0) continue;
+    audience += size;
+    responses += campaign._count.responses;
+  }
+
+  return audience > 0 ? Math.round((responses / audience) * 100) / 100 : null;
 }
 
 type Comment = NonNullable<HomeView['recentComments']>[number];
