@@ -5,7 +5,7 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-20  (T-044 — the vocabulary nonsense audit. Four leaks found and closed)
+UPDATED   2026-08-21  (first walkthrough of the running app — D-009, D-010, D-005)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  6 days  ·  demo 27 Aug  ·  GRADED
 STATUS    41/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
@@ -31,6 +31,19 @@ NEXT      TWO ITEMS LEFT. T-043 (OPEN-002 — yours, below) and T-045 (three reh
           tenantResolver in the query it already ran; lib/vocabulary.ts has nounsOf(req)
           and counted(n, label). 17 sites across 7 services. If you add a message that
           names a unit/subject/campaign, use it — pass 3 of audit:vocab fails otherwise.
+          !! THE FIRST WALKTHROUGH FOUND THREE THINGS, 21 Aug. Read D-009, D-010 and
+          D-005 before T-045. In short:
+            D-009  the CSRF cookie dies with the browser and the SESSION cookie does
+                   not, so you stay signed in with no token and EVERY mutation fails
+                   forever with "Reload and try again" — which cannot fix it. Sign out
+                   and back in is the only remedy. Worst of the three.
+            D-010  Roles, People and Settings are live sidebar links to "Not built
+                   yet". The Soon-tag mechanism exists and is used for the P3 items;
+                   nobody extended the rule to the five P2-after-M0 routes.
+            D-005  the fonts. Caprasimo is on every heading, KPI and button label per
+                   design_specs 01 §5, and public/fonts/ is empty — so the product is
+                   running in system-ui. This is why it reads as generic. Highest
+                   visual return of anything left.
           !! THE DEMO NOW RUNS END TO END. Scan -> fill -> submit -> the results
           number moves, and the two counts agree because they are the same COUNT
           read in the same transaction. Rehearse it (T-045).
@@ -43,11 +56,11 @@ NEXT      TWO ITEMS LEFT. T-043 (OPEN-002 — yours, below) and T-045 (three reh
           N-043 fixed the response rate at the results service; features/home held its
           own copy and rendered 2610-4675% on the FIRST SCREEN AFTER SIGN-IN until
           T-041 read it. `_count.subjects` as a divisor was greppable. N-046.
-          !! OPEN-002 IS STILL OPEN AND STILL YOURS. The build never needed it — the
-          URL comes from the API — but somebody has to set PUBLIC_BASE_URL to an
-          address a phone can reach. The share sheet SAYS SO on screen when it is
-          localhost, so it cannot fail silently. Due 24 Aug. THE WHOLE FLOW BEHIND
-          THAT URL NOW EXISTS — scan it and you get a form, not a placeholder.
+          !! OPEN-002: DEFERRED, NOT ANSWERED (21 Aug). Local URLs for now, no tunnel.
+          That is fine for building and for clicking through. It is NOT fine for the
+          demo: a QR encoding localhost resolves to the PHONE, so the scan beat cannot
+          work until PUBLIC_BASE_URL points somewhere the room can reach. The share
+          sheet says so on screen, so it cannot fail silently. Still due before T-045.
           !! ANYTHING YOU IMPORT NEAR router/layouts.tsx SHIPS TO A PHONE. The
           console shell was in the ENTRY chunk until T-039 measured the build;
           <AppShell> is lazy now and pages/respond/bundle.test.ts fails if it comes
@@ -210,7 +223,7 @@ Blocking or dated. Move to `_MEMORY.md` as a `DEC-` entry once resolved, and tic
 
 | Ref | Question | Needed by | Blocks |
 |---|---|---|---|
-| `OPEN-002` | What public URL does the QR encode? `localhost` will not scan from a phone | **24 Aug** | T-038, T-043 |
+| `OPEN-002` | What public URL does the QR encode? `localhost` will not scan from a phone. **Deferred 21 Aug — local for now, by decision.** That unblocks development and unblocks nothing else: the scan-to-respond beat still cannot run until this is answered, so it is deferred rather than resolved | **before `T-045`** | T-038, T-043 |
 | `OPEN-001` | Phase-3 Redux shape (`23` §4). Recommendation on file: RTK Query + hand-written slices | 15 Oct | nothing before P3 |
 | `OPEN-003` | Analysis engine: rule-based or LLM-assisted (`43`) | 1 Nov | nothing before P3 |
 | `OPEN-004` | Third member's lane assignment (`02` §6) | — | scheduling only |
@@ -231,8 +244,10 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-004` | Integration tests write into the **dev** database — **THIS NOW FAILS THE BUILD** | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo. **On 19 Aug it stopped being theoretical**: `chain.test.ts` registered a fixed org name every run, `uniqueSlug()` gives up after twenty variants, and the twenty-first run of the suite failed — a test about stripping unknown keys, failing with a conflict about slugs. That test was made independent of history; the next one to depend on it will not be found as quickly | before `T-045` |
 | `D-006` | `uniqueSlug()` runs **outside** register's transaction | Two registrations naming the same organisation in the same second both read "that slug is free"; the loser then collides on the unique index and gets a 500. The rollback is correct — `register-rollback.test.ts` proves nothing is left behind — but the caller deserves a retry, not an error page. Fix: retry the transaction on a P2002 against `slug` | before `T-045` |
 | `D-007` | `CONF-013` is **mitigated, not resolved** | Login filters `passwordHash: not null` and orders by `createdAt`, which closes the cross-tenant lockout. It does not answer whether an email address is global or per-tenant, and two *activated* accounts on one address are still ambiguous. Three options are written out in `CONF-013`; pick one and supersede it | **24 Aug** |
+| `D-009` | **The CSRF cookie dies with the browser; the session cookie does not** — so you stay signed in and every mutation fails permanently | Found by walkthrough, 21 Aug. `issueCsrfToken()` sets `endur.csrf` with **no `maxAge` and no `expires`**, making it a browser-session cookie. `session.ts` sets the session cookie with `maxAge: SESSION_TTL_DAYS`, so it is persistent. Close the browser and reopen: the session survives, the CSRF token is gone, and every POST/PATCH/DELETE answers *"Your session token was missing or invalid. Reload and try again."* **Reloading cannot fix it** — the SPA never calls `GET /auth/csrf` (nothing in `src/frontend` references it; only tests do), and the token is re-issued on login and register only. The message names the one remedy that does not work; the only real one is sign out and back in. Reproduced with curl: drop `endur.csrf`, keep the session, `GET /auth/me` still names the user and the next mutation 403s | **before `T-045`** — a rehearsal that starts by reopening a browser fails at the first click |
+| `D-010` | **Three sidebar items navigate to "Not built yet" pages** | Found by walkthrough, 21 Aug. `navItems.ts` has a `disabled` + `Soon` mechanism and uses it correctly for the three P3 items (Analysis, Inbox, Reflect). **Roles, People and Settings are live links to `<Placeholder>`**, as are `/app/profile` (from the TopBar user menu) and `/app/people/:id`. `router/index.tsx`'s own header states the rule being broken: *"The sidebar shows them disabled with a Soon tag and they never navigate. A stub page behind a dead link is worse than a disabled item."* The rule was written for P3; these five are **P2-after-M0**, which the rule never covered — so this is a gap in the rule, not only in the code. Someone clicking the sidebar during the demo hits three dead ends | **before `T-045`** — decide per item: `Soon`-style disable, or build it |
 | `D-008` | The capability catalogue's power labels are English | `roles/service.ts` `describe()` turns `campaign.launch` into *"launch campaigns"* — a domain noun, for `33`'s powers grid. Found by the T-044 audit and deliberately not fixed: the grid is not built, and the object → label mapping for `role`, `person`, `template` and `org` — none of which HAS a label — is `33`'s design work, not something to invent from outside it. `audit:vocab` does not scan it, because the string is assembled from a capability key rather than written | with `T-033` |
-| `D-005` | The two woff2 faces are not vendored | `tokens.css` declares both; the files are absent, so the product renders in `system-ui`. Nothing breaks, but nothing looks right either. `src/frontend/public/fonts/README.md` names the two files | **24 Aug** (`21` §4) |
+| `D-005` | The two woff2 faces are not vendored — **and this is why the UI reads as generic** | `tokens.css` declares both; `public/fonts/` holds only a README. `design_specs/design/01` §5 puts **Caprasimo on every `h1`–`h4`, card title, KPI number, button label and badge** and Figtree on everything else — so with the files absent, *every heading and every number in the product is `system-ui`*. The spec is explicit that the personality is concentrated in the type (*"Caprasimo has one weight and a lot of personality… a paragraph set in it instantly cheapens the page"*), and the fonts README says it plainly: *"until the files land… nothing breaks — it just does not look like Endur."* Confirmed as the main cause of the 21 Aug walkthrough's *"too simple, too AI-like"*. `endur.css` (1,451 lines) and the vendored `organic.css` are in place and doing their job; the two files are the missing input | **24 Aug** (`21` §4) — **highest visual return of anything left** |
 
 ---
 
@@ -240,6 +255,43 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-21 · First walkthrough of the running app — three findings, none fixed
+
+Ran both servers and clicked through. **No code was changed**; this entry and `D-009`,
+`D-010`, `D-005` are the whole output.
+
+**1 · `D-009` — the CSRF failure is not flakiness, it is permanent, and the message lies.**
+`endur.csrf` is set with no `maxAge`, so it dies with the browser. The session cookie has a
+7-day `maxAge`, so it does not. Reopen the browser and you are **still signed in with no CSRF
+token**, and every mutation answers *"Your session token was missing or invalid. Reload and
+try again."* Reloading does nothing — the SPA never calls `GET /auth/csrf`, and the token is
+only issued on login and register. Sign out and back in is the only remedy, and the message
+does not say so. Reproduced with curl.
+
+**2 · `D-010` — Roles, People and Settings are live links to "Not built yet".** The sidebar
+already has the right mechanism — `disabled` + a `Soon` tag — and uses it for the three P3
+items. `router/index.tsx` states the rule in its own header: *a stub page behind a dead link
+is worse than a disabled item.* That rule was written for P3 and never extended to the five
+P2-after-M0 routes, so the code is consistent with the rule as written and the rule is what
+is wrong.
+
+**3 · `D-005` — the "too simple, too AI-like" verdict has a concrete cause, and it is the
+fonts.** `design_specs/design/01` §5 puts **Caprasimo on every heading, card title, KPI
+number, button label and badge**. `public/fonts/` contains a README and nothing else, so all
+of that is rendering in `system-ui` right now. The design layer itself is not thin —
+`endur.css` is 1,451 lines over a vendored `organic.css` taken from the mockups — it is
+running without the one input that carries the personality. The fonts README predicted this
+sentence: *"until the files land… it just does not look like Endur."*
+
+On the question of the frontend-design skill: it has not been used, deliberately. `CLAUDE.md`
+makes `design_specs/` authoritative for visual design, and that skill gives generic aesthetic
+direction that would pull against a spec this specific. **That call is worth re-opening once
+the fonts are in**, because judging the design before its typography exists is judging
+something nobody has seen yet.
+
+`OPEN-002` stays open by decision — local URLs for now, no tunnel (21 Aug). The share sheet's
+localhost warning is therefore expected, not a bug.
 
 ### 2026-08-20 · T-044 — the vocabulary nonsense audit
 
