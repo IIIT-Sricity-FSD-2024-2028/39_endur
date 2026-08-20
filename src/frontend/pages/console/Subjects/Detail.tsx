@@ -137,10 +137,18 @@ export default function SubjectDetail(): JSX.Element {
             data.lastResponseAt ? `Last ${formatRelative(data.lastResponseAt)}` : 'None yet'
           }
         />
+        {/* "cycle" is the DTO's word for a campaign this subject appeared in, and it was on
+            screen as "3 cycles so far" until T-044 — a domain noun in a sentence, which is
+            the class 22 §5 keeps the manual walk for. A hotel reads "Active guest surveys"
+            in the kicker and would not recognise a "cycle". */}
         <StatCard
           kicker={`Active ${labels.campaign.many}`}
           value={data.activeCampaigns}
-          context={pluralise(data.cycles.length, 'cycle so far', 'cycles so far')}
+          context={`${pluralise(
+            data.cycles.length,
+            labels.campaign.one.toLowerCase(),
+            labels.campaign.many.toLowerCase(),
+          )} so far`}
         />
         <StatCard
           kicker="Linked person"

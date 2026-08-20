@@ -221,9 +221,26 @@ the recovery path during a live demo (`50-SEED-AND-DEMO.md`).
 
 Two node scripts in `/scripts`. Both run in CI and both are cheap.
 
-**`audit-vocab.mjs`** (INV-001) — greps `src/frontend/pages` and `components` for the banned
-domain nouns outside `useLabels()` calls. Complements, does not replace, the manual
-nonsense-label walkthrough on 24 Aug.
+**`audit-vocab.mjs`** (INV-001) — **three passes since T-044**, and each one exists because
+the pass before it missed something real.
+
+1. Banned education nouns anywhere in a component's code. `pages`, `components`, and — added
+   at T-044 — `lib` and `router`, because the 404 page and the three error boundaries are
+   copy too and nothing was reading them.
+2. **The five default labels, in user-facing text only** — JSX text nodes and the
+   copy-bearing attributes (`aria-label`, `placeholder`, `title`). Restricted to those two
+   positions because `Campaign` is also a type, a table and a route segment. This is the
+   pass that catches the likeliest hardcoding of all: `<ShareSheet>` had said *"Respondents
+   don't need an account."* since T-038 and pass 1 could not see it, because "Respondent" is
+   the Custom preset rather than an education word.
+3. **The server's own user-facing strings** (22 §6). `error.message` is rendered verbatim by
+   ten console pages, so an English noun in a service is INV-001 broken by the API. Only
+   message-shaped literals are scanned, and `presets/` and `database/` are excluded because
+   they are DATA — a university preset really does say "Department".
+
+Template-literal interpolations are blanked before every pass, so `${nounsOf(req).unit.one}`
+is read as the mechanism it is. Still complements, and does not replace, the manual
+nonsense-label walkthrough — 22 §5 lists what no grep can reach.
 
 **`audit-drift.mjs`** (DRIFT-003, DRIFT-004) — two checks:
 1. No hex colour, font name, or spacing token appears anywhere in `architecture/`

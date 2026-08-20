@@ -58,7 +58,7 @@ campaignsRouter.get(
   (req, res, next) => {
     const { params } = req.data as { params: { id: string } };
     void Promise.resolve()
-      .then(() => readCampaign(req.ctx.orgId as string, userOf(req), version(req), params.id))
+      .then(() => readCampaign(req, req.ctx.orgId as string, userOf(req), version(req), params.id))
       .then((campaign) => res.json({ data: campaign }))
       .catch(next);
   },
@@ -134,7 +134,7 @@ campaignsRouter.get(
   (req, res, next) => {
     const { params } = req.data as { params: { id: string } };
     void Promise.resolve()
-      .then(() => audiencePreview(req.ctx.orgId as string, userOf(req), version(req), params.id))
+      .then(() => audiencePreview(req, req.ctx.orgId as string, userOf(req), version(req), params.id))
       .then((preview) => res.json({ data: preview }))
       .catch(next);
   },

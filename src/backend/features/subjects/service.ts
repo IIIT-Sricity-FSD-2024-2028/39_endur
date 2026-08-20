@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
+import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { seesNothing, visibleUnits } from '../../authz/index.js';
 import { statusOf } from '../campaigns/status.js';
@@ -108,7 +109,7 @@ export async function createSubject(
     where: { id: body.unitId, orgId, kind: 'unit' },
     select: { id: true },
   });
-  if (!unit) throw new NotFoundError('That unit does not exist.');
+  if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
 
   if (body.linkedUserId) {
     const user = await prisma.user.findFirst({
@@ -149,7 +150,7 @@ export async function updateSubject(
       where: { id: body.unitId, orgId, kind: 'unit' },
       select: { id: true },
     });
-    if (!unit) throw new NotFoundError('That unit does not exist.');
+    if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
   }
 
   return runInTransaction(req, async (tx) => {

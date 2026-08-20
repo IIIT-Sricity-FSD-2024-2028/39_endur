@@ -258,7 +258,11 @@ describe('DELETE /units/:id', () => {
     const res = await withCsrf(founder, 'delete', `/api/v1/units/${sectionA}`).send({});
 
     expect(res.status).toBe(409);
-    expect(res.body.error.message).toMatch(/1 unit/);
+    // In the ORG'S noun. This line asserted `/1 unit/` until T-044, which is to say it was
+    // pinning the bug in place: the message said "unit" because the code hardcoded it, and
+    // the test agreed. The count and the word have to agree too — see vocabulary-server
+    // for the full assertion (22 §5, §6).
+    expect(res.body.error.message).toMatch(/1 section/);
   });
 
   it('reassigns children when told where they go', async () => {

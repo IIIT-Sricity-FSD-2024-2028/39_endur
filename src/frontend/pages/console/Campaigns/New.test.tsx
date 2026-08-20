@@ -36,7 +36,9 @@ const SUBJECTS: SubjectSummary[] = [
   },
 ];
 
-const UNITS: UnitNode[] = [{
+/** Reassignable so one test can shrink the tree to a single person — see the agreement
+ *  test at the end of step 2. The mock factory reads the binding on each call. */
+let UNITS: UnitNode[] = [{
   id: 'u1', name: 'Engineering', parentId: null, isTemporary: false, endsAt: null,
   peopleCount: 40, subjectCount: 2,
   children: [{
@@ -157,6 +159,26 @@ describe('step 2 — two different questions', () => {
     fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Continue' }).disabled).toBe(true);
+  });
+
+  it('AGREES with the count — "1 frimble", not "1 frimbles"', () => {
+    // This line passed `labels.respondent.many` as BOTH forms until T-044, so a one-person
+    // unit read "About 1 frimbles can respond." The two forms are stored rather than
+    // derived precisely so a screen can get this right (22 §2, §5).
+    const whole = UNITS;
+    UNITS = [{
+      id: 'u9', name: 'Solo', parentId: null, isTemporary: false, endsAt: null,
+      peopleCount: 1, subjectCount: 0, children: [],
+    }];
+    try {
+      mount();
+      fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      fireEvent.click(screen.getByRole('radio', { name: /Everyone in a zblorn/ }));
+      expect(screen.getByText(/About 1 frimble can respond/)).toBeTruthy();
+    } finally {
+      UNITS = whole;
+    }
   });
 
   it('counts the audience from the org graph when a unit is chosen', () => {

@@ -87,6 +87,14 @@ Rows are capabilities grouped by module and collapsible; columns are roles.
 | **Click a column header** | Copy an entire column from another role, then edit |
 | **Click a row header** | Grant a capability to everyone or nobody |
 
+**The row labels are not written yet, and INV-001 applies to them** (`D-008`). The backend's
+`capabilityCatalogue()` builds them from the capability key — `campaign.launch` becomes
+*"launch campaigns"* — which is an English domain noun on a grid a hotel administrator reads.
+The T-044 vocabulary audit found it and deliberately left it here rather than guessing: four
+of the objects in that catalogue (`role`, `person`, `template`, `org`) have no label at all,
+and deciding what a row says for those is this document's work. `audit:vocab` cannot catch it
+either, because the string is assembled from a key rather than written down.
+
 **Colour intensity tracks scope width.** An over-granted role appears as a visibly dark
 column; an orphan capability appears as a visibly empty row. Mistakes are *visible* rather
 than discoverable, which is the entire argument for a grid over a list of permissions.
@@ -150,6 +158,9 @@ Likewise, removing `grant.update` from your own only role prompts explicitly:
 - [ ] Every grid change writes an audit row with `decidedBy` (INV-007)
 - [ ] Without `grant.update`, the grid is visibly read-only rather than absent
 - [ ] Usable at 390px — the grid scrolls horizontally inside its own container
+- [ ] **Row labels use the org's vocabulary** — `D-008`. `capabilityCatalogue()` currently
+      derives *"launch campaigns"* from the key, and four of its objects have no label to
+      derive from
 
 ## Out of scope
 

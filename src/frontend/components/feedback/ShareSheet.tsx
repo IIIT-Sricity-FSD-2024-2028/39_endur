@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { CampaignStatus } from '@endur/shared';
 import { formatDateTime } from '../../lib/format.js';
+import { useLabels } from '../../lib/labels.js';
 
 /**
  * The only literal colours outside `design-system/`, and DEC-012 is right to have flagged
@@ -76,6 +77,7 @@ export function ShareSheet({
   anonymous?: boolean | undefined;
   onClose: () => void;
 }): JSX.Element {
+  const L = useLabels();
   const [copied, setCopied] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -187,7 +189,11 @@ export function ShareSheet({
               : 'Open until it is closed'}
           {anonymous && ' · anonymous'}
         </p>
-        <p className="share-meta text-meta">Respondents don’t need an account.</p>
+        {/* The org's own noun. This line said "Respondents" until T-044 — the vocabulary
+            audit's one frontend finding, and it survived four audits because "Respondent"
+            is the DEFAULT label rather than an education word, so the banned-noun grep had
+            nothing to match (22 §5). */}
+        <p className="share-meta text-meta">{L.respondent.many} don’t need an account.</p>
       </div>
     </div>
   );

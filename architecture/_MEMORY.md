@@ -583,6 +583,10 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     T-030 lands AppShell (24 §2). taking it then is correct.
 21-DESIGN-SYSTEM-BINDING.md      -> src/frontend/design-system/**
 22-VOCABULARY-SYSTEM.md          -> src/frontend/lib/labels.ts store/vocabularySlice.ts
+                                    src/backend/lib/vocabulary.ts (§6, the server half —
+                                    nounsOf/counted, added T-044) and scripts/audit-vocab.mjs
+                                    (§5, the mechanical half; 03 §7 describes it, 22 owns
+                                    what it looks for)
 23-STATE-AND-REDUX.md            -> src/frontend/store/**
 24-COMPONENT-INVENTORY.md        -> src/frontend/components/**
                                     components/Icon.tsx owns the closed icon vocabulary
@@ -1255,4 +1259,57 @@ N-047  A CONTRACT EXTENDED SO A CLICK STAYS A CLICK. 46 § Interactions gives ea
        from several campaigns, the payload does not say which, and a cross-campaign response
        inbox is P3 by name (40 § Out of scope). A link to the wrong page is worse than no
        link.
+
+N-048  THE DEFAULT VOCABULARY IS THE LIKELIEST THING TO BE HARDCODED. T-044 ran 22 §5's
+       nonsense walk and found four leaks. NOT ONE was an education word — which is the
+       entire class audit:vocab had been built around since T-003.
+       <ShareSheet> had rendered "Respondents don't need an account." since T-038, on the
+       component that IS the demo, through four audits. The grep could not see it: its list
+       holds Course/Faculty/Student/Department, and "Respondent" is the CUSTOM PRESET — the
+       fallback vocabulary, English, generic, and wrong for a hotel, which calls them Guests.
+       The rule: nobody types "Guests don't need an account" while building generic UI.
+       Everybody types "Respondents". A banned list of words a developer would have to go
+       out of their way to write is a banned list that catches nothing.
+       audit:vocab now has three passes (03 §7). Pass 2 adds the five default labels but ONLY
+       inside JSX text and copy-bearing attributes, because `Campaign` is also a type, a
+       table and a route segment; template-literal interpolations are blanked first, so
+       ${nounsOf(req).unit.one} reads as the mechanism it is. Each pass was proved by
+       planting a real violation and watching it fail — the T-035 discipline.
+       The other three findings: "About 1 frimbles can respond." on the campaign-create
+       screen (the plural passed as BOTH forms — the agreement case 22 §5 names by name),
+       "3 cycles so far" on the subject detail, where `cycle` is the DTO's internal word for
+       a campaign and was sitting directly under a kicker reading "Active {campaign.many}",
+       and the server, below.
+       The last one stays manual and cannot be otherwise: nothing but a reader knows that
+       "cycle" and "{campaign}" are the same thing.
+
+N-049  17 MESSAGE SITES, AND THE UI RENDERS THEM VERBATIM. N-044 wrote the brief — "every
+       user-facing string the SERVER produces is outside the vocabulary check; 22 §6 lists
+       three kinds and only one has been audited" — and T-044 paid it off.
+       The API said "That unit does not exist.", "That campaign has launched. It can be
+       closed, but not edited.", "That unit has 3 units inside it." Ten console pages render
+       `error.message` straight out of the envelope, so a hotel was told about a "unit" by
+       the API rather than by a component, in a place audit:vocab could not look.
+       22 §6 had specified the mechanism since revision one and nobody had built it: the
+       label set on req.ctx after tenantResolver. It costs nothing — that middleware already
+       read organizations for authzVersion, so `labels` is a column on a query that was
+       happening anyway. lib/vocabulary.ts holds nounsOf(req) and counted(n, label); the
+       latter takes a Label rather than two strings, because the delete-unit message used to
+       build its plural with + "s" and "Faculty" pluralises to "Faculty".
+       Three things worth keeping:
+         · A 404's UNIFORMITY IS ABOUT THE ANSWER, NOT THE LANGUAGE. assertVisible throws
+           the same message on both branches — no row, and out of scope — so the two stay
+           indistinguishable (13 §5). Saying it in the org's noun does not change that.
+         · THE WIZARD READS THE BODY, NOT ctx. POST /org/setup validates a structure while
+           the reader is looking at words they chose two steps ago that the database has not
+           been told about. validateStructure takes them from SetupOrgBody.
+         · A STRUCTURAL WORD STAYS STRUCTURAL IN THE SAME SENTENCE: "That template is used by
+           1 review round." A hotel calls a template a template.
+       ALSO FOUND, NOT FIXED, AND WRITTEN DOWN SO IT IS NOT REDISCOVERED: roles/service.ts
+       `describe()` turns "campaign.launch" into "launch campaigns" for 33's powers grid.
+       That grid is not built (33 is after M0) and the object→label mapping for `role`,
+       `person`, `template` and `org` — none of which HAS a label — is 33's design work, not
+       something to invent now. Whoever builds T-033 owns it.
+       AND ONE TEST WAS PINNING THE BUG: units.test.ts asserted /1 unit/. The message said
+       "unit" because the code hardcoded it, and the test agreed with it.
 ```

@@ -20,6 +20,7 @@ import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
+import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { resolve, seesNothing, visibleUnits, clearGrantCache } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
@@ -293,7 +294,7 @@ export async function addAssignment(
   ]);
   if (!person) throw new NotFoundError('That person does not exist.');
   if (!role) throw new NotFoundError('That role does not exist.');
-  if (!unit) throw new NotFoundError('That unit does not exist.');
+  if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
 
   return runInTransaction(req, async (tx) => {
     // The position node is shared by everyone holding the same role at the same unit, so

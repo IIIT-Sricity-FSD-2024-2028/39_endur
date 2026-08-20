@@ -6,6 +6,7 @@
 // It runs BEFORE authenticate because an API key resolves the tenant *and* the principal,
 // and the tenant-bound client must exist before any lookup can happen (12 §5).
 import type { Request, RequestHandler } from 'express';
+import { resolveLabels, type LabelSet, type ResolvedLabels } from '@endur/shared';
 import { AppError } from '../lib/errors.js';
 import { tenantClient, type TenantClient } from '../db/tenant.js';
 import { prisma } from '../db/client.js';
@@ -49,7 +50,9 @@ export const tenantResolver: RequestHandler = (req, _res, next) => {
       if (orgId) {
         req.ctx.orgId = orgId;
         req.db = tenantClient(orgId);
-        req.ctx.authzVersion = await authzVersionOf(orgId);
+        const tenant = await factsOf(orgId);
+        req.ctx.authzVersion = tenant.authzVersion;
+        req.ctx.labels = tenant.labels;
         return next();
       }
       if (!NEEDS_TENANT.test(req.path)) return next();
@@ -60,17 +63,27 @@ export const tenantResolver: RequestHandler = (req, _res, next) => {
 };
 
 /**
- * The tenant's current authz version. One small read per authenticated request, and it is
- * what makes the grant cache safe: without it the cache key is a constant, and a revoked
- * permission keeps working until the TTL expires.
+ * The two tenant facts every later link needs, in ONE read.
+ *
+ * `authzVersion` is what makes the grant cache safe: without it the cache key is a
+ * constant, and a revoked permission keeps working until the TTL expires.
+ *
+ * `labels` rides along because this query was already happening (T-044). 22 §6 puts the
+ * label set here so the server's own user-facing strings — validation messages,
+ * confirmation text, export headers — go through the same vocabulary the UI does. Adding
+ * a column to a read that runs anyway is the difference between doing it and deciding it
+ * costs a query per request.
  */
-async function authzVersionOf(orgId: string): Promise<number> {
+async function factsOf(orgId: string): Promise<{ authzVersion: number; labels: ResolvedLabels }> {
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { settings: true },
+    select: { settings: true, labels: true },
   });
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
-  return typeof settings.authzVersion === 'number' ? settings.authzVersion : 0;
+  return {
+    authzVersion: typeof settings.authzVersion === 'number' ? settings.authzVersion : 0,
+    labels: resolveLabels(org?.labels as LabelSet | null),
+  };
 }
 
 /** Strict priority. Each source is a credential the caller could not have forged. */

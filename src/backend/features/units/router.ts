@@ -116,7 +116,7 @@ unitsRouter.get(
   (req, res, next) => {
     const { params } = req.data as { params: { id: string } };
     const newParentId = typeof req.query.newParentId === 'string' ? req.query.newParentId : undefined;
-    void unitImpact(req.ctx.orgId as string, params.id, newParentId)
+    void unitImpact(req, req.ctx.orgId as string, params.id, newParentId)
       .then((impact) => res.json({ data: impact }))
       .catch(next);
   },

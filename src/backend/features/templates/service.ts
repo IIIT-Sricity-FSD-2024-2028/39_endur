@@ -18,6 +18,7 @@ import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
+import { counted, nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 
 /**
@@ -118,7 +119,7 @@ export async function updateTemplate(
   body: UpdateTemplateBody,
 ): Promise<TemplateDetail> {
   await assertOwned(orgId, templateId);
-  await assertEditable(templateId);
+  await assertEditable(req, templateId);
 
   return runInTransaction(req, async (tx) => {
     await tx.template.update({
@@ -207,7 +208,7 @@ export async function putQuestions(
   body: PutQuestionsBody,
 ): Promise<TemplateDetail> {
   await assertOwned(orgId, templateId);
-  await assertEditable(templateId);
+  await assertEditable(req, templateId);
 
   for (const question of body.questions) {
     // The config union is discriminated on `kind`, and a mismatch would store a shape the
@@ -257,8 +258,10 @@ export async function deleteTemplate(
   if (inUse > 0) {
     // Deleting would cascade the questions away and leave every collected answer pointing
     // at nothing. The campaign's history is the reason this is a 409 and not a soft delete.
+    // "Template" is structural — a hotel calls it a template too (22 §1). The thing it is
+    // used BY is not: that is the org's own noun, and the count agrees with it (22 §5).
     throw new ConflictError(
-      `That template is used by ${inUse} campaign${inUse === 1 ? '' : 's'}. Delete or close those first.`,
+      `That template is used by ${counted(inUse, nounsOf(req).campaign).toLowerCase()}. Delete or close those first.`,
     );
   }
 
@@ -295,10 +298,10 @@ async function isLocked(templateId: string): Promise<boolean> {
   return launched > 0;
 }
 
-async function assertEditable(templateId: string): Promise<void> {
+async function assertEditable(req: Request, templateId: string): Promise<void> {
   if (await isLocked(templateId)) {
     throw new ConflictError(
-      'That template is in use by a campaign that has launched. Duplicate it to make changes.',
+      `That template is in use by a ${nounsOf(req).campaign.one.toLowerCase()} that has launched. Duplicate it to make changes.`,
     );
   }
 }

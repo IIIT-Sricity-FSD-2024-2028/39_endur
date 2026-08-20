@@ -126,7 +126,7 @@ blocked or builds a second shell.
 |---|---|---|---|---|
 | T-042 | A | T-021 | **Resolve `OPEN-005`** — campaign status derived-on-read vs scheduler. Record as a DEC | `17` |
 | T-043 | X | — | **Resolve `OPEN-002`** — public URL / tunnel. Test QR on two real phones | `50` §6 |
-| T-044 | X | T-041 | **Vocabulary nonsense audit** across every screen — 24 Aug | `22` §5 |
+| T-044 | X | T-041 | **Vocabulary nonsense audit** across every screen — 24 Aug · **done 20 Aug**, four findings, three of them now mechanical (`22` § What T-044 found, `N-048`, `N-049`) | `22` §5 |
 | T-045 | X | all | **Three full demo rehearsals** on the venue network | `50` §5 |
 
 `T-042` and `T-043` are decisions, not code, and both are M0-critical. Do them early — they

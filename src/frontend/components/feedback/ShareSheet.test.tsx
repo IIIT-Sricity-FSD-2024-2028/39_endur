@@ -8,7 +8,8 @@
 // handed are what gets checked. That is the right seam anyway — the encoder is a tested
 // library, and what this component owns is the parameters.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
+import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
 import { isUnscannable, ShareSheet } from './ShareSheet.js';
 
 const toCanvas = vi.fn();
@@ -27,7 +28,9 @@ const URL_OK = 'https://feedback.example.test/r/K4M9X2PQ';
 
 const mount = (over: Partial<Parameters<typeof ShareSheet>[0]> = {}) => {
   const onClose = vi.fn();
-  const result = render(
+  // Mounted with a store because the sheet reads the vocabulary (T-044). The nonsense
+  // labels are the point: an English domain noun on screen here is a hardcoded one.
+  const result = renderWithProviders(
     <ShareSheet
       url={URL_OK}
       campaignName="Spring check"
@@ -37,6 +40,7 @@ const mount = (over: Partial<Parameters<typeof ShareSheet>[0]> = {}) => {
       onClose={onClose}
       {...over}
     />,
+    { labels: NONSENSE_LABELS },
   );
   return { onClose, ...result };
 };
@@ -210,5 +214,15 @@ describe('the sheet reports the campaign honestly', () => {
     });
     // A poster on a wall is the other half of the collection model.
     expect((toDataURL.mock.calls[0]?.[1] as { width: number }).width).toBeGreaterThanOrEqual(1024);
+  });
+
+  it('names the ORG\'S respondents, not "Respondents" — 22 §5, T-044', () => {
+    const { container } = mount();
+    expect(screen.getByText(/Frimbles don’t need an account/)).toBeTruthy();
+    // The assertion that would have failed the day this line was written. It said
+    // "Respondents", and audit:vocab could not see it: the banned list holds education
+    // words, and "Respondent" is the DEFAULT label — English, generic, and wrong for a
+    // hotel, which calls them Guests.
+    expect(container.textContent).not.toMatch(/Respondent/);
   });
 });
