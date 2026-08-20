@@ -5,16 +5,27 @@
 // low-permission user's home a coherent page instead of a wall of locks.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { app, addStaff, setUpOrg, unitIdByName, withCsrf, registerOrg } from './helpers.js';
+import { app, addStaff, roleIdByLevel, setUpOrg, unitIdByName, withCsrf, registerOrg } from './helpers.js';
+import type { AudienceRule } from '@endur/shared';
 import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
 import { config } from '../lib/config.js';
 
 const stranger = () => request(app);
 
-async function collectingOrg(responses: number) {
+/**
+ * An org with one launched campaign and `responses` responses in it.
+ *
+ * `invite` puts real people in Section A and points the campaign's audience at them, which
+ * is the only way to get a response RATE that means anything — an open link has no roll.
+ */
+async function collectingOrg(responses: number, invite?: { people: number }) {
   const founder = await setUpOrg();
   const sectionA = await unitIdByName(founder.orgId, 'Section A');
+  if (invite) await fillUnit(founder.orgId, 'Section A', invite.people);
+  const audience: AudienceRule = invite
+    ? { kind: 'unit', unitId: sectionA, includeSubtree: true }
+    : { kind: 'anyone' };
   const subject = await withCsrf(founder, 'post', '/api/v1/subjects').send({
     name: 'Data Structures',
     unitId: sectionA,
@@ -28,7 +39,7 @@ async function collectingOrg(responses: number) {
     name: 'Autumn feedback',
     templateId,
     subjectIds: [subject.body.data.id],
-    audience: { kind: 'anyone' },
+    audience,
   });
   const launch = await withCsrf(
     founder,
@@ -77,6 +88,31 @@ async function collectingOrg(responses: number) {
   }
 
   return founder;
+}
+
+/**
+ * People in a unit, without the cost of an account each.
+ *
+ * `countAudience` counts person NODES reachable through a member edge to a position in the
+ * unit — a user row is not part of that question, and hashing ten passwords to answer it
+ * would make this suite slower for nothing.
+ */
+async function fillUnit(orgId: string, unitName: string, count: number): Promise<void> {
+  const unitId = await unitIdByName(orgId, unitName);
+  const roleId = await roleIdByLevel(orgId, 4);
+  for (let i = 0; i < count; i += 1) {
+    const person = await prisma.node.create({
+      data: { orgId, kind: 'person', name: `Member ${i + 1}` },
+      select: { id: true },
+    });
+    const position = await prisma.node.create({
+      data: { orgId, kind: 'position', name: `Member ${i + 1} @ ${unitName}`, roleId, unitId },
+      select: { id: true },
+    });
+    await prisma.edge.create({
+      data: { orgId, type: 'member', parentId: person.id, childId: position.id, isPrimary: true },
+    });
+  }
 }
 
 describe('GET /home', () => {
@@ -154,5 +190,38 @@ describe('GET /home', () => {
     // become a way to read a gated campaign one aggregate at a time (46 § Acceptance).
     expect(res.body.data.recentComments).toEqual([]);
     expect(JSON.stringify(res.body)).not.toMatch(/Comment 1/);
+  });
+});
+
+// The bug N-043 fixed on the results page had a SECOND reader here, and this one is the
+// first screen after sign-in. Measured against the seeded demo before the fix: Northfield
+// 3161%, Grand Palace 2654%, Meridian 2610%, Riverside 4675%.
+describe('the response rate needs a denominator that exists — 46', () => {
+  it('has no rate for an open link, however many responses came back', async () => {
+    const founder = await collectingOrg(config.K_ANON_THRESHOLD);
+    const res = await founder.agent.get('/api/v1/home');
+
+    // One subject and five responses used to divide one into the other and render 500%.
+    expect(res.body.data.stats.responsesTotal).toBe(config.K_ANON_THRESHOLD);
+    expect(res.body.data.activeCampaigns[0].subjectCount).toBe(1);
+    expect(res.body.data.stats.responseRate).toBeNull();
+  });
+
+  it('measures against PEOPLE when the audience is a real set of them', async () => {
+    const founder = await collectingOrg(config.K_ANON_THRESHOLD, { people: 10 });
+    const res = await founder.agent.get('/api/v1/home');
+
+    // Ten people asked, five answered. Half, and it says half — not "500%" because five
+    // responses arrived about one subject.
+    expect(res.body.data.stats.responseRate).toBe(0.5);
+  });
+
+  it('hands the campaign card its share link, so the QR costs a click and not a request', async () => {
+    const founder = await collectingOrg(config.K_ANON_THRESHOLD);
+    const res = await founder.agent.get('/api/v1/home');
+
+    const card = res.body.data.activeCampaigns[0];
+    expect(card.url).toMatch(/\/r\/[A-Za-z0-9]+$/);
+    expect(card.anonymous).toBe(true);
   });
 });

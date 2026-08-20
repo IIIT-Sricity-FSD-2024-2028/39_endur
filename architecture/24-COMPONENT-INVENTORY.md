@@ -90,7 +90,7 @@ built early beats two built in parallel. `Valence` is the shared `results.ts` en
 ### `<BarRow>` — the workhorse
 ```ts
 { label: string; value: number; total: number;
-  tone?: 'accent' | 'good' | 'neutral' | 'bad' }
+  tone?: 'accent' | 'good' | 'neutral' | 'bad'; showPercent?: boolean }
 ```
 Built at T-034. Used in stat breakdowns, results distributions, per-subject shares, theme
 scores — and the subject detail's per-cycle response counts, which is what a trend looks like
@@ -98,23 +98,47 @@ before there is a chart. Never colour alone (`21` §8): the number renders besid
 Default tone is `accent` — single colour. **Valence tones only when the meaning is genuinely
 valenced**; do not rainbow a single question's options.
 
+`showPercent` was added at T-040 for the results distribution, which
+`design_specs/design/08` §8.1 draws as `count` *and* `percent` in separate columns. It is
+off by default because a stat breakdown of four items does not need two numbers per row.
+The percentage is derived here from `value / total` rather than taken as a prop, so the bar's
+width and the number beside it can never disagree — even though `ResultsView` also carries a
+`percent` the server computed.
+
 ### `<StackedBar>`
 ```ts
 { good: number; neutral: number; bad: number; showLegend?: boolean }
 ```
-Always paired with a legend or numbers — never colour alone (`21` §8).
+Always paired with a legend or numbers — never colour alone (`21` §8). Built at T-040, and
+**NPS is its only caller in P1–P2**: it is the one place a three-colour split is a definition
+rather than a judgement, because the instrument itself names promoters and detractors
+(`CONF-004`). Using it anywhere else on `40` would be the interpretation that page refuses.
 
-### `<ScoreBadge>`
+### `<ScoreBadge>` — **not built, and not stubbed**
 ```ts
 { score: number; max?: number }   // threshold colours from design_specs/design/01 §2b
 ```
+`40` § Components lists it and `40` § Interactions forbids exactly what it does — threshold
+colours on an average are interpretation, and *"results states what happened; it does not
+judge it"* is that page's opening line. `design_specs/design/08` §8.1 agrees with the
+prohibition and not with the list: it draws the average as display type beside the answer
+count, with no badge. Resolved as `CONF-016`; T-040 renders the number. It has no other
+caller, so building it would mean shipping a component whose only use is one the docs rule
+out.
 
-### `<TrendChip>`
+### `<TrendChip>` — **not built in P1-P2**
 ```ts
 { delta: number; suffix?: string }
 ```
 **The arrow is mandatory**, not decorative — it is the non-colour cue that keeps trend
 readable for colour-blind users and in print.
+
+Its only P2 caller was `46` § Components, and `46` § Out of scope rules trends off that page
+(*"that is `43`, and it is P3"*) while its payload carries nothing to compare "today"
+against. Resolved as `CONF-017` at T-041; the remaining caller is `43`, which is P3. Second
+component after `<ScoreBadge>` to be listed by a page that forbids what it does — both were
+catalogued from `43`'s needs and then borrowed by a P2 page that only looked like it needed
+one.
 
 ### `<ResponsiveTable>`
 ```ts

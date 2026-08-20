@@ -122,7 +122,8 @@ scores: aggregate numbers live behind the results endpoints, where the k-anonymi
 | GET | `/` | `org.read` — the whole dashboard in one call (`46`) |
 
 Deliberately one endpoint rather than six. A dashboard that fires six requests is six chances
-to be slow, and it is the first screen after login.
+to be slow, and it is the first screen after login. That includes the share URL on each
+active campaign (`46`), so opening the QR from here costs a click and not a round trip.
 
 ### Profile — `/api/v1/profile`
 

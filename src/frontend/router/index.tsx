@@ -21,7 +21,7 @@ const Landing = lazy(() => import('../pages/public/Landing.js'));
 const Login = lazy(() => import('../pages/public/Login.js'));
 const Start = lazy(() => import('../pages/public/Start.js'));
 
-const Home = lazy(() => import('../pages/console/Home.js'));
+const Home = lazy(() => import('../pages/console/Home/index.js'));
 const Setup = lazy(() => import('../pages/console/Setup/index.js'));
 const Structure = lazy(() => import('../pages/console/Structure/index.js'));
 const Roles = lazy(() => import('../pages/console/Roles.js'));
@@ -36,7 +36,7 @@ const BuilderPreview = lazy(() => import('../pages/console/Builder/Preview.js'))
 const Campaigns = lazy(() => import('../pages/console/Campaigns/index.js'));
 const CampaignNew = lazy(() => import('../pages/console/Campaigns/New.js'));
 const CampaignDetail = lazy(() => import('../pages/console/Campaigns/Detail.js'));
-const Results = lazy(() => import('../pages/console/Results.js'));
+const Results = lazy(() => import('../pages/console/Results/index.js'));
 const Profile = lazy(() => import('../pages/console/Profile.js'));
 const Simulator = lazy(() => import('../pages/console/Simulator.js'));
 const Settings = lazy(() => import('../pages/console/Settings.js'));

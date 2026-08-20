@@ -1328,3 +1328,124 @@ textarea.q-text-input { min-height: 90px; }
 @media (min-width: 640px) {
   .rf-title { font-size: 32px; }
 }
+
+/* ══ T-040 · RESULTS ═══════════════════════════════════════════════════════
+   40, design_specs/design/08 §8.1. Descriptive, never judged: there is no
+   rule below that paints a distribution bar by its value, and that absence
+   is the design (CONF-016).                                              */
+
+.results-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.results-filters { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
+.filter-field { display: flex; align-items: center; gap: var(--space-2); }
+.filter-field .input { min-height: 36px; padding: 4px var(--space-2); }
+.header-actions { display: flex; gap: var(--space-2); }
+
+.results-suppressed { display: flex; flex-direction: column; gap: var(--space-2); }
+.results-questions { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); }
+
+.qr-card {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-card); border: 1px solid var(--color-divider);
+}
+.qr-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.qr-title { margin: 0; font-size: 17px; }
+.qr-meta { margin: 0; }
+/* Display type beside the count, as the mockup draws it — no badge, no threshold
+   colour. Colouring an average is interpretation, and interpretation is 43. */
+.qr-average { margin: 0; font-family: var(--font-heading); font-size: 20px; }
+.qr-bars { display: flex; flex-direction: column; gap: 6px; }
+.qr-empty { margin: 0; }
+
+.qr-nps { display: flex; flex-direction: column; gap: var(--space-2); }
+.qr-score { margin: 0; font-size: 14px; }
+.qr-score strong { font-family: var(--font-heading); font-size: 20px; }
+
+/* The one three-colour chart in the product. NPS names its own groups, so the
+   colour repeats a definition rather than inventing a judgement (CONF-004). */
+.stacked { display: flex; flex-direction: column; gap: var(--space-2); }
+.stacked-track {
+  display: flex; height: 14px; border-radius: 999px; overflow: hidden;
+  background: var(--color-neutral-200);
+}
+.stacked-part { display: block; height: 100%; }
+.stacked-legend {
+  display: flex; flex-wrap: wrap; gap: var(--space-3);
+  list-style: none; margin: 0; padding: 0; font-size: 13px;
+}
+.stacked-legend li { display: flex; align-items: center; gap: 6px; }
+.stacked-key { width: 10px; height: 10px; border-radius: 3px; }
+
+/* The percent column design_specs/design/08 §8.1 draws beside the count. */
+.bar-row.has-percent { grid-template-columns: minmax(0, 1fr) 2fr auto 3.2rem; }
+.bar-percent { font-size: 12px; text-align: right; color: var(--color-neutral-700); }
+
+.results-comments { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.section-title { margin: 0; font-size: 17px; }
+.comment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.comment {
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-neutral-100);
+}
+.comment-text { margin: 0; font-size: 14px; line-height: 1.5; }
+.comment-meta { margin: 4px 0 0; }
+/* THE LANDING. What the evaluator sees after scanning, and it should not require
+   a manual refresh — 600ms, and the global reduced-motion rule neutralises it. */
+.comment.is-new { animation: comment-land 600ms var(--ease) both; }
+@keyframes comment-land {
+  from { background: var(--color-accent-100); }
+  to   { background: var(--color-neutral-100); }
+}
+
+@media (max-width: 639px) {
+  .results-filters { flex-direction: column; align-items: stretch; }
+  .filter-field { justify-content: space-between; }
+  .header-actions { width: 100%; }
+  .header-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ── T-041 · home dashboard (46, design_specs/design/04 §4.1) ───────────────── */
+
+.home-prompts { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.home-prompt {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.home-prompt-title { margin: 0 0 2px; font-weight: 600; }
+.home-prompt .text-meta { margin: 0; }
+
+/* Two columns on a wide screen, one on a narrow one. A dashboard that keeps two columns
+   at 390px is a dashboard with two unreadable columns. */
+.home-columns {
+  display: grid; gap: var(--space-3); margin-top: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+}
+.home-column { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+.home-campaigns { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.home-campaign { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.home-campaign-name { font-family: var(--font-heading); font-size: 18px; text-decoration: none; }
+.home-campaign-count { margin: 0; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.home-campaign-number { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 26px; color: var(--color-accent-2-700); }
+.home-campaign-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+
+.home-recent { display: flex; flex-direction: column; gap: var(--space-3); }
+.home-recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.home-recent-item { display: flex; gap: var(--space-2); align-items: flex-start; }
+.home-recent-text { margin: 0; font-size: 14px; line-height: 1.5; }
+.home-recent-item .text-meta { margin: 2px 0 0; }
+/* The 7px accent dot design_specs/design/04 §4.1 draws. Decorative, and aria-hidden. */
+.home-dot { flex: 0 0 auto; width: 7px; height: 7px; margin-top: 7px; border-radius: 50%; background: var(--color-accent-500); }
+
+.home-error { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+/* A skeleton at the real card size, so nothing jumps when the numbers land. */
+.home-skeleton { min-height: 104px; background: var(--color-neutral-100); border-color: transparent; }
+
+@media (max-width: 639px) {
+  .home-prompt { flex-direction: column; align-items: stretch; }
+  .home-prompt .btn { width: 100%; justify-content: center; }
+}

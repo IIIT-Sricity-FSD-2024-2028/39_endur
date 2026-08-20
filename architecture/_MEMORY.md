@@ -361,6 +361,41 @@ CONF-012  password minimum. design_specs/design/03 §3.3 helper copy says "At le
           single `MIN_PASSWORD` const that mirrors the DTO, so the two cannot drift by
           hand-editing a string.
 
+CONF-017  <TrendChip> IS THE SECOND ONE. 46 § Components puts a trend chip on the
+          "today" delta. THREE THINGS DISAGREE WITH THAT LIST ENTRY, and they are not
+          subtle: 46 § Out of scope says "charts, trends, sentiment - that is 43, and it
+          is P3. Home is a hub"; 46 § Purpose says the page "must not become a second
+          analysis dashboard"; and HomeView carries no yesterday, so the direction an
+          arrow would point is not in the payload at all.
+          <StatCard>'s own contract says the same thing in one line - a delta "only ever
+          appears where a direction is real".
+          RESOLVED to the prohibitions. Today's count renders as a count with a context
+          line. <TrendChip> is NOT BUILT and NOT STUBBED; 24 records it, and its remaining
+          caller is 43, which is P3.
+          The pattern is now worth naming, because this is twice: 24's component list was
+          written from 43's needs, and P2 pages have been borrowing entries from it that
+          only LOOK like things they need. A component listed by a page is not the same as
+          a component that page can use — check what the rest of that document says about
+          the thing before building it.
+
+CONF-016  <ScoreBadge> IS A COMPONENT THAT DOES THE THING ITS OWN PAGE FORBIDS.
+          24 §3 defines it as `{ score, max }` with "threshold colours", and 40 §
+          Components lists it among the results page's components.
+          40 § Purpose opens with "Results states what happened; it does not judge it", and
+          40 § Interactions is explicit: "Distribution bars are single-colour. Do not colour
+          rating 1 red and rating 5 green — that is interpretation." A threshold colour on
+          an average is the same inference wearing a badge. design_specs/design/08 §8.1
+          sides with the prohibition rather than with the list — its per-question card spec
+          draws the average as display type beside the answer count, no badge, no colour.
+          RESOLVED -> the no-interpretation rule wins. It is stated twice in 40 and once in
+          the design spec; the component appears in one list. T-040 renders the average as
+          a number and <ScoreBadge> is NOT BUILT and not stubbed — its only would-be caller
+          is the one place the docs rule it out, and a component with no legitimate caller
+          is a component that will eventually acquire an illegitimate one.
+          Nothing is lost: the Analyze layer (43, P3) is where a judged score belongs, and
+          it can define its own thresholds against a rubric rather than against arithmetic.
+          status   ACTIVE. revisit when 43 is built, with a rubric.
+
 CONF-015  39 CONTRADICTS ITSELF ABOUT THE EDGE STATES, and the two halves cannot both
           be built.
           39 § States (and design_specs/design/07 §7.6) draw FOUR screens, two of which
@@ -595,6 +630,33 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     scanning requirement, not a style. new dependency:
                                     `qrcode`, rendered to canvas locally, never through an
                                     image service. see N-037 and N-038.
+40-PAGE-results.md               -> src/frontend/pages/console/Results/** lib/results.ts
+                                    + src/backend/features/results/**
+                                    the k-anonymity gate is the point of this feature and
+                                    it is enforced IN THE BODY (52 §2) — the page has
+                                    nothing that could reconstruct a suppressed
+                                    distribution, and it must stay that way.
+                                    T-040 also took components/data/StackedBar.tsx (owned
+                                    by 24, NPS is its only legitimate caller), extended
+                                    <BarRow> with showPercent, and created
+                                    src/backend/features/campaigns/audience.ts — shared
+                                    with 38 and read N-043 before changing either side.
+                                    lib/tree.ts is new and is NOT lib/units.ts: N-045.
+                                    <ScoreBadge> is catalogued and deliberately unbuilt,
+                                    CONF-016.
+46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/** lib/home.ts
+                                    + src/backend/features/home/**
+                                    THE FIRST SCREEN AFTER SIGN-IN and the one the org
+                                    switcher lands on, so its nouns are the ten-second
+                                    proof (22 §4). ONE request, NO polling — live counters
+                                    are 40's, and a second poller here has no reader.
+                                    readStats() carried its own copy of the response-rate
+                                    bug until T-041: read N-046 before touching either
+                                    reader, and go through features/campaigns/audience.ts.
+                                    cards.ts, CampaignCard.tsx and Recent.tsx are pure
+                                    page-local modules and are not 24's business.
+                                    <TrendChip> is catalogued and deliberately unbuilt,
+                                    CONF-017.
 39-PAGE-respondent-flow.md       -> src/frontend/pages/respond/** lib/respond.ts
                                     + src/backend/features/public/**
                                     THE HERO SCREEN, and the only world with no store, no
@@ -1100,4 +1162,97 @@ N-042  A CUSTOM PROPERTY THAT WAS NEVER DEFINED, and eight CSS rules asked for i
        The names themselves are deliberately not written here; they live in the design
        system, which is the only place that owns them (DEC-012). Read the declarations
        before adding a rule rather than copying the nearest line.
+
+N-043  THE RESPONSE RATE HAD NO DENOMINATOR, AND SHOWED 4675%. `readResults` set
+       `audienceEstimate` to `campaign.subjects.length` — so `responseRate` was
+       responses-per-SUBJECT, rendered as a percentage. Measured against the seeded demo
+       before touching anything: Northfield's Spring term feedback 633 responses / 18
+       subjects = 3517%; Riverside's patient survey 4675%; every one of the eight seeded
+       campaigns with real data between 1750% and 4675%. On the screen an evaluator opens
+       straight after scanning a QR code.
+       CAUSE: two different questions with one answer. `audiencePreview` substitutes the
+       subject count for an `anyone` rule ON PURPOSE and says so — the create screen needs a
+       number to show, and "0" beside an open audience reads as a broken rule. `readResults`
+       reused that number as a divisor, where the honest answer is that there isn't one.
+       FIXED by extracting features/campaigns/audience.ts: countAudience() resolves a unit
+       or role rule against the org graph and returns NULL for `anyone`, because a link has
+       no roll. 40's DTO has typed both fields `| null` since revision one, which is the
+       document having anticipated this and nobody having read it that way.
+       The page renders a dash AND THE REASON — "anyone with the link can respond, so there
+       is no total to measure against" — rather than a bare "—", which would read as a
+       number that failed to load.
+       CONSEQUENCE FOR THE DEMO, and it is somebody's call, not this task's: all four seeded
+       orgs use `anyone`, so the RESPONSE RATE card is a dash throughout the demo. One
+       seeded campaign given a `unit` audience would make that card show a real number. That
+       is 50's data, not 40's page.
+       ALSO FOUND on the way: `audience_rule` is JSONB and the dev database holds rows with
+       `{}` in it, from before the discriminated union existed. Both readers now go through
+       ruleOf(), which treats an unreadable rule as the open case rather than throwing — a
+       results page that 500s because of an old row is worse than one that guesses the
+       likeliest thing and stays up.
+
+N-044  THE CSV SAID "SUBJECT". 22 §6 warns in as many words that "a CSV export whose header
+       column says Course for a hotel is exactly the kind of leak the manual audit is for,
+       and it is the one nobody thinks to check" — and the export shipped at T-023 with the
+       literal word as a header. Nobody checked it for the reason the doc predicted:
+       audit:vocab only scans the frontend, because that is where components render.
+       Fixed at T-040 (resolveLabels on the campaign's org), and the test now pins the test
+       org's own noun and asserts the English word is ABSENT — an assertion that would have
+       failed the day the export was written.
+       WORTH GENERALISING: every user-facing string the SERVER produces is outside the
+       vocabulary check. 22 §6 lists three kinds — validation messages, confirmation text,
+       export headers. Only one of the three has been audited.
+
+N-045  A PURE FUNCTION INSIDE A MOCKED MODULE IS A FUNCTION EVERY MOCK REIMPLEMENTS.
+       `flattenUnits` — the tree flattened for a `<select>` — existed twice, character for
+       character, in 35's subject filter and 38's audience picker. T-040 needed a third, so
+       it was lifted into lib/units.ts.
+       Two suites went red immediately: `No "flattenUnits" export is defined on the
+       "lib/units.js" mock`. Every page that filters by unit mocks `useUnits()`, and adding
+       a pure helper to that module meant every one of those mocks would have to grow a copy
+       of it — which is the duplication again, moved somewhere harder to see.
+       Moved to lib/tree.ts, which nothing mocks. The rule: a module that tests replace
+       wholesale is a bad home for a function that has no reason to be replaced. The failing
+       mock is the signal, not an obstacle.
+
+N-046  THE SAME BUG HAD A SECOND READER, AND IT WAS THE FIRST SCREEN AFTER SIGN-IN. N-043
+       fixed `readResults`. It did not know `readStats` in features/home/service.ts held its
+       own copy of the substitution — sum the campaigns' `_count.subjects`, divide the
+       responses by it, render as a percentage. Measured against the seeded demo before
+       touching anything, exactly as N-043 was: Northfield 3161%, Grand Palace 2654%,
+       Meridian 2610%, Riverside 4675%. Verified afterwards on the same data: all four now
+       report no denominator.
+       WHAT IT COST TO FIND: nothing, because T-041 read the endpoint it was building
+       against. WHAT IT WOULD HAVE COST TO MISS: the first number on the first screen of the
+       graded demo. The generalisable half is the one worth keeping — A FIX APPLIED AT THE
+       CALL SITE IS NOT A FIX. `countAudience()` existed, was correct, and was documented as
+       the honest counter, and a second caller three files away still divided by the wrong
+       thing. When a wrong number is corrected, grep for the ARITHMETIC, not for the
+       function: `_count.subjects` as a divisor was greppable and nobody grepped it.
+       Both readers go through features/campaigns/audience.ts now. Home aggregates across
+       campaigns, so it drops a campaign with no audience from BOTH sides of the fraction
+       rather than counting its responses against everybody else's audience — that would be
+       a third wrong number rather than a compromise.
+       THE SEED DECISION FROM N-043 NOW AFFECTS TWO SCREENS: all four demo orgs use `anyone`,
+       so both cards read "—" throughout the demo. Correctly. One seeded campaign with a
+       `unit` audience fixes both, and that is 50's data.
+
+N-047  A CONTRACT EXTENDED SO A CLICK STAYS A CLICK. 46 § Interactions gives each campaign
+       card a Share that opens <ShareSheet>, "because during a demo the most common thing you
+       want from this screen is the QR code". <ShareSheet> cannot render without the URL, and
+       HomeView did not carry one — so the choice was a second request fired on the click, on
+       venue wifi, at the moment somebody is holding a phone up, or two fields from columns
+       the query already reads.
+       Extended, per N-033's rule: substitute when the missing number is informational,
+       extend the contract when a required behaviour depends on it. `url` and `anonymous`
+       are in 46 § Data contract and in 13 § Home. `status` is NOT — every campaign on this
+       page is open by definition, and a field with one possible value is a field that will
+       eventually hold the wrong one.
+       ALSO NOT BUILT, and for the N-046 reason: design_specs/design/04 §4.1 draws a progress
+       bar reading `612 / 800` on each card. The 800 is the same invented denominator. The
+       count renders alone.
+       ALSO NOT BUILT: the "View all →" on the recent-response strip. Those comments come
+       from several campaigns, the payload does not say which, and a cross-campaign response
+       inbox is P3 by name (40 § Out of scope). A link to the wrong page is worse than no
+       link.
 ```
