@@ -99,6 +99,9 @@ describe('the page', () => {
     expect(screen.getByRole('heading', { name: 'Data Structures' })).toBeTruthy();
     expect(screen.getByText('Quaxel · in Engineering')).toBeTruthy();
     expect(screen.getByText('Active Plithes')).toBeTruthy();
+    // The line under that kicker said "2 cycles so far" until T-044 — "cycle" is the DTO's
+    // word for a campaign this subject appeared in, and a hotel would not recognise it.
+    expect(screen.getByText('2 plithes so far')).toBeTruthy();
   });
 
   it('shows the history oldest first, with per-cycle counts', () => {

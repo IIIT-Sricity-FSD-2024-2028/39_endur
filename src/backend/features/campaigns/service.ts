@@ -14,6 +14,7 @@ import { runInTransaction } from '../../db/tx.js';
 import { unitSubtree } from '../../db/graph.js';
 import { ruleOf } from './audience.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
+import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { seesNothing, visibleUnits } from '../../authz/index.js';
 import { config } from '../../lib/config.js';
@@ -61,12 +62,13 @@ export async function listCampaigns(
 }
 
 export async function readCampaign(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
 ): Promise<CampaignDetail> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.read');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.read');
   return {
     ...toSummary(campaign),
     // Through ruleOf, not a bare cast: the column is JSONB and holds `{}` on rows that
@@ -134,7 +136,7 @@ export async function createCampaign(
     return campaign.id;
   });
 
-  return readCampaign(orgId, userId, 0, created);
+  return readCampaign(req, orgId, userId, 0, created);
 }
 
 export async function updateCampaign(
@@ -145,12 +147,14 @@ export async function updateCampaign(
   campaignId: string,
   body: UpdateCampaignBody,
 ): Promise<CampaignDetail> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.update');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.update');
 
   // Draft only (13 §3). Once responses can arrive, changing the audience or the subjects
   // would make the numbers already collected mean something different.
   if (statusOf(campaign) !== 'draft') {
-    throw new ConflictError('That campaign has launched. It can be closed, but not edited.');
+    throw new ConflictError(
+      `That ${nounsOf(req).campaign.one.toLowerCase()} has launched. It can be closed, but not edited.`,
+    );
   }
 
   await runInTransaction(req, async (tx) => {
@@ -177,7 +181,7 @@ export async function updateCampaign(
     });
   });
 
-  return readCampaign(orgId, userId, authzVersion, campaignId);
+  return readCampaign(req, orgId, userId, authzVersion, campaignId);
 }
 
 /**
@@ -194,7 +198,7 @@ export async function launchCampaign(
   authzVersion: number,
   campaignId: string,
 ): Promise<LaunchResult> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.launch');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.launch');
 
   if (campaign.publicToken) {
     return {
@@ -203,7 +207,9 @@ export async function launchCampaign(
       status: statusOf(campaign),
     };
   }
-  if (campaign.closedAt) throw new ConflictError('That campaign has been closed.');
+  if (campaign.closedAt) {
+    throw new ConflictError(`That ${nounsOf(req).campaign.one.toLowerCase()} has been closed.`);
+  }
 
   const token = await runInTransaction(req, async (tx) => {
     const minted = mintToken();
@@ -232,9 +238,10 @@ export async function closeCampaign(
   authzVersion: number,
   campaignId: string,
 ): Promise<CampaignDetail> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.close');
-  if (statusOf(campaign) === 'closed') throw new ConflictError('That campaign is already closed.');
-  if (!campaign.publicToken) throw new ConflictError('That campaign has not launched yet.');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.close');
+  const noun = nounsOf(req).campaign.one.toLowerCase();
+  if (statusOf(campaign) === 'closed') throw new ConflictError(`That ${noun} is already closed.`);
+  if (!campaign.publicToken) throw new ConflictError(`That ${noun} has not launched yet.`);
 
   await runInTransaction(req, async (tx) => {
     // The ONE stored transition. Everything else about status is read off the dates.
@@ -246,7 +253,7 @@ export async function closeCampaign(
     });
   });
 
-  return readCampaign(orgId, userId, authzVersion, campaignId);
+  return readCampaign(req, orgId, userId, authzVersion, campaignId);
 }
 
 /**
@@ -257,12 +264,13 @@ export async function closeCampaign(
  * read as a broken audience rather than an open one.
  */
 export async function audiencePreview(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
 ): Promise<AudiencePreview> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'campaign.read');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.read');
   const rule = ruleOf(campaign.audienceRule);
 
   if (rule.kind === 'anyone') {
@@ -307,17 +315,22 @@ export async function audiencePreview(
 /* ---------------------------------------------------------------- helpers */
 
 async function assertVisible(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
   capability: 'campaign.read' | 'campaign.update' | 'campaign.launch' | 'campaign.close',
 ): Promise<CampaignRow> {
+  // Both throws below say the SAME thing, deliberately (13 §5) — and both say it in the
+  // org's own noun (22 §6). Uniform and vocabulary-aware are not in tension: what must not
+  // vary between the two branches is the answer, not the language it is written in.
+  const missing = `That ${nounsOf(req).campaign.one.toLowerCase()} does not exist.`;
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, orgId },
     select: campaignSelect,
   });
-  if (!campaign) throw new NotFoundError('That campaign does not exist.');
+  if (!campaign) throw new NotFoundError(missing);
 
   const visibility = await visibleUnits({ orgId, userId, capability, authzVersion });
   if (visibility.all) return campaign;
@@ -328,8 +341,8 @@ async function assertVisible(
   if (units.some((unitId) => visibility.unitIds.includes(unitId))) return campaign;
 
   // 404, not 403: a 403 would confirm the campaign exists to somebody outside its scope
-  // and leak which departments are collecting feedback (13 §5).
-  throw new NotFoundError('That campaign does not exist.');
+  // and leak which parts of the organisation are collecting feedback (13 §5).
+  throw new NotFoundError(missing);
 }
 
 const campaignSelect = {

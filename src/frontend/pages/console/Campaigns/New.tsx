@@ -9,7 +9,7 @@
 // produce two links — the QR already on screen would then point at the wrong one.
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { AudienceRule, CampaignDetail, SubjectSummary, UnitNode } from '@endur/shared';
+import type { AudienceRule, CampaignDetail, Label, SubjectSummary, UnitNode } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { Toggle } from '../../../components/form/Toggle.js';
@@ -66,7 +66,7 @@ export default function CampaignNew(): JSX.Element {
   // The audience preview needs a campaign id, which does not exist until step 3 commits.
   // Before then the count is computed from what IS known: "anyone" is uncountable by
   // definition, and the other two rules are answerable from the org graph already loaded.
-  const audienceLine = useAudienceLine(audience, units.data ?? [], labels.respondent.many);
+  const audienceLine = useAudienceLine(audience, units.data ?? [], labels.respondent);
 
   const chooseTemplate = (id: string, templateName: string): void => {
     setTemplateId(id);
@@ -352,15 +352,19 @@ export default function CampaignNew(): JSX.Element {
  * shown here is computed from the org tree already in memory. It is labelled as an
  * estimate, and the authoritative number is the one the API returns afterwards.
  */
-function useAudienceLine(rule: AudienceRule, units: UnitNode[], respondentWord: string): string {
+function useAudienceLine(rule: AudienceRule, units: UnitNode[], respondent: Label): string {
   return useMemo(() => {
     if (rule.kind === 'anyone') return `Anyone holding the link can respond.`;
     if (rule.kind === 'role') return `Everyone at that role level can respond.`;
     const node = find(units, rule.unitId);
     if (!node) return 'Choose where.';
     const count = countPeople(node);
-    return `About ${pluralise(count, respondentWord.toLowerCase(), respondentWord.toLowerCase())} can respond.`;
-  }, [rule, units, respondentWord]);
+    // BOTH forms, from the label set. This passed the plural twice until T-044 and read
+    // "About 1 guests can respond." — the agreement failure 22 §5 names, and the reason
+    // the two forms are stored rather than derived (a derived one would have said
+    // "Facultys" instead).
+    return `About ${pluralise(count, respondent.one.toLowerCase(), respondent.many.toLowerCase())} can respond.`;
+  }, [rule, units, respondent]);
 }
 
 function find(nodes: UnitNode[], id: string): UnitNode | undefined {

@@ -32,7 +32,7 @@ resultsRouter.get(
     const { params, query } = req.data as { params: { id: string }; query: ResultsQuery };
     void Promise.resolve()
       .then(() =>
-        readResults(req.ctx.orgId as string, userOf(req), version(req), params.id, query),
+        readResults(req, req.ctx.orgId as string, userOf(req), version(req), params.id, query),
       )
       .then((results) => res.json({ data: results }))
       .catch(next);
@@ -51,7 +51,7 @@ resultsRouter.get(
     const { params, query } = req.data as { params: { id: string }; query: ResponsesQuery };
     void Promise.resolve()
       .then(() =>
-        readResponses(req.ctx.orgId as string, userOf(req), version(req), params.id, query),
+        readResponses(req, req.ctx.orgId as string, userOf(req), version(req), params.id, query),
       )
       .then((page) => res.json(page))
       .catch(next);
@@ -67,7 +67,7 @@ resultsRouter.get(
   (req, res, next) => {
     const { params } = req.data as { params: { id: string } };
     void Promise.resolve()
-      .then(() => exportResults(req.ctx.orgId as string, userOf(req), version(req), params.id))
+      .then(() => exportResults(req, req.ctx.orgId as string, userOf(req), version(req), params.id))
       .then(({ filename, csv }) => {
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

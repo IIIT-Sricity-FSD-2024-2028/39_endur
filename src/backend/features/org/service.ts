@@ -1,6 +1,6 @@
 // Organisation reads and the wizard's single commit. 13 § Organisation, 31, 50 §1.
 import { estimateSeconds, resolveLabels } from '@endur/shared';
-import type { LabelSet, OrgView, SetupOrgBody, UpdateOrgBody } from '@endur/shared';
+import type { LabelSet, OrgView, ResolvedLabels, SetupOrgBody, UpdateOrgBody } from '@endur/shared';
 import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction, type Tx } from '../../db/tx.js';
@@ -67,7 +67,7 @@ export async function setupOrg(
   body: SetupOrgBody,
 ): Promise<OrgView> {
   const preset = presetFor(body.industry);
-  const root = validateStructure(body.units);
+  const root = validateStructure(body.units, resolveLabels(body.labels));
 
   return runInTransaction(req, async (tx) => {
     // Setup GENERATES the canonical objects; it is not a parallel store (CONF-008). Once
@@ -243,14 +243,23 @@ export async function bumpVersion(
  * halfway through means the message is about a foreign key rather than about the form the
  * person is looking at.
  */
-function validateStructure(units: SetupOrgBody['units']): SetupOrgBody['units'][number] {
+function validateStructure(
+  units: SetupOrgBody['units'],
+  labels: ResolvedLabels,
+): SetupOrgBody['units'][number] {
+  // The noun comes from the BODY, not from req.ctx (22 §6, T-044). This runs mid-wizard:
+  // the words the reader is looking at are the ones they picked two steps ago, which the
+  // database has not been told about yet. Reading the stored labels here would answer in
+  // the vocabulary they are in the middle of replacing.
+  const unit = labels.unit.one.toLowerCase();
+  const units_ = labels.unit.many.toLowerCase();
   const tempIds = new Set(units.map((unit) => unit.tempId));
   if (tempIds.size !== units.length) {
-    throw new ConflictError('Two units in that structure share the same id.');
+    throw new ConflictError(`Two ${units_} in that structure share the same id.`);
   }
   const roots = units.filter((unit) => unit.parentTempId === null);
   if (roots.length !== 1) {
-    throw new ConflictError('The structure needs exactly one top-level unit.');
+    throw new ConflictError(`The structure needs exactly one top-level ${unit}.`);
   }
   for (const unit of units) {
     if (unit.parentTempId !== null && !tempIds.has(unit.parentTempId)) {

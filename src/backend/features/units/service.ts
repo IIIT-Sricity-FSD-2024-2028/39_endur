@@ -13,6 +13,7 @@ import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { unitAncestors, unitSubtree, wouldCreateCycle } from '../../db/graph.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
+import { counted, nounsOf } from '../../lib/vocabulary.js';
 import { seesNothing, visibleUnits, type Visibility } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
 
@@ -94,7 +95,7 @@ export async function createUnit(
   userId: string,
   body: CreateUnitBody,
 ): Promise<UnitNode[]> {
-  if (body.parentId) await assertUnitInOrg(orgId, body.parentId);
+  if (body.parentId) await assertUnitInOrg(req, orgId, body.parentId);
 
   // `Floor 1..8` — one request, one transaction, eight siblings. The grammar and the cap
   // live in the shared DTO so the client's preview and this loop cannot disagree, and so
@@ -149,7 +150,7 @@ export async function updateUnit(
   unitId: string,
   body: UpdateUnitBody,
 ): Promise<UnitNode> {
-  await assertUnitInOrg(orgId, unitId);
+  await assertUnitInOrg(req, orgId, unitId);
 
   return runInTransaction(req, async (tx) => {
     const unit = await tx.node.update({
@@ -185,17 +186,18 @@ export async function reparentUnit(
   unitId: string,
   body: ReparentBody,
 ): Promise<{ ok: true }> {
-  await assertUnitInOrg(orgId, unitId);
+  await assertUnitInOrg(req, orgId, unitId);
   if (body.newParentId) {
-    await assertUnitInOrg(orgId, body.newParentId);
+    await assertUnitInOrg(req, orgId, body.newParentId);
     // The client also prevents the obvious drags, but the server is the authority. A cycle
     // here does not merely produce wrong answers — it is what the recursive queries' depth
     // guard exists to survive (10 §6).
+    const inItself = `That move would put the ${nounsOf(req).unit.one.toLowerCase()} inside itself.`;
     if (await wouldCreateCycle(orgId, 'primary', body.newParentId, unitId)) {
-      throw new ConflictError('That move would put the unit inside itself.');
+      throw new ConflictError(inItself);
     }
     if (await wouldCreateCycle(orgId, 'contains', body.newParentId, unitId)) {
-      throw new ConflictError('That move would put the unit inside itself.');
+      throw new ConflictError(inItself);
     }
   }
 
@@ -221,21 +223,27 @@ export async function deleteUnit(
   unitId: string,
   body: DeleteUnitBody,
 ): Promise<{ ok: true }> {
-  await assertUnitInOrg(orgId, unitId);
+  await assertUnitInOrg(req, orgId, unitId);
   const children = await childrenOf(orgId, unitId);
 
+  const unitNoun = nounsOf(req).unit;
   if (children.length > 0 && !body.reassignChildrenTo) {
     // Deleting silently orphans everything below, and the cascade would take the positions
     // with it. Refusing with a number is the honest answer; the dialog states it (32).
+    //
+    // `counted` takes the stored plural rather than two strings, because this line used to
+    // append an "s" — and "Faculty" pluralises to "Faculty" (22 §5, §8).
     throw new ConflictError(
-      `That unit has ${children.length} unit${children.length === 1 ? '' : 's'} inside it. Say where they should go first.`,
+      `That ${unitNoun.one.toLowerCase()} has ${counted(children.length, unitNoun).toLowerCase()} inside it. Say where they should go first.`,
     );
   }
   if (body.reassignChildrenTo) {
-    await assertUnitInOrg(orgId, body.reassignChildrenTo);
+    await assertUnitInOrg(req, orgId, body.reassignChildrenTo);
     const subtree = await unitSubtree(orgId, unitId);
     if (subtree.includes(body.reassignChildrenTo)) {
-      throw new ConflictError('The children cannot be moved into a unit that is being deleted.');
+      throw new ConflictError(
+        `The children cannot be moved into a ${unitNoun.one.toLowerCase()} that is being deleted.`,
+      );
     }
   }
 
@@ -265,11 +273,12 @@ export async function deleteUnit(
  * what changes is a confirmation nobody reads (32).
  */
 export async function unitImpact(
+  req: Request,
   orgId: string,
   unitId: string,
   newParentId?: string,
 ): Promise<UnitImpact> {
-  const unit = await assertUnitInOrg(orgId, unitId);
+  const unit = await assertUnitInOrg(req, orgId, unitId);
   const subtree = await unitSubtree(orgId, unitId);
 
   const [people, subjects, campaigns] = await Promise.all([
@@ -317,12 +326,19 @@ export async function unitImpact(
  * The failure is 404 rather than 403 on purpose: a 403 would confirm the unit exists to
  * somebody who cannot see it, which leaks structure (13 §5).
  */
-async function assertUnitInOrg(orgId: string, unitId: string): Promise<{ id: string; name: string }> {
+async function assertUnitInOrg(
+  req: Request,
+  orgId: string,
+  unitId: string,
+): Promise<{ id: string; name: string }> {
   const unit = await prisma.node.findFirst({
     where: { id: unitId, orgId, kind: 'unit' },
     select: { id: true, name: true },
   });
-  if (!unit) throw new NotFoundError('That unit does not exist.');
+  // The ORG'S noun, not the word "unit" (22 §6). This message reaches a reader: 32's page
+  // renders `error.message` inline, and a hotel being told about a "unit" is INV-001 broken
+  // by the API rather than by a component.
+  if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
   return unit;
 }
 

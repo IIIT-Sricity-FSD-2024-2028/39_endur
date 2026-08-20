@@ -8,6 +8,7 @@ import type { RequestHandler } from 'express';
 // authz/ existed; two definitions of the same shape is exactly the drift the DTO approach
 // is meant to prevent.
 import type { Decision } from '../authz/types.js';
+import type { ResolvedLabels } from '@endur/shared';
 
 export type { Decision };
 
@@ -36,6 +37,17 @@ export type RequestContext = {
    * working for the length of the TTL, which is a security bug and not a trade-off.
    */
   authzVersion?: number;
+  /**
+   * The tenant's vocabulary, resolved, read alongside authzVersion in the same query
+   * (T-044). 22 §6 has specified this since revision one — "the label set is on req.ctx
+   * after tenantResolver, and message builders take it" — because THE SERVER PRODUCES
+   * USER-FACING STRINGS TOO. `That unit does not exist.` renders verbatim in the console
+   * (10 pages read `error.message`), so a hotel was told about a "unit" until T-044.
+   *
+   * Absent on the tenantless routes, which is why `nounsOf()` exists rather than call
+   * sites reaching in here and finding `undefined` on the login screen.
+   */
+  labels?: ResolvedLabels;
   /** Set by authenticate (T-007). */
   principal?: Principal;
   /**

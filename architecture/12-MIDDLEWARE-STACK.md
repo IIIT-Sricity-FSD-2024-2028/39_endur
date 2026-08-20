@@ -95,6 +95,8 @@ export type RequestContext = {
   requestId: string;
   startedAt: number;
   orgId?: string;                 // set by tenantResolver
+  authzVersion?: number;          // set by tenantResolver — part of the grant cache key
+  labels?: ResolvedLabels;        // set by tenantResolver — 22 §6, message builders read it
   principal?: Principal;          // set by authenticate
   decision?: Decision;            // set by requireCapability
   audit: AuditIntent[];           // appended by handlers, flushed by auditWriter
@@ -153,6 +155,13 @@ Resolves `orgId` in strict priority:
 It then attaches a **tenant-bound Prisma client** to the context. Services call
 `ctx.db.subject.findMany()`, which injects `where: { orgId }`. A service physically cannot
 construct a cross-tenant query without importing the raw client, which lint forbids.
+
+It also puts **two tenant facts on `ctx` from one read**: `authzVersion`, which is part of
+the grant cache key, and — since T-044 — `labels`, which is what 22 §6 has specified since
+revision one. The label set rides along because that query was already happening; adding a
+column to a read that runs anyway is the difference between doing it and deciding it costs a
+query per request. `lib/vocabulary.ts` is where message builders pick it up, and it falls
+back to the Custom preset on the tenantless routes rather than rendering `undefined`.
 
 Failure → `401 UNRESOLVED_TENANT`.
 

@@ -17,23 +17,26 @@ import type {
   ResultsQuery,
   ResultsView,
 } from '@endur/shared';
+import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { config } from '../../lib/config.js';
 import { NotFoundError } from '../../lib/errors.js';
+import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursorOn, orderOn, pageOf, type Paged } from '../../lib/paginate.js';
 import { visibleUnits } from '../../authz/index.js';
 import { unitSubtree } from '../../db/graph.js';
 import { countAudience, ruleOf } from '../campaigns/audience.js';
 
 export async function readResults(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
   query: ResultsQuery,
 ): Promise<ResultsView> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'results.read');
-  const subjectIds = await filterSubjects(orgId, campaign, query);
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'results.read');
+  const subjectIds = await filterSubjects(req, orgId, campaign, query);
 
   const responseWhere = {
     campaignId,
@@ -103,13 +106,14 @@ export async function readResults(
  * access, and a head of department may reasonably have the first without the second (40).
  */
 export async function readResponses(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
   query: ResponsesQuery,
 ): Promise<Paged<ResponseItem> & { suppressed: boolean }> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'response.read');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'response.read');
 
   const total = await prisma.response.count({ where: { campaignId } });
   if (total < config.K_ANON_THRESHOLD) {
@@ -167,12 +171,13 @@ export async function readResponses(
 
 /** CSV, gated exactly as the aggregates are — an export is a results page you can email. */
 export async function exportResults(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
 ): Promise<{ filename: string; csv: string }> {
-  const campaign = await assertVisible(orgId, userId, authzVersion, campaignId, 'results.export');
+  const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'results.export');
 
   const total = await prisma.response.count({ where: { campaignId } });
   if (total < config.K_ANON_THRESHOLD) {
@@ -351,12 +356,15 @@ async function summarise(
 /* ---------------------------------------------------------------- helpers */
 
 async function assertVisible(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   campaignId: string,
   capability: 'results.read' | 'response.read' | 'results.export',
 ) {
+  // The org's own noun, on both branches, for the same reason as campaigns/service.ts.
+  const missing = `That ${nounsOf(req).campaign.one.toLowerCase()} does not exist.`;
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, orgId },
     select: {
@@ -368,7 +376,7 @@ async function assertVisible(
       subjects: { select: { subject: { select: { id: true, unitId: true } } } },
     },
   });
-  if (!campaign) throw new NotFoundError('That campaign does not exist.');
+  if (!campaign) throw new NotFoundError(missing);
 
   const visibility = await visibleUnits({ orgId, userId, capability, authzVersion });
   if (visibility.all) return campaign;
@@ -378,7 +386,7 @@ async function assertVisible(
     .filter((unitId): unitId is string => Boolean(unitId));
   if (units.some((unitId) => visibility.unitIds.includes(unitId))) return campaign;
 
-  throw new NotFoundError('That campaign does not exist.');
+  throw new NotFoundError(missing);
 }
 
 /**
@@ -387,13 +395,18 @@ async function assertVisible(
  * the list already applied (40, INV-003).
  */
 async function filterSubjects(
+  req: Request,
   orgId: string,
   campaign: { subjects: Array<{ subject: { id: string; unitId: string | null } }> },
   query: ResultsQuery,
 ): Promise<string[] | null> {
   if (query.subjectId) {
     const included = campaign.subjects.some(({ subject }) => subject.id === query.subjectId);
-    if (!included) throw new NotFoundError('That one is not part of this campaign.');
+    if (!included) {
+      throw new NotFoundError(
+        `That one is not part of this ${nounsOf(req).campaign.one.toLowerCase()}.`,
+      );
+    }
     return [query.subjectId];
   }
   if (query.unitId) {

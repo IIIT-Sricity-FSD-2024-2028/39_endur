@@ -5,11 +5,11 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-20  (T-041 — home dashboard. **STAGE 4 IS COMPLETE**)
+UPDATED   2026-08-20  (T-044 — the vocabulary nonsense audit. Four leaks found and closed)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  6 days  ·  demo 27 Aug  ·  GRADED
-STATUS    40/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
-          797 tests across 69 files, all green (191 backend + 606 frontend).
+STATUS    41/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
+          807 tests across 70 files, all green (199 backend + 608 frontend).
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! READ CONF-013 IN _MEMORY.md BEFORE TOUCHING AUTH. A cross-tenant account
           lockout was found and closed on 19 Aug; the schema question behind it is
@@ -17,9 +17,20 @@ STATUS    40/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUIL
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      STAGE 5 ONLY. T-043 (OPEN-002), T-044 (vocabulary audit, 24 Aug), T-045
-          (three rehearsals + the 390px checks). No screen work is left: every route
-          in 20 §2 renders a real page, and no placeholder remains behind an M0 path.
+NEXT      TWO ITEMS LEFT. T-043 (OPEN-002 — yours, below) and T-045 (three rehearsals
+          + the 390px checks + a QR scan on two phones). No screen work is left: every
+          route in 20 §2 renders a real page, and no placeholder is behind an M0 path.
+          !! THE VOCABULARY AUDIT IS DONE AND IT FOUND FOUR LEAKS — none of them an
+          education word, which is the whole class audit:vocab was built around. The
+          worst was <ShareSheet> saying "Respondents don't need an account." since
+          T-038, on the component that IS the demo, through four audits. THE DEFAULT
+          VOCABULARY IS THE LIKELIEST THING TO BE HARDCODED, because it does not look
+          like a domain word. audit:vocab has three passes now and covers the SERVER
+          too (03 §7). Read N-048 and N-049 before writing user-facing copy anywhere.
+          !! SERVER MESSAGES SPEAK THE ORG'S NOUNS NOW. req.ctx.labels, set by
+          tenantResolver in the query it already ran; lib/vocabulary.ts has nounsOf(req)
+          and counted(n, label). 17 sites across 7 services. If you add a message that
+          names a unit/subject/campaign, use it — pass 3 of audit:vocab fails otherwise.
           !! THE DEMO NOW RUNS END TO END. Scan -> fill -> submit -> the results
           number moves, and the two counts agree because they are the same COUNT
           read in the same transaction. Rehearse it (T-045).
@@ -88,13 +99,15 @@ development login affordance prefills: `admin@northfield.endur.test`,
  — password `endur-demo-password`.
 
 **Before you commit anything:** `npm run typecheck && npm run lint && npm run audit:drift`
-&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **797 tests
-across 69 files**, 191 backend + 606 frontend. All five are green right now, so anything red
+&& `npm run audit:vocab && npm test`. That last one runs both workspaces — **807 tests
+across 70 files**, 199 backend + 608 frontend. All five are green right now, so anything red
 is yours.
 
-`audit:vocab` prints how many files it scanned **and how many test files it skipped**. It
-stopped scanning `*.test.tsx` at T-035, on purpose and with the proof written down — see
-`N-032` before assuming that is a hole.
+`audit:vocab` prints how many files it scanned — **frontend AND server since T-044** — and
+how many test files it skipped. It stopped scanning `*.test.tsx` at T-035, on purpose and
+with the proof written down — see `N-032` before assuming that is a hole. It now runs three
+passes (`03` §7); if it fails on a server file, the fix is `nounsOf(req)` from
+`src/backend/lib/vocabulary.ts`, not a rephrase.
 
 **Claude does not commit.** The user commits, always — stated 19 Aug and written into
 `CLAUDE.md` § Working conventions. Finish, run the checks, report, stop.
@@ -181,7 +194,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ```
 [x] T-042  A  resolve OPEN-005 (campaign status)   ← DEC-016, derived on read
 [ ] T-043  X  resolve OPEN-002 (public URL / QR)   ← decision, do early
-[ ] T-044  X  vocabulary nonsense audit            ← 24 Aug
+[x] T-044  X  vocabulary nonsense audit            ← 4 leaks, N-048/N-049. 3 now mechanical
 [ ] T-045  X  three demo rehearsals
 ```
 
@@ -218,6 +231,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-004` | Integration tests write into the **dev** database — **THIS NOW FAILS THE BUILD** | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo. **On 19 Aug it stopped being theoretical**: `chain.test.ts` registered a fixed org name every run, `uniqueSlug()` gives up after twenty variants, and the twenty-first run of the suite failed — a test about stripping unknown keys, failing with a conflict about slugs. That test was made independent of history; the next one to depend on it will not be found as quickly | before `T-045` |
 | `D-006` | `uniqueSlug()` runs **outside** register's transaction | Two registrations naming the same organisation in the same second both read "that slug is free"; the loser then collides on the unique index and gets a 500. The rollback is correct — `register-rollback.test.ts` proves nothing is left behind — but the caller deserves a retry, not an error page. Fix: retry the transaction on a P2002 against `slug` | before `T-045` |
 | `D-007` | `CONF-013` is **mitigated, not resolved** | Login filters `passwordHash: not null` and orders by `createdAt`, which closes the cross-tenant lockout. It does not answer whether an email address is global or per-tenant, and two *activated* accounts on one address are still ambiguous. Three options are written out in `CONF-013`; pick one and supersede it | **24 Aug** |
+| `D-008` | The capability catalogue's power labels are English | `roles/service.ts` `describe()` turns `campaign.launch` into *"launch campaigns"* — a domain noun, for `33`'s powers grid. Found by the T-044 audit and deliberately not fixed: the grid is not built, and the object → label mapping for `role`, `person`, `template` and `org` — none of which HAS a label — is `33`'s design work, not something to invent from outside it. `audit:vocab` does not scan it, because the string is assembled from a capability key rather than written | with `T-033` |
 | `D-005` | The two woff2 faces are not vendored | `tokens.css` declares both; the files are absent, so the product renders in `system-ui`. Nothing breaks, but nothing looks right either. `src/frontend/public/fonts/README.md` names the two files | **24 Aug** (`21` §4) |
 
 ---
@@ -226,6 +240,67 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-20 · T-044 — the vocabulary nonsense audit
+
+`22` §5 says the manual walk *"always finds something"*. It found four things, and **not one
+of them was an education word** — which is the entire class `audit:vocab` had been built
+around since T-003.
+
+| Where | Said | Why the grep could not see it |
+|---|---|---|
+| `<ShareSheet>` | *"Respondents don't need an account."* | "Respondent" is the **Custom preset**, not an education noun. Live since T-038, on the component that IS the demo |
+| The API, 17 sites | *"That unit does not exist."*, *"That campaign has launched."* | `audit:vocab` scanned the frontend only. Ten console pages render `error.message` verbatim |
+| `/app/campaigns/new` | *"About 1 frimbles can respond."* | The plural passed as **both** forms — the agreement case `22` §5 names |
+| `/app/subjects/:id` | *"3 cycles so far"* | `cycle` is the DTO's internal word for a campaign. It sat under a kicker reading "Active {campaign.many}" |
+
+**The generalisation, and it is `N-048`: the default vocabulary is the likeliest thing to be
+hardcoded, precisely because it does not look like a domain word.** Nobody types "Guests
+don't need an account" while building generic UI. Everybody types "Respondents". A banned
+list made only of words a developer would have to go out of their way to write catches
+nothing.
+
+**Three of the four are now mechanical.** `audit:vocab` has three passes (`03` §7): the
+original banned-noun grep, now over `lib/` and `router/` as well; the five default labels in
+**user-facing text only** — JSX text nodes and copy-bearing attributes, because `Campaign` is
+also a type, a table and a route segment; and the server's own message strings. Template
+interpolations are blanked first, so `${nounsOf(req).unit.one}` reads as the mechanism it is.
+Each pass was proved by planting a real violation and watching it fail, which is the T-035
+discipline. The fourth finding stays manual and cannot be otherwise — nothing but a reader
+knows that "cycle" and "{campaign}" are the same thing.
+
+**The server half is built, and `22` §6 had specified it since revision one** (`N-049`).
+`tenantResolver` puts the resolved label set on `req.ctx` in the query it was *already*
+running for `authzVersion`, so it costs nothing. `src/backend/lib/vocabulary.ts` holds
+`nounsOf(req)` and `counted(n, label)` — the latter takes a `Label` rather than two strings,
+because the delete-unit message used to build its plural with `+ 's'` and "Faculty"
+pluralises to "Faculty". Three decisions came out of it:
+
+- **A 404's uniformity is about the answer, not the language.** `assertVisible` throws the
+  same message on both branches — no row, and out of scope — so they stay indistinguishable
+  (`13` §5). The org's noun does not change that.
+- **The setup wizard reads the body, not `ctx`.** It validates a structure while the reader is
+  looking at words they picked two steps ago that the database has not been told about.
+- **A structural word stays structural in the same sentence:** *"That template is used by 1
+  review round."*
+
+**Found, not fixed, and written down so it is not rediscovered:** `roles/service.ts`
+`describe()` builds *"launch campaigns"* for `33`'s powers grid. That grid is after M0, and
+the object → label mapping for `role`, `person`, `template` and `org` — none of which *has* a
+label — is `33`'s design work. **Whoever builds `T-033` owns it.**
+
+**One test was pinning the bug.** `units.test.ts` asserted `/1 unit/`: the message said "unit"
+because the code hardcoded it, and the test agreed with it.
+
+Docs: `22` §5 (§ What T-044 found), §6, § Acceptance, § Out of scope; `03` §7; `12` §3 and
+§4.6; `55`; `_MEMORY.md` `N-048`, `N-049`, MAP.
+
+All five checks green. **807 tests across 70 files** (199 backend + 608 frontend, up from
+797/69); `vite build` succeeds with the entry chunk unchanged at 308.64 kB / 96.54 kB gzip.
+
+**Next: `T-043` and `T-045`, and nothing else.** `T-043` is yours — set `PUBLIC_BASE_URL` to
+an address a phone can reach. The share sheet says so on screen when it is `localhost`, so it
+cannot fail silently.
 
 ### 2026-08-20 · T-041 — the home dashboard. **STAGE 4 IS COMPLETE**
 
