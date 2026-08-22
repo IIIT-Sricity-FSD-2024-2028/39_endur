@@ -77,11 +77,16 @@ export function AmbientBackground({
 }): JSX.Element {
   return (
     <div className={`ambient ambient-${variant}`} aria-hidden="true">
-      {/* The colour. Three fields on different periods so they never return to the same
-          arrangement — a two-field drift visibly repeats within about a minute. */}
+      {/* The colour. Five fields, each anchored past a viewport edge and oversized, so what
+          reaches the middle of the screen is their falloff rather than their boundary and
+          the whole ground is covered — a gap between fields shows the flat page colour
+          through, and the glass then has nothing to refract. Five different periods, none
+          a multiple of another, so the arrangement never returns to where it started. */}
       <span className="ambient-field ambient-field-1" />
       <span className="ambient-field ambient-field-2" />
       <span className="ambient-field ambient-field-3" />
+      <span className="ambient-field ambient-field-4" />
+      <span className="ambient-field ambient-field-5" />
 
       {/* The structure. */}
       <svg className="ambient-lattice" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">

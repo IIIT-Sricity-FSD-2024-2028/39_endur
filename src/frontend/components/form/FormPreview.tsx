@@ -13,12 +13,13 @@ import { QuestionInput, type Question } from './QuestionInput.js';
 
 /**
  * Real pixel frames rather than a browser resize. The question being answered is "what does
- * somebody on a phone see", and that has to be answerable while sitting at a desktop.
+ * somebody on a phone see", and that has to be answerable while sitting at a desktop. Ordered
+ * widest-first so the control reads left-to-right from the default (desktop) down.
  */
 export const PREVIEW_WIDTHS = [
-  { key: 'phone', label: 'Phone', width: 390 },
-  { key: 'tablet', label: 'Tablet', width: 720 },
   { key: 'desktop', label: 'Desktop', width: 0 },
+  { key: 'tablet', label: 'Tablet', width: 720 },
+  { key: 'phone', label: 'Phone', width: 390 },
 ] as const;
 
 export type PreviewWidth = (typeof PREVIEW_WIDTHS)[number]['key'];
@@ -38,7 +39,7 @@ export function FormPreview({
   /** What to say when there is nothing to answer yet. The two callers differ. */
   emptyBody?: string;
 }): JSX.Element {
-  const [width, setWidth] = useState<PreviewWidth>('phone');
+  const [width, setWidth] = useState<PreviewWidth>('desktop');
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const frame = PREVIEW_WIDTHS.find((entry) => entry.key === width);
 

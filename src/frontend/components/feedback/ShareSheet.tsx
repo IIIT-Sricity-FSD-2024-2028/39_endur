@@ -19,8 +19,19 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { CampaignStatus } from '@endur/shared';
+import { Icon } from '../Icon.js';
 import { formatDateTime } from '../../lib/format.js';
 import { useLabels } from '../../lib/labels.js';
+
+/** The share sheet's own three-way status tag — narrower than campaigns' four-value
+ *  STATUS_TAG (which distinguishes draft from open): here "collecting" covers both,
+ *  because a share link works identically for either. */
+const SHARE_STATUS: Record<CampaignStatus, { label: string; tag: string }> = {
+  open: { label: 'Collecting', tag: 'tag-good' },
+  draft: { label: 'Collecting', tag: 'tag-good' },
+  scheduled: { label: 'Scheduled', tag: 'tag-neutral' },
+  closed: { label: 'Closed', tag: 'tag-muted' },
+};
 
 /**
  * The only literal colours outside `design-system/`, and DEC-012 is right to have flagged
@@ -133,6 +144,8 @@ export function ShareSheet({
     );
   }
 
+  const shareStatus = SHARE_STATUS[status];
+
   return (
     <div className="dialog-backdrop" onMouseDown={onClose}>
       <div
@@ -142,58 +155,61 @@ export function ShareSheet({
         aria-label={`Share ${campaignName}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="share-head">
-          <h2 className="dialog-title">
-            {status === 'closed'
-              ? `${campaignName} has closed.`
-              : status === 'scheduled'
-                ? `${campaignName} is scheduled.`
-                : `${campaignName} is collecting.`}
-          </h2>
-          <button type="button" className="toast-close" onClick={onClose} aria-label="Close">×</button>
-        </div>
-
-        <Qr url={url} size={QR_SIZE} className="share-qr" />
-
-        {/* Selectable, and big. Somebody at the back types this. */}
-        <p className="share-url">{display(url)}</p>
-
-        {isUnscannable(url) && (
-          <p className="share-warn" role="alert">
-            This address points at <strong>localhost</strong>, which on a phone means the
-            phone. Nobody can scan this. Set <code>PUBLIC_BASE_URL</code> to an address the
-            room can reach before the demo — see <code>OPEN-002</code>.
-          </p>
-        )}
-
-        <div className="share-actions">
-          <button type="button" className="btn btn-secondary" onClick={copy}>
-            {copied ? 'Copied' : 'Copy link'}
+        <header className="share-head">
+          <div className="share-headings">
+            <p className={`tag ${shareStatus.tag}`}>{shareStatus.label}</p>
+            <h2 className="share-title">{campaignName}</h2>
+          </div>
+          <button type="button" className="btn btn-icon share-close" onClick={onClose}>
+            <Icon name="close" size={20} label="Close" />
           </button>
-          <button type="button" className="btn btn-secondary" onClick={download}>Download QR</button>
-          <button type="button" className="btn btn-primary" onClick={() => setPresenting(true)}>Full</button>
+        </header>
+
+        <div className="share-body">
+          <Qr url={url} size={QR_SIZE} className="share-qr" />
+
+          {/* Selectable, and big. Somebody at the back types this. */}
+          <p className="share-url">{display(url)}</p>
+
+          {isUnscannable(url) && (
+            <p className="share-warn" role="alert">
+              This address points at <strong>localhost</strong>, which on a phone means the
+              phone. Nobody can scan this. Set <code>PUBLIC_BASE_URL</code> to an address the
+              room can reach before the demo — see <code>OPEN-002</code>.
+            </p>
+          )}
+
+          {failed && (
+            <p className="field-error" role="alert">
+              Copying was refused by the browser. The address above can be selected by hand.
+            </p>
+          )}
         </div>
 
-        {failed && (
-          <p className="field-error" role="alert">
-            Copying was refused by the browser. The address above can be selected by hand.
-          </p>
-        )}
-
-        <hr className="hr" />
-        <p className="share-meta text-meta">
-          {status === 'closed'
-            ? 'Closed'
-            : endsAt
-              ? `Open until ${formatDateTime(endsAt)}`
-              : 'Open until it is closed'}
-          {anonymous && ' · anonymous'}
-        </p>
-        {/* The org's own noun. This line said "Respondents" until T-044 — the vocabulary
-            audit's one frontend finding, and it survived four audits because "Respondent"
-            is the DEFAULT label rather than an education word, so the banned-noun grep had
-            nothing to match (22 §5). */}
-        <p className="share-meta text-meta">{L.respondent.many} don’t need an account.</p>
+        <footer className="share-foot">
+          <div className="share-foot-meta">
+            <p className="share-meta text-meta">
+              {status === 'closed'
+                ? 'Closed'
+                : endsAt
+                  ? `Open until ${formatDateTime(endsAt)}`
+                  : 'Open until it is closed'}
+              {anonymous && ' · anonymous'}
+            </p>
+            {/* The org's own noun. This line said "Respondents" until T-044 — the vocabulary
+                audit's one frontend finding, and it survived four audits because "Respondent"
+                is the DEFAULT label rather than an education word, so the banned-noun grep had
+                nothing to match (22 §5). */}
+            <p className="share-meta text-meta">{L.respondent.many} don’t need an account.</p>
+          </div>
+          <div className="share-foot-actions">
+            <button type="button" className="btn btn-secondary" onClick={copy}>
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={download}>Download QR</button>
+            <button type="button" className="btn btn-primary" onClick={() => setPresenting(true)}>Full</button>
+          </div>
+        </footer>
       </div>
     </div>
   );

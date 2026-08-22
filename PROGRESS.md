@@ -275,6 +275,117 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
+### 2026-08-23 · share sheet frame, and the theme wipe softened
+
+The share sheet inherited the vendored `.dialog`'s own padding and gap on top of its three
+bands' padding, and had no height cap — so on a laptop viewport the backdrop centred a sheet
+taller than the screen and clipped both ends, taking the campaign name with it. The sheet now
+has `padding: 0`, `max-height: min(760px, calc(100dvh - var(--space-8)))`, a header and footer
+pinned with `flex: none` and a body that scrolls. The code scales down on short windows
+(`min(300px, 44vh, 100%)`) and never up past the 300px it was encoded at; the plate gained a
+hairline and a shadow so pure white does not float on the dark theme; the footer sits on a 4%
+band; the localhost warning gained a status-ramp left edge.
+
+The theme swap kept the circular reveal but lost its hard edge: the clip-path is now a radial
+mask feathered over `--wipe-feather` (120px), declared in CSS against
+`.is-theme-wiping::view-transition-new(root)` and driven by a registered `--theme-wipe`
+length, so the compositor runs it instead of a WAAPI call from `lib/theme.ts`. Also fixed
+there: re-picking a choice that resolves to the theme already on screen now returns instead of
+wiping one theme over itself, and the transition promise has a rejection handler (a second
+click used to skip the transition and log an unhandled rejection, leaving the wipe class on).
+
+No task id — presentation only, no contract touched.
+
+### 2026-08-23 · light-theme ambient field rebuilt as a continuous wash
+
+The light ambient layer read as three separate blurred discs on a visible page ground rather
+than as one field. Rebuilt it: five corner-anchored, oversized fields instead of three, with
+the falloff painted as a `radial-gradient` stop instead of produced by `filter: blur()` on a
+solid disc — a blurred disc keeps a locatable ring at its edge, a gradient stop does not.
+Default opacity `.45` → `.72`, blur `72px` → `48px` (the gradient now does the falloff, the
+blur only kills banding), and the lattice comes down `.5` → `.38` so it does not compete.
+
+New tokens `--ambient-4` / `--ambient-5` in both themes. Hues unchanged — the whole set is
+still accent, accent-2 and the rose whisper. Dark keeps its old character: 4 and 5 are faint
+there, because a fully washed dark ground loses the depth the glass edge depends on.
+
+Touched: `design-system/tokens.css`, `design-system/endur.css`, `components/AmbientBackground.tsx`.
+No `DEC-` superseded — DEC-029 already owns this layer and the change is a retune within it.
+
+### 2026-08-23 · `frontend_upgrade.md` — five visual fixes, radius, glass, share sheet restyle
+
+Implemented the five-item brief in `frontend_upgrade.md` against `src/frontend`, in the
+order it specifies. No task id — a targeted visual-fixes pass, not board work.
+
+**1 · Dropdown menus were see-through.** `.menu` (`design-system/endur.css`) is a child of
+`.topbar`, and `.topbar` has its own `backdrop-filter` — an ancestor with `backdrop-filter`
+is a backdrop root, so the menu's own blur never reached the page it overlapped. Fixed both
+halves: the glass `.menu` block now uses a near-opaque `color-mix` surface instead of
+`var(--glass-tint)`, and both menu panels in `TopBar.tsx` now render through
+`createPortal(..., document.body)`, positioned from the anchor's `getBoundingClientRect()`
+and recomputed on resize/scroll. `useMenu()` grew a `panelRef` alongside `anchorRef` so the
+outside-click check still closes correctly once the panel is no longer a DOM descendant of
+the anchor. A `.menu.is-portal { position: fixed; }` rule carries the portal variant.
+
+**2 · Template quick-look and every dialog had the same defect**, one level up: `.tpv` sits
+under `.tpv-backdrop`/`.dialog-backdrop`, which is itself the backdrop root, so `glass-strong`
+on the panel had nothing of its own to blur. `.tpv` and the generic `.dialog` glass rule both
+moved from `var(--glass-tint)` to a near-opaque `color-mix(in srgb, var(--color-card) 96–97%,
+transparent)`; the edge, sheen and shadow still carry the glass read.
+
+**3 · `<ShareSheet>` restyled to match the quick-look's anatomy** — header band / scrolling
+body / footer action band, modeled directly on `.tpv-head` / `.tpv-body` / `.tpv-foot`. The
+`<h2>` dropped the three-way sentence ("X is collecting.") in favor of the campaign name
+alone, with the state carried by a new status tag instead (`tag-good` / `tag-neutral` /
+`tag-muted` — the last one didn't exist yet, added next to `.tag-good`/`tag-warn`/`tag-bad`
+in `endur.css`, quieter than `.tag-neutral` since a closed campaign is over, not merely
+inactive). `.share-sheet` narrowed to 560px, lost `text-align: center` (only `.share-body`
+centers now), the close button became `btn btn-icon` with `<Icon name="close">`, the `<hr>`
+was dropped in favor of the footer's own border, and the "Copying was refused" error moved
+into `.share-body` so it can't shift the footer. Every N-037 rule (280px+ QR, pure ink on
+pure white, 24px quiet zone, `Full` for the projector, copy-in-place, Escape leaving
+presentation mode first) is untouched — none of that markup moved, only its wrapper anatomy
+did. `ShareSheet.test.tsx` updated: the dialog's accessible name stayed an explicit
+`aria-label="Share {campaignName}"` (the visible `<h2>` no longer says "Share", so
+`aria-labelledby` alone would have changed what a screen reader announces); the "is
+collecting" / "has closed" text assertions became tag-text assertions; `.share-actions`
+renamed to `.share-foot-actions` throughout.
+
+**4 · Preview segmented control now defaults to Desktop.** `PREVIEW_WIDTHS` in
+`FormPreview.tsx` reordered widest-first (desktop, tablet, phone) and the initial
+`useState<PreviewWidth>` changed from `'phone'` to `'desktop'`. `Detail.test.tsx`'s "the
+three widths" suite asserted the old phone-first default by name — both tests rewritten to
+assert desktop-first rather than deleted, per the brief's instruction to update the
+assertion, not the source.
+
+**5 · Corner radius pulled in globally**, done first per the brief's ordering (widest blast
+radius). `tokens.css`: `--radius-sm: 8px→6px`, `--radius-md: 16px→10px`, `--radius-lg:
+28px→16px` (the `* 1.15` card/dialog multiplier is untouched and now resolves to 18.4px, on
+the brief's 14–16px target). Every other radius in the codebase already reads from these
+tokens or is a `999px` pill, confirmed by grepping every `border-radius` hit in
+`src/frontend` — nothing needed a direct edit except one literal: `.topbar-mark`'s glass
+override (`endur.css` ~2039) hardcodes `11px` rather than reading `--radius-sm`, and next to
+the now much-tighter neighbouring corners it read rounder than everything around it —
+dropped to `8px` with a comment explaining why it's a literal, not a token reference.
+
+**Verified:** `npm run typecheck` clean. `npx vitest run` — 645/646 passing; the one
+failure (`pages/respond/bundle.test.ts`, "shares the ONE `<QuestionInput>` set") is
+pre-existing and unrelated to this pass — `relative()` from Node's `path` module returns
+backslash-separated paths on Windows, so the test's own `toContain('components/form/
+QuestionInput.tsx')` (forward slash) fails on this OS regardless of what the import graph
+actually contains; confirmed by walking the same graph manually and finding the file
+present, just under a `components\form\QuestionInput.tsx` key. Not touched — it is a test
+bug orthogonal to this brief, and fixing cross-platform path handling wasn't in scope.
+`npm run build` succeeds (dist emits normally, `ShareSheet` chunk 29.4 kB / 11.5 kB gzip).
+
+**Not done, and worth carrying forward:** `frontend-design` skill was invoked per the
+instruction to use it, but this was a spec-driven implementation brief with exact CSS/values
+given throughout, not an open design brief — so the skill's brainstorm/critique process
+didn't apply; the five fixes were built to `frontend_upgrade.md`'s letter instead. The two
+"leave alone" exceptions the brief named (`.sidebar-item.is-active` pill, and the QR colours
+in `ShareSheet.tsx`) were left untouched, as instructed. Nothing committed — per `CLAUDE.md`,
+the user commits.
+
 ### 2026-08-22 · Visual overhaul — type, dark mode, glass, illustrations
 
 Owner-requested pass over the whole frontend. Four decisions recorded as `DEC-027`…`DEC-030`

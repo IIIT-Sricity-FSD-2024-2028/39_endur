@@ -116,26 +116,26 @@ describe('the preview IS the respondent form (INV-008)', () => {
 });
 
 describe('the three widths', () => {
-  it('offers phone, tablet and desktop, and opens on phone', () => {
+  it('offers phone, tablet and desktop, and opens on desktop', () => {
     const { container } = mount();
-    // Phone-first is not a default chosen for tidiness: on demo day every respondent is
-    // on a phone (39).
-    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Phone' }).checked).toBe(true);
-    expect(container.querySelector('.preview-frame.is-phone')).toBeTruthy();
+    // Desktop-first: it is the frame most people compare templates in, and the widest
+    // one — phone and tablet are checks, not the starting point.
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Desktop' }).checked).toBe(true);
+    expect(container.querySelector('.preview-frame.is-phone')).toBeFalsy();
     expect(screen.getByRole('radio', { name: 'Tablet' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Desktop' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Phone' })).toBeTruthy();
   });
 
   it('constrains the frame at phone and tablet, and releases it at desktop', () => {
     const { container } = mount();
     const frame = (): HTMLElement => container.querySelector('.preview-frame') as HTMLElement;
-    expect(frame().style.maxWidth).toBe('390px');
+    expect(frame().style.maxWidth).toBe('');
 
     fireEvent.click(screen.getByRole('radio', { name: 'Tablet' }));
     expect(frame().style.maxWidth).toBe('720px');
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Desktop' }));
-    expect(frame().style.maxWidth).toBe('');
+    fireEvent.click(screen.getByRole('radio', { name: 'Phone' }));
+    expect(frame().style.maxWidth).toBe('390px');
   });
 });
 

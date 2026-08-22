@@ -77,8 +77,8 @@
   --space-12: 52.8px; --space-16: 70.4px; --space-24: 105.6px;
 
   /* ── Radius ─────────────────────────────────────────────── */
-  --radius-sm: 8px; --radius-md: 16px; --radius-lg: 28px;
-  /* cards & dialogs: calc(var(--radius-lg) * 1.15) = 32.2px
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+  /* cards & dialogs: calc(var(--radius-lg) * 1.15) = 18.4px
      buttons, tags, inputs, seg controls, bar tracks: 999px */
 
   /* ── Elevation ──────────────────────────────────────────── */
@@ -120,9 +120,18 @@
   /* Rose is kept very low. It is here to stop the field reading as a two-colour gradient,
      not to be seen — at any strength where you can name the colour, it turns the blue and
      the teal it sits between into mud. */
-  --ambient-1: color-mix(in srgb, var(--color-accent-300) 48%, transparent);
-  --ambient-2: color-mix(in srgb, var(--color-accent-2-300) 38%, transparent);
-  --ambient-3: color-mix(in srgb, var(--illus-rose) 8%, transparent);
+  /* Five stops, not three. Three fields on a wide screen leave the ground visible between
+     them, and a ground you can see is a ground the glass is sitting ON rather than
+     refracting — the fields have to overlap into one continuous wash before the blur
+     reads as a material. */
+  --ambient-1: color-mix(in srgb, var(--color-accent-400) 58%, transparent);
+  --ambient-2: color-mix(in srgb, var(--color-accent-2-400) 46%, transparent);
+  --ambient-3: color-mix(in srgb, var(--illus-rose) 11%, transparent);
+  /* The two that close the remaining corners. 5 is the deepest of the set and stays the
+     smallest: it gives the wash a dark end to travel toward, which is what stops a
+     five-field field from flattening into one even tint. */
+  --ambient-4: color-mix(in srgb, var(--color-accent-300) 62%, transparent);
+  --ambient-5: color-mix(in srgb, var(--color-accent-600) 24%, transparent);
 }
 
 /* ── Dark — DEC-028 ────────────────────────────────────────────────────────
@@ -185,6 +194,11 @@
   --ambient-1: color-mix(in srgb, #3f86e6 26%, transparent);
   --ambient-2: color-mix(in srgb, #48a99f 17%, transparent);
   --ambient-3: color-mix(in srgb, #e8577f 6%, transparent);
+  /* Dark takes the same five fields but not the same coverage. A dark ground washed edge
+     to edge loses the depth that makes the glass edge visible at all, so 4 and 5 stay
+     faint — they close the corners without lifting the whole field. */
+  --ambient-4: color-mix(in srgb, #22456f 40%, transparent);
+  --ambient-5: color-mix(in srgb, #6fabf0 9%, transparent);
 }
 
 /* ── The status ramp — §2b. STRICTLY SEMANTIC ──────────────────────────────
