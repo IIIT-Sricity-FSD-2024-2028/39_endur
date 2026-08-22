@@ -198,6 +198,115 @@ DEC-019  ACTIVE  2026-08-19  origin:A
            requireCapability() decides on every route and this list decides nothing.
   see      13 § Auth, 20 §6, src/backend/authz/held.ts, src/backend/test/me.test.ts
 
+DEC-027  ACTIVE  2026-08-22  origin:owner
+  the display and body faces were both replaced. WHICH faces is a design value and is NOT
+  recorded here — tokens.css owns the @font-face blocks and the family tokens beside them,
+  and that file is the only place the names appear. (audit:drift enforces this; an earlier
+  draft of this entry named all four faces and the audit failed on it.)
+  driver   requested by the owner. the outgoing display face carried a single weight and
+           had no usable body companion at reading size, which is why every heading in the
+           product was one weight and every attempt at hierarchy had to be made with size
+           alone. the incoming pair is variable across four weights.
+  fact     both faces stay SELF-HOSTED, subset, and served from public/fonts.
+  fact     the new display face runs wide and needs negative tracking at display sizes;
+           --track-display and --track-heading exist for that and are applied in
+           endur.css, never inline.
+  fact     <Icon>'s stroke-width came down in the same pass. the old weight was chosen to
+           match the old display face; against the new one every icon read as a bold
+           accent beside its own label.
+  supersed 21 §4's named faces. the SELF-HOSTED rule in 21 §4 is unchanged and is why
+           there is still no @import of a font CDN.
+
+DEC-028  ACTIVE  2026-08-22  origin:owner
+  the product ships light AND dark. every colour token is declared twice — once on :root,
+  once under [data-theme="dark"] — so no component ever learns which theme it is in.
+  driver   requested by the owner.
+  fact     the choice is THREE-valued: light | dark | system, stored in localStorage under
+           `endur.theme`. system is the default and keeps following the OS; picking a side
+           stops that. a two-state switch would have to lie about one of the three.
+  fact     theme is a property of the DEVICE, not the session — it never touches the store
+           or the API, so a shared machine does not carry one person's theme to the next.
+  fact     an inline script in index.html sets data-theme BEFORE first paint. without it a
+           dark-mode machine renders light and flips, which is a white flash in a dark
+           room. that script and lib/theme.ts duplicate the same key and the same fallback
+           ON PURPOSE and must be changed together.
+  fact     the swap is a View Transitions circular wipe from the control that was pressed.
+           it degrades to an instant set where the API is missing or reduced-motion is on.
+  see      lib/theme.ts, components/ThemeToggle.tsx, tokens.css, index.html
+
+DEC-029  ACTIVE  2026-08-22  origin:owner
+  surfaces are translucent — tint + backdrop blur + hairline edge + inset top sheen, all
+  four together. chrome (top bar, rail, menus, dialogs, drawer) sits at ~58% tint; content
+  cards sit at ~88% and still read as paper.
+  driver   requested by the owner ("apple glass theme on the whole website").
+  fact     THE ONE OVERRIDE survives. white still means "the thing you are working on";
+           content cards were made glass at a tint that reads as white rather than being
+           left opaque, so the rule holds and the material is consistent.
+  fact     <AmbientBackground> is part of this decision, not decoration on one page. a blur
+           with nothing behind it is a grey rectangle, so the glass needs a field with
+           colour and variation under it. it draws the org graph — nodes and edges, with a
+           pulse travelling one now and then — because the field may as well say something
+           true.
+  cost     @supports not (backdrop-filter) drops every surface back to opaque. without that
+           branch, Firefox <103 and old iOS render the tint alone: unreadable text over a
+           moving background.
+
+DEC-030  ACTIVE  2026-08-22  origin:owner
+  illustrations get their own ramp (--illus-*): an ink, a paper, and three fills, with rose
+  as a rare accent. line art — dark outline, flat fill, drawn on by animating
+  stroke-dashoffset.
+  driver   requested by the owner, with a reference style. the status ramp is strictly
+           semantic (01 §2b, CONF-004) and could not be borrowed for artwork; the two brand
+           accents alone are not enough to draw a scene with.
+  fact     rose NEVER appears in chrome, navigation or a control. one or two elements per
+           drawing, and nowhere else in the product.
+  fact     the SVGs are INLINED (?raw + dangerouslySetInnerHTML), not <img> or <object>,
+           so var(--illus-*) resolves against tokens.css and one drawing serves both
+           themes. through <img> the SVG is a separate document and would stay light.
+  fact     the animation is CSS keyframes, not SVGator's JS player: CSS runs on injected
+           markup where an injected <script> does not, and the global reduced-motion rule
+           neutralises it for free — leaving the finished drawing, which is the correct
+           still.
+  see      components/illustrations/, tokens.css § Illustration ramp
+
+DEC-031  ACTIVE  2026-08-22  origin:owner
+  every number on the home dashboard is measured over a RANGE the reader picks — today,
+  7 days, 30 days, all time — and 30 days is the default. GET /home takes ?window=.
+  driver   requested by the owner: "a lot of stats are unintuitive, like who cares how many
+           responses had been received all time". an all-time total only goes up, prompts
+           no action, and by month three is large enough to read as decoration.
+  fact     stats.responsesTotal and stats.responsesToday are GONE. today is a range now, and
+           the total was the thing being complained about. two cards were replaced: subjects
+           covered (distinct subjects with >=1 response in the range, which says whether
+           feedback is spread or concentrated) and the response rate, now windowed.
+  fact     stats.activeCampaigns is deliberately NOT windowed. it is a fact about the
+           present, and the card says "collecting right now" so it cannot be misread as
+           "open at some point in the last 30 days".
+  fact     stats.responsesEver survives, is never rendered, and exists for ONE decision:
+           whether the org has ever collected anything. the "you are new here" empty state
+           reads that and not the windowed count — otherwise a two-year-old organisation
+           gets the welcome screen, with its range control hidden, every quiet month.
+  fact     the response-rate DENOMINATOR is restricted to campaigns that were actually
+           collecting during the range (features/home/service.ts collectedDuring). charging
+           a campaign closed last year against this week is N-043's mistake in the time
+           dimension — a denominator from one period over a numerator from another.
+  fact     the k-anon gate still keys off the ALL-TIME campaign total, not the windowed one.
+           gating on the window would make a campaign enter and leave the rate as the range
+           moved, which reads as a bug and leaks the same aggregate to anyone who presses
+           two buttons.
+  fact     window is validated with .default AND .catch, the only DTO here that tolerates
+           junk. a range is a display preference; a stale bookmark must not 400 the first
+           screen after sign-in. nothing is written or authorised from it.
+  fact     midnight is the SERVER's midnight, as the old "today" card already assumed. exact
+           boundaries need a timezone on the organisation, which is a schema change and was
+           not taken here.
+  holds    CONF-017 STILL STANDS. a window makes a previous period measurable, which removes
+           one of CONF-017's three reasons and neither of the other two — 46 § Out of scope
+           rules trends off this page by name and § Purpose forbids it becoming an analysis
+           surface. counts, never directions; <TrendChip> remains unbuilt.
+  supersed 46 § Data contract's stats shape, and 46 § Components' four cards.
+  see      dto/home.ts, features/home/service.ts, pages/console/Home/cards.ts
+
 ```
 
 ---
@@ -806,6 +915,14 @@ Review of Reviews        a Campaign whose Subject is the feedback process itself
 ```
 N-001  git working tree at seed had 305 deletions staged (all of v1). that was deliberate.
        do not "restore missing files".
+N-026  ANY component added to router/layouts.tsx must be checked against
+       pages/respond/bundle.test.ts before you believe it is free. layouts.tsx is imported
+       STATICALLY by router/index.tsx, so everything it imports statically lands in the
+       entry chunk that a phone downloads before the first question renders.
+       caught twice now, both times by that test and neither time by reading: first
+       <AppShell>, then <ThemeToggle> — three icons in a pill, but it imports <Icon>, and
+       <Icon> is thirty lucide glyphs. both are `lazy()` in that file for this reason.
+       the rule is about the IMPORT GRAPH, not about how big the component looks.
 N-002  design_specs/design/*.dc.html + _ds/ are MOCKUP EXPORTS, not source. read them for
        component anatomy; never import from them.
 N-003  the vocabulary chip row is the demo's ten-second proof. it renders on EVERY console

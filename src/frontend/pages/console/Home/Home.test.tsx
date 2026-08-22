@@ -18,13 +18,21 @@ vi.mock('qrcode', () => ({
 
 const reload = vi.fn();
 let home: { data: HomeView | null; loading: boolean; error: Error | null };
+/** Every range the page has asked the hook for, in order — DEC-031. */
+const ranges: string[] = [];
 
 vi.mock('../../../lib/home.js', () => ({
-  useHome: () => ({ ...home, reload }),
+  useHome: (window: string) => {
+    ranges.push(window);
+    return { ...home, reload };
+  },
 }));
 
 const FULL: HomeView = {
-  stats: { responsesTotal: 1057, responsesToday: 47, activeCampaigns: 2, responseRate: null },
+  stats: {
+    window: '30d', responses: 1057, subjectsCovered: 18,
+    activeCampaigns: 2, responseRate: null, responsesEver: 4210,
+  },
   activeCampaigns: [
     {
       id: 'c1', name: 'Spring check', subjectCount: 18, responseCount: 612,
@@ -58,6 +66,7 @@ const mount = (capabilities: Capability[] = ALL) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ranges.length = 0;
   home = { data: FULL, loading: false, error: null };
 });
 
@@ -93,7 +102,7 @@ describe('what the caller may not read is ABSENT — INV-003', () => {
     // A junior role. Both keys are missing from the payload, which is the server saying
     // "not yours" — and the page must not look broken because of it (46 § States).
     home = {
-      data: { stats: { responsesTotal: 0, responsesToday: 0, activeCampaigns: 0, responseRate: null }, prompts: [], configured: true },
+      data: { stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 }, prompts: [], configured: true },
       loading: false, error: null,
     };
     mount(['org.read']);
@@ -121,7 +130,7 @@ describe('a brand-new organisation', () => {
   beforeEach(() => {
     home = {
       data: {
-        stats: { responsesTotal: 0, responsesToday: 0, activeCampaigns: 0, responseRate: null },
+        stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 },
         activeCampaigns: [],
         recentComments: [],
         prompts: [{ kind: 'no_subjects', href: '/app/subjects' }],
@@ -138,6 +147,67 @@ describe('a brand-new organisation', () => {
     expect(screen.queryByText('Response rate')).toBeNull();
     expect(screen.getByText('Add a quaxel')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Add a Quaxel' })).toBeTruthy();
+  });
+});
+
+describe('the range control — DEC-031', () => {
+  it('opens on 30 days rather than all time', () => {
+    mount();
+    // The complaint this exists to answer: an all-time total only goes up, and nobody
+    // acts on it. The first thing after sign-in is recent activity.
+    expect(ranges[0]).toBe('30d');
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: '30 days' }).checked).toBe(true);
+  });
+
+  it('refetches rather than filtering what it already has', () => {
+    mount();
+    fireEvent.click(screen.getByRole('radio', { name: 'Today' }));
+    // Server-side, and it must stay server-side: the k-anon gate and the response rate's
+    // denominator are both decided there. A client slicing all-time rows would be holding
+    // the rows the gate exists to withhold.
+    expect(ranges.at(-1)).toBe('today');
+  });
+
+  it('keeps the previous numbers on screen while the new range loads', () => {
+    home = { data: FULL, loading: true, error: null };
+    const { container } = mount();
+    // Not four skeletons. A range change that blanks the band makes the page jump more
+    // than the data moves — the old figures dim and are replaced in place.
+    expect(container.querySelectorAll('.home-skeleton')).toHaveLength(0);
+    expect(screen.getByText((1057).toLocaleString())).toBeTruthy();
+    expect(container.querySelector('.stat-row')?.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('is absent for a brand-new org, which has no activity to range over', () => {
+    home = {
+      data: {
+        stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 },
+        activeCampaigns: [], recentComments: [],
+        prompts: [{ kind: 'no_subjects', href: '/app/subjects' }],
+        configured: true,
+      },
+      loading: false, error: null,
+    };
+    mount();
+    expect(screen.queryByRole('radiogroup', { name: 'Range' })).toBeNull();
+  });
+
+  it('stays visible for an org that has collected before but is quiet now', () => {
+    // The distinction `responsesEver` exists for: nothing arrived in 30 days, but this is
+    // not a new organisation, and hiding the control would strand them on an empty band
+    // with no way to widen the range.
+    home = {
+      data: {
+        ...FULL,
+        stats: { ...FULL.stats, responses: 0, subjectsCovered: 0, activeCampaigns: 0 },
+        activeCampaigns: [],
+        recentComments: [],
+      },
+      loading: false, error: null,
+    };
+    mount();
+    expect(screen.getByRole('radiogroup', { name: 'Range' })).toBeTruthy();
+    expect(screen.getByText('nothing in the last 30 days')).toBeTruthy();
   });
 });
 

@@ -119,11 +119,16 @@ scores: aggregate numbers live behind the results endpoints, where the k-anonymi
 
 | Method | Path | C |
 |---|---|---|
-| GET | `/` | `org.read` — the whole dashboard in one call (`46`) |
+| GET | `/?window=` | `org.read` — the whole dashboard in one call (`46`) |
 
 Deliberately one endpoint rather than six. A dashboard that fires six requests is six chances
 to be slow, and it is the first screen after login. That includes the share URL on each
 active campaign (`46`), so opening the QR from here costs a click and not a round trip.
+
+`window` is `today | 7d | 30d | all` and defaults to `30d` (`DEC-031`). It is the only query
+parameter in this surface that **tolerates** a bad value instead of returning a 400: a range
+is a display preference, nothing is written or authorised from it, and a stale bookmark must
+not break the first screen after sign-in.
 
 ### Profile — `/api/v1/profile`
 

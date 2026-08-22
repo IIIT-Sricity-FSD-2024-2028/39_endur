@@ -275,6 +275,54 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
+### 2026-08-22 · Visual overhaul — type, dark mode, glass, illustrations
+
+Owner-requested pass over the whole frontend. Four decisions recorded as `DEC-027`…`DEC-030`
+in `_MEMORY.md`; each one supersedes something and says what it supersedes.
+
+**What moved**
+
+- **Type.** Outfit (display) + Inter (body), both variable, both self-hosted in
+  `public/fonts`. A named scale (`--text-*`) and tracking tokens replace the vendored
+  layer's fixed px sizes, overridden in `endur.css` because `organic.css` is re-vendored
+  mechanically. Body is 16px, up from 15. `<Icon>` stroke-width 2.75 → 2.1.
+- **Dark mode.** Every colour token declared twice; `[data-theme]` on `<html>`, set before
+  first paint by an inline script in `index.html`. Three-valued choice (light/dark/system)
+  in `localStorage`, never in the store. The swap is a View Transitions circular wipe from
+  the control that was pressed, degrading to an instant set.
+- **Glass.** Tint + blur + hairline edge + inset sheen on chrome and cards, with a
+  `@supports not (backdrop-filter)` branch back to opaque. `<AmbientBackground>` is part of
+  it, not decoration: it is the field the blur needs, and it draws the org graph.
+- **Landing.** Rebuilt. The vocabulary switcher is now the hero mechanic — it rewrites the
+  headline, so the product claim is demonstrated rather than described. Added the noun
+  grid, three steps, the anonymity and grants claims, and a closing call.
+- **Illustrations.** A line-art house style, authored in SVGator, inlined with `?raw` so
+  `var(--illus-*)` resolves and one drawing serves both themes. CSS keyframes, not the JS
+  player.
+- **Auth.** Larger type, deeper cards, and a three-point aside beside the form.
+- **Structure.** Added an overview band (four counts, units-per-level chart) and
+  `<UnitMap>` — the tree drawn as a node-link graph, tidy-tree layout, edges drawn on with
+  `pathLength="1"`. The indented tree remains the editing surface; the map only selects.
+- **Templates.** Cards carry a drawing of the form so twelve templates are comparable at a
+  glance, and Preview opens a glass quick-look that fetches the real questions instead of
+  navigating away from the grid.
+
+**What the next session should know**
+
+- `pages/respond/bundle.test.ts` caught a real regression: `<ThemeToggle>` imported
+  statically into `router/layouts.tsx` put lucide-react in the entry chunk. It is `lazy()`
+  there now, same as `<AppShell>`. Recorded as `N-026` — check that test before adding
+  anything to `layouts.tsx`.
+- Six tests were updated, none weakened: nouns and unit names now legitimately appear more
+  than once per page (headline + grid, map + tree), so `getByText` became `getAllByText`,
+  and template Preview is a button rather than a link.
+- 619/619 frontend tests pass; `audit:vocab` and `audit:drift` are clean. Eight lint errors
+  remain in `Settings.tsx` / `Settings.test.tsx` — pre-existing on this branch, untouched
+  by this pass, and worth a separate fix.
+- `tokens.css` is no longer a verbatim copy of any `design_specs` section. `design_specs/`
+  is absent from this branch; when it returns, §2 has to be reconciled against the token
+  block rather than re-copied over it (`DRIFT-001`).
+
 ### 2026-08-21 · T-049 — the slug race, and a worse bug found on the way to it
 
 `D-006`. `uniqueSlug()` runs outside register's transaction and cannot move inside it: it reads

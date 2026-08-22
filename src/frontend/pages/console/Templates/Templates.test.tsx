@@ -284,9 +284,14 @@ describe('capabilities decide what is offered, never what is enforced', () => {
     expect(within(section('Library')).getByText('Semester review')).toBeTruthy();
   });
 
+  // A button rather than a link since T-035's quick look: preview opens a dialog over the
+  // grid instead of navigating away from it. The full page is still linked from inside the
+  // dialog, so nothing became unreachable — only the first step changed.
   it('leaves Preview available to everybody who can read', () => {
     mount(['template.read']);
-    expect(within(section('Library')).getAllByRole('link', { name: 'Preview' }).length).toBeGreaterThan(0);
+    expect(
+      within(section('Library')).getAllByRole('button', { name: 'Preview' }).length,
+    ).toBeGreaterThan(0);
   });
 });
 

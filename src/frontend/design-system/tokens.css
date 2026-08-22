@@ -1,19 +1,30 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   tokens.css — the :root block, copied VERBATIM from
-   design_specs/design/01-DESIGN-SYSTEM.md §2 and §2b (21 §3, DEC-012).
+   tokens.css — the token layer (21 §3, DEC-012).
 
-   This file may contain nothing but `:root` and `@font-face`. When §2 changes,
-   this file is RE-COPIED WHOLESALE, never patched (DRIFT-001).
+   This file may contain nothing but `:root`, the theme blocks, and `@font-face`.
 
-   The canonical accent is the form-builder set, not the analysis dashboard's
-   (CONF-003). The vendored organic.css ships its own warm :root; that block is
-   dropped when vendoring, precisely so this one is the only token source.
+   Superseded here, with the decisions recorded in architecture/_MEMORY.md:
+     DEC-027  type pairing is Outfit (display) + Inter (body), replacing
+              Caprasimo + Figtree.
+     DEC-028  the product ships light AND dark. Every colour token is declared
+              twice — once on :root, once under [data-theme="dark"] — so a
+              component never learns which theme it is in.
+     DEC-029  surfaces are translucent (the glass layer). The blur needs
+              something behind it, which is why the ambient background is part
+              of the system rather than decoration on one page.
+     DEC-030  illustrations get their own three-colour ramp. The status ramp is
+              strictly semantic (§2b) and could not be borrowed for artwork.
+
+   The canonical accent is still the form-builder set, not the analysis
+   dashboard's (CONF-003).
    ───────────────────────────────────────────────────────────────────────── */
 
 :root {
+  color-scheme: light;
+
   /* ── Ground & ink ───────────────────────────────────────── */
-  --color-bg:        #eef5fb;   /* page ground — pale blue, never white */
-  --color-surface:   #e2edf7;   /* chrome: nav bar, inputs, collapsed rows */
+  --color-bg:        #eaf1f9;   /* page ground — pale blue, never white */
+  --color-surface:   #dfe9f4;   /* chrome: nav bar, inputs, collapsed rows */
   --color-text:      #17232e;   /* ink */
   --color-divider:   color-mix(in srgb, #17232e 14%, transparent);
   --color-card:      #ffffff;   /* content cards lift OFF the ground */
@@ -42,13 +53,28 @@
   --color-neutral-900:#212a30;
 
   /* ── Type ───────────────────────────────────────────────── */
-  --font-heading: "Caprasimo", system-ui, sans-serif;   /* weight 400 only */
-  --font-heading-weight: 400;
-  --font-body:    "Figtree", system-ui, sans-serif;      /* 400 / 600 / 700 */
+  --font-heading: "Outfit", system-ui, sans-serif;   /* 400 / 500 / 600 / 700 */
+  --font-heading-weight: 600;
+  --font-body:    "Inter", system-ui, sans-serif;    /* 400 / 500 / 600 / 700 */
+
+  /* The scale. Named by role rather than by size so a component states what a
+     piece of text IS, and the ramp can be retuned in one place (01 §3). */
+  --text-micro: 11.5px;  --text-meta:  13px;   --text-small: 14.5px;
+  --text-body:  16px;    --text-lead:  18.5px; --text-sub:   22px;
+  --text-h3:    27px;    --text-h2:    34px;   --text-h1:    46px;
+  --text-display: 62px;
+
+  /* Outfit is geometric and runs wide; at display sizes it needs negative
+     tracking or the words drift apart. Inter needs none. */
+  --track-display: -0.03em;
+  --track-heading: -0.018em;
+  --track-body:     0em;
+  --track-utility:  0.09em;
 
   /* ── Space — density 1.10× ──────────────────────────────── */
   --space-1: 4.4px;  --space-2: 8.8px;  --space-3: 13.2px;
   --space-4: 17.6px; --space-6: 26.4px; --space-8: 35.2px;
+  --space-12: 52.8px; --space-16: 70.4px; --space-24: 105.6px;
 
   /* ── Radius ─────────────────────────────────────────────── */
   --radius-sm: 8px; --radius-md: 16px; --radius-lg: 28px;
@@ -59,12 +85,113 @@
   --shadow-sm: 0 1px 2px  color-mix(in srgb, #212a30 12%, transparent);
   --shadow-md: 0 3px 10px color-mix(in srgb, #212a30 14%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #212a30 20%, transparent);
+
+  /* ── The glass layer — DEC-029 ──────────────────────────────────────────
+     Four properties, because real glass is four things at once: a tint you
+     can see through, a hairline edge, a sheen along the top where the light
+     catches, and the blur itself. A surface that has the blur but not the
+     sheen reads as a translucent rectangle, not as a material.
+
+     Saturation is boosted above 100% on purpose — glass over a coloured
+     ground should pick that colour up, which is the whole reason the ambient
+     background exists underneath it.                                       */
+  --glass-tint:   rgba(255, 255, 255, 0.62);
+  --glass-edge:   rgba(255, 255, 255, 0.75);
+  --glass-sheen:  rgba(255, 255, 255, 0.9);
+  --glass-shade:  rgba(23, 35, 46, 0.09);
+  --glass-blur:   blur(22px) saturate(175%);
+  --glass-blur-strong: blur(40px) saturate(190%);
+
+  /* ── Illustration ramp — DEC-030 ────────────────────────────────────────
+     For line-art artwork only: the ink the outlines are drawn in, and three
+     fills. Rose is the rare accent and stays rare — one element per scene,
+     never a whole shape group. It is NOT a brand colour and never appears in
+     chrome, buttons or navigation.                                          */
+  --illus-ink:       #2c3a47;
+  --illus-paper:     #ffffff;
+  --illus-blue:      #6fabf0;
+  --illus-blue-soft: #d3e6fb;
+  --illus-teal:      #6ec2ba;
+  --illus-teal-soft: #c9edea;
+  --illus-rose:      #e8577f;
+  --illus-amber:     #f5c451;
+
+  /* ── Ambient background — the field the glass refracts ─────────────────── */
+  /* Rose is kept very low. It is here to stop the field reading as a two-colour gradient,
+     not to be seen — at any strength where you can name the colour, it turns the blue and
+     the teal it sits between into mud. */
+  --ambient-1: color-mix(in srgb, var(--color-accent-300) 48%, transparent);
+  --ambient-2: color-mix(in srgb, var(--color-accent-2-300) 38%, transparent);
+  --ambient-3: color-mix(in srgb, var(--illus-rose) 8%, transparent);
+}
+
+/* ── Dark — DEC-028 ────────────────────────────────────────────────────────
+   Not an inversion. The ground goes to a deep desaturated navy rather than
+   black, because pure black behind a blurred surface produces grey mud and
+   loses the material entirely. Accents lift one or two steps: #3f86e6 passes
+   on the light ground and fails as running text on the dark one.            */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg:        #0e1621;
+  --color-surface:   #172433;
+  --color-text:      #e4edf7;
+  --color-divider:   color-mix(in srgb, #e4edf7 16%, transparent);
+  --color-card:      #16212f;
+
+  --color-accent:    #6fabf0;
+  --color-accent-100:#132741;  --color-accent-200:#193253;
+  --color-accent-300:#22456f;  --color-accent-400:#3f86e6;
+  --color-accent-500:#6fabf0;  --color-accent-600:#8dc0f5;
+  --color-accent-700:#a8cdf7;  --color-accent-800:#cbe2fb;
+  --color-accent-900:#e8f2fe;
+
+  --color-accent-2:    #6ec2ba;
+  --color-accent-2-100:#122c2a; --color-accent-2-200:#173c38;
+  --color-accent-2-300:#1f544e; --color-accent-2-400:#48a99f;
+  --color-accent-2-500:#6ec2ba; --color-accent-2-600:#8ed3cc;
+  --color-accent-2-700:#a0dbd6; --color-accent-2-800:#c9edea;
+  --color-accent-2-900:#e6f7f6;
+
+  --color-neutral-100:#131d29; --color-neutral-200:#1b2836;
+  --color-neutral-300:#243343; --color-neutral-400:#3a4c5e;
+  --color-neutral-500:#5d7186; --color-neutral-600:#8299ae;
+  --color-neutral-700:#a6bacc; --color-neutral-800:#c8d7e4;
+  --color-neutral-900:#e4edf7;
+
+  /* Shadows on a dark ground do almost nothing; the lift has to come from the
+     edge instead, so the sheen is what gets stronger here, not the shadow. */
+  --shadow-sm: 0 1px 2px  rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  --glass-tint:   rgba(30, 44, 62, 0.58);
+  --glass-edge:   rgba(255, 255, 255, 0.13);
+  --glass-sheen:  rgba(255, 255, 255, 0.16);
+  --glass-shade:  rgba(0, 0, 0, 0.35);
+
+  /* The artwork does not invert — it becomes a night scene. Outlines go pale, the paper
+     the shapes are cut from goes dark, and the three fills stay exactly where they were,
+     because a rose roof that shifts hue between themes stops being the same drawing. */
+  --illus-ink:       #cfe0f0;
+  --illus-paper:     #1b2736;
+  --illus-blue:      #6fabf0;
+  --illus-blue-soft: #24486f;
+  --illus-teal:      #6ec2ba;
+  --illus-teal-soft: #23574f;
+  --illus-rose:      #ef6f92;
+  --illus-amber:     #f5c451;
+
+  --ambient-1: color-mix(in srgb, #3f86e6 26%, transparent);
+  --ambient-2: color-mix(in srgb, #48a99f 17%, transparent);
+  --ambient-3: color-mix(in srgb, #e8577f 6%, transparent);
 }
 
 /* ── The status ramp — §2b. STRICTLY SEMANTIC ──────────────────────────────
    Never used for brand, navigation or decoration. It exists because the base
    system is two-accent, and blue cannot simultaneously mean "the product" and
-   "a respondent is unhappy" (CONF-004).                                      */
+   "a respondent is unhappy" (CONF-004). The illustration ramp above exists for
+   the same reason in the other direction (DEC-030).                          */
 :root {
   /* success — reuses accent-2, which is already the "good" voice */
   --status-good-100:#e6f7f6; --status-good-500:#48a99f; --status-good-800:#1e4f4a;
@@ -76,28 +203,59 @@
   --status-bad-100: #fdecea; --status-bad-500: #d95c4a; --status-bad-800: #7d2a1e;
 }
 
+/* The ramp inverts too, or a "good" tag becomes a bright mint slab on navy. */
+[data-theme="dark"] {
+  --status-good-100:#14332f; --status-good-500:#5cbdb2; --status-good-800:#c9edea;
+  --status-warn-100:#332714; --status-warn-500:#e6b055; --status-warn-800:#fbe6c2;
+  --status-bad-100: #351c18; --status-bad-500: #e57764; --status-bad-800: #fbd8d1;
+}
+
 /* ── Faces ────────────────────────────────────────────────────────────────
    SELF-HOSTED (21 §4). The declaration lives beside the family custom property
    so the two cannot drift apart.
 
-   The woff2 files are NOT yet vendored — see public/fonts/README.md. Until they
-   are, both stacks fall back to system-ui and the product still renders; the
-   deadline for vendoring is 24 Aug, not demo day.
-
-   There is deliberately no @import of fonts.googleapis.com. A venue network that
-   blocks it would drop the whole product to system-ui mid-presentation, and a
-   remote font that works in dev and not on the projector is the worst of both.  */
+   There is deliberately no @import of fonts.googleapis.com. A venue network
+   that blocks it would drop the whole product to system-ui mid-presentation,
+   and a remote font that works in dev and not on the projector is the worst of
+   both. Both faces are variable — one file covers every weight the product
+   uses, so adding a weight costs nothing at runtime.                         */
 @font-face {
-  font-family: 'Caprasimo';
+  font-family: 'Outfit';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/caprasimo-400.woff2') format('woff2');
+  src: url('/fonts/outfit-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Figtree';
+  font-family: 'Outfit';
   font-style: normal;
-  font-weight: 400 700;   /* variable: 400 / 600 / 700 all come from one file */
+  font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/figtree-variable.woff2') format('woff2');
+  src: url('/fonts/outfit-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+                 U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                 U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+                 U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                 U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }

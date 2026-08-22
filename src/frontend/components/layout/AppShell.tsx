@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
+import { AmbientBackground } from '../AmbientBackground.js';
 
 export function AppShell({
   children,
@@ -39,6 +40,10 @@ export function AppShell({
 
   return (
     <div className="shell">
+      {/* Quieter than the public world's: the console is where work happens, and a
+          background competing with a data table is a background in the wrong place. */}
+      <AmbientBackground />
+
       {/* First focusable element on the page. 26 — and it is cheap now, expensive later. */}
       <a className="skip-link" href="#main">Skip to content</a>
 

@@ -8,15 +8,16 @@
 // constraint the product rests on (`01` §5). Competitors ship 40-question templates;
 // putting the cost in the reader's eye before the name is what makes "deliberately short"
 // a promise rather than a claim in a pitch deck.
-import { Link } from 'react-router-dom';
 import type { TemplateSummary } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
+import { TemplatePreview } from './TemplatePreview.js';
 
 export function TemplateCard({
   template,
   campaign,
   busy = false,
+  onPreview,
   onUse,
   onOpen,
   onDelete,
@@ -30,6 +31,8 @@ export function TemplateCard({
    */
   campaign: { one: string; many: string };
   busy?: boolean;
+  /** Opens the quick-look dialog. The full page is still reachable from inside it. */
+  onPreview: () => void;
   /** Clone into the org. Absent without `template.clone`. */
   onUse?: (() => void) | undefined;
   /** The org's own templates only: straight into the builder. */
@@ -41,6 +44,17 @@ export function TemplateCard({
 
   return (
     <article className={`card tcard${template.isLibrary ? ' is-library' : ''}`}>
+      {/* The shape of the form, before its name. Twelve cards of identical text are
+          impossible to compare; twelve drawings of different lengths are not. */}
+      <button
+        type="button"
+        className="tcard-figure"
+        onClick={onPreview}
+        aria-label={`Preview ${template.name}`}
+      >
+        <TemplatePreview questionCount={template.questionCount} />
+      </button>
+
       <h4 className="tcard-name">
         <Icon name="template" size={16} className="tcard-icon" />
         {template.name}
@@ -67,9 +81,9 @@ export function TemplateCard({
       {error && <p className="field-error" role="alert">{error}</p>}
 
       <div className="tcard-actions">
-        <Link className="btn btn-ghost" to={`/app/templates/${template.id}`}>
+        <button type="button" className="btn btn-ghost" onClick={onPreview}>
           Preview
-        </Link>
+        </button>
         {onOpen && (
           <button type="button" className="btn btn-secondary" onClick={onOpen}>
             Open

@@ -25,6 +25,7 @@ import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { UnitTree, type UnitTreeRequest } from '../../../components/org/UnitTree.js';
+import { UnitMap } from '../../../components/org/UnitMap.js';
 import { Icon } from '../../../components/Icon.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
@@ -32,6 +33,7 @@ import { ApiError } from '../../../lib/api.js';
 import { unitImpact, useUnits } from '../../../lib/units.js';
 import { pluralise } from '../../../lib/format.js';
 import { DetailPanel } from './DetailPanel.js';
+import { Overview } from './Overview.js';
 import { checkingConsequence, deleteConsequence, unknownConsequence } from './consequence.js';
 
 /** A row that exists only in the browser, waiting for a name. `+` creates one. */
@@ -246,6 +248,23 @@ export default function Structure(): JSX.Element {
             ) : undefined
           }
         />
+      )}
+
+      {/* Derived from `data`, not `tree` — the unnamed draft row is not a unit yet, and
+          counting it would make the totals flicker while somebody is still typing. */}
+      {total > 0 && <Overview nodes={data} labels={labels} />}
+
+      {total > 0 && (
+        <section className="card structure-map-card" aria-labelledby="map-heading">
+          <p className="utility" id="map-heading">The shape of it</p>
+          <UnitMap
+            nodes={data}
+            selectedId={selectedId ?? undefined}
+            subjectWord={labels.subject.many}
+            unitWord={labels.unit.many}
+            onSelect={setSelectedId}
+          />
+        </section>
       )}
 
       {(tree.length > 0 || draft) && (

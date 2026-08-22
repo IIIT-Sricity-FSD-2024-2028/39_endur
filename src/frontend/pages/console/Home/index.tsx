@@ -18,7 +18,7 @@
 //      campaign one aggregate at a time (46 § Acceptance).
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import type { HomeView } from '@endur/shared';
+import { StatWindows, type HomeView, type StatWindow } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { StatCard } from '../../../components/data/StatCard.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
@@ -28,7 +28,7 @@ import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useHome } from '../../../lib/home.js';
 import { useAppSelector } from '../../../store/index.js';
-import { promptCopy, statCards } from './cards.js';
+import { RANGE_LABEL, promptCopy, statCards } from './cards.js';
 import { CampaignCard } from './CampaignCard.js';
 import { Recent } from './Recent.js';
 
@@ -38,7 +38,10 @@ export default function Home(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
   const org = useAppSelector((state) => state.auth.org);
-  const home = useHome();
+  // 30 days, not all time — DEC-031. The first thing anybody sees after signing in should
+  // be recent activity; a lifetime total only goes up and asks nobody to do anything.
+  const [range, setRange] = useState<StatWindow>('30d');
+  const home = useHome(range);
   const [sharing, setSharing] = useState<Campaign | null>(null);
 
   const view = home.data;
@@ -70,8 +73,12 @@ export default function Home(): JSX.Element {
   // Absent, not empty. `undefined` means the server withheld the section; `[]` means the
   // section is theirs and holds nothing yet. Those are two different sentences.
   const readsNothing = campaigns === undefined && comments === undefined;
+  // `responsesEver`, NOT the windowed count — DEC-031. "This organisation has never
+  // collected anything" and "nothing arrived in the last 30 days" are different sentences,
+  // and reading the windowed number here would show a two-year-old organisation the
+  // welcome screen — with its range control hidden — every quiet month.
   const isNew =
-    !readsNothing && view.stats.responsesTotal === 0 && (campaigns?.length ?? 0) === 0;
+    !readsNothing && view.stats.responsesEver === 0 && (campaigns?.length ?? 0) === 0;
 
   const cards = statCards(view, labels);
   const prompts = view.prompts.map((prompt) => promptCopy(prompt, labels, orgName));
@@ -141,15 +148,44 @@ export default function Home(): JSX.Element {
             </ul>
           )}
 
-          <div className="stat-row">
-            {cards.map((card) => (
-              <StatCard
-                key={card.kicker}
-                kicker={card.kicker}
-                value={card.value}
-                context={card.context}
-              />
-            ))}
+          {/* The range owns the row beneath it and nothing else on the page, so it sits
+              inside the band rather than up in the header beside "New campaign" — a
+              control in the header would read as filtering the campaign list too. */}
+          <div className="stat-band">
+            <div className="stat-band-head">
+              <h2 className="section-title">Activity</h2>
+              <div className="segmented range-control" role="radiogroup" aria-label="Range">
+                {StatWindows.map((option) => (
+                  <label
+                    className={`segment${range === option ? ' is-active' : ''}`}
+                    key={option}
+                  >
+                    <input
+                      type="radio"
+                      name="range"
+                      checked={range === option}
+                      onChange={() => setRange(option)}
+                    />
+                    <span>{RANGE_LABEL[option]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* `aria-busy` rather than a spinner: the previous numbers stay on screen
+                while the new range loads, so there is nothing to replace — only a fact to
+                announce. Swapping four cards for four skeletons on every press would make
+                the page jump more than the numbers change. */}
+            <div className="stat-row" aria-busy={home.loading || undefined}>
+              {cards.map((card) => (
+                <StatCard
+                  key={card.kicker}
+                  kicker={card.kicker}
+                  value={card.value}
+                  context={card.context}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="home-columns">
