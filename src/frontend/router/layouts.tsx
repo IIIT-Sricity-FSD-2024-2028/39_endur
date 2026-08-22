@@ -6,6 +6,7 @@
 import { lazy, Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { RequireSession, SessionLoading } from './guards.js';
+import { AmbientBackground } from '../components/AmbientBackground.js';
 
 /**
  * LAZY, and it is not a micro-optimisation — it is 20 §8's "the respondent bundle must not
@@ -22,6 +23,19 @@ import { RequireSession, SessionLoading } from './guards.js';
  */
 const AppShell = lazy(() =>
   import('../components/layout/AppShell.js').then((module) => ({ default: module.AppShell })),
+);
+
+/**
+ * LAZY FOR THE SAME REASON, and it is not obvious: <ThemeToggle> is three icons in a pill,
+ * but it imports <Icon>, and <Icon> is lucide-react's thirty glyphs. Imported statically
+ * here it lands in the ENTRY chunk — the one a phone downloads before it can render a
+ * single question — which is precisely the leak `pages/respond/bundle.test.ts` was written
+ * to catch, and which it caught again when this was added.
+ *
+ * <AmbientBackground> above needs none of this: it imports nothing at all.
+ */
+const ThemeToggle = lazy(() =>
+  import('../components/ThemeToggle.js').then((module) => ({ default: module.ThemeToggle })),
 );
 
 /** The two screens that are a form and nothing else (design_specs/design/03 §3.2, §3.3). */
@@ -41,12 +55,25 @@ export function PublicLayout(): JSX.Element {
 
   return (
     <>
+      {/* The public world gets the ambient layer at full strength — out here it is part of
+          the composition rather than something the console sits quietly on top of. */}
+      <AmbientBackground variant="hero" />
       <a className="skip-link" href="#main">Skip to content</a>
-      <nav className="nav">
+      <nav className="nav nav-public glass glass-lit">
         <Link className="nav-brand" to="/">
           <span className="nav-mark" aria-hidden="true" />
           Endur
         </Link>
+        {/* Appearance stays even on the form-only screens. Someone who signs in at night
+            should not have to reach the console before the product stops glaring.
+
+            No fallback: the theme itself is already applied by the inline script in
+            index.html, so the only thing still loading is the CONTROL. A placeholder
+            would reserve space and then swap, which is more visible than the control
+            simply arriving. */}
+        <Suspense fallback={null}>
+          <ThemeToggle className="nav-theme" />
+        </Suspense>
         {!formOnly && (
           <>
             <NavLink to="/login">Sign in</NavLink>
@@ -91,8 +118,14 @@ export function ConsoleLayout(): JSX.Element {
  */
 export function RespondLayout(): JSX.Element {
   return (
-    <main className="page page-form">
-      <Outlet />
-    </main>
+    <>
+      {/* Still no chrome. The ambient layer carries no navigation, no brand and no link —
+          it is the ground the form's glass needs in order to read as glass, and nothing
+          more. */}
+      <AmbientBackground />
+      <main className="page page-form">
+        <Outlet />
+      </main>
+    </>
   );
 }

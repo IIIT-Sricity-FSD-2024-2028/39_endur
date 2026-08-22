@@ -14,6 +14,7 @@ import { Icon } from '../../components/Icon.js';
 import { ApiError } from '../../lib/api.js';
 import { useSignIn } from '../../lib/auth.js';
 import { DEMO_ORGS, isDemoBuild } from '../../lib/demo.js';
+import { AuthAside } from './AuthAside.js';
 
 /** Mirrors `Credentials` in packages/shared. The server is the authority; this only saves
  *  a round trip on an obviously short password (30 § Acceptance). */
@@ -76,8 +77,10 @@ export default function Login(): JSX.Element {
 
   return (
     <div className="auth">
-      <div className="card elev-md auth-card">
+      <div className="auth-main">
+      <div className="card elev-lg auth-card">
         <h1 className="auth-title">Sign in</h1>
+        <p className="auth-sub">Welcome back.</p>
 
         <form onSubmit={(event) => void submit(event)} noValidate>
           <div className="field">
@@ -169,6 +172,9 @@ export default function Login(): JSX.Element {
           </div>
         </div>
       )}
+      </div>
+
+      <AuthAside />
     </div>
   );
 }

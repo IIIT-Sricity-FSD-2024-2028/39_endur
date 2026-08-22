@@ -277,10 +277,13 @@ describe('what the reader may do', () => {
     expect(screen.queryByRole('button', { name: /Add a Zblorn/ })).toBeNull();
   });
 
+  // The name is on screen twice now — once in the map above, once in the tree — so this
+  // counts rather than demanding one. The assertion that matters is the first: a reader
+  // without `unit.update` gets text, never an editable field.
   it('shows names as text, not inputs, without unit.update', () => {
     mount(['unit.read']);
     expect(screen.queryByDisplayValue('Engineering')).toBeNull();
-    expect(screen.getByText('Engineering')).toBeTruthy();
+    expect(screen.getAllByText('Engineering').length).toBeGreaterThan(0);
   });
 });
 

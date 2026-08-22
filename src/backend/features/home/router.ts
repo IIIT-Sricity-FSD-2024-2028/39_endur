@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../middleware/validate.js';
 import { requireCapability } from '../../middleware/requireCapability.js';
 import { authenticate } from '../../middleware/authenticate.js';
-import { HomeDto } from '@endur/shared';
+import { HomeDto, type HomeQuery } from '@endur/shared';
 import { UnauthenticatedError } from '../../lib/errors.js';
 import { readHome } from './service.js';
 
@@ -17,7 +17,10 @@ export const homeRouter: Router = Router();
 homeRouter.get('/', authenticate, validate(HomeDto), requireCapability('org.read'), (req, res, next) => {
   const principal = req.ctx.principal;
   if (principal?.kind !== 'user') return next(new UnauthenticatedError());
-  void readHome(req.ctx.orgId as string, principal.id, req.ctx.authzVersion ?? 0)
+  // `window` is validated and DEFAULTED by the DTO (DEC-031), so an absent or junk range
+  // is 30 days rather than a 400 — a dashboard must not fail to load over a query string.
+  const { query } = req.data as { query: HomeQuery };
+  void readHome(req.ctx.orgId as string, principal.id, req.ctx.authzVersion ?? 0, query.window)
     .then((home) => res.json({ data: home }))
     .catch(next);
 });

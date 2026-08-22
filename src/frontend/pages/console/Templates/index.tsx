@@ -22,6 +22,7 @@ import { useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
 import { cloneKey, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
 import { TemplateCard } from './TemplateCard.js';
+import { PreviewDialog } from './PreviewDialog.js';
 import { deleteConsequence } from './consequence.js';
 import { BlankFormDialog } from './BlankFormDialog.js';
 
@@ -60,6 +61,8 @@ export default function Templates(): JSX.Element {
   const [term, setTerm] = useState(q);
   const [blank, setBlank] = useState(false);
   const [pending, setPending] = useState<TemplateSummary | null>(null);
+  /** The template being looked at in the quick-look dialog, if any. */
+  const [preview, setPreview] = useState<TemplateSummary | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cardError, setCardError] = useState<{ id: string; text: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -228,6 +231,7 @@ export default function Templates(): JSX.Element {
                 campaign={labels.campaign}
                 busy={busyId === template.id}
                 error={cardError?.id === template.id ? cardError.text : undefined}
+                onPreview={() => setPreview(template)}
                 onOpen={() => navigate(`/app/forms/${template.id}/build`)}
                 {...(can('template.delete') ? { onDelete: () => setPending(template) } : {})}
               />
@@ -266,12 +270,26 @@ export default function Templates(): JSX.Element {
                 campaign={labels.campaign}
                 busy={busyId === template.id}
                 error={cardError?.id === template.id ? cardError.text : undefined}
+                onPreview={() => setPreview(template)}
                 {...(can('template.clone') ? { onUse: () => use(template) } : {})}
               />
             ))}
           </div>
         )}
       </section>
+
+      {preview && (
+        <PreviewDialog
+          template={preview}
+          busy={busyId === preview.id}
+          onClose={() => setPreview(null)}
+          {...(preview.isLibrary
+            ? can('template.clone')
+              ? { onUse: () => { const target = preview; setPreview(null); use(target); } }
+              : {}
+            : { onOpen: () => navigate(`/app/forms/${preview.id}/build`) })}
+        />
+      )}
 
       {blank && (
         <BlankFormDialog

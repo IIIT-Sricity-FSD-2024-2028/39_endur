@@ -33,13 +33,16 @@ describe('landing — 30 § Landing', () => {
     }
   });
 
+  // Each noun now appears more than once — the row, the tile grid, and for two of them the
+  // headline — so these count occurrences rather than demanding exactly one. What is being
+  // proven is unchanged: every one of them came out of the preset data.
   it('shows the first preset\'s four nouns before anything is clicked', () => {
     reducedMotion(true);
     mount();
     const first = PRESET_VOCABULARIES[0];
     expect(first).toBeTruthy();
     for (const key of ['unit', 'subject', 'respondent', 'reviewee'] as const) {
-      expect(screen.getByText(first!.labels[key].one)).toBeTruthy();
+      expect(screen.getAllByText(first!.labels[key].one).length).toBeGreaterThan(0);
     }
   });
 
@@ -51,10 +54,24 @@ describe('landing — 30 § Landing', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: hotel!.displayName }));
 
-    expect(screen.getByText(hotel!.labels.unit.one)).toBeTruthy();
-    expect(screen.getByText(hotel!.labels.reviewee.one)).toBeTruthy();
+    expect(screen.getAllByText(hotel!.labels.unit.one).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(hotel!.labels.reviewee.one).length).toBeGreaterThan(0);
     // And the previous vocabulary is gone, not merely covered.
     expect(screen.queryByText(PRESET_VOCABULARIES[0]!.labels.unit.one)).toBeNull();
+  });
+
+  it('rewrites the headline into the chosen organisation\'s words', () => {
+    reducedMotion(true);
+    const { container } = mount();
+    const hospital = PRESET_VOCABULARIES.find((entry) => entry.key === 'hospital');
+
+    fireEvent.click(screen.getByRole('radio', { name: hospital!.displayName }));
+
+    // The headline is the demonstration, so it is the one place the swap must be proven
+    // rather than assumed. Lowercased in the sentence, as the copy sets it.
+    const title = container.querySelector('.landing-title')?.textContent ?? '';
+    expect(title).toContain(hospital!.labels.respondent.one.toLowerCase());
+    expect(title).toContain(hospital!.labels.subject.one.toLowerCase());
   });
 
   it('renders the row as the data says, in the data\'s order', () => {
@@ -75,7 +92,7 @@ describe('landing — 30 § Landing', () => {
     const second = PRESET_VOCABULARIES[1];
 
     act(() => { vi.advanceTimersByTime(3500); });
-    expect(screen.getByText(second!.labels.unit.one)).toBeTruthy();
+    expect(screen.getAllByText(second!.labels.unit.one).length).toBeGreaterThan(0);
   });
 
   it('stops advancing FOR GOOD once a segment is clicked', () => {
@@ -89,7 +106,7 @@ describe('landing — 30 § Landing', () => {
 
     // Still on the one they chose. A control that moves after you have used it reads as
     // a bug on a projector.
-    expect(screen.getByText(hospital!.labels.unit.one)).toBeTruthy();
+    expect(screen.getAllByText(hospital!.labels.unit.one).length).toBeGreaterThan(0);
   });
 
   it('does not auto-advance at all under prefers-reduced-motion (WCAG 2.2.2)', () => {
@@ -99,15 +116,19 @@ describe('landing — 30 § Landing', () => {
     const first = PRESET_VOCABULARIES[0];
 
     act(() => { vi.advanceTimersByTime(3500 * 3); });
-    expect(screen.getByText(first!.labels.unit.one)).toBeTruthy();
+    expect(screen.getAllByText(first!.labels.unit.one).length).toBeGreaterThan(0);
   });
 
   it('sends the primary action to /start and the secondary to /login', () => {
     reducedMotion(true);
     mount();
-    expect(
-      screen.getByRole('link', { name: 'Create your organization' }).getAttribute('href'),
-    ).toBe('/start');
+    // The page opens and closes with the same action, so there are two of them. Both must
+    // lead to the same place — a closing call that goes somewhere else is the kind of thing
+    // nobody notices until a demo.
+    const create = screen.getAllByRole('link', { name: 'Create your organization' });
+    expect(create.length).toBe(2);
+    for (const link of create) expect(link.getAttribute('href')).toBe('/start');
+
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login');
   });
 

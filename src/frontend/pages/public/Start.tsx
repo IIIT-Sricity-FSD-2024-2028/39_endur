@@ -17,6 +17,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/Icon.js';
 import { ApiError } from '../../lib/api.js';
 import { useRegister } from '../../lib/auth.js';
+import { AuthAside } from './AuthAside.js';
 
 /** `Credentials` in packages/shared says min(10). Mirrored, never trusted — the server
  *  rejects a short password whatever this form believes (30 § Acceptance). */
@@ -69,9 +70,10 @@ export default function Start(): JSX.Element {
 
   return (
     <div className="auth">
-      <div className="card elev-md auth-card">
+      <div className="auth-main">
+      <div className="card elev-lg auth-card">
         <h1 className="auth-title">Create your organization</h1>
-        <p className="text-meta auth-sub">Takes about two minutes.</p>
+        <p className="auth-sub">Takes about two minutes.</p>
 
         <form onSubmit={(event) => void submit(event)} noValidate>
           <div className="field">
@@ -180,6 +182,9 @@ export default function Start(): JSX.Element {
           Already have an account? <Link className="btn btn-ghost" to="/login">Sign in</Link>
         </p>
       </div>
+      </div>
+
+      <AuthAside />
     </div>
   );
 }

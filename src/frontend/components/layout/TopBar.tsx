@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../Icon.js';
+import { ThemeToggle } from '../ThemeToggle.js';
 import { useAppSelector } from '../../store/index.js';
 import { signOut, switchToDemoOrg } from '../../lib/session.js';
 import { DEMO_ORGS, isDemoBuild } from '../../lib/demo.js';
@@ -38,6 +39,7 @@ export function TopBar({
       <OrgSwitcher name={org?.name ?? ''} />
 
       <div className="topbar-right">
+        <ThemeToggle className="topbar-theme" />
         <UserChip name={user?.name ?? ''} email={user?.email ?? ''} />
       </div>
     </header>

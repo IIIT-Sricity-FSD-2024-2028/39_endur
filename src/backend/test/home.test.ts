@@ -121,8 +121,10 @@ describe('GET /home', () => {
     const res = await founder.agent.get('/api/v1/home');
 
     expect(res.status).toBe(200);
-    expect(res.body.data.stats.responsesTotal).toBe(config.K_ANON_THRESHOLD);
-    expect(res.body.data.stats.responsesToday).toBe(config.K_ANON_THRESHOLD);
+    expect(res.body.data.stats.window).toBe('30d');
+    expect(res.body.data.stats.responses).toBe(config.K_ANON_THRESHOLD);
+    expect(res.body.data.stats.responsesEver).toBe(config.K_ANON_THRESHOLD);
+    expect(res.body.data.stats.subjectsCovered).toBe(1);
     expect(res.body.data.stats.activeCampaigns).toBe(1);
     expect(res.body.data.activeCampaigns).toHaveLength(1);
     expect(res.body.data.activeCampaigns[0].name).toBe('Autumn feedback');
@@ -185,7 +187,7 @@ describe('GET /home', () => {
     const res = await founder.agent.get('/api/v1/home');
 
     // The raw count is fine — it says how many people answered, which identifies nobody.
-    expect(res.body.data.stats.responsesTotal).toBe(config.K_ANON_THRESHOLD - 1);
+    expect(res.body.data.stats.responses).toBe(config.K_ANON_THRESHOLD - 1);
     // But no comment from a suppressed campaign leaks onto the dashboard. Home must not
     // become a way to read a gated campaign one aggregate at a time (46 § Acceptance).
     expect(res.body.data.recentComments).toEqual([]);
@@ -202,7 +204,7 @@ describe('the response rate needs a denominator that exists — 46', () => {
     const res = await founder.agent.get('/api/v1/home');
 
     // One subject and five responses used to divide one into the other and render 500%.
-    expect(res.body.data.stats.responsesTotal).toBe(config.K_ANON_THRESHOLD);
+    expect(res.body.data.stats.responses).toBe(config.K_ANON_THRESHOLD);
     expect(res.body.data.activeCampaigns[0].subjectCount).toBe(1);
     expect(res.body.data.stats.responseRate).toBeNull();
   });
@@ -214,6 +216,56 @@ describe('the response rate needs a denominator that exists — 46', () => {
     // Ten people asked, five answered. Half, and it says half — not "500%" because five
     // responses arrived about one subject.
     expect(res.body.data.stats.responseRate).toBe(0.5);
+  });
+
+  it('measures the rate over the RANGE, not over the campaign’s whole life — DEC-031', async () => {
+    const founder = await collectingOrg(config.K_ANON_THRESHOLD, { people: 10 });
+
+    // Move every response back six weeks. The campaign is still open and its audience is
+    // still ten people, so an unwindowed rate would keep saying 50% for a month in which
+    // literally nothing arrived — which is the "who cares about all time" complaint in
+    // its most damaging form: a number that is stale AND reassuring.
+    await prisma.response.updateMany({
+      where: { campaign: { orgId: founder.orgId } },
+      data: { submittedAt: new Date(Date.now() - 42 * 86_400_000) },
+    });
+
+    const recent = await founder.agent.get('/api/v1/home?window=30d');
+    expect(recent.body.data.stats.responses).toBe(0);
+    expect(recent.body.data.stats.subjectsCovered).toBe(0);
+    // Zero of ten, not "no data": the campaign WAS collecting, so the denominator is real.
+    expect(recent.body.data.stats.responseRate).toBe(0);
+    // And the org has not vanished — the page still knows it has collected before.
+    expect(recent.body.data.stats.responsesEver).toBe(config.K_ANON_THRESHOLD);
+
+    const ever = await founder.agent.get('/api/v1/home?window=all');
+    expect(ever.body.data.stats.responses).toBe(config.K_ANON_THRESHOLD);
+    expect(ever.body.data.stats.responseRate).toBe(0.5);
+  });
+
+  it('keeps a campaign that was never collecting OUT of the denominator', async () => {
+    const founder = await collectingOrg(config.K_ANON_THRESHOLD, { people: 10 });
+
+    // Closed a year ago. Its ten-person audience must not be charged against this week —
+    // that is `N-043`'s mistake in the time dimension: a denominator from one period
+    // divided into a numerator from another.
+    await prisma.campaign.updateMany({
+      where: { orgId: founder.orgId },
+      data: { closedAt: new Date(Date.now() - 365 * 86_400_000) },
+    });
+
+    const res = await founder.agent.get('/api/v1/home?window=7d');
+    expect(res.body.data.stats.responseRate).toBeNull();
+  });
+
+  it('falls back to 30 days rather than 400ing on a junk range', async () => {
+    const founder = await collectingOrg(config.K_ANON_THRESHOLD);
+    const res = await founder.agent.get('/api/v1/home?window=since-the-dawn-of-time');
+
+    // A range is a DISPLAY preference. A stale bookmark must not break the first screen
+    // after sign-in, and nothing is written or authorised from it (DEC-031).
+    expect(res.status).toBe(200);
+    expect(res.body.data.stats.window).toBe('30d');
   });
 
   it('hands the campaign card its share link, so the QR costs a click and not a request', async () => {

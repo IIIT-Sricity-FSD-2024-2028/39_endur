@@ -283,35 +283,119 @@
   max-width: var(--width-reading); margin: 0 auto;
   padding: var(--space-4) var(--space-4) var(--space-8);
 }
+/* The landing page is the one public screen that is not a column of prose, so it takes
+   the app width rather than the reading width. Scoped to the page rather than added to
+   `.public-main` so /login and /start keep their narrow measure. */
+.public-main:has(.landing) { max-width: var(--width-app); }
 /* The two form screens centre a card on the ground rather than filling a page.
    `min-height` is measured from the nav, not the viewport, or the card sits
    half a nav-height below true centre — visible, and it looks like a mistake. */
 .public-main-form {
   display: grid; place-items: start center;
-  min-height: calc(100dvh - 140px); padding-top: var(--space-6);
+  max-width: var(--width-app);
+  min-height: calc(100dvh - 140px); padding-top: var(--space-12);
 }
 
-/* ── landing ─────────────────────────────────────────────────────────────── */
+/* ── landing ───────────────────────────────────────────────────────────────
+   Sections are separated by --space-24 rather than a rule. On a page with a
+   live background, a horizontal line reads as a seam in the glass.          */
 
-.landing { display: flex; flex-direction: column; gap: var(--space-8); }
-.landing-hero { padding-top: var(--space-6); }
+.landing { display: flex; flex-direction: column; gap: var(--space-16); }
+
+/* ── hero ──────────────────────────────────────────────────────────────── */
+.landing-hero { padding-top: var(--space-16); }
+.landing-eyebrow {
+  margin: 0 0 var(--space-4);
+  color: var(--color-accent-700);
+}
 .landing-title {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(32px, 6vw, 42px); line-height: 1.12; margin: 0;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: clamp(38px, 6.4vw, var(--text-display));
+  letter-spacing: var(--track-display);
+  line-height: 1.04; margin: 0;
+  text-wrap: balance;
 }
+/* The two words that rewrite themselves. Marked so the swap is visible as a
+   swap — an unstyled word changing on a timer just looks like a typo being
+   corrected. The underline is drawn on the accent and sits below the
+   baseline, so a descender never collides with it. */
+.landing-swap {
+  position: relative; white-space: nowrap;
+  color: var(--color-accent-700);
+  animation: swap-in 420ms var(--ease) both;
+}
+.landing-swap::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: -0.06em;
+  height: 0.075em; border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+@keyframes swap-in {
+  from { opacity: 0; transform: translateY(0.14em); }
+  to   { opacity: 1; transform: none; }
+}
+
 .landing-lede {
-  max-width: 46ch; margin: var(--space-3) 0 0; font-size: 18px; line-height: 1.55;
+  max-width: 52ch;
+  margin: var(--space-6) 0 0;
+  font-size: var(--text-lead); line-height: 1.6;
+  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+}
+
+.landing-switcher {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  margin-top: var(--space-8);
+}
+.landing-switcher .utility { margin: 0; }
+.landing-switcher .seg {
+  background: color-mix(in srgb, var(--color-card) 55%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-color: var(--glass-edge);
+}
+
+.landing-actions {
+  display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8);
+}
+/* The one button size above the default, and it exists only for the two page
+   actions that are the whole point of their screen. */
+.btn-lg {
+  font-size: var(--text-body); min-height: 52px;
+  padding-inline: calc(var(--space-4) * 1.3);
+}
+.btn-primary.btn-lg {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset,
+              0 8px 22px -8px color-mix(in srgb, var(--color-accent) 70%, transparent);
+}
+.btn-lg svg { transition: transform var(--dur-base) var(--ease); }
+.btn-lg:hover svg { transform: translateX(3px); }
+
+/* ── the scene ─────────────────────────────────────────────────────────── */
+/* The drawing carries its own margins — sky above the roof, ground below the
+   feet — so the section pulls in on both sides. Left as-is, the artwork's own
+   empty space stacks on top of the page's and the scene floats. */
+.landing-scene {
+  margin-block: calc(var(--space-16) * -1) calc(var(--space-12) * -1);
+}
+.illus, .illus svg { display: block; width: 100%; height: auto; }
+.illus-hero { max-width: 1240px; margin-inline: auto; }
+
+/* ── the substitution, laid out ────────────────────────────────────────── */
+.landing-section-title {
+  font-size: clamp(27px, 3.6vw, var(--text-h2));
+  margin: 0; text-wrap: balance;
+}
+.landing-section-lede {
+  max-width: 58ch; margin: var(--space-3) 0 0;
+  font-size: var(--text-lead); line-height: 1.6;
   color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
-.landing-actions {
-  display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4);
-}
 
-.landing-switch { gap: var(--space-3); padding: var(--space-4); }
-.landing-switch .seg { align-self: flex-start; }
 .landing-nouns {
-  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(19px, 3.4vw, 25px); line-height: 1.3;
+  margin: var(--space-8) 0 0;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: clamp(22px, 3.6vw, var(--text-h3));
+  letter-spacing: var(--track-heading); line-height: 1.3;
   animation: noun-swap var(--dur-base) var(--ease);
 }
 .landing-dot { color: var(--color-accent); }
@@ -320,33 +404,210 @@
   to   { opacity: 1; transform: none; }
 }
 
-.landing-steps {
-  display: grid; gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.landing-grid {
+  list-style: none; margin: var(--space-6) 0 0; padding: 0;
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
-.landing-steps p { margin: 0; }
-.landing-steps .utility { margin-bottom: 4px; }
-.landing-footer { border-top: 1px solid var(--color-divider); padding-top: var(--space-3); }
+.landing-tile {
+  gap: var(--space-1); padding: var(--space-4);
+  animation: tile-in 420ms var(--ease) both;
+}
+/* Staggered so the four read as a set arriving, not four things appearing.
+   Under 500ms total, or the page feels like it is loading rather than moving. */
+.landing-tile:nth-child(2) { animation-delay: 60ms; }
+.landing-tile:nth-child(3) { animation-delay: 120ms; }
+.landing-tile:nth-child(4) { animation-delay: 180ms; }
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.landing-tile-word {
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: var(--text-sub); letter-spacing: var(--track-heading);
+  line-height: 1.2;
+}
 
-/* ── the two auth cards ──────────────────────────────────────────────────── */
+/* ── the three steps ───────────────────────────────────────────────────── */
+.landing-step-list {
+  list-style: none; margin: var(--space-8) 0 0; padding: 0;
+  display: grid; gap: var(--space-8);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.landing-step { position: relative; padding-top: var(--space-6); }
+/* The rule above each step is the step's own progress through the sequence —
+   it is a numbered list, so the number is information, not ornament. */
+.landing-step::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 2px;
+  background: var(--color-divider);
+}
+.landing-step:first-child::before { background: var(--color-accent); }
+.landing-step-num {
+  display: block; margin-bottom: var(--space-2);
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: var(--text-meta); letter-spacing: var(--track-utility);
+  color: var(--color-accent-700);
+}
+.landing-step-title { margin: 0 0 var(--space-2); font-size: var(--text-sub); }
+.landing-step-body {
+  margin: 0; font-size: var(--text-small); line-height: 1.6;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
 
-.auth { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: var(--space-3); }
-.auth-card { gap: var(--space-2); padding: var(--space-4); }
+/* ── the two claims ────────────────────────────────────────────────────── */
+.landing-claim-pair {
+  display: grid; gap: var(--space-4); margin-top: var(--space-8);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.landing-claim { gap: var(--space-3); padding: var(--space-8); }
+.landing-claim-mark {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-700);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+}
+.landing-claim:nth-child(2) .landing-claim-mark {
+  background: color-mix(in srgb, var(--color-accent-2) 18%, transparent);
+  color: var(--color-accent-2-700);
+}
+.landing-claim-title { margin: var(--space-2) 0 0; font-size: var(--text-sub); }
+.landing-claim-body {
+  margin: 0; font-size: var(--text-small); line-height: 1.65;
+  color: color-mix(in srgb, var(--color-text) 72%, transparent);
+}
+.landing-claim-note {
+  margin: 0; padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+/* ── closing call ──────────────────────────────────────────────────────── */
+.landing-cta {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: var(--space-3); padding: var(--space-16) var(--space-6);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+.landing-cta-title {
+  margin: 0; font-size: clamp(27px, 3.6vw, var(--text-h2)); text-wrap: balance;
+}
+.landing-cta-body {
+  margin: 0; max-width: 50ch; font-size: var(--text-lead); line-height: 1.6;
+  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+}
+.landing-cta .landing-actions { margin-top: var(--space-4); justify-content: center; }
+
+.landing-footer { border-top: 1px solid var(--color-divider); padding-top: var(--space-4); }
+
+@media (max-width: 639px) {
+  .landing { gap: var(--space-16); }
+  .landing-hero { padding-top: var(--space-8); max-width: none; }
+  .landing-switcher .seg { width: 100%; }
+  .landing-switcher .seg-opt { flex: 1 1 0; justify-content: center; padding-inline: 6px; }
+  .landing-actions .btn { width: 100%; }
+  .landing-claim { padding: var(--space-6); }
+  .landing-cta { padding: var(--space-8) var(--space-4); }
+}
+
+/* ── the two auth cards ────────────────────────────────────────────────────
+   A form and a short column of reassurance beside it. The mockup draws these
+   screens as one centred card, and one card alone on a wide page reads as an
+   unfinished screen rather than a focused one; the aside gives the layout a
+   second mass to balance against without adding anything to decide.
+
+   Below 900px the aside moves under the form — never away. What it says is
+   the answer to "should I bother", which does not stop mattering on a phone. */
+
+.auth {
+  width: 100%; max-width: 900px;
+  display: grid; gap: var(--space-16);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  align-items: start;
+}
+.auth-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+.auth-card {
+  gap: var(--space-3);
+  padding: var(--space-8);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
 .auth-title {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 22px; margin: 0;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: var(--text-h2); letter-spacing: var(--track-heading);
+  line-height: 1.1; margin: 0;
 }
-.auth-sub { margin: -4px 0 var(--space-1); }
-.auth-card form { display: flex; flex-direction: column; gap: var(--space-3); }
-.auth-alt { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
-.auth-alt .btn { font-size: 13px; }
+.auth-sub {
+  margin: 0; font-size: var(--text-small);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.auth-card form {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+/* Bigger than the console's fields. This is the first screen anybody touches and
+   there is no density pressure on it — nothing else is competing for the space. */
+.auth-card .input { min-height: 50px; font-size: var(--text-body); padding-inline: var(--space-4); }
+.auth-card .field > label {
+  font-size: var(--text-small); font-weight: 500;
+  color: color-mix(in srgb, var(--color-text) 78%, transparent);
+}
+.auth-card .btn-block {
+  min-height: 52px; font-size: var(--text-body); margin-top: var(--space-2);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset,
+              0 8px 22px -8px color-mix(in srgb, var(--color-accent) 70%, transparent);
+}
+.auth-alt {
+  margin: 0; padding-top: var(--space-4);
+  border-top: 1px solid var(--color-divider);
+  font-size: var(--text-small);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.auth-alt .btn { font-size: var(--text-small); }
+
+/* The column beside the form. */
+.auth-aside {
+  display: flex; flex-direction: column; gap: var(--space-6);
+  padding-top: var(--space-4);
+}
+.auth-aside-title {
+  margin: 0; font-size: var(--text-sub); letter-spacing: var(--track-heading);
+}
+.auth-points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.auth-point { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); }
+.auth-point-mark {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  color: var(--color-accent-700);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+}
+.auth-point-title { margin: 0 0 2px; font-size: var(--text-small); font-weight: 600; }
+.auth-point-body {
+  margin: 0; font-size: var(--text-meta); line-height: 1.55;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+}
 
 /* Development only — `DEMO_ORGS` is [] in a production build, so this never renders
    there and the credentials are not in the bundle at all (lib/demo.ts). */
-.auth-demo { display: flex; flex-direction: column; gap: 6px; padding-inline: var(--space-1); }
+.auth-demo {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--color-divider);
+}
 .auth-demo-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.auth-demo-row .tag { border: 0; cursor: pointer; font: inherit; font-size: 11px; padding: 3px 10px; }
+.auth-demo-row .tag {
+  border: 0; cursor: pointer; font: inherit;
+  font-size: var(--text-meta); padding: 5px 12px;
+}
 .auth-demo-row .tag:hover { background: var(--color-accent-100); color: var(--color-accent-800); }
+
+@media (max-width: 899px) {
+  .auth { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); max-width: 480px; }
+  .auth-aside { padding-top: 0; }
+}
+@media (max-width: 479px) {
+  .auth-card { padding: var(--space-6) var(--space-4); }
+}
 
 /* ── form feedback, shared by both ───────────────────────────────────────── */
 
@@ -1470,3 +1731,707 @@ textarea.q-text-input { min-height: 90px; }
 .settings-card .card-actions { display: flex; justify-content: flex-end; }
 
 .settings-skeleton { gap: var(--space-3); min-height: 120px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE MATERIAL LAYER — DEC-027 · DEC-028 · DEC-029 · DEC-030
+
+   Everything below was added in one pass and belongs together: the type
+   pairing, the glass, the field the glass sits on, and the control that
+   swaps the theme. They are one design decision expressed four ways, and
+   splitting them across files would hide that.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Type — DEC-027 ────────────────────────────────────────────────────────
+   Outfit is a geometric face with a wide, even rhythm. It sets beautifully
+   large and goes slightly mushy small, so it takes the headings and the
+   numbers-that-are-content and nothing else. Inter takes everything a person
+   actually reads, at 16px rather than the vendored layer's 15 — the product is
+   read on a projector as often as on a laptop.
+
+   The vendored layer's sizes are overridden here rather than there, because
+   organic.css is re-vendored mechanically and any edit to it is lost (21 §2). */
+
+body {
+  font-size: var(--text-body);
+  line-height: 1.6;
+  letter-spacing: var(--track-body);
+  /* Inter ships a single-storey `a` and a straight-tailed `l` behind feature
+     flags. `cv11` is the one that stops `Il1` collapsing into one shape, which
+     matters in a product full of counts and identifiers. */
+  font-feature-settings: 'cv11' 1, 'ss03' 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: var(--track-heading);
+  line-height: 1.14;
+  text-wrap: balance;
+}
+h1 { font-size: var(--text-h1);    letter-spacing: var(--track-display); }
+h2 { font-size: var(--text-h2); }
+h3 { font-size: var(--text-h3); }
+h4 { font-size: var(--text-sub); }
+h5 { font-size: var(--text-lead);  font-weight: 600; }
+h6 { font-size: var(--text-micro); letter-spacing: var(--track-utility); }
+
+/* Long-form paragraphs never get an orphan on the last line. */
+p { text-wrap: pretty; }
+
+/* The controls come up with the body text or the pairing looks bottom-heavy:
+   16px copy above a 14px button reads as a disabled button. */
+.btn        { font-size: var(--text-small); font-weight: 600;
+              letter-spacing: -0.005em;
+              padding: calc(var(--space-2) * 1.15) calc(var(--space-3) * 1.35); }
+.btn-icon   { width: 38px; height: 38px; padding: 0; }
+.input      { font-size: var(--text-small); min-height: 42px; padding: 9px 15px; }
+.field > label { font-size: var(--text-meta); font-weight: 500;
+                 letter-spacing: 0.005em; margin-bottom: 6px; }
+.seg-opt    { font-size: var(--text-meta); padding: 8px 14px; }
+.tag        { font-size: var(--text-micro); }
+.table      { font-size: var(--text-small); }
+.card-title { font-size: var(--text-lead); }
+.card-body  { font-size: var(--text-small); }
+.dialog-title { font-size: var(--text-sub); }
+.dialog-body  { font-size: var(--text-small); }
+.nav-brand  { font-size: var(--text-sub); font-weight: 600;
+              letter-spacing: var(--track-heading); }
+
+.utility    { font-size: var(--text-micro); letter-spacing: var(--track-utility); }
+.text-meta  { font-size: var(--text-meta); }
+.text-small { font-size: var(--text-small); }
+.kpi        { font-size: 48px; letter-spacing: var(--track-display); font-weight: 600; }
+
+/* ── The glass — DEC-029 ───────────────────────────────────────────────────
+   Four properties, always together. A surface with the blur but no sheen and
+   no edge is a translucent rectangle; the highlight along the top is what the
+   eye reads as a pane catching the light, and it is the whole trick.
+
+   `isolation` matters: without it the inset sheen composites against whatever
+   is behind the element rather than against the element's own tint, and the
+   highlight disappears on exactly the busy backgrounds it is there for.       */
+.glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 1px 2px var(--glass-shade),
+    0 12px 32px -8px var(--glass-shade);
+}
+.glass-strong {
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
+}
+/* For panes wide enough that a straight sheen looks like a drawn line: fades
+   the highlight out toward both ends, the way a real edge catches light. */
+.glass-lit::before {
+  content: '';
+  position: absolute; inset: 0 0 auto; height: 1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    transparent, var(--glass-sheen) 22%, var(--glass-sheen) 78%, transparent);
+  pointer-events: none;
+}
+
+/* Content cards stay near-opaque. White means "this is the thing you are
+   working on" (THE ONE OVERRIDE above) and a 60%-transparent data table is
+   both harder to read and a lie about what it is. They are still glass — they
+   blur, they have the edge and the sheen — just at a tint that reads as paper. */
+.card {
+  background: color-mix(in srgb, var(--color-card) 88%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-sm);
+}
+.card.elev-md { box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-md); }
+.card.elev-lg { box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-lg); }
+
+/* Chrome goes the other way — it should let the page show through it. */
+.dialog {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-lg);
+}
+.dialog-backdrop {
+  background: color-mix(in srgb, var(--color-neutral-900) 34%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.input {
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: border-color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.input:focus-visible {
+  background: color-mix(in srgb, var(--color-card) 82%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+
+/* Safari on iOS and every Firefox before 103 ignore backdrop-filter. Without
+   this they render the tint alone, which at 58% opacity is unreadable text on
+   a moving background — so where there is no blur, there is no transparency. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass, .dialog { background: var(--color-surface); }
+  .card, .input   { background: var(--color-card); }
+}
+
+/* ── The ambient field — DEC-029 ───────────────────────────────────────────
+   Fixed, behind everything, never interactive. It is the only element in the
+   product allowed to animate indefinitely; the global reduced-motion rule at
+   the top of this file stops all of it.                                      */
+.ambient {
+  position: fixed; inset: 0; z-index: -1;
+  overflow: hidden; pointer-events: none;
+  background: var(--color-bg);
+}
+.ambient-field {
+  position: absolute;
+  width: 62vmax; height: 62vmax;
+  border-radius: 50%;
+  filter: blur(72px);
+  will-change: transform;
+}
+/* Three different periods, none a multiple of another, so the arrangement does
+   not visibly repeat. A two-field drift comes back to its start in under a
+   minute and the eye catches it. */
+.ambient-field-1 {
+  top: -22vmax; left: -14vmax; background: var(--ambient-1);
+  animation: ambient-drift-a 43s ease-in-out infinite alternate;
+}
+.ambient-field-2 {
+  bottom: -26vmax; right: -16vmax; background: var(--ambient-2);
+  animation: ambient-drift-b 57s ease-in-out infinite alternate;
+}
+.ambient-field-3 {
+  top: 28%; right: 18%; width: 40vmax; height: 40vmax; background: var(--ambient-3);
+  animation: ambient-drift-c 71s ease-in-out infinite alternate;
+}
+.ambient-hero .ambient-field { filter: blur(78px); opacity: .8; }
+.ambient-default .ambient-field { opacity: .45; }
+
+@keyframes ambient-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(14vmax, 9vmax, 0) scale(1.15); }
+}
+@keyframes ambient-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-12vmax, -8vmax, 0) scale(1); }
+}
+@keyframes ambient-drift-c {
+  from { transform: translate3d(0, 0, 0) scale(.9); }
+  to   { transform: translate3d(-9vmax, 12vmax, 0) scale(1.2); }
+}
+
+/* The lattice — the organisation graph, at wallpaper strength. */
+.ambient-lattice { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ambient-lattice-drift {
+  transform-origin: 50% 50%;
+  animation: ambient-rotate 180s linear infinite;
+}
+@keyframes ambient-rotate {
+  from { transform: rotate(0deg)   scale(1.35); }
+  to   { transform: rotate(360deg) scale(1.35); }
+}
+.ambient-edge {
+  stroke: var(--color-accent); stroke-width: .07; opacity: .13;
+}
+.ambient-node {
+  fill: var(--color-accent); opacity: .22;
+  animation: ambient-breathe 9s ease-in-out infinite;
+}
+@keyframes ambient-breathe {
+  0%, 100% { opacity: .12; }
+  50%      { opacity: .3; }
+}
+/* A pulse travelling an edge: a short dash, drawn the length of the line and
+   then run off the end of it. Feedback moving through the graph. */
+.ambient-pulse {
+  stroke: var(--color-accent-2); stroke-width: .3; stroke-linecap: round;
+  stroke-dasharray: 2 100; opacity: .55;
+  animation: ambient-travel 11s cubic-bezier(.5, 0, .5, 1) infinite;
+}
+@keyframes ambient-travel {
+  0%        { stroke-dashoffset: 2;    opacity: 0; }
+  8%        { opacity: .6; }
+  36%       { opacity: .6; }
+  44%, 100% { stroke-dashoffset: -34;  opacity: 0; }
+}
+.ambient-default .ambient-lattice { opacity: .5; }
+
+/* ── The appearance control — DEC-028 ──────────────────────────────────────
+   The thumb is a sibling that slides, not a background on the checked segment,
+   so the movement between the three is continuous.                           */
+.theme-toggle {
+  position: relative;
+  display: inline-flex; align-items: center;
+  padding: 3px; border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.theme-toggle-thumb {
+  position: absolute; left: 3px; top: 3px;
+  width: 32px; height: 30px; border-radius: 999px;
+  background: var(--color-card);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--glass-sheen);
+  /* Slightly springy: the thumb overshoots by a hair and settles. A linear
+     slide here reads as a progress bar rather than as a control answering. */
+  transition: transform 380ms cubic-bezier(.34, 1.4, .5, 1);
+  pointer-events: none;
+}
+.theme-toggle-seg {
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 30px; padding: 0;
+  border: 0; background: none; cursor: pointer;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  border-radius: 999px;
+  transition: color var(--dur-base) var(--ease);
+}
+.theme-toggle-seg:hover { color: var(--color-text); }
+.theme-toggle-seg[aria-checked='true'] { color: var(--color-accent-600); }
+.theme-toggle-seg:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* ── The theme swap — DEC-028 ──────────────────────────────────────────────
+   The default cross-fade is replaced by a hard cut, because lib/theme.ts
+   animates a clip-path on the NEW snapshot instead: the incoming theme is
+   wiped over the outgoing one in a circle from the control. Two themes
+   cross-fading through each other passes through a washed grey midpoint that
+   looks like a rendering fault.                                              */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+/* Nothing else in the product should try to tween its own colours during the
+   swap — the snapshot already handles it, and a 200ms background transition
+   underneath a 620ms wipe produces a visible second change. */
+html:active-view-transition * {
+  transition: none !important;
+}
+
+/* ── Chrome on glass — DEC-029 ─────────────────────────────────────────────
+   The frame stops being a painted surface and becomes a pane the page scrolls
+   under. Every one of these was already `background: var(--color-surface)`;
+   the change is the tint plus the blur plus the edge, never the layout.       */
+
+.topbar {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-edge);
+  box-shadow: 0 1px 0 var(--glass-shade);
+}
+.topbar-mark {
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 6px var(--glass-shade);
+  font-weight: 600;
+}
+
+/* The rail is translucent for its whole height, so the ambient lattice runs
+   behind the navigation rather than stopping at the content well's edge. */
+.shell-rail {
+  background: color-mix(in srgb, var(--color-surface) 45%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-right: 1px solid var(--glass-edge);
+}
+.sidebar-item {
+  font-size: var(--text-small);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+/* The active pill gets the sheen too — without it, it is the one opaque object
+   in a translucent column and reads as pasted on. */
+.sidebar-item.is-active {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+}
+
+.menu {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--shadow-lg);
+}
+
+.drawer {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  border-right: 1px solid var(--glass-edge);
+}
+.drawer-backdrop {
+  background: color-mix(in srgb, var(--color-neutral-900) 32%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* The public nav floats rather than sitting flush — it is a pill on the page,
+   which is what makes the ambient field visible above and around it. */
+.nav-public {
+  position: sticky; top: var(--space-3); z-index: 20;
+  width: min(1180px, calc(100% - var(--space-6)));
+  margin: var(--space-3) auto 0;
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  gap: var(--space-3);
+}
+.nav-public .nav-brand { margin-right: auto; }
+.nav-public a:not(.btn) {
+  font-size: var(--text-small); font-weight: 500; text-decoration: none;
+  padding: 6px 10px; border-radius: 999px;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.nav-public a:not(.btn):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.nav-mark {
+  width: 16px; height: 16px; border-radius: 5px;
+  background: linear-gradient(140deg, var(--color-accent-400), var(--color-accent-700));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+
+@media (max-width: 639px) {
+  .nav-public {
+    width: calc(100% - var(--space-4));
+    padding-inline: var(--space-3) var(--space-2);
+  }
+  /* The appearance control is chrome, and chrome loses to content on a phone.
+     It stays in the console top bar, where there is a menu to put it beside. */
+  .nav-theme { display: none; }
+}
+@media (max-width: 479px) {
+  .topbar-theme { display: none; }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .topbar, .menu, .drawer, .nav-public { background: var(--color-surface); }
+  .shell-rail { background: var(--color-surface); }
+}
+
+/* ══ T-033 · STRUCTURE — the overview band and the map ══════════════════════
+   32. Both are read-only views of the tree the page already has; neither
+   fetches anything and neither can edit. The editable surface is still the
+   tree below them.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.structure-overview {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.stat-row {
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.stat-tile {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) * 0.85);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-card) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--shadow-sm);
+}
+.stat-tile .utility { margin: 0; }
+.stat-value {
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: 38px; line-height: 1.05;
+  letter-spacing: var(--track-display);
+  color: var(--color-accent-700);
+}
+
+/* ── units per level ───────────────────────────────────────────────────── */
+.shape-chart {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-card) 70%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-edge);
+}
+.shape-chart-title { margin: 0 0 var(--space-3); }
+/* Capped. Stretched to the full width of a 1240px page, a bar for a level with one
+   unit in it is a 40px stub on a 900px track, and the comparison the chart exists
+   to make becomes harder to read than the number beside it. */
+.shape-bars {
+  list-style: none; margin: 0; padding: 0; max-width: 560px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.shape-bar-row {
+  display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) 2.2rem;
+  align-items: center; gap: var(--space-3);
+}
+.shape-bar-label, .shape-bar-count {
+  font-size: var(--text-meta);
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+}
+.shape-bar-count { text-align: right; }
+.shape-bar-track {
+  height: 10px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+.shape-bar-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent-400), var(--color-accent-600));
+  /* The width is set inline; the animation scales it in from the left so the bars
+     grow rather than appear. transform-origin, not a width transition — animating
+     width relayouts the row on every frame. */
+  transform-origin: left center;
+  animation: bar-grow 620ms var(--ease) both;
+}
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ── the map ───────────────────────────────────────────────────────────── */
+.structure-map-card {
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+/* The map is laid out in real pixels so its labels stay readable. When it does
+   not fit, it scrolls sideways rather than scaling the type down to nothing. */
+.unit-map-scroll {
+  overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-1);
+  /* Centred while it fits, hard-left once it does not — `margin: auto` on the child
+     would push the start of a too-wide map out of reach of the scroll origin. */
+  display: flex; justify-content: safe center;
+}
+.unit-map { display: block; flex: none; }
+
+.unit-edge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  /* pathLength="1" on the element makes these two numbers mean "all of it". */
+  stroke-dasharray: 1;
+  animation: edge-draw 620ms var(--ease) both;
+}
+@keyframes edge-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.unit-node { animation: node-in 380ms var(--ease) both; }
+@keyframes node-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.unit-node[role='button'] { cursor: pointer; }
+.unit-node-box {
+  fill: var(--color-card);
+  stroke: var(--color-divider);
+  stroke-width: 1;
+  transition: stroke var(--dur-fast) var(--ease), fill var(--dur-fast) var(--ease);
+}
+.unit-node-edge { fill: var(--color-accent-300); transition: fill var(--dur-fast) var(--ease); }
+.unit-node-name {
+  font-family: var(--font-body); font-size: 13.5px; font-weight: 600;
+  fill: var(--color-text);
+}
+.unit-node-meta {
+  font-family: var(--font-body); font-size: 11px;
+  fill: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.unit-node[role='button']:hover .unit-node-box { stroke: var(--color-accent-400); }
+.unit-node[role='button']:focus-visible { outline: none; }
+.unit-node[role='button']:focus-visible .unit-node-box {
+  stroke: var(--color-accent); stroke-width: 2;
+}
+.unit-node.is-selected .unit-node-box {
+  fill: color-mix(in srgb, var(--color-accent) 12%, var(--color-card));
+  stroke: var(--color-accent); stroke-width: 1.75;
+}
+.unit-node.is-selected .unit-node-edge { fill: var(--color-accent); }
+
+@media (max-width: 639px) {
+  .stat-value { font-size: 30px; }
+  .structure-map-card { padding: var(--space-3); }
+}
+
+/* ══ T-035 · TEMPLATES — the drawing and the quick look ═════════════════════
+   36. The thumbnail is the same component at two sizes; the dialog is the
+   glass layer at its strongest, because it is the one surface in the product
+   that deliberately sits over the page it came from.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the drawing ───────────────────────────────────────────────────────── */
+.tp { display: block; width: 100%; height: auto; }
+
+.tp-paper {
+  fill: color-mix(in srgb, var(--color-card) 92%, var(--color-accent));
+  stroke: var(--color-divider); stroke-width: 1.5;
+}
+.tp-title { fill: color-mix(in srgb, var(--color-text) 78%, transparent); }
+.tp-sub   { fill: color-mix(in srgb, var(--color-text) 34%, transparent); }
+.tp-rule  { stroke: var(--color-divider); stroke-width: 1.5; }
+.tp-label { fill: color-mix(in srgb, var(--color-text) 46%, transparent); }
+.tp-strip { fill: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.tp-dot   { fill: var(--color-accent-300); }
+.tp-tick  { fill: var(--color-accent-300); }
+.tp-pill  { fill: color-mix(in srgb, var(--color-accent-2) 30%, transparent); }
+.tp-field {
+  fill: color-mix(in srgb, var(--color-text) 5%, transparent);
+  stroke: var(--color-divider); stroke-width: 1;
+}
+.tp-ring  { fill: none; stroke: var(--color-accent-400); stroke-width: 1.75; }
+.tp-line  { fill: color-mix(in srgb, var(--color-text) 30%, transparent); }
+.tp-more  {
+  font-family: var(--font-body); font-size: 9.5px;
+  fill: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+
+/* Rows draw themselves in, top to bottom, the way the form would be written. */
+.tp-row { animation: tp-row-in 380ms var(--ease) both; }
+@keyframes tp-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── the card's figure ─────────────────────────────────────────────────── */
+.tcard-figure {
+  display: block; width: 100%; padding: 0; margin-bottom: var(--space-2);
+  border: 0; background: none; cursor: pointer;
+  border-radius: var(--radius-md); overflow: hidden;
+  /* The drawing is a fixed aspect so a four-question card and a twelve-question
+     card line up in the grid; the SVG's own meet-fit does the rest. */
+  aspect-ratio: 16 / 10;
+}
+.tcard-figure .tp {
+  height: 100%;
+  transition: transform var(--dur-slow) var(--ease);
+}
+.tcard-figure:hover .tp { transform: scale(1.03); }
+.tcard-figure:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* ── the quick look ────────────────────────────────────────────────────── */
+.tpv-backdrop { padding: var(--space-4); align-items: center; }
+.tpv {
+  width: min(940px, 100%); max-height: min(86dvh, 780px);
+  display: flex; flex-direction: column;
+  border-radius: calc(var(--radius-lg) * 1.15);
+  overflow: hidden;
+  animation: tpv-in 320ms var(--ease) both;
+}
+/* Rises and settles rather than appearing. It starts at .96 rather than 0 —
+   a panel that grows from nothing reads as a glitch, not as an arrival. */
+@keyframes tpv-in {
+  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+.tpv-head {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.tpv-headings { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.tpv-category { align-self: flex-start; }
+.tpv-title {
+  margin: 0; font-size: var(--text-h3); letter-spacing: var(--track-heading);
+  line-height: 1.15;
+}
+.tpv-cost {
+  margin: 0; font-size: var(--text-small);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.tpv-close { margin-left: auto; flex: none; }
+
+.tpv-body {
+  display: grid; gap: var(--space-6);
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  padding: var(--space-6);
+  overflow-y: auto;
+}
+.tpv-figure { margin: 0; position: sticky; top: 0; }
+.tp-large { border-radius: var(--radius-md); }
+
+.tpv-detail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.tpv-desc {
+  margin: 0; font-size: var(--text-small); line-height: 1.6;
+  color: color-mix(in srgb, var(--color-text) 72%, transparent);
+}
+
+.tpv-questions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.tpv-question {
+  display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+  align-items: baseline; gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-card) 55%, transparent);
+}
+.tpv-question-num {
+  font-size: var(--text-meta);
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.tpv-question-text { font-size: var(--text-small); line-height: 1.5; }
+.tpv-kind { flex: none; align-self: center; }
+.tpv-question.is-skeleton { display: block; }
+
+.tpv-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--glass-edge);
+}
+.tpv-foot-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+@media (max-width: 799px) {
+  .tpv-body { grid-template-columns: minmax(0, 1fr); }
+  .tpv-figure { position: static; max-width: 340px; }
+}
+@media (max-width: 559px) {
+  .tpv-head, .tpv-body, .tpv-foot { padding-inline: var(--space-4); }
+  .tpv-foot-actions { margin-left: 0; width: 100%; }
+  .tpv-foot-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ══ DEC-031 · THE RANGE BAND ══════════════════════════════════════════════
+   The stat row stopped being four standalone numbers the moment they all
+   answered "over what period" — so they get a container that says so, with
+   the control inside it rather than up in the page header where it would
+   read as filtering the campaign list too.                                */
+
+.stat-band {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.stat-band-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); flex-wrap: wrap;
+}
+.stat-band-head .section-title { margin: 0; }
+
+/* The shared segmented control, sized down: this one sits beside a heading
+   rather than above a page, so it must not out-weigh it. The margin the
+   base class carries is for a control that owns the row above content. */
+.range-control { margin-bottom: 0; padding: 3px; }
+.range-control .segment { padding: 5px 12px; font-size: var(--text-micro); }
+
+/* Refetching, not reloading. The old numbers stay legible — a range change
+   that blanks four cards makes the page jump more than the data moves —
+   and they lift back to full opacity as the new ones land. */
+.stat-row[aria-busy='true'] { opacity: 0.62; }
+.stat-row { transition: opacity var(--dur-fast) var(--ease); }
+
+@media (max-width: 559px) {
+  .stat-band-head { align-items: flex-start; }
+  .range-control { width: 100%; justify-content: space-between; }
+}

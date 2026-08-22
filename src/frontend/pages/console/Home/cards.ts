@@ -4,37 +4,79 @@
 // "there is no such number" case in it, and a sentence assembled inside JSX is one nobody
 // can check without rendering the page. This is also the first screen after sign-in and the
 // screen the org switcher lands on, so its nouns are the ten-second proof (22 §4).
-import type { HomeView } from '@endur/shared';
+import type { HomeView, StatWindow } from '@endur/shared';
 import type { ResolvedLabels } from '@endur/shared';
 
 export type Stat = { kicker: string; value: string; context?: string | undefined };
 
 const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
+/**
+ * The range, as a phrase that finishes a sentence about a number — DEC-031.
+ *
+ * The control says "30 days" because a button has room for two words; the card underneath
+ * says "in the last 30 days" because a bare "30 days" under the figure 412 reads as though
+ * 412 were a duration. Same range, two registers, and the card is the one that has to be
+ * unambiguous on its own.
+ */
+export const RANGE_LABEL: Record<StatWindow, string> = {
+  today: 'Today',
+  '7d': '7 days',
+  '30d': '30 days',
+  all: 'All time',
+};
+
+const RANGE_PHRASE: Record<StatWindow, string> = {
+  today: 'since midnight',
+  '7d': 'in the last 7 days',
+  '30d': 'in the last 30 days',
+  all: 'all time',
+};
+
+const NOTHING: Record<StatWindow, string> = {
+  today: 'nothing yet today',
+  '7d': 'nothing in the last 7 days',
+  '30d': 'nothing in the last 30 days',
+  all: 'nothing yet',
+};
+
 export function statCards(view: HomeView, labels: ResolvedLabels): Stat[] {
   const { stats } = view;
+  const window = stats.window;
+  const subject = labels.subject.many.toLowerCase();
+
   return [
     {
       kicker: 'Responses',
-      value: stats.responsesTotal.toLocaleString(),
-      ...(stats.responsesTotal > 0 ? { context: 'all time' } : {}),
+      value: stats.responses.toLocaleString(),
+      // Every card carries its range in words. The control above says it once, but a
+      // screen reader lands on the figure and not on the control, and a screenshot of
+      // this row travels without it — DEC-031.
+      context: stats.responses === 0 ? NOTHING[window] : RANGE_PHRASE[window],
     },
+    responseRateCard(view, labels),
     {
-      kicker: 'Today',
-      value: stats.responsesToday.toLocaleString(),
-      // No arrow, no comparison. 46 § Components put a <TrendChip> here; 46 § Out of scope
-      // rules trends off this page and the payload carries no yesterday to compare against,
-      // so a direction would be invented rather than measured — CONF-017.
-      context: stats.responsesToday === 0 ? 'nothing yet today' : 'since midnight',
+      kicker: `${labels.subject.many} covered`,
+      value: stats.subjectsCovered.toLocaleString(),
+      // The number that says whether feedback is spread or concentrated, which a bare
+      // response count cannot: 200 responses about two courses is a different week from
+      // 200 about forty.
+      context:
+        stats.subjectsCovered === 0
+          ? `no ${labels.subject.one.toLowerCase()} heard from`
+          : `${subject} with at least one response`,
     },
     {
       kicker: `Active ${labels.campaign.many}`,
+      // NOT windowed, and it says so. This is a fact about the present, and "campaigns
+      // that were open at some point in the last 30 days" is a different, less useful
+      // number that would look identical sitting in this row.
       value: String(stats.activeCampaigns),
-      ...(stats.activeCampaigns === 0
-        ? { context: `no ${labels.campaign.one.toLowerCase()} is collecting` }
-        : {}),
+      context:
+        stats.activeCampaigns === 0
+          ? `no ${labels.campaign.one.toLowerCase()} is collecting`
+          : 'collecting right now',
     },
-    responseRateCard(view, labels),
   ];
 }
 
@@ -51,13 +93,19 @@ function responseRateCard(view: HomeView, labels: ResolvedLabels): Stat {
     return {
       kicker: 'Response rate',
       value: '—',
-      context: `no ${labels.campaign.one.toLowerCase()} here has a fixed audience to measure against`,
+      // Two different nothings, and the difference matters to whoever is reading it: no
+      // measurable audience at all, versus an audience that simply was not being asked
+      // during the range they picked. The second is fixed by changing the range.
+      context:
+        view.stats.window === 'all'
+          ? `no ${labels.campaign.one.toLowerCase()} here has a fixed audience to measure against`
+          : `no ${labels.campaign.one.toLowerCase()} with a fixed audience was collecting then`,
     };
   }
   return {
     kicker: 'Response rate',
     value: `${Math.round(view.stats.responseRate * 100)}%`,
-    context: 'of the people asked',
+    context: `of the people asked, ${RANGE_PHRASE[view.stats.window]}`,
   };
 }
 

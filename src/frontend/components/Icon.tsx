@@ -2,17 +2,20 @@
 //
 // Two rules live here so that eighteen components do not each have to remember them:
 //
-//   1. stroke-width 2.75 — deliberately heavy, to match Caprasimo's weight and to stop
-//      icons looking thin against the rounded shapes.
+//   1. stroke-width 2.1 — heavy enough not to look thin against the rounded shapes, light
+//      enough to sit with Outfit. It was 2.75 to match Caprasimo, which was a much darker
+//      face; carrying that weight over to Outfit made every icon read as a bold accent
+//      next to its own label (DEC-027).
 //   2. ONE icon per concept, always. `IconName` is the agreed vocabulary as a union, so a
 //      concept nobody has picked an icon for does not compile.
 //
 // Never emoji. The mockups use them as placeholders; they render differently on the
 // projector machine and read as unfinished. audit-drift greps for them in JSX.
 import {
-  BarChart3, Building2, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, GripVertical, Home,
-  Inbox, LayoutTemplate, Pencil,
-  Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles,
+  ArrowRight, BarChart3, Building2, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff,
+  GripVertical, Home,
+  Inbox, LayoutTemplate, Maximize2, Monitor as MonitorSmartphone, Moon, Pencil, Play,
+  Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
   type LucideIcon,
 } from 'lucide-react';
@@ -58,6 +61,15 @@ const ICONS = {
   edit: Pencil,
   check: Check,
   disclosure: ChevronRight,
+  // Theme (DEC-028). Three, because the choice is three-valued: following the OS is a
+  // state of its own and needs a glyph that is neither sun nor moon.
+  light: Sun,
+  dark: Moon,
+  'theme-system': MonitorSmartphone,
+  // Landing and empty states.
+  arrow: ArrowRight,
+  play: Play,
+  preview: Maximize2,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
@@ -81,7 +93,7 @@ export function Icon({
   return (
     <Glyph
       size={size}
-      strokeWidth={2.75}
+      strokeWidth={2.1}
       className={className}
       // Decorative unless it is the only thing carrying the meaning. An icon beside its own
       // label announced twice is worse than one not announced at all.
