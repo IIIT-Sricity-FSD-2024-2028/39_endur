@@ -105,7 +105,7 @@ export const routes: RouteObject[] = [
       { path: 'campaigns/:id/results', element: hold(<Results />) },
       { path: 'profile', element: hold(<Profile />) },
       { path: 'simulator', element: hold(<Simulator />) },
-      { path: 'settings', element: hold(<Settings />) },
+      { path: 'settings', element: hold(<RequireCapability capability="org.read"><Settings /></RequireCapability>) },
     ],
   },
   {

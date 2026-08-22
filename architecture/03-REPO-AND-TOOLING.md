@@ -150,6 +150,7 @@ NODE_ENV=development
 PORT=4000
 
 DATABASE_URL=postgresql://endur:endur@localhost:5432/endur
+TEST_DATABASE_URL=postgresql://endur:endur@localhost:5432/endur_test  # NEVER the same. D-004
 
 SESSION_SECRET=             # >=32 chars. required. DEC-014 — staff auth is a cookie session.
 SESSION_TTL_DAYS=7          # rolling: active use extends it
@@ -202,6 +203,37 @@ volumes: { endur-db: }
 
 `npm run db:reset` drops, migrates and re-seeds in one command. It must stay reliable — it is
 the recovery path during a live demo (`50-SEED-AND-DEMO.md`).
+
+### The test database is a different database
+
+The integration suite registers organisations and writes responses. Until 21 Aug it did that
+in `endur`, and the cost was not hypothetical: 2,880 junk organisations accumulated, the demo
+seed was pushed out, the advertised logins stopped working, and one run failed because
+`uniqueSlug()` had exhausted twenty variants of a name a test reused (`D-004`).
+
+`vitest.config.ts` now carries two hooks, and `test/database.ts` holds the rules:
+
+| | What it does |
+|---|---|
+| `globalSetup` | Creates `endur_test` if absent, then `prisma migrate deploy`. A fresh clone needs no setup step |
+| `setupFiles` | Points each worker's `DATABASE_URL` at it **before `lib/config.ts` reads `.env`** |
+
+That ordering is the mechanism. `process.loadEnvFile()` does not overwrite a variable that is
+already set, so a value assigned in `setupFiles` wins over the file for the whole worker.
+
+`TEST_DATABASE_URL` is optional — absent, it is derived by appending `_test`. Two rules refuse
+to run rather than trusting the configuration, because this suite truncates:
+
+1. the database name must end in `_test`
+2. it must not be the `DATABASE_URL` written in `.env`
+
+Rule 2 reads the **file**, not `process.env`. Once `globalSetup` has switched the process, the
+two are legitimately equal, and a guard comparing against the live value would refuse to run
+for the exact reason everything was correct. `test/test-database.test.ts` asserts both rules by
+their failure — a guard that never refuses anything is not a guard.
+
+`migrate deploy`, never `migrate dev`: `dev` would offer to GENERATE a migration from a drifted
+schema, and a test run is the last place that should be possible.
 
 ## 6. Lint and format
 

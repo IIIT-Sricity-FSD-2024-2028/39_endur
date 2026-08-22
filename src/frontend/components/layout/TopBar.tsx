@@ -124,10 +124,9 @@ function UserChip({ name, email }: { name: string; email: string }): JSX.Element
         <div className="menu menu-right elev-lg" role="menu">
           <p className="menu-heading">{name}</p>
           <p className="text-meta menu-note">{email}</p>
-          <Link className="menu-item" role="menuitem" to="/app/profile" onClick={menu.close}>
-            <Icon name="person" size={16} />
-            <span>My account</span>
-          </Link>
+          {/* "My account" lived here and went to a scaffold page. Out until 47 is built —
+              the name and email above already say who is signed in, which is what the menu
+              is actually for (design_specs/design/02 §7). */}
           <button type="button" role="menuitem" className="menu-item" onClick={() => void signOut()}>
             <Icon name="close" size={16} />
             <span>Sign out</span>

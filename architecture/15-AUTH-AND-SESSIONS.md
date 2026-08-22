@@ -57,6 +57,11 @@ token-theft class *and* removes the silent-refresh dance on every page load.
   still-valid session is not a logout.
 - Regenerate on privilege change — specifically when a user's own assignments change.
 - `Secure` is unconditional outside development; the demo tunnel is HTTPS (OPEN-002).
+- **`endur.csrf` carries the same `maxAge` as this cookie.** The two must be present together
+  to make a mutation, so they must expire together. When they did not, closing the browser
+  dropped the CSRF cookie, kept the session, and left the caller signed in and unable to write
+  anything — permanently (`T-047`, `_MEMORY.md` `N-050`). The mechanism is `12` §4.8; the
+  lifetime is a session concern and belongs here.
 
 ### Why not JWT for staff
 

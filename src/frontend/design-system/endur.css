@@ -1449,3 +1449,24 @@ textarea.q-text-input { min-height: 90px; }
   .home-prompt { flex-direction: column; align-items: stretch; }
   .home-prompt .btn { width: 100%; justify-content: center; }
 }
+
+/* ── /app/settings — 41, design_specs/design/04 §4.6 ─────────────────────── */
+
+/* "A single 900px column of white cards. No sub-navigation — there is not enough here to
+   justify it." The words card is wide because five singular/plural pairs and a preview do
+   not fit in a narrower one at 390px without wrapping into nonsense. */
+.settings-page {
+  display: flex; flex-direction: column; gap: var(--space-6);
+  max-width: 900px;
+}
+.settings-card { display: flex; flex-direction: column; gap: var(--space-3); }
+.settings-card > .utility { margin: 0; }
+.settings-card > .text-muted { margin: 0; }
+/* Scrolled to by the #words anchor from <VocabularyChips>, so it needs room to clear the
+   sticky top bar rather than landing under it. */
+.settings-card[id] { scroll-margin-top: var(--space-6); }
+
+.settings-card .card { display: flex; flex-direction: column; gap: var(--space-4); }
+.settings-card .card-actions { display: flex; justify-content: flex-end; }
+
+.settings-skeleton { gap: var(--space-3); min-height: 120px; }

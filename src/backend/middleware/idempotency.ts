@@ -51,24 +51,37 @@ async function run(
   res.json = (body: unknown): Response => {
     // Only successes are replayable. Caching a 500 would make one transient failure
     // permanent for 24 hours, which is the opposite of what a retry is for.
-    if (res.statusCode < 400) {
-      void prisma.idempotencyKey
-        .create({
-          data: {
-            orgId,
-            key,
-            endpoint,
-            requestHash,
-            status: res.statusCode,
-            body: body as never,
-          },
-        })
-        // A duplicate here means two requests raced and both missed the read above. The
-        // unique index picked a winner; this one simply lost, and its response is
-        // identical anyway because it ran the same handler on the same input.
-        .catch(() => undefined);
-    }
-    return originalJson(body);
+    if (res.statusCode >= 400) return originalJson(body);
+
+    // THE ROW IS COMMITTED BEFORE THE RESPONSE IS SENT. This used to be fire-and-forget,
+    // and the gap was reachable: a retry arriving between the response and the insert missed
+    // the read above, ran the handler again, and created a SECOND response — the exact
+    // duplicate this middleware exists to prevent. It surfaced as an intermittent failure in
+    // public.test.ts once the suite moved to a small, fast test database (D-004) and the
+    // window widened relative to the work.
+    //
+    // Sending after the write costs one indexed insert of latency and removes the window for
+    // every retry that follows a delivered response.
+    void prisma.idempotencyKey
+      .create({
+        data: {
+          orgId,
+          key,
+          endpoint,
+          requestHash,
+          status: res.statusCode,
+          body: body as never,
+        },
+      })
+      // A duplicate here means two requests raced and both missed the read above — the
+      // narrower window that remains, D-011. The unique index picked a winner; this one lost.
+      .catch(() => undefined)
+      .finally(() => {
+        originalJson(body);
+      });
+
+    // Express only uses this for chaining, and the body is sent from the callback above.
+    return res;
   };
 
   next();

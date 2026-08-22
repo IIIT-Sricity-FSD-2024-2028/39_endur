@@ -118,8 +118,9 @@ export default function Subjects(): JSX.Element {
       header: 'Linked person',
       hideBelow: 'md',
       render: (row) =>
+        // Plain text until /app/people exists — see DetailPanel for the same call.
         row.linkedUserId ? (
-          <Link to={`/app/people/${row.linkedUserId}`}>{row.linkedUserName}</Link>
+          <span>{row.linkedUserName}</span>
         ) : (
           <span className="text-meta">—</span>
         ),

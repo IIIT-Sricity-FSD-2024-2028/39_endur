@@ -128,6 +128,15 @@ blocked or builds a second shell.
 | T-043 | X | — | **Resolve `OPEN-002`** — public URL / tunnel. Test QR on two real phones | `50` §6 |
 | T-044 | X | T-041 | **Vocabulary nonsense audit** across every screen — 24 Aug · **done 20 Aug**, four findings, three of them now mechanical (`22` § What T-044 found, `N-048`, `N-049`) | `22` §5 |
 | T-045 | X | all | **Three full demo rehearsals** on the venue network | `50` §5 |
+| T-046 | B | T-041 | **Settings — the Words card** (`D-010`). The cut-list keeps it and `<VocabularyChips>` links `#words` from every console page, so `/app/settings` was an M0 route behind a scaffold. Extracted `<WordsEditor>` from wizard step 4 rather than forking it · **done 21 Aug** | `41`, `24` §4 |
+| T-047 | A | — | **CSRF cookie lifetime + self-heal** (`D-009`). It had none beside a 7-day session, so reopening the browser left a signed-in caller with no token and every mutation failing permanently · **done 21 Aug** | `12` §4, `15` §2 |
+| T-048 | A | — | **A separate test database** (`D-004`). `globalSetup` creates and migrates `endur_test`; `setupFiles` points each worker at it before `lib/config.ts` reads `.env`. Two guards refuse to run against the development database · **done 21 Aug** | `03` §5 |
+| T-049 | A | — | **Register retries a slug collision** (`D-006`). A P2002 on `slug` takes the next slug rather than answering 500; the retry uses a random suffix, because a sequential retry needs as many attempts as there are contenders. Found `N-055` while checking it · **done 21 Aug** | `15` §5, `30` |
+
+`T-046` and `T-047` were not planned. They came out of the first walkthrough of the running
+app on 21 Aug, which is the argument for walking it early — 45 tasks of green tests had not
+found either one, because both are about what survives BETWEEN sessions and what a sidebar
+promises, and neither is a thing a unit test thinks to ask.
 
 `T-042` and `T-043` are decisions, not code, and both are M0-critical. Do them early — they
 are cheap now and expensive on 25 Aug.

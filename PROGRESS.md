@@ -5,11 +5,13 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-21  (first walkthrough of the running app — D-009, D-010, D-005)
+UPDATED   2026-08-21  (T-046..T-049 — D-009, D-010, D-004, D-006, and N-055)
 PHASE     P1 MIDDLEWARE
 MILESTONE M0 = 2026-08-26  ·  6 days  ·  demo 27 Aug  ·  GRADED
-STATUS    41/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
-          807 tests across 70 files, all green (199 backend + 608 frontend).
+STATUS    42/47. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
+          828 tests across 72 files, all green (210 backend + 618 frontend).
+          TESTS NOW RUN AGAINST endur_test, NOT endur (D-004, T-048). It is created
+          and migrated automatically; nothing to set up.
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
           !! READ CONF-013 IN _MEMORY.md BEFORE TOUCHING AUTH. A cross-tenant account
           lockout was found and closed on 19 Aug; the schema question behind it is
@@ -17,9 +19,11 @@ STATUS    41/45. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUIL
           !! FOLDERS WERE RENAMED 19 Aug. apps/api -> src/backend, apps/web ->
           src/frontend, prisma -> database, and neither app has an inner src/ any
           more. If you had a branch open, rebase before doing anything else.
-NEXT      TWO ITEMS LEFT. T-043 (OPEN-002 — yours, below) and T-045 (three rehearsals
-          + the 390px checks + a QR scan on two phones). No screen work is left: every
-          route in 20 §2 renders a real page, and no placeholder is behind an M0 path.
+NEXT      THREE ITEMS LEFT. D-005 (vendor the two woff2 files — YOURS, and the highest
+          visual return of anything remaining), T-043 (OPEN-002 — yours, below) and
+          T-045 (three rehearsals + the 390px checks + a QR scan on two phones).
+          No screen work is left, and since T-046 that claim is actually true: nothing
+          in the console navigates to <Placeholder> any more.
           !! THE VOCABULARY AUDIT IS DONE AND IT FOUND FOUR LEAKS — none of them an
           education word, which is the whole class audit:vocab was built around. The
           worst was <ShareSheet> saying "Respondents don't need an account." since
@@ -31,19 +35,27 @@ NEXT      TWO ITEMS LEFT. T-043 (OPEN-002 — yours, below) and T-045 (three reh
           tenantResolver in the query it already ran; lib/vocabulary.ts has nounsOf(req)
           and counted(n, label). 17 sites across 7 services. If you add a message that
           names a unit/subject/campaign, use it — pass 3 of audit:vocab fails otherwise.
-          !! THE FIRST WALKTHROUGH FOUND THREE THINGS, 21 Aug. Read D-009, D-010 and
-          D-005 before T-045. In short:
-            D-009  the CSRF cookie dies with the browser and the SESSION cookie does
-                   not, so you stay signed in with no token and EVERY mutation fails
-                   forever with "Reload and try again" — which cannot fix it. Sign out
-                   and back in is the only remedy. Worst of the three.
-            D-010  Roles, People and Settings are live sidebar links to "Not built
-                   yet". The Soon-tag mechanism exists and is used for the P3 items;
-                   nobody extended the rule to the five P2-after-M0 routes.
-            D-005  the fonts. Caprasimo is on every heading, KPI and button label per
-                   design_specs 01 §5, and public/fonts/ is empty — so the product is
-                   running in system-ui. This is why it reads as generic. Highest
-                   visual return of anything left.
+          !! THE FIRST WALKTHROUGH FOUND THREE THINGS, 21 Aug. TWO ARE FIXED.
+            D-009  FIXED (T-047). The CSRF cookie had no lifetime beside a 7-day
+                   session, so reopening the browser left you signed in with no token
+                   and every mutation failing forever with "Reload and try again" —
+                   advice that could not work, because only login issued the cookie.
+                   It now matches the session's lifetime AND csrfProtection re-issues
+                   it on any safe method, so the boot GET /auth/me heals it. If you
+                   pair a readable cookie with an httpOnly one anywhere else, read
+                   N-050 first: they must expire together.
+            D-010  FIXED (T-046), and it was not what it looked like. Settings was NOT
+                   post-M0 — the cut-list keeps its Words card and <VocabularyChips>
+                   links #words from EVERY console page — so the most-linked
+                   destination in the console was a stub. Built it. Roles and People
+                   are Soon-disabled; the TopBar's "My account", the structure panel's
+                   person links and the subjects linked-person column are text or gone
+                   until 34/47 exist. FOLLOW THE LINKS INTO A PAGE BEFORE YOU CALL IT
+                   POST-M0 — a cut-list entry in design_specs decided this one.
+            D-005  STILL OPEN, AND NOW THE LARGEST THING LEFT. The fonts. Caprasimo is
+                   on every heading, KPI and button label per design_specs 01 §5, and
+                   public/fonts/ is empty — so the product renders in system-ui. This
+                   is why it reads as generic. It is two files.
           !! THE DEMO NOW RUNS END TO END. Scan -> fill -> submit -> the results
           number moves, and the two counts agree because they are the same COUNT
           read in the same transaction. Rehearse it (T-045).
@@ -209,11 +221,17 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [ ] T-043  X  resolve OPEN-002 (public URL / QR)   ← decision, do early
 [x] T-044  X  vocabulary nonsense audit            ← 4 leaks, N-048/N-049. 3 now mechanical
 [ ] T-045  X  three demo rehearsals
+[x] T-046  B  settings — the Words card             ← D-010. Was an M0 route behind a stub
+[x] T-047  A  CSRF cookie lifetime + self-heal      ← D-009. N-050
+[x] T-048  A  a separate test database              ← D-004. N-053
+[x] T-049  A  register retries a slug collision     ← D-006. Found N-055 on the way
 ```
 
-**Progress: 40 / 45 done (T-027 partial). Stages 0-4 complete but for the font files —
-every M0 screen is built. What is left is Stage 5: one decision, one audit, and three
-rehearsals. The demo runs end to end: scan, fill, submit, and the results count moves.**
+**Progress: 44 / 49 done (T-027 partial). Stages 0-4 complete but for the font files.
+T-046 to T-049 were all unplanned, and every one came from running or stressing the thing
+rather than from the board. What is left is Stage 5: one decision (`T-043`), the fonts
+(`D-005`), `D-007`, `D-011`, and three rehearsals. The demo runs end to end: scan, fill,
+submit, and the results count moves.**
 
 ---
 
@@ -241,11 +259,12 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 |---|---|---|---|
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
-| `D-004` | Integration tests write into the **dev** database — **THIS NOW FAILS THE BUILD** | 249 junk users and 168 throwaway orgs had accumulated in `endur`, and the demo seed had been pushed out of it entirely — the advertised logins did not work until re-seeded on 19 Aug. A rehearsal against a polluted database is not evidence about the demo. **On 19 Aug it stopped being theoretical**: `chain.test.ts` registered a fixed org name every run, `uniqueSlug()` gives up after twenty variants, and the twenty-first run of the suite failed — a test about stripping unknown keys, failing with a conflict about slugs. That test was made independent of history; the next one to depend on it will not be found as quickly | before `T-045` |
-| `D-006` | `uniqueSlug()` runs **outside** register's transaction | Two registrations naming the same organisation in the same second both read "that slug is free"; the loser then collides on the unique index and gets a 500. The rollback is correct — `register-rollback.test.ts` proves nothing is left behind — but the caller deserves a retry, not an error page. Fix: retry the transaction on a P2002 against `slug` | before `T-045` |
+| ~~`D-004`~~ | **REPAID 21 Aug by `T-048`.** `vitest.config.ts` gained a `globalSetup` (create `endur_test` if absent, then `prisma migrate deploy`) and a `setupFiles` that points each worker's `DATABASE_URL` at it **before `lib/config.ts` reads `.env`** — which works because `process.loadEnvFile()` does not overwrite an already-set variable. `TEST_DATABASE_URL` is optional; absent, it derives by appending `_test`. Two guards in `test/database.ts` refuse to run rather than trust the config: the name must end in `_test`, and it must not be the `DATABASE_URL` written in `.env`. `test/test-database.test.ts` asserts both by their failure. **The leak is closed; the puddle is not mopped** — `endur` still holds 2,880 organisations, and `npm run db:reset` is yours to run because it also drops anything you made by hand | ~~before `T-045`~~ — **done** |
+| ~~`D-006`~~ | **REPAID 21 Aug by `T-049`.** A P2002 on `slug` is now caught and retried with the next slug, up to five attempts, so nobody gets an error page for choosing a name somebody else chose a millisecond earlier. `uniqueSlug()` still cannot move inside the transaction — it reads committed rows, and a transaction cannot see what it is racing. **The retry uses a random suffix, not the next number:** re-running the sequential scan makes every contender pick the same next value, so one collision becomes a queue as deep as the field, and the first version still 500ed one of six. The uncontended path still scans, so registering "Acme" next week when `acme` exists still gets the readable `acme-2`. `register-rollback.test.ts` inverted with it — all six contenders now succeed on six distinct slugs, which is also what proves the retry ran | ~~before `T-045`~~ — **done** |
 | `D-007` | `CONF-013` is **mitigated, not resolved** | Login filters `passwordHash: not null` and orders by `createdAt`, which closes the cross-tenant lockout. It does not answer whether an email address is global or per-tenant, and two *activated* accounts on one address are still ambiguous. Three options are written out in `CONF-013`; pick one and supersede it | **24 Aug** |
-| `D-009` | **The CSRF cookie dies with the browser; the session cookie does not** — so you stay signed in and every mutation fails permanently | Found by walkthrough, 21 Aug. `issueCsrfToken()` sets `endur.csrf` with **no `maxAge` and no `expires`**, making it a browser-session cookie. `session.ts` sets the session cookie with `maxAge: SESSION_TTL_DAYS`, so it is persistent. Close the browser and reopen: the session survives, the CSRF token is gone, and every POST/PATCH/DELETE answers *"Your session token was missing or invalid. Reload and try again."* **Reloading cannot fix it** — the SPA never calls `GET /auth/csrf` (nothing in `src/frontend` references it; only tests do), and the token is re-issued on login and register only. The message names the one remedy that does not work; the only real one is sign out and back in. Reproduced with curl: drop `endur.csrf`, keep the session, `GET /auth/me` still names the user and the next mutation 403s | **before `T-045`** — a rehearsal that starts by reopening a browser fails at the first click |
-| `D-010` | **Three sidebar items navigate to "Not built yet" pages** | Found by walkthrough, 21 Aug. `navItems.ts` has a `disabled` + `Soon` mechanism and uses it correctly for the three P3 items (Analysis, Inbox, Reflect). **Roles, People and Settings are live links to `<Placeholder>`**, as are `/app/profile` (from the TopBar user menu) and `/app/people/:id`. `router/index.tsx`'s own header states the rule being broken: *"The sidebar shows them disabled with a Soon tag and they never navigate. A stub page behind a dead link is worse than a disabled item."* The rule was written for P3; these five are **P2-after-M0**, which the rule never covered — so this is a gap in the rule, not only in the code. Someone clicking the sidebar during the demo hits three dead ends | **before `T-045`** — decide per item: `Soon`-style disable, or build it |
+| ~~`D-009`~~ | **REPAID 21 Aug by `T-047`.** The CSRF cookie now carries `SESSION_TTL_DAYS`, matching the session cookie, and `csrfProtection` re-issues it on any safe method for a cookie principal — so the boot `GET /auth/me` heals a browser that came back without one, and *"reload and try again"* is true for the first time. An existing token is re-set rather than rotated, so the expiry slides with the rolling session without killing a mutation already in flight. Two regression tests in `org.test.ts` (the cookie has a `Max-Age`; a reload with only the session cookie gets a working token back) and verified live with curl | ~~before `T-045`~~ — **done** |
+| ~~`D-010`~~ | **REPAID 21 Aug by `T-046`.** Settings turned out not to be post-M0 at all — `41` § Route & access has `<VocabularyChips>` linking `#words` from every console page and `design_specs/design/11` §1 keeps the Words card — so it was **built**, not disabled. Roles and People are now `Soon`-disabled like the P3 items. The other three link sites went with them: the TopBar's *My account*, the structure panel's person links, and the subjects table's linked-person column are text or gone until `34`/`47` exist. Nothing in the console now navigates to `<Placeholder>` | ~~before `T-045`~~ — **done** |
+| `D-011` | **Two genuinely concurrent submits can both run the handler** | Found 21 Aug while checking `T-049` for flakiness (`N-055`). The `Idempotency-Key` row is now committed before the response is sent, which closes the window for any retry that follows a delivered response. The real flaky-network case is narrower and still open: the client never got the first response, both requests arrive together, both miss the read. The unique index still allows only one key row, so the replay stays correct — but both handlers ran, and on respondent submit that means two responses. Closing it means RESERVING the key before the handler instead of writing it after, which introduces an in-flight case that has to answer something (409, or wait-and-replay). Not a thing to invent five days from a graded demo | after M0, or before `T-045` if a rehearsal ever shows a duplicate |
 | `D-008` | The capability catalogue's power labels are English | `roles/service.ts` `describe()` turns `campaign.launch` into *"launch campaigns"* — a domain noun, for `33`'s powers grid. Found by the T-044 audit and deliberately not fixed: the grid is not built, and the object → label mapping for `role`, `person`, `template` and `org` — none of which HAS a label — is `33`'s design work, not something to invent from outside it. `audit:vocab` does not scan it, because the string is assembled from a capability key rather than written | with `T-033` |
 | `D-005` | The two woff2 faces are not vendored — **and this is why the UI reads as generic** | `tokens.css` declares both; `public/fonts/` holds only a README. `design_specs/design/01` §5 puts **Caprasimo on every `h1`–`h4`, card title, KPI number, button label and badge** and Figtree on everything else — so with the files absent, *every heading and every number in the product is `system-ui`*. The spec is explicit that the personality is concentrated in the type (*"Caprasimo has one weight and a lot of personality… a paragraph set in it instantly cheapens the page"*), and the fonts README says it plainly: *"until the files land… nothing breaks — it just does not look like Endur."* Confirmed as the main cause of the 21 Aug walkthrough's *"too simple, too AI-like"*. `endur.css` (1,451 lines) and the vendored `organic.css` are in place and doing their job; the two files are the missing input | **24 Aug** (`21` §4) — **highest visual return of anything left** |
 
@@ -255,6 +274,188 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-21 · T-049 — the slug race, and a worse bug found on the way to it
+
+`D-006`. `uniqueSlug()` runs outside register's transaction and cannot move inside it: it reads
+**committed** rows, and a transaction cannot see the one it is racing. So two people naming
+their organisation the same thing in the same second both read "that slug is free" and the
+loser collided on the unique index and got a 500.
+
+The collision was correct, the rollback was correct, the 500 was not — a slug is derived from a
+name the caller is allowed to reuse, so it is neither their mistake nor theirs to fix. Register
+now catches a P2002 **on `slug` only** and tries again.
+
+**The first version of the fix still failed, and the reason is worth keeping.** Retrying by
+re-running the sequential scan makes every contender pick the same next value: six requests
+re-read, six find `acme-2` free, five collide again. Sequential retry needs as many attempts as
+there are contenders, so one of six still got a 500 at five attempts. A retry now takes a
+**random suffix**, and the field spreads out in one round however many are racing. The
+uncontended path still scans, so registering "Acme" next week when `acme` exists still gets the
+readable `acme-2` — that path is not racing anything.
+
+The retry path deliberately does **not** read first. Under contention that read is precisely
+the thing that lies; the unique index and the loop are a better guard than a SELECT already
+proven stale.
+
+**`register-rollback.test.ts` inverted, which is correct.** It was built on the collision
+producing a 500. Now all six contenders succeed on six distinct slugs — and those distinct
+slugs are what prove the retry ran, since all six derive the same base before any of them
+commits. The rollback property is still tested, by every retry: an attempt that left half an
+organisation behind would show as an org count exceeding the number of winners.
+
+**Then the suite went intermittent, and it was not this.** One run in six failed on
+`public.test.ts` — *"creates ONE response when a flaky network retries with the same key"*.
+`middleware/idempotency.ts` wrote the key row with `void prisma…create()` inside the `res.json`
+wrapper, so **the response went out before the row landed**. A retry arriving in that gap missed
+the read, ran the handler again, and created a second response — the exact duplicate the
+middleware exists to prevent, on the respondent submit path, which is the one a phone takes in
+front of the evaluator.
+
+The code even argued it was fine: *"its response is identical anyway because it ran the same
+handler on the same input."* That is false when the handler **creates** something. The second
+response has a different id.
+
+The row is now committed before the body is sent — one indexed insert of latency — and
+`public.test.ts` asserts the ordering directly instead of depending on timing. Six consecutive
+full runs, clean.
+
+**Two things worth carrying forward.** A flaky test is a bug report nobody has read yet; this
+one had been passing since T-022. And it surfaced the day the suite moved to a small, fast test
+database (`T-048`) — the same work in less time widened the window relative to it, which is a
+reminder that making the tests faster changes what they can see.
+
+**`D-011` is what is left**, and it is the harder half: two genuinely concurrent requests can
+both miss the read — the real flaky-network case, where the client never received the first
+response. At most one key row exists, so the replay stays correct, but both handlers ran.
+Closing it means reserving the key *before* the handler rather than writing it after, which
+introduces an in-flight case that has to answer something. Not worth inventing five days out.
+
+210 backend tests green (209 + 1), typecheck clean, `audit:vocab` and `audit:drift` clean.
+Docs: `13` §7 and its acceptance list, `55` gained `T-049`, `_MEMORY.md` `N-054` and `N-055`.
+Nothing committed.
+
+---
+
+### 2026-08-21 · T-048 — the tests stopped writing to the development database
+
+`D-004`. The board's remaining items are `T-043` (deferred by the team) and `T-045` (needs the
+public URL and real phones), so this was the topmost unblocked one — and it is the one that
+would have made a rehearsal meaningless.
+
+209 integration tests register organisations and submit responses, and they were doing it in
+`endur`. Two hooks in `vitest.config.ts`:
+
+- `globalSetup` — creates `endur_test` if it is not there, then `prisma migrate deploy`. A
+  fresh clone runs `npm test` with no setup step, which is the only version of this people
+  keep using.
+- `setupFiles` — points each worker's `DATABASE_URL` at it.
+
+**The ordering is the whole mechanism.** `lib/config.ts` parses `DATABASE_URL` at module load,
+and `process.loadEnvFile()` does **not** overwrite a variable that is already set — so a value
+assigned in `setupFiles` wins over the repo `.env` for the entire worker. I verified that Node
+behaviour before building on it rather than assuming it.
+
+`migrate deploy`, never `migrate dev`: `dev` offers to GENERATE a migration from a drifted
+schema, and a test run is the last place that should be possible.
+
+**Two guards, and the second one is the subtle one.** `test/database.ts` refuses to run rather
+than trusting configuration, because this suite truncates:
+
+1. the database name must end in `_test`
+2. it must not be the `DATABASE_URL` **written in `.env`**
+
+Rule 2 reads the file, not `process.env`. My first version compared against the live value and
+refused to start — correctly, by its own logic: `globalSetup` had already pointed the process
+at `endur_test`, so the two matched. A guard that fires for the exact reason everything is
+correct is worse than no guard, and the same trap was hiding in `derive()`, which turned a
+second call into `endur_test_test`. Both fixed; both have tests.
+
+**Write the test for the guard.** `test/test-database.test.ts` asserts both rules by their
+**failure** — a guard that never refuses anything is not a guard, and this one decides what 209
+tests may truncate. It found the `derive()` bug on its first run.
+
+**Still true after the fix, and it is yours:** `endur` holds **2,880 organisations**. The leak
+is closed, the puddle is not mopped. `npm run db:reset` drops, migrates and re-seeds — it is
+also the live-demo recovery path, so it is worth running once before rehearsals. I have not
+run it: it would drop anything you created by hand while clicking around.
+
+209 backend tests green (201 + 8 new), typecheck clean, `audit:drift` clean. Docs: `03` §5 has
+a new *The test database is a different database*, `.env.example` carries `TEST_DATABASE_URL`,
+`55` gained `T-048`, `_MEMORY.md` `N-053`. Nothing committed.
+
+---
+
+### 2026-08-21 · T-047 and T-046 — the two fixable findings, fixed
+
+Picked up the three findings from the walkthrough entry below. Two were code; the third
+(`D-005`, the fonts) is two binary files and stays yours.
+
+**1 · `T-047` — the CSRF failure, and the general rule underneath it.** `endur.csrf` was set
+with no `maxAge`, making it a browser-session cookie, next to a session cookie carrying seven
+days. Close the browser, come back: signed in, no token, every mutation dead. Two changes, and
+both are needed:
+
+- The cookie now carries `SESSION_TTL_DAYS`, so the pair expires together.
+- `csrfProtection` issues it on **safe** methods for a cookie principal — a fresh token when
+  there is none, the **existing** token again when there is. Re-setting rather than rotating
+  is deliberate: it slides the expiry with the rolling session without invalidating a mutation
+  already in flight holding the old value.
+
+The second change is what makes the error message honest. Nothing outside login and register
+issued that cookie, and the SPA never called `GET /auth/csrf`, so *"reload and try again"* was
+previously impossible to act on. Now the boot `GET /auth/me` heals it.
+
+Issuing a token on a GET is not a hole — double-submit rests on the attacker being unable to
+**read** the cookie cross-origin, and a random value they cannot see buys them nothing.
+
+Two regression tests in `org.test.ts`: the register response's `Set-Cookie` carries a
+`Max-Age`, and a request holding **only** the session cookie gets a working token back from a
+plain GET and can then mutate. Also verified live against the running API with curl — login,
+drop `endur.csrf`, `GET /auth/me`, `PATCH /org/labels` → 200. Before, that last call was 403
+forever.
+
+**Worth keeping:** 807 tests were green while this was live. Every one of them starts a fresh
+agent — **nothing in the suite ever reopened anything**, so nothing could see a bug whose whole
+shape is "what survives between sessions". `N-050`.
+
+**2 · `T-046` — the dead ends, and the one that was not post-M0.** The plan was to grey out the
+five P2 routes the way the three P3 items already are. Reading `41` first changed that:
+
+> `/app/settings` … the `#words` anchor is linked from `<VocabularyChips>` on every console
+> page, so it must land on the right card.
+
+and `design_specs/design/11` §1 keeps the Words card while cutting billing, the danger zone and
+the logo. So the **most-linked destination in the whole console** was a `<Placeholder>`, on an
+M0 path, while `PROGRESS.md` said in good faith that no placeholder was behind one. Nobody had
+followed a link out of a component into a cut-list.
+
+Built it. `<WordsEditor>` was **extracted** from wizard step 4 rather than copied — `41` asks
+for "the same five fields and the same live preview", which is only true if it is the same
+component (`24` §4, `N-052`). Saving dispatches `labelsLoaded`, so the sidebar and the chip row
+change with no reload, which is the ten-second proof repeated outside the wizard.
+
+One thing that is deliberately not stored server-side: **which plurals are overridden**. A saved
+plural that differs from `derivePlural(singular)` *is* the override. That is what makes the
+hotel's "Staff / Staff" survive a reload instead of quietly becoming "Staffs" the next time
+somebody edits the singular. There is a test for exactly that.
+
+The rest of the sweep: Roles and People are `Soon`-disabled; the TopBar's *My account* is gone;
+the structure panel's person links and the subjects table's linked-person column are plain text
+until `34` and `47` exist. **Greying the sidebar item is only the visible half** — three other
+places pointed at the same unbuilt pages and would have kept doing it. `N-051`.
+
+Three existing tests failed on this and all three were asserting the old behaviour, which is
+what you want a test to do. Updated, not deleted.
+
+**Not touched:** `D-005`. Judging the design before its typography exists is judging something
+nobody has seen — every heading and number in the product is still `system-ui`. Two woff2 files.
+
+819 tests green (201 backend, 618 frontend), `audit:vocab` and `audit:drift` clean. Docs
+updated: `12` §4.8 and §2 diagram, `15` § Session hygiene, `24` §4 + §8 + §9, `55` Stage 5,
+`_MEMORY.md` MAP and `N-050`–`N-052`. Nothing committed.
+
+---
 
 ### 2026-08-21 · First walkthrough of the running app — three findings, none fixed
 

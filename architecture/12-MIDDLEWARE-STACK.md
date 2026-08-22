@@ -42,7 +42,7 @@ per endpoint and eventually got wrong.
 ┌─ per-router ────────────────────────────────────────────────────────────┐
 │  6  tenantResolver     org from host / session / API key → req.ctx.orgId │
 │  7  authenticate       session | API key | respondent token → principal  │
-│  8  csrfProtection     unsafe methods, cookie-auth principals only       │
+│  8  csrfProtection     unsafe methods; issues the cookie on safe ones     │
 └──────────────────────────────────────────────────────────────────────────┘
 ┌─ per-route ─────────────────────────────────────────────────────────────┐
 │  9  validate(Dto)      zod over body/query/params → typed req.data       │
@@ -202,6 +202,21 @@ token-fetch round trip on boot.
 
 Failure → `403 CSRF_FAILED`, distinct from an authorisation `403` so the two are separable in
 logs.
+
+**The cookie's lifetime is the session cookie's, and the link re-issues it.** On a safe method
+with a cookie principal, `csrfProtection` sets the cookie: a fresh token when there is none, and
+the existing token again when there is, which slides the expiry in step with the rolling session
+(`15` §2) without invalidating a mutation already in flight holding the old value.
+
+Both halves are load-bearing, and `T-047` had to add them after the first walkthrough of the
+running app found the failure they prevent (`_MEMORY.md` `N-050`). With no `maxAge`, `endur.csrf`
+died when the browser closed while the session cookie lived seven days — so the caller came back
+signed in, holding no token, and every mutation failed permanently. The re-issue is what makes
+the error's own advice true: nothing else in the product issued the cookie outside login and
+register, so "reload and try again" was previously impossible to act on.
+
+Issuing on a GET is not a hole. Double-submit rests on an attacker being unable to **read** the
+cookie cross-origin; a fresh random token they cannot see is worth nothing to them.
 
 **This link exists because of an auth decision, not despite one.** Bearer tokens would have
 made it unnecessary; cookies make it mandatory. That trade is the honest answer to why it is

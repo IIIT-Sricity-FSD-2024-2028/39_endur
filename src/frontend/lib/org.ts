@@ -4,8 +4,10 @@
 // touch `fetch` — its whole correctness argument is that five steps produce ONE request,
 // and that is much easier to keep true when there is exactly one function that can send it.
 import { useCallback, useEffect, useState } from 'react';
-import type { OrgView, PresetView, SetupOrgBody } from '@endur/shared';
-import { apiGet, apiPost } from './api.js';
+import type {
+  LabelSet, OrgView, PresetView, SetupOrgBody, UpdateOrgBody,
+} from '@endur/shared';
+import { apiGet, apiPatch, apiPost } from './api.js';
 
 export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
 
@@ -44,6 +46,56 @@ export function usePresets(): Loadable<PresetView[]> {
 export function useSetupOrg(): (body: SetupOrgBody) => Promise<OrgView> {
   return useCallback(async (body: SetupOrgBody) => {
     const response = await apiPost<SetupOrgBody, { data: OrgView }>('/org/setup', body);
+    return response.data;
+  }, []);
+}
+
+/**
+ * The org as settings needs it. Separate from the session's copy in `authSlice`: that one
+ * carries only what the shell renders, and this page edits fields the shell never shows.
+ */
+export function useOrg(): Loadable<OrgView> & { set: (org: OrgView) => void } {
+  const [state, setState] = useState<Loadable<OrgView>>({
+    data: null, loading: true, error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void apiGet<{ data: OrgView }>('/org')
+      .then((response) => {
+        if (!cancelled) setState({ data: response.data, loading: false, error: null });
+      })
+      .catch((error: Error) => {
+        if (!cancelled) setState({ data: null, loading: false, error });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const set = useCallback((org: OrgView) => {
+    setState({ data: org, loading: false, error: null });
+  }, []);
+
+  return { ...state, set };
+}
+
+export function useUpdateOrg(): (body: UpdateOrgBody) => Promise<OrgView> {
+  return useCallback(async (body: UpdateOrgBody) => {
+    const response = await apiPatch<UpdateOrgBody, { data: OrgView }>('/org', body);
+    return response.data;
+  }, []);
+}
+
+/**
+ * Labels are PATCHed per key and merged server-side (`22` §3) — a whole-set write would
+ * silently discard a rename the caller did not have on screen.
+ */
+export function useUpdateLabels(): (labels: LabelSet) => Promise<OrgView> {
+  return useCallback(async (labels: LabelSet) => {
+    const response = await apiPatch<{ labels: LabelSet }, { data: OrgView }>(
+      '/org/labels', { labels },
+    );
     return response.data;
   }, []);
 }

@@ -13,20 +13,45 @@ import { config, isProd } from '../lib/config.js';
 export const CSRF_COOKIE = 'endur.csrf';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-/** Deliberately NOT httpOnly — the SPA has to read it to echo it back. */
+/**
+ * Deliberately NOT httpOnly — the SPA has to read it to echo it back.
+ *
+ * The lifetime MUST match the session cookie's. D-009: it used to have none, making it a
+ * browser-session cookie beside a 7-day session — so closing the browser left you signed
+ * in with no token, and every mutation failed permanently.
+ */
 export function issueCsrfToken(res: Response): string {
   const token = randomBytes(32).toString('base64url');
+  setCsrfCookie(res, token);
+  return token;
+}
+
+function setCsrfCookie(res: Response, token: string): void {
   res.cookie(CSRF_COOKIE, token, {
     httpOnly: false,
     secure: config.COOKIE_SECURE || isProd,
     sameSite: 'lax',
+    maxAge: config.SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
     path: '/',
   });
-  return token;
 }
 
-export const csrfProtection: RequestHandler = (req, _res, next) => {
-  if (SAFE_METHODS.has(req.method)) return next();
+export const csrfProtection: RequestHandler = (req, res, next) => {
+  const cookies = req.cookies as Record<string, string> | undefined;
+  const fromCookie = cookies?.[CSRF_COOKIE];
+
+  if (SAFE_METHODS.has(req.method)) {
+    // Self-heal, and slide. A cookie principal with no token is a dead end otherwise: the
+    // error tells you to reload, and a reload is all GETs, so nothing would re-issue it
+    // (only login and register did). Re-setting an EXISTING token rather than rotating it
+    // keeps the expiry in step with the rolling session without breaking a mutation that
+    // is already in flight holding the old value.
+    if (req.ctx.principal?.kind === 'user') {
+      if (fromCookie) setCsrfCookie(res, fromCookie);
+      else issueCsrfToken(res);
+    }
+    return next();
+  }
 
   // Scope it precisely, or it breaks the two surfaces that must stay open:
   //   apiKey     — a header is never attached automatically by a browser
@@ -35,8 +60,6 @@ export const csrfProtection: RequestHandler = (req, _res, next) => {
   if (req.ctx.principal && req.ctx.principal.kind !== 'user') return next();
   if (!req.ctx.principal) return next(); // nothing to forge yet; auth guards handle it
 
-  const cookies = req.cookies as Record<string, string> | undefined;
-  const fromCookie = cookies?.[CSRF_COOKIE];
   const fromHeader = req.get('x-csrf-token');
 
   if (!fromCookie || !fromHeader || !equal(fromCookie, fromHeader)) {

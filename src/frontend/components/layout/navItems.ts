@@ -15,7 +15,9 @@ export type NavItem = {
   label: string;
   icon: IconName;
   group: NavGroup;
-  /** P3. Renders greyed with a "Soon" tag, never navigates, has no page behind it. */
+  /** Renders greyed with a "Soon" tag and never navigates. Set it for anything not built
+   *  yet, P3 or P2 — an item that navigates to "Not built yet" is a worse answer than one
+   *  that visibly does not navigate (design_specs/design/02 §7). */
   disabled?: boolean;
   /** One line of what the screen will do, shown on hover. Required when disabled — a
    *  greyed item with no explanation is just a broken link. */
@@ -38,9 +40,16 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
 
     { to: '/app/structure', label: 'Structure', icon: 'structure', group: 'organize',
       needs: 'unit.read' },
-    { to: '/app/roles', label: 'Roles', icon: 'role', group: 'organize', needs: 'role.read' },
+    // P2, after M0. Disabled for the same reason the P3 items are: the routes exist as a
+    // contract with 20 §2, but the pages behind them are scaffold, and a sidebar that
+    // navigates to "Not built yet" is the one thing 02 §7 tells us not to build.
+    { to: '/app/roles', label: 'Roles', icon: 'role', group: 'organize', needs: 'role.read',
+      disabled: true,
+      soonHint: 'Roles, and the grid of what each one is allowed to do.' },
     { to: '/app/people', label: 'People', icon: 'people', group: 'organize',
-      needs: 'person.read' },
+      needs: 'person.read',
+      disabled: true,
+      soonHint: 'Everyone in the organization, what they do and where.' },
     { to: '/app/subjects', label: labels.subject.many, icon: 'subject', group: 'organize',
       needs: 'subject.read' },
 
@@ -51,6 +60,7 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
 
     // P3 — visible, disabled, and honest about it. Showing the roadmap costs an hour and
     // turns "what's next?" into something an evaluator can see (design_specs/design/02 §7).
+    // Same treatment as Roles and People above; only the phase differs.
     { to: '/app/analysis', label: 'Analysis', icon: 'results', group: 'understand',
       disabled: true,
       soonHint: 'Themes, sentiment and key drivers across every response.' },
