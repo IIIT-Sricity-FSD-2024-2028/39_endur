@@ -162,7 +162,7 @@ describe('presentation mode is what goes on the projector', () => {
     const { container } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Full' }));
     expect(container.querySelector('.present')).toBeTruthy();
-    expect(container.querySelector('.share-actions')).toBeNull();
+    expect(container.querySelector('.share-foot-actions')).toBeNull();
   });
 
   it('draws the code larger than the sheet does', () => {
@@ -189,16 +189,20 @@ describe('presentation mode is what goes on the projector', () => {
 describe('the sheet reports the campaign honestly', () => {
   it('says collecting while it is open, with the window and the anonymity', () => {
     mount();
-    expect(screen.getByText(/Spring check is collecting/)).toBeTruthy();
+    // The campaign name is the heading now; the state is the status tag beside it (§3
+    // restyle — the sentence "X is collecting" moved out of the <h2>).
+    expect(screen.getByRole('heading', { name: 'Spring check' })).toBeTruthy();
+    expect(screen.getByText('Collecting')).toBeTruthy();
     expect(screen.getByText(/Open until .* · anonymous/)).toBeTruthy();
   });
 
   it('does not claim to be collecting once closed', () => {
-    // A sheet saying "is collecting" over a closed campaign is worse than no sheet: it is
+    // A sheet saying "collecting" over a closed campaign is worse than no sheet: it is
     // reachable forever from the card, so it will be opened after the fact.
     mount({ status: 'closed' });
-    expect(screen.getByText(/Spring check has closed/)).toBeTruthy();
-    expect(screen.queryByText(/is collecting/)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Spring check' })).toBeTruthy();
+    expect(screen.getByText('Closed')).toBeTruthy();
+    expect(screen.queryByText('Collecting')).toBeNull();
   });
 
   it('drops the anonymity claim when the campaign is not anonymous', () => {

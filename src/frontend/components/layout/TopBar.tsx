@@ -1,6 +1,7 @@
 // 56px, sticky, and it carries the second most important control in the demo.
 // design_specs/design/02 §3.
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Icon } from '../Icon.js';
 import { ThemeToggle } from '../ThemeToggle.js';
@@ -59,7 +60,7 @@ function OrgSwitcher({ name }: { name: string }): JSX.Element {
   if (!isDemoBuild()) return <span className="topbar-org">{name}</span>;
 
   return (
-    <div className="menu-anchor" ref={menu.ref}>
+    <div className="menu-anchor" ref={menu.anchorRef}>
       <button
         type="button"
         className="btn btn-ghost topbar-org"
@@ -71,30 +72,38 @@ function OrgSwitcher({ name }: { name: string }): JSX.Element {
         <Icon name="chevron" size={16} />
       </button>
 
-      {menu.open && (
-        <div className="menu elev-lg" role="menu">
-          <p className="utility menu-heading">Demo organizations</p>
-          {DEMO_ORGS.map((demo) => (
-            <button
-              key={demo.slug}
-              type="button"
-              role="menuitem"
-              className="menu-item"
-              // Current org first, so the menu reads as a state rather than a list of
-              // strangers.
-              aria-current={demo.name === org?.name}
-              onClick={() => void switchToDemoOrg(demo)}
-            >
-              <Icon name="organization" size={16} />
-              <span>{demo.name}</span>
-              <span className="tag tag-neutral menu-tag">{demo.industry}</span>
-            </button>
-          ))}
-          <p className="text-meta menu-note">
-            Development build only. Each one is a separate account, so this signs in again.
-          </p>
-        </div>
-      )}
+      {menu.open &&
+        menu.rect &&
+        createPortal(
+          <div
+            ref={menu.panelRef}
+            className="menu is-portal elev-lg"
+            role="menu"
+            style={{ top: menu.rect.bottom + 9, left: menu.rect.left }}
+          >
+            <p className="utility menu-heading">Demo organizations</p>
+            {DEMO_ORGS.map((demo) => (
+              <button
+                key={demo.slug}
+                type="button"
+                role="menuitem"
+                className="menu-item"
+                // Current org first, so the menu reads as a state rather than a list of
+                // strangers.
+                aria-current={demo.name === org?.name}
+                onClick={() => void switchToDemoOrg(demo)}
+              >
+                <Icon name="organization" size={16} />
+                <span>{demo.name}</span>
+                <span className="tag tag-neutral menu-tag">{demo.industry}</span>
+              </button>
+            ))}
+            <p className="text-meta menu-note">
+              Development build only. Each one is a separate account, so this signs in again.
+            </p>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -109,7 +118,7 @@ function UserChip({ name, email }: { name: string; email: string }): JSX.Element
     .join('');
 
   return (
-    <div className="menu-anchor" ref={menu.ref}>
+    <div className="menu-anchor" ref={menu.anchorRef}>
       <button
         type="button"
         className="btn btn-ghost user-chip"
@@ -122,47 +131,78 @@ function UserChip({ name, email }: { name: string; email: string }): JSX.Element
         <Icon name="chevron" size={16} />
       </button>
 
-      {menu.open && (
-        <div className="menu menu-right elev-lg" role="menu">
-          <p className="menu-heading">{name}</p>
-          <p className="text-meta menu-note">{email}</p>
-          {/* "My account" lived here and went to a scaffold page. Out until 47 is built —
-              the name and email above already say who is signed in, which is what the menu
-              is actually for (design_specs/design/02 §7). */}
-          <button type="button" role="menuitem" className="menu-item" onClick={() => void signOut()}>
-            <Icon name="close" size={16} />
-            <span>Sign out</span>
-          </button>
-        </div>
-      )}
+      {menu.open &&
+        menu.rect &&
+        createPortal(
+          <div
+            ref={menu.panelRef}
+            className="menu menu-right is-portal elev-lg"
+            role="menu"
+            style={{ top: menu.rect.bottom + 9, right: window.innerWidth - menu.rect.right }}
+          >
+            <p className="menu-heading">{name}</p>
+            <p className="text-meta menu-note">{email}</p>
+            {/* "My account" lived here and went to a scaffold page. Out until 47 is built —
+                the name and email above already say who is signed in, which is what the menu
+                is actually for (design_specs/design/02 §7). */}
+            <button type="button" role="menuitem" className="menu-item" onClick={() => void signOut()}>
+              <Icon name="close" size={16} />
+              <span>Sign out</span>
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
-/** Open/close with the two dismissals people actually expect: click away, and Escape. */
+/**
+ * Open/close with the two dismissals people actually expect: click away, and Escape.
+ *
+ * The panel renders through a portal into `document.body` — see the §1 note above — so it
+ * is no longer a DOM descendant of the anchor. Outside-click detection has to check both
+ * the anchor and the (separately ref'd) panel; the anchor's bounding rect is recomputed on
+ * open, resize and scroll so the panel tracks it.
+ */
 function useMenu() {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  const updateRect = useCallback(() => {
+    if (anchorRef.current) setRect(anchorRef.current.getBoundingClientRect());
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    updateRect();
     const onPointer = (event: MouseEvent): void => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (anchorRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setOpen(false);
     };
+    const onReflow = (): void => updateRect();
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
     return () => {
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('scroll', onReflow, true);
     };
-  }, [open]);
+  }, [open, updateRect]);
 
   return {
     open,
-    ref,
+    rect,
+    anchorRef,
+    panelRef,
     toggle: () => setOpen((was) => !was),
     close: () => setOpen(false),
   };

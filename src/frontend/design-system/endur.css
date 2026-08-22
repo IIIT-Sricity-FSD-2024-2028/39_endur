@@ -17,6 +17,13 @@
   --dur-base:  200ms;
   --dur-slow:  320ms;
 
+  /* The theme wipe — DEC-028. The feather is duplicated as FEATHER_PX in
+     lib/theme.ts, which adds it to the radius so the soft tail clears the
+     furthest corner instead of stopping one feather short of it. */
+  --wipe-dur:     620ms;
+  --wipe-feather: 120px;
+  --wipe-x: 50%; --wipe-y: 0%; --wipe-span: 0px;
+
   /* Layout maxima — §8. Named, so a page states its intent rather than a px. */
   --width-app:     1240px;
   --width-builder: 1100px;
@@ -54,6 +61,9 @@
 .tag-good { background: var(--status-good-100); color: var(--status-good-800); }
 .tag-warn { background: var(--status-warn-100); color: var(--status-warn-800); }
 .tag-bad  { background: var(--status-bad-100);  color: var(--status-bad-800); }
+/* Quieter than .tag-neutral (organic.css) — a closed campaign is over, not merely inactive;
+   the share sheet uses it so "Closed" reads as the lowest-emphasis of its three states. */
+.tag-muted { background: var(--color-neutral-100); color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 
 .fill-good    { background: var(--status-good-500); }
 .fill-neutral { background: var(--color-neutral-400); }
@@ -1452,29 +1462,97 @@ textarea.q-text-input { min-height: 90px; }
 .summary-name { margin: 0; font-family: var(--font-heading); font-size: 20px; }
 .summary-card p { margin: 0; }
 
-/* ── the share sheet — 06 §6.3. THE DEMO MOMENT ─────────────────────────── */
+/* ── the share sheet — 06 §6.3. THE DEMO MOMENT ─────────────────────────
+   Same three-part anatomy as the template quick look (.tpv-* above): header
+   band, scrolling body, footer action band — so the two modals in the
+   product read as one system rather than two unrelated dialogs. */
 
-.share-sheet { width: min(640px, 100%); text-align: center; }
-.share-head { display: flex; align-items: flex-start; gap: var(--space-2); }
-.share-head .dialog-title { flex: 1 1 auto; text-align: left; }
+.share-sheet {
+  width: min(560px, 100%);
+  /* The vendored .dialog pads and gaps itself. The three bands below pad
+     themselves too, so leaving that on draws a second, uneven frame inside
+     the first — visible as the header rule stopping short of both edges. */
+  padding: 0;
+  gap: 0;
+  /* A 300px code plus a header, a warning and a footer is taller than a laptop
+     viewport once the browser's own chrome is off it, and a .dialog-backdrop
+     that centres its child clips BOTH ends. What fell off the top was the
+     campaign name — on the one screen that exists to be read from across a
+     room. The body scrolls instead; the header and footer never move. */
+  max-height: min(760px, calc(100dvh - var(--space-8)));
+  overflow: hidden;
+  animation: share-in var(--dur-base) var(--ease) both;
+}
+/* Arrives from where the backdrop already is rather than being cut in. */
+@keyframes share-in {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+.share-head {
+  flex: none;
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.share-headings { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.share-title {
+  margin: 0; font-size: var(--text-h3); letter-spacing: var(--track-heading);
+  line-height: 1.15;
+}
+.share-close { margin-left: auto; flex: none; }
+
+/* Only the QR + URL block centres — a centred header and footer are what
+   made this read as unfinished next to the quick look. */
+.share-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: var(--space-4); padding: var(--space-6); overflow-y: auto;
+}
 /* PURE white behind the code, always — not --color-card, not a tint. A background that is
    nearly white still costs contrast, and contrast is what a phone camera is working with. */
 .share-qr {
-  display: inline-block; margin: var(--space-3) auto; padding: 0;
+  display: inline-block; padding: 0;
   background: #ffffff; border-radius: var(--radius-md); line-height: 0;
+  /* The plate is pure white on both themes, so on dark it floats with no edge
+     at all. A hairline and a shadow seat it without touching the code: neither
+     lands inside the quiet zone, which is what a camera reads. */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 14%, transparent),
+              var(--shadow-md);
 }
-.share-qr canvas { display: block; }
+/* Never larger than the 300px it was encoded at — scaling a QR up softens the
+   module edges — but free to come down on a short window rather than pushing
+   the header off the screen. */
+.share-qr canvas { display: block; width: min(300px, 44vh, 100%); height: auto; }
 /* Readable from the back of the room, and typeable by somebody who cannot scan. */
 .share-url {
-  margin: 0; font-family: var(--font-heading); font-size: 20px; letter-spacing: .02em;
+  margin: 0; font-family: var(--font-heading); font-size: clamp(17px, 2.4vw, 20px);
+  letter-spacing: .02em; line-height: 1.25;
   overflow-wrap: anywhere; user-select: all;
 }
 .share-warn {
-  margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-md);
-  text-align: left; font-size: 13px;
+  margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
+  border-left: 3px solid var(--status-bad-500);
+  width: 100%; text-align: left; font-size: var(--text-meta); line-height: 1.45;
   background: var(--status-bad-100); color: var(--status-bad-800);
 }
-.share-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-3); }
+.share-warn code {
+  padding: 1px 5px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--status-bad-500) 16%, transparent);
+  font-size: .95em;
+}
+
+.share-foot {
+  flex: none;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--glass-edge);
+  /* The band the eye lands on after the code. A shade off the sheet's own
+     surface separates it without needing a second rule. */
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+.share-foot-meta { display: flex; flex-direction: column; gap: 2px; }
+.share-foot-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .share-meta { margin: 0; }
 
 /* Presentation mode: this is what goes on the projector. Nothing else on the screen. */
@@ -1489,9 +1567,17 @@ textarea.q-text-input { min-height: 90px; }
 .present-url { margin: 0; font-family: var(--font-heading); font-size: 42px; letter-spacing: .02em; }
 .present-exit { position: absolute; top: var(--space-4); right: var(--space-4); }
 
+/* On a short window the header and the footer are what must survive, so the
+   padding around the code yields before the code does. */
+@media (max-height: 700px) {
+  .share-head { padding: var(--space-4) var(--space-6) var(--space-3); }
+  .share-body { gap: var(--space-3); padding: var(--space-4) var(--space-6); }
+}
+
 @media (max-width: 639px) {
   .when-row { flex-direction: column; }
-  .share-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .share-foot-actions { margin-left: 0; width: 100%; }
+  .share-foot-actions .btn { flex: 1 1 auto; justify-content: center; }
   .present-url { font-size: 24px; }
   .present-name { font-size: 22px; }
 }
@@ -1851,9 +1937,13 @@ p { text-wrap: pretty; }
 .card.elev-md { box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-md); }
 .card.elev-lg { box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-lg); }
 
-/* Chrome goes the other way — it should let the page show through it. */
+/* Chrome goes the other way — it should let the page show through it — except a dialog
+   sits under .dialog-backdrop, which is itself a backdrop root: the dialog's own blur never
+   reaches the page behind it, so an unblurred glass tint would show sharp page text through
+   a 58%-transparent panel. Near-opaque instead; the edge, sheen and shadow still read as
+   glass, only the tint stops carrying the contrast. */
 .dialog {
-  background: var(--glass-tint);
+  background: color-mix(in srgb, var(--color-card) 96%, transparent);
   -webkit-backdrop-filter: var(--glass-blur-strong);
   backdrop-filter: var(--glass-blur-strong);
   border: 1px solid var(--glass-edge);
@@ -1896,28 +1986,52 @@ p { text-wrap: pretty; }
 }
 .ambient-field {
   position: absolute;
-  width: 62vmax; height: 62vmax;
   border-radius: 50%;
-  filter: blur(72px);
   will-change: transform;
+  /* The falloff is painted, not filtered. A solid disc under `filter: blur()` fades over
+     the blur radius and no further, which leaves a soft but locatable ring at the edge of
+     the circle — three of those on a pale ground read as three blobs, not as a field. A
+     radial stop runs the colour to fully transparent inside the shape, so there is no edge
+     left for the eye to find; the blur that remains is only there to kill the banding a
+     wide gradient shows on an 8-bit display. */
+  filter: blur(48px) saturate(118%);
 }
-/* Three different periods, none a multiple of another, so the arrangement does
-   not visibly repeat. A two-field drift comes back to its start in under a
-   minute and the eye catches it. */
+
+/* Every field is anchored past the viewport edge and sized so its own falloff, not its
+   boundary, is what reaches the middle of the screen. Nothing here is meant to be seen as
+   a shape. Three different periods, none a multiple of another, so the arrangement does
+   not visibly repeat — a two-field drift returns to its start in under a minute and the
+   eye catches it. */
 .ambient-field-1 {
-  top: -22vmax; left: -14vmax; background: var(--ambient-1);
+  top: -32vmax; left: -26vmax; width: 96vmax; height: 96vmax;
+  background: radial-gradient(circle at 50% 50%, var(--ambient-1) 0%, transparent 68%);
   animation: ambient-drift-a 43s ease-in-out infinite alternate;
 }
 .ambient-field-2 {
-  bottom: -26vmax; right: -16vmax; background: var(--ambient-2);
+  bottom: -36vmax; right: -24vmax; width: 100vmax; height: 100vmax;
+  background: radial-gradient(circle at 50% 50%, var(--ambient-2) 0%, transparent 66%);
   animation: ambient-drift-b 57s ease-in-out infinite alternate;
 }
 .ambient-field-3 {
-  top: 28%; right: 18%; width: 40vmax; height: 40vmax; background: var(--ambient-3);
+  top: 18%; right: 10%; width: 58vmax; height: 58vmax;
+  background: radial-gradient(circle at 50% 50%, var(--ambient-3) 0%, transparent 70%);
   animation: ambient-drift-c 71s ease-in-out infinite alternate;
 }
-.ambient-hero .ambient-field { filter: blur(78px); opacity: .8; }
-.ambient-default .ambient-field { opacity: .45; }
+.ambient-field-4 {
+  bottom: -30vmax; left: -24vmax; width: 88vmax; height: 88vmax;
+  background: radial-gradient(circle at 50% 50%, var(--ambient-4) 0%, transparent 67%);
+  animation: ambient-drift-d 89s ease-in-out infinite alternate;
+}
+.ambient-field-5 {
+  top: -28vmax; right: -26vmax; width: 80vmax; height: 80vmax;
+  background: radial-gradient(circle at 50% 50%, var(--ambient-5) 0%, transparent 64%);
+  animation: ambient-drift-e 101s ease-in-out infinite alternate;
+}
+
+.ambient-hero .ambient-field { filter: blur(56px) saturate(126%); opacity: 1; }
+/* The console sits on this all day, so it comes down — but not to the point where the
+   ground shows through again, which was the whole problem. */
+.ambient-default .ambient-field { opacity: .72; }
 
 @keyframes ambient-drift-a {
   from { transform: translate3d(0, 0, 0) scale(1); }
@@ -1930,6 +2044,14 @@ p { text-wrap: pretty; }
 @keyframes ambient-drift-c {
   from { transform: translate3d(0, 0, 0) scale(.9); }
   to   { transform: translate3d(-9vmax, 12vmax, 0) scale(1.2); }
+}
+@keyframes ambient-drift-d {
+  from { transform: translate3d(0, 0, 0) scale(1.05); }
+  to   { transform: translate3d(11vmax, -10vmax, 0) scale(.92); }
+}
+@keyframes ambient-drift-e {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-8vmax, 11vmax, 0) scale(1.18); }
 }
 
 /* The lattice — the organisation graph, at wallpaper strength. */
@@ -1966,7 +2088,10 @@ p { text-wrap: pretty; }
   36%       { opacity: .6; }
   44%, 100% { stroke-dashoffset: -34;  opacity: 0; }
 }
-.ambient-default .ambient-lattice { opacity: .5; }
+/* The wash carries more colour than it used to, and the lattice has to give way by the
+   same amount or the two compete — the graph is meant to be noticed on the second look,
+   not the first. */
+.ambient-default .ambient-lattice { opacity: .38; }
 
 /* ── The appearance control — DEC-028 ──────────────────────────────────────
    The thumb is a sibling that slides, not a background on the checked segment,
@@ -2017,9 +2142,42 @@ p { text-wrap: pretty; }
 ::view-transition-old(root) { z-index: 1; }
 ::view-transition-new(root) { z-index: 2; }
 
+/* The edge of the wipe.
+
+   A clip-path circle has a hard boundary, and across a full screen that
+   boundary becomes the thing the eye tracks: it reads as a shape crossing the
+   page rather than as the page changing. Feathering it over --wipe-feather of
+   travel lets the two themes overlap for a few frames — enough to blend, far
+   too little to sit at the washed grey midpoint a plain cross-fade passes
+   through. lib/theme.ts sets the origin and the span; the animation lives here
+   so the compositor runs it rather than a script.
+
+   --theme-wipe has to be registered or it cannot be animated at all: an
+   unregistered custom property is a string to the animation engine and jumps
+   between keyframes. It inherits so that animating it ON the pseudo-element is
+   what that pseudo-element's own mask reads back. */
+@property --theme-wipe {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+html.is-theme-wiping::view-transition-new(root) {
+  animation: theme-wipe var(--wipe-dur) var(--ease) both;
+  -webkit-mask-image: radial-gradient(circle at var(--wipe-x) var(--wipe-y),
+    #000 max(0px, calc(var(--theme-wipe) - var(--wipe-feather))),
+    transparent var(--theme-wipe));
+  mask-image: radial-gradient(circle at var(--wipe-x) var(--wipe-y),
+    #000 max(0px, calc(var(--theme-wipe) - var(--wipe-feather))),
+    transparent var(--theme-wipe));
+}
+@keyframes theme-wipe {
+  from { --theme-wipe: 0px; }
+  to   { --theme-wipe: var(--wipe-span); }
+}
+
 /* Nothing else in the product should try to tween its own colours during the
    swap — the snapshot already handles it, and a 200ms background transition
-   underneath a 620ms wipe produces a visible second change. */
+   underneath the wipe produces a visible second change. */
 html:active-view-transition * {
   transition: none !important;
 }
@@ -2037,7 +2195,10 @@ html:active-view-transition * {
   box-shadow: 0 1px 0 var(--glass-shade);
 }
 .topbar-mark {
-  border-radius: 11px;
+  /* was 11px against a 28px --radius-lg; the softened scale (T-05x radius
+     pass) shrank every neighbour, so this literal now read rounder than
+     the corners around it — tightened to match. */
+  border-radius: 8px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 6px var(--glass-shade);
   font-weight: 600;
 }
@@ -2061,14 +2222,19 @@ html:active-view-transition * {
   box-shadow: inset 0 1px 0 var(--glass-sheen);
 }
 
+/* A menu opens OVER page content and is a child of .topbar, which is itself a
+   backdrop root — so its own backdrop-filter never reaches the content it
+   covers. The surface therefore has to be opaque enough to read on its own;
+   the blur below is a bonus where it applies, not the thing carrying contrast. */
 .menu {
-  background: var(--glass-tint);
+  background: color-mix(in srgb, var(--color-card) 96%, transparent);
   -webkit-backdrop-filter: var(--glass-blur-strong);
   backdrop-filter: var(--glass-blur-strong);
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-lg);
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--shadow-lg);
 }
+.menu.is-portal { position: fixed; }
 
 .drawer {
   background: var(--glass-tint);
@@ -2330,6 +2496,10 @@ html:active-view-transition * {
   border-radius: calc(var(--radius-lg) * 1.15);
   overflow: hidden;
   animation: tpv-in 320ms var(--ease) both;
+  /* .tpv-backdrop is a backdrop root, so this panel's own blur (from .glass-strong)
+     never reaches the page behind it. Long-form reading surface: opaque, with the
+     glass carried by the edge, sheen and shadow instead of the tint. */
+  background: color-mix(in srgb, var(--color-card) 97%, transparent);
 }
 /* Rises and settles rather than appearing. It starts at .96 rather than 0 —
    a panel that grows from nothing reads as a glitch, not as an arrival. */
