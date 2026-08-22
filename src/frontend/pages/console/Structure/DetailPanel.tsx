@@ -4,7 +4,6 @@
 // the question somebody asks right before they move or delete something. It is also the
 // touch-friendly home for the three row actions, since the row's own icon buttons are
 // hover-revealed on a pointer device.
-import { Link } from 'react-router-dom';
 import type { ResolvedLabels, UnitNode } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { usePeopleIn } from '../../../lib/people.js';
@@ -79,7 +78,10 @@ export function DetailPanel({
           <ul className="unit-people-list">
             {people.data?.data.map((person) => (
               <li key={person.id}>
-                <Link to={`/app/people/${person.id}`}>{person.name}</Link>
+                {/* Names, not links, until /app/people is built. A link to a page that
+                    says "Not built yet" reads as a broken product; a name reads as a
+                    name (design_specs/design/02 §7). Restore the <Link> with the page. */}
+                <span>{person.name}</span>
                 <span className="text-meta">
                   {person.positions[0]?.roleName ?? '—'}
                 </span>
@@ -87,9 +89,9 @@ export function DetailPanel({
             ))}
           </ul>
           {node.peopleCount > (people.data?.data.length ?? 0) && (
-            <Link className="text-meta" to={`/app/people?unit=${node.id}`}>
-              View all {pluralise(node.peopleCount, 'person', 'people')} →
-            </Link>
+            <p className="text-meta">
+              {pluralise(node.peopleCount, 'person', 'people')} here in total.
+            </p>
           )}
         </section>
       )}

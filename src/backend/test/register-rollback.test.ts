@@ -5,11 +5,22 @@
 // because their address is taken. The service comments say so; nothing proved it.
 //
 // THE FORCED FAILURE IS REAL, NOT INJECTED. `uniqueSlug()` runs OUTSIDE the transaction
-// (features/auth/service.ts), so several registrations naming the same organisation at the
-// same moment all read "that slug is free", and all but one then collide on the unique
-// index INSIDE the transaction. Argon2 hashing takes ~100ms and the slug SELECT takes ~1ms,
-// so every request below clears the check long before the winner commits — the collision
-// is reliable rather than lucky.
+// (features/auth/service.ts) because it reads COMMITTED rows, so several registrations naming
+// the same organisation at the same moment all read "that slug is free", and all but one then
+// collide on the unique index INSIDE the transaction. Argon2 hashing takes ~100ms and the slug
+// SELECT takes ~1ms, so every request below clears the check long before the winner commits —
+// the collision is reliable rather than lucky.
+//
+// WHAT CHANGED AT T-049 (`D-006`): the collision still happens, and the losing attempt is still
+// rolled back — but the service now takes the next slug and tries again instead of answering
+// 500. So the observable outcome inverted: every contender is expected to SUCCEED, on a
+// distinct slug. The rollback property did not stop being tested. It is tested by every retry:
+// an attempt that left half an organisation behind would show up below as an org count that
+// exceeds the number of winners, or as a user belonging to an org that does not exist.
+//
+// The distinct slugs are what prove the retry ran at all. All six requests compute the same
+// base slug before any of them commits, so six different slugs can only mean five collisions
+// were caught and retried.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app, unique } from './helpers.js';
@@ -33,15 +44,19 @@ describe('POST /auth/register rolls back completely — 30 § Acceptance, 15 §5
     const won = results.filter((res) => res.status === 201);
     const lost = results.filter((res) => res.status !== 201);
 
-    // The premise. More than one CAN win — `uniqueSlug` retries with `-2`, `-3`… for
-    // anything that starts after the first commit, and an organisation name is not unique.
-    // What must not happen is a loser leaving wreckage. If this ever reads zero the race
-    // stopped racing and every assertion below stopped meaning anything: fix the test,
-    // do not delete it.
-    expect(lost.length).toBeGreaterThan(0);
-    expect(won.length).toBeGreaterThan(0);
+    // D-006. A slug collision is not the caller's mistake and not theirs to fix, so nobody
+    // gets an error page for choosing a name somebody else chose a millisecond earlier.
+    expect(lost.map((res) => res.status)).toEqual([]);
+    expect(won).toHaveLength(CONTENDERS);
 
-    // Exactly as many organisations as succeeded. Every failure rolled all the way back.
+    // The retry actually ran. Every request derived the SAME base slug before any of them
+    // committed, so six distinct slugs is only reachable by catching five collisions and
+    // asking `uniqueSlug` again. Without the retry this reads 1.
+    const slugs = new Set(won.map((res) => res.body.organization.slug as string));
+    expect(slugs.size).toBe(CONTENDERS);
+
+    // Exactly as many organisations as succeeded. Every rolled-back ATTEMPT — and there were
+    // five — left nothing behind, or this count would exceed the number of winners.
     const orgs = await prisma.organization.findMany({ where: { name: orgName } });
     expect(orgs).toHaveLength(won.length);
 
@@ -71,10 +86,11 @@ describe('POST /auth/register rolls back completely — 30 § Acceptance, 15 §5
       .send({ email: winner, password: 'a-long-enough-password' });
     expect(login.status).toBe(200);
 
-    // What a loser was told. A slug collision is not the caller's fault and not their
-    // problem to fix, so 500 is the honest answer — but see D-006: they deserve a retry
-    // rather than an error page, and `uniqueSlug` running outside the transaction is why
-    // this is reachable at all.
-    for (const res of lost) expect(res.status).toBeGreaterThanOrEqual(400);
+    // And every survivor's scaffolding belongs to the slug it actually got. A retry that
+    // reused the first attempt's organisation id would pass every count above.
+    for (const org of orgs) {
+      const owner = await prisma.node.findFirstOrThrow({ where: { orgId: org.id, kind: 'role' } });
+      expect(owner.name).toBe('Owner');
+    }
   });
 });

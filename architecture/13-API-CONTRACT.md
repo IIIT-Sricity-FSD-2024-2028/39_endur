@@ -324,6 +324,18 @@ respondent submit (keyed on the invitation token). First response cached 24 h an
 Respondent submit matters most: a phone on a flaky venue network retries, and a duplicate
 response would corrupt the demo's numbers in front of the evaluator.
 
+**The key row is committed BEFORE the response is sent.** It was written fire-and-forget
+afterwards until 21 Aug, which left a window: a retry arriving between the response going out
+and the insert landing missed the read, ran the handler again, and created the second response
+the mechanism exists to prevent. It cost one indexed insert of latency to close, and it was
+only ever visible as an intermittent test failure (`_MEMORY.md` `N-055`).
+
+A narrower window remains and is recorded as `D-011`: two requests that arrive genuinely
+concurrently — the real flaky-network case, where the client never received the first response
+— can both miss the read. The unique index still picks one winner, so at most one key row
+exists, but both handlers ran. Closing it needs the key RESERVED before the handler rather than
+written after it, which introduces an in-flight case that has to answer something.
+
 ---
 
 ## 8. Acceptance
@@ -335,6 +347,7 @@ response would corrupt the demo's numbers in front of the evaluator.
       explicit key allowlist test
 - [ ] Invalid, closed and expired tokens are indistinguishable in the response
 - [ ] A repeated `POST /campaigns/:id/launch` with the same key returns the first response
+- [ ] The key row is readable the instant the caller has the response, not a beat later
 - [ ] Cursor pagination is stable while rows are inserted concurrently
 - [ ] `meta.total` is scope-filtered
 

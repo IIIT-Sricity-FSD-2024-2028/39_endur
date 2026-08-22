@@ -53,7 +53,19 @@ describe('roadmap items', () => {
     // Not an <a>: there is no href to follow and nothing to tab into, so the behaviour is
     // structural rather than styled-on.
     expect(analysis?.tagName).not.toBe('A');
-    expect(screen.getAllByText('Soon').length).toBe(3);
+    // Three P3 items and, since T-046, the two P2 pages that are still scaffold. The count
+    // is the assertion: an item goes back to being a link when its page exists, and never
+    // before (design_specs/design/02 §7).
+    expect(screen.getAllByText('Soon').length).toBe(5);
+  });
+
+  it('does not navigate to a page that is only scaffold', () => {
+    renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
+    for (const label of ['Roles', 'People']) {
+      const item = screen.getByText(label).closest('.sidebar-item');
+      expect(item?.getAttribute('aria-disabled')).toBe('true');
+      expect(item?.tagName).not.toBe('A');
+    }
   });
 
   it('explains itself on hover — a greyed item with no reason is a broken link', () => {

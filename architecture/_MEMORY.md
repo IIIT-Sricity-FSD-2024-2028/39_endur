@@ -648,6 +648,18 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     lib/tree.ts is new and is NOT lib/units.ts: N-045.
                                     <ScoreBadge> is catalogued and deliberately unbuilt,
                                     CONF-016.
+41-PAGE-settings.md              -> src/frontend/pages/console/Settings.tsx
+                                    reads/writes go through lib/org.ts (useOrg,
+                                    useUpdateOrg, useUpdateLabels); the server side is
+                                    features/org/**, owned by 31. NOT a folder — the
+                                    cut-list keeps one card and a folder would promise
+                                    more than is there.
+                                    THE WORDS CARD IS <WordsEditor>, owned by 24, shared
+                                    with wizard step 4. Do not fork it; read N-052.
+                                    The #words anchor is a contract with <VocabularyChips>,
+                                    which links it from every console page (41 § Route).
+                                    Billing, danger zone and logo are the cut-list, not an
+                                    oversight — design_specs/design/11 §1.
 46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/** lib/home.ts
                                     + src/backend/features/home/**
                                     THE FIRST SCREEN AFTER SIGN-IN and the one the org
@@ -1312,4 +1324,127 @@ N-049  17 MESSAGE SITES, AND THE UI RENDERS THEM VERBATIM. N-044 wrote the brief
        something to invent now. Whoever builds T-033 owns it.
        AND ONE TEST WAS PINNING THE BUG: units.test.ts asserted /1 unit/. The message said
        "unit" because the code hardcoded it, and the test agreed with it.
+
+N-050  A COOKIE THAT OUTLIVES ITS PARTNER IS A PERMANENT OUTAGE, NOT A FLAKE. The first
+       walkthrough of the running app (21 Aug) kept hitting "Your session token was missing
+       or invalid. Reload and try again." It was not intermittent. `endur.csrf` was set with
+       no maxAge — a browser-session cookie — beside a session cookie with seven days, so
+       closing the browser dropped one and kept the other. You came back signed in, with no
+       CSRF token, and EVERY mutation failed. Forever.
+       The message named the one remedy that could not work: a reload issues only GETs, and
+       `issueCsrfToken` had exactly three callers — GET /auth/csrf, register and login. The
+       SPA never called /auth/csrf (grep src/frontend: nothing). Sign out and back in was the
+       only way out, which is not a thing a reader would guess.
+       T-047 fixed both halves. The cookie now carries SESSION_TTL_DAYS, and csrfProtection
+       re-issues it on any safe method when the principal is a cookie user — so the boot
+       GET /auth/me heals it and "reload and try again" became true. An EXISTING token is
+       re-set rather than rotated, which slides the expiry in step with the rolling session
+       without invalidating a mutation already in flight holding the old value.
+       Issuing on a GET is not a hole: double-submit rests on an attacker being unable to
+       READ the cookie cross-origin, and a fresh random token they cannot see is worth
+       nothing to them.
+       THE GENERAL RULE: two cookies that must be present together must expire together.
+       Anything that pairs a readable token with an httpOnly session has this bug available
+       to it. 201 backend tests and 618 frontend ones were green while it was live, because
+       every one of them starts a fresh agent — nothing in the suite ever REOPENED anything.
+
+N-051  A DISABLED ITEM IS AN ANSWER; A STUB PAGE IS AN APOLOGY. The same walkthrough found
+       Roles, People and Settings as live sidebar links onto "Not built yet", plus /app/profile
+       from the top bar and person links from the structure panel and the subjects table.
+       router/index.tsx states the rule in its own header — "a stub page behind a dead link is
+       worse than a disabled item" — and the code did not break it: the rule was written for
+       P3 and nobody extended it to the P2-after-M0 routes. The mechanism already existed and
+       was in use three times.
+       Extending it was mechanical. What was NOT mechanical: /app/settings turned out not to
+       be post-M0 at all. 41 § Route & access has <VocabularyChips> linking `#words` from
+       EVERY console page, and design_specs/design/11 §1 keeps the Words card while cutting
+       the rest of that screen. So the most-linked destination in the console was scaffold,
+       and PROGRESS.md said "no placeholder is behind an M0 path" in good faith because
+       nobody had followed a link out of a component into a cut-list. T-046 built it.
+       WHEN A PAGE IS DISABLED, THE LINKS INTO IT ARE PART OF THE JOB. Greying the sidebar
+       item is the visible half; the structure panel, the subjects table and the user menu
+       all pointed at the same unbuilt pages and would have kept doing it.
+
+N-052  BUILD THE SECOND PLACEMENT BY EXTRACTING, NOT BY COPYING. 41 asks for "the same five
+       fields and the same live preview as wizard step 4", which is only true if it is the
+       same component. <WordsEditor> came out of WordsStep whole; the step kept its title and
+       lede and nothing else. Same rule as <UnitTree> (INV-009), and the same reason: the
+       preview is the product claim rendered live, and a second copy of it would eventually
+       disagree with the first about what saving does.
+       Like <UnitTree>, it does not call useLabels(). The wizard edits an unsaved draft and
+       settings edits the saved org; a component that reached for the store would render the
+       wrong one of the two.
+       ONE THING THE SERVER DOES NOT STORE AND SHOULD NOT: which plurals are overridden.
+       A saved plural that differs from derivePlural(singular) IS the override — that is what
+       makes the hotel's "Staff / Staff" survive a reload instead of quietly becoming
+       "Staffs" the next time somebody edits the singular.
+
+N-053  THE TESTS HAD BEEN WRITING TO THE DEVELOPMENT DATABASE FOR THREE DAYS. D-004, repaid
+       21 Aug. 209 integration tests register organisations and submit responses, and they did
+       it in `endur`. By the time it was fixed there were 2,880 organisations in there, the
+       demo seed had been pushed out once already (19 Aug — the advertised logins stopped
+       working), and one run had failed because uniqueSlug() exhausted twenty variants of a
+       name a test reused.
+       vitest.config.ts now has globalSetup (create endur_test if absent, `prisma migrate
+       deploy`) and setupFiles (point the worker at it). THE ORDERING IS THE MECHANISM:
+       lib/config.ts parses DATABASE_URL at module load, and process.loadEnvFile() does NOT
+       overwrite an already-set variable, so a value assigned in setupFiles wins over .env for
+       the whole worker. Verified that behaviour before relying on it.
+       TWO GUARDS, AND THE SECOND ONE IS THE SUBTLE PART. The name must end in `_test`, and it
+       must not be the DATABASE_URL written in .env. Rule 2 reads the FILE rather than
+       process.env, because once globalSetup has switched the process the two are legitimately
+       equal — the first version of this refused to run for the exact reason everything was
+       correct. Same trap in derive(): a second call in a switched process produced
+       `endur_test_test`, which fails at connect with a message about a missing database
+       rather than about the double derivation. It is idempotent now, and a test says so.
+       WRITE THE TEST FOR THE GUARD. test/test-database.test.ts asserts both rules by their
+       FAILURE and found the derive() bug on the first run. A guard that never refuses
+       anything is not a guard, and this one decides what 209 tests may truncate.
+       STILL TRUE AFTER THE FIX: `endur` holds 2,880 organisations. The leak is closed, the
+       puddle is not mopped — `npm run db:reset` does that and is the user's call, because it
+       also drops anything they created by hand while clicking around.
+
+N-054  A RETRY THAT SCANS TURNS ONE COLLISION INTO A QUEUE. D-006, repaid 21 Aug (T-049).
+       uniqueSlug() cannot move inside register's transaction — it reads COMMITTED rows and a
+       transaction cannot see what it is racing — so the fix is to catch the P2002 and try
+       again. The first version retried by re-running the sequential scan, and one contender
+       still got a 500: six requests all re-read, all found `acme-2` free, five collided again.
+       Sequential retry needs as many attempts as there are contenders.
+       A retry now takes a RANDOM suffix instead, and the field spreads out in one round
+       however many are racing. The uncontended path still scans, so the ordinary case —
+       registering "Acme" next week when `acme` exists — still gets the readable `acme-2`, and
+       that path is not racing anything.
+       IT DOES NOT READ FIRST ON THE RETRY PATH, DELIBERATELY. Under contention that read is
+       exactly the thing that lies. The unique index plus the retry loop are a better guard
+       than a SELECT already proven stale.
+       ONLY A P2002 ON `slug` IS RETRIED. Retrying a genuine conflict would fail five times
+       more slowly and hide what happened.
+       AND THE TEST INVERTED, WHICH IS CORRECT. register-rollback.test.ts was built on the
+       collision producing a 500; now every contender succeeds on a distinct slug. The rollback
+       property is still tested — by every retry, since a failed attempt that left half an
+       organisation behind would show as an org count exceeding the number of winners. The six
+       DISTINCT SLUGS are what prove the retry ran: all six derive the same base before any
+       commits, so six slugs can only mean five collisions were caught.
+
+N-055  FIRE-AND-FORGET AFTER THE RESPONSE IS A RACE WITH THE CLIENT. Found 21 Aug while
+       checking T-049 for flakiness, in middleware/idempotency.ts — not in anything that task
+       touched.
+       The Idempotency-Key row was written with `void prisma…create()` INSIDE the res.json
+       wrapper, so the response went out first. A retry arriving in that gap missed the read,
+       ran the handler again, and created a SECOND response — the exact duplicate the
+       middleware exists to prevent, on the respondent submit path, which is the one a phone
+       takes in front of the evaluator. The code even said the loser's "response is identical
+       anyway because it ran the same handler on the same input", which is false when the
+       handler CREATES something: the second response has a different id.
+       Now the row is committed before the body is sent. One indexed insert of latency.
+       IT WAS ONLY EVER VISIBLE AS AN INTERMITTENT TEST FAILURE, and it appeared the day the
+       suite moved to a small fast test database (D-004) — the same work in less time widened
+       the window relative to it. A flaky test is a bug report you have not read yet. This one
+       had been sitting in the suite since T-022, passing.
+       WHAT IS LEFT IS D-011, and it is the harder half: two genuinely concurrent requests can
+       both miss the read, which is the REAL flaky-network case where the client never got the
+       first response. The unique index still allows only one key row, but both handlers ran.
+       Closing it means RESERVING the key before the handler instead of writing it after, which
+       introduces an in-flight case that has to answer something — 409, or wait-and-replay.
+       Not invented under time pressure five days from a graded demo.
 ```

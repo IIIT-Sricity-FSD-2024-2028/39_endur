@@ -2,16 +2,63 @@
 // Owner role, the founder's user + person node, their position, the membership edge, and
 // the level-1 grants. Partially-created orgs are the worst possible failure here — a user
 // who exists but cannot see anything, with no way to retry because their email is taken.
+import { randomBytes } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/client.js';
 import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, presetFor } from '../../presets/index.js';
 import { ConflictError } from '../../lib/errors.js';
 import type { RegisterBody } from '@endur/shared';
 
-export async function register(input: RegisterBody) {
-  const passwordHash = await hashPassword(input.password);
-  const slug = await uniqueSlug(input.orgName);
+/**
+ * D-006. `uniqueSlug()` cannot run inside the transaction — it reads COMMITTED rows, and a
+ * transaction cannot see the ones it is racing. So two people naming their organisation the
+ * same thing in the same second both read "that slug is free", and the loser collides on the
+ * unique index.
+ *
+ * The collision is correct and the rollback is correct; the 500 was not. A slug is derived
+ * from a name the caller is allowed to reuse — it is not their mistake and not theirs to fix,
+ * so the fix is to take the next slug and try again rather than to hand them an error page.
+ *
+ * Five attempts, and the RETRY MUST NOT SCAN. Retrying the sequential search turns one
+ * collision into a queue: six contenders all re-read, all find `acme-2` free, and five collide
+ * again — the loser needs as many attempts as there are contenders, which is exactly how the
+ * first version of this failed. A retry takes a random suffix instead, so the field spreads out
+ * in one round however many are racing.
+ */
+const SLUG_ATTEMPTS = 5;
 
+export async function register(input: RegisterBody) {
+  // Hashed ONCE, outside the loop. Argon2 is ~100ms by design and a retry is not a reason
+  // to pay it again.
+  const passwordHash = await hashPassword(input.password);
+
+  for (let attempt = 1; ; attempt += 1) {
+    const slug = await uniqueSlug(input.orgName, attempt > 1);
+    try {
+      return await createOrganisation(input, passwordHash, slug);
+    } catch (error) {
+      if (attempt >= SLUG_ATTEMPTS || !isSlugCollision(error)) throw error;
+      // Nothing to clean up: the transaction rolled the whole attempt back, which is the
+      // property register-rollback.test.ts exists to prove.
+    }
+  }
+}
+
+/**
+ * A P2002 on `slug` and a P2002 on anything else are different events. Only this one is safe
+ * to retry — retrying a genuine conflict would just fail five times more slowly, and hide
+ * what actually happened.
+ */
+function isSlugCollision(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  const target = error.meta?.['target'];
+  // Postgres reports the constraint's columns as an array; other providers use a string.
+  if (Array.isArray(target)) return target.includes('slug');
+  return typeof target === 'string' && target.includes('slug');
+}
+
+function createOrganisation(input: RegisterBody, passwordHash: string, slug: string) {
   return prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({
       data: {
@@ -65,9 +112,25 @@ export async function register(input: RegisterBody) {
   });
 }
 
-async function uniqueSlug(name: string): Promise<string> {
+/**
+ * `contended` means the caller just lost a race for this name.
+ *
+ * The uncontended path scans in order, so the ordinary case — somebody registering "Acme"
+ * next week when `acme` already exists — still gets the readable `acme-2`. That path involves
+ * no race at all: the row it read is committed and is not going anywhere.
+ *
+ * The contended path deliberately does NOT read first. Under a race that read is precisely
+ * the thing that lies, and everyone who believes it picks the same answer. A random suffix is
+ * unguessable by the other contenders, which is what makes them spread out. It is not verified
+ * either — 16.7M values, and the unique index plus the retry loop are a better guard than a
+ * SELECT that was already proven to be stale.
+ */
+async function uniqueSlug(name: string, contended: boolean): Promise<string> {
   const base =
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'org';
+
+  if (contended) return `${base}-${randomBytes(3).toString('hex')}`;
+
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
     const taken = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });

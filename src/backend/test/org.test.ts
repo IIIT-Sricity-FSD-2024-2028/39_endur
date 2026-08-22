@@ -38,6 +38,12 @@ async function registerOrg(industry: string) {
   };
 }
 
+/** supertest types set-cookie loosely; every assertion below wants the raw header lines. */
+const setCookies = (res: { headers: Record<string, unknown> }): string[] => {
+  const raw = res.headers['set-cookie'];
+  return Array.isArray(raw) ? (raw as string[]) : [];
+};
+
 const post = (agent: Agent, path: string, token: string) =>
   agent.post(path).set('X-CSRF-Token', token);
 const patch = (agent: Agent, path: string, token: string) =>
@@ -346,5 +352,55 @@ describe('the guards are real', () => {
     const res = await session.agent.patch('/api/v1/org').send({ name: 'Renamed' });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('CSRF_FAILED');
+  });
+
+  // D-009. The CSRF cookie had no lifetime while the session cookie had seven days, so
+  // closing the browser left a signed-in caller with no token and no way back: the error
+  // says "reload", a reload is all GETs, and nothing but login re-issued the cookie.
+  it('gives the CSRF cookie a lifetime, so it does not die with the browser', async () => {
+    const agent = request.agent(app);
+    const res = await agent.post('/api/v1/auth/register').send({
+      email: `${unique('ttl')}@example.test`,
+      password: 'a-long-enough-password',
+      name: 'Founder',
+      orgName: `Test Org ${unique('n')}`,
+      industry: 'custom',
+    });
+    expect(res.status).toBe(201);
+
+    const csrfCookie = setCookies(res).find((c) => c.startsWith('endur.csrf='));
+    expect(csrfCookie).toBeDefined();
+    expect(csrfCookie).toMatch(/Max-Age=/i);
+  });
+
+  it('re-issues the CSRF cookie on a plain GET when only the session survived', async () => {
+    const agent = request.agent(app);
+    const res = await agent.post('/api/v1/auth/register').send({
+      email: `${unique('heal')}@example.test`,
+      password: 'a-long-enough-password',
+      name: 'Founder',
+      orgName: `Test Org ${unique('n')}`,
+      industry: 'custom',
+    });
+    expect(res.status).toBe(201);
+    const session = setCookies(res)
+      .map((c) => c.split(';')[0])
+      .find((c) => c.startsWith('endur.sid='));
+    expect(session).toBeDefined();
+
+    // Exactly what a reopened browser sends: the persistent session, and nothing else.
+    const reload = await request(app).get('/api/v1/auth/me').set('Cookie', session as string);
+    expect(reload.status).toBe(200);
+    const reissued = setCookies(reload).find((c) => c.startsWith('endur.csrf='));
+    expect(reissued).toBeDefined();
+
+    // And the token it hands back actually works, so "reload and try again" is now true.
+    const token = decodeURIComponent((reissued as string).split('=')[1].split(';')[0]);
+    const mutation = await request(app)
+      .patch('/api/v1/org/labels')
+      .set('Cookie', [session as string, `endur.csrf=${token}`])
+      .set('X-CSRF-Token', token)
+      .send({ labels: { subject: { one: 'Venue', many: 'Venues' } } });
+    expect(mutation.status).toBe(200);
   });
 });

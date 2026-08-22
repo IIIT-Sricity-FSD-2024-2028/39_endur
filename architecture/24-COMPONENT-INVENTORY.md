@@ -237,6 +237,30 @@ The most complex component in the product. Full interaction spec in
 role is a visibly dark column and an orphan capability is a visibly empty row — mistakes are
 *visible* rather than discoverable.
 
+### `<WordsEditor>`
+```ts
+{ labels: ResolvedLabels; overrides: LabelKey[];
+  onSetOne: (key: LabelKey, one: string) => void;
+  onSetMany: (key: LabelKey, many: string) => void;
+  onResetPlural: (key: LabelKey) => void; readOnly?: boolean }
+```
+The five vocabulary fields and the live preview, extracted from wizard step 4 at T-046 so
+`41` could have it too. `41` § Interactions requires *the same five fields and the same live
+preview as wizard step 4, so the pattern is learned once and there is one implementation* —
+which is only true if there is one component. Same rule as `<UnitTree>` (INV-009): the second
+placement extends, it does not fork.
+
+Like `<UnitTree>`, it never calls `useLabels()` itself. The wizard edits an unsaved draft and
+the settings page edits the saved org, and a component that reached for the store would
+render the wrong one of the two. The caller owns the state; this renders it and reports edits.
+
+`readOnly` covers `org.read` without `org.update`: the words render, the controls do not.
+Read-only rather than absent, because the vocabulary is what every other screen is speaking
+and hiding it would hide the explanation.
+
+The preview is a scaled, `pointer-events: none` render of the real sidebar shape rather than
+a picture of it — a separately-maintained preview eventually lies about what saving will do.
+
 ## 5. Form engine
 
 ### `<QuestionCard>`
@@ -440,7 +464,7 @@ may see, and the UI trusts it.
 
 | Track | Builds |
 |---|---|
-| **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, RoleRow, PersonChip, PowersGrid, ResponsiveTable |
+| **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersGrid, ResponsiveTable |
 | **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip, FileUpload |
 | **Shared** | EmptyState, Toast, ConfirmDialog — whoever needs one first, then announced |
 
@@ -452,6 +476,7 @@ builds a second shell.
 - [ ] Twenty-one components exist with the documented prop types
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
+- [ ] `<WordsEditor>` has exactly one implementation, used by wizard step 4 and by `41`
 - [x] `<QuestionInput>` is shared by the preview and the live respondent form (INV-008) —
       closed at T-039, and asserted by an import-graph walk (`pages/respond/bundle.test.ts`)
       rather than by reading the imports

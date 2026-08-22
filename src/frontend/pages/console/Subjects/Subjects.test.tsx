@@ -110,7 +110,9 @@ describe('the vocabulary showcase (INV-001)', () => {
     mount();
     const row = screen.getByDisplayValue('Data Structures').closest('tr');
     expect(within(row as HTMLElement).getByText('612')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Vikram Shah' })).toBeTruthy();
+    // Text, not a link — same call as the structure panel, for the same reason.
+    expect(screen.getByText('Vikram Shah')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Vikram Shah' })).toBeNull();
   });
 });
 

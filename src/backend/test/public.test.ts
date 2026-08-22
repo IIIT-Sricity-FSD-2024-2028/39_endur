@@ -275,6 +275,27 @@ describe('POST /public/campaigns/:token/responses', () => {
     expect(await prisma.response.count({ where: { campaignId } })).toBe(before + 1);
   });
 
+  // The ordering the test above depends on, asserted directly instead of by timing. The row
+  // used to be written fire-and-forget AFTER the response went out, so a retry arriving in
+  // that gap missed it, ran the handler again and created a second response — the exact
+  // duplicate this middleware exists to prevent. It failed intermittently, which is the worst
+  // way to own a bug on the one path a phone takes.
+  it('has committed the key before the caller is told the submission worked', async () => {
+    const key = `commit-${Date.now()}`;
+    const answers = await answersFor();
+
+    const res = await stranger()
+      .post(`/api/v1/public/campaigns/${token}/responses`)
+      .set('Idempotency-Key', key)
+      .send({ answers });
+    expect(res.status).toBe(201);
+
+    // No waiting, no polling: by the time the response is in hand, the row is readable.
+    const row = await prisma.idempotencyKey.findFirst({ where: { key } });
+    expect(row).not.toBeNull();
+    expect(row?.status).toBe(201);
+  });
+
   it('refuses a submission to a closed campaign, with the same 404 as a bad token', async () => {
     const other = await setUpOrg();
     const closed = await launchedCampaign(other);

@@ -342,9 +342,12 @@ describe('the detail panel', () => {
     fireEvent.click(rowFor('Engineering'));
 
     const panel = screen.getByRole('complementary', { name: 'Engineering details' });
-    expect(within(panel).getByRole('link', { name: 'Meera Iyer' })).toBeTruthy();
+    // Names, not links, until /app/people is built — a link to "Not built yet" reads as a
+    // broken product (design_specs/design/02 §7). Restore both links with the page.
+    expect(within(panel).getByText('Meera Iyer')).toBeTruthy();
+    expect(within(panel).queryByRole('link', { name: 'Meera Iyer' })).toBeNull();
     expect(within(panel).getByText('Head')).toBeTruthy();
-    expect(within(panel).getByRole('link', { name: 'View all 4 people →' })).toBeTruthy();
+    expect(within(panel).getByText('4 people here in total.')).toBeTruthy();
   });
 
   it('starts a move from the panel, for a reader with no hover', async () => {
