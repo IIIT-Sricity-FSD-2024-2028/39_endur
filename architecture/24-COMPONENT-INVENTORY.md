@@ -367,7 +367,9 @@ Completed steps are clickable; future ones are not.
 ### `<ShareSheet>`
 ```ts
 { url: string; campaignName: string; status: CampaignStatus;
-  endsAt?: string | null; anonymous?: boolean; onClose: () => void }
+  endsAt?: string | null; anonymous?: boolean;
+  access?: CampaignAccess;                    // 'public' | 'organization' — DEC-037
+  onClose: () => void }
 ```
 QR canvas, short URL, three actions, presentation mode. Built at T-038.
 
@@ -385,6 +387,11 @@ decides whether the sheet says the campaign is collecting or has closed — a sh
 single failure that ends the demo, so the sheet checks its own URL and says so in place
 rather than leaving it to a checklist. That is `OPEN-002`'s operational half made visible; the
 value itself is still the team's to set.
+
+`access` (added with DEC-037) changes one line of the footer and nothing else about the
+sheet: an `organization` campaign says *"Only people in {org} can answer — they'll be asked
+to sign in"*. Somebody scanning a restricted code and hitting a sign-in wall with no warning
+is a support ticket, and the person handing the link out is the one who can prevent it.
 
 ### `<FileUpload>`
 ```ts
@@ -507,6 +514,77 @@ instead of amounts and no currency prop, because there is no currency.
 Uses the same chart primitives as `<StackedBar>` and `<BarRow>`; it is a third placement of
 that machinery, not a second charting approach.
 
+## 6c. Trust, accounts and diagnostics
+
+Four components added 2026-08-23 with `56`, `57`, `58` and `72`. `<LogViewer>` is
+internal-only; the other three are customer-facing.
+
+### `<DecisionTrace>`
+```ts
+{ decision: Decision; compact?: boolean }
+```
+Renders a resolver `Decision` (`11` § The decision trace) as readable prose: what was asked,
+what answered, and — when `compact` is false — the `considered` list with each grant's
+`rejectedBecause`.
+
+**Two placements, one implementation, and that is the whole reason it is an inventory entry.**
+`42`'s simulator and `56`'s activity log are the same question asked at different times —
+*would this be allowed* and *why was this allowed* — and a forked renderer would eventually
+have them describe the same trace two different ways, which is precisely the credibility the
+trace exists to buy (`53`).
+
+`compact` is the row-level form used in the activity log's table; expanding a row swaps it for
+the full one. **`considered` is absent from a production 403 body** (`11` §10) so the compact
+form must render correctly without it, not merely tolerate it.
+
+### `<InviteLink>`
+```ts
+{ url: string; expiresAt: string;
+  onRegenerate?: (() => Promise<void>) | undefined; label: string }
+```
+A one-time credential shown once: the URL in a read-only field, a copy button that confirms in
+place, the expiry in words, and an unmissable statement that it will not be shown again.
+
+Used by `57` for account activation and reserved for `45`'s API keys, which have the identical
+shape-and-shown-once problem. **No `onDismiss` that hides it silently** — the dialog closes
+only through an explicit action, because a credential the administrator never copied is a
+person who cannot sign in and a support call nobody can answer without regenerating.
+
+`onRegenerate` is optional and absent where re-issuing is a separate audited capability
+(`account.reset`); when absent the component shows no regenerate affordance rather than a
+disabled one.
+
+### `<ResponseCard>`
+```ts
+{ response: InboxResponse; read: boolean; archived: boolean;
+  onToggleRead: () => void; onArchive: () => void; subjectWord: string }
+```
+One free-text response in the inbox (`58`), following `design_specs/design/08` §8.3: score
+badge, the comment, the subject tag, and the read/unread state.
+
+**The analysis tags that mockup draws — sentiment, emotion, intent, topic — are not props
+here.** They need the Analyze layer, and a component with four props nothing can fill is a
+component that invites a stub. They arrive with `43` or not at all.
+
+`subjectWord` rather than a hardcoded noun (INV-001), passed in rather than read from
+`useLabels()` inside, matching `<UnitTree>`'s `subjectWord` for the same reason: a presentation
+component that reaches for a context is one that cannot be rendered in a test or a preview.
+
+### `<LogViewer>`
+```ts
+{ files: LogFileMeta[]; selected: string; lines: LogLine[];
+  filter: LogFilter; onSelect: (file: string) => void;
+  onFilter: (f: LogFilter) => void; loading?: boolean }
+```
+`72` only, and internal like `<GrowthChart>`. A file picker, a level/status/path filter, and a
+monospace pane of parsed JSON lines with the `requestId` clickable to filter to that one
+request — which is `18` §6's workflow made into a screen instead of a `grep` you have to
+remember.
+
+**It renders parsed fields into columns, never a raw blob.** A viewer that prints whatever is
+in the file would render a line that should never have been written as though it were fine;
+one that maps known fields makes an unexpected key visible as an unexpected key.
+
 ## 7. Patterns
 
 **Inline rename** — a real component since T-032: `<InlineName>` in `components/org/`.
@@ -531,20 +609,41 @@ making them derived is what keeps setup at ninety seconds.
 render. **Never filter in the component** (INV-003) — the API returns only what the caller
 may see, and the UI trusts it.
 
+**`<AccessNotice>` — say what the promise is, on the screen where it is made.** A one-line
+notice above the submit button of every respondent form, generated from the campaign's
+`anonymous` and `access` pair (DEC-037). Four combinations, **three sentences and one
+deliberate silence**, and it is a *pattern* rather than an inventory entry because it is one
+function returning one string, lives beside `39`'s `copy.ts`, and must not import anything
+the respondent bundle does not already carry (`20` §8, `N-040`).
+
+**"Four sentences" is what this line said until `T-070` built it, and the fourth is not
+writable.** The silent pair is `!anonymous` on an open link: no source gives copy for it, and
+both things the page could invent are wrong — a promise it cannot keep, or a warning about a
+linkage the schema does not make. `copy.ts`'s `anonymityLine` had already reached the same
+conclusion on the `anonymous` half alone; `access` did not change it. The silence is asserted
+by a test rather than left as an absence, so an omission stays distinguishable from a
+decision.
+
+It is listed here because getting it wrong is a privacy failure rather than a copy failure:
+an `organization` campaign checks who you are at the door, and a respondent who is not told
+that has been misled about the one thing `52` promises them.
+
 ## 8. Ownership
 
 | Track | Builds |
 |---|---|
 | **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersGrid, ResponsiveTable |
 | **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip, FileUpload |
-| **Shared** | EmptyState, Toast, ConfirmDialog — whoever needs one first, then announced |
+| **Shared** | EmptyState, Toast, ConfirmDialog, DecisionTrace, InviteLink — whoever needs one first, then announced |
 
 Track B ships AppShell and PageHeader before starting the wizard, or track C is blocked or
 builds a second shell.
 
 ## 9. Acceptance
 
-- [ ] Twenty-six components exist with the documented prop types
+- [~] Thirty-one components exist with the documented prop types — twenty-six through
+      2026-08-23 morning, plus the `<AccessNotice>` pattern in §7 (`T-070`). `<DecisionTrace>`,
+      `<InviteLink>`, `<ResponseCard>` and `<LogViewer>` are still unbuilt
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
 - [ ] `<WordsEditor>` has exactly one implementation, used by wizard step 4 and by `41`
@@ -553,6 +652,10 @@ builds a second shell.
       rather than by reading the imports
 - [ ] `<ConfirmDialog>` cannot be rendered without a `consequence` — it is a required prop
 - [ ] `<TrendChip>` always renders an arrow
+- [ ] `<DecisionTrace>` has exactly one implementation, used by `42` and `56`
+- [ ] `<DecisionTrace compact>` renders correctly when `considered` is absent
+- [ ] `<ResponseCard>` has no prop that requires the Analyze layer
+- [ ] `<InviteLink>` cannot be dismissed without an explicit action
 - [ ] `<ResponsiveTable>` collapses correctly for all four tables at 390px
 - [ ] No component filters data for permission reasons
 - [ ] Every component is keyboard operable with a visible focus ring

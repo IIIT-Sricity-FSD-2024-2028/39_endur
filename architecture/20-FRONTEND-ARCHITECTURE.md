@@ -72,6 +72,24 @@ RESPOND  (no auth, no shell)
 shows one line of what the screen will do. **Do not build a stub page behind them** — a dead
 link is worse than a disabled item.
 
+**An item whose page the caller cannot use is ABSENT, not empty.** `navItems.ts` gives each
+item a `needs` capability and hides it when the caller does not hold one —
+`design_specs/design/02` §5's rule, and it is usability rather than enforcement: `13` and
+INV-003 mean the API returns nothing either way.
+
+**Today that rule is only half true, and `D-027` is the gap.** `needs` names a bare
+capability, and `authz/held.ts` deliberately discards scope — a capability counts as held when
+*any* live allow exists. So `person.read: self`, the **universal** grant every role receives
+(`50` §1), satisfies `People`'s gate for every account in the product, and the page then
+renders exactly one row: the reader. `org.read: all` does the same for `Settings`, because it
+is seeded to all four levels so the vocabulary can load on first paint. What `needs` means is
+*"can act on the organisation"*; what it tests is *"holds this verb anywhere, at any scope"*,
+and those diverge precisely where a grant is `self`-scoped or seeded universally.
+
+`T-086` carries the scope to the client so a gate can say *"`person.read` **beyond `self`**"*;
+`T-087` applies it per tier. The per-tier shape is `OPEN-009` and the owner has to settle one
+cell of it. See `55` § Stage 8 for the table.
+
 React Router v6, `createBrowserRouter`. Each world is a layout route with its own error
 boundary, so a crash in the console cannot take down the respondent flow.
 

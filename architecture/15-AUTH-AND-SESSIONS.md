@@ -139,6 +139,38 @@ guarantee we give" is a better viva answer than a false one.
 Exactly two things: read the form for their token, and submit to it once. There is no
 respondent-facing anything else, and no respondent principal ever reaches the grant tables.
 
+### The authenticated respondent — DEC-037, and how narrow it is
+
+A campaign may be marked `access: 'organization'` (`38`), and then the token alone is not
+enough: the caller must also present a **staff session for that organisation**.
+
+This amends DEC-009 and does not overturn it, and the difference is worth being precise about,
+because "respondents never authenticate" was load-bearing and still is for every `public`
+campaign — which is the default, the demo path, and every seeded campaign today.
+
+| | |
+|---|---|
+| What is **not** created | A respondent account. A respondent cookie. A fourth principal kind. A new `Principal` variant in `11` §2 |
+| What is used instead | The `endur.sid` session the person already has as staff (§2). They are a `user` principal answering a form |
+| What is checked | **Membership only** — is this session's `orgId` the campaign's `orgId`. No grant is resolved; no capability is required; holding more powers buys nothing |
+| What is written | A `campaign_participants` row: *this member answered*. Never *what* |
+| What is **not** written | Anything on `responses`. That table still has no column that could identify a respondent, and INV-006 is untouched because it is a property of the schema (`10` §4.4) |
+
+**Membership is checked at the gate; identity is discarded at the door.** That sentence is the
+whole design, and it is what lets an organisation say *"only our people can answer"* without
+the product learning who said what.
+
+The honest cost, stated here as well as in `10` §4.4 and on the form itself: **participation
+stops being anonymous.** An administrator can see that Priya answered and Sam did not — exactly
+what `invitations` has always allowed for invited campaigns. `<AccessNotice>` (`24` §7) tells
+the respondent which of the two promises they are being given, because a respondent who
+believes the wrong one has been misled about the only thing `52` promises them.
+
+**The gate runs after token resolution, never before.** An invalid, unlaunched, closed or
+expired token produces the same `404` it always did (`13` §6); only a *valid* token can reach
+`401 SIGN_IN_REQUIRED`. So the existence oracle stays closed — the 401 discloses nothing the
+working token in the caller's hand did not already disclose.
+
 ---
 
 ## 4. API keys — P3
@@ -174,6 +206,36 @@ nobody can do anything, which looks exactly like a broken product.
 Deliberately **not** in P1: email verification, password reset, SSO. Each is real work with
 no demo value, and the graded surface this phase is the middleware chain. Password reset is
 the first thing to add in P2 — it is the first support request any real deployment generates.
+
+### Every other account is provisioned, not registered — DEC-038
+
+`POST /auth/register` is the **only** path that creates an organisation, and it creates exactly
+one account: the founder's. There is no second public way in. Everybody else gets an account
+because somebody inside the organisation provisioned one for them
+(`57-FEATURE-accounts-and-invites.md`):
+
+```
+POST /people/:id/account   ->  a one-time activation link, shown once, hashed at rest
+GET  /auth/activate/:token ->  whose link is this, and for which organisation
+POST /auth/activate/:token ->  set a password, activate, and land signed in
+```
+
+Three properties of that flow belong in this document rather than in `57`, because they are
+session properties:
+
+**Activation regenerates the session id**, exactly as login does. The fixation risk is
+identical and the mitigation must be too — this is a route that hands out a session, and every
+route that hands out a session gets the same treatment.
+
+**An administrator never knows a working credential.** They choose nothing about the password;
+they hand over a link. `34` has always said so and it survives DEC-038 unchanged — an
+administrator who can set a dean's password can sign in as the dean, and every audit row from
+that session would name the dean. The org chart would be intact and the audit log would be
+fiction, which is precisely what `56` exists to prevent.
+
+**Revocation is a delete.** `DELETE /people/:id/account` removes the account's `sessions` rows,
+so access ends on the next request rather than whenever a credential happens to expire. That is
+the concrete advantage §2 claims for cookie sessions, and this is the route that spends it.
 
 ---
 
@@ -222,6 +284,22 @@ Specified fully in `20-FRONTEND-ARCHITECTURE.md` §5; the contract:
 - [ ] `responses` cannot be joined to a person — verified by schema inspection, not by review
 - [ ] Registration is atomic: a forced failure at step 3 leaves no organisation behind
 - [ ] Two respondent submissions with the same idempotency key create one response
+- [x] An `organization` campaign is unreachable without a session and unreachable with a
+      session for another organisation — two assertions, and neither is satisfiable by the
+      other (`T-069`)
+- [x] A valid token on a restricted campaign returns `401 SIGN_IN_REQUIRED`; an **invalid**
+      token on the same campaign returns the same `404` as any other bad token — the gate runs
+      after resolution, and this is the test that proves the order. A **closed** restricted
+      campaign 404s a stranger too, which is the same rule from the other side
+- [x] An authenticated submission writes no identifying column on `responses` — the same
+      schema assertion as above, run against the authenticated path. **It was `audit_log`,
+      not `responses`, that nearly carried the name** (`DEC-045`, `D-022`): the promise is
+      kept by two tables, so it can be broken by either
+- [ ] Activation regenerates the session id (fixation test, on `/auth/activate` too)
+- [ ] Activating an expired, used or unknown token returns identical responses
+- [ ] Revoking an account ends its live sessions on the next request
+- [ ] No route anywhere lets one user set another user's password — asserted by route
+      enumeration (`12` §7), not by reading handlers
 
 ## 9. Out of scope
 

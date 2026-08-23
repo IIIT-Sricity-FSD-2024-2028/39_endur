@@ -8,6 +8,7 @@
 //      probe must not be able to tell them apart.
 import { resolveLabels } from '@endur/shared';
 import type {
+  CampaignAccess,
   LabelSet,
   PublicCampaign,
   QuestionConfig,
@@ -15,64 +16,29 @@ import type {
   SubmitResult,
 } from '@endur/shared';
 import type { Request } from 'express';
-import { prisma } from '../../db/client.js';
+import { Prisma } from '@prisma/client';
 import { runInTransaction } from '../../db/tx.js';
-import { NotFoundError, ValidationError } from '../../lib/errors.js';
-import { isAccepting } from '../campaigns/status.js';
+import { ConflictError, ValidationError } from '../../lib/errors.js';
+import { uniform404, type LiveCampaign } from './resolve.js';
 import { z } from 'zod';
 
 /**
- * One 404 for every reason a token might not work.
+ * The allowlist. Every key below is one somebody deliberately added; nothing arrives here
+ * because a row happened to carry it.
  *
- * Different messages here would turn this endpoint into an oracle: try a token, and the
- * wording tells you whether that campaign exists, whether it has launched, and whether it
- * has closed. Same object, thrown from every path.
+ * The campaign is already resolved and already gated (12 §4.10c) — this function does no
+ * lookup and makes no access decision. It maps.
  */
-const uniform404 = () => new NotFoundError('That link is not available.');
-
-export async function readPublicCampaign(token: string): Promise<PublicCampaign> {
-  const campaign = await prisma.campaign.findUnique({
-    where: { publicToken: token },
-    select: {
-      name: true,
-      anonymous: true,
-      publicToken: true,
-      closedAt: true,
-      startsAt: true,
-      endsAt: true,
-      org: { select: { name: true, labels: true } },
-      subjects: { select: { subject: { select: { id: true, name: true, archivedAt: true } } } },
-      template: {
-        select: {
-          estimatedSeconds: true,
-          questions: {
-            orderBy: { position: 'asc' },
-            select: {
-              id: true,
-              kind: true,
-              text: true,
-              config: true,
-              required: true,
-              position: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!campaign) throw uniform404();
-  // Scheduled, closed and expired all land here, and all leave as the same 404 an unknown
-  // token produces.
-  if (!isAccepting(campaign)) throw uniform404();
-
-  // The allowlist. Every key below is one somebody deliberately added; nothing arrives here
-  // because a row happened to carry it.
+export function readPublicCampaign(campaign: LiveCampaign): PublicCampaign {
   return {
     campaignName: campaign.name,
     organizationName: campaign.org.name,
     labels: resolveLabels(campaign.org.labels as LabelSet),
     anonymous: campaign.anonymous,
+    // Which of the two promises this form makes (52 §1). `<AccessNotice>` needs the PAIR:
+    // an `organization` campaign keeps "the answer is anonymous" and gives up "nobody knows
+    // you took part", and a respondent told the wrong one has been misled.
+    access: campaign.access as CampaignAccess,
     estimatedSeconds: campaign.template.estimatedSeconds,
     subjects: campaign.subjects
       .filter(({ subject }) => subject.archivedAt === null)
@@ -90,39 +56,47 @@ export async function readPublicCampaign(token: string): Promise<PublicCampaign>
 
 export async function submitResponse(
   req: Request,
-  token: string,
+  campaign: LiveCampaign,
   body: SubmitResponseBody,
+  /**
+   * The member behind an `organization` submission, from requireMembership, or null.
+   *
+   * It is passed IN rather than read from `req.ctx` here, so that the one place in the
+   * codebase that touches a respondent's identity is a named parameter somebody has to
+   * hand over on purpose. It reaches exactly one table, and that table has three columns.
+   */
+  memberId: string | null,
 ): Promise<SubmitResult> {
-  const campaign = await prisma.campaign.findUnique({
-    where: { publicToken: token },
-    select: {
-      id: true,
-      orgId: true,
-      publicToken: true,
-      closedAt: true,
-      startsAt: true,
-      endsAt: true,
-      subjects: { select: { subjectId: true } },
-      template: {
-        select: {
-          questions: {
-            select: { id: true, kind: true, config: true, required: true, text: true },
-          },
-        },
-      },
-    },
-  });
-
-  if (!campaign) throw uniform404();
-  if (!isAccepting(campaign)) throw uniform404();
-
-  const subjectId = resolveSubject(campaign.subjects.map((s) => s.subjectId), body.subjectId);
+  const subjectId = resolveSubject(
+    campaign.subjects.map(({ subject }) => subject.id),
+    body.subjectId,
+  );
   const answers = validateAnswersAgainstTemplate(campaign.template.questions, body.answers);
+  const restricted = campaign.access === 'organization';
 
   const count = await runInTransaction(req, async (tx) => {
+    if (restricted && memberId) {
+      // FIRST, so that a second submission aborts the transaction before a response row is
+      // written. The refusal comes from the PRIMARY KEY and not from a service read: a
+      // check-then-insert has a race, and this is the one table where losing that race
+      // means one person answering twice (10 §10).
+      await tx.campaignParticipant
+        .create({ data: { campaignId: campaign.id, userId: memberId } })
+        .catch((error: unknown) => {
+          if (isDuplicateParticipant(error)) {
+            throw new ConflictError('You have already responded to this one.');
+          }
+          throw error;
+        });
+    }
+
     // The row this writes has NO respondent column and never will (INV-006). It cannot
     // identify who answered because it has nothing to identify them with — anonymity is a
     // property of the schema, not a setting the application respects.
+    //
+    // THAT IS TRUE ON THIS PATH TOO, and this is the path where somebody would be tempted:
+    // `memberId` is in scope, right here, and it does not appear below. The participant row
+    // above says THAT they answered; this one says WHAT was said; nothing joins them.
     const response = await tx.response.create({
       data: {
         campaignId: campaign.id,
@@ -145,9 +119,13 @@ export async function submitResponse(
       })),
     });
 
-    // A respondent is not a principal, so there is no grant that decided this and no actor
-    // to record. The row still goes in: INV-007 is about every state change, and a
-    // submission is the most consequential one in the product.
+    // INV-007 covers every state change, and a submission is the most consequential one in
+    // the product — so the row goes in even though no principal is credited with it.
+    //
+    // `flushAudit` strips the actor AND the ip from this action for every principal kind
+    // (DEC-045). On an `organization` campaign the submitter IS a signed-in user, so the
+    // ordinary rule would have written their id and their address next to a response
+    // committed in the same transaction. Sort both by time, zip them, and INV-006 is gone.
     req.ctx.audit.push({
       action: 'response.submit',
       targetType: 'campaign',
@@ -160,6 +138,21 @@ export async function submitResponse(
   // The number the thank-you page shows. It has to agree with the results count, which is
   // why it is read inside the same transaction that wrote the row (39 § Acceptance).
   return { ok: true, responseCount: count };
+}
+
+/**
+ * A P2002 on `campaign_participants` is the one-per-member rule firing, and nothing else.
+ * Any other unique violation in that transaction is a real bug and must not be reported to
+ * a respondent as "you have already answered".
+ */
+function isDuplicateParticipant(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return false;
+  }
+  // Postgres reports the constraint's columns as an array; other providers use a string.
+  const target = error.meta?.['target'];
+  if (Array.isArray(target)) return target.includes('campaign_id') || target.includes('campaignId');
+  return typeof target === 'string' && target.includes('campaign');
 }
 
 /* ---------------------------------------------------------------- helpers */

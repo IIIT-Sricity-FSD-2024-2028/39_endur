@@ -230,3 +230,40 @@ describe('the sheet reports the campaign honestly', () => {
     expect(container.textContent).not.toMatch(/Respondent/);
   });
 });
+
+describe('a restricted link warns the person handing it out — DEC-037, 24 §6', () => {
+  it('replaces the line that would otherwise be FALSE', () => {
+    mount({ access: 'organization' });
+
+    // "Frimbles don't need an account" is true of an open link and a lie about a
+    // restricted one. Somebody scanning a restricted code and hitting a sign-in wall with
+    // no warning is a support ticket, and the person sharing the link is the only one who
+    // can prevent it.
+    expect(screen.queryByText(/don’t need an account/)).toBeNull();
+    expect(screen.getByText(/Only people in Northfield can answer/)).toBeTruthy();
+    expect(screen.getByText(/asked to sign in/)).toBeTruthy();
+  });
+
+  it('leaves an open link saying exactly what it said before', () => {
+    mount();
+    expect(screen.getByText(/Frimbles don’t need an account/)).toBeTruthy();
+    expect(screen.queryByText(/asked to sign in/)).toBeNull();
+  });
+
+  it('defaults to open when nothing is passed — every existing caller is unchanged', () => {
+    // The prop is optional on purpose: five call sites existed before it, and a sheet that
+    // warned about a restriction no campaign had would be worse than one that said nothing.
+    mount({ access: undefined });
+    expect(screen.getByText(/Frimbles don’t need an account/)).toBeTruthy();
+  });
+
+  it('changes ONE line and nothing else about the sheet', () => {
+    // 24 §6 is explicit that this is a footer line, not a mode. The QR, the URL and the
+    // three actions are what the demo depends on and none of them may move.
+    mount({ access: 'organization' });
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download QR' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Full' })).toBeTruthy();
+    expect(screen.getByText(URL_OK.replace(/^https:\/\//, ''))).toBeTruthy();
+  });
+});

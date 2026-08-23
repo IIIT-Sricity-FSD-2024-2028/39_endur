@@ -50,7 +50,50 @@ export const AudienceRule = z.discriminatedUnion('kind', [
              includeSubtree: z.boolean().default(true) }),
   z.object({ kind: z.literal('role'), roleId: z.string().uuid() }),
 ]);
+
+// DEC-037. A SECOND AXIS, and the toggle step 2 draws.
+export const CampaignAccess = z.enum(['public', 'organization']);
 ```
+
+### `access` and `audience_rule` are two different questions
+
+They look adjacent and they are not, and conflating them is the mistake this section exists to
+prevent. Adding an `access` *kind* to `AudienceRule` would have been the obvious move and it is
+wrong:
+
+| | `audience_rule` | `access` |
+|---|---|---|
+| Asks | Who is **expected** to answer | Who **gets in** |
+| Is | A denominator — it is what the response-rate card divides by (`46`, `40`) | A gate — it is what the public route enforces |
+| Enforced | Nowhere. It describes | On every request to `/public/campaigns/:token` |
+| Default | `anyone` | `public` |
+
+A campaign can perfectly well be *"open to anyone with the link, and we expect the 40 people in
+Housekeeping to answer"* — that is `access: 'public'` with a `unit` audience, and it is the
+most common shape in the seed. Folding them together would make that unsayable.
+
+| `access` | Behaviour |
+|---|---|
+| `public` | **The default and the demo path.** Token only. DEC-009 unchanged: no account, no cookie, nothing that identifies a person |
+| `organization` | The respondent must present a valid staff session **for this organisation** before the form renders. Anyone else gets `401 SIGN_IN_REQUIRED` or `403 NOT_A_MEMBER` (`13` §5) |
+
+**`access` is immutable once the campaign leaves draft**, by the same trigger and for the same
+reason as `anonymous` (`10` §4.3) — both are promises made at the moment the QR code was
+printed, and neither is one the product should be able to take back.
+
+### What `organization` costs and what it buys
+
+It buys the thing a college actually asks for: *"only our own people can answer this"*, without
+issuing a per-person invitation link to four hundred people.
+
+It costs one honest sentence on the form, because **participation stops being anonymous even
+though the response stays anonymous**. `campaign_participants` records that Priya answered and
+Sam did not, keyed `(campaign_id, user_id)` with no response reference — the same shape and the
+same guarantee `invitations` has always had (`10` §4.4). The primary key is what prevents a
+second submission; the absence of a third column is what keeps the answer anonymous.
+
+`<AccessNotice>` (`24` §7) says which of the two promises the respondent is being given. A
+narrower promise the product can keep beats a broader one it cannot.
 
 **Launch mints `public_token` and is irreversible.** It is idempotent by key (`13` §7) — a
 double-click on stage must not create two links, because the QR already on screen would then
@@ -105,8 +148,28 @@ live demo.
 real work.
 
 *What is being reviewed* — the subject picker, scope-filtered.
-*Who can respond* — the audience rule. **"Anyone with the link" is the default**, because it
-is the demo path and respondents never log in (DEC-009).
+*Who can respond* — **the access toggle**, and then the audience rule.
+
+The toggle is two options with one line of consequence each, in the shape people already know
+from Google Forms:
+
+```
+( • ) Anyone with the link            No sign-in. Nobody is recorded as having answered.
+(   ) Only people in {org name}       They sign in first. You'll see who answered — never
+                                      what they said.
+```
+
+**"Anyone with the link" is the default**, because it is the demo path and respondents never
+log in (DEC-009). Choosing the second is a deliberate act, and the second line of copy is not
+optional: it is the only place the administrator is told that participation becomes visible.
+
+Then the audience rule, which is a **description and a denominator, not a gate** — see the two
+axes above. It is the same control it has always been.
+
+Choosing `organization` changes one downstream thing worth knowing before it surprises someone
+on stage: **the response-rate card gets a real denominator** (`46`, `40`), because the audience
+is now a knowable set of accounts rather than an open link. That is the seed decision
+`PROGRESS.md` has been carrying — an `organization` campaign answers it for free.
 
 The **live audience count** recomputes on every change. It is the visible proof that the org
 graph is real and not decorative — a number that moves when you change a dropdown is worth
@@ -114,6 +177,10 @@ more than a paragraph claiming the hierarchy is wired up.
 
 **Step 3 · When.** Open and close datetimes, anonymity toggle with the honest one-liner, and a
 summary card restating everything in one sentence before the irreversible action.
+
+The summary card names **both** immutable choices, because launch is where they set: *"Anyone
+with the link · anonymous · open until 26 Aug"*. Neither can be changed afterwards, and a
+summary that mentions one and not the other teaches that only one is final.
 
 The primary button uses the org's own word: `Launch {campaign.one}` — never "Submit" or
 "Finish".
@@ -169,6 +236,7 @@ is what INV-007 exists to prevent, so that one is refused rather than merely def
 | Draft | Editable, no token, no reachable URL |
 | Scheduled | Locked, countdown shown, `Cancel schedule` available |
 | Open | Read-only except close; Share and Results available |
+| Open · `organization` | As above, plus a *"{n} of {m} people have answered"* line the open-link case cannot show, because it now has a denominator |
 | Closed | Read-only; Results available; Share shows the closed state |
 
 ## Acceptance
@@ -193,6 +261,22 @@ is what INV-007 exists to prevent, so that one is refused rather than merely def
 - [x] Presentation mode fills the screen and exits on `Esc` — and `Esc` leaves presentation
       before it closes the sheet, so one key never dumps the reader two screens back
 - [x] `anonymous` cannot change after launch — trigger test (T-004)
+- [x] `access` cannot change after launch — the same trigger, extended, not a second one
+      (`T-069`). The function was renamed with it: `endur_anonymous_is_immutable` was a lie
+      the moment it guarded two columns
+- [x] An `organization` campaign is unreachable without a session, and unreachable with a
+      session belonging to a different organisation — two separate assertions, and two
+      different codes: `401 SIGN_IN_REQUIRED` and `403 NOT_A_MEMBER`. A 401 to somebody
+      already signed in would tell them to do the one thing they have done
+- [x] The share sheet states the access mode; a restricted code does not surprise a scanner
+      (`T-070`). It **replaces** the footer line rather than adding one, because
+      *"{Respondents} don't need an account"* is a lie about a restricted campaign — a
+      warning that sits beside a falsehood is worse than either alone
+- [x] A member cannot answer an `organization` campaign twice — refused by the
+      `campaign_participants` primary key, not by a service check. The insert runs **first**
+      inside the transaction, so a duplicate aborts before a response row exists; the test
+      asserts the response count did not move
+- [x] `campaign_participants` cannot be joined to `responses` — asserted against the schema
 - [x] A campaign cannot be edited once open; the attempt returns 409 (T-021)
 - [x] The share sheet is reachable again from the campaign card, and from the detail page
 - [~] `PUBLIC_BASE_URL` is verified non-localhost before the demo — the product now checks

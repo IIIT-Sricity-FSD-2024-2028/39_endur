@@ -216,6 +216,33 @@ because the client is not trustworthy (INV-003 applies to input as well as autho
 | Enums come from shared consts, never inline literals in two places | One rename, one place |
 | Response DTOs carry an explicit `valence` on anything charted | CONF-004 — the client must never infer good/bad from a sign |
 
+## 8b. DTOs added 2026-08-23 — the four-ask pass
+
+Listed here rather than only in their feature docs, because `packages/shared/src/dto/` is a
+single namespace and two people adding files to it in parallel is exactly what `MAP` locks.
+
+| File | Exports | Spec |
+|---|---|---|
+| `dto/campaign.ts` (existing) | `CampaignAccess = z.enum(['public','organization'])`, added to `CreateCampaignBody` and refused by `UpdateCampaignBody` once launched | `38` |
+| `dto/account.ts` (new) | `ActivateAccountBody`, `AccountInvite`, `AccountStatus` | `57` |
+| `dto/audit.ts` (new) | `AuditQuery`, `AuditEntry` | `56` |
+| `dto/inbox.ts` (new) | `InboxQuery`, `InboxResponse` | `58` |
+| `dto/platform-logs.ts` (new) | `LogFileQuery`, `LogFileMeta`, `LogLine` | `72` |
+
+Three of these are worth a note because they are the kind of thing that goes subtly wrong:
+
+**`AccountStatus` is a discriminated union**, not `users.status` plus three nullable dates —
+same reasoning as §4's `AnswerValue`. The four states carry genuinely different fields, and a
+shape admitting `{ state: 'none', lastLoginAt: '...' }` is a shape every consumer has to
+defend against.
+
+**`AuditEntry` has no `ip` field, and that absence is a contract** (DEC-040, `56`). The column
+exists for staff forensics; the DTO is what stops it reaching a screen. A test asserts the key
+is absent rather than merely unset.
+
+**`InboxQuery.state` defaults to `unread`**, not `all`. It is a queue; opening it on
+everything makes it a second results page (`58`).
+
 ## 9. Acceptance
 
 - [ ] Every route in `13-API-CONTRACT.md` has a DTO in `packages/shared/src/dto`

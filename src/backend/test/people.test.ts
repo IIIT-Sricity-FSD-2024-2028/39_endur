@@ -98,6 +98,47 @@ describe('POST /people', () => {
     // An account nobody has activated must not be sign-in-able.
     expect(user.passwordHash).toBeNull();
   });
+
+  // D-026 — THE DEADLOCK, as a test. Found while building T-072, and it was live in
+  // shipped code: `POST /people` creates a person and no position (14 §8 requires that),
+  // so the person it returned had no unit, matched no unit-scoped caller, and disappeared.
+  // The founder of a brand-new organisation could create somebody and then not see them,
+  // open them, or give them a position — every route that could do so had first to see
+  // them. Before the fix this was 201, then a list that did not contain them and a 404.
+  it('can still see somebody it just created, who has no position yet', async () => {
+    const founder = await setUpOrg();
+    const created = await withCsrf(founder, 'post', '/api/v1/people').send({
+      name: 'Fresh Person',
+      email: `fresh-${Date.now()}@example.test`,
+    });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    // The founder holds `person.read: subtree` at the root — NOT `all`. That is the
+    // ordinary shape, and it is the shape the hole was invisible in.
+    const list = await founder.agent.get('/api/v1/people');
+    expect((list.body.data as Array<{ id: string }>).map((row) => row.id)).toContain(id);
+    expect(await founder.agent.get(`/api/v1/people/${id}`)).toMatchObject({ status: 200 });
+  });
+
+  // The other half of the same rule: unanchored is not a back door into other people. A
+  // person WITH a position outside the caller's reach is still invisible.
+  it('does not make somebody in another section visible along with them', async () => {
+    const founder = await setUpOrg();
+    const head = await addStaff(founder.orgId, { name: 'Head', level: 2, unitName: 'Section A' });
+    const outsider = await addStaff(founder.orgId, { name: 'Outsider', level: 3, unitName: 'Section B' });
+
+    const list = await head.agent.get('/api/v1/people');
+    const names = (list.body.data as Array<{ name: string }>).map((row) => row.name);
+    expect(names).toContain('Head');
+    expect(names).not.toContain('Outsider');
+
+    const person = await prisma.node.findFirstOrThrow({
+      where: { orgId: founder.orgId, kind: 'person', userId: outsider.userId },
+      select: { id: true },
+    });
+    const detail = await head.agent.get(`/api/v1/people/${person.id}`);
+    expect(detail.status).toBe(404);
+  });
 });
 
 describe('POST /people/:id/assignments — the two-hat case', () => {

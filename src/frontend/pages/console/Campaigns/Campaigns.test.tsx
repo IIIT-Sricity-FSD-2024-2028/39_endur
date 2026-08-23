@@ -17,7 +17,7 @@ vi.mock('qrcode', () => ({
 
 const summary = (over: Partial<CampaignSummary> & { id: string; name: string }): CampaignSummary => ({
   status: 'open', templateId: 't1', templateName: 'Mid-term form',
-  subjectCount: 12, responseCount: 612, anonymous: true,
+  subjectCount: 12, responseCount: 612, anonymous: true, access: 'public',
   startsAt: '2026-08-11T09:00:00.000Z', endsAt: '2026-08-26T23:59:00.000Z', closedAt: null,
   publicToken: 'K4M9X2PQ', url: 'https://feedback.example.test/r/K4M9X2PQ',
   createdAt: '2026-08-01T00:00:00.000Z', ...over,

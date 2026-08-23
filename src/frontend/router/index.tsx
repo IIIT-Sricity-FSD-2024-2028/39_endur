@@ -25,7 +25,7 @@ const Home = lazy(() => import('../pages/console/Home/index.js'));
 const Setup = lazy(() => import('../pages/console/Setup/index.js'));
 const Structure = lazy(() => import('../pages/console/Structure/index.js'));
 const Roles = lazy(() => import('../pages/console/Roles.js'));
-const People = lazy(() => import('../pages/console/People.js'));
+const People = lazy(() => import('../pages/console/People/index.js'));
 const PersonDetail = lazy(() => import('../pages/console/PersonDetail.js'));
 const Subjects = lazy(() => import('../pages/console/Subjects/index.js'));
 const SubjectDetail = lazy(() => import('../pages/console/Subjects/Detail.js'));

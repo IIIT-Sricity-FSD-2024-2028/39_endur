@@ -1,6 +1,6 @@
 # 33 — Roles and the powers grid
 
-Phase: P2 · Milestone: — · Design ref: `design_specs/design/04` §4.3, `design_specs/customization.md` §9 screens 1, 3–8
+Phase: P2 · Milestone: — · Invariants: INV-004, **INV-012** · Design ref: `design_specs/design/04` §4.3, `design_specs/customization.md` §9 screens 1, 3–8
 
 ## Purpose
 
@@ -133,6 +133,24 @@ product overrides the administrator's intent.
 Likewise, removing `grant.update` from your own only role prompts explicitly:
 *"You will not be able to edit powers after this."*
 
+## The escalation bound — INV-012, and it generalises the lockout guard
+
+**A save that would raise a role above what the saver holds is refused** (`11` §5b, DEC-039).
+Editing a role's row raises everyone holding it, so this screen is the highest-leverage place
+in the product to hand out a power you do not have.
+
+The lockout guard above is the same idea in one specific case — *do not let this save produce
+an organisation nobody can administer* — and INV-012 is the general form: *do not let this save
+produce an actor more powerful than you*. They stay separate rules because they fail
+differently: the lockout guard protects the org from the administrator, and the escalation
+bound protects the org from a delegate.
+
+Refusal is `403 WOULD_ESCALATE` naming the capability and the cell, so the grid can highlight
+it. **The cell is not pre-disabled**, unlike an out-of-scope row: which cells would escalate
+depends on the whole submitted matrix, not on any one cell, and greying half a grid on the
+strength of a guess teaches the wrong model of a system whose whole claim is that it explains
+its refusals.
+
 ## States
 
 | State | Behaviour |
@@ -142,6 +160,7 @@ Likewise, removing `grant.update` from your own only role prompts explicitly:
 | Error | Save failure keeps the working copy and shows one line above the grid |
 | 403 | Roles tab renders read-only without `grant.update`; the grid renders with cells non-interactive and a one-line explanation |
 | Conflict | `409` on lockout, with the specific reason |
+| Would escalate | `403 WOULD_ESCALATE`, the offending cell highlighted and named. Never pre-disabled — see above |
 
 ## Acceptance
 

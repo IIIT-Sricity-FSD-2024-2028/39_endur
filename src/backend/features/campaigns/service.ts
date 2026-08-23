@@ -1,4 +1,5 @@
 // Campaigns. 13 § Campaigns, 38, DEC-016, DEC-017.
+import { CampaignAccess } from '@endur/shared';
 import type {
   AudiencePreview,
   CampaignDetail,
@@ -121,6 +122,9 @@ export async function createCampaign(
         name: body.name,
         audienceRule: body.audience,
         anonymous: body.anonymous,
+        // Two axes, written together. `audienceRule` is the denominator the response-rate
+        // card divides by; `access` is the gate the public route enforces (38, DEC-037).
+        access: body.access,
         ...(body.startsAt ? { startsAt: body.startsAt } : {}),
         ...(body.endsAt ? { endsAt: body.endsAt } : {}),
         createdById: userId,
@@ -166,6 +170,9 @@ export async function updateCampaign(
         ...(body.startsAt !== undefined ? { startsAt: body.startsAt } : {}),
         ...(body.endsAt !== undefined ? { endsAt: body.endsAt } : {}),
         ...(body.anonymous !== undefined ? { anonymous: body.anonymous } : {}),
+        // Draft only, like everything else here — the status check above already refused a
+        // launched campaign, and the trigger refuses this column even if it had not.
+        ...(body.access !== undefined ? { access: body.access } : {}),
       },
     });
     if (body.subjectIds) {
@@ -351,6 +358,7 @@ const campaignSelect = {
   templateId: true,
   audienceRule: true,
   anonymous: true,
+  access: true,
   startsAt: true,
   endsAt: true,
   closedAt: true,
@@ -371,6 +379,7 @@ type CampaignRow = {
   templateId: string;
   audienceRule: unknown;
   anonymous: boolean;
+  access: string;
   startsAt: Date | null;
   endsAt: Date | null;
   closedAt: Date | null;
@@ -394,6 +403,10 @@ function toSummary(campaign: CampaignRow): CampaignSummary {
     subjectCount: campaign.subjects.length,
     responseCount: campaign._count.responses,
     anonymous: campaign.anonymous,
+    // Through the parser rather than a bare cast: the column is TEXT with a CHECK, and a
+    // row written outside the API (a seed, a migration) should not be able to put an
+    // unknown mode in front of a client switching on it.
+    access: CampaignAccess.catch('public').parse(campaign.access),
     startsAt: campaign.startsAt?.toISOString() ?? null,
     endsAt: campaign.endsAt?.toISOString() ?? null,
     closedAt: campaign.closedAt?.toISOString() ?? null,

@@ -47,6 +47,8 @@ per endpoint and eventually got wrong.
 ┌─ per-route ─────────────────────────────────────────────────────────────┐
 │  9  validate(Dto)      zod over body/query/params → typed req.data       │
 │ 10  requireCapability  the GRANT resolver         → req.ctx.decision     │
+│ 10b requireNoEscalation you cannot hand out what you do not hold (INV-012)│
+│ 10c requireMembership  respondent gate on organization-access campaigns  │
 │ 11  requireEntitlement subscription tier gate                            │
 │ 12  rateLimit(scoped)  tighter bucket for expensive or abusable routes   │
 │ 13  idempotency        only where a double POST would be harmful         │
@@ -322,6 +324,70 @@ principal's **scope set** — the unit ids their grants cover — and filters th
 The API returns only what the caller may see, and the UI never filters for permission reasons
 (INV-003). Out-of-scope rows are absent, not greyed.
 
+### 10b · `requireNoEscalation` — the second half of the guard, added 2026-08-23
+
+`requireCapability` answers *may this person act on this target*. It does **not** answer *may
+this person create an actor more powerful than themselves*, and until DEC-039 nothing did —
+a caller holding only `assignment.create` could assign the Owner role and hold the
+organisation an hour later, with every check passing (`11` §5b).
+
+```ts
+requireNoEscalation({ person: 'params.id', role: 'data.body.roleId',
+                      unit: 'data.body.unitId' })
+```
+
+**It is a middleware and not a service check, and that is not a stylistic choice.** INV-003
+says authorisation is decided in middleware, never inside a handler — and *"may you hand this
+power out"* is an authorisation decision. Putting it in `people/service.ts` would have made it
+the one authorisation rule in the product you cannot see by reading the route, which is the
+property §2 exists to protect.
+
+It runs **after** `requireCapability`, never instead of it, and it can only refuse. Three
+routes carry it: `POST /people/:id/assignments`, `POST /people/:id/account` (`57`) and the
+powers-grid write (`33`). Refusal is `403 WOULD_ESCALATE` naming the capability, because a
+bare 403 on a button the caller just used successfully one row above reads as a bug.
+
+It is the same shape as `requireEntitlement` below — an extra reason to say no, composed onto
+a route that already carries its capability — which is why it sits between them rather than
+inside link 10.
+
+### 10c · `requireMembership` — the respondent gate (DEC-037)
+
+The public respondent routes have no capability check; access is the token (`39`). A campaign
+whose `access` is `organization` (`38`) adds one question — *is this caller signed in to this
+campaign's organisation* — and nothing else. No grant is resolved.
+
+```ts
+publicRouter.get('/campaigns/:token', validate(TokenDto), resolveCampaign,
+                 requireMembership, renderForm);
+```
+
+**Order is the whole security property.** `resolveCampaign` runs first and 404s an invalid,
+unlaunched, closed or expired token exactly as it always has (`13` §6), so `requireMembership`
+is reachable **only with a valid token** — its `401 SIGN_IN_REQUIRED` therefore discloses
+nothing the working token in the caller's hand did not already disclose. Gating before
+resolution would have turned a restricted campaign into an existence oracle. Asserted by a
+test that sends a bad token to a restricted campaign and compares the bytes with any other bad
+token.
+
+Built at `T-069`, and the ordering is enforced rather than merely written down: the gate reads
+the campaign through `campaignOf(req)`, which **throws** if the resolver did not run. Swapping
+the two lines produces a loud `500` on every request instead of a quiet gate deciding on a
+campaign it never loaded — the failure mode a mis-ordered chain should have.
+
+It also runs **before `idempotency`** on the submit route. A refused caller should not consume
+a key, and somebody who is turned away, signs in, and retries with the same key must not be
+replayed their own `401`.
+
+**The CSRF exemption on this chain now rests on something else, and that is worth stating.**
+`chains.ts` has always argued the respondent routes carry no ambient authority for a forged
+request to borrow. DEC-037 gives the submit route some: a forged cross-site POST would burn a
+member's one allowed submission with answers they did not write. What actually stops it is
+`sameSite: 'lax'` on `endur.sid` — a cross-site POST carries no session, so the request arrives
+as a stranger and this link refuses it. The protection is the **cookie's**, not the chain's, so
+loosening that flag to `none` means mounting `csrfProtection` here in the same commit. Asserted
+by a test, so the coupling cannot be broken silently.
+
 ### 11 · `requireEntitlement` — separate on purpose (DEC-011)
 
 ```ts
@@ -420,7 +486,9 @@ These are the reason the chain is a chain. Each is worth being able to state out
 | `csrfProtection` → any mutation | A forged request must die before it reaches a handler, not after |
 | `authenticate` → `requireCapability` | Cannot ask "may they" before knowing who |
 | `validate` → `requireCapability` | The target id must be read from **validated** input |
+| `requireCapability` → `requireNoEscalation` | The escalation bound can only refuse. Running it first would answer *"you cannot hand that out"* to someone who was never allowed to hand anything out — a more specific refusal than the truth |
 | `requireCapability` → `requireEntitlement` | 403 outranks 402: never tell someone to buy an upgrade for something they would not be allowed to use anyway |
+| token resolution → `requireMembership` | Gating before resolving turns a restricted campaign into an existence oracle. An invalid token must 404 before `access` is ever consulted (`13` §6) |
 | handler → `auditWriter` assertion | Only the handler knows what actually happened |
 | everything → `errorFunnel` | Registered last, or Express will not route errors to it |
 

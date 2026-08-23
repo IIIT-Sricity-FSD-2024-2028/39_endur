@@ -168,7 +168,37 @@ evaluation; all become real the moment the system runs anywhere but a laptop.
 - Migration strategy against a database holding real data
 - Error alerting, and who finds out
 
-## 9. Out of scope
+## 9. Who reads these files, and who reads the other log
+
+Two logs exist, they have different subjects, and the 2026-08-23 request for *"admins of Endur
+and of an organisation must be able to see logs"* is answered by **both** — differently.
+
+| | `app-*.log` / `error-*.log` (this document) | `audit_log` (`10` §5) |
+|---|---|---|
+| Subject | What the **system** did — requests, statuses, durations, stack traces | What **people** did, and which grant allowed it |
+| Scope | Every tenant, one file | One organisation, per row |
+| Lifetime | 14 days, then deleted | Forever. It is evidence |
+| Read at | `/ops/logs` (`72`) | `/app/logs` (`56`) |
+| Read by | A platform operator, `platform.logs.read` | An org administrator, `audit.read` |
+
+**An organisation administrator does not read these files, and that is a decision rather than
+an omission.** They are one file per day across every tenant; serving a customer a filtered
+slice means one filter bug away from serving somebody else's traffic, and the interesting
+content for a customer — who changed what, and how were they allowed to — is not in here at
+all. It is in `audit_log`, which is per-row tenant-scoped by construction (INV-010) and which
+`56` renders.
+
+Stated the other way round: the customer's question is *"who did this?"* and the operator's is
+*"what broke?"*. Two questions, two tables, two screens, two capabilities.
+
+### One consequence for anything added to a log line
+
+`72` puts these files on a screen. Combined with §2's fourteen-day retention, the blast radius
+of a careless `logger.info({ user })` is now retained files **and** an internal viewer. §3 was
+already load-bearing; it is now the only thing standing between a stray field and both.
+`72` § Acceptance tests for exactly that, with a fixture line carrying an unexpected key.
+
+## 10. Out of scope
 
 | Not building | Why |
 |---|---|
@@ -176,3 +206,4 @@ evaluation; all become real the moment the system runs anywhere but a laptop.
 | A log shipper (Loki, ELK, CloudWatch) | One process, one machine. `grep` is the correct tool here and saying so is more honest than adding a service to look serious |
 | Log-based metrics or dashboards | Counting log lines is the wrong source for a number the database already knows |
 | Audit logging | **Different thing entirely, and already built.** `audit_log` is a durable business record written inside the handler's transaction (INV-007, `12` §4.14). These files are operational and disposable. Never conflate them: one is evidence, the other is diagnostics |
+| A viewer for these files | Built, but it is `72-PAGE-platform-logs.md`'s and not this document's. This one decides what is written; that one decides who may read it — and the answer is **a platform operator, never a customer**. See §10 |

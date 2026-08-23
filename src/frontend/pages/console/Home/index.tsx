@@ -237,6 +237,7 @@ export default function Home(): JSX.Element {
           status="open"
           endsAt={sharing.endsAt}
           anonymous={sharing.anonymous}
+          access={sharing.access}
           onClose={() => setSharing(null)}
         />
       )}

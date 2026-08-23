@@ -41,6 +41,7 @@ import { orgRouter } from './features/org/router.js';
 import { unitsRouter } from './features/units/router.js';
 import { authzRouter, grantsRouter, rolesRouter } from './features/roles/router.js';
 import { peopleRouter } from './features/people/router.js';
+import { activationRouter, personAccountRouter } from './features/accounts/router.js';
 import { subjectsRouter } from './features/subjects/router.js';
 import { templatesRouter } from './features/templates/router.js';
 import { campaignsRouter } from './features/campaigns/router.js';
@@ -104,12 +105,19 @@ export function createApp() {
   // Per ROUTE, inside each router:        9 validate -> 10 requireCapability ->
   //                                       11 requireEntitlement -> 12 rateLimit(scoped)
   //                                       -> 13 idempotency
+  // Activation is unauthenticated by nature (57) and has its own chain, so it is mounted
+  // beside /auth rather than inside it — again so the enumeration test can see it.
+  mount(app, '/api/v1/auth/activate', activationRouter);
   mount(app, '/api/v1/auth', authRouter);
   mount(app, '/api/v1/org', orgRouter);
   mount(app, '/api/v1/units', unitsRouter);
   mount(app, '/api/v1/roles', rolesRouter);
   mount(app, '/api/v1/grants', grantsRouter);
   mount(app, '/api/v1/authz', authzRouter);
+  // BEFORE /api/v1/people, so an account request does not walk the people chain first and
+  // fall through. Its own mount rather than a sub-router on peopleRouter, because
+  // routes.test.ts walks mountedRouters() and does not recurse (INV-003).
+  mount(app, '/api/v1/people/:id/account', personAccountRouter);
   mount(app, '/api/v1/people', peopleRouter);
   mount(app, '/api/v1/subjects', subjectsRouter);
   mount(app, '/api/v1/templates', templatesRouter);

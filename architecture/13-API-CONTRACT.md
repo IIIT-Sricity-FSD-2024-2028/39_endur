@@ -95,10 +95,42 @@ request per cell would make undo incoherent and the warnings recomputed dozens o
 | POST | `/` | `person.create` |
 | PATCH | `/:id` | `person.update` |
 | DELETE | `/:id` | `person.delete` |
-| POST | `/:id/assignments` | `assignment.create` |
+| POST | `/:id/assignments` | `assignment.create` — **also bounded by INV-012** (`11` §5b) |
 | DELETE | `/:id/assignments/:edgeId` | `assignment.delete` |
-| POST | `/import` | `person.import` — CSV, idempotent |
+| POST | `/import` | `person.import` — CSV, idempotent. **Also bounded by INV-012**: it creates positions, so it carries the same guard as `/:id/assignments` (`11` §5b) |
 | POST | `/import/preview` | `person.import` — column mapper, first 5 rows |
+| POST | `/:id/account` | `account.create` — provision a sign-in. Returns a one-time activation link. **Bounded by INV-012** |
+| POST | `/:id/account/reset` | `account.reset` — re-issue activation; invalidates any outstanding link |
+| DELETE | `/:id/account` | `account.revoke` — disables the account and ends its sessions. The person survives |
+
+Specified in `57-FEATURE-accounts-and-invites.md`. Activation itself is **unauthenticated** and
+lives under `/auth`, not here — the person activating has no session yet, by definition.
+
+### Accounts — `/api/v1/people/:id/account` · and the unauthenticated half
+
+| Method | Path | C |
+|---|---|---|
+| GET | `/auth/activate/:token` | — · is this link live, and whose name is on it |
+| POST | `/auth/activate/:token` | — · set a password, activate, sign in. Rate limited per token and per IP |
+
+`GET` before `POST` so the activation screen can greet the person by name and say which
+organisation they are joining before asking for a password — a bare password box reached from
+a pasted link is indistinguishable from a phishing page.
+
+### Inbox — `/api/v1/inbox`
+
+Free-text responses as a triage queue (`58`). **Reads through the same k-anonymity-gated
+service as `40`** — never a second path to response content.
+
+| Method | Path | C |
+|---|---|---|
+| GET | `/` | `response.read` — `?state=all\|unread\|read\|archived&campaignId&subjectId&cursor` |
+| POST | `/:responseId/read` · `/:responseId/unread` | `response.read` — **per-caller** state, not org state |
+| POST | `/:responseId/archive` · `/:responseId/unarchive` | `response.read` — also per-caller |
+
+Marking your own inbox needs no capability beyond seeing it, which is why there is no
+`inbox.*` module in `11` §3: the state is yours, one row per `(user, response)`, and two
+administrators triaging the same campaign never overwrite each other.
 
 ### Subjects — `/api/v1/subjects`
 
@@ -202,7 +234,7 @@ reader, it does not replace the check.
 |---|---|---|
 | POST | `/authz/simulate` | `simulator.run` — full `Decision` incl. `considered` |
 | GET | `/authz/capabilities` | `org.read` — the catalogue, for the grid (DEC-018) |
-| GET | `/audit` | `audit.read` |
+| GET | `/audit` | `audit.read` — the organisation's activity log (`56`). `?actorId&action&targetType&outcome&from&to&cursor`. Returns **allows and denies** (DEC-041) |
 
 ### Public respondent — `/api/v1/public`
 
@@ -212,6 +244,16 @@ No auth, no capability. The only routes a stranger's phone touches.
 |---|---|---|
 | GET | `/campaigns/:token` | The form to render. **No org internals** — see §6 |
 | POST | `/campaigns/:token/responses` | Submit. Rate limited, idempotent per token |
+
+**One exception to "no auth", added by DEC-037.** A campaign whose `access` is `organization`
+answers both routes with **`401 SIGN_IN_REQUIRED`** to a caller with no staff session for that
+organisation, and **`403 NOT_A_MEMBER`** to one signed in elsewhere. The body carries the
+organisation's display name and nothing else, so the sign-in prompt can say *which* one.
+
+That 401 is reachable **only with a valid token**, so it discloses nothing the token did not
+already disclose — §6's rule that invalid, unlaunched, closed and expired tokens are
+indistinguishable is unchanged, because all four still 404 before `access` is ever consulted.
+Order matters here and is asserted: **resolve the token first, gate second.**
 
 ### Billing — `/api/v1/billing` · the organisation's own plan
 
@@ -321,8 +363,11 @@ One envelope, produced only by `errorFunnel` (`12` §4.15).
 | 400 | `BAD_REQUEST` | Malformed beyond schema failure |
 | 401 | `UNAUTHENTICATED` | Missing or invalid credential |
 | 401 | `UNRESOLVED_TENANT` | No org could be determined |
+| 401 | `SIGN_IN_REQUIRED` | An `organization`-access campaign, reached without a session (DEC-037). Distinct from `UNAUTHENTICATED` because the respond world must offer a sign-in link rather than route to the console's login |
 | 402 | `PAYMENT_REQUIRED` | Entitlement. `details.requiredTier` |
 | 403 | `FORBIDDEN` | Capability. `details.decidedBy` |
+| 403 | `NOT_A_MEMBER` | Signed in, but to a different organisation than the campaign's (DEC-037) |
+| 403 | `WOULD_ESCALATE` | The request would create a position or account holding a power the caller does not hold at that unit (INV-012, `11` §5b). `details.capability` names which one |
 | 403 | `CSRF_FAILED` | Missing or invalid CSRF token on a cookie-authenticated mutation (`12` §4.8). Distinct from `FORBIDDEN` so the two are separable in logs |
 | 404 | `NOT_FOUND` | Absent, **or out of scope** — see below |
 | 409 | `CONFLICT` | State transition invalid (closed campaign, cycle, duplicate) |
@@ -338,6 +383,9 @@ One envelope, produced only by `errorFunnel` (`12` §4.15).
   it.
 - Being denied a **capability on a resource you can see** → `403` with the decision trace,
   because that is actionable: it tells you whom to ask.
+- Being refused because the request would **hand out a power you do not hold** → `403
+  WOULD_ESCALATE`, naming the capability. The caller can see they hold `assignment.create`, so
+  a bare refusal reads to them as a bug; the answer they need is *which* power (`11` §5b).
 
 Validation detail shape, rendered inline by the UI (`design_specs/design/10` §4):
 

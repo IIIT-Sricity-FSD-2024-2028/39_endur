@@ -53,12 +53,45 @@ export const authChain: RequestHandler[] = [
  * deliberately NO csrfProtection: these routes take no credential, are open to every
  * origin by design, and a forged cross-site POST can do nothing an attacker could not do
  * with curl. CSRF exists to stop a browser using ambient authority; there is none here.
+ *
+ * DEC-037 PUT ONE HERE, and the exemption survives for a DIFFERENT REASON than the one
+ * above — worth writing down, because the old sentence now reads as an argument it is not
+ * making. An `organization` campaign is answered by a signed-in member (15 §3), so the
+ * session cookie IS ambient authority on the submit route, and a forged cross-site POST
+ * would burn that member's one allowed submission with answers they did not write.
+ *
+ * What stops it is `sameSite: 'lax'` on `endur.sid` (auth/session.ts): a cross-site POST
+ * carries no session, so the request arrives as a stranger and requireMembership refuses it
+ * with 401 rather than accepting it as the member. The protection is real but it is the
+ * COOKIE'S, not this chain's — so if that flag is ever loosened to `none`, csrfProtection
+ * has to be mounted on the submit route in the same commit. Asserted in
+ * test/campaign-access.test.ts so the coupling cannot be silently broken.
  */
 export const respondentChain: RequestHandler[] = [
   publicCors,
   tenantResolver({ required: false }),
   authenticateOptional,
 ];
+
+/**
+ * Activation (`57`). `/api/v1/auth/activate/:token`, and the shortest chain with a tenant.
+ *
+ * `authenticateOptional` IS DELIBERATELY ABSENT, and its absence is a correctness
+ * requirement rather than a saving. Any session in this browser belongs to SOMEBODY ELSE —
+ * the person following the link has no account yet, by definition. Attaching that stranger
+ * as the principal would make `flushAudit` write THEIR user id onto the audit row for
+ * another person's activation, in another organisation, which is the same shape of mistake
+ * DEC-045 closed on `response.submit`. Having no principal is the truth here, and the truth
+ * produces the right row.
+ *
+ * `csrfProtection` is absent for the reason the respondent chain gives: there is no ambient
+ * authority to abuse. The server reads no cookie on this route, so a forged cross-site POST
+ * would have to carry the token — and anybody holding the token can use curl.
+ *
+ * The tenant is resolved from the token in the PATH, ahead of the session, and
+ * `tenantResolver` explains why it is the one strategy that outranks one.
+ */
+export const activationChain: RequestHandler[] = [tenantResolver({ required: false })];
 
 /**
  * Serving uploaded images (`48`). The shortest chain here: wide CORS and nothing else.

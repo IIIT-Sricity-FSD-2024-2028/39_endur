@@ -9,6 +9,10 @@ import type { Request, RequestHandler } from 'express';
 import { resolveLabels, type LabelSet, type ResolvedLabels } from '@endur/shared';
 import { AppError } from '../lib/errors.js';
 import { tenantClient, type TenantClient } from '../db/tenant.js';
+// ONE definition of token -> hash, shared with the activation service. A second sha256
+// here would be a second mapping, and a disagreement would show up as a link that
+// resolves no tenant rather than as an error anybody could see.
+import { hashInviteToken } from '../auth/inviteToken.js';
 import { prisma } from '../db/client.js';
 
 declare global {
@@ -99,6 +103,29 @@ async function factsOf(orgId: string): Promise<{ authzVersion: number; labels: R
 
 /** Strict priority. Each source is a credential the caller could not have forged. */
 async function resolve(req: Request, opts: TenantResolverOptions): Promise<string | undefined> {
+  // 0 · ACTIVATION TOKEN — /api/v1/auth/activate/:token (57). THE ONE STRATEGY THAT
+  //     OUTRANKS A SESSION, and it needs the argument spelled out because "strict priority"
+  //     is otherwise the whole rule.
+  //
+  //     Every other strategy answers "who is calling". This route is different: the person
+  //     following an activation link HAS NO ACCOUNT — that is the entire situation — so any
+  //     session in the browser belongs to somebody else, quite possibly in a different
+  //     organisation. Letting it win would file org B's activation under org A's audit log.
+  //     The token is in the PATH, is unforgeable, and is what the request is ABOUT.
+  //
+  //     An unknown token resolves no tenant and becomes the same uniform dead end the
+  //     handler produces anyway — never a hint that the token was nearly right.
+  const activation = /^\/api\/v1\/auth\/activate\/([0-9A-Za-z]{43})(?:$|[/?])/.exec(
+    req.originalUrl.split('?')[0] ?? '',
+  )?.[1];
+  if (activation) {
+    const invite = await prisma.accountInvite.findUnique({
+      where: { tokenHash: hashInviteToken(activation) },
+      select: { orgId: true },
+    });
+    return invite?.orgId;
+  }
+
   // 1 · API key  — T-007 attaches the parsed key; its org_id wins.
   // 2 · Session  — the signed-in user's orgId, set by express-session (T-007).
   const session = (req as { session?: { orgId?: string } }).session;

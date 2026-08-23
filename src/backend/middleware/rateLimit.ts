@@ -68,8 +68,29 @@ const loginKey = (req: Parameters<RequestHandler>[0]): string => {
   return `${ipKeyGenerator(req.ip ?? '')}|${email}`;
 };
 
+/**
+ * Activation (57), keyed on IP **and** the token in the path — the same pairing as login,
+ * for the same reason and with one extra.
+ *
+ * A token is a credential, so an unlimited activation endpoint is an unlimited
+ * password-set endpoint. Per-IP alone would let a whole department behind one NAT exhaust
+ * the bucket on a Monday morning after a bulk invite; per-token alone would leave a script
+ * free to work through a list of guessed tokens at full speed. The pair costs nothing and
+ * removes both.
+ *
+ * The token is read from `req.path`, not from `req.data` — this runs at link 12, before
+ * `validate` at link 13, so nothing has been narrowed yet. A path that does not match the
+ * shape contributes an empty string and shares one bucket with every other malformed
+ * request, which is the correct place for them to be.
+ */
+const activationKey = (req: Parameters<RequestHandler>[0]): string => {
+  const token = /\/([0-9A-Za-z]{43})(?:$|[/?])/.exec(req.path)?.[1] ?? '';
+  return `${ipKeyGenerator(req.ip ?? '')}|${token}`;
+};
+
 export const scopedRateLimits = {
   login: bucket({ windowMs: 15 * 60_000, max: 10, keyBy: loginKey }),
+  activate: bucket({ windowMs: 15 * 60_000, max: 10, keyBy: activationKey }),
   respondentSubmit: bucket({ windowMs: 60_000, max: 120 }),
   simulator: bucket({ windowMs: 60_000, max: 30 }),
 };

@@ -24,6 +24,7 @@ const CAMPAIGN: PublicCampaign = {
   organizationName: 'Northfield',
   labels: LABELS,
   anonymous: true,
+  access: 'public',
   estimatedSeconds: 110,
   subjects: [{ id: 's1', name: 'Data Structures' }],
   questions: [
@@ -57,7 +58,14 @@ vi.mock('../../lib/respond.js', () => ({
 
 const reload = vi.fn();
 const ready = (over: Partial<PublicCampaign> = {}) => ({
-  campaign: { ...CAMPAIGN, ...over }, loading: false, unavailable: false, error: null, reload,
+  campaign: { ...CAMPAIGN, ...over }, loading: false, unavailable: false, gate: null,
+  error: null, reload,
+});
+
+/** DEC-037. The token WORKED; the gate refused. Never reachable with a bad token. */
+const gated = (kind: 'signIn' | 'notMember', organizationName = 'Northfield') => ({
+  campaign: null, loading: false, unavailable: false, error: null, reload,
+  gate: { kind, organizationName },
 });
 
 /** Reads back what the form handed the thank-you page, since that is the only carrier. */
@@ -346,5 +354,79 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
     // The form arrives in a single payload, so there is no moment where part of it is
     // known — a per-question skeleton would be an animation pretending to be progress.
     expect(container.querySelectorAll('.rf-skeleton')).toHaveLength(1);
+  });
+});
+
+describe('the two access dead ends — DEC-037, 39 § States', () => {
+  it('a stranger is told WHICH organisation, and offered a way in', () => {
+    usePublicCampaign.mockReturnValue(gated('signIn', 'Northfield University'));
+    mount();
+
+    expect(screen.getByRole('heading', { name: 'Sign in to answer' })).toBeTruthy();
+    // "Sign in" with no `which` is not an instruction anybody can follow. The person was
+    // handed this code; they should be told whose it is.
+    expect(screen.getByText('Only people in Northfield University can answer this one.')).toBeTruthy();
+  });
+
+  it('the sign-in link carries `next`, so they come BACK to the form', () => {
+    usePublicCampaign.mockReturnValue(gated('signIn'));
+    mount();
+
+    const link = screen.getByRole<HTMLAnchorElement>('link', { name: 'Sign in' });
+    // Without `next`, a respondent who signs in lands on a console dashboard — sent away
+    // from the form somebody asked them to fill in, with no way back to it.
+    expect(link.getAttribute('href')).toBe('/login?next=%2Fr%2FK4M9X2PQ');
+  });
+
+  it('somebody signed in ELSEWHERE gets no action at all', () => {
+    usePublicCampaign.mockReturnValue(gated('notMember', 'Northfield University'));
+    mount();
+
+    expect(screen.getByRole('heading', { name: "This isn't your organization's link" })).toBeTruthy();
+    // 39 § States: telling them to sign out and try again is a worse suggestion than
+    // asking whoever sent them the link. So there is deliberately nothing to press.
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('a gate is NOT offered a retry — the button would always do the same thing', () => {
+    usePublicCampaign.mockReturnValue(gated('signIn'));
+    mount();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('a BAD TOKEN still lands on the plain dead end, never on a gate', () => {
+    // The property the whole ordering exists for, asserted from the client side. The server
+    // resolves before it gates, so an invalid token 404s and can never surface as
+    // "this campaign is restricted" — which is what would turn it into an existence oracle.
+    usePublicCampaign.mockReturnValue({
+      campaign: null, loading: false, unavailable: true, gate: null, error: null, reload,
+    });
+    mount();
+
+    expect(screen.getByRole('heading', { name: "This link isn't active" })).toBeTruthy();
+    expect(screen.queryByText(/Only people in/)).toBeNull();
+  });
+});
+
+describe('<AccessNotice> on the form itself', () => {
+  it('a restricted campaign says participation is not private', () => {
+    usePublicCampaign.mockReturnValue(
+      ready({ access: 'organization', organizationName: 'Northfield University' }),
+    );
+    mount();
+
+    expect(
+      screen.getByText(
+        'Your answers are anonymous. ' +
+        'Northfield University will see that you responded, but not what you said.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('an open link says only what is true of it', () => {
+    mount();
+    expect(screen.getByText('Your answers are anonymous.')).toBeTruthy();
+    expect(screen.queryByText(/will see that you responded/)).toBeNull();
   });
 });

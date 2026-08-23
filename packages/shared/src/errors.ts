@@ -9,6 +9,24 @@ export const ERROR_CODES = {
   PAYMENT_REQUIRED: 402,
   FORBIDDEN: 403,
   CSRF_FAILED: 403,
+  /**
+   * INV-012. The request would create a position or account holding a power the caller
+   * does not hold at that unit (11 §5b). Its own code rather than a plain FORBIDDEN
+   * because it is the one refusal the UI shows as an error rather than by hiding the
+   * action: the caller CAN do this on most rows, so an absent button would read as a
+   * rendering bug. `details.capability` names the power that would have been handed out.
+   */
+  WOULD_ESCALATE: 403,
+  /**
+   * DEC-037. An `organization`-access campaign, reached with no staff session for that
+   * organisation. Its own code rather than UNAUTHENTICATED because the respond world must
+   * offer a sign-in LINK rather than route to the console's login — a respondent who lands
+   * on `/login` with no `next` has been sent away from the form they were asked to fill in.
+   * `details.organizationName` is the only thing in the body, so the prompt can say which.
+   */
+  SIGN_IN_REQUIRED: 401,
+  /** DEC-037. Signed in, but to a different organisation than the campaign's. */
+  NOT_A_MEMBER: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,

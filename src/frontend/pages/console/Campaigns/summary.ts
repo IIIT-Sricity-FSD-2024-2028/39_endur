@@ -6,6 +6,7 @@
 //
 // The `Structure/consequence.ts` precedent applies: writing that sentence as a module found
 // a real verb-agreement bug that reading it had not.
+import type { CampaignAccess } from '@endur/shared';
 import { approxDuration, formatDateTime, pluralise } from '../../../lib/format.js';
 
 export type SummaryInput = {
@@ -19,6 +20,12 @@ export type SummaryInput = {
   startsAt: string | null;
   endsAt: string | null;
   anonymous: boolean;
+  /**
+   * DEC-037, and it is here because launch makes it PERMANENT. `anonymous` and `access` are
+   * the only two fields the trigger freezes, so they are the two this card must restate —
+   * a summary that omits an irreversible choice is not a summary.
+   */
+  access: CampaignAccess;
 };
 
 export type Summary = { name: string; detail: string; window: string };
@@ -51,7 +58,11 @@ export function summarise(input: SummaryInput): Summary {
  * also a plain-English description of what the derivation will do.
  */
 function windowOf(input: SummaryInput): string {
-  const anonymity = input.anonymous ? ' · anonymous' : ' · not anonymous';
+  // Both irreversible choices, in the order they are made. "restricted" says the shorter,
+  // truer half — WHO GETS IN — rather than repeating the consequence line from step 2; the
+  // reader has just chosen it, and this card exists to confirm, not to re-argue.
+  const gate = input.access === 'organization' ? ' · restricted' : '';
+  const anonymity = (input.anonymous ? ' · anonymous' : ' · not anonymous') + gate;
 
   if (input.startsAt && input.endsAt) {
     return `${formatDateTime(input.startsAt)} → ${formatDateTime(input.endsAt)}${anonymity}`;

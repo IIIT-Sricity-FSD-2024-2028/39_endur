@@ -16,11 +16,17 @@ can be inserted next to related ones instead of being appended at the end where 
 | Block | Covers | Free |
 |---|---|---|
 | `00`–`09` | Foundations — product, phases, tooling | `04`–`09` |
-| `10`–`19` | Backend and API | `19` |
+| `10`–`19` | Backend and API | — |
 | `20`–`29` | Frontend | **`29`** |
-| `30`–`49` | Pages and features | `49` |
-| `50`–`59` | Cross-cutting | `56`–`59` |
+| `30`–`49` | Pages and features | — |
+| `50`–`59` | Cross-cutting, and pages added after `30`–`49` filled | `59` |
 | `60`–`69` | P3 stretch features | `64`–`69` |
+| `70`–`79` | Endur's own platform surfaces | `73`–`79` |
+
+`README.md` § Numbering is the authority; this copy exists because someone reading *this* file
+is deciding where to put a document. **If the two disagree, `README` wins and this one is
+stale** — it has been twice (`19` and `49` were listed free after they were written, and the
+`70`s block was missing entirely until 2026-08-23).
 
 ## If you use this slot
 

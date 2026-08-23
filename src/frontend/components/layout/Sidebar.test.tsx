@@ -53,19 +53,32 @@ describe('roadmap items', () => {
     // Not an <a>: there is no href to follow and nothing to tab into, so the behaviour is
     // structural rather than styled-on.
     expect(analysis?.tagName).not.toBe('A');
-    // Three P3 items and, since T-046, the two P2 pages that are still scaffold. The count
-    // is the assertion: an item goes back to being a link when its page exists, and never
-    // before (design_specs/design/02 §7).
-    expect(screen.getAllByText('Soon').length).toBe(5);
+    // Three P3 items, plus Roles — which is still scaffold. **People left this list at
+    // T-050**, when its page was actually built. The count is the assertion: an item goes
+    // back to being a link when its page exists, and never before
+    // (design_specs/design/02 §7). If this number goes UP, something regressed; if it goes
+    // down, check the page behind it is real before changing the number.
+    expect(screen.getAllByText('Soon').length).toBe(4);
   });
 
   it('does not navigate to a page that is only scaffold', () => {
     renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
-    for (const label of ['Roles', 'People']) {
+    for (const label of ['Roles']) {
       const item = screen.getByText(label).closest('.sidebar-item');
       expect(item?.getAttribute('aria-disabled')).toBe('true');
       expect(item?.tagName).not.toBe('A');
     }
+  });
+
+  // The other half of the rule, and the half nothing asserted before T-050: a page that
+  // EXISTS must be reachable. Without this, un-disabling an item could be forgotten
+  // indefinitely and only the count above would notice — and only if somebody changed it.
+  it('DOES navigate to People, whose page exists since T-050', () => {
+    renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
+    const item = screen.getByText('People').closest('.sidebar-item');
+    expect(item?.tagName).toBe('A');
+    expect(item?.getAttribute('href')).toBe('/app/people');
+    expect(item?.getAttribute('aria-disabled')).toBeNull();
   });
 
   it('explains itself on hover — a greyed item with no reason is a broken link', () => {

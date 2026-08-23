@@ -101,7 +101,7 @@ beforeEach(() => {
   create.mockResolvedValue({
     id: 'c9', name: 'Mid-term form — August 2026', status: 'draft',
     templateId: 't1', templateName: 'Mid-term form', subjectCount: 1, responseCount: 0,
-    anonymous: true, startsAt: null, endsAt: null, closedAt: null,
+    anonymous: true, access: 'public', startsAt: null, endsAt: null, closedAt: null,
     publicToken: null, url: null, createdAt: '2026-08-19T00:00:00.000Z',
     audience: { kind: 'anyone' }, subjects: [],
   });
@@ -132,6 +132,88 @@ describe('step 1 — the form, and one less typing beat', () => {
   it('will not continue without a form', () => {
     mount();
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Continue' }).disabled).toBe(true);
+  });
+});
+
+describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () => {
+  const toStepTwo = (): void => {
+    fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  };
+
+  it('asks it as its OWN question, under its own heading', () => {
+    mount();
+    toStepTwo();
+    // 38 exists partly to stop these being folded together. Above: who is EXPECTED — a
+    // denominator, enforced nowhere. Below: who GETS IN — a gate, enforced on every
+    // request. The heading break is what says so on screen.
+    expect(screen.getByText('Who can respond?')).toBeTruthy();
+    expect(screen.getByText('Who gets in?')).toBeTruthy();
+  });
+
+  it('the two questions do not share a visible option label', () => {
+    mount();
+    toStepTwo();
+    // Both once said "Anyone with the link". Two radios with the same label on one screen
+    // undoes the section break the previous test asserts — and it is ambiguous to a screen
+    // reader, which hears the label and not the heading above it.
+    expect(screen.getAllByRole('radio', { name: /^Anyone with the link/ })).toHaveLength(1);
+    expect(screen.getAllByRole('radio', { name: /^Open to everyone/ })).toHaveLength(1);
+  });
+
+  it('defaults to open, which keeps DEC-009 the default path', () => {
+    mount();
+    toStepTwo();
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: /^Open to everyone/ }).checked)
+      .toBe(true);
+  });
+
+  it('names the organisation rather than saying "your organization"', () => {
+    mount();
+    toStepTwo();
+    expect(screen.getByRole('radio', { name: /Only people in Northfield/ })).toBeTruthy();
+  });
+
+  it('states the CONSEQUENCE at the point of choosing, not in a help page', () => {
+    mount();
+    toStepTwo();
+    // This mode gives up a promise (52 §1): participation stops being private even though
+    // the answer stays anonymous. The person choosing it is the one who should be told.
+    expect(screen.getByText(/You’ll see who responded, never what they said/)).toBeTruthy();
+  });
+
+  it('warns that it is permanent, but only once it has been chosen', () => {
+    mount();
+    toStepTwo();
+    expect(screen.queryByText(/cannot be changed after launch/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Only people in Northfield/ }));
+    expect(screen.getByText(/cannot be changed after launch/)).toBeTruthy();
+  });
+
+  it('sends the chosen mode to the API', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Data Structures/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Only people in Northfield/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: /Launch/ }));
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ access: 'organization' });
+  });
+
+  it('restates it on the summary card — it is one of two things launch freezes', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Data Structures/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Only people in Northfield/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // A summary that omits an irreversible choice is not a summary.
+    expect(screen.getByText(/restricted/)).toBeTruthy();
   });
 });
 

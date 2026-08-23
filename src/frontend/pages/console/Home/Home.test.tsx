@@ -37,11 +37,11 @@ const FULL: HomeView = {
     {
       id: 'c1', name: 'Spring check', subjectCount: 18, responseCount: 612,
       endsAt: '2026-08-26T23:59:00.000Z',
-      url: 'https://feedback.example.test/r/K4M9X2PQ', anonymous: true,
+      url: 'https://feedback.example.test/r/K4M9X2PQ', anonymous: true, access: 'public',
     },
     {
       id: 'c2', name: 'Facilities pulse', subjectCount: 1, responseCount: 210,
-      endsAt: null, url: 'https://feedback.example.test/r/PQ42M9XK', anonymous: false,
+      endsAt: null, url: 'https://feedback.example.test/r/PQ42M9XK', anonymous: false, access: 'public',
     },
   ],
   recentComments: [

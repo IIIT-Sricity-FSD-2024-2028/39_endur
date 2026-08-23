@@ -78,6 +78,7 @@ Lives in code at `packages/shared/src/platform-capabilities.ts`.
 | `platform.usage.read` | ✔ | ✔ | Seats, campaign counts, response volume — as **numbers** |
 | `platform.message.send` | ✔ | ✔ | Contact an org's administrators (`70` §Interactions) |
 | `platform.audit.read` | ✔ | ✔ | The platform's own audit trail |
+| `platform.logs.read` | ✔ | ✔ | **The rotating application log files** (`18` §2) through `72`. Diagnostics, so support needs it as much as the owner does. Safe under INV-011 **because `18` §3 already guarantees no body, no credential and no respondent identity ever reaches a log line** — the viewer inherits that property, it does not create it |
 | `platform.operator.manage` | — | ✔ | Create, disable and re-role operator accounts |
 
 Naming rule matches `11` §3 — `platform.<object>.<verb>` — with the `platform.` prefix as the
@@ -253,6 +254,7 @@ route-enumeration test (`12` §7) assert that no `platform.` capability appears 
 | GET | `/platform/analytics` | `platform.analytics.read` · `71` |
 | POST | `/platform/orgs/:id/message` | `platform.message.send` · `70` §Interactions |
 | GET | `/platform/audit` | `platform.audit.read` |
+| GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` · `72`. The file list, and one file tailed or filtered |
 | GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` |
 
 ## 12. The vocabulary exception
@@ -284,6 +286,8 @@ check people learn to route around.
 - [ ] An operator cannot change their own role, and the last `owner` cannot be removed
 - [ ] Two sessions with two cookie names coexist in one browser without either being confused
       for the other
+- [ ] `/platform/logs/:file` accepts only names matching the log-file pattern and cannot be
+      made to read a file outside `LOG_DIR` — asserted with `../` and with an absolute path
 
 ## 14. Out of scope
 

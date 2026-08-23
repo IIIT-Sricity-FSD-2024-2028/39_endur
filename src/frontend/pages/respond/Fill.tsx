@@ -26,7 +26,7 @@ import {
   hasResponded, markResponded, submitKey, submitResponse, usePublicCampaign,
   type DoneState,
 } from '../../lib/respond.js';
-import { anonymityLine, costLine } from './copy.js';
+import { accessNotice, costLine } from './copy.js';
 import { answeredCount, missingRequired, remainingLabel, toSubmitAnswers, type Answers } from './answers.js';
 import { Unavailable } from './Unavailable.js';
 
@@ -40,7 +40,7 @@ export default function Fill(): JSX.Element {
   // Read once, on mount. A marker found here skips the request entirely: a phone that has
   // already answered should get its answer instantly, not after a round trip.
   const [already] = useState(() => (token ? hasResponded(token) : false));
-  const { campaign, loading, unavailable, error, reload } = usePublicCampaign(
+  const { campaign, loading, unavailable, gate, error, reload } = usePublicCampaign(
     already ? undefined : token,
   );
 
@@ -134,10 +134,32 @@ export default function Fill(): JSX.Element {
   if (already) return <Unavailable variant="responded" />;
   if (loading) return <FormSkeleton />;
   if (unavailable) return <Unavailable variant="unavailable" />;
+  // AFTER `unavailable`, and the order is not arbitrary. A bad token 404s at the server
+  // before `access` is ever consulted (12 §4.10c), so these two are reachable only with a
+  // WORKING token — which is what keeps a restricted campaign from being an existence
+  // oracle. Reading the branches in this order is reading that guarantee.
+  if (gate) {
+    return (
+      <Unavailable
+        variant={gate.kind}
+        organizationName={gate.organizationName}
+        // The `next` is the point: a respondent dropped on a bare login screen has been
+        // sent away from the form somebody asked them to fill in.
+        signInHref={token ? `/login?next=${encodeURIComponent(`/r/${token}`)}` : '/login'}
+      />
+    );
+  }
   if (error || !campaign) return <Unavailable variant="error" onRetry={() => void reload()} />;
 
   const only = subjects.length === 1 ? subjects[0] : undefined;
-  const anonymity = anonymityLine(campaign.anonymous);
+  // <AccessNotice> (24 §7) — WHICH of the two promises this form is making, said on the
+  // screen where it is made. `anonymityLine` alone said only half of it, and the half it
+  // left out is the one an `organization` campaign gives up (52 §1).
+  const anonymity = accessNotice({
+    anonymous: campaign.anonymous,
+    access: campaign.access,
+    organizationName: campaign.organizationName,
+  });
   const left = pressed ? remainingLabel(missing.length + (needsSubject && !subjectId ? 1 : 0)) : null;
 
   return (

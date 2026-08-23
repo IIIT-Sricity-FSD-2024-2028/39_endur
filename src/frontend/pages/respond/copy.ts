@@ -8,7 +8,7 @@
 // Domain nouns come from the payload's `labels`, never from `useLabels()` — the respond
 // world mounts no store (39 § State). That is the whole reason these take a `labels`
 // argument instead of reading one.
-import type { ResolvedLabels } from '@endur/shared';
+import type { CampaignAccess, ResolvedLabels } from '@endur/shared';
 import { minutes } from '../../lib/format.js';
 
 /**
@@ -44,6 +44,46 @@ export function costLine(input: {
  */
 export const anonymityLine = (anonymous: boolean): string | null =>
   anonymous ? 'Your answers are anonymous.' : null;
+
+/**
+ * `<AccessNotice>` (24 §7) — SAY WHICH PROMISE IS BEING MADE, ON THE SCREEN WHERE IT IS
+ * MADE. One line above Submit, from the `anonymous` x `access` pair (DEC-037).
+ *
+ * Getting this wrong is a privacy failure rather than a copy failure. 52 §1 names two
+ * promises that used to be indistinguishable because only one side of the pair existed:
+ *
+ *   the ANSWER is anonymous       nothing links what you wrote to who you are.
+ *                                 ALWAYS true — it is INV-006 and it is in the schema.
+ *   your PARTICIPATION is private nobody knows you took part at all.
+ *                                 Only on an open link.
+ *
+ * An `organization` campaign keeps the first and gives up the second, and a respondent who
+ * has not been told that has been misled about the one thing 52 promises them.
+ *
+ * FOUR PAIRS, THREE SENTENCES AND ONE DELIBERATE SILENCE. The silence is
+ * `!anonymous && public`, and it is the same one `anonymityLine` already keeps, for the
+ * same documented reason: neither 39 nor design_specs/design/07 gives copy for it, and the
+ * two things this page could invent are both wrong — a promise it cannot keep, or a warning
+ * about a linkage the schema does not actually make. Nothing is added here that would need
+ * a contract that does not exist.
+ *
+ * `organizationName` comes from the payload (`PublicCampaign.organizationName`), which the
+ * respond world already has. Nothing is fetched to render this.
+ */
+export function accessNotice(input: {
+  anonymous: boolean;
+  access: CampaignAccess;
+  organizationName: string;
+}): string | null {
+  const anonymity = anonymityLine(input.anonymous);
+  if (input.access !== 'organization') return anonymity;
+
+  // TRUE in both halves and worth saying in both: the participant row records THAT this
+  // member answered and carries no reference to the response (10 §4.4). "but not what you
+  // said" is the schema's guarantee, not a policy the application could relax.
+  const participation = `${input.organizationName} will see that you responded, but not what you said.`;
+  return anonymity ? `${anonymity} ${participation}` : participation;
+}
 
 /** `Your feedback on Data Structures has been recorded anonymously.` (07 §7.5) */
 export function thanksLine(input: { subjectName?: string | undefined; anonymous: boolean }): string {

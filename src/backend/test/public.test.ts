@@ -71,6 +71,12 @@ describe('GET /public/campaigns/:token', () => {
     // The allowlist itself, asserted. Adding a key to the payload without adding it here
     // fails the test — which is the whole point of listing rather than excluding (13 §6).
     expect(Object.keys(res.body.data).sort()).toEqual([
+      // DEC-037, and it was added HERE first: the allowlist refused the payload until it
+      // was, which is the whole point of listing rather than excluding. `access` discloses
+      // nothing — reaching this payload means the gate already let you in — and
+      // <AccessNotice> needs the anonymous x access PAIR to say which promise is being
+      // made (52 §1).
+      'access',
       'anonymous',
       'campaignName',
       'estimatedSeconds',
@@ -215,6 +221,50 @@ describe('POST /public/campaigns/:token/responses', () => {
       'submitted_at',
     ]);
     expect(response.meta).toEqual({});
+  });
+
+  // DEC-040 / D-019. THIS TEST IS THE ONE THAT WOULD HAVE CAUGHT THE LEAK.
+  //
+  // The response row above has nothing to identify a respondent with, and that was true
+  // before this test existed. The link was in a table INV-006 never mentions: flushAudit
+  // wrote `ip` for every principal alike, and a submission writes an audit row in the same
+  // transaction as the response. Sorting both by time and zipping them gave IPs against
+  // answers.
+  //
+  // Dormant only because nothing read audit_log. 56 is the reader that makes it live.
+  it('writes an audit row for the submission that carries NO ip — DEC-040', async () => {
+    const rows = await prisma.auditLog.findMany({
+      where: { action: 'response.submit', targetId: campaignId },
+      select: { ip: true, actorUserId: true, action: true, targetId: true },
+    });
+
+    // INV-007 still holds: the submission IS recorded. It is deliberately the least
+    // informative row in the table.
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.ip).toBeNull();
+      expect(row.actorUserId).toBeNull();
+    }
+  });
+
+  // The same rule inverted, and it is not padding: without it, `ip: null` for everybody
+  // would pass the test above, and "we never write an IP" is a different (and worse)
+  // decision than "we write it only for a principal we can name". 56 renders these rows.
+  it('still writes ip for a STAFF mutation, so the rule is narrow and not a blanket', async () => {
+    const sectionA = await unitIdByName(founder.orgId, 'Section A');
+    const created = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Audit IP probe',
+      unitId: sectionA,
+    });
+    expect(created.status).toBe(201);
+
+    const row = await prisma.auditLog.findFirstOrThrow({
+      where: { orgId: founder.orgId, targetId: created.body.data.id as string },
+      select: { ip: true, actorUserId: true },
+      orderBy: { id: 'desc' },
+    });
+    expect(row.ip).not.toBeNull();
+    expect(row.actorUserId).not.toBeNull();
   });
 
   it('writes numeric_value alongside value, not instead of it', async () => {
