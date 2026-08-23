@@ -148,16 +148,32 @@ which is the argument INV-008 and INV-009 already make twice.
 `30` currently creates the organisation and drops into the setup wizard. Plan selection is
 inserted as a step **between** account creation and the wizard.
 
-**A trial is pre-selected and the step is skippable.** `16` §7 starts new organisations
-`trialing` on Gold for 14 days *"so the improvement loop is seen before it is sold"* — it is the
-differentiator, and hiding it behind a paywall on day one guarantees nobody discovers it. A
-mandatory plan choice before anyone has seen the product is a sign-up form that asks a question
-its reader cannot yet answer.
+**SUPERSEDED 2026-08-24 BY `DEC-048`. The step is a direct choice and there is no trial.**
+Three buttons — Bronze, Silver, Gold — and the one pressed is the tier the organisation is on,
+written by `register` with `status: 'active'`. Not skippable, nothing pre-selected, no
+`trialing`. Owner's words: *"just pick the option (bronze, silver and gold) and you get
+assigned that."*
 
-So: the step shows what the trial includes, offers the four tiers for anyone who already knows
-what they want, and defaults to *continue with the trial*. **This is why `D-012` matters** —
-nothing currently writes a `Subscription` row at all, so the trial the docs promise has never
-once happened. This step is where that row is created.
+**Enterprise is not on the picker.** `16` §4 prices it individually as *"a base platform plus
+chosen services"*, which is a sales conversation rather than a button. It stays
+operator-assigned through `platform.plan.override` (`19` §4) — a route the spec already has
+for exactly this.
+
+The paragraph this replaces argued for a pre-selected 14-day Gold trial, on the grounds that
+*"hiding the differentiator behind a paywall on day one guarantees nobody discovers it"* and
+that *"a mandatory plan choice before anyone has seen the product is a sign-up form that asks a
+question its reader cannot yet answer."* **Both arguments are about price, and `DEC-035`
+removed price the day before.** When any tier is one free click, a 14-day free trial of Gold is
+a countdown to nothing — on day 15 the organisation presses Gold again — and expiring it would
+need a scheduler, which `OPEN-005` says nothing in this product owns. The unanswerable question
+stops being unanswerable too: with no amounts, the choice is reversible at zero cost from
+Settings.
+
+**This step is still where `D-012` is repaid** — nothing currently writes a `Subscription` row
+at all, so every organisation in the product is silently Bronze and every Gold surface `402`s
+for everyone. `DEC-048` settles the three-way ambiguity that blocked it: the row is written at
+registration, with the tier the person chose. `T-088`, carved out of `T-058` because it needs
+none of the rest of this page.
 
 **With no prices the step is genuinely one click**, which is the whole reason DEC-035 is worth
 having: sign-up does not fork into a payment flow that would have to be faked for a demo and

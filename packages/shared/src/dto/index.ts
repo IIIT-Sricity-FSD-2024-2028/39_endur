@@ -9,6 +9,7 @@ export * from './unit.js';
 export * from './role.js';
 export * from './grant.js';
 export * from './person.js';
+export * from './account.js';
 export * from './subject.js';
 export * from './campaign.js';
 export * from './response.js';

@@ -1,7 +1,7 @@
 # 11 — Permission engine
 
 Phase: P1 · Milestone: M0 · Owns: `src/backend/authz/**`
-Decisions: `_MEMORY.md` DEC-002 · Invariants: INV-003, INV-004, INV-005
+Decisions: `_MEMORY.md` DEC-002, DEC-039, DEC-044 · Invariants: INV-003, INV-004, INV-005, **INV-012**
 Source: `design_specs/customization.md` §5
 
 This is the novelty claim and the reason the middleware chain is worth grading. Read it
@@ -66,7 +66,10 @@ file must agree (`DRIFT-004`).
 | | `grant.update` | **edit who can do what.** The most dangerous capability in the system | P2 |
 | **People** | `person.read` `person.create` `person.update` `person.delete` | `self`-scoped variants of the first two are seeded to **every** role — they are what make `/app/profile` (`47`) openable | P1 |
 | | `person.import` | CSV | P2 |
-| | `assignment.create` `assignment.delete` | give / remove a position | P1 |
+| | `assignment.create` `assignment.delete` | give / remove a position. **Bounded by §5b** | P1 |
+| **Accounts** | `account.create` | Provision a sign-in for an existing person — mints a one-time activation link, never a password (`57`). **Bounded by §5b** | P2 |
+| | `account.revoke` | Disable an account and end its sessions. The person and their positions survive | P2 |
+| | `account.reset` | Re-issue activation for someone who never activated or lost access | P2 |
 | **Groups** | `group.read` `group.create` `group.update` `group.delete` | committees, teams | P2 |
 | **Delegation** | `delegation.read` `delegation.create` `delegation.revoke` | stand-ins | P2 |
 | **Subjects** | `subject.read` `subject.create` `subject.update` `subject.archive` | | P1 |
@@ -80,7 +83,7 @@ file must agree (`DRIFT-004`).
 | | `results.read` | aggregates | P1 |
 | | `results.export` | | P2 |
 | **Trust** | `simulator.run` | "why was this allowed?" | P2 |
-| | `audit.read` | | P2 |
+| | `audit.read` | The organisation's own activity log, `56`. Reads allows **and denies** (DEC-041) | P2 |
 | **Platform** | `apikey.read` `apikey.create` `apikey.revoke` | Enterprise only | P3 |
 | | `billing.read` `billing.update` | | P2 |
 | **Improve** | `reflection.create` `reflection.read` | | P3 |
@@ -158,7 +161,40 @@ Anchor resolution, by grant subject kind:
 | a **role** node | the unit of each position the principal holds with that role — evaluated once per position |
 | a **position** node | that position's unit |
 | a **group** node | the group's `meta.scopeUnitId`; absent ⇒ the whole org |
-| a **person** node | the person's primary position's unit; absent ⇒ `self` only |
+| a **person** node | the person's **home unit** — see below (DEC-044) |
+
+### The home unit — DEC-044
+
+| The person has | Anchor |
+|---|---|
+| One **primary** position | Its unit. This is the original rule |
+| No primary, exactly **one** position | That one's unit |
+| No primary, **two or more** positions | **None** — no unit-scoped claim |
+| No positions | **None** — `self` and `all` grants only |
+
+The second row exists because `isPrimary` **defaults to `false`** on `CreateAssignmentBody`,
+so the ordinary *"give this person a position"* call produces no primary at all. A strict
+primary-only rule would have left per-person overrides inert for the commonest shape in the
+product — which is the bug DEC-044 was written to fix.
+
+The third row refuses to guess, and that is deliberate. `isPrimary` exists to resolve exactly
+that ambiguity; picking one anyway would anchor somebody's override at whichever row the
+database happened to return first, and **a permission system that answers non-deterministically
+is worse than one that answers narrowly.** The trace records `"the grant has no anchor unit"`
+so the simulator (`42`) explains it rather than leaving it a mystery.
+
+> **This was broken until 2026-08-23, and silently.** `collect.ts` registered the person node
+> with no unit at all, so `scopeCovers()` correctly refused every unit-scoped person grant a
+> claim — and **a per-person deny at `own_unit` or `subtree` did nothing whatsoever.** INV-004
+> says a deny beats an allow unconditionally; a deny that never applies never beats anything.
+> The per-person *allow* was equally inert. Every existing test used scope `all`, which needs
+> no anchor, which is why four audits missed it (`CONF-020`, `D-020`).
+>
+> A related bug in `held.ts` fell out of the same misreading and was **pre-existing**: it
+> subtracted an org-wide deny only when the grant had no anchor, but `all` scope is decided
+> before an anchor is ever consulted — so an `all`-scoped deny on a **role** was never
+> subtracted from the UI capability set either. Scope is the test; the anchor is irrelevant
+> to it.
 
 ---
 
@@ -241,6 +277,117 @@ non-production. Production 403s carry `decidedBy` and `reason` only — enough t
 actionable, not enough to map the org's permission structure from outside.
 
 ---
+
+---
+
+## 5b. The escalation bound — you cannot hand out what you do not hold
+
+**INV-012. No principal may create a position, a grant or an account whose resolved powers
+exceed their own.**
+
+§5 answers *may this person act on this target*. It does **not** answer *may this person
+create an actor more powerful than themselves*, and those are different questions. Until
+2026-08-23 the product only asked the first one, and that was a hole:
+
+> `POST /people/:id/assignments` requires `assignment.create` on the target unit and nothing
+> else. A caller holding exactly that one capability — a departmental coordinator, say, whose
+> job really is to put people into positions — could assign the **Owner** role at the root
+> unit to a colleague, or to a second account of their own, and hold the organisation an hour
+> later. Every check passed. There is no bug to point at; the resolver worked exactly as
+> specified, because nobody had specified this.
+
+Found while writing `57-FEATURE-accounts-and-invites.md`, and it is the same shape as the
+`billing.update` hole `DEC-034` found: a capability that is safe to *hold* becomes unsafe to
+*hand out* the moment there is a route that hands things out. `57` is that route, which is
+why the bound is written here rather than there — the guard belongs to the engine, not to one
+feature.
+
+### The rule
+
+```
+mayGrant(actor, position) :=
+  for every capability C in the catalogue:
+    for every anchor unit U the position would reach C at:
+      resolve(position, C, U).allowed  ==>  resolve(actor, C, U).allowed
+```
+
+In words: **the capability set the new position resolves to, at the units it resolves them
+at, must be a subset of the actor's own set at those same units.** A dean may create another
+dean inside their own faculty. A dean may not create an owner, and may not create a dean of a
+faculty that is not theirs — the second is already INV-005 and the guard is the first.
+
+Three properties of that formulation matter:
+
+**It is computed from the resolver, never from `Node.level`.** Level is ordering and seeding
+only (DEC-002, CONF-002); a comparison like *"level 3 may create level 4 and below"* would
+re-introduce the integer-level model through a side door, and would be wrong the moment an
+administrator edits the powers grid so that a lower-numbered role holds less.
+
+**A deny the actor carries must survive into what they create.** If a coordinator is denied
+`grant.update` anywhere, they cannot create a position that is allowed it — otherwise a deny
+is escapable by proxy, and INV-004 becomes a suggestion.
+
+**It never widens anything.** The bound can only refuse; it is a second gate after
+`requireCapability`, never a substitute for it. A route still needs its capability. This is
+the same posture as `requireEntitlement` (`12` §4.11) — an extra reason to say no.
+
+### Where it applies
+
+| Route | Status | Why |
+|---|---|---|
+| `POST /people/:id/assignments` | **Built, `T-071`** | The original hole. A position is the only thing that carries powers (INV-005) |
+| `POST /people/import` | **Built, `T-071`** | **The import creates positions too**, behind `person.import` alone — found while building the guard. Without it the row above is bypassable in one call by naming a senior role in a one-row CSV |
+| `POST /people/:id/account` (`57`) | **Built, `T-072`** | Provisioning a sign-in for a position is what turns the graph into access. The pairs come from the positions the person ALREADY HOLDS — the bound is checked against what they would wake up holding |
+| `POST /people/:id/account/reset` (`57`) | **Built, `T-072`** | **Found while building the row above.** Re-issuing mints an equally working link for the same account, so a bound on one and not the other is a bound with a second door. Same shape as the `POST /people/import` row |
+| `PATCH /grants` (the powers grid, `33`) | `T-052` | Editing a role's row raises everyone holding it. Already partly covered by `33`'s lockout guard; this generalises it |
+
+`POST /people` is deliberately **not** in that table. A person with no position has no powers
+at all, which is exactly why `34` keeps roles out of the create-person DTO — so there is
+nothing to bound yet.
+
+**The bulk path is the one to notice.** A guard mounted only on the single-assignment route
+would have been *worse than no guard*, because the board would have recorded the hole as
+repaid. The two routes share one resolution of *"which role does this row mean"*
+(`features/people/positions.ts`) rather than each doing their own, because the failure mode
+of two copies is a row the guard did not check and the handler did create.
+
+### What it actually catches first, which is not what you would guess
+
+The bound is about **reach**, not possession. Building it produced a case worth recording:
+a Section Head holding `assignment.create: own_unit` who tries to assign the *Principal*
+role in their own unit is refused on **`assignment.create` itself** — the Principal role
+carries it at `subtree`, which reaches units the Section Head cannot. The capability is one
+they hold; the *distance* is not.
+
+So a refusal naming a capability the caller obviously has is correct rather than confusing,
+and the message says **where**: *"That position includes `assignment.create` on Team A1,
+which you do not hold there yourself."* A message naming only the capability would have read
+as a bug in exactly this, the most common case.
+
+### The failure it returns
+
+`403 WOULD_ESCALATE` (its own code in `13` §5, not a plain `FORBIDDEN`) with
+`details.capability` and `details.unitName`:
+
+> *"That position includes `grant.update` on Engineering, which you do not hold there
+> yourself."*
+
+**One finding, not all of them.** The caller needs one specific power named to understand
+the refusal; enumerating every over-reach of an Owner role produces a forty-item list that
+says less than one line does.
+
+Naming the specific capability is not a nicety. A bare "not allowed" on this route reads as a
+bug to the administrator, who can plainly see they hold `assignment.create`; the answer they
+need is *which* power they were about to hand out that they do not have.
+
+### The bootstrap exception, stated so nobody finds it by accident
+
+Registration and `/org/setup` create the founder's position before any actor exists to bound
+against (`15` §5, `31`). They run **before** this guard, not around it: they are seeded, not
+granted, and the seam is that both write inside the registration transaction rather than
+through `POST /assignments`. Any future route that seeds a position must go through the same
+seam or through the guard — never neither.
+
 
 ## 6. Implementation
 
@@ -351,6 +498,21 @@ The administrator edits these in the powers grid. Editing a derived grant clears
 - [ ] A production 403 body contains `reason` and `decidedBy` but never `considered`
 - [ ] Default-deny: a fresh capability nobody has been granted is refused for every principal
 - [ ] Every seeded role can read and update **itself** — the `/app/profile` precondition
+- [ ] **A per-person deny at `subtree` actually denies** (DEC-044) — the test that would have
+      caught `D-020`, and its `own_unit` counterpart stops at the anchor rather than sweeping
+      the branch
+- [ ] A per-person **allow** at `own_unit` actually grants
+- [ ] `visibleUnits()` subtracts the same per-person deny the resolver honours — the list side
+      and the detail side must not disagree
+- [ ] Two unflagged positions produce **no** anchor, and the trace says why
+- [ ] `heldCapabilities()` subtracts an `all`-scoped deny **whether or not it is anchored**
+- [ ] **INV-012**: a caller holding only `assignment.create` cannot assign a role that would
+      resolve to a capability they do not hold at that unit — the escalation test (§5b)
+- [ ] A deny the actor carries cannot be escaped by creating a position that lacks it
+- [ ] The escalation bound is computed from `resolve()`, never from `Node.level` — asserted
+      by inverting two roles' levels and observing the bound not move
+- [ ] Registration and `/org/setup` still seed the founder's position with no actor to bound
+      against, and no other path can
 
 ## 11. Out of scope
 

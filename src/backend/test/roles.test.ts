@@ -214,8 +214,13 @@ describe('GET /authz/capabilities', () => {
 
     expect(res.status).toBe(200);
     const catalogue = res.body.data as Array<{ key: string; module: string; phase: string }>;
-    expect(catalogue).toHaveLength(61);
+    // 64 since T-072 added the Accounts module (account.create/reset/revoke, 11 §3).
+    // The number is asserted rather than derived on purpose: a capability appearing in the
+    // catalogue is a permission the powers grid will render and an administrator can hand
+    // out, so it should never arrive without somebody changing this line.
+    expect(catalogue).toHaveLength(64);
     expect(catalogue.some((entry) => entry.key === 'campaign.launch')).toBe(true);
+    expect(catalogue.some((entry) => entry.module === 'Accounts')).toBe(true);
     // Phase travels with each capability so the grid can grey out P3 rows without needing
     // a second table (T-003's note on CAPABILITY_CATALOGUE).
     expect(catalogue.some((entry) => entry.phase === 'P3')).toBe(true);

@@ -9,12 +9,15 @@
 // produce two links — the QR already on screen would then point at the wrong one.
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { AudienceRule, CampaignDetail, Label, SubjectSummary, UnitNode } from '@endur/shared';
+import type {
+  AudienceRule, CampaignAccess, CampaignDetail, Label, SubjectSummary, UnitNode,
+} from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { Toggle } from '../../../components/form/Toggle.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
 import { useLabels } from '../../../lib/labels.js';
+import { useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
 import { useTemplates } from '../../../lib/templates.js';
@@ -39,6 +42,8 @@ export function autoName(templateName: string, now = new Date()): string {
 export default function CampaignNew(): JSX.Element {
   const labels = useLabels();
   const navigate = useNavigate();
+  /** The org's own name, so the restricted option names it rather than saying "your org". */
+  const orgName = useAppSelector((state) => state.auth.org?.name ?? '');
 
   const templates = useTemplates();
   const subjects = useSubjectList({});
@@ -53,6 +58,12 @@ export default function CampaignNew(): JSX.Element {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [anonymous, setAnonymous] = useState(true);
+  /**
+   * DEC-037, and `public` is the default on purpose: it is the demo path, and it is the only
+   * mode where a respondent needs nothing at all. Immutable after launch, so it is asked
+   * BEFORE the irreversible button and restated on the summary card.
+   */
+  const [access, setAccess] = useState<CampaignAccess>('public');
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +102,7 @@ export default function CampaignNew(): JSX.Element {
         subjectIds,
         audience,
         anonymous,
+        access,
         ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
         ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
       })
@@ -118,8 +130,11 @@ export default function CampaignNew(): JSX.Element {
         startsAt: startsAt || null,
         endsAt: endsAt || null,
         anonymous,
+        // On the last card anybody reads before the irreversible action, because it is one
+        // of the two things launch makes permanent (10 §4.3).
+        access,
       }),
-    [name, template, subjectIds.length, labels.subject, startsAt, endsAt, anonymous],
+    [name, template, subjectIds.length, labels.subject, startsAt, endsAt, anonymous, access],
   );
 
   return (
@@ -257,6 +272,55 @@ export default function CampaignNew(): JSX.Element {
 
           {/* The visible proof that the org graph is real and not decorative. */}
           <p className="audience-count">{audienceLine}</p>
+
+          {/* TWO DIFFERENT QUESTIONS, and 38 exists partly to stop them being folded into
+              one. Above: who is EXPECTED to answer — a denominator, enforced nowhere.
+              Below: who GETS IN — a gate, enforced on every request to the link. A campaign
+              can perfectly well be "open to anyone with the link, and we expect the 40
+              people in Housekeeping" — that is the commonest shape in the seed, and folding
+              the two together would make it unsayable. The heading break is what says so. */}
+          <h3>Who gets in?</h3>
+          <div className="q-options">
+            <label className="q-option">
+              <input
+                type="radio"
+                name="access"
+                checked={access === 'public'}
+                onChange={() => setAccess('public')}
+              />
+              <span className="q-dot" aria-hidden="true" />
+              {/* NOT "Anyone with the link" — that is the audience option four lines above,
+                  and two radios with the same visible label on one screen is the exact
+                  confusion the section break exists to prevent. Caught by a test that
+                  suddenly matched two elements. This one is about getting IN, so it says
+                  so. */}
+              <span>Open to everyone</span>
+              <span className="text-meta">No sign-in. Nobody learns who answered</span>
+            </label>
+            <label className="q-option">
+              <input
+                type="radio"
+                name="access"
+                checked={access === 'organization'}
+                onChange={() => setAccess('organization')}
+              />
+              <span className="q-dot" aria-hidden="true" />
+              <span>Only people in {orgName || 'your organization'}</span>
+              {/* THE CONSEQUENCE, stated where the choice is made rather than in a help
+                  page. This mode gives up a promise (52 §1) — participation stops being
+                  private even though the answer stays anonymous — and the person choosing
+                  it is the one who should be told, in the same breath. */}
+              <span className="text-meta">
+                They sign in first. You’ll see who responded, never what they said
+              </span>
+            </label>
+          </div>
+          {access === 'organization' && (
+            <p className="field-help">
+              This cannot be changed after launch, and people outside{' '}
+              {orgName || 'your organization'} will not be able to answer even with the link.
+            </p>
+          )}
         </section>
       )}
 
@@ -338,6 +402,7 @@ export default function CampaignNew(): JSX.Element {
           status="open"
           endsAt={launched.campaign.endsAt}
           anonymous={launched.campaign.anonymous}
+          access={launched.campaign.access}
           onClose={() => navigate(`/app/campaigns/${launched.campaign.id}`)}
         />
       )}

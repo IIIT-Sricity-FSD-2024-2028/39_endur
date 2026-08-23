@@ -180,6 +180,7 @@ CREATE TABLE users (
   status          TEXT NOT NULL DEFAULT 'active', -- active | invited | disabled
   avatar_file_id  UUID REFERENCES files(id) ON DELETE SET NULL,  -- 48
   last_login_at   TIMESTAMPTZ,
+  disabled_at     TIMESTAMPTZ,            -- set by account.revoke, CLEARED on activation (57)
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (org_id, email)
 );
@@ -291,6 +292,12 @@ CREATE TABLE campaigns (
   starts_at     TIMESTAMPTZ,
   ends_at       TIMESTAMPTZ,
   anonymous     BOOLEAN NOT NULL DEFAULT true,
+  access        TEXT NOT NULL DEFAULT 'public',  -- 'public' | 'organization'. DEC-037.
+                                                 -- A SECOND AXIS, not a kind of audience_rule:
+                                                 -- audience_rule describes WHO IS EXPECTED and
+                                                 -- is a denominator; access decides WHO GETS IN
+                                                 -- and is a gate. Immutable after launch, same
+                                                 -- trigger and same reason as `anonymous`.
   public_token  TEXT UNIQUE,                   -- the /r/:token link. NULL until launched.
                                               -- 8 chars, unambiguous alphabet (DEC-017).
   closed_at     TIMESTAMPTZ,                  -- set by /close. the only stored transition.
@@ -315,11 +322,17 @@ ends_at   < now()       ->  closed
 otherwise               ->  open
 ```
 
-`anonymous` is **immutable once the campaign leaves draft**, and leaving draft is exactly
-`public_token IS NOT NULL` — minting the token is the irreversible act, so the trigger is
-keyed on the column that carries the truth. Enforced by a trigger, not only in the service
-layer. Respondents were promised anonymity at submission time; letting an admin flip it
+`anonymous` **and `access`** are **immutable once the campaign leaves draft**, and leaving
+draft is exactly `public_token IS NOT NULL` — minting the token is the irreversible act, so the
+trigger is keyed on the column that carries the truth. Enforced by a trigger, not only in the
+service layer. Respondents were promised anonymity at submission time; letting an admin flip it
 afterwards would retroactively break that promise (INV-006, `52`).
+
+`access` joins that trigger rather than getting a softer rule of its own. Loosening it
+mid-flight would let people who were told *"only your colleagues can answer this"* be answered
+alongside strangers, and tightening it would strand a link already handed out. Both are
+promises made at the moment the code was printed on a table card, and neither is a promise the
+product should be able to take back. **One trigger, two columns, one reason.**
 
 ### 4.4 `responses` and `answers`
 
@@ -361,10 +374,34 @@ CREATE TABLE invitations (
 );
 ```
 
-`invitations` records **that** a token was used. `responses` records **what** was said.
+```sql
+-- DEC-037. The `organization`-access counterpart to `invitations`, and deliberately the
+-- SAME SHAPE: it records THAT a member responded, never WHAT they said.
+CREATE TABLE campaign_participants (
+  campaign_id  UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  responded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign_id, user_id)
+);
+```
+
+**There is no `response_id` on that table and there will never be one** — it is the column
+that would undo INV-006 in a single migration. The primary key is what prevents a second
+submission; the absence of a third column is what keeps the first one anonymous.
+
+`invitations` records **that** a token was used. `campaign_participants` records **that** a
+member responded. `responses` records **what** was said.
 Nothing joins them. So the system can say "312 of 400 invited people responded" and still
 cannot say which response is whose. This separation is the whole privacy architecture and is
 worth stating explicitly under questioning.
+
+**What that costs, said out loud rather than left for someone to notice:** on an
+`organization` campaign, participation is *not* anonymous — an administrator can see that Priya
+answered and that Sam did not, exactly as `invitations` has always allowed for invited
+campaigns. What stays anonymous is the answer. That is a real and defensible guarantee, and it
+is a different one from *"nobody knows I took part"*, so `39`'s `<AccessNotice>` says which of
+the two the respondent is being given (`24` §7). A promise the product cannot keep is worse
+than a narrower promise it can.
 
 `numeric_value` exists because every results query aggregates rating and NPS answers, and
 `(value->>'n')::numeric` on every row is the difference between a fast page and a slow one.
@@ -406,11 +443,43 @@ CREATE TABLE audit_log (
   action        TEXT NOT NULL,          -- the capability string
   target_type   TEXT,
   target_id     UUID,
+  outcome       TEXT NOT NULL DEFAULT 'allowed',  -- 'allowed' | 'denied'. DEC-041.
   decided_by    JSONB,                  -- WHICH GRANT decided it. INV-007.
   request_id    TEXT,
-  ip            INET,
+  ip            INET,                   -- NULL FOR NON-USER PRINCIPALS. DEC-040. See below.
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Account provisioning. DEC-038, spec 57.
+-- NOT called `invitations` -- that name is taken, means campaign tokens, and two tables
+-- called invitations in one schema is a mistake somebody makes at 2am.
+CREATE TABLE account_invites (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash  TEXT NOT NULL UNIQUE,     -- SHA-256. The link is shown ONCE and never stored.
+  expires_at  TIMESTAMPTZ NOT NULL,     -- 7 days
+  accepted_at TIMESTAMPTZ,
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX ON account_invites (user_id) WHERE accepted_at IS NULL;
+-- ^ one live invite per person. Re-issuing (account.reset) deletes the old row rather than
+-- adding a second, so a superseded link stops working the moment its replacement is minted.
+
+-- Per-caller inbox triage. 58.
+CREATE TABLE inbox_state (
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  response_id UUID NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
+  read_at     TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  PRIMARY KEY (user_id, response_id)
+);
+-- Keyed by USER, not by org: read state is a reader's, not the organisation's, so two
+-- administrators triaging one campaign never mark each other's queue. org_id rides along
+-- for the tenant seam (db/tenant.ts) and for a cascade that does not need a join.
+-- It holds no response CONTENT, so it is not a second path to one (INV-006, 58).
 
 CREATE TABLE api_keys (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -436,6 +505,42 @@ CREATE TABLE subscriptions (
 
 `audit_log.decided_by` stores the decision trace from the resolver. It is what turns "access
 denied" from an assertion into evidence, and it is what the simulator replays (`42`).
+
+### `audit_log.ip` is NULL for non-user principals — DEC-040
+
+`ip` is written for a `user` principal and **must be NULL for a `respondent` one**. This is not
+hygiene; it closes a live path back to a respondent:
+
+> Every response submission writes an audit row — correctly, INV-007 covers every state change
+> and a submission is the most consequential one in the product. That row carries
+> `action: 'response.submit'`, the campaign id, `created_at`, and — until 2026-08-23 — the
+> **submitting IP address**. `responses.submitted_at` is written in the same transaction. So
+> ordering the audit rows and the response rows by time and zipping them yields a list of IPs
+> against responses, and INV-006 is defeated through a table it never mentions.
+
+Nothing read `audit_log` while that was true, which is exactly why it survived four audits.
+**`56-PAGE-activity-log.md` is what would have made it live**, and the column is fixed with the
+page rather than after it.
+
+For a `user` principal `ip` earns its place — *who changed this permission, and from where* is
+real forensics on the one table that answers it. The rule is therefore narrow and mechanical:
+`db/tx.ts` writes `ip` only when `principal.kind === 'user'`, asserted by a test that submits a
+response and checks the column is NULL.
+
+### `audit_log.outcome` — the log records refusals too, DEC-041
+
+INV-007 says every state change writes a row, so historically a row meant *something
+happened*. **A denial is also worth recording**, and it is the half an administrator actually
+wants from something called a log: *somebody tried to launch a campaign in Engineering and was
+refused* is a security event; *somebody launched one* is a business record.
+
+Scoped deliberately to keep the volume honest: **denials of mutating capabilities only.** A
+403 on a `GET` is the permission system working as designed, thousands of times a day, and
+writing all of them would produce a table nobody can read — the same reasoning that keeps a
+403 at `warn` rather than `error` in `18` §4.
+
+`decided_by` is populated on a denial too, and on a denial it is the *most useful* — the
+narrowest deny that stopped it, which is the answer to "whom do I ask".
 
 ---
 
@@ -577,7 +682,9 @@ imports all write too (`customization.md` §6).
 | Cycle detection per dimension | `wouldCreateCycle()` before any `contains`/`reports` insert |
 | One level per role | `CHECK` + the `node_level_only_on_role` constraint |
 | Single parent per dimension | Unique index on `(org_id, dimension, type, child_id)` for `contains`/`reports` |
-| Campaign anonymity immutable after draft | Trigger on `campaigns` |
+| Campaign anonymity **and access** immutable after draft | One trigger on `campaigns`, both columns (§4.3) |
+| One live account invite per person | Partial unique index on `account_invites (user_id) WHERE accepted_at IS NULL` |
+| A member responds at most once to an `organization` campaign | `campaign_participants` primary key, **not** a service check |
 | Answer type matches question kind | Service layer, via the discriminated DTO union (`14` §4) |
 | Response only while campaign is `open` | Service layer + `CHECK` on the write path |
 
@@ -594,6 +701,21 @@ detection is the highest-value of these (`customization.md` §6) and is specifie
 - [ ] `prisma migrate dev` runs clean from an empty database
 - [ ] Seed produces four orgs across industries, each with historical responses (`50`)
 - [ ] `unitSubtree` returns correct ids for a 4-level tree and terminates on a cycle
+- [x] `campaigns.access` cannot change once `public_token` is set — trigger test, alongside
+      the existing `anonymous` one and in the same trigger. Built at `T-069`: one function,
+      `endur_campaign_promises_are_immutable()`, raising a different message per column, and
+      the `anonymous` half is re-asserted in the same file so the rename cannot have dropped
+      it. A `CHECK` refuses any third value, tested on a **draft** — on a launched campaign
+      the trigger fires first and the constraint would go unproven
+- [x] `campaign_participants` has no column referencing a response, asserted against the
+      live schema rather than the migration file — three columns, exactly
+- [x] A respondent submission writes an audit row whose `ip` is **NULL** (DEC-040) — **and
+      whose actor is NULL too, whoever is signed in** (DEC-045). The narrower rule is the one
+      that survives `access: 'organization'`, where the submitter *is* a user principal
+- [x] A staff mutation writes an audit row whose `ip` **and actor** are populated — the same
+      test, inverted, so the rule cannot be satisfied by blinding the log
+- [ ] Re-issuing an account invite invalidates the previous link, enforced by the partial
+      unique index and not by a service `deleteMany`
 - [ ] A cross-tenant read is impossible: attempting one with a forged `orgId` in a body has
       no effect, because the body value is never consulted
 - [ ] `responses` has no column referencing a person, verified by inspecting the schema

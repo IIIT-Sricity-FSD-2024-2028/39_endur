@@ -1,8 +1,21 @@
 # 44 — The improve loop
 
-Phase: **P3** · Milestone: — · Source: `design_specs/SCOPE.md` §"Improve", `_MEMORY.md` § GLOSSARY
+Phase: **P3, re-tagged buildable 2026-08-23 — CONF-019** · Milestone: —
+Source: `design_specs/SCOPE.md` §"Improve", `_MEMORY.md` § GLOSSARY
 
-**Do not build before P3.** Sidebar item disabled with a "Soon" tag, no page behind it.
+> **Status changed 2026-08-23.** This document said *"do not build before P3"* and the owner
+> asked for every disabled sidebar item to be completed (`CONF-019`). `Reflect` is the sidebar
+> item this specifies.
+>
+> **It has one hard prerequisite and it is not negotiable: `D-012`.** Every capability here is
+> **Gold**-entitled, and no organisation has ever had a `subscriptions` row — so
+> `requireEntitlement` reads `'bronze'` for everyone and this entire surface returns `402` to
+> every user in the product, forever. Building the screens first would produce a feature that
+> nobody, including the demo, can open. **`T-057` before `T-081`**, and that ordering is the
+> single most important line in this document today.
+>
+> The P3 tag stays on the parts that need a scheduler or an engine: cycle-over-cycle
+> measurement (step 5), and the coaching suggestions already ruled out below.
 
 ## Purpose
 
@@ -150,8 +163,12 @@ Scoped to one check-in, it stays a feature; unscoped, it becomes a product.
 | 402 | Upgrade card explaining what Gold adds |
 | Finalised | Read-only, with a visible finalisation timestamp |
 
-## Acceptance — P3
+## Acceptance
 
+- [ ] **`D-012` is repaid first** — an org has a real `subscriptions` row and a Gold org can
+      open this at all. Assert it by opening the page as a Bronze org and getting `402`, and
+      as a Gold org and getting the page: two orgs, two outcomes, which is impossible while
+      every org is silently Bronze
 - [ ] Results for a reviewee are refused by the **API** until their reflection is submitted
 - [ ] A reviewee cannot read another reviewee's reflection at the same level
 - [ ] A supervisor reads their subtree's reflections and nothing outside it (INV-005)

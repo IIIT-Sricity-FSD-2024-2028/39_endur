@@ -24,13 +24,16 @@ import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { resolve, seesNothing, visibleUnits, clearGrantCache } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
+import { nameMaps, resolveRow } from './positions.js';
+import { assertPersonVisible as assertVisible, personScopeFilter } from './visibility.js';
+import { accountStatusOf } from '../accounts/status.js';
 
 /**
  * The list, scope-filtered by the API (INV-003).
  *
- * A person is visible when one of their positions sits in a unit the caller can see. Their
- * own row is always visible, which is what the universal `person.read self` grant is for —
- * without it a default-deny model produces an unopenable profile page (50 §1).
+ * The rule itself lives in `visibility.ts`, because the detail route has to apply exactly
+ * the same one — a row that appears in this table and then 404s when somebody clicks it is
+ * the failure N-005 and N-016 are about.
  */
 export async function listPeople(
   orgId: string,
@@ -43,23 +46,11 @@ export async function listPeople(
     return { data: [], page: { nextCursor: null, hasMore: false }, meta: { total: 0 } };
   }
 
-  const scopeFilter = visibility.all
-    ? {}
-    : {
-        OR: [
-          // Reachable through a position in a visible unit...
-          {
-            edgesAsParent: {
-              some: {
-                type: 'member' as const,
-                child: { unitId: { in: visibility.unitIds } },
-              },
-            },
-          },
-          // ...or it is the caller themselves.
-          ...(visibility.self ? [{ userId }] : []),
-        ],
-      };
+  // ONE predicate, shared with the detail route (visibility.ts). It used to be written out
+  // here and again inside assertVisible, and the two had already drifted: neither admitted
+  // a person with NO positions, which made everybody `POST /people` creates invisible to
+  // the caller who created them (D-026).
+  const scopeFilter = personScopeFilter(visibility, userId);
 
   const where = {
     orgId,
@@ -87,49 +78,6 @@ export async function listPeople(
   ]);
 
   return pageOf(rows, query.limit, total, toSummary);
-}
-
-/**
- * The row-level half of the person guard.
- *
- * requireCapability can only ask "do you hold this anywhere" for a person route, because a
- * person is not anchored to a unit in the request — their POSITIONS are, and those are only
- * known once the row is read. This closes that gap, and it answers 404 rather than 403 for
- * the same reason every out-of-scope read does: a 403 would confirm the person exists to
- * somebody who cannot see them (13 §5).
- */
-async function assertVisible(
-  orgId: string,
-  callerId: string,
-  authzVersion: number,
-  personId: string,
-  capability: 'person.read' | 'person.update' | 'person.delete' | 'assignment.delete',
-): Promise<void> {
-  const visibility = await visibleUnits({ orgId, userId: callerId, capability, authzVersion });
-  if (visibility.all) return;
-
-  const person = await prisma.node.findFirst({
-    where: { id: personId, orgId, kind: 'person' },
-    select: {
-      userId: true,
-      edgesAsParent: {
-        where: { type: 'member' },
-        select: { child: { select: { unitId: true } } },
-      },
-    },
-  });
-  if (!person) throw new NotFoundError('That person does not exist.');
-
-  // Their own row, always. That is what the universal `person.read self` grant buys, and
-  // without it a default-deny model produces an unopenable profile page (50 §1).
-  if (visibility.self && person.userId === callerId) return;
-
-  const units = person.edgesAsParent
-    .map((edge) => edge.child.unitId)
-    .filter((unitId): unitId is string => Boolean(unitId));
-  if (units.some((unitId) => visibility.unitIds.includes(unitId))) return;
-
-  throw new NotFoundError('That person does not exist.');
 }
 
 export async function readPerson(
@@ -229,13 +177,16 @@ export async function updatePerson(
 
   return runInTransaction(req, async (tx) => {
     if (body.name) await tx.node.update({ where: { id: personId }, data: { name: body.name } });
-    if (person.userId && (body.name || body.email || body.status)) {
+    // NAME AND EMAIL ONLY. `status` used to be settable here and it was a fake revoke —
+    // it blocked new sign-ins while leaving live sessions and the password hash intact,
+    // under a weaker capability than `account.revoke`. D-024, and 57 § Revocation owns the
+    // real one.
+    if (person.userId && (body.name || body.email)) {
       await tx.user.update({
         where: { id: person.userId },
         data: {
           ...(body.name ? { name: body.name } : {}),
           ...(body.email ? { email: body.email } : {}),
-          ...(body.status ? { status: body.status } : {}),
         },
       });
     }
@@ -439,23 +390,16 @@ export async function commitImport(
   orgId: string,
   body: ImportPeopleBody,
 ): Promise<{ created: number; updated: number; assigned: number; skipped: string[] }> {
-  const [roles, units] = await Promise.all([
-    prisma.node.findMany({ where: { orgId, kind: 'role' }, select: { id: true, name: true } }),
-    prisma.node.findMany({ where: { orgId, kind: 'unit' }, select: { id: true, name: true } }),
-  ]);
-  const roleByName = new Map(roles.map((role) => [role.name.toLowerCase(), role.id]));
-  const unitByName = new Map(units.map((unit) => [unit.name.toLowerCase(), unit.id]));
+  // The SAME resolution the INV-012 guard ran in front of this route (positions.ts). Two
+  // copies of "which role does this row mean" would eventually disagree, and the failure
+  // mode of that disagreement is a row the guard did not check and this loop did create.
+  const maps = await nameMaps(orgId);
 
   const result = { created: 0, updated: 0, assigned: 0, skipped: [] as string[] };
 
   await runInTransaction(req, async (tx) => {
     for (const row of body.rows) {
-      const roleId = row.roleName
-        ? (body.roleMapping[row.roleName] ?? roleByName.get(row.roleName.toLowerCase()))
-        : undefined;
-      const unitId = row.unitName
-        ? (body.unitMapping[row.unitName] ?? unitByName.get(row.unitName.toLowerCase()))
-        : undefined;
+      const { roleId, unitId } = resolveRow(maps, body, row);
 
       // A row naming a role or unit nobody resolved is SKIPPED and reported, never
       // silently imported without its position. Somebody who appears in the list with no
@@ -604,7 +548,25 @@ const personSelect = {
   name: true,
   userId: true,
   createdAt: true,
-  user: { select: { email: true, status: true } },
+  user: {
+    select: {
+      email: true,
+      status: true,
+      lastLoginAt: true,
+      disabledAt: true,
+      // READ, REDUCED TO A BOOLEAN IN toSummary(), AND NEVER RETURNED. `status` alone
+      // cannot answer "can this person sign in": `PATCH /people/:id` can set a status and
+      // the login query trusts the HASH, not the string (features/auth/router.ts). The
+      // panel must agree with the door, so it asks the same column the door asks.
+      passwordHash: true,
+      // At most one row — a partial unique index on (user_id) WHERE accepted_at IS NULL.
+      accountInvites: {
+        where: { acceptedAt: null },
+        select: { expiresAt: true, createdAt: true },
+        take: 1,
+      },
+    },
+  },
   edgesAsParent: {
     where: { type: 'member' as const },
     select: {
@@ -620,7 +582,14 @@ type PersonRow = {
   name: string;
   userId: string | null;
   createdAt: Date;
-  user: { email: string; status: string } | null;
+  user: {
+    email: string;
+    status: string;
+    lastLoginAt: Date | null;
+    disabledAt: Date | null;
+    passwordHash: string | null;
+    accountInvites: Array<{ expiresAt: Date; createdAt: Date }>;
+  } | null;
   edgesAsParent: Array<{
     id: string;
     isPrimary: boolean;
@@ -642,5 +611,16 @@ function toSummary(person: PersonRow): PersonSummary & { createdAt: string } {
       isPrimary: edge.isPrimary,
     })),
     createdAt: person.createdAt.toISOString(),
+    // 57. Derived in ONE place, shared with the detail route, and the hash is reduced to a
+    // boolean HERE so it cannot travel any further than this expression.
+    account: person.user
+      ? accountStatusOf({
+          hasPassword: person.user.passwordHash !== null,
+          status: person.user.status,
+          lastLoginAt: person.user.lastLoginAt,
+          disabledAt: person.user.disabledAt,
+          liveInvite: person.user.accountInvites[0] ?? null,
+        })
+      : { state: 'none' },
   };
 }

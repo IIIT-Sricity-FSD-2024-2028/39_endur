@@ -15,6 +15,20 @@ import { ApiError, apiGet, apiPost } from './api.js';
 /** Local knowledge, honestly best-effort: a marker per token (39 § State, 15 §3). */
 const MARKER = (token: string) => `endur.responded.${token}`;
 
+/**
+ * DEC-037. The campaign is real and answerable, and this caller may not have it.
+ *
+ * Two outcomes rather than one, because the reader's next move differs and a shared screen
+ * would have to hedge: a stranger can sign in, and somebody signed in elsewhere cannot do
+ * anything useful at all (39 § States).
+ *
+ * `organizationName` is the CAMPAIGN's, which is the only name either error carries (13 §5).
+ */
+export type CampaignGate = {
+  kind: 'signIn' | 'notMember';
+  organizationName: string;
+};
+
 export type PublicCampaignState = {
   campaign: PublicCampaign | null;
   loading: boolean;
@@ -23,14 +37,35 @@ export type PublicCampaignState = {
    * refuses to say which, on purpose (13 §6), so neither can this flag. See CONF-015.
    */
   unavailable: boolean;
+  /**
+   * Set only when the token WORKED and the gate refused (DEC-037). Distinct from
+   * `unavailable` on purpose and in both directions: a restricted campaign is not a broken
+   * link, and — the half that matters — a broken link never becomes a gate. The server
+   * resolves before it gates, so a bad token 404s and lands above, which is what stops a
+   * restricted campaign being an existence oracle.
+   */
+  gate: CampaignGate | null;
   /** Anything else — the network, a proxy, a 500. Distinct because it is worth retrying. */
   error: Error | null;
   reload: () => Promise<void>;
 };
 
+/** The organisation's display name is the only key either gate body carries (13 §5). */
+function gateOf(error: unknown): CampaignGate | null {
+  if (!(error instanceof ApiError)) return null;
+  if (error.code !== 'SIGN_IN_REQUIRED' && error.code !== 'NOT_A_MEMBER') return null;
+  const name = (error.details as { organizationName?: unknown } | undefined)?.organizationName;
+  return {
+    kind: error.code === 'SIGN_IN_REQUIRED' ? 'signIn' : 'notMember',
+    // A gate screen with a blank where a name should be is worse than a general one, and
+    // the name is the server's to send — so fall back rather than render "undefined".
+    organizationName: typeof name === 'string' && name ? name : 'this organization',
+  };
+}
+
 export function usePublicCampaign(token: string | undefined): PublicCampaignState {
   const [state, setState] = useState<Omit<PublicCampaignState, 'reload'>>({
-    campaign: null, loading: true, unavailable: false, error: null,
+    campaign: null, loading: true, unavailable: false, gate: null, error: null,
   });
   const alive = useRef(true);
 
@@ -38,7 +73,7 @@ export function usePublicCampaign(token: string | undefined): PublicCampaignStat
     if (!token) {
       // No token in the path at all is the same dead end as a wrong one, and it is
       // reachable: somebody types `/r/` from the back of the room.
-      setState({ campaign: null, loading: false, unavailable: true, error: null });
+      setState({ campaign: null, loading: false, unavailable: true, gate: null, error: null });
       return;
     }
     setState((current) => ({ ...current, loading: true }));
@@ -52,16 +87,22 @@ export function usePublicCampaign(token: string | undefined): PublicCampaignStat
         { suppress401Handler: true },
       );
       if (alive.current) {
-        setState({ campaign: response.data, loading: false, unavailable: false, error: null });
+        setState({
+          campaign: response.data, loading: false, unavailable: false, gate: null, error: null,
+        });
       }
     } catch (error) {
       if (!alive.current) return;
       const notFound = error instanceof ApiError && error.status === 404;
+      const gate = gateOf(error);
       setState({
         campaign: null,
         loading: false,
         unavailable: notFound,
-        error: notFound ? null : (error as Error),
+        gate,
+        // A gate is not a failure to retry. "Try again" on a 403 is a button that will
+        // always do the same thing, which teaches the reader the product is broken.
+        error: notFound || gate ? null : (error as Error),
       });
     }
   }, [token]);

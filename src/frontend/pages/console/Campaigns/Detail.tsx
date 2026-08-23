@@ -161,6 +161,7 @@ export default function CampaignDetail(): JSX.Element {
           status={detail.status}
           endsAt={detail.endsAt}
           anonymous={detail.anonymous}
+          access={detail.access}
           onClose={() => setSharing(false)}
         />
       )}

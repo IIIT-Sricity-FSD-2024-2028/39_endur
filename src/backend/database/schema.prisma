@@ -90,25 +90,26 @@ model Organization {
   /// The vocabulary system and the visible product claim (INV-001, doc 22).
   labels   Json
   /// incl. authzVersion (11 §7), paramMode (11 §5)
-  settings Json   @default("{}")
+  settings Json @default("{}")
 
   logoFileId String? @map("logo_file_id") @db.Uuid
   logo       File?   @relation("OrganizationLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  users         User[]
-  nodes         Node[]
-  edges         Edge[]
-  grants        Grant[]
-  subjects      Subject[]
-  templates     Template[]
-  campaigns     Campaign[]
-  files         File[]        @relation("FileOrganization")
+  users           User[]
+  nodes           Node[]
+  edges           Edge[]
+  grants          Grant[]
+  subjects        Subject[]
+  templates       Template[]
+  campaigns       Campaign[]
+  files           File[]           @relation("FileOrganization")
   auditLog        AuditLog[]
   apiKeys         ApiKey[]
   idempotencyKeys IdempotencyKey[]
-  subscription  Subscription?
+  accountInvites  AccountInvite[]
+  subscription    Subscription?
 
   @@map("organizations")
 }
@@ -116,9 +117,9 @@ model Organization {
 /// Staff. **Respondents are NOT users** (DEC-009) — that is a privacy decision first and a
 /// billing one second: a college with 4,000 respondents has perhaps 200 rows here.
 model User {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId  String @map("org_id") @db.Uuid
-  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   /// Case-insensitive: nobody should fail to sign in over a capital letter.
   email        String  @db.Citext
@@ -132,17 +133,65 @@ model User {
   avatar       File?   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
 
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+  /// Set by account.revoke, CLEARED on activation (57). A re-enabled account is not a
+  /// disabled one carrying a stale date.
+  disabledAt  DateTime? @map("disabled_at") @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   personNodes      Node[]
-  grantsCreated    Grant[]     @relation("GrantCreatedBy")
-  subjectsLinked   Subject[]   @relation("SubjectLinkedUser")
-  campaignsCreated Campaign[]  @relation("CampaignCreatedBy")
-  filesUploaded    File[]      @relation("FileCreatedBy")
+  grantsCreated    Grant[]               @relation("GrantCreatedBy")
+  subjectsLinked   Subject[]             @relation("SubjectLinkedUser")
+  campaignsCreated Campaign[]            @relation("CampaignCreatedBy")
+  participations   CampaignParticipant[]
+  filesUploaded    File[]                @relation("FileCreatedBy")
   auditEntries     AuditLog[]
+  accountInvites   AccountInvite[]       @relation("AccountInviteUser")
+  invitesSent      AccountInvite[]       @relation("AccountInviteCreatedBy")
 
   @@unique([orgId, email])
   @@map("users")
+}
+
+/// Account provisioning. DEC-038, spec 57, 10 §5.
+///
+/// The one-time LINK, not the account. A `users` row already exists for every person in the
+/// graph, written by createPerson() with `status = 'invited'` and a NULL passwordHash — the
+/// state that cannot be signed in to. This row is the key that lets them set the password
+/// themselves; nobody else ever chooses it, because an administrator who can set a dean's
+/// password can sign in as the dean and every audit row from that session names the dean.
+///
+/// ONE INDEX IS NOT DECLARED HERE and that is deliberate, not an omission. Prisma cannot
+/// express a PARTIAL unique index, and the rule "one LIVE invite per person" is partial by
+/// nature — accepted rows are history and one person accumulates many over the years. It
+/// lives in the migration as
+///   CREATE UNIQUE INDEX account_invites_one_live_per_user ON account_invites (user_id)
+///     WHERE accepted_at IS NULL
+/// which is the same posture the `sessions` table already takes (10 §5): the database owns
+/// a constraint the ORM has no vocabulary for, and the migration is its documentation.
+model AccountInvite {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("AccountInviteUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the token, hex. The plaintext is NEVER stored — we can mint a new link,
+  /// never recover one, which is what makes "shown once" true rather than decorative.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
+
+  /// SetNull, not Cascade: when the administrator who sent an invite leaves, the invite is
+  /// still a fact that happened (10 §9).
+  createdById String? @map("created_by") @db.Uuid
+  createdBy   User?   @relation("AccountInviteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orgId])
+  @@map("account_invites")
 }
 
 // ---------------------------------------------------------------------------
@@ -150,8 +199,8 @@ model User {
 // ---------------------------------------------------------------------------
 
 model Node {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   kind NodeKind
@@ -183,9 +232,9 @@ model Node {
   positionsWithRole Node[] @relation("PositionRole")
   positionsInUnit   Node[] @relation("PositionUnit")
 
-  edgesAsParent Edge[]    @relation("EdgeParent")
-  edgesAsChild  Edge[]    @relation("EdgeChild")
-  grants        Grant[]   @relation("GrantSubject")
+  edgesAsParent  Edge[]    @relation("EdgeParent")
+  edgesAsChild   Edge[]    @relation("EdgeChild")
+  grants         Grant[]   @relation("GrantSubject")
   subjectsInUnit Subject[] @relation("SubjectUnit")
 
   @@index([orgId, kind])
@@ -196,8 +245,8 @@ model Node {
 /// node has one parent, across dimensions it may have many. That is what lets a head of
 /// department report to the dean academically and the registrar administratively.
 model Edge {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   /// 'academic', 'reporting', 'project', …
@@ -226,8 +275,8 @@ model Edge {
 /// Resolution semantics — deny-beats-allow (INV-004), narrower-scope-wins — are specified
 /// in 11 §5. They are NOT re-stated here: this table only stores.
 model Grant {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   /// A role, position, group or person node. Role grants are the common case.
@@ -265,8 +314,8 @@ model Grant {
 /// The single biggest unlock in the model. A course, a restaurant, a ward, a bus route.
 /// `linkedUserId` turns "review the thing" into "review the person" with no second code path.
 model Subject {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   unitId String? @map("unit_id") @db.Uuid
@@ -278,7 +327,7 @@ model Subject {
   linkedUserId String? @map("linked_user_id") @db.Uuid
   linkedUser   User?   @relation("SubjectLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
 
-  meta Json @default("{}")
+  meta       Json      @default("{}")
   /// Archived, never hard-deleted while responses exist (§9).
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -290,9 +339,9 @@ model Subject {
 }
 
 model Template {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   /// NULL = library template, cloned into orgs on demand.
-  orgId String? @map("org_id") @db.Uuid
+  orgId String?       @map("org_id") @db.Uuid
   org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   name        String
@@ -320,12 +369,12 @@ model Question {
   templateId String   @map("template_id") @db.Uuid
   template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
-  kind QuestionKind
-  text String
+  kind     QuestionKind
+  text     String
   /// Shape per kind is a discriminated Zod union (14 §4) — that is what stops this
   /// column from becoming an untyped bag.
-  config   Json    @default("{}")
-  required Boolean @default(false)
+  config   Json         @default("{}")
+  required Boolean      @default(false)
   /// DEFERRABLE unique on (template_id, position), added in SQL: a reorder is then one
   /// UPDATE inside a transaction rather than a shuffle through a temporary value.
   position Int
@@ -336,16 +385,16 @@ model Question {
 }
 
 model Campaign {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   templateId String   @map("template_id") @db.Uuid
   template   Template @relation(fields: [templateId], references: [id])
 
-  name String
+  name         String
   /// { unitId, includeSubtree, roleIds[] }
-  audienceRule Json @default("{}") @map("audience_rule")
+  audienceRule Json   @default("{}") @map("audience_rule")
 
   startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
   endsAt   DateTime? @map("ends_at") @db.Timestamptz(6)
@@ -353,6 +402,12 @@ model Campaign {
   /// **Immutable once status leaves draft**, enforced by a trigger and not only in the
   /// service layer. Respondents were promised anonymity at submission time (INV-006).
   anonymous Boolean @default(true)
+
+  /// WHO GETS IN — 'public' | 'organization' (DEC-037). A SECOND AXIS, not a kind of
+  /// audienceRule: audienceRule says who is EXPECTED and is a denominator, `access` says
+  /// who gets in and is a gate. Immutable after launch, by the SAME trigger and for the
+  /// same reason as `anonymous` — both are promises made when the QR code was printed.
+  access String @default("public")
 
   /// The /r/:token link. NULL until launched; minting it is irreversible — and it is what
   /// "has left draft" means, now that status is derived (DEC-016). 8 characters from an
@@ -367,9 +422,10 @@ model Campaign {
   createdBy   User?    @relation("CampaignCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  subjects    CampaignSubject[]
-  responses   Response[]
-  invitations Invitation[]
+  subjects     CampaignSubject[]
+  responses    Response[]
+  invitations  Invitation[]
+  participants CampaignParticipant[]
 
   @@index([orgId, startsAt, endsAt])
   @@map("campaigns")
@@ -418,7 +474,7 @@ model Answer {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   /// Typed by question kind (14 §4).
-  value Json
+  value        Json
   /// Denormalised for rating/NPS aggregation. Written by the service layer alongside
   /// `value`, never independently — `(value->>'n')::numeric` on every row is the
   /// difference between a fast results page and a slow one.
@@ -431,6 +487,24 @@ model Answer {
 /// Records **that** a token was used. `responses` records **what** was said. Nothing joins
 /// them — so the system can report "312 of 400 responded" and still not know whose is whose.
 /// This separation is the entire privacy architecture.
+/// The `organization`-access counterpart to Invitation, and deliberately the SAME SHAPE:
+/// it records THAT a member responded, never WHAT they said (10 §4.4, INV-006, 52 §1).
+///
+/// There is no responseId here and there never will be — it is the one field that would
+/// undo INV-006 in a single migration. The composite key prevents a second submission; the
+/// absence of a third field is what keeps the first one anonymous.
+model CampaignParticipant {
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id") @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
+
+  @@id([campaignId, userId])
+  @@map("campaign_participants")
+}
+
 model Invitation {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   campaignId String   @map("campaign_id") @db.Uuid
@@ -450,12 +524,12 @@ model Invitation {
 /// Uploaded binaries: org logos and user avatars only (48). Bytes live on disk; this row
 /// is the metadata and the id in the URL.
 model File {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation("FileOrganization", fields: [orgId], references: [id], onDelete: Cascade)
 
   /// 'logo' | 'avatar'
-  kind String
+  kind   String
   /// Always the RE-ENCODED type, never the uploaded one — re-encoding is what strips
   /// metadata such as EXIF GPS (48, INV-006).
   mime   String
@@ -484,8 +558,8 @@ model IdempotencyKey {
   orgId String?       @map("org_id") @db.Uuid
   org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  key      String
-  endpoint String
+  key         String
+  endpoint    String
   /// Same key, different body, is a client bug. Answering it with the cached response of a
   /// different request would be worse than an error, so the hash is compared.
   requestHash String @map("request_hash")
@@ -500,8 +574,8 @@ model IdempotencyKey {
 }
 
 model AuditLog {
-  id    BigInt  @id @default(autoincrement())
-  orgId String? @map("org_id") @db.Uuid
+  id    BigInt        @id @default(autoincrement())
+  orgId String?       @map("org_id") @db.Uuid
   org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   actorUserId String? @map("actor_user_id") @db.Uuid
@@ -525,16 +599,16 @@ model AuditLog {
 }
 
 model ApiKey {
-  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orgId String @map("org_id") @db.Uuid
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  name String
+  name    String
   /// The key itself is shown once and never stored.
-  keyHash String @unique @map("key_hash")
+  keyHash String   @unique @map("key_hash")
   /// First 8 chars, for display.
-  prefix String
-  scopes String[] @default([])
+  prefix  String
+  scopes  String[] @default([])
 
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
   revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
@@ -544,13 +618,13 @@ model ApiKey {
 }
 
 model Subscription {
-  orgId String @id @map("org_id") @db.Uuid
+  orgId String       @id @map("org_id") @db.Uuid
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   /// bronze | silver | gold | enterprise
-  tier String @default("bronze")
+  tier  String @default("bronze")
   /// Reviewees + staff. **Never respondents** — that is what makes seat counting honest.
-  seats Int @default(0)
+  seats Int    @default(0)
 
   periodStart DateTime @map("period_start") @db.Date
   periodEnd   DateTime @map("period_end") @db.Date

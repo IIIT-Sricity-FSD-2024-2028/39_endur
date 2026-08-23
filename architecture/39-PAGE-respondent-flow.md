@@ -19,9 +19,37 @@ It is authored phone-first and desktop-second. On demo day every respondent is o
 must never see a login screen (DEC-009). The respondent bundle must not include console code
 (`20` §8) — it loads on a phone, on a venue network, for someone with no patience.
 
+### The one exception — `organization` access, DEC-037
+
+A campaign whose `access` is `organization` (`38`) **does** ask for a sign-in, and the sentence
+above still holds for every other campaign: `public` is the default, the demo path and the
+hotel guest.
+
+The narrow shape of the exception matters, because it would be easy to implement as something
+much larger:
+
+- **The respondent is not a new principal kind.** They sign in as **staff**, with the `endur.sid`
+  cookie they already have (`15` §2). There is no respondent account, no second session type,
+  and `Principal` in `11` §2 is unchanged.
+- **The gate is on the API, not on the page.** `GET /public/campaigns/:token` answers `401
+  SIGN_IN_REQUIRED`; the page renders what it is told (INV-003). A client that ignores the gate
+  still cannot read the form.
+- **The respond world does not import the console to do it.** The sign-in prompt is a plain
+  `<a href="/login?next=/r/{token}">` — a full navigation into the public world, not a lazy
+  import, not a shared auth provider. Anything imported near `router/layouts.tsx` ships to a
+  phone (`N-040`), and `pages/respond/bundle.test.ts` is what enforces it.
+- **Identity is discarded at the door.** The session proves membership and is then thrown away:
+  nothing about it reaches `responses`, which has no column that could hold it (INV-006). What
+  is written is a `campaign_participants` row saying *this member answered* — never *what*.
+
 ## Capabilities
 
 **None.** The only routes in the product with no capability check. Access is the token itself.
+
+On an `organization` campaign the check is **membership, not capability** — the caller has a
+session for this org, or they do not. No grant is resolved, `requireCapability()` does not run,
+and holding more powers does not get you a second submission. It is the thinnest possible gate
+that answers the question asked.
 
 ## Data contract
 
@@ -159,6 +187,23 @@ the server will not say.
 | Not available — the uniform 404 | This link isn't active | *It may have closed, it may not have opened yet, or the code may be wrong. Check the link, or scan the code again.* |
 | Already responded | You've already responded | *Thanks — one response per person on this cycle.* |
 | Load failed | We couldn't load this | *Check your connection and try again.* — the only one with an action |
+| **Sign-in required** (`401 SIGN_IN_REQUIRED`) | Sign in to answer | *Only people in {org} can answer this one.* Action: **Sign in** → `/login?next=/r/{token}` |
+| **Wrong organisation** (`403 NOT_A_MEMBER`) | This isn't your organization's link | *This form belongs to {campaign's org}. You're signed in to a different organisation.* No action — signing out to try again is a worse suggestion than asking whoever sent it |
+
+**That second body is not the one this table first drafted, and the change is deliberate.**
+It read *"You're signed in to {your org}"* — which this screen **cannot say**. The respond
+world mounts no store and holds no session concept (§ State), so it does not know the
+reader's own organisation; the `403` carries the **campaign's** name and nothing else, by
+`13` §5. Filling in that one word would mean a `/auth/me` call on a dead-end screen, for a
+phone that may hold no session at all, to tell the reader something they already know.
+
+Same fact, said from the side the page actually has. Built that way at `T-070`.
+
+**Five screens now, and the two new ones do not weaken the oracle argument above.** They are
+reachable *only with a valid token* — the route resolves the token first and gates second
+(`13` § Public respondent), so invalid, unlaunched, not-yet-open and closed tokens all still
+produce the one identical `404` before `access` is ever consulted. Someone holding a working
+token learning that it is restricted has learned nothing the token did not already tell them.
 
 The first screen names all three possibilities rather than claiming the link is broken:
 *"This link doesn't work"* is a lie in two of the three cases, and the reader's next move
@@ -194,6 +239,34 @@ Plus: loading (a single skeleton, since the form arrives in one payload), and su
       construction rather than by timing
 - [x] Every edge state is reachable and correct — **three, not four**, and `CONF-015` says
       why. Each has a test
+- [x] **Five, once DEC-037 lands**: the two access states are reachable only with a valid
+      token, and every invalid one still 404s before `access` is consulted — asserted by
+      requesting a restricted campaign with a bad token and getting the same bytes as any
+      other bad token (`T-069`), including a closed restricted campaign still 404ing a
+      stranger rather than 401ing them. **The two screens exist too** (`T-070`), and the
+      client half of the same property has its own test: a `404` renders the plain dead end
+      and can never surface as *"this campaign is restricted"*
+- [x] An `organization` campaign renders for a signed-in member and for nobody else —
+      membership only, no capability. Priya holds a level-3 role and no campaign power, and
+      holding more would buy her nothing (`15` §3)
+- [x] A member's second submission is refused, and the refusal comes from the
+      `campaign_participants` primary key rather than from a service read — `409`
+- [x] **A submitted response on an `organization` campaign has no column linking it to the
+      member who submitted it** — the same INV-006 assertion as the public path, run against
+      the authenticated one, because this is the path where somebody would be tempted.
+      **And the temptation was real**: the audit row was about to carry the member's id
+      instead, in the same transaction. See `DEC-045` and `D-022` — the response table was
+      never the only place a name could land
+- [x] The sign-in prompt is a plain navigation; the respondent bundle still contains no
+      console code, asserted by the existing graph walk rather than a new test. An `<a href>`
+      rather than a router `<Link>` — which is also the correct behaviour, since signing in
+      is a full page load
+- [x] `<AccessNotice>` states the correct one of the four `anonymous` × `access` sentences —
+      **three sentences and one deliberate silence**, and the silence is `!anonymous` on an
+      open link. It is the same one `anonymityLine` has always kept: neither this doc nor
+      `design_specs/design/07` gives copy for that pair, and the two things the page could
+      invent are both wrong. Asserted, so *"somebody forgot"* and *"somebody decided"* stay
+      distinguishable
 - [x] The public payload contains no org internals — key-allowlist test (T-022)
 - [x] Invalid, closed and expired tokens are byte-identical 404s (T-022), and the client
       reads them as one state rather than guessing between them

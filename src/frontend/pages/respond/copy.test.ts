@@ -4,7 +4,7 @@
 // read off a phone held up in front of the room.
 import { describe, expect, it } from 'vitest';
 import type { ResolvedLabels } from '@endur/shared';
-import { anonymityLine, costLine, respondedLine, thanksLine } from './copy.js';
+import { accessNotice, anonymityLine, costLine, respondedLine, thanksLine } from './copy.js';
 
 /** The nonsense fixture: an English noun appearing below means somebody hardcoded one. */
 const LABELS: ResolvedLabels = {
@@ -83,5 +83,60 @@ describe('the count is the detail that lands', () => {
     // Reachable: somebody opens /r/:token/done directly, having submitted nothing. "0 have
     // responded" under "Thank you." is worse than no line.
     expect(respondedLine(0, LABELS)).toBeNull();
+  });
+});
+
+describe('<AccessNotice> — which of the two promises this form makes (24 §7, 52 §1)', () => {
+  const ORG = 'Northfield University';
+
+  it('an open anonymous link promises both, and says the one worth saying', () => {
+    // The answer is anonymous AND participation is private. Nothing is given up, so there
+    // is nothing extra to warn about.
+    expect(accessNotice({ anonymous: true, access: 'public', organizationName: ORG }))
+      .toBe('Your answers are anonymous.');
+  });
+
+  it('a RESTRICTED anonymous campaign keeps one promise and gives up the other', () => {
+    // The sentence this whole component exists for. An administrator sees that Priya
+    // answered and Sam did not — exactly what invitations have always allowed — and the
+    // respondent is told so on the screen where it happens rather than left to assume the
+    // stronger promise (52 §1).
+    expect(accessNotice({ anonymous: true, access: 'organization', organizationName: ORG }))
+      .toBe(
+        'Your answers are anonymous. ' +
+        'Northfield University will see that you responded, but not what you said.',
+      );
+  });
+
+  it('a restricted NON-anonymous campaign still says what the org can see', () => {
+    // No anonymity claim, because the campaign did not make one. The participation half is
+    // true regardless and is the half the reader could not otherwise know.
+    expect(accessNotice({ anonymous: false, access: 'organization', organizationName: ORG }))
+      .toBe('Northfield University will see that you responded, but not what you said.');
+  });
+
+  it('says NOTHING for a non-anonymous open link, and that silence is deliberate', () => {
+    // The fourth pair. Neither 39 nor design_specs/design/07 gives copy for it, and both
+    // things this page could invent are wrong: a promise it cannot keep, or a warning
+    // about a linkage the schema does not make. Silence is the only honest option without
+    // a contract — asserted so that "somebody forgot" and "somebody decided" stay
+    // distinguishable.
+    expect(accessNotice({ anonymous: false, access: 'public', organizationName: ORG }))
+      .toBeNull();
+  });
+
+  it('NEVER claims the organisation can read the answers', () => {
+    // The failure that would matter. "will see that you responded" is true; anything
+    // stronger would be a lie the schema contradicts (INV-006).
+    for (const anonymous of [true, false]) {
+      const line = accessNotice({ anonymous, access: 'organization', organizationName: ORG }) ?? '';
+      expect(line).toContain('not what you said');
+      expect(line).not.toMatch(/will see your answers|can read/i);
+    }
+  });
+
+  it('uses the organisation from the payload, not a hardcoded word', () => {
+    expect(accessNotice({ anonymous: true, access: 'organization', organizationName: 'Grand Palace' }))
+      .toContain('Grand Palace');
   });
 });

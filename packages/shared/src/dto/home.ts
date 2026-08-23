@@ -1,6 +1,7 @@
 // Home dashboard DTO. 13 § Home, 46.
 import { z } from 'zod';
 import { dto } from './common.js';
+import type { CampaignAccess } from './campaign.js';
 
 /**
  * The period every number on the dashboard is measured over — DEC-031.
@@ -96,6 +97,12 @@ export type HomeView = {
     url: string | null;
     /** <ShareSheet> says whether responses are anonymous; the promise is per campaign. */
     anonymous: boolean;
+    /**
+     * DEC-037. Carried for the same reason as `anonymous`: the sheet opens from this card
+     * with no further request, and on a restricted campaign it must say so — its default
+     * line, "they don't need an account", is FALSE for one of the two modes.
+     */
+    access: CampaignAccess;
   }>;
   recentComments?: Array<{ text: string; subjectName: string | null; submittedAt: string }>;
   /**

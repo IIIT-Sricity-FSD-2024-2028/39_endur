@@ -23,6 +23,7 @@ const input = (over: Partial<SummaryInput> = {}): SummaryInput => ({
   startsAt: null,
   endsAt: null,
   anonymous: true,
+  access: 'public',
   ...over,
 });
 
@@ -108,7 +109,7 @@ describe('closeConsequence — the real number, and what is KEPT', () => {
 describe('timing — the line that makes a card feel live', () => {
   const campaign = (over: Partial<CampaignSummary>): CampaignSummary => ({
     id: 'c1', name: 'x', status: 'open', templateId: 't1', templateName: 'f',
-    subjectCount: 1, responseCount: 0, anonymous: true,
+    subjectCount: 1, responseCount: 0, anonymous: true, access: 'public',
     startsAt: null, endsAt: null, closedAt: null, publicToken: null, url: null,
     createdAt: '2026-01-01T00:00:00.000Z', ...over,
   });
@@ -142,5 +143,24 @@ describe('autoName — one less typing beat in the live demo', () => {
     expect(autoName('Mid-term form', new Date('2026-08-20T00:00:00.000Z'))).toMatch(
       /^Mid-term form — \w+ 2026$/,
     );
+  });
+});
+
+describe('the summary restates BOTH irreversible choices — DEC-037', () => {
+  it('says a restricted campaign is restricted', () => {
+    // `anonymous` and `access` are the only two columns the launch trigger freezes
+    // (10 §4.3). This card is the last thing read before that button, so omitting one of
+    // them means somebody makes a permanent choice without seeing it restated.
+    expect(summarise(input({ access: 'organization' })).window).toContain('restricted');
+  });
+
+  it('says nothing extra about an open one', () => {
+    // The default and the demo path. A word beside every campaign is a word nobody reads.
+    expect(summarise(input()).window).not.toContain('restricted');
+  });
+
+  it('keeps both facts, in the order they were chosen', () => {
+    expect(summarise(input({ anonymous: false, access: 'organization' })).window)
+      .toMatch(/not anonymous · restricted$/);
   });
 });

@@ -82,6 +82,15 @@ link to it rather than restating it.
 | 48 | [`48-FEATURE-file-upload.md`](48-FEATURE-file-upload.md) | **P1** — see CONF-018 |
 | 49 | [`49-PAGE-plan-and-billing.md`](49-PAGE-plan-and-billing.md) | P2 |
 
+**Pages and features that arrived after `30`–`49` filled.** They sit in the `50`s beside the
+cross-cutting docs rather than being renumbered into a block with no room; see § Numbering.
+
+| # | File | Phase |
+|---|---|---|
+| 56 | [`56-PAGE-activity-log.md`](56-PAGE-activity-log.md) | P2 — the organisation's own log |
+| 57 | [`57-FEATURE-accounts-and-invites.md`](57-FEATURE-accounts-and-invites.md) | P2 |
+| 58 | [`58-PAGE-inbox.md`](58-PAGE-inbox.md) | P2 |
+
 **P3 stretch** — the four `SCOPE.md` layers shown as disabled "Soon" items in the sidebar
 (`20` §2). Reserved, not designed; designing them now would be work thrown away (CONF-006).
 
@@ -99,6 +108,7 @@ guards; `70` and `71` are its two screens. Read `19` before either.
 |---|---|---|
 | 70 | [`70-PAGE-platform-console.md`](70-PAGE-platform-console.md) | P2 |
 | 71 | [`71-PAGE-platform-analytics.md`](71-PAGE-platform-analytics.md) | P2 |
+| 72 | [`72-PAGE-platform-logs.md`](72-PAGE-platform-logs.md) | P2 |
 
 **Cross-cutting**
 
@@ -109,7 +119,7 @@ guards; `70` and `71` are its two screens. Read `19` before either.
 | 52 | [`52-SECURITY-AND-PRIVACY.md`](52-SECURITY-AND-PRIVACY.md) | Anonymity, k-anonymity, audit, the confidentiality limit |
 | 53 | [`53-NOVELTY-CLAIMS.md`](53-NOVELTY-CLAIMS.md) | What is genuinely novel and how to defend it under questioning |
 | 54 | [`54-COURSE-DELIVERABLE.md`](54-COURSE-DELIVERABLE.md) | **Hand this to the React teacher.** Their checklist → our routes, MPA-vs-SPA per page |
-| 55 | [`55-BUILD-ORDER.md`](55-BUILD-ORDER.md) | **The task backlog.** 45 ids, lanes, dependencies. Companion to `/PROGRESS.md` |
+| 55 | [`55-BUILD-ORDER.md`](55-BUILD-ORDER.md) | **The task backlog.** Stable `T-###` ids, lanes, dependencies. Companion to `/PROGRESS.md` |
 
 ---
 
@@ -124,9 +134,16 @@ instead of being appended where nobody looks.
 | `10`–`19` | Backend and API | — |
 | `20`–`29` | Frontend | — |
 | `30`–`49` | Pages and features | — |
-| `50`–`59` | Cross-cutting | `56`–`59` |
+| `50`–`59` | Cross-cutting, **and pages that arrived after `30`–`49` filled** | `59` |
 | `60`–`69` | P3 stretch features | `64`–`69` |
-| `70`–`79` | **Endur's own platform surfaces** | `72`–`79` |
+| `70`–`79` | **Endur's own platform surfaces** | `73`–`79` |
+
+**The page block overflowed on 2026-08-23** and three new page/feature docs took `56`–`58`.
+The alternative was renumbering `30`–`49`, which would have invalidated several hundred
+cross-references in docs and in code comments to save a filing inconsistency. Two of the three
+are genuinely cross-cutting anyway — `56` reads what every feature writes, `57` spans auth,
+people and the permission engine — and `58` is the odd one out, filed next to them rather than
+alone. **Do not renumber them back**, for the same reason `60`–`63` says so.
 
 A file marked *Placeholder* has a reserved number, a stated purpose, and a **"write this
 when"** trigger — but no decided content. Do not treat one as a specification, and do not feed

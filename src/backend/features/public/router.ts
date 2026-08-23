@@ -13,6 +13,8 @@ import { validate } from '../../middleware/validate.js';
 import { respondentChain } from '../../middleware/chains.js';
 import { scopedRateLimits } from '../../middleware/rateLimit.js';
 import { idempotent } from '../../middleware/idempotency.js';
+import { memberOf, requireMembership } from '../../middleware/requireMembership.js';
+import { campaignOf, resolveCampaign } from './resolve.js';
 import { readPublicCampaign, submitResponse } from './service.js';
 
 export const publicRouter: Router = Router();
@@ -28,14 +30,20 @@ export const publicRouter: Router = Router();
 // for a forged request to borrow. See middleware/chains.ts.
 publicRouter.use(respondentChain);
 
+// RESOLVE FIRST, GATE SECOND, AND THE ORDER IS THE SECURITY PROPERTY (12 §4.10c).
+//
+// resolveCampaign 404s an invalid, unlaunched, not-yet-open, closed or expired token
+// exactly as this route always has, so requireMembership is reachable ONLY with a working
+// token. Its 401 therefore discloses nothing the token in the caller's hand did not.
+// Swapping these two lines turns a restricted campaign into an existence oracle — probe a
+// token, and a 401 instead of a 404 tells you the campaign is real.
 publicRouter.get(
   '/campaigns/:token',
   validate(PublicCampaignDto),
-  (req, res, next) => {
-    const { params } = req.data as { params: { token: string } };
-    void readPublicCampaign(params.token)
-      .then((campaign) => res.json({ data: campaign }))
-      .catch(next);
+  resolveCampaign,
+  requireMembership,
+  (req, res) => {
+    res.json({ data: readPublicCampaign(campaignOf(req)) });
   },
 );
 
@@ -44,16 +52,18 @@ publicRouter.post(
   // Per-IP, and tight. This route writes to the database with no credential at all.
   scopedRateLimits.respondentSubmit,
   validate(SubmitResponseDto),
+  // Same order, same reason. The gate also runs BEFORE idempotency: a refused request
+  // should not consume a key, and a caller who is turned away and then signs in must not
+  // be replayed their own 401.
+  resolveCampaign,
+  requireMembership,
   // The idempotency case that matters most (13 §7): a phone on a flaky venue network
   // retries by itself, and a duplicate response corrupts the demo's numbers in front of
   // the evaluator.
   idempotent('public.submit'),
   (req, res, next) => {
-    const { body, params } = req.data as {
-      body: SubmitResponseBody;
-      params: { token: string };
-    };
-    void submitResponse(req, params.token, body)
+    const { body } = req.data as { body: SubmitResponseBody };
+    void submitResponse(req, campaignOf(req), body, memberOf(req))
       .then((result) => res.status(201).json({ data: result }))
       .catch(next);
   },

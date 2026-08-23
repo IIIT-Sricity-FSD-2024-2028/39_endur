@@ -190,6 +190,7 @@ export default function Campaigns(): JSX.Element {
           status={sharing.status}
           endsAt={sharing.endsAt}
           anonymous={sharing.anonymous}
+          access={sharing.access}
           onClose={() => setSharing(null)}
         />
       )}

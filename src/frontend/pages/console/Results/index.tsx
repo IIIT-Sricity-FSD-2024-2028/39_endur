@@ -276,6 +276,7 @@ export default function Results(): JSX.Element {
           status={detail.status}
           endsAt={detail.endsAt}
           anonymous={detail.anonymous}
+          access={detail.access}
           onClose={() => setSharing(false)}
         />
       )}

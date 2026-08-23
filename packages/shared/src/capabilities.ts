@@ -17,6 +17,7 @@ export type CapabilityModule =
   | 'Roles'
   | 'Powers'
   | 'People'
+  | 'Accounts'
   | 'Groups'
   | 'Delegation'
   | 'Subjects'
@@ -65,6 +66,19 @@ export const CAPABILITY_CATALOGUE = {
   'person.import': { module: 'People', phase: 'P2', note: 'CSV' },
   'assignment.create': { module: 'People', phase: 'P1', note: 'give a position' },
   'assignment.delete': { module: 'People', phase: 'P1', note: 'remove a position' },
+
+  /**
+   * 57. THREE VERBS, NOT ONE, and the split is deliberate: creating a sign-in is routine,
+   * re-issuing is the support path, and revoking ends somebody's access mid-day. An
+   * administrator should be able to withhold the third from a coordinator while granting
+   * the other two, which one `account.manage` would make impossible.
+   *
+   * Every one is additionally bounded by INV-012 (11 §5b): holding `account.create` is not
+   * permission to create an account more powerful than your own.
+   */
+  'account.create': { module: 'Accounts', phase: 'P2', note: 'mint an activation link — never a password' },
+  'account.reset': { module: 'Accounts', phase: 'P2', note: 're-issue activation' },
+  'account.revoke': { module: 'Accounts', phase: 'P2', note: 'disable, and end live sessions' },
 
   'group.read': { module: 'Groups', phase: 'P2' },
   'group.create': { module: 'Groups', phase: 'P2' },

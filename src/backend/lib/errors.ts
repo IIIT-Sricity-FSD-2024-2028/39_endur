@@ -41,6 +41,53 @@ export class ForbiddenError extends AppError {
   }
 }
 
+/**
+ * INV-012 (11 §5b). Refused not because the caller may not act, but because the act would
+ * create an actor more powerful than they are.
+ *
+ * It names the capability on purpose. The caller can plainly see they hold
+ * `assignment.create` — they just used it on the row above — so a bare "not allowed" reads
+ * to them as a bug rather than a rule. The answer they need is WHICH power they were about
+ * to hand out that they do not have.
+ */
+export class WouldEscalateError extends AppError {
+  constructor(message: string, capability: string, unitName?: string) {
+    super('WOULD_ESCALATE', message, {
+      capability,
+      ...(unitName ? { unitName } : {}),
+    });
+  }
+}
+
+/**
+ * DEC-037. An `organization`-access campaign, reached without a staff session for it.
+ *
+ * Reachable ONLY behind a resolved token (12 §4.10c): every invalid, unlaunched, closed and
+ * expired token still 404s before `access` is ever consulted. So this 401 discloses nothing
+ * the working token in the caller's hand did not already disclose — which is the whole
+ * reason the gate runs second and not first.
+ *
+ * The body carries the organisation's display name and nothing else, so the respond world
+ * can say WHICH organisation to sign in to. That name is not a leak: the caller is holding a
+ * working link to a campaign belonging to it.
+ */
+export class SignInRequiredError extends AppError {
+  constructor(organizationName: string) {
+    super('SIGN_IN_REQUIRED', `Only people in ${organizationName} can answer this one.`, {
+      organizationName,
+    });
+  }
+}
+
+/** DEC-037. Signed in — to somebody else's organisation. */
+export class NotAMemberError extends AppError {
+  constructor(organizationName: string) {
+    super('NOT_A_MEMBER', 'This form belongs to a different organisation.', {
+      organizationName,
+    });
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message = 'Not found.') {
     super('NOT_FOUND', message);

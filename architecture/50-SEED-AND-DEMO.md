@@ -70,6 +70,8 @@ regeneration never silently reverts an administrator's change (`10` §9).
 | `person.create` `person.update` | subtree | subtree | — | — |
 | `person.delete` `person.import` | subtree | — | — | — |
 | `assignment.create` `assignment.delete` | subtree | own_unit | — | — |
+| `account.create` `account.reset` | subtree | subtree | — | — |
+| `account.revoke` | subtree | — | — | — |
 | `group.*` `delegation.*` | subtree | — | — | — |
 | `subject.read` | subtree | subtree | own_unit | — |
 | `subject.create` `subject.update` `subject.archive` | subtree | subtree | — | — |
@@ -96,7 +98,7 @@ Those two back `/app/profile` (`47`). A default-deny model silently produces an 
 profile page if `self` is forgotten, so the seed must never omit them — and `11` §10 has an
 acceptance test for exactly this.
 
-Notes on three rows that look surprising:
+Notes on four rows that look surprising:
 
 - **`template.*` is `all`, not `subtree`.** Templates are org-wide artefacts with no unit, so
   a unit scope would mean nobody could read them. Scope is about the org graph; templates are
@@ -104,9 +106,20 @@ Notes on three rows that look surprising:
 - **L3 gets `results.read own_unit`.** A reviewee seeing their own feedback is the product
   working. In P3 the improve loop adds a gate on top — results stay locked until the
   self-reflection is submitted (`44`) — but that is an additional check, not a different grant.
+- **`account.revoke` stops at L1, where `account.create` and `account.reset` reach L2.**
+  `57` gives the reason: creating a sign-in is routine and re-issuing is the support path,
+  but revoking ends somebody's access in the middle of their working day. The three are
+  separate verbs precisely so this row can differ from the two above it.
 - **L4 gets `org.read` and nothing else.** L4 is the respondent-level role. Respondents are
   not `users` (DEC-009), so this row only matters for the rare case of someone at that level
   who *does* hold an account.
+
+  **That case stopped being rare on 2026-08-24.** `T-072` made provisioning a sign-in for
+  anybody in the graph a one-click action, and the owner's first question about it was what
+  such an account should see. The answer wanted is *the Subjects list and nothing else in
+  `organize`* — which this row cannot currently produce, because it has **no `subject.read`
+  at all**. `T-086` adds one (proposed `own_unit`); it is a change to what every organisation
+  gets by default, so `OPEN-009` holds it until the owner confirms. See `55` § Stage 8.
 
 Presets ship **no deny grants**. A `deny` is a deliberate administrator act, and seeding one
 would teach the wrong lesson about a rule that is absolute (INV-004).

@@ -11,10 +11,13 @@
 // cosmetic result.
 //
 // So a capability is reported as held when the principal has at least one live ALLOW
-// grant for it, minus any capability denied ORG-WIDE — a deny at `all` scope with no
-// anchor unit, which is the only deny that cannot be escaped by choosing a different
-// target. A unit-anchored deny is intentionally NOT subtracted: it would hide a button
-// the person can legitimately use elsewhere.
+// grant for it, minus any capability denied ORG-WIDE — a deny at `all` SCOPE, which is the
+// only deny that cannot be escaped by choosing a different target. A unit-SCOPED deny
+// (`own_unit`, `subtree`) is intentionally NOT subtracted: it would hide a button the
+// person can legitimately use elsewhere.
+//
+// Scope is the whole test, and the ANCHOR is irrelevant here: scopeCovers() returns
+// covers:true for `all` before it ever looks at one.
 //
 // The consequence is bounded and acceptable: the caller may occasionally see an action
 // that the server then refuses with a 403 carrying its decision trace. That is a
@@ -45,7 +48,13 @@ export async function heldCapabilities(
 
     if (grant.effect === 'allow') {
       allowed.add(grant.capability);
-    } else if (grant.scope === 'all' && !grant.anchorUnitId) {
+    } else if (grant.scope === 'all') {
+      // ANY deny at `all` scope, anchored or not. scopeCovers() returns covers:true for
+      // `all` before it ever looks at an anchor, so an anchored `all` deny is every bit as
+      // inescapable as an unanchored one — this used to read `&& !grant.anchorUnitId`,
+      // which silently failed to subtract a deny reached through a ROLE (role grants are
+      // anchored at the position's unit) and, after DEC-044, through a person node too.
+      // The rule here has to match the resolver's or the UI hides the wrong buttons.
       deniedEverywhere.add(grant.capability);
     }
   }

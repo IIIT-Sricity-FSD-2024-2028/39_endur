@@ -45,6 +45,14 @@ export const GRANT_MATRIX: Partial<Record<Capability, Row>> = {
   'assignment.create': S('subtree', 'own_unit'),
   'assignment.delete': S('subtree', 'own_unit'),
 
+  // 57. `revoke` stops one level short of the other two ON PURPOSE: creating a sign-in is
+  // routine and re-issuing is the support path, but revoking ends somebody's access in the
+  // middle of their working day. Three verbs exist so this line can differ from the one
+  // above it — one `account.manage` would have made the distinction unsayable.
+  'account.create': S('subtree', 'subtree'),
+  'account.reset': S('subtree', 'subtree'),
+  'account.revoke': S('subtree'),
+
   'group.read': S('subtree'), 'group.create': S('subtree'),
   'group.update': S('subtree'), 'group.delete': S('subtree'),
   'delegation.read': S('subtree'), 'delegation.create': S('subtree'),

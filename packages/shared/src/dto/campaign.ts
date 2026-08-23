@@ -24,6 +24,21 @@ export const AudienceRule = z.discriminatedUnion('kind', [
 ]);
 export type AudienceRule = z.infer<typeof AudienceRule>;
 
+/**
+ * WHO GETS IN — a second axis, and deliberately not a kind of `AudienceRule` (38, DEC-037).
+ *
+ * They look adjacent and they are not. `audience_rule` says who is EXPECTED to answer and
+ * is a denominator — it is what the response-rate card divides by, and it is enforced
+ * nowhere because it describes. `access` says who GETS IN and is a gate, enforced on every
+ * request to the public route.
+ *
+ * Folding them together would make the commonest shape in the seed unsayable: "open to
+ * anyone with the link, and we expect the 40 people in Housekeeping to answer" is
+ * `access: 'public'` with a `unit` audience.
+ */
+export const CampaignAccess = z.enum(['public', 'organization']);
+export type CampaignAccess = z.infer<typeof CampaignAccess>;
+
 export const CreateCampaignBody = z
   .object({
     name: z.string().min(1).max(120),
@@ -38,6 +53,13 @@ export const CreateCampaignBody = z
      * an administrator flip it afterwards would retroactively break that promise.
      */
     anonymous: z.boolean().default(true),
+    /**
+     * Immutable after launch by the SAME trigger and for the same reason as `anonymous`
+     * (10 §4.3). Loosening it mid-flight would let people told "only your colleagues can
+     * answer this" be answered alongside strangers; tightening it would strand a link
+     * already handed out. One trigger, two columns, one reason.
+     */
+    access: CampaignAccess.default('public'),
   })
   .refine((body) => !body.startsAt || !body.endsAt || body.endsAt > body.startsAt, {
     message: 'End must be after start',
@@ -52,6 +74,9 @@ export const UpdateCampaignBody = z.object({
   startsAt: z.coerce.date().nullable().optional(),
   endsAt: z.coerce.date().nullable().optional(),
   anonymous: z.boolean().optional(),
+  /** Draft only, like every other field here — the service refuses the whole body once
+   *  launched (38), and the trigger refuses this column specifically even if it did not. */
+  access: CampaignAccess.optional(),
 });
 export type UpdateCampaignBody = z.infer<typeof UpdateCampaignBody>;
 
@@ -75,6 +100,8 @@ export type CampaignSummary = {
   subjectCount: number;
   responseCount: number;
   anonymous: boolean;
+  /** DEC-037. `public` on every campaign that predates it, which is the honest default. */
+  access: CampaignAccess;
   startsAt: string | null;
   endsAt: string | null;
   closedAt: string | null;

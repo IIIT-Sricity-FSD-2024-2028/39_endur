@@ -128,9 +128,17 @@ the plan.
 
 ## 7. Trials and downgrades
 
-- New orgs start `trialing` on Gold for 14 days, so the improvement loop is seen before it is
+- ~~New orgs start `trialing` on Gold for 14 days, so the improvement loop is seen before it is
   sold. It is the differentiator; hiding it behind a paywall from day one guarantees nobody
-  discovers it.
+  discovers it.~~ **SUPERSEDED ON THE SIGN-UP PATH BY `DEC-048` (2026-08-24).** A new
+  organisation picks Bronze, Silver or Gold at sign-up and is on it immediately, `status:
+  'active'`. The sentence above is an argument about **price**, and `DEC-035` removed price —
+  when any tier is one free click, a 14-day free trial of Gold is a countdown to nothing, and
+  expiring it would need a scheduler that `OPEN-005` says nothing owns. **Never implemented:**
+  nothing has ever written a `Subscription` row (`D-012`), so this trial has not once happened.
+  Whether a `trialing` status survives anywhere else — an operator granting one, say — is not
+  decided; the line is annotated rather than deleted because removing a documented feature is
+  larger than the change that prompted this.
 - On downgrade, data is **retained, not deleted** — the surfaces just stop resolving. A
   re-upgrade restores access to history. Deleting a customer's data on downgrade is how you
   lose a re-upgrade.

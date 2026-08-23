@@ -18,10 +18,11 @@
 // the network does, which on demo day is the moment it matters.
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import type { CampaignStatus } from '@endur/shared';
+import type { CampaignAccess, CampaignStatus } from '@endur/shared';
 import { Icon } from '../Icon.js';
 import { formatDateTime } from '../../lib/format.js';
 import { useLabels } from '../../lib/labels.js';
+import { useAppSelector } from '../../store/index.js';
 
 /** The share sheet's own three-way status tag — narrower than campaigns' four-value
  *  STATUS_TAG (which distinguishes draft from open): here "collecting" covers both,
@@ -79,6 +80,7 @@ export function ShareSheet({
   status,
   endsAt,
   anonymous = true,
+  access = 'public',
   onClose,
 }: {
   url: string;
@@ -86,9 +88,15 @@ export function ShareSheet({
   status: CampaignStatus;
   endsAt?: string | null | undefined;
   anonymous?: boolean | undefined;
+  /**
+   * DEC-037. Changes ONE line of the footer and nothing else about the sheet — but it is the
+   * line that would otherwise be false. See below.
+   */
+  access?: CampaignAccess | undefined;
   onClose: () => void;
 }): JSX.Element {
   const L = useLabels();
+  const orgName = useAppSelector((state) => state.auth.org?.name ?? '');
   const [copied, setCopied] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -199,8 +207,18 @@ export function ShareSheet({
             {/* The org's own noun. This line said "Respondents" until T-044 — the vocabulary
                 audit's one frontend finding, and it survived four audits because "Respondent"
                 is the DEFAULT label rather than an education word, so the banned-noun grep had
-                nothing to match (22 §5). */}
-            <p className="share-meta text-meta">{L.respondent.many} don’t need an account.</p>
+                nothing to match (22 §5).
+
+                AND IT BECOMES FALSE ON A RESTRICTED CAMPAIGN, which is why `access` reaches
+                this component at all (24 §6). Somebody scanning a restricted code and hitting
+                a sign-in wall with no warning is a support ticket, and the person handing the
+                link out is the only one who can prevent it — so the warning belongs here,
+                where they are looking, and not only on the form. */}
+            <p className="share-meta text-meta">
+              {access === 'organization'
+                ? `Only people in ${orgName || 'your organization'} can answer — they’ll be asked to sign in.`
+                : `${L.respondent.many} don’t need an account.`}
+            </p>
           </div>
           <div className="share-foot-actions">
             <button type="button" className="btn btn-secondary" onClick={copy}>

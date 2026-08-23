@@ -1,5 +1,6 @@
 // Person DTOs. 13 § People, 34, 14 §8.
 import { z } from 'zod';
+import type { AccountStatus } from './account.js';
 import { dto, Id, PageQuery, SearchQuery } from './common.js';
 
 /**
@@ -17,10 +18,29 @@ export const CreatePersonBody = z.object({
 });
 export type CreatePersonBody = z.infer<typeof CreatePersonBody>;
 
+/**
+ * NO `status`, AND ITS REMOVAL CLOSED A REAL HOLE (D-024, 57 § Revocation).
+ *
+ * This DTO accepted `status: 'disabled'` from T-033 until 2026-08-24, behind `person.update`
+ * alone. That was a second way to disable an account, and it was the WORSE one in three
+ * separate respects:
+ *
+ *   · it needed `person.update` (seeded to L2 subtree), not `account.revoke` (L1) — the
+ *     split 57 makes precisely so revocation can be withheld from a coordinator;
+ *   · it left `sessions` rows alone, and `authenticate` never reads `users.status`, so the
+ *     target's open browser kept working until the session expired on its own. The
+ *     administrator saw "disabled" and believed access had ended;
+ *   · it left `password_hash` in place, so flipping the status back restored their OLD
+ *     password — the thing 57 says cannot exist, because there is no old password to
+ *     restore once an account is properly revoked.
+ *
+ * An account's lifecycle belongs to `account.*` and to `DELETE /people/:id/account`, which
+ * does all four things at once. A person's NAME and EMAIL are still edited here: those are
+ * facts about the person, not about the key.
+ */
 export const UpdatePersonBody = z.object({
   name: z.string().min(1).max(120).optional(),
   email: z.string().email().max(200).optional(),
-  status: z.enum(['active', 'invited', 'disabled']).optional(),
 });
 export type UpdatePersonBody = z.infer<typeof UpdatePersonBody>;
 
@@ -114,6 +134,15 @@ export type PersonSummary = {
   status: string;
   positions: Array<{ edgeId: string; roleName: string; unitName: string; isPrimary: boolean }>;
   createdAt: string;
+  /**
+   * ON THE SUMMARY, not only the detail, and that placement is forced by `57` § States:
+   * the LIST shows `Invite` on anybody with no account and `Pending` on anybody with a
+   * live one. `status` alone cannot tell those two apart — a person awaiting activation and
+   * a person nobody has invited are both `users.status = 'invited'` with a null password
+   * hash. The difference is whether an unaccepted `account_invites` row exists, so the
+   * server answers it rather than leaving the row to guess.
+   */
+  account: AccountStatus;
 };
 
 export type PersonDetail = PersonSummary & {

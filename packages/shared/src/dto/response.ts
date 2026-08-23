@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { dto } from './common.js';
 import type { ResolvedLabels } from '../labels.js';
 import type { QuestionConfig, QuestionKind } from './template.js';
+import type { CampaignAccess } from './campaign.js';
 
 /**
  * Mirrors QuestionConfig, which is how "the answer type matches the question kind" (10 §10)
@@ -66,6 +67,15 @@ export type PublicCampaign = {
    */
   labels: ResolvedLabels;
   anonymous: boolean;
+  /**
+   * DEC-037. On the payload because `<AccessNotice>` (24 §7) needs the `anonymous` × `access`
+   * PAIR to say which of two promises this form is making, and a respondent who is told the
+   * wrong one has been misled about the only thing 52 promises them.
+   *
+   * It discloses nothing: reaching this payload at all means the gate already let you in, so
+   * an `organization` campaign only ever says `organization` to somebody who is a member.
+   */
+  access: CampaignAccess;
   estimatedSeconds: number;
   subjects: Array<{ id: string; name: string }>;
   questions: Array<{

@@ -6,6 +6,7 @@
 // The other rule here is that a section the caller cannot read is ABSENT (INV-003). Not
 // empty, not greyed, not present-with-a-flag — absent. A low-level user gets a smaller,
 // coherent page rather than a page full of locks.
+import { CampaignAccess } from '@endur/shared';
 import type { HomeView, StatWindow } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { config } from '../../lib/config.js';
@@ -55,6 +56,7 @@ export async function readHome(
           name: true,
           endsAt: true,
           anonymous: true,
+          access: true,
           publicToken: true,
           _count: { select: { subjects: true, responses: true } },
         },
@@ -77,6 +79,9 @@ export async function readHome(
         ? publicUrlFor(config.PUBLIC_BASE_URL, campaign.publicToken)
         : null,
       anonymous: campaign.anonymous,
+      // One more column the query already reads, so the sheet can warn about a restricted
+      // link at the point somebody shares it (24 §6).
+      access: CampaignAccess.catch('public').parse(campaign.access),
     }));
   }
 

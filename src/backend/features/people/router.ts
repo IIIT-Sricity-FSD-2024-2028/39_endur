@@ -24,6 +24,8 @@ import type {
 } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
 import { requireCapability } from '../../middleware/requireCapability.js';
+import { requireNoEscalation } from '../../middleware/requireNoEscalation.js';
+import { pairsFromImport } from './positions.js';
 import { idempotent } from '../../middleware/idempotency.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { UnauthenticatedError } from '../../lib/errors.js';
@@ -86,6 +88,14 @@ peopleRouter.post(
   authenticate,
   validate(ImportPeopleDto),
   requireCapability('person.import', { target: 'any' }),
+  // THE IMPORT CREATES POSITIONS TOO, so it carries the same bound — and it is the more
+  // dangerous half of D-018, because it is bulk. Without this line the guard on
+  // /:id/assignments above is bypassable in a single call by naming the Owner role in a
+  // one-row CSV. The pairs come from the same resolution the service uses (positions.ts),
+  // so the guard cannot check one role and the handler create another.
+  requireNoEscalation((req) =>
+    pairsFromImport(req.ctx.orgId as string, (req.data as { body: ImportPeopleBody }).body),
+  ),
   // A retried import must not duplicate people (13 §7). The service is idempotent by email
   // as well; this layer means the retry does not even re-run.
   idempotent('people.import'),
@@ -166,6 +176,11 @@ peopleRouter.post(
   // The target is the UNIT the position sits in: giving someone a role at Section A is an
   // act on Section A, and that is what the caller's scope has to cover (INV-005).
   requireCapability('assignment.create', { target: 'unit', from: 'body.unitId' }),
+  // Link 10b, INV-012. The line above answers "may you assign AT Section A". It does not
+  // answer "may you assign THE OWNER ROLE", and before 2026-08-23 nothing did — a caller
+  // holding only `assignment.create` could hand out a role more powerful than their own
+  // and hold the organisation an hour later (D-018, 11 §5b). It only ever refuses.
+  requireNoEscalation({ role: 'body.roleId', unit: 'body.unitId' }),
   (req, res, next) => {
     const { body, params } = req.data as {
       body: CreateAssignmentBody;

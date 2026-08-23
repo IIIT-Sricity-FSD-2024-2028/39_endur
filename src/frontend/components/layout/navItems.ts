@@ -40,16 +40,16 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
 
     { to: '/app/structure', label: 'Structure', icon: 'structure', group: 'organize',
       needs: 'unit.read' },
-    // P2, after M0. Disabled for the same reason the P3 items are: the routes exist as a
-    // contract with 20 §2, but the pages behind them are scaffold, and a sidebar that
+    // P2, after M0. Disabled for the same reason the P3 items are: the route exists as a
+    // contract with 20 §2, but the page behind it is scaffold, and a sidebar that
     // navigates to "Not built yet" is the one thing 02 §7 tells us not to build.
     { to: '/app/roles', label: 'Roles', icon: 'role', group: 'organize', needs: 'role.read',
       disabled: true,
       soonHint: 'Roles, and the grid of what each one is allowed to do.' },
+    // Un-disabled by T-050. It is the LAST edit of that task and not a task of its own:
+    // an item that navigates to a half-built page is the one thing 02 §7 forbids.
     { to: '/app/people', label: 'People', icon: 'people', group: 'organize',
-      needs: 'person.read',
-      disabled: true,
-      soonHint: 'Everyone in the organization, what they do and where.' },
+      needs: 'person.read' },
     { to: '/app/subjects', label: labels.subject.many, icon: 'subject', group: 'organize',
       needs: 'subject.read' },
 
