@@ -82,7 +82,7 @@ export function nameOf(url: string): string {
  */
 export function resolveTestUrl(
   devUrl: string,
-  configured?: string | undefined,
+  configured?: string  ,
   writtenDevUrl?: string | null,
 ): string {
   const url = configured ?? derive(devUrl);

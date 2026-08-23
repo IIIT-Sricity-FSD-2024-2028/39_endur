@@ -1,5 +1,7 @@
 // Auth routes. 13 § Auth, 15 §5.
 import { Router } from 'express';
+import { urlFor } from '../files/service.js';
+import { authChain } from '../../middleware/chains.js';
 import { LoginDto, RegisterDto, resolveLabels } from '@endur/shared';
 import type { LoginBody, MeResponse, RegisterBody } from '@endur/shared';
 import { prisma } from '../../db/client.js';
@@ -14,6 +16,11 @@ import { heldCapabilities } from '../../authz/held.js';
 import { register } from './service.js';
 
 export const authRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). The ONE router whose tenant is optional — signing in
+// and registering happen before there is an organisation to belong to — and the one place
+// X-Org-Slug is honoured, because a caller with no credential cannot widen anything.
+authRouter.use(authChain);
 
 authRouter.get('/csrf', (_req, res) => {
   res.json({ token: issueCsrfToken(res) });
@@ -102,7 +109,7 @@ authRouter.get('/me', authenticate, (req, res, next) => {
     if (principal?.kind !== 'user') throw new UnauthenticatedError();
     const user = await prisma.user.findUnique({
       where: { id: principal.id },
-      select: { id: true, name: true, email: true,
+      select: { id: true, name: true, email: true, avatarFileId: true,
                 org: { select: { id: true, name: true, slug: true, industry: true, labels: true } } },
     });
     if (!user) throw new AppError('UNAUTHENTICATED', 'Your account no longer exists.');
@@ -110,7 +117,12 @@ authRouter.get('/me', authenticate, (req, res, next) => {
     // The vocabulary rides along with the session, so the SPA can render domain nouns on
     // its first paint rather than flashing generic words (22 §3).
     const body: MeResponse = {
-      user: { id: user.id, name: user.name, email: user.email },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarFileId ? urlFor(user.avatarFileId) : null,
+      },
       organization: {
         id: user.org.id, name: user.org.name, slug: user.org.slug, industry: user.org.industry,
       },

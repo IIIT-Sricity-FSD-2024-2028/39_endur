@@ -3,7 +3,7 @@
 Phase: P2 · Milestone: M0 · Owns: `src/frontend/components/**`
 Design ref: `design_specs/design/09-COMPONENTS-AND-PATTERNS.md` — **authoritative for anatomy**
 
-Twenty-one components. **A page doc may not invent a component** — if a screen needs something
+Twenty-six components. **A page doc may not invent a component** — if a screen needs something
 not listed here, that is a design decision and it gets added here first
 (`design_specs/design/09` preamble).
 
@@ -388,17 +388,22 @@ value itself is still the team's to set.
 
 ### `<FileUpload>`
 ```ts
-{ current: string | null;
+{ current: string | null;            // the stored image, as a url
   onUpload: (file: File) => Promise<void>;
   onRemove: () => Promise<void>;
   shape: 'circle' | 'square';        // avatar | logo
+  label: string; hint?: string;      // label REQUIRED — see <Toggle>, same reasoning
   maxBytes?: number; disabled?: boolean }
 ```
-Org logo and user avatar. Full spec, including the validation rules that make an upload
-endpoint safe, in `48-FEATURE-file-upload.md`.
+**Built T-062.** Org logo (`41`) and user avatar (`47`). Full spec, including the validation
+rules that make an upload endpoint safe, in `48-FEATURE-file-upload.md`.
 
 A real `<input type="file">` underneath — the drop zone is an enhancement, never the only
 path, or the control is unusable by keyboard.
+
+Client-side type and size checks mirror the server's and **never replace them** (`14` §7).
+They exist so a 4 MB photo fails instantly rather than after a 4 MB round trip, and the
+message names both numbers: *"That file is 4.2 MB. The limit is 2 MB."*
 
 ### `<EmptyState>`
 ```ts
@@ -435,6 +440,72 @@ with focus behind it traps nobody.
 
 This is a prop contract enforcing a copy rule, which is deliberate: the type system is the
 only thing that reliably stops "Are you sure?" from reappearing.
+
+## 6b. Billing and platform
+
+Five components added 2026-08-23 with `49`, `70` and `71`. Four are customer-facing or
+shared; `<GrowthChart>` and `<MessageComposer>` are internal-only.
+
+### `<PlanPicker>`
+```ts
+{ plans: PlanOption[];
+  current: Tier;
+  onSelect: (tier: Tier) => void;
+  mode: 'join' | 'override';         // customer joining | operator setting
+  busyTier?: Tier | null;            // the one being joined right now
+  disabled?: boolean }
+```
+**One component, two worlds** — the customer joining a plan in `49` and an operator overriding
+one in `70`. Same information, different verb, and `mode` is what changes the copy and the
+confirmation. Two implementations would drift within a month; this is INV-008's argument
+applied to a second component.
+
+**`PlanOption` carries no price** — DEC-035 removed pricing from the product, so every tier
+including Enterprise renders the same **Join** action. `includes[]` comes from
+`TIER_ENTITLEMENTS` (`16` §3), resolved once on the server rather than written a second time in
+the component, so a tier that gains a surface gains a bullet with no edit here.
+
+### `<OverLimitBanner>`
+```ts
+{ over: number; limit: number; noun: string; onUpgrade: () => void }
+```
+Persistent, rendered by `<AppShell>` so it appears on **every** console page rather than only
+on billing — `16` §6 requires a customer over their seat count to see the exact number
+everywhere, not to discover it when they next visit settings.
+
+`noun` comes from `useLabels()`: a hotel is over on *properties*, not on "subjects" (INV-001).
+
+### `<OrgRow>`
+```ts
+{ org: PlatformOrgSummary;
+  onOpen: (id: string) => void;
+  chips?: ('quiet' | 'overSeats')[] }
+```
+One organisation in `70`'s estate list. **`PlatformOrgSummary` carries counts only** — the
+prop type is where INV-011 is enforced for this component, since a row that cannot receive
+response content cannot render it.
+
+### `<MessageComposer>`
+```ts
+{ recipients: { name: string; email: string }[];   // resolved SERVER-side
+  onSend: (subject: string, body: string) => Promise<void>;
+  sending?: boolean }
+```
+`70`'s contact-the-administrators action. **`recipients` is display-only and the send call
+carries no address** — the server resolves who holds `org.update` and mails them. An operator
+typing an address is an operator who can typo a customer's plan details to a stranger.
+
+### `<GrowthChart>`
+```ts
+{ series: { period: string; byTier: Record<Tier, number> }[];
+  granularity: 'month' | 'quarter' }
+```
+`71` only. Organisations over time, split by tier. **Renamed from `<RevenueChart>` on
+2026-08-23 with DEC-035** — the shape is the same series-over-periods chart, with counts
+instead of amounts and no currency prop, because there is no currency.
+
+Uses the same chart primitives as `<StackedBar>` and `<BarRow>`; it is a third placement of
+that machinery, not a second charting approach.
 
 ## 7. Patterns
 
@@ -473,7 +544,7 @@ builds a second shell.
 
 ## 9. Acceptance
 
-- [ ] Twenty-one components exist with the documented prop types
+- [ ] Twenty-six components exist with the documented prop types
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
 - [ ] `<WordsEditor>` has exactly one implementation, used by wizard step 4 and by `41`

@@ -10,6 +10,18 @@
 // Links 6-16 land in T-006..T-013 and slot in at the marked positions. Do not reorder to
 // make something work; if a link seems to need moving, the constraint table is the thing
 // to argue with.
+//
+// TWO KINDS OF MIDDLEWARE LIVE HERE, and the split is the point (12 §2):
+//
+//   APPLICATION-LEVEL, below — links 0-5 and 14-16. They apply to EVERY request,
+//   including /healthz and including a URL that matches no route at all.
+//
+//   ROUTER-LEVEL, in each feature router — links 6-8, as `router.use(tenantChain)`.
+//   They apply to one router's routes and they differ BETWEEN routers: the console gets
+//   a required tenant and CSRF, auth gets an optional tenant and the slug header, the
+//   respondent surface gets its own CORS and no CSRF at all. See middleware/chains.ts.
+//   (Moved out of this file by T-064; the diagram in 12 §2 has drawn them per-router
+//   since the first revision, and D-017 was the gap between the two.)
 import express from 'express';
 import {
   context,
@@ -20,9 +32,6 @@ import {
   globalRateLimit,
   notFound,
   errorFunnel,
-  tenantResolver,
-  authenticateOptional,
-  csrfProtection,
   auditWriter,
 } from './middleware/index.js';
 import cookieParser from 'cookie-parser';
@@ -38,6 +47,8 @@ import { campaignsRouter } from './features/campaigns/router.js';
 import { publicRouter } from './features/public/router.js';
 import { resultsRouter } from './features/results/router.js';
 import { homeRouter } from './features/home/router.js';
+import { filesRouter } from './features/files/router.js';
+import { profileRouter } from './features/profile/router.js';
 import { mount } from './lib/mount.js';
 
 export function createApp() {
@@ -73,33 +84,26 @@ export function createApp() {
   //  5 · rateLimit (global, per IP)
   app.use(globalRateLimit);
 
-  // Cookie parsing and the SESSION LOAD sit above tenantResolver. That refines 12 §5
-  // rather than contradicting it: the table says tenantResolver precedes `authenticate`,
-  // and it still does — but tenantResolver resolves the org FROM req.session.orgId, so
-  // the session record has to be loaded by the time it runs.
+  // Cookie parsing and the SESSION LOAD sit above the routers, and above tenantResolver.
+  // That refines 12 §5 rather than contradicting it: the table says tenantResolver
+  // precedes `authenticate`, and it still does — but tenantResolver resolves the org FROM
+  // req.session.orgId, so the session record has to be loaded by the time it runs.
   //
   // The distinction that makes both true: LOADING a session is not AUTHENTICATING.
-  // Loading happens here; deciding who the principal is happens at link 7, once the
-  // tenant and its db client exist.
+  // Loading happens here, for everybody; deciding who the principal is happens at link 7,
+  // inside a router, once the tenant and its db client exist.
   app.use(cookieParser());
   app.use(sessionMiddleware);
-
-  //  6 · tenantResolver — INV-010. Must precede authenticate: an API key resolves the
-  //      tenant AND the principal, and the db client must exist before any lookup.
-  app.use(tenantResolver);
-  //  7 · authenticate — attaches the principal. Optional globally; individual routers
-  //      use `authenticate` where a principal is required.
-  app.use(authenticateOptional);
-
-  //  8 · csrfProtection — cookie principals only, unsafe methods only.
-  app.use(csrfProtection);
 
   // Feature routers. mount() rather than app.use() records the prefix, which is what
   // lets the route-enumeration test see every route without walking Express internals
   // (lib/mount.ts). A router added with app.use() is a route the test cannot check.
   //
-  // Per route, inside each router: validate -> requireCapability -> requireEntitlement
-  // -> scoped rateLimit -> idempotency.
+  // Per ROUTER, at the top of each file:  6 tenantResolver -> 7 authenticate ->
+  //                                       8 csrfProtection      (middleware/chains.ts)
+  // Per ROUTE, inside each router:        9 validate -> 10 requireCapability ->
+  //                                       11 requireEntitlement -> 12 rateLimit(scoped)
+  //                                       -> 13 idempotency
   mount(app, '/api/v1/auth', authRouter);
   mount(app, '/api/v1/org', orgRouter);
   mount(app, '/api/v1/units', unitsRouter);
@@ -117,6 +121,9 @@ export function createApp() {
   // rate limit — the only routes a stranger's phone ever touches (13 §6, DEC-009).
   mount(app, '/api/v1/public', publicRouter);
   mount(app, '/api/v1/home', homeRouter);
+  mount(app, '/api/v1/profile', profileRouter);
+  // Serving uploaded bytes. Its own chain — no tenant, no principal, no CSRF (48).
+  mount(app, '/api/v1/files', filesRouter);
 
   // 14 · auditWriter — the safety net (the write itself happens in ctx.tx)
   app.use(auditWriter);

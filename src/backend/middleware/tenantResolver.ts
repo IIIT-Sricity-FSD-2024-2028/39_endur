@@ -20,47 +20,58 @@ declare global {
   }
 }
 
-/**
- * Routes that legitimately have no tenant yet: signing in, registering, health, and the
- * respondent surface. Only these may fall through to the slug header, and only these may
- * proceed without an org.
- *
- * The public routes are here for a specific reason. A VALID token resolves its campaign's
- * org above and never reaches this list; an INVALID one resolves nothing, and 401ing here
- * would answer differently from the 404 a closed campaign produces at the handler. That
- * difference is an existence oracle: try a token, and the status code tells you whether
- * that campaign exists (13 §6). Falling through lets one uniform 404 answer every case.
- */
-const TENANTLESS = [
-  /^\/healthz$/,
-  /^\/api\/v1\/auth\//,
-  /^\/api\/v1\/public\//,
-];
-
-/**
- * Only API routes need a tenant. Anything else that reaches here matched no route, so it
- * must fall through to `notFound` and leave as a 404 — demanding a tenant first would turn
- * every mistyped URL into a 401, which is a confusing answer to "that page does not exist".
- */
-const NEEDS_TENANT = /^\/api\/v1\//;
-
-export const tenantResolver: RequestHandler = (req, _res, next) => {
-  void resolve(req)
-    .then(async (orgId) => {
-      if (orgId) {
-        req.ctx.orgId = orgId;
-        req.db = tenantClient(orgId);
-        const tenant = await factsOf(orgId);
-        req.ctx.authzVersion = tenant.authzVersion;
-        req.ctx.labels = tenant.labels;
-        return next();
-      }
-      if (!NEEDS_TENANT.test(req.path)) return next();
-      if (TENANTLESS.some((pattern) => pattern.test(req.path))) return next();
-      next(new AppError('UNRESOLVED_TENANT', 'No organisation could be determined.'));
-    })
-    .catch(next);
+export type TenantResolverOptions = {
+  /**
+   * Fail closed when no organisation can be resolved. True on every tenant router; false
+   * on auth (signing in has no tenant yet) and on the respondent surface.
+   *
+   * The respondent surface is false for a specific reason. A VALID token resolves its
+   * campaign's org and never reaches the decision; an INVALID one resolves nothing, and
+   * 401ing here would answer differently from the 404 a closed campaign produces at the
+   * handler. That difference is an existence oracle: try a token, and the status code
+   * tells you whether that campaign exists (13 §6). Falling through lets one uniform 404
+   * answer every case.
+   */
+  required: boolean;
+  /**
+   * Allow `X-Org-Slug` to name the tenant. ONLY on routes where the caller holds no
+   * credential — otherwise a header could widen the access of someone who already has one.
+   *
+   * This used to be a path regex (`TENANTLESS`) tested inside the resolver. It is an
+   * option now because the resolver became router-level (T-064, D-017): the router that
+   * mounts it knows whether its routes are credential-free, and a mount point is a much
+   * harder thing to get wrong than a regex that has to be kept in step with app.ts.
+   */
+  allowSlugHeader?: boolean;
 };
+
+/**
+ * Link 6, as a factory. Router-level: each router mounts the variant its routes need
+ * (12 §2's per-router box, made true by T-064).
+ */
+export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
+  return (req, _res, next) => {
+    // Idempotent. `resultsRouter` and `campaignsRouter` share the `/campaigns` prefix, so
+    // a results request runs both chains; resolving twice would double the tenant read for
+    // no benefit.
+    if (req.ctx.orgId) return next();
+
+    void resolve(req, opts)
+      .then(async (orgId) => {
+        if (orgId) {
+          req.ctx.orgId = orgId;
+          req.db = tenantClient(orgId);
+          const tenant = await factsOf(orgId);
+          req.ctx.authzVersion = tenant.authzVersion;
+          req.ctx.labels = tenant.labels;
+          return next();
+        }
+        if (!opts.required) return next();
+        next(new AppError('UNRESOLVED_TENANT', 'No organisation could be determined.'));
+      })
+      .catch(next);
+  };
+}
 
 /**
  * The two tenant facts every later link needs, in ONE read.
@@ -87,7 +98,7 @@ async function factsOf(orgId: string): Promise<{ authzVersion: number; labels: R
 }
 
 /** Strict priority. Each source is a credential the caller could not have forged. */
-async function resolve(req: Request): Promise<string | undefined> {
+async function resolve(req: Request, opts: TenantResolverOptions): Promise<string | undefined> {
   // 1 · API key  — T-007 attaches the parsed key; its org_id wins.
   // 2 · Session  — the signed-in user's orgId, set by express-session (T-007).
   const session = (req as { session?: { orgId?: string } }).session;
@@ -97,7 +108,12 @@ async function resolve(req: Request): Promise<string | undefined> {
   // The FULL prefix, including /campaigns/. The earlier pattern matched the segment after
   // /api/v1/public/ and so captured the literal word "campaigns" as the token, resolving no
   // tenant at all — invisible until the first public route existed (N-017).
-  const token = /^\/(?:r\/|api\/v1\/public\/campaigns\/)([A-Za-z0-9_-]{6,128})/.exec(req.path)?.[1];
+  // Matched against the ORIGINAL url, not req.path: router-level middleware sees a path
+  // relative to its mount point, so `/api/v1/public/campaigns/<token>` arrives here as
+  // `/campaigns/<token>` and the full-prefix pattern would never match (T-064).
+  const token = /^\/(?:r\/|api\/v1\/public\/campaigns\/)([A-Za-z0-9_-]{6,128})/.exec(
+    req.originalUrl.split('?')[0] ?? '',
+  )?.[1];
   if (token) {
     const campaign = await prisma.campaign.findUnique({
       where: { publicToken: token },
@@ -108,9 +124,9 @@ async function resolve(req: Request): Promise<string | undefined> {
     return campaign?.orgId;
   }
 
-  // 4 · Slug header — ONLY on unauthenticated routes, so it can never widen the access of
+  // 4 · Slug header — ONLY where the router said so, so it can never widen the access of
   //     a caller who already has a credential.
-  if (TENANTLESS.some((pattern) => pattern.test(req.path))) {
+  if (opts.allowSlugHeader) {
     const slug = req.get('x-org-slug');
     if (slug) {
       const org = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });

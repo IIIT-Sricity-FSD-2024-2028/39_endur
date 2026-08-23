@@ -5,11 +5,52 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-21  (T-046..T-049 — D-009, D-010, D-004, D-006, and N-055)
+UPDATED   2026-08-23  (STAGE E BUILT — T-061..T-065 ALL DONE. Every mandatory middleware
+                       type is now implemented and tested. Also: DEC-035 removed pricing
+                       from the product, DEC-036 resolved OPEN-008. Earlier the same day:
+                       five docs written — 18, 19, 49, 70, 71)
 PHASE     P1 MIDDLEWARE
-MILESTONE M0 = 2026-08-26  ·  6 days  ·  demo 27 Aug  ·  GRADED
-STATUS    42/47. STAGES 0-4 DONE BUT FOR THE FONT FILES. EVERY M0 SCREEN IS BUILT.
-          828 tests across 72 files, all green (210 backend + 618 frontend).
+MILESTONE M0 = 2026-08-26  ·  3 days  ·  demo 27 Aug  ·  GRADED
+STATUS    49/60 (49/49 for M0 minus the fonts). STAGES 0-4 DONE BUT FOR THE FONT FILES.
+          EVERY M0 SCREEN IS BUILT.
+          !! EVALUATION 1 IS COVERED. All five mandatory middleware types are implemented
+          and asserted by tests, and logs and errors are written to rotating files.
+            logging        requestLogger + pino, redact list, never a body
+            error handling errorFunnel, one exit, four-arg, registered last
+            FILE UPLOAD    middleware/upload.ts — multipart, images only, magic bytes,
+                           dimension cap, size refused AS THE BYTES ARRIVE, metadata
+                           stripped. 15 tests. Was ABSENT this morning (T-061, T-062)
+            security       helmet, two CORS policies, CSRF, rate limits, argon2id
+            ROUTER-LEVEL   middleware/chains.ts — FOUR different chains, applied with
+                           router.use(). Was ONE line this morning (T-064)
+            logs to files  lib/logFile.ts — app-<date>.log + error-<date>.log, daily and
+                           size rotation, 14-day retention, fails OFF (T-063)
+          !! WHAT TO DEMONSTRATE, in this order: app.ts (application-level, links 0-5) ->
+          any feature router (router-level, links 6-8, and they DIFFER per router) -> any
+          route (per-route, links 9-13) -> errorFunnel (error-handling, four arguments).
+          12 §2 now has a table naming which Express middleware kind each box is.
+          !! EVERY REMAINING TASK NOW HAS A SPEC. 18 was written from placeholder, 19/49/
+          70/71 are new, 48 is re-tagged P1, and 11 §3 / 13 / 24 were amended first.
+          57 docs, audit:drift clean. The placeholder PAGES were never unspecified —
+          33, 34, 42, 43, 47 have been complete since round 1; they are unbuilt.
+          !! INV-011 IS NEW AND IT IS ABSOLUTE. A platform operator reads COUNTS, NEVER
+          CONTENT — no operator capability in any role resolves to a response, an answer,
+          a comment or a respondent identity, enforced at the db seam and not in the UI.
+          !! DEC-034 CLOSED A REAL HOLE. billing.update as written in 16 §8 would have let
+          an org administrator SET THEIR OWN TIER. It now means "request a change"; only
+          platform.plan.override sets one.
+          !! 70 AND 71 ARE EXEMPT FROM INV-001 (19 §12) and audit:vocab WILL FAIL on them
+          until pages/platform/ joins its exclusion list. Same reasoning as N-049.
+          !! STAGE 6 WAS OPENED 23 AUG AND IS NOT M0. Eleven P2 tasks, T-050..T-060, from
+          a read-only survey. NONE of them is on the path to the demo, and the one with
+          the largest blast radius (OPEN-007, what an Endur operator IS) is a decision
+          that must be written into a 19- doc before any of it is code. Finish T-043,
+          T-045 and D-005 first. Read the 23 Aug session log entry before starting any
+          T-05x — it records what was already checked so it is not checked twice.
+          859 tests, all green — 213 backend + 646 frontend. THE FRONTEND FIGURE WAS
+          MEASURED IN TWO RUNS, NOT ONE (status.md §6); a single full-suite run has not
+          been done. Do not chain the two workspace suites in one shell command — the
+          backend shares one database and fails spuriously if started mid-teardown.
           TESTS NOW RUN AGAINST endur_test, NOT endur (D-004, T-048). It is created
           and migrated automatically; nothing to set up.
           60 endpoints · 4 seeded demo orgs · 3,382 responses · migrate+seed ~14 s.
@@ -227,11 +268,78 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 [x] T-049  A  register retries a slug collision     ← D-006. Found N-055 on the way
 ```
 
-**Progress: 44 / 49 done (T-027 partial). Stages 0-4 complete but for the font files.
-T-046 to T-049 were all unplanned, and every one came from running or stressing the thing
-rather than from the board. What is left is Stage 5: one decision (`T-043`), the fonts
+### Stage E — THE FIRST EVALUATION. Top priority, above everything below it
+Opened 23 Aug when the graded criteria for evaluation 1 arrived. **These outrank Stage 6 and
+they outrank most of Stage 5.** The criteria are: a complete working application · five
+mandatory middleware types — **logging, error handling, file upload, security,
+router-level** · and **logs and error information written to files at regular intervals**.
+
+**All six are now done.** Three were already strong on 23 Aug morning (logging, error
+handling, security); file upload did not exist in any form and nothing was written to a file.
+Both were built the same day, along with the router-level pass.
+```
+[x] T-061  A  MULTIPART + FILE UPLOAD. middleware/upload.ts, lib/imageBytes.ts,
+              lib/storage.ts, features/files/**. 4 routes + serving. 15 tests. DEC-036
+[x] T-062  B  <FileUpload> + apiUpload() + logo in Settings + /app/profile (partial, 47)
+[x] T-063  A  LOG + ERROR FILES. lib/logFile.ts, pino.multistream, rotation, retention
+[x] T-064  A  router-level pass. middleware/chains.ts — 4 chains, 12 routers. D-017 repaid
+[x] T-065  A  CSV size: ONE number, CSV_MAX_CHARS, BELOW the parser's. D-016 repaid
+```
+**Doc work for Stage E and Stage 6 is DONE as of 23 Aug** — `18` written from placeholder,
+`19` new, `49` new, `70` and `71` new, `48` re-tagged P1, and the three catalogues (`11` §3,
+`13`, `24`) amended first as the ground rule requires. Every `T-0xx` above now has a spec to
+build from. `audit:drift` clean at 57 docs.
+
+| Criterion | Status |
+|---|---|
+| Complete web application | **Yes, with two known holes**, both already on the board and neither new: five console routes render `<Placeholder>` (`T-050`–`T-054`), and a cold start cannot add a person (`T-050`). Seeded, the whole path runs |
+| Middleware — **logging** | **Done.** `middleware/requestLogger.ts`, structured pino, hand-rolled rather than `pino-http` so a request body can never reach a log, with `cookie`, `authorization`, `password`, `passwordHash` on a redact list behind it |
+| Middleware — **error handling** | **Done.** `middleware/errorFunnel.ts` is a true single exit: four-arg Express error handler, registered last, no handler anywhere calls `res.status(500)`, no stack crosses the boundary, `headersSent` handled. Plus `notFound` ahead of it |
+| Middleware — **file upload** | **DONE 23 Aug (`T-061`).** `middleware/upload.ts` — a hand-written multipart parser, images only: boundary parse, size counted **as the bytes arrive** (unpipe and drain, so a 413 still gets back), magic-byte sniff, header dimension cap, metadata stripped (`lib/imageBytes.ts`, DEC-036), tenant-partitioned disk store. Four upload routes plus `GET /files/:id`. 15 tests |
+| Middleware — **security** | **Done.** helmet, two CORS policies that never both apply to one request, `csrfProtection`, global + scoped rate limits, argon2id, session regeneration on login |
+| Middleware — **router-level** | **DONE 23 Aug (`T-064`).** `middleware/chains.ts` — links 6–8 composed into **four different chains** and applied with `router.use()`: `tenantChain` (10 console routers, tenant required + CSRF), `authChain` (tenant optional, the only router honouring `X-Org-Slug`), `respondentChain` (own CORS, no CSRF), `assetChain` (nothing but CORS). The differences are the point; if they were all the same it would belong in `app.ts`. 10 tests |
+| Logs + errors **written to files** | **DONE 23 Aug (`T-063`).** `pino.multistream` over stdout + `logs/app-<date>.log` + `logs/error-<date>.log`. Daily **and** 10 MB rotation, 14-day retention by the date in the filename, synchronous writes so the last line before a crash survives, and a logging failure **fails off to stdout rather than taking the app down**. 9 tests |
+
+**All six rows are finished as of 23 Aug**, and nothing had to be unpicked — `T-061` was
+additive, `T-063` was a destination and a rotation policy, `T-064` was a refactor toward what
+`12` §2 already claimed. `12` §2 now also carries a table naming which **kind** of Express
+middleware each box is (application-level, router-level, per-route, error-handling, built-in,
+third-party), which is the thing the criterion is actually asking to see.
+
+### Stage 6 — P2 build-out, the platform surface, and the cold-start flow
+Opened 23 Aug from a four-item survey. Nothing here is M0: **do not start any of it before
+`T-043` and `T-045`.** Stage 6 is what P2 is, written down.
+```
+[ ] T-050  B  people — list, create, invite, assignments (34)  ← THE E2E HOLE. Do first
+[ ] T-051  B  person detail + my account (34, 47)
+[ ] T-052  B  roles + the powers grid (33)                     ← repays D-008
+[ ] T-053  A  POST /authz/simulate — the route does not exist  ← blocks T-054
+[ ] T-054  C  permission simulator page (42)                   ← needs T-053
+[ ] T-055  A  RLS policies                                     ← repays D-001 + D-003
+[x] T-056  X  DECIDE: what an Endur operator IS (OPEN-007)     ← DEC-033. Doc 19 written
+[ ] T-057  A  billing read surface + seat metering (16 §5, §8) ← repays D-012, D-013
+[ ] T-058  B  plan + billing page, JOIN buttons, over-limit banner (49)  ← DEC-035
+[ ] T-059  A  platform backend — platform_users, requirePlatform, seam (19)  ← needs T-057
+[ ] T-066  B  /ops console — estate, plan override, messaging (70)   ← needs T-059
+[ ] T-067  B  /ops/analytics — tier mix, movement, trials, quiet (71) ← needs T-059
+[x] T-068  X  DROPPED 23 Aug — DEC-035. No pricing, no plan_prices table at all
+[ ] T-060  X  cold-start end-to-end pass                       ← needs T-050. NOT T-045
+```
+
+**Progress: 49 / 60 done (T-027 partial). Stages 0-4 complete but for the font files.
+Stage 5 is what stands between here and the graded demo: one decision (`T-043`), the fonts
 (`D-005`), `D-007`, `D-011`, and three rehearsals. The demo runs end to end: scan, fill,
 submit, and the results count moves.**
+
+**Stage 6 exists because a survey on 23 Aug asked four questions and got four different
+kinds of answer.** They are worth keeping distinct, because only one of them is a hole:
+
+| Asked | Found |
+|---|---|
+| Missing middleware, logging etc. | **Nothing missing.** All 16 links of `12` §2 are wired in `app.ts` in the documented order, `requestLogger` is structured pino with a redact list and never touches a body, and both rate limiters, CSRF, idempotency and the audit writer are live. The only genuine gap at this layer is `D-001` — RLS, layer 2 — which was already debt. `T-055` |
+| Do all pages work | **Five console routes still render `<Placeholder>`** — roles, people, person detail, simulator, my account. All five are P2, all five are sidebar-disabled or unlinked so nobody walks into one, and all five have their backend already built and tested — except the simulator, whose route was never mounted. `T-050`–`T-054` |
+| Endur admin, operator stats, revenue model | **The largest of the four, and the only one that needs architecture before code.** See `OPEN-007`, `D-012`, `D-013`. `T-056`–`T-059` |
+| Does the end-to-end flow work | **Not from cold.** Seeded, yes — that is what `T-045` rehearses. From `/start` with an empty org it breaks at *add people*: the API has full people CRUD and CSV import, the UI has read-only search. `T-050`, then `T-060` |
 
 ---
 
@@ -242,9 +350,11 @@ Blocking or dated. Move to `_MEMORY.md` as a `DEC-` entry once resolved, and tic
 | Ref | Question | Needed by | Blocks |
 |---|---|---|---|
 | `OPEN-002` | What public URL does the QR encode? `localhost` will not scan from a phone. **Deferred 21 Aug — local for now, by decision.** That unblocks development and unblocks nothing else: the scan-to-respond beat still cannot run until this is answered, so it is deferred rather than resolved | **before `T-045`** | T-038, T-043 |
+| ~~`OPEN-008`~~ | **RESOLVED 23 Aug — `DEC-036`.** File upload **strips metadata, it does not re-encode.** `lib/imageBytes.ts` sniffs the real format from magic bytes, reads dimensions from the header, and removes JPEG APP1/APP13/COM, PNG `eXIf`/`tEXt`/`zTXt`/`iTXt`/`tIME`, and WebP `EXIF`/`XMP ` chunks with the VP8X flag bits that advertise them — without decoding anything, and therefore **without an image library nobody approved**. The privacy property `48` wanted re-encoding for survives: GPS, device ids and author names do not reach disk, asserted by a test that uploads a GPS-tagged JPEG and greps the stored bytes. What is not bought is polyglot neutralisation, and that risk is written into `48` and `DEC-036` rather than left quiet — stored bytes are only ever *served*, with a sniffed `Content-Type`, `nosniff` and `inline`, and respondent uploads stay out of scope, which is where a hostile file would come from. **If an image library is ever approved, `stripMetadata()` is the one function to replace** | ~~before `T-061`~~ — **done** | ~~T-061~~, ~~T-062~~ |
 | `OPEN-001` | Phase-3 Redux shape (`23` §4). Recommendation on file: RTK Query + hand-written slices | 15 Oct | nothing before P3 |
 | `OPEN-003` | Analysis engine: rule-based or LLM-assisted (`43`) | 1 Nov | nothing before P3 |
 | `OPEN-004` | Third member's lane assignment (`02` §6) | — | scheduling only |
+| ~~`OPEN-007`~~ | **RESOLVED 23 Aug — `DEC-033`, and `19-PLATFORM-OPERATORS.md` is written.** A separate principal kind, two fixed roles, a separate account table, login, cookie, capability catalogue and db seam, with `INV-011` over all of it. Original question, kept because the reasoning is the answer: There is no platform-level actor anywhere in the architecture — not a capability, not a principal kind, not a row. `GrantScope` stops at `all`, which means *this whole organisation*; `db/tenant.ts` stamps `orgId` on every query by construction and lint forbids importing the raw client outside that seam; INV-010 forbids taking an org from anywhere but `tenantResolver`. So an Endur-side admin is **not a big grant** — every mechanism the product has for saying "may do more" is org-shaped, and a cross-tenant operator is the one thing they were built to make impossible. It needs its own principal kind, its own seam past the tenant client, and its own audit story, and that is a `19-PLATFORM-OPERATORS.md` plus a `DEC-`, not a handler. **Nothing about the revenue model can be built correctly before this is answered**, because "who may set a tier" is the same question — and it was the same question: answering it produced `DEC-034`, which found that `billing.update` as specified in `16` §8 would have let an org administrator set their own tier | ~~before `T-057`~~ — **done** | ~~T-056~~, T-057, T-059 |
 
 **Also non-blocking but time-sensitive:** mention to the React teacher that the project is
 already a SPA (`54` §1). A courtesy, not a risk — see `DEC-013`.
@@ -267,6 +377,12 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-011` | **Two genuinely concurrent submits can both run the handler** | Found 21 Aug while checking `T-049` for flakiness (`N-055`). The `Idempotency-Key` row is now committed before the response is sent, which closes the window for any retry that follows a delivered response. The real flaky-network case is narrower and still open: the client never got the first response, both requests arrive together, both miss the read. The unique index still allows only one key row, so the replay stays correct — but both handlers ran, and on respondent submit that means two responses. Closing it means RESERVING the key before the handler instead of writing it after, which introduces an in-flight case that has to answer something (409, or wait-and-replay). Not a thing to invent five days from a graded demo | after M0, or before `T-045` if a rehearsal ever shows a duplicate |
 | `D-008` | The capability catalogue's power labels are English | `roles/service.ts` `describe()` turns `campaign.launch` into *"launch campaigns"* — a domain noun, for `33`'s powers grid. Found by the T-044 audit and deliberately not fixed: the grid is not built, and the object → label mapping for `role`, `person`, `template` and `org` — none of which HAS a label — is `33`'s design work, not something to invent from outside it. `audit:vocab` does not scan it, because the string is assembled from a capability key rather than written | with `T-033` |
 | `D-005` | The two woff2 faces are not vendored — **and this is why the UI reads as generic** | `tokens.css` declares both; `public/fonts/` holds only a README. `design_specs/design/01` §5 puts **Caprasimo on every `h1`–`h4`, card title, KPI number, button label and badge** and Figtree on everything else — so with the files absent, *every heading and every number in the product is `system-ui`*. The spec is explicit that the personality is concentrated in the type (*"Caprasimo has one weight and a lot of personality… a paragraph set in it instantly cheapens the page"*), and the fonts README says it plainly: *"until the files land… nothing breaks — it just does not look like Endur."* Confirmed as the main cause of the 21 Aug walkthrough's *"too simple, too AI-like"*. `endur.css` (1,451 lines) and the vendored `organic.css` are in place and doing their job; the two files are the missing input | **24 Aug** (`21` §4) — **highest visual return of anything left** |
+| `D-012` | **No organisation has ever had a subscription row, so the trial in `16` §7 has never once happened** | Found 23 Aug. `16` §7 says a new org starts `trialing` on **Gold for 14 days**, *"so the improvement loop is seen before it is sold"*. Nothing creates a `Subscription`: not `register`, not `/org/setup`, not the seed. `requireEntitlement` reads `subscription?.tier ?? 'bronze'` — and its own comment above that line calls bronze *"the trial default"*, which is a third answer again. The effect is that **every org in the product, including all four demo orgs, is silently Bronze**, so `analysis.read`, `results.export`, `response.export` and the whole `reflection`/`actionplan`/`checkin` surface return 402 to everyone, forever. The entitlement middleware is correct; it is being handed a tier nobody ever set. Pick one of the three answers, make `register` write the row, and seed one org per tier so the 402 path and the paid path are both demonstrable | with `T-057` |
+| `D-013` | **`billable_seats` is specified and not implemented** | `16` §5 defines it — active users, plus non-person subjects, never respondents — and says it is *"recomputed on a schedule and on membership change, cached on `subscriptions.seats`, and shown in settings with a breakdown so a bill is never a surprise"*. `subscriptions.seats` defaults to `0` and is never written by anything. With it absent, `16` §6's over-limit behaviour cannot exist either: there is no count to be over. Neither is M0, and neither should be invented in a hurry — but *"the revenue model is architecture, not a slide"* is `16`'s own opening line, and right now the metering half of it is a slide | with `T-057` |
+| `D-014` | `POST /authz/simulate` is in `13` §Trust and is not mounted | `authz/simulate.ts` exists and exports `simulate()`; `roles/router.ts` mounts only `GET /authz/capabilities`. So the resolver's explain path — the thing `42` renders and `_MEMORY.md` N-005 calls the cheapest trust-builder in the product — has no route to reach it. It is a handler and a DTO, not a design problem: the decision it returns is the same `Decision` `requireCapability` already builds | with `T-053` |
+| `D-015` | The liveness route is `/healthz`; `13` §Unauthenticated utility says `GET /health` | Cosmetic, one line, and listed only because `13` is meant to be the single authority on paths and this is the one place a reader would be told something untrue. `tenantResolver`'s bypass list, `routes.test.ts`'s allowlist and `chain.test.ts` all say `/healthz`, so the code is self-consistent and the doc is the odd one out — but fix whichever, not neither | with `T-057` |
+| ~~`D-016`~~ | ~~**Three different maximum CSV sizes, and the smallest one wins silently**~~ | **REPAID 23 Aug, `T-065`.** One number now: `CSV_MAX_CHARS` (150,000) in `packages/shared`, and it sits **below** the parser's 256 kb on purpose — so anything a person plausibly pastes fails `validate()` with a field error naming the CSV, and the body parser is left as the outer backstop for a body that is malicious rather than merely large. `12` §4.4 rewritten: it claimed a streaming CSV parser with a 5 MB cap that was never written, and now states what is actually true (the import is a string in a JSON body) and names the one real bypass (`48`'s multipart). Asserted by a test that sends an oversized CSV and checks the error is `VALIDATION_FAILED` on `body.csv`, not `PAYLOAD_TOO_LARGE` | done |
+| ~~`D-017`~~ | ~~**`12` §2 draws links 6–8 in a `per-router` box; `app.ts` mounts all three with `app.use()`**~~ | **REPAID 23 Aug, `T-064`.** `middleware/chains.ts` composes links 6–8 into four chains, applied with `router.use()` in twelve routers. `tenantResolver` became a factory in the process and **lost both its path-regex exception lists** — "which routes may have no tenant" and "which routes may use the slug header" are now mount-point decisions, which is a much harder thing to get wrong than a regex kept in step with `app.ts` by hand. Side effect worth having: a mistyped `/api/v1/...` now 404s instead of answering 401 | done |
 
 ---
 
@@ -274,6 +390,277 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
+
+### 2026-08-23 · STAGE E BUILT — every mandatory middleware type, plus DEC-035 (no pricing)
+
+Two instructions, in order: *"leave out pricing cause this aint an actual product anyway,
+just add a button to join and directly make them join that tier"*, then *"begin with our new
+plan"* — Stage E, the evaluation-1 criteria.
+
+**Pricing removed — `DEC-035`.** A tier is now **joined**, not bought: one button per tier,
+`POST /billing/tier`, the row is written, and the entitlement gate answers differently on the
+next request. No amounts, no currency, no checkout, no processor, and **no `plan_prices`
+table** — `T-068` is dropped rather than deferred. `DEC-034`'s split of `billing.update` had
+nothing left to hang on and is superseded: the capability writes the tier again, deliberately,
+and the protection that remains is the one that was always doing the work — it is a
+capability, so it is grantable, denyable, deny-wins, audited, and seeded to administrators
+only. `71` stopped being a revenue page and became
+[`71-PAGE-platform-analytics.md`](architecture/71-PAGE-platform-analytics.md): organisations,
+seats, tier mix, movement, trials, quiet orgs. MRR would have been a constant times a count,
+which is a count with false confidence attached. `<RevenueChart>` → `<GrowthChart>`,
+`platform.revenue.read` → `platform.analytics.read`.
+
+**Then Stage E, all five tasks.**
+
+| | What landed |
+|---|---|
+| `T-063` | `lib/logFile.ts` + `pino.multistream`. `logs/app-<date>.log` (everything) and `logs/error-<date>.log` (warn and above), **alongside stdout, never instead of it**. Daily *and* 10 MB rotation, 14-day retention decided by the date in the filename rather than mtime, synchronous writes so the last line before a crash survives, and a broken log directory **fails off to stdout instead of taking the app down**. Verified end to end against the real module, not only in tests |
+| `T-064` | `middleware/chains.ts`. Links 6–8 moved out of `app.ts` into **four different `router.use()` chains**. `tenantResolver` became a factory and lost both path-regex exception lists — the mount point knows what a regex was being kept in step to know. A mistyped `/api/v1/...` now 404s instead of 401ing |
+| `T-061` | `middleware/upload.ts` — a hand-written multipart parser, one file, one field, images only. Size counted **as the bytes arrive**, and on refusal it unpipes and drains rather than destroying the request, so a 413 actually gets back. `lib/imageBytes.ts` sniffs format and dimensions from headers and strips metadata; `lib/storage.ts` writes tenant-partitioned to disk. Four upload routes plus `GET /files/:id` |
+| `T-062` | `<FileUpload>`, `apiUpload()`, the logo card in Settings, and `/app/profile` — which stops being a placeholder and becomes **partially real**: the avatar works, the rest is still `T-051` and the page says so |
+| `T-065` | One CSV number, `CSV_MAX_CHARS`, and it sits **below** the parser's so a field error wins over `PAYLOAD_TOO_LARGE`. `12` §4.4 rewritten — it described a streaming CSV parser that was never written |
+
+**`OPEN-008` resolved — `DEC-036`, and it is the one thing to read before touching uploads.**
+`48` said *"Re-encode: **Always**"*. Re-encoding needs an image library, which is a dependency
+nobody approved and not an install to make unasked. What is built instead **strips the
+metadata segments without decoding** — JPEG APP1/APP13/COM, PNG text chunks, WebP EXIF/XMP —
+so GPS, device ids and author names never reach disk, which is the property `48` wanted
+re-encoding *for*. What that does **not** buy is polyglot neutralisation, and that is written
+into `48` and `DEC-036` rather than left quiet. `stripMetadata()` is the one function to
+replace if a library is ever approved.
+
+**Checks:** `npm run typecheck` clean · `npm run lint` clean · `audit:drift` clean (57 docs)
+· `audit:vocab` clean · **248 backend tests** (was 213) and **652 frontend tests** (was 646),
+run as two separate commands as the warning above says.
+
+Three pre-existing failures were fixed on the way, all outside this work: three `tsc` errors
+in `test/org.test.ts` that broke `npm run typecheck` on a clean tree, and eight `eslint`
+errors in `test/database.ts` and `Settings.test.tsx`. The `eslint --fix` for the last of those
+removed casts that `tsc` needs, so they are written as `getByRole<HTMLButtonElement>(...)`
+instead — both checkers are happy with the generic form.
+
+**Nothing committed. The tree is dirty, as always.**
+
+**What the next session should know.** Stage E is done, so the top of the board is Stage 5
+again — `T-043` (blocked on `OPEN-002`, the user's), `T-045`'s three rehearsals, and the
+fonts. `70`/`71` are still exempt from INV-001 and `audit:vocab` **will fail on
+`pages/platform/`** the moment that directory exists, until it joins the exclusion list.
+
+### 2026-08-23 · FIVE DOCS WRITTEN — 18, 19, 49, 70, 71. No code.
+
+Third entry today. Asked to write the specs for the five task groups, *"if not already"*.
+**One of the five was already written and four were not**, so the first useful output was
+finding which.
+
+**Item 5 needed nothing.** Every placeholder page already has a complete spec: `33` roles and
+the powers grid (173 lines), `34` people (135), `42` simulator (163), `47` profile (130), `43`
+analysis (133) — all with the full ten-section page template from `README` § The
+page/feature doc template. The one sidebar item with no doc of its own is the **response
+inbox**, and it is referenced as P3 by `40`, `43` and `20` and pointed at
+`design_specs/design/08` §8.3. That is deliberately deferred, not missing, so it was left
+alone. **The placeholder pages are unbuilt, not unspecified** — `T-050`–`T-054` can start from
+the docs that already exist.
+
+**Half of item 4 needed nothing either, and the half that did is a trap worth naming.**
+*"Assign levelled roles"* is `33` § Interactions plus `11` §8 plus `10`'s `Node.level`, and
+those already say the important thing: a level is **ordering and seeding only, never consulted
+at authorisation time**. `DEC-002` replaced an integer permission ladder with the GRANT engine
+and `CONF-002` records it. `49` § "Assigning levelled roles" points at all four places rather
+than restating any of them, and says out loud that making a level decide an access question
+would supersede `DEC-002`.
+
+**What was actually written:**
+
+| Doc | Was | Covers |
+|---|---|---|
+| `18-OBSERVABILITY-AND-OPS.md` | a reserved placeholder | Item 1's file half — two rotating streams, retention, what is never written, and `logs/` |
+| `19-PLATFORM-OPERATORS.md` | did not exist | Items 2 + 3's model. **Resolves `OPEN-007`** |
+| `49-PAGE-plan-and-billing.md` | did not exist | Item 4 — the customer's plan, usage, **one-click join** (DEC-035), and the sign-up plan step |
+| `70-PAGE-platform-console.md` | did not exist | Item 3's screen — estate, plan override, messaging org admins |
+| `71-PAGE-platform-analytics.md` | did not exist | Item 2's screen — tier mix, movement, trials, quiet orgs. **Renamed from `-revenue` by DEC-035**; counts, never money |
+
+**The catalogues were amended first**, per the ground rule that has kept the docs consistent
+through three revisions: `11` §3 gained the section saying platform capabilities are a
+*separate* catalogue and why, `13` gained the billing, platform and multipart route tables,
+`24` went from twenty-one components to twenty-six.
+
+**Three decisions came out of the writing rather than going into it.**
+
+`DEC-033` — an operator is a separate principal kind, not a bigger grant. The reasoning is in
+`19` §2 and it is the same three mechanisms every time: `GrantScope` stops at one org,
+`tenantClient` stamps `orgId` by construction, INV-010 forbids it from anywhere else. Those
+are the isolation guarantee, so the answer is a second system rather than a hole in the first.
+
+**`INV-011` is the one to remember**: an operator reads counts, never content. No operator
+capability in any role resolves to a response, an answer, a comment or a respondent identity,
+and it is enforced at the database seam rather than by a UI that declines to render. The
+support consequence is real and is stated rather than hidden — when a customer says *"results
+look wrong"*, an operator cannot look at their results.
+
+`DEC-034` — **a live hole found while writing `19` §8.** `16` §8 put `POST /billing/tier`
+behind `billing.update`, an **org** capability. As written, an org administrator could be
+granted the power to set their own tier — a free Enterprise upgrade in a product whose revenue
+model is tiers, with no bug to point at, because the grant system would have worked exactly as
+designed. Split into: `billing.read` see it · `billing.update` *request* a change through the
+`49` checkout · `platform.plan.override` actually set it. The powers grid can hand out
+`billing.update` safely now; it could not before.
+
+`DEC-032` — logs and errors to two rotating files, in addition to stdout and never instead.
+`18` §2 has the reasoning; the sharp edge is `18` §3, that persisting logs widens a logging
+mistake from one terminal session to fourteen days of retained files, so the redact list stops
+being belt-and-braces.
+
+**`CONF-018` is resolved:** `48` is re-tagged **P1**. The other half of it is not — `12` §4.4
+still claims a streaming CSV parser that was never written, and that stays `D-016`.
+
+**One thing left deliberately undone.** `70`/`71` have **no `design_specs` entry** — `70`
+§ Design note says so plainly and restricts both pages to existing tokens and existing
+component anatomy, because inventing colour or spacing in `architecture/` breaches `DEC-012`
+and fails `audit:drift`.
+
+*(The other one, `plan_prices`, stopped existing an hour later: **`DEC-035` removed pricing
+from the product entirely** at the user's instruction. `T-068` is dropped, the table is gone,
+`71` reports in organisations rather than money, and `POST /billing/tier` joins a tier with one
+button. See the 23 Aug DEC-035 log entry below.)*
+
+**One thing the next session must not miss:** `70` and `71` are exempt from INV-001 (`19`
+§12) — they are Endur's own furniture, they have no `organization.labels` to resolve against,
+and they legitimately say "Organizations" and "Revenue". `audit:vocab` scans
+`src/frontend/pages/**` and **will fail on them** until `pages/platform/` is added to its
+exclusion list, in the same spirit as `presets/` and `database/` (`N-049`).
+
+### 2026-08-23 · THE EVALUATION-1 CRITERIA — checked the docs against all six
+
+Second entry today. The graded criteria for the first evaluation arrived after the survey
+above, and they re-rank everything: a complete working application, five mandatory
+middleware types (**logging, error handling, file upload, security, router-level**), and
+**logs and error information stored in files at regular intervals**. Read-only pass; nothing
+outside `PROGRESS.md`, `_MEMORY.md` and `55` was touched.
+
+**The result is four done, two not, and the two are additive.** The § Board Stage E table
+carries the per-criterion verdict. What follows is only what would otherwise be re-derived.
+
+**File upload is the serious one, and the tag is why it was missed.** `48-FEATURE-file-upload.md`
+is a complete spec — endpoints, the validation order, magic-byte checking, re-encoding,
+storage layout, an acceptance list — and it is tagged **`Phase: P2`**. `02` §4 lists it under
+the Phase-2 checklist; `02` §3, the Phase-1 deliverables, does not mention uploads at all. So
+every doc we have files this *after* the evaluation that requires it. That is `CONF-018`.
+
+The groundwork is further along than the tag suggests: the `File` model is in `10` and
+migrated, `src/backend/storage/` exists and is gitignored, `<FileUpload>`'s props are in the
+`24` catalogue. **What does not exist is any multipart parsing at all** — no multer, busboy or
+formidable in `src/backend/package.json`, no route, no service, `File` referenced by nothing,
+`storage/` empty.
+
+**And `12` §4.4 describes code that was never written.** It says CSV import *"bypasses this
+with a streaming parser and its own 5 MB cap"*. The import takes a CSV as a **string in a
+JSON body** — `ImportPreviewBody.csv` is `z.string().max(1_000_000)` — through
+`express.json({ limit: '256kb' })`. Three numbers, and the smallest wins silently: a CSV
+between 256 kb and 1 MB is accepted by the DTO and rejected by the body parser before
+validation runs, surfacing as `PAYLOAD_TOO_LARGE` rather than a field error. `D-016`.
+
+**Nothing is written to a file anywhere.** `lib/logger.ts` constructs pino with a level and a
+redact list and **no destination**, so every log line and every error `errorFunnel` records
+goes to stdout and is gone. No transport, no rotation, no `logs/`. `*.log` sits in
+`.gitignore`, which reads like somebody intended this and it never happened. `18` is the
+reserved slot that would own it and it is an explicit placeholder — *"reserved rather than
+written because writing it now would be speculation"* — a deferral that was reasonable in
+June and is wrong now that a criterion names it. `T-063` writes both.
+
+**Router-level middleware: one line.** `publicRouter.use(publicCors)`. Thirteen routers are
+created with `express.Router()` and twelve never call `.use()`; everything else is
+application-level via `app.use()` or route-level via the middleware array. The useful part is
+that **`12` §2 already draws links 6–8 in a `per-router` box** — `tenantResolver`,
+`authenticate`, `csrfProtection` — and `app.ts` mounts all three globally. So the published
+diagram is simultaneously wrong and describing the better answer, and `T-064` is a refactor
+toward a doc that already exists rather than anything invented for a rubric. `D-017`.
+
+**Three criteria need no work and should be said out loud in the viva, because they are
+stronger than the rubric asks for.** `requestLogger` is hand-rolled rather than `pino-http`
+*specifically* so a request body can never reach a log, with a redact list behind it as a
+second line. `errorFunnel` is a genuine single exit — four-arg handler, registered last, no
+handler anywhere calls `res.status(500)`, no stack crosses the boundary, `headersSent`
+handled by delegating to Express rather than emitting half a JSON body. Security is helmet
+plus two CORS policies that never both apply to one request, plus CSRF, two rate limiters,
+argon2id and session regeneration on login.
+
+**One decision is the user's and it blocks `T-061`:** `OPEN-008`, whether `48`'s *"re-encode:
+always"* survives into P1. It needs an image library, there is no image dependency in the API
+today, and it changes what the task is. Recommendation on file is to add it — the part of
+file upload that is interesting *as middleware* is the validation chain, and a route that
+rejects a renamed `.exe` by magic byte during streaming is worth more than one that accepts
+bytes. Not an install to make unasked.
+
+**Suggested order:** `T-063` and `T-064` start immediately and depend on nothing. `T-061`
+waits on `OPEN-008`. `T-062` and `T-065` follow `T-061`.
+
+### 2026-08-23 · survey of four questions — STAGE 6 OPENED, NO CODE WRITTEN
+
+Asked to look over the state of the build rather than add to it, against four questions:
+missing middleware, do all the pages work, the Endur-operator and revenue surface, and
+whether the flow runs end to end. Read only — nothing was edited outside this file.
+
+**The four answers were four different shapes, and that is the useful finding.** One is
+already done, one is a known list, one is a genuine architectural hole, and one is a single
+missing screen wearing a bigger costume. The Stage 6 table above states each; what follows
+is only what a later session would otherwise have to re-derive.
+
+**Middleware: complete.** All 16 links of `12` §2 are present in `app.ts` in the documented
+order, with the two deliberate refinements already commented in place (cookie parsing and
+the session *load* sit above `tenantResolver`, because resolving the org reads
+`req.session.orgId` — loading a session is not authenticating, and link 7 still runs after
+link 6). `requestLogger` is hand-rolled pino rather than `pino-http` precisely so a body can
+never reach a log, with `cookie`, `authorization`, `password` and `passwordHash` on a redact
+list as a second line. `helmet` plus two CORS policies that never both apply to one request.
+Both rate limiters, CSRF, `validate`, `requireCapability`, `requireEntitlement`,
+`idempotent`, `auditWriter`, `notFound`, `errorFunnel` — all live, all mounted, 60 routes
+across 11 feature routers. **There is nothing to add here.** The one real gap at this layer
+is `D-001`, which predates the survey. `compression` is absent and is not in `12` and does
+not need to be.
+
+**Pages: five placeholders, and only one of them is in anybody's way.** Roles, People, person
+detail, simulator and my account still render `<Placeholder>`. That was already in
+`status.md` §4 and it is still accurate. What that section does not say is that **four of the
+five have a complete, tested backend waiting behind them** — `people` alone has nine
+endpoints including CSV preview and import, `roles`/`grants` have nine more. The exception is
+the simulator: `authz/simulate.ts` exports `simulate()` and no router mounts it (`D-014`).
+
+**The Endur operator does not exist, and cannot be added by granting somebody more.** This is
+`OPEN-007` and it is the largest item found. Every mechanism the product has for expressing
+authority is org-shaped by construction: `GrantScope` stops at `all`, meaning this whole
+organisation; `tenantClient` stamps `orgId` on every read and every create and lint forbids
+importing the raw client outside `db/tenant.ts`; INV-010 forbids an org id arriving from
+anywhere but `tenantResolver`. Those are not obstacles to route around — they are the
+product's central claim, and the eventual answer has to be a **new principal kind with its
+own seam and its own audit story**, written into a `19-` doc and a `DEC-` before a line of it
+is typed. Slot `19` is free; `17` and `18` are the reserved neighbours.
+
+**The revenue model is half-built, and the missing half is the half that runs.** The
+entitlement *architecture* is genuinely complete and enforced — `TIER_ENTITLEMENTS`,
+`requireEntitlement`, 402-with-`requiredTier`, capability-before-entitlement so nobody is
+ever told to buy something they still could not use. But **nothing ever writes a
+`Subscription` row** (`D-012`), so every org including all four demo orgs falls to the
+`?? 'bronze'` default and the Gold trial in `16` §7 has never happened once; `billable_seats`
+is specified and unimplemented (`D-013`), which also means `16` §6's over-limit behaviour has
+no number to be over; and `/api/v1/billing` does not exist though `billing.read` and
+`billing.update` have been in the capability catalogue since `T-003`. **The correct order is
+`OPEN-007` first** — "who may set a tier" and "what is an operator" are one question, and
+answering the second first would mean building the billing surface twice.
+
+**End to end: seeded yes, cold no.** Sign in to a seeded org and the whole path runs, which
+is what `T-045` rehearses and what the 21 Aug entry already established. Start at `/start`
+with a new empty organisation and it runs create org → setup wizard → subjects → templates →
+builder → campaign → launch → respond → results, and breaks at exactly one point: **there is
+no way to add a person.** The API has had full people CRUD and CSV import since `T-018`; the
+frontend `lib/people.ts` exports `usePeopleIn` and `usePeopleSearch` and nothing else, both
+read-only, consumed only by the structure detail panel and the subject form. So the org graph
+can be built and subjects can be created, but the people who would hold roles in it cannot
+be. `T-050` is therefore the first Stage 6 task and the only one that unblocks another.
+
+**Do not start Stage 6 yet.** M0 is 26 Aug and the demo is 27 Aug; `T-043`, `T-045` and
+`D-005` are what stand in front of it, and none of the eleven tasks opened today is on that
+path. This entry exists so that the day after the demo does not begin with this survey being
+run again.
 
 ### 2026-08-23 · share sheet frame, and the theme wipe softened
 

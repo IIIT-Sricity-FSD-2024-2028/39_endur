@@ -307,6 +307,110 @@ DEC-031  ACTIVE  2026-08-22  origin:owner
   supersed 46 § Data contract's stats shape, and 46 § Components' four cards.
   see      dto/home.ts, features/home/service.ts, pages/console/Home/cards.ts
 
+DEC-032  ACTIVE  2026-08-23  origin:eval-1 criteria
+  what     LOGS AND ERRORS ARE WRITTEN TO ROTATING FILES ON DISK, IN ADDITION TO STDOUT.
+           two streams via pino.multistream: logs/app-<date>.log (everything) and
+           logs/error-<date>.log (warn and above). daily + 10MB rotation, 14-day retention.
+  why      the first evaluation requires logs and error information stored in files at
+           regular intervals, and lib/logger.ts had a level and a redact list and NO
+           DESTINATION -- everything went to stdout and died with the process.
+           IN ADDITION TO, never instead of: stdout is what a container platform and
+           npm run dev read. a separate error file is not duplication -- "error
+           information should be stored" is a distinct requirement with a distinct
+           reader, and it must not require grepping megabytes of 200 OK.
+  cost     a logging mistake now persists for 14 days instead of one terminal session.
+           the redact list stops being belt-and-braces and becomes load-bearing.
+  holds    a logging failure must NEVER take the app down. unopenable stream -> say so on
+           stdout and keep serving.
+  see      18-OBSERVABILITY-AND-OPS.md (written from placeholder by this decision)
+
+DEC-033  ACTIVE  2026-08-23  origin:owner  resolves:OPEN-007
+  what     A PLATFORM OPERATOR IS A SEPARATE PRINCIPAL KIND WITH A SEPARATE ACCOUNT TABLE,
+           A SEPARATE AUTH SURFACE, A SEPARATE CAPABILITY CATALOGUE AND A SEPARATE DB SEAM.
+           two fixed roles: owner (business, sees revenue) and staff (support, does not).
+           never a User, never a Grant, never an is_superuser flag.
+  why      every mechanism the product has for expressing authority is org-shaped BY
+           CONSTRUCTION: GrantScope stops at `all` = one org; db/tenant.ts stamps orgId on
+           every query and lint forbids the raw client outside that seam; INV-010 forbids
+           an orgId from anywhere else. those three ARE the isolation guarantee we sell.
+           a bypass ordinary services could reach would turn a structural guarantee back
+           into a remembered one -- the trade D-003 already regrets making once.
+  cost     a second account table, a second login, a second guard, a second audit table.
+           accepted: the payoff is that no grant and no column can make an org admin into
+           an operator, so the question cannot be got wrong later.
+  holds    INV-011. requireCapability and requirePlatform NEVER appear on the same route.
+           MFA is required for operators and is NOT deferred like other security work --
+           one stolen operator password exposes every customer at once.
+  see      19-PLATFORM-OPERATORS.md, 70, 71
+
+DEC-034  SUPERSEDED-BY-DEC-035  2026-08-23  origin:owner
+  what     `billing.update` NO LONGER MEANS "SET A TIER". it means "start a plan change
+           from inside the org" -- the 49 checkout, which REQUESTS a change and never
+           writes subscriptions.tier. the authoritative write is platform.plan.override
+           (19 §4) or the checkout's own server-side completion.
+  why      16 §8 put POST /billing/tier behind billing.update, which is an ORG capability.
+           as written, an org administrator could be GRANTED the power to set their own
+           tier -- a free upgrade to Enterprise, in a product whose revenue model is
+           tiers. there was no bug to point at: the grant system would have worked
+           exactly as designed. found 2026-08-23 while writing 19.
+  supersed 16 §8's capability column for the POST /billing/tier row.
+  holds    the powers grid may now hand out billing.update safely. it could not before.
+  status   SUPERSEDED SAME DAY by DEC-035, which deletes the checkout this split hung on.
+           kept in full because the HOLE it names is real and would come straight back if
+           pricing ever returned. read DEC-035 with it, never instead of it.
+  see      19 §8, 49-PAGE-plan-and-billing.md, 16 §8
+
+DEC-035  ACTIVE  2026-08-23  origin:user
+  what     ENDUR HAS NO PRICES. no amounts, no currency, no checkout, no payment
+           processor, no invoice, NO plan_prices TABLE. an organisation JOINS a tier:
+           one button per tier in 49, POST /billing/tier, subscriptions.tier is written,
+           and the entitlement gate answers differently from the next request.
+           billing.update writes the tier again -- deliberately.
+  why      user, 2026-08-23: "leave out pricing cause this aint an actual product anyway,
+           just add a button to join and directly make them join that tier". a course
+           project cannot take money, and a faked checkout demonstrates nothing the
+           middleware chain does not already demonstrate.
+  supersed DEC-034 (the billing.update split -- no checkout left to split around).
+           16 §8's "payment collection is absent" framing: it is now ABSENT BY DESIGN,
+           not deferred. 19 §10's plan_prices table: DELETED, not unseeded.
+           71 stops being a revenue page -- see the rename below.
+  holds    THE PARTS THAT WERE EVER INTERESTING SURVIVE UNTOUCHED: the entitlement gate
+           (16 §3), requireEntitlement's 402, the seat meter and billable_seats (16 §5),
+           the over-limit asymmetry (16 §6, collection never stops), and the trial
+           (16 §7). a plan with no price still has a SIZE and still gates SURFACES.
+           the protection that remains on billing.update is that it is a CAPABILITY:
+           grantable, denyable, deny-wins, audited, seeded to administrators only,
+           resolved in middleware and never in a handler.
+           a join is audited -- with no invoice, audit_log is the ONLY record it happened.
+  renamed  71-PAGE-platform-revenue.md -> 71-PAGE-platform-analytics.md
+           platform.revenue.read       -> platform.analytics.read
+           <RevenueChart>              -> <GrowthChart>
+           reports in ORGS, SEATS and ACTIVITY. MRR would have been a constant times a
+           count, which is a count with false confidence attached.
+  see      49, 71, 19 §8, 19 §10, 16 §8, 24 §6b
+
+DEC-036  ACTIVE  2026-08-23  origin:claude  resolves:OPEN-008
+  what     FILE UPLOAD STRIPS METADATA, IT DOES NOT RE-ENCODE. lib/imageBytes.ts sniffs
+           the real format from magic bytes, reads dimensions from the header, and removes
+           JPEG APP1/APP13/COM, PNG eXIf/tEXt/zTXt/iTXt/tIME, and WebP EXIF/XMP chunks
+           (clearing the VP8X flag bits with them). the pixel data is untouched.
+  why      re-encoding needs an image library (sharp, and it is a native build). there is
+           no image dependency in the API today and installing one unasked is not a call
+           to make -- the user has said so before, and OPEN-008 recorded it as theirs.
+  supersed 48 § Validation's "Re-encode: ALWAYS. Never store the uploaded bytes".
+  holds    THE PRIVACY PROPERTY SURVIVES: GPS, device ids, author names and embedded
+           thumbnails do not reach disk, and a test uploads a GPS-tagged JPEG and greps
+           the stored bytes for it.
+  risk     STATED, NOT HIDDEN: stripping does not neutralise a polyglot whose payload is
+           inside the image data. what makes that survivable is the rest of the design --
+           stored bytes are only ever SERVED, with a sniffed Content-Type, nosniff and
+           Content-Disposition: inline, never executed and never parsed as anything else --
+           plus 48's standing rule that RESPONDENT UPLOADS ARE OUT OF SCOPE, which is
+           where a hostile file would actually come from.
+  reverse  if a library is approved, stripMetadata() is the ONE function to replace and
+           48 § Acceptance is the checklist it has to keep passing.
+  see      48 § "Re-encode -> strip", OPEN-008, src/backend/lib/imageBytes.ts
+
 ```
 
 ---
@@ -353,6 +457,12 @@ INV-008  one <QuestionInput> implementation, parameterised by readOnly. the buil
 
 INV-009  one <UnitTree> component, three placements (wizard step 3, /app/structure,
   campaign audience picker). never fork it.
+
+INV-011  a platform operator reads COUNTS, NEVER CONTENT. no operator capability, in any
+         role, resolves to a response body, an answer, a free-text comment or a respondent
+         identity -- enforced by the platform db seam returning aggregates only, not by a
+         UI that declines to render them. an Endur employee with a "read any response"
+         button makes 01 §6, 52 and INV-006 all false at once. see 19 §5.
 
 INV-010  tenant isolation: every query touching tenant data filters by orgId, injected by
   tenantResolver middleware, never taken from a request body.
@@ -403,6 +513,32 @@ CONF-008  customization.md §14 says "build the board (Tier 2) before the wizard
   later edit. the wizard is a generator, never a parallel store. this satisfies the real
   concern behind customization.md §13 "a wizard that produces unmaintainable state".
   the Tier-2 board itself is P3.
+
+CONF-018  RESOLVED  2026-08-23  48-FEATURE-file-upload.md  vs  the evaluation-1 criteria
+  48 IS TAGGED "Phase: P2". THE FIRST EVALUATION MAKES FILE UPLOAD MANDATORY, AND THAT
+  EVALUATION IS P1.
+  the criteria name five middleware types that must be implemented "wherever applicable"
+  and list file upload among them. 02 §3 Deliverables does not mention uploads at all;
+  02 §4 lists 48 under the PHASE 2 checklist. so every doc we have puts this after the
+  evaluation that requires it.
+  WHAT ALREADY EXISTS, WHICH IS MORE THAN THE TAG SUGGESTS: the File model is in 10 and
+  migrated; src/backend/storage/ exists and is gitignored; <FileUpload> is in the 24
+  catalogue with its props; 48 itself is a complete spec down to the acceptance list.
+  WHAT DOES NOT EXIST: any multipart parser. no multer, no busboy, no formidable in
+  src/backend/package.json. no route. no service. the File model is referenced by nothing.
+  storage/ is empty. AND 12 §4.4 claims "CSV import uploads bypass this with a streaming
+  parser and its own 5 MB cap" — that describes code that was never written; the import
+  takes a CSV as a STRING in a JSON body (D-016).
+  RESOLVED 2026-08-23 -> 48 IS RE-TAGGED P1 and pulled into evaluation scope; README's
+  page table and 13 § Uploads carry the multipart routes. it is the only reading that does
+  not leave a mandatory criterion unbuilt.
+  12 §4.4 STILL CLAIMS A STREAMING CSV PARSER THAT DOES NOT EXIST -- that half is D-016 and
+  is repaid with T-065, when a real multipart path arrives and the sentence becomes true
+  for uploads even though it never was for CSV.
+  BLOCKED ON OPEN-008 for scope: whether 48's "always re-encode" survives into P1 decides
+  whether this is a parser plus a disk write, or a parser plus an image pipeline.
+  see PROGRESS.md Stage E, T-061, T-062, D-016, D-017.
+
 ```
 
 CONF-009  react course vs our stack. teacher's pre-preparation message (2026-08-18) requires
@@ -656,6 +792,80 @@ OPEN-006  REVISIT:2026-08-24  blocks:nothing-for-M0  found 2026-08-19 building T
     c. one demo super-account with positions in all four orgs. cheapest of the real fixes,
        but it makes the demo path differ from the product's.
   see  src/frontend/lib/demo.ts, components/layout/TopBar.tsx, 24 §2
+
+OPEN-007  RESOLVED-BY:DEC-033  2026-08-23   (raised and answered the same day)
+  THERE IS NO ENDUR OPERATOR, AND ONE CANNOT BE ADDED BY GRANTING SOMEBODY MORE.
+  the product has no platform-level actor anywhere: not a capability in 11 §3, not a
+  principal kind in 12 §3, not a row in 10. asked for as "endur admin, superuser/owner
+  stats".
+  WHY IT IS NOT A BIG GRANT, WHICH IS THE OBVIOUS WRONG ANSWER: every mechanism for
+  expressing authority here is org-shaped BY CONSTRUCTION, not by omission.
+    - GrantScope stops at `all`, and `all` means THIS WHOLE ORGANISATION. there is no
+      scope above it and INV-005 ties powers to the unit of an assignment, which is
+      inside an org by definition.
+    - db/tenant.ts stamps orgId onto every read and every create, and lint forbids
+      importing the raw client outside that one seam. a service CANNOT express a
+      cross-tenant query.
+    - INV-010 forbids an orgId arriving from anywhere but tenantResolver.
+  those three are the product's central claim (16 §1, 52), so the answer is a NEW
+  PRINCIPAL KIND with its own seam, its own auth path, and its own audit story — not a
+  fourth GrantScope and not a boolean on users.
+  QUESTIONS THAT HAVE TO BE ANSWERED TOGETHER, because answering them apart builds it twice:
+    1. where does an operator authenticate? the same /auth/login (and then users.org_id
+       means what?), or a separate surface with no tenant at all?
+    2. what may an operator SEE? aggregate counts across orgs is a very different
+       promise from reading one org's responses, and 52 + INV-006 constrain the second
+       hard. recommendation on file: COUNTS AND TIERS ONLY, never response content —
+       it is the only version that does not contradict the anonymity claim we sell.
+    3. who may set a tier? 16 §8 puts `billing.update` behind a capability, which is an
+       ORG capability — meaning an org admin can currently be granted the power to
+       upgrade themselves for free. that is the revenue model's actual hole and it is
+       the same question as 1 and 2.
+    4. how is an operator action audited, when audit_log has org_id NOT NULL?
+  OUTPUT IS A DOC, NOT CODE: 19-PLATFORM-OPERATORS.md (slot 19 is free; 17 and 18 are the
+  reserved neighbours) plus a DEC-. catalogue-first applies — any new capability goes in
+  11 §3 first, any endpoint in 13 first.
+  NOT M0. raised 3 days before a graded demo and deliberately parked behind T-043/T-045.
+  RESOLVED 2026-08-23 -> DEC-033. a separate principal kind, not a bigger grant. two fixed
+  roles (owner, staff), a separate platform_users table, a separate login and cookie, a
+  separate capability catalogue, a separate db seam, and INV-011 over all of it. the four
+  questions listed above are each answered in 19: §7 auth, §5 what may be seen (COUNTS
+  ONLY), §8 who may set a tier (-> DEC-034, then DEC-035), §10 audit (platform_audit_log,
+  because audit_log.org_id is NOT NULL and belongs to the customer).
+  see 19-PLATFORM-OPERATORS.md, 70, 71. PROGRESS.md Stage 6, T-056..T-059.
+
+OPEN-008  RESOLVED 2026-08-23 -> option (b), narrowed. see DEC-036. kept in full because
+          the ARGUMENT for (a) is still the right one if a library is ever approved.
+          found 2026-08-23 from the eval-1 criteria
+  DOES FILE UPLOAD RE-ENCODE? this decides what T-061 IS, so it comes before the code.
+  48 § Validation is unambiguous today: "Re-encode: ALWAYS. Never store the uploaded
+  bytes", and the paragraph under it says why in the strongest terms the doc set uses —
+  "Re-encoding is not an optimisation, it is the security control". decoding to a bitmap
+  and re-encoding strips EXIF, embedded payloads and polyglot files in one step, and it
+  removes any question of whether a stored file could execute. it also strips GPS and
+  device ids, which is 48's stated reason respondent uploads are out of scope (INV-006).
+  THE COST: an image library. sharp is the usual answer and it is a NATIVE build. there
+  is no image dependency in src/backend/package.json today, and the API's whole dependency
+  list is currently thirteen well-known packages.
+  THE OPTIONS:
+    a. add it, honour 48 as written. strongest answer, and the acceptance list in 48
+       (a .exe renamed .png; a GPS-tagged photo; a 20000x20000 decompression bomb) becomes
+       demonstrable rather than aspirational.
+    b. supersede 48 § Validation for P1: verify magic bytes + dimensions + size, store the
+       original, re-encode later. weaker, and it contradicts a doc we wrote deliberately.
+       if taken, it MUST be a DEC- with the risk stated, not a quiet omission.
+    c. accept PNG only and re-encode with something already present. narrows the surface
+       but does not remove the need for a decoder.
+  RECOMMENDATION ON FILE: (a). the evaluation names file upload as MANDATORY MIDDLEWARE,
+  and the part that is interesting as middleware is precisely the validation chain 48
+  specifies — a route that accepts bytes is not worth marks, a route that rejects a
+  renamed .exe by magic byte during streaming is.
+  NOT AN INSTALL TO MAKE UNASKED. see CONF-018, PROGRESS.md Stage E.
+  OUTCOME: (b), but narrower than (b) as written -- the stored bytes are NOT the uploaded
+  bytes. lib/imageBytes.ts strips the metadata segments WITHOUT decoding, so EXIF/GPS/XMP/
+  IPTC never reach disk, which is the privacy property 48 wanted re-encoding for. what is
+  NOT bought: polyglot neutralisation. see DEC-036 for the risk, stated rather than quiet.
+
 ```
 
 ---
@@ -850,6 +1060,27 @@ middleware/idempotency.ts        -> owned by 13 §7
 CONTESTED  src/frontend/components/** is written by 24 but consumed by every page doc.
            rule: a page doc may NOT add a component. it requests one in 24 first.
            source: design_specs/design/09 preamble.
+
+12-MIDDLEWARE-STACK.md           -> src/backend/middleware/**  src/backend/app.ts
+                                    chains.ts (links 6-8, router-level) added by T-064.
+18-OBSERVABILITY-AND-OPS.md      -> src/backend/lib/logger.ts  src/backend/lib/logFile.ts
+                                    src/backend/logs/**
+48-FEATURE-file-upload.md        -> src/backend/middleware/upload.ts
+                                    src/backend/lib/imageBytes.ts  src/backend/lib/storage.ts
+                                    src/backend/features/files/**  src/backend/storage/**
+                                    src/frontend/components/form/FileUpload.tsx
+19-PLATFORM-OPERATORS.md         -> src/backend/platform/**  packages/shared/src/platform-capabilities.ts
+                                    also owns the platform_users / platform_audit_log
+                                    tables in database/schema.prisma. 10 owns the FILE;
+                                    19 owns those two MODELS. (plan_prices was a third
+                                    until DEC-035 deleted pricing outright.)
+49-PAGE-plan-and-billing.md      -> src/frontend/pages/console/Billing/**
+                                    src/backend/features/billing/**
+70-PAGE-platform-console.md      -> src/frontend/pages/platform/Console/**
+71-PAGE-platform-analytics.md    -> src/frontend/pages/platform/Analytics/**
+                                    NOTE 70+71 are EXEMPT from INV-001 (19 §12) and
+                                    audit-vocab.mjs must exclude pages/platform/.
+
 ```
 
 ---

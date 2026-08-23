@@ -66,9 +66,30 @@ export const ImportPeopleBody = z.object({
 });
 export type ImportPeopleBody = z.infer<typeof ImportPeopleBody>;
 
+/**
+ * ONE number for CSV size, and it is smaller than the JSON body limit on purpose — D-016.
+ *
+ * The import arrives as a STRING inside a JSON body, so two caps apply to it: this one, in
+ * characters, and `express.json({ limit: '256kb' })`, in bytes. When the DTO's cap is the
+ * larger of the two, the parser rejects the request before `validate()` ever runs and the
+ * caller gets `PAYLOAD_TOO_LARGE` for a field problem — which is exactly what happened
+ * between 256 kb and the old 1 MB.
+ *
+ * Setting it below the byte limit inverts that: anything a person plausibly pastes fails
+ * with a readable field error naming the CSV, and the body parser is left as the outer
+ * backstop for a body that is malicious rather than merely large.
+ *
+ * 150,000 characters is roughly 2,500 rows of `name,email,role,unit` — comfortably past
+ * `ImportPeopleBody`'s 2,000-row commit limit, so the row cap is what a real import hits.
+ */
+export const CSV_MAX_CHARS = 150_000;
+
 export const ImportPreviewBody = z.object({
   /** Raw CSV text. Parsed server-side so the preview and the commit read it identically. */
-  csv: z.string().min(1).max(1_000_000),
+  csv: z
+    .string()
+    .min(1)
+    .max(CSV_MAX_CHARS, 'That file is too large to import in one go. Split it and import in parts.'),
 });
 export type ImportPreviewBody = z.infer<typeof ImportPreviewBody>;
 

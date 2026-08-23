@@ -4,6 +4,7 @@
 // feature folder, because the k-anonymity gate is the thing they are actually about and it
 // should be somewhere a reviewer can find in one look.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
 import { ExportDto, ResponsesDto, ResultsDto } from '@endur/shared';
 import type { ResponsesQuery, ResultsQuery } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
@@ -14,6 +15,10 @@ import { UnauthenticatedError } from '../../lib/errors.js';
 import { exportResults, readResponses, readResults } from './service.js';
 
 export const resultsRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+resultsRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
   const principal = req.ctx.principal;

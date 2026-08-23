@@ -1,5 +1,6 @@
 // Campaign routes. 13 § Campaigns, 38.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
 import {
   CampaignIdDto,
   CampaignListDto,
@@ -27,6 +28,10 @@ import {
 } from './service.js';
 
 export const campaignsRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+campaignsRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
   const principal = req.ctx.principal;

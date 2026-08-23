@@ -2605,3 +2605,47 @@ html:active-view-transition * {
   .stat-band-head { align-items: flex-start; }
   .range-control { width: 100%; justify-content: space-between; }
 }
+
+/* ── <FileUpload> — 24 §5, 48 ───────────────────────────────────────────────
+   Tokens only. This component has no design_specs entry yet, so it borrows the
+   field, card and button anatomy that already exists rather than inventing a
+   colour or a spacing value (DEC-012). */
+.file-upload .file-drop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: border-color var(--dur-base) var(--ease), background var(--dur-base) var(--ease);
+}
+.file-upload .file-drop.is-dragging {
+  border-color: var(--color-accent-500);
+  border-style: solid;
+  background: var(--color-accent-100);
+}
+.file-upload .file-drop.is-busy { opacity: 0.7; }
+
+.file-preview,
+.file-placeholder {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  background: var(--color-card);
+  border: 1px solid var(--color-divider);
+}
+.file-preview.shape-circle,
+.file-placeholder.shape-circle { border-radius: 50%; }
+.file-preview.shape-square,
+.file-placeholder.shape-square { border-radius: var(--radius-sm); }
+
+.file-upload .file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.file-upload input[type='file'] { max-width: 100%; font-size: var(--text-meta); }

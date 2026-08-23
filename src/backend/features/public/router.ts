@@ -10,17 +10,23 @@ import { Router } from 'express';
 import { PublicCampaignDto, SubmitResponseDto } from '@endur/shared';
 import type { SubmitResponseBody } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
-import { publicCors } from '../../middleware/security.js';
+import { respondentChain } from '../../middleware/chains.js';
 import { scopedRateLimits } from '../../middleware/rateLimit.js';
 import { idempotent } from '../../middleware/idempotency.js';
 import { readPublicCampaign, submitResponse } from './service.js';
 
 export const publicRouter: Router = Router();
 
-// Wide, and without credentials. A QR scan has to work from any network, off any phone,
-// with no cookie attached — which is exactly why this is a different CORS policy from the
-// console's and why it is mounted here rather than globally.
-publicRouter.use(publicCors);
+// Links 6-8, router-level (12 §2), and a DIFFERENT set from every other router.
+//
+// publicCors is wide and without credentials: a QR scan has to work from any network, off
+// any phone, with no cookie attached — which is exactly why this is a different CORS
+// policy from the console's and why it is mounted here rather than globally.
+//
+// The tenant is optional (an invalid token must 404 like a closed campaign, not 401 —
+// 13 §6) and there is NO csrfProtection, because these routes carry no ambient authority
+// for a forged request to borrow. See middleware/chains.ts.
+publicRouter.use(respondentChain);
 
 publicRouter.get(
   '/campaigns/:token',

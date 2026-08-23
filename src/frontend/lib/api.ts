@@ -110,7 +110,12 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Op
   const { idempotencyKey, suppress401Handler, headers: extraHeaders, ...init } = opts;
   const headers = new Headers(extraHeaders);
 
-  if (body !== undefined) headers.set('Content-Type', 'application/json');
+  // FormData is the ONE non-JSON body this client sends (48). The Content-Type is left
+  // unset on purpose: the browser has to write it itself, because only it knows the
+  // multipart boundary it generated, and setting it by hand produces a body the server
+  // cannot parse.
+  const isMultipart = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (body !== undefined && !isMultipart) headers.set('Content-Type', 'application/json');
   if (!SAFE_METHODS.has(method)) {
     const token = csrfToken();
     // Send it if we have it. If we do not, the server rejects with CSRF_FAILED and the
@@ -126,7 +131,7 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Op
     headers,
     // Without this the session cookie is not sent and every call is anonymous.
     credentials: 'include',
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(body === undefined ? {} : { body: isMultipart ? body : JSON.stringify(body) }),
   });
 
   if (response.status === 204) return undefined as T;
@@ -206,3 +211,16 @@ export const apiDelete = <TOut = void, TIn = undefined>(
   body?: TIn,
   opts?: Options,
 ): Promise<TOut> => request<TOut>('DELETE', path, body, opts);
+
+/**
+ * Upload one file, as multipart. 48.
+ *
+ * Everything else about the request is unchanged — same session cookie, same CSRF echo,
+ * same error envelope — which is the reason this is four lines here rather than a second
+ * client with its own idea of what a failure looks like.
+ */
+export function apiUpload<T>(path: string, file: File, field = 'file'): Promise<T> {
+  const form = new FormData();
+  form.append(field, file);
+  return request<T>('POST', path, form);
+}

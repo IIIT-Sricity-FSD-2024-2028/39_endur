@@ -91,6 +91,26 @@ file must agree (`DRIFT-004`).
 Naming rule: `<object>.<verb>`, lowercase, singular object. A page doc may not use a string
 absent from this table — add it here first (`README.md` ground rule 3).
 
+### What is NOT in this table — platform capabilities
+
+**Capabilities carrying the `platform.` prefix are a separate catalogue and must never be
+merged into this one.**
+They live in `packages/shared/src/platform-capabilities.ts` and are specified by
+`19-PLATFORM-OPERATORS.md` §4.
+
+This is not filing tidiness. Everything in the table above is **grantable**: it can be assigned
+to a role in the powers grid (`33`), it is swept up by the per-module wildcard expansion
+`TIER_ENTITLEMENTS` uses (`16` §3), and it is resolved per-request against the `grants` table by
+the algorithm in §5. A
+platform capability must be none of those things — an organisation administrator holding
+`platform.analytics.read` would be able to read the whole estate at once, and there would be no
+bug to point at, because the grant system would have worked exactly as designed.
+
+Two catalogues, two resolvers, two guards: `requireCapability()` reads this table, and
+`requirePlatform()` reads that one. **A route carries one or the other and never both**
+(`19` §9). `packages/shared` asserts the two sets are disjoint, and the route-enumeration test
+(`12` §7) asserts no `platform.` string appears outside `/api/v1/platform/*`.
+
 ### Parameterised capabilities
 
 `grants.params` lets one capability carry different strength at different levels, instead of

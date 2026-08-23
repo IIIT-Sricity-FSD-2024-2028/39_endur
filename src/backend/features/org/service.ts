@@ -2,6 +2,7 @@
 import { estimateSeconds, resolveLabels } from '@endur/shared';
 import type { LabelSet, OrgView, ResolvedLabels, SetupOrgBody, UpdateOrgBody } from '@endur/shared';
 import type { Request } from 'express';
+import { urlFor } from '../files/service.js';
 import { prisma } from '../../db/client.js';
 import { runInTransaction, type Tx } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
@@ -312,6 +313,7 @@ function view(org: {
   industry: string;
   labels: unknown;
   settings: unknown;
+  logoFileId?: string | null;
   createdAt: Date;
 }): OrgView {
   const settings = (org.settings ?? {}) as Record<string, unknown>;
@@ -324,6 +326,7 @@ function view(org: {
     // What /app checks before rendering: an unconfigured org's home is empty and confusing,
     // so the console redirects to the wizard instead (46 § Route & access).
     configured: typeof settings.setupCompletedAt === 'string',
+    logoUrl: org.logoFileId ? urlFor(org.logoFileId) : null,
     createdAt: org.createdAt.toISOString(),
   };
 }

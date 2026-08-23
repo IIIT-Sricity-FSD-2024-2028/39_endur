@@ -9,8 +9,10 @@
 // <VocabularyChips> links here with #words from EVERY console page, so the anchor is a
 // contract, not a nicety (41 § Route & access).
 //
-// Billing, the danger zone and the logo upload are specified in 41 and deliberately absent:
-// they are the cut-list, not an oversight.
+// Billing and the danger zone are specified in 41 and deliberately absent: they are the
+// cut-list, not an oversight. THE LOGO UPLOAD IS NO LONGER ON IT — file upload became a
+// mandatory evaluation criterion on 23 Aug, `48` was re-tagged P1 (CONF-018), and this is
+// one of the two places `<FileUpload>` is mounted (T-062).
 import { useEffect, useMemo, useState } from 'react';
 import {
   Industry, LabelKey, resolveLabels,
@@ -22,7 +24,10 @@ import { Toast } from '../../components/feedback/Toast.js';
 import { useCan } from '../../lib/capabilities.js';
 import { ApiError } from '../../lib/api.js';
 import { derivePlural } from '../../lib/format.js';
-import { useOrg, usePresets, useUpdateLabels, useUpdateOrg } from '../../lib/org.js';
+import { FileUpload } from '../../components/form/FileUpload.js';
+import {
+  useOrg, usePresets, useRemoveLogo, useUpdateLabels, useUpdateOrg, useUploadLogo,
+} from '../../lib/org.js';
 import { labelsLoaded, useAppDispatch } from '../../store/index.js';
 
 /**
@@ -41,6 +46,8 @@ export default function Settings(): JSX.Element {
   const dispatch = useAppDispatch();
   const updateOrg = useUpdateOrg();
   const updateLabels = useUpdateLabels();
+  const uploadLogo = useUploadLogo();
+  const removeLogo = useRemoveLogo();
 
   const editable = can('org.update');
 
@@ -62,7 +69,7 @@ export default function Settings(): JSX.Element {
   const loaded = org.data;
   useEffect(() => {
     if (!loaded) return;
-    const resolved = resolveLabels(loaded.labels as LabelSet);
+    const resolved = resolveLabels(loaded.labels);
     setDraft(resolved);
     setOverrides(overridesOf(resolved));
     setName(loaded.name);
@@ -213,6 +220,23 @@ export default function Settings(): JSX.Element {
                   so the copy has to say what this does NOT do. */}
               <p className="text-meta">This only changes which templates we suggest.</p>
             </div>
+
+            {/* 48. `org.update` covers the logo too — an upload is an attribute of the
+                thing it belongs to, not a permission of its own (11 §3). Without it the
+                control renders read-only: the image shows, the actions do not. */}
+            <FileUpload
+              label="Logo"
+              shape="square"
+              current={org.data?.logoUrl ?? null}
+              disabled={!editable}
+              hint="PNG, JPEG or WebP, up to 2 MB."
+              onUpload={async (file) => {
+                org.set(await uploadLogo(file));
+              }}
+              onRemove={async () => {
+                org.set(await removeLogo());
+              }}
+            />
 
             {profileError && <p className="field-error" role="alert">{profileError}</p>}
 

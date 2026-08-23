@@ -1,0 +1,265 @@
+# 49 — Page: plan and billing (the organisation's own)
+
+Phase: **P2** · Milestone: — · Owns: `src/frontend/pages/console/Billing/**`
+Related: `16` (tiers, metering, over-limit), `41` (settings, which hosts this), `30` (sign-up),
+`19` §8 (what `billing.update` means now)
+Decisions: `_MEMORY.md` DEC-034, **DEC-035 (no pricing — joining a tier is one click)**
+Design ref: none yet — see `70` § Design note
+
+---
+
+## Purpose
+
+The customer's side of the plan model: what plan this organisation is on, what it is using
+against that plan, and how to change it. `71` is the estate-wide view of the same thing.
+
+It also carries the **plan-selection step at sign-up**, which is the other half of what the
+user asked for — *"buys a plan sign up page"*.
+
+> **There are no prices anywhere in this product — DEC-035.** Endur is a course project, not a
+> business, so a plan is **joined**, not bought: one button per tier, and clicking it puts the
+> organisation on that tier immediately. No amounts, no currency, no checkout, no processor,
+> no invoice. What survives is the part that was ever architecturally interesting — the
+> **entitlement gate** (`16` §3) and the **seat meter** (`16` §5), both of which work exactly
+> as specified whether or not money moves.
+
+## Route & access
+
+| | |
+|---|---|
+| Route | `/app/settings/billing` — a tab in settings (`41`), not a top-level nav item |
+| Also rendered at | `/start` step 2, as plan selection during sign-up (§ Interactions) |
+| World | Console |
+| Guard | `RequireCapability capability="billing.read"` on the route — this page *is* the action, so someone without it gets a full-page 403 rather than an empty screen (the rule `31` and `32` already follow) |
+
+**A settings tab, not a nav item.** Billing is looked at monthly, not daily, and `design_specs/design/02`
+§3's sidebar is grouped by what people do — Organize, Collect, Understand. Billing is none of
+those, and a fourth group holding one item is a worse answer than a tab.
+
+## Capabilities
+
+| Action | Capability | Notes |
+|---|---|---|
+| See the plan and usage | `billing.read` | Seeded to administrators only, not to every role |
+| Join a tier | `billing.update` | **Writes `subscriptions.tier`.** One click, effective immediately — DEC-035 |
+| Set another org's tier | — | Not reachable from this world at all. `platform.plan.override` (`19` §4) |
+
+> **What DEC-034 was protecting, and why it still matters with no prices.** `16` §8 put
+> `POST /billing/tier` behind `billing.update`, so an administrator could give their own
+> organisation Enterprise for free. DEC-034 split the capability so the tier write happened
+> server-side after a checkout. **DEC-035 deletes the checkout, so that split has nothing left
+> to hang on and `billing.update` writes the tier again — deliberately, and recorded.**
+>
+> The protection that remains is the one that was always doing the real work: `billing.update`
+> is a **capability**, so it is grantable, denyable and audited like every other, and the
+> default grant matrix (`11` §8) seeds it to administrators and to nobody else. A self-upgrade
+> is now an intended feature rather than a hole, and it is still the resolver — not a handler —
+> that decides who may do it.
+>
+> `platform.plan.override` (`19` §4) is unchanged and is still a *different* capability in a
+> *different* system: it sets **someone else's** tier, which no org capability can ever do.
+
+## Data contract
+
+| Purpose | Endpoint | Returns |
+|---|---|---|
+| Current plan | `GET /billing` | `BillingSummary` |
+| Usage against it | `GET /billing/usage` | `UsageReport` |
+| The four tiers and what each unlocks | `GET /billing/plans` | `PlanOption[]` |
+| **Join a tier** | `POST /billing/tier` | `BillingSummary` — the new state, applied |
+
+```ts
+type BillingSummary = {
+  tier: Tier; status: 'trialing' | 'active' | 'cancelled';
+  periodStart: string; periodEnd: string;
+  trialEndsAt: string | null;
+  // No price field. There is no price — DEC-035.
+};
+
+type PlanOption = {
+  tier: Tier;
+  name: string;            // "Silver — Understand", from 16 §2
+  sells: string;           // the one-line promise
+  includes: string[];      // resolved from TIER_ENTITLEMENTS, never hand-written twice
+  current: boolean;
+};
+
+type UsageReport = {
+  seats: { used: number; included: number | null; breakdown:
+    { activeUsers: number; nonPersonSubjects: number } };
+  campaigns: { active: number };
+  responses: { last30d: number };     // shown, never billed — see §"What is not counted"
+};
+```
+
+`seats.breakdown` is required, not decorative. `16` §5 says a bill must never be a surprise,
+and *"you have 34 seats"* invites the reply *"34 of what?"* — the breakdown answers it in
+place.
+
+## The billable-seat rule, restated where the customer reads it
+
+```
+billable_seats = active users
+               + non-person subjects that are not archived
+```
+
+Seats are still metered and the limit is still enforced (`16` §5–§6) — a plan with no price
+still has a size, and the seat meter is what makes the entitlement gate mean something. Two
+facts the page states in words, because they are the model's argument:
+
+- **Respondents are never counted.** A college with 4,000 students is metered on the staff
+  being reviewed and the staff running the system. This is `16` §5, and it is *why* respondents
+  are not `users` in the schema — the seat model and the privacy model point the same way.
+- **A person-subject is not double-counted.** A subject with `linkedUserId` set is already a
+  user and counts once.
+
+### What is not counted, and why it is shown anyway
+
+Response volume appears on this page as **usage, never as a limit**. `16` §5 rules out
+per-response metering outright: counting responses creates an incentive to suppress
+participation, which is the exact problem the product exists to solve. Showing the number
+while stating it does not count against anything is the clearest possible signal that the
+model follows the product thesis. Say it on the page.
+
+## State
+
+| What | Where |
+|---|---|
+| The summary and usage | Fetched on open. Not stored — a stale tier is a wrong tier |
+| The tier after a join | Refetched, never patched locally. The server decides the resulting state (a join can change `status` as well as `tier`) |
+| Over-limit banner state | Derived from `UsageReport`, rendered by the shell so it appears on **every** console page (`16` §6) |
+
+## Components
+
+| Component | New? | Use |
+|---|---|---|
+| `<PlanPicker>` | **new**, shared with `70` | The four tiers, what each includes, current one marked, a **Join** button on each of the others |
+| `<StatCard>` `<BarRow>` `<ResponsiveTable>` `<ConfirmDialog>` | existing | Usage figures and the downgrade confirmation |
+| `<OverLimitBanner>` | **new** | Persistent, in `<AppShell>`, with the exact number over |
+
+`<PlanPicker>` is one component used by two worlds — the customer choosing and the operator
+overriding. Same information, different verb. Two implementations would drift within a month,
+which is the argument INV-008 and INV-009 already make twice.
+
+## Interactions
+
+### Sign-up — plan selection at `/start`
+
+`30` currently creates the organisation and drops into the setup wizard. Plan selection is
+inserted as a step **between** account creation and the wizard.
+
+**A trial is pre-selected and the step is skippable.** `16` §7 starts new organisations
+`trialing` on Gold for 14 days *"so the improvement loop is seen before it is sold"* — it is the
+differentiator, and hiding it behind a paywall on day one guarantees nobody discovers it. A
+mandatory plan choice before anyone has seen the product is a sign-up form that asks a question
+its reader cannot yet answer.
+
+So: the step shows what the trial includes, offers the four tiers for anyone who already knows
+what they want, and defaults to *continue with the trial*. **This is why `D-012` matters** —
+nothing currently writes a `Subscription` row at all, so the trial the docs promise has never
+once happened. This step is where that row is created.
+
+**With no prices the step is genuinely one click**, which is the whole reason DEC-035 is worth
+having: sign-up does not fork into a payment flow that would have to be faked for a demo and
+explained away in a viva.
+
+### Joining a tier from settings
+
+`<PlanPicker>` → **Join** → `POST /billing/tier` → the row is written and the entitlement gate
+starts answering differently on the next request. No intermediate state, no `pending`, no
+`effectiveFrom` in the future — a plan change that takes effect later is a scheduling problem
+(`OPEN-005`) bought for nothing.
+
+An **upgrade applies with no dialog.** A confirmation before giving someone more is friction
+with no risk behind it. A **downgrade confirms**, because it takes surfaces away, and the
+dialog states in words:
+
+| Direction | What the dialog says |
+|---|---|
+| Upgrade | No dialog. Takes effect immediately; the new surfaces unlock now |
+| Downgrade | **Data is retained, not deleted** (`16` §7). Surfaces stop resolving; re-joining the higher tier restores access to the same history |
+| Either | Collection never stops. Running campaigns keep running (`16` §6) |
+
+The downgrade sentence is the one that matters. Deleting a customer's data on downgrade is how
+a re-upgrade never happens, and a customer who does not know the data survives will not
+downgrade — they will leave.
+
+**A join is audited like any other privileged write** (`12` §4.14): actor, from-tier, to-tier,
+request id. With no invoice and no receipt, `audit_log` is the *only* record that the change
+happened, which makes it more load-bearing here than it is on a route that also produces a
+document.
+
+### Going over the seat limit
+
+`16` §6, and the behaviour is deliberately asymmetric:
+
+- **Still allowed:** collecting responses, reading results, everything the respondents touch
+- **Blocked:** adding people, adding non-person subjects → `402` with current and required counts
+- **Always visible:** `<OverLimitBanner>` on every console page, naming the exact number over
+
+Blocking collection would punish the respondents, who are not the customer and did not choose
+the plan.
+
+## Assigning levelled roles — already specified, deliberately not re-specified here
+
+The other half of what was asked for — *"can assign leveled roles"* — **exists and is owned by
+`33-PAGE-roles-and-powers-grid.md`**. It is not repeated here, and it must not be:
+
+| Question | Where it is answered |
+|---|---|
+| The role ladder and reordering | `33` § Interactions — drag to reorder, levels renumber live |
+| How a level is stored | `10` — `Node.level`, *"ordering only, nothing else"* |
+| What a level actually **does** | `11` §8 — it seeds a default grant matrix at org creation and nothing more |
+| Assigning a person to a role in a unit | `34` § Interactions — the assignment, which is what carries scope (INV-005) |
+
+> **The trap this note exists to prevent.** "Levelled roles" sounds like an integer permission
+> ladder, and `DEC-002` replaced exactly that with the GRANT engine — `CONF-002` records the
+> conflict. A level is a **display and seeding** concept: it orders the ladder and it decides
+> which default grants a new org gets. **It is never consulted at authorisation time.** If a
+> future change makes a level decide an access question, that supersedes `DEC-002` and needs
+> saying out loud, not doing quietly.
+
+## States
+
+| State | Behaviour |
+|---|---|
+| Trialing | Days remaining, what happens at the end (**Bronze, never zero access** — `16` §7), and the join buttons |
+| Active | Plan, what it unlocks, period, usage. **No amount is rendered** — there is none |
+| Over limit | Banner plus an inline explanation of exactly which actions are blocked |
+| No subscription row | Treated as the trial default and **repaired on read** — this is today's reality for every organisation (`D-012`), and a customer must never see a billing page that says "unknown" |
+| Loading / Error / 403 | As `25` |
+
+## Acceptance
+
+- [ ] `POST /billing/tier` without `billing.update` returns **403 from middleware**, and the
+      row is unchanged — the check that replaces DEC-034's, and the one that matters now
+- [ ] `POST /billing/tier` with `billing.update` writes the row and the response reflects it
+- [ ] A tier written by one org is invisible to another — the write goes through `tenantClient`
+      like every other (INV-010)
+- [ ] A join writes an `audit_log` row naming the from-tier and the to-tier
+- [ ] The entitlement gate answers differently on the **next** request after a join, with no
+      restart and no cache to invalidate
+- [ ] No response body, no page and no seed carries a price, an amount or a currency (DEC-035)
+- [ ] `billable_seats` excludes respondents and does not double-count person-subjects
+- [ ] The breakdown's parts sum to the displayed total
+- [ ] An over-limit org can still collect responses and read results
+- [ ] An over-limit org gets `402` with current and required counts when adding a person
+- [ ] The banner appears on **every** console page, not only this one
+- [ ] A downgrade deletes nothing; a re-upgrade restores access to the same history
+- [ ] Sign-up creates a `Subscription` row — `trialing`, Gold, 14 days (`16` §7)
+- [ ] An expired trial moves to Bronze, never to zero access
+- [ ] Response counts appear with an explicit statement that they are not billed
+- [ ] Every user-facing noun on this page resolves through `useLabels()` — this is a customer
+      surface and INV-001 applies in full, unlike `70` and `71` (`19` §12)
+
+## Out of scope
+
+| Not building | Why |
+|---|---|
+| **Prices, amounts, currency** | DEC-035. Not deferred — *absent*. There is no number to show, no `plan_prices` table, and nothing in the seed invents one |
+| Payment processing, cards, invoices, tax | `16` §10, and now moot. A processor is a webhook security surface for zero marks |
+| A checkout flow | DEC-035. With nothing to collect, a checkout is a form that asks for nothing and then does what the button already did |
+| Enterprise as an enquiry | Joined like the other three. "Contact us" is a sales flow, and there is no sales |
+| Proration | Finance, not architecture, and there is no money to prorate |
+| Seat purchase as a separate transaction | Seats are metered, not bought. `16` §5 |
+| A usage history chart | The current period answers the billing question. Trends over billing periods are `71`'s question, on the other side of the product |

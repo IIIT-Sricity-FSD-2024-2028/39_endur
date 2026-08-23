@@ -74,6 +74,25 @@ router.post(
 
 You can audit that route by reading it. That property is the whole point.
 
+### The three boxes are three *kinds* of middleware, and the code says so
+
+Express distinguishes application-level, router-level, error-handling, built-in and
+third-party middleware. This chain uses all five, and the boxes above are not decoration:
+
+| Box | Kind | Where it is written | Applies to |
+|---|---|---|---|
+| 1–5 | **application-level** (plus built-in `express.json`, and third-party `helmet`, `cors`, `express-rate-limit`) | `app.ts`, `app.use(...)` | every request, including `/healthz` and a URL that matches no route |
+| 6–8 | **router-level** | each feature router, `router.use(tenantChain)` — `middleware/chains.ts` | that router's routes, and they **differ per router** |
+| 9–13 | per-route | the route definition itself | one route |
+| 16 | **error-handling** (four arguments) | `app.ts`, registered last | anything that calls `next(err)` |
+
+**Links 6–8 were application-level in the code until 2026-08-23** while this diagram drew
+them per-router — that gap was `D-017`, repaid by `T-064`. Three chains exist now, and the
+differences are the argument for the move: the console requires a tenant and enforces CSRF,
+auth makes the tenant optional and is the only router that honours `X-Org-Slug`, the
+respondent surface brings its own CORS and no CSRF at all, and `/api/v1/files/:id` has the
+shortest chain in the application because a logo renders on a phone with no session.
+
 ---
 
 ## 3. The request context
@@ -132,9 +151,33 @@ loosening the global one.
 
 ### 4 · `bodyParser`
 
-`express.json({ limit: '256kb' })`. The limit is deliberate: the largest legitimate body is a
-form with ~20 questions, and an unbounded parser is a free denial-of-service. CSV import
-uploads bypass this with a streaming parser and its own 5 MB cap.
+`express.json({ limit: '256kb' })` and `express.urlencoded({ limit: '256kb' })`. The limit is
+deliberate: the largest legitimate JSON body is a form with ~20 questions, and an unbounded
+parser is a free denial-of-service.
+
+**Two things bypass it, and only two:**
+
+| Bypass | Cap | Why |
+|---|---|---|
+| Binary upload (`48`) | `UPLOAD_MAX_MB`, default 2 MB, counted as the bytes arrive | `multipart/form-data` is never handed to the JSON parser. `middleware/upload.ts` is mounted **per route**, on the four upload routes and nowhere else, so the exception cannot spread by accident |
+
+`imageUpload()` sits in **link 9's slot** — it *is* the validation for those routes, so it runs
+before `requireCapability` exactly as `validate()` does. Parsing before authorising is also
+what keeps the refusal clean: refusing mid-upload would reset the connection and the caller
+would see a network error instead of a 403. On the size limit it unpipes and drains rather
+than destroying the request, for the same reason `raw-body` does — a destroyed request cannot
+carry the 413 back.
+
+**CSV import does NOT bypass it, and an earlier revision of this section said it did.** The
+import is a *string inside a JSON body* (`ImportPreviewBody`), not multipart, and no streaming
+CSV parser was ever written. That sentence described code that did not exist, and its
+"5 MB cap" was the third of three different numbers — `D-016`.
+
+The resolution (`T-065`): **one number, and it sits below the parser's.** `CSV_MAX_CHARS` is
+150,000 characters, which for any realistic CSV is well inside 256 kb, so an oversized import
+fails `validate()` with a field error naming the CSV rather than failing the body parser with
+`PAYLOAD_TOO_LARGE`. The parser stays as the outer backstop for a body that is malicious
+rather than merely large.
 
 ### 5 · `rateLimit` (global)
 
@@ -394,9 +437,11 @@ src/backend/middleware/
   requestId.ts
   requestLogger.ts
   security.ts         helmet + the two cors policies
-  tenantResolver.ts   INV-010, tenant-bound prisma client
+  tenantResolver.ts   INV-010, tenant-bound prisma client. A FACTORY since T-064
   authenticate.ts     three principal kinds
   csrfProtection.ts   cookie-auth principals only
+  chains.ts           links 6-8 composed per router: tenant | auth | respondent | asset
+  upload.ts           multipart, images only. The one bypass of express.json (48)
   validate.ts         the DTO pipe
   requireCapability.ts
   requireEntitlement.ts
@@ -408,8 +453,9 @@ src/backend/middleware/
   index.ts            barrel — app.ts imports only from here
 ```
 
-`app.ts` assembles the chain and mounts routers. It should be readable top to bottom in under
-a screen; if it is not, something belongs in a router.
+`app.ts` assembles the **application-level** chain and mounts routers. It should be readable
+top to bottom in under a screen; if it is not, something belongs in a router. Since `T-064`
+that is literally true of links 6–8: they belong in a router, and that is where they are.
 
 ---
 

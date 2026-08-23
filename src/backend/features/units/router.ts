@@ -1,5 +1,6 @@
 // Unit routes. 13 § Structure, 32.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
 import {
   CreateUnitDto,
   DeleteUnitDto,
@@ -27,6 +28,10 @@ import {
 } from './service.js';
 
 export const unitsRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+unitsRouter.use(tenantChain);
 
 /** Every handler here needs the signed-in user's id; a key or a respondent never reaches it. */
 const userOf = (req: Parameters<Parameters<Router['get']>[1]>[0]) => {

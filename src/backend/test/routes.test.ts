@@ -22,6 +22,14 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
   { pattern: /^\/api\/v1\/auth\//, why: 'authentication itself cannot require a principal' },
   { pattern: /^\/r\//, why: 'respondent flow — a QR scan has no account (DEC-009)' },
   { pattern: /^\/api\/v1\/public\//, why: 'respondent payloads, allowlisted in 13 §6' },
+  {
+    pattern: /^\/api\/v1\/files\/:id$/,
+    why:
+      'serving a logo or an avatar (48). The unguessable id IS the credential: these render ' +
+      'on a respondent phone with no session, no tenant and no cookie, so there is no ' +
+      'principal for requireCapability to decide about. Nothing else is ever served here — ' +
+      'readFile() refuses any row whose kind is not logo or avatar.',
+  },
 ];
 
 type Route = { method: string; path: string; guarded: boolean };

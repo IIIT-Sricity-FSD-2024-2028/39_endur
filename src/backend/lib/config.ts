@@ -53,6 +53,21 @@ const Env = z.object({
 
   K_ANON_THRESHOLD: z.coerce.number().int().min(1).default(5),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+
+  // 18 §5. LOG_DIR and LOG_TO_FILE are deliberately optional rather than defaulted here:
+  // their real defaults depend on where this file lives and on NODE_ENV, and a Zod
+  // `.default()` cannot see either. logger.ts resolves both, once.
+  LOG_DIR: z.string().min(1).optional(),
+  LOG_TO_FILE: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(14),
+  LOG_MAX_SIZE_MB: z.coerce.number().positive().default(10),
+
+  // 48 § Storage. Same treatment as LOG_DIR: optional here, resolved in lib/storage.ts.
+  STORAGE_DIR: z.string().min(1).optional(),
+  UPLOAD_MAX_MB: z.coerce.number().positive().default(2),
 });
 
 export type Config = z.infer<typeof Env>;
@@ -78,3 +93,4 @@ export const config = load();
 
 export const isProd = config.NODE_ENV === 'production';
 export const isDev = config.NODE_ENV === 'development';
+export const isTest = config.NODE_ENV === 'test';

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   LabelSet, OrgView, PresetView, SetupOrgBody, UpdateOrgBody,
 } from '@endur/shared';
-import { apiGet, apiPatch, apiPost } from './api.js';
+import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from './api.js';
 
 export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
 
@@ -98,4 +98,23 @@ export function useUpdateLabels(): (labels: LabelSet) => Promise<OrgView> {
     );
     return response.data;
   }, []);
+}
+
+/**
+ * The organisation logo (48). Both hooks return the updated `OrgView` rather than the file,
+ * so the caller updates the org it already holds instead of stitching a url in by hand —
+ * the same reason `useUpdateLabels` returns the whole org.
+ */
+export function useUploadLogo(): (file: File) => Promise<OrgView> {
+  return async (file) => {
+    await apiUpload<{ data: unknown }>('/org/logo', file);
+    return await apiGet<{ data: OrgView }>('/org').then((res) => res.data);
+  };
+}
+
+export function useRemoveLogo(): () => Promise<OrgView> {
+  return async () => {
+    await apiDelete('/org/logo');
+    return await apiGet<{ data: OrgView }>('/org').then((res) => res.data);
+  };
 }

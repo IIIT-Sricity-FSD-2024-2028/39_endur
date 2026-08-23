@@ -1,5 +1,6 @@
 // Template routes. 13 § Templates and forms, 36, 37.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
 import {
   CloneTemplateDto,
   CreateTemplateDto,
@@ -30,6 +31,10 @@ import {
 } from './service.js';
 
 export const templatesRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+templatesRouter.use(tenantChain);
 
 // Registered before /:id so "library" is never read as a template id.
 //

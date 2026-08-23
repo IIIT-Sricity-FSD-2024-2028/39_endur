@@ -39,7 +39,8 @@ link to it rather than restating it.
 | 15 | [`15-AUTH-AND-SESSIONS.md`](15-AUTH-AND-SESSIONS.md) | Staff cookie sessions, respondent tokens, API keys, the anonymity guarantee |
 | 16 | [`16-TENANCY-BILLING-ENTITLEMENTS.md`](16-TENANCY-BILLING-ENTITLEMENTS.md) | Tiers → entitlements, metering, tenant isolation |
 | 17 | [`17-BACKGROUND-JOBS.md`](17-BACKGROUND-JOBS.md) | ⚠️ **Placeholder — covers a real gap.** Campaign open/close, expiry, webhook retry |
-| 18 | [`18-OBSERVABILITY-AND-OPS.md`](18-OBSERVABILITY-AND-OPS.md) | *Placeholder* — deploy, logs, backup |
+| 18 | [`18-OBSERVABILITY-AND-OPS.md`](18-OBSERVABILITY-AND-OPS.md) | **P1** — log + error files, rotation |
+| 19 | [`19-PLATFORM-OPERATORS.md`](19-PLATFORM-OPERATORS.md) | P2 |
 
 **Frontend — Phase 2**
 
@@ -78,7 +79,8 @@ link to it rather than restating it.
 | 45 | [`45-FEATURE-public-api.md`](45-FEATURE-public-api.md) | P3 |
 | 46 | [`46-PAGE-home-dashboard.md`](46-PAGE-home-dashboard.md) | P2 · M0 |
 | 47 | [`47-PAGE-profile.md`](47-PAGE-profile.md) | P2 |
-| 48 | [`48-FEATURE-file-upload.md`](48-FEATURE-file-upload.md) | P2 |
+| 48 | [`48-FEATURE-file-upload.md`](48-FEATURE-file-upload.md) | **P1** — see CONF-018 |
+| 49 | [`49-PAGE-plan-and-billing.md`](49-PAGE-plan-and-billing.md) | P2 |
 
 **P3 stretch** — the four `SCOPE.md` layers shown as disabled "Soon" items in the sidebar
 (`20` §2). Reserved, not designed; designing them now would be work thrown away (CONF-006).
@@ -89,6 +91,14 @@ link to it rather than restating it.
 | 61 | [`61-FEATURE-announcements.md`](61-FEATURE-announcements.md) | *Placeholder* · P3 stretch |
 | 62 | [`62-FEATURE-voting.md`](62-FEATURE-voting.md) | *Placeholder* · P3 stretch |
 | 63 | [`63-FEATURE-notifications.md`](63-FEATURE-notifications.md) | *Placeholder* · P3 stretch |
+
+**Endur's own platform** — the deliberately cross-tenant surface. `19` is the model and the
+guards; `70` and `71` are its two screens. Read `19` before either.
+
+| # | File | Phase |
+|---|---|---|
+| 70 | [`70-PAGE-platform-console.md`](70-PAGE-platform-console.md) | P2 |
+| 71 | [`71-PAGE-platform-analytics.md`](71-PAGE-platform-analytics.md) | P2 |
 
 **Cross-cutting**
 
@@ -111,11 +121,12 @@ instead of being appended where nobody looks.
 | Block | Covers | Free slots |
 |---|---|---|
 | `00`–`09` | Foundations | `04`–`09` |
-| `10`–`19` | Backend and API | `19` |
+| `10`–`19` | Backend and API | — |
 | `20`–`29` | Frontend | — |
-| `30`–`49` | Pages and features | `49` |
+| `30`–`49` | Pages and features | — |
 | `50`–`59` | Cross-cutting | `56`–`59` |
 | `60`–`69` | P3 stretch features | `64`–`69` |
+| `70`–`79` | **Endur's own platform surfaces** | `72`–`79` |
 
 A file marked *Placeholder* has a reserved number, a stated purpose, and a **"write this
 when"** trigger — but no decided content. Do not treat one as a specification, and do not feed

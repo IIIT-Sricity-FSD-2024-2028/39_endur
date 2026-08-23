@@ -1,6 +1,11 @@
 # 48 — File upload
 
-Phase: P2 · Milestone: — · Related: `12` §4.4, `34` (CSV import), `47` (avatar), `41` (logo)
+Phase: **P1** (re-tagged 2026-08-23, CONF-018 — the first evaluation makes file upload mandatory)
+Milestone: — · Related: `12` §4.4, `34` (CSV import), `47` (avatar), `41` (logo)
+Status: **BUILT 2026-08-23 (`T-061`, `T-062`)** — with one deliberate deviation, § Re-encode
+Owns: `src/backend/middleware/upload.ts`, `src/backend/lib/imageBytes.ts`,
+`src/backend/lib/storage.ts`, `src/backend/features/files/**`,
+`src/frontend/components/form/FileUpload.tsx`
 
 ## Purpose
 
@@ -18,8 +23,8 @@ No page of its own. A component used in two places:
 
 | Where | Route | Doc |
 |---|---|---|
-| Org logo | `/app/settings#profile` | `41` |
-| User avatar | `/app/profile` | `47` |
+| Org logo | `/app/settings`, in the Organization card | `41` |
+| User avatar | `/app/profile` | `47` — that page is **partial**: the avatar is real, the rest is `T-051` |
 
 Serving: `GET /api/v1/files/:id` — no auth for logos and avatars, which are low-sensitivity
 and cached hard. Ids are random, not enumerable.
@@ -55,53 +60,91 @@ streaming multipart parser with its own cap. That exception is deliberate and is
 An upload endpoint is the widest input surface in the application. Every one of these is
 required, and the order matters:
 
-| Check | Rule |
-|---|---|
-| Size | ≤ 2 MB, enforced **during streaming** — reject at the limit, never after buffering |
-| Declared type | `image/png`, `image/jpeg`, `image/webp` only |
-| **Actual type** | Verified by magic bytes. `Content-Type` is client-supplied and is a claim, not a fact |
-| Dimensions | ≤ 4000×4000, checked before any resize, to stop decompression bombs |
-| Re-encode | **Always.** Never store the uploaded bytes |
-| Filename | Never trusted, never used on disk. Storage name is a generated id |
+| Check | Rule | Built |
+|---|---|---|
+| Size | ≤ `UPLOAD_MAX_MB` (2 MB), counted **as the bytes arrive** — refused at the limit, never after buffering | ✔ |
+| Declared type | `image/png`, `image/jpeg`, `image/webp` only | ✔ |
+| **Actual type** | Verified by magic bytes. `Content-Type` is client-supplied and is a claim, not a fact | ✔ |
+| Dimensions | ≤ 4000×4000, read from the header before anything decodes it, to stop decompression bombs | ✔ |
+| Re-encode | **Superseded — see below** | ✖ |
+| **Metadata strip** | EXIF, XMP, IPTC and PNG text chunks removed from the stored bytes | ✔ |
+| Filename | Never trusted, never used on disk. Storage name is a generated id | ✔ |
 
-**Re-encoding is not an optimisation, it is the security control.** Decoding to a bitmap and
-re-encoding at a fixed size strips EXIF, embedded payloads and polyglot files in one step, and
-it removes any question of whether a stored file could execute.
+### Re-encode → strip: what changed, and what it costs
 
-It also strips **GPS coordinates and device identifiers**, which is why respondent-facing
-uploads are out of scope entirely (below).
+This section originally said *"Re-encode: **Always.** Never store the uploaded bytes"*, on the
+argument that decoding to a bitmap and writing a new file strips EXIF, embedded payloads and
+polyglot files in one step.
+
+**It was not built that way, and the reason is `OPEN-008`.** Re-encoding needs an image
+library — `sharp` or equivalent — which is a dependency nobody has approved, and installing
+one unasked is not this document's call to make. What is built instead is
+`lib/imageBytes.ts`, which **removes the metadata segments without decoding**:
+
+| Format | Removed | Kept, and why |
+|---|---|---|
+| JPEG | APP1 (EXIF **and its GPS block**, XMP), APP13 (IPTC/Photoshop), COM | APP0 (JFIF density), APP2 (ICC), APP14 (Adobe) — none identifies a person or a place, and dropping ICC or Adobe silently shifts the colours of the image we were asked to store |
+| PNG | `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME` | Everything a decoder needs |
+| WebP | `EXIF` and `XMP ` chunks, and the VP8X flag bits that advertise them | The image chunks |
+
+**What that gets us:** GPS coordinates, device identifiers, author names and embedded
+thumbnails do not reach disk. That is the privacy property this section was written for, and
+it is verified by a test that uploads a JPEG carrying a GPS string and greps the stored bytes.
+
+**What it does not get us, stated plainly rather than left implicit:** stripping does not
+neutralise a polyglot file whose payload hides inside the image data itself, and it does not
+normalise a malformed image. What makes that survivable is the rest of the design rather than
+this step — stored files are only ever **served as bytes** with a sniffed `Content-Type`,
+`X-Content-Type-Options: nosniff` and `Content-Disposition: inline`, never executed, never
+parsed as anything else, never handed to a shell; and **respondent uploads are out of scope
+entirely** (below), which is where a hostile file would actually come from.
+
+If an image library is ever approved, `stripMetadata()` is the one function to replace and
+the acceptance list below is the checklist it has to keep passing.
 
 Rejections return `422` with a message that says which rule failed — *"That file is 4.2 MB;
 the limit is 2 MB"*, not *"Invalid file"*.
 
 ## Storage
 
-Local disk under `src/backend/storage/<orgId>/<fileId>.webp` for P1–P3, behind a thin interface
+Local disk under `src/backend/storage/<orgId>/<fileId>.<ext>` for P1–P3, behind `lib/storage.ts`
 so S3 is a swap rather than a rewrite. No object store yet — one more service to run and
-explain, for no marks.
+explain, for no marks. `STORAGE_DIR` overrides the root; the test suite points it at a temp
+directory so a run leaves nothing behind.
+
+The extension is the **sniffed** one, not the uploaded one — a file that arrived as
+`logo.png` and is really a JPEG is stored as `.jpg`, because the extension is derived from the
+bytes in the same step that decided whether to accept them at all.
 
 Files are tenant-partitioned on disk, which makes an org deletion a directory delete and makes
 a cross-tenant path bug visible rather than silent.
 
-Two derivatives per upload, generated on write, never on read: `256px` display and `64px`
-thumbnail. On-read resizing is a denial-of-service vector.
+**Derivatives are not built** (`256px` display, `64px` thumbnail). They need the same image
+library `OPEN-008` is waiting on. `<FileUpload>` renders at a fixed CSS size, so the visible
+result is correct and the cost is bandwidth rather than layout. On-**read** resizing stays
+ruled out whenever they are built: it is a denial-of-service vector.
 
 ## Components
 
 `<FileUpload>` — added to `24-COMPONENT-INVENTORY.md`:
 
 ```ts
-{ current: string | null;
+{ current: string | null;          // the stored image, as a url
   onUpload: (file: File) => Promise<void>;
   onRemove: () => Promise<void>;
-  shape: 'circle' | 'square';       // avatar | logo
+  shape: 'circle' | 'square';      // avatar | logo
+  label: string;                   // required — an unlabelled file input is inaccessible
+  hint?: string;
   maxBytes?: number;
   disabled?: boolean }
 ```
 
-Behaviour: click or drop, a client-side preview before the request completes, a progress
-indicator for anything over ~200 kb, inline errors (never a toast, `24` §6), and a Remove
-action on the current image.
+Behaviour: click or drop, a client-side preview before the request completes, inline errors
+(never a toast, `24` §6), and a Remove action on the current image.
+
+**No progress bar.** `fetch` gives no upload progress without moving to `XMLHttpRequest`, and
+at a 2 MB cap the honest indicator is a busy state that says *Uploading…* rather than a bar
+that would have to be faked. If the cap ever rises, this is the line to revisit.
 
 Client-side checks mirror the server's but **never replace them** — same principle as DTO
 validation (`14` §7).
@@ -114,25 +157,34 @@ an enhancement rather than the only path.
 | State | Behaviour |
 |---|---|
 | Empty | Initials placeholder for avatars; a lettermark for logos. Never a broken-image icon |
-| Uploading | Preview at reduced opacity + progress; the rest of the form stays usable |
-| Error | Inline under the control, naming the specific rule that failed |
-| 403 | The control renders read-only — the image shows, the actions do not |
-| Removing | Confirm only for the org logo, which is org-wide; an avatar removal is trivially reversible |
+| Uploading | Local preview at reduced opacity, *Uploading…* under the control; the rest of the form stays usable |
+| Error | Inline under the control, naming the specific rule that failed — the server's message, not a generic one |
+| 403 | The control renders read-only — the image shows, the actions do not. Driven by `can('org.update')` in `41`, not by catching a 403 |
+| Removing | **Not confirmed yet.** The intent was a `<ConfirmDialog>` on the logo, which is org-wide, and none on an avatar. Not built: `T-058` brings `<ConfirmDialog>` onto this screen anyway and doing it twice is worse than doing it once |
 
 ## Acceptance
 
-- [ ] A `.exe` renamed `.png` is rejected by magic-byte check, not by extension
-- [ ] A 10 MB file is rejected **during** streaming, without being buffered
-- [ ] A 20000×20000 PNG is rejected before decode
-- [ ] Every stored file is re-encoded; **no uploaded bytes are ever written to disk**
-- [ ] EXIF, including GPS, is absent from stored output — verified with a GPS-tagged photo
-- [ ] The stored path never contains any part of the client filename
-- [ ] A path-traversal filename (`../../etc/passwd`) cannot escape the org directory
-- [ ] Uploading another user's avatar without `subtree` scope returns 403
-- [ ] The upload route is exempt from the JSON body limit and no other route is
-- [ ] Files are tenant-partitioned; deleting an org removes its directory
-- [ ] `<FileUpload>` is keyboard operable without drag-and-drop
-- [ ] Errors appear inline, never in a toast
+Ticked boxes are asserted in `src/backend/test/upload.test.ts` and
+`src/frontend/components/form/FileUpload.test.tsx`.
+
+- [x] A `.exe` renamed `.png` is rejected by magic-byte check, not by extension
+- [x] An oversized file is rejected **as it arrives**, and still gets a 413 rather than a
+      dropped connection — the request is unpiped and drained, not destroyed
+- [x] A 20000×20000 PNG is rejected before anything decodes it
+- [ ] ~~Every stored file is re-encoded~~ — **superseded**, see § Re-encode → strip
+- [x] EXIF, including GPS, is absent from stored output — verified with a tagged JPEG
+- [x] PNG text chunks are absent from stored output, and `IHDR`/`IDAT`/`IEND` survive
+- [x] The stored path never contains any part of the client filename
+- [x] A path-traversal filename (`../../etc/passwd`) cannot escape the org directory
+- [x] An upload without the capability returns 403, decided in middleware
+- [x] An upload with no session returns 401
+- [x] The upload route is exempt from the JSON body limit and no other route is
+- [x] Files are tenant-partitioned, and replacing an image deletes the one it replaced
+- [x] Serving needs no session, no tenant and no CSRF, and 404s an unknown id
+- [x] `<FileUpload>` is keyboard operable without drag-and-drop — a real `<input type=file>`
+- [x] Errors appear inline, never in a toast, and name the rule that failed
+- [ ] Uploading another user's avatar without `subtree` scope returns 403 — the route exists
+      and is guarded with `target: 'person'`; the scope case is not yet asserted by a test
 
 ## Out of scope
 

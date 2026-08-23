@@ -142,14 +142,22 @@ the plan.
 |---|---|---|---|
 | GET | `/api/v1/billing` | `billing.read` | P2 |
 | GET | `/api/v1/billing/usage` | `billing.read` | P2 |
-| POST | `/api/v1/billing/tier` | `billing.update` | P3 |
+| GET | `/api/v1/billing/plans` | `billing.read` | P2 |
+| POST | `/api/v1/billing/tier` | `billing.update` | P2 |
 
-No payment processor in P1–P3. `subscriptions.tier` is set administratively. Integrating
-Stripe would demonstrate nothing the middleware chain does not already demonstrate, and it
-introduces a webhook surface with real security requirements for zero marks.
+**DEC-035 — there are no prices.** `POST /billing/tier` is a **join**: the caller picks a tier,
+the row is written, and the entitlement gate answers differently from the next request. No
+payment processor, no checkout, no amount, no currency, in any phase. Integrating Stripe would
+demonstrate nothing the middleware chain does not already demonstrate, and it introduces a
+webhook surface with real security requirements for zero marks.
 
 **This is a stated limitation, not a hidden one:** the entitlement *architecture* is complete
-and enforced; only the payment collection is absent.
+and enforced, and the seat meter still meters — only money is absent, and deliberately.
+
+> This supersedes DEC-034's split of `billing.update`, which existed to keep the tier write out
+> of the org's hands until a checkout completed. There is no checkout. `19` §8 carries the
+> full reasoning and the one protection that remains: `billing.update` is a capability, seeded
+> to administrators only, resolved in middleware, and audited.
 
 ## 9. Acceptance
 
