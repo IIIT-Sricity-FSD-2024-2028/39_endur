@@ -13,5 +13,6 @@ export * from "./requireCapability.js";
 export * from "./requireEntitlement.js";
 export * from "./authenticate.js";
 export * from "./csrfProtection.js";
+export * from "./chains.js";
 export * from "./auditWriter.js";
 export * from "./idempotency.js";

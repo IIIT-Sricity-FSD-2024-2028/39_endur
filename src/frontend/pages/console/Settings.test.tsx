@@ -23,6 +23,7 @@ const ORG: OrgView = {
     campaign: { one: 'Plithe', many: 'Plithe' },
   },
   configured: true,
+  logoUrl: null,
   createdAt: '2026-08-01T00:00:00.000Z',
 };
 
@@ -45,8 +46,15 @@ vi.mock('../../lib/org.js', async () => {
     usePresets: () => ({ data: PRESETS, loading: false, error: null }),
     useUpdateOrg: () => updateOrg,
     useUpdateLabels: () => updateLabels,
+    // 48 / T-062. Mocked rather than exercised: the logo card has its own tests in
+    // components/form/FileUpload.test.tsx, and this file is about the words card.
+    useUploadLogo: () => uploadLogo,
+    useRemoveLogo: () => removeLogo,
   };
 });
+
+const uploadLogo = vi.fn();
+const removeLogo = vi.fn();
 
 const ALL: Capability[] = ['org.read', 'org.update'];
 
@@ -68,9 +76,9 @@ beforeEach(() => {
 describe('the words card', () => {
   it('opens on the org’s own words, not the defaults', () => {
     mount();
-    expect((screen.getByLabelText('A part of the organization') as HTMLInputElement).value)
+    expect(screen.getByLabelText<HTMLInputElement>('A part of the organization').value)
       .toBe('Zblorn');
-    expect((screen.getByLabelText('The thing being reviewed') as HTMLInputElement).value)
+    expect(screen.getByLabelText<HTMLInputElement>('The thing being reviewed').value)
       .toBe('Quaxel');
   });
 
@@ -86,14 +94,14 @@ describe('the words card', () => {
     fireEvent.change(screen.getByLabelText('A part of the organization'), {
       target: { value: 'Wing' },
     });
-    expect((screen.getByLabelText('Plural of Wing') as HTMLInputElement).value).toBe('Wings');
+    expect(screen.getByLabelText<HTMLInputElement>('Plural of Wing').value).toBe('Wings');
 
     fireEvent.change(screen.getByLabelText('Plural of Wing'), { target: { value: 'Wing' } });
     fireEvent.change(screen.getByLabelText('A part of the organization'), {
       target: { value: 'Wingg' },
     });
     // Taken over, so it stays put rather than becoming "Winggs".
-    expect((screen.getByLabelText('Plural of Wingg') as HTMLInputElement).value).toBe('Wing');
+    expect(screen.getByLabelText<HTMLInputElement>('Plural of Wingg').value).toBe('Wing');
   });
 
   it('refuses to save a blank word, and says why', () => {
@@ -102,7 +110,7 @@ describe('the words card', () => {
       target: { value: '  ' },
     });
     expect(screen.getByText(/needs a singular and a plural/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save words' }) as HTMLButtonElement).disabled)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save words' }).disabled)
       .toBe(true);
   });
 
@@ -135,7 +143,7 @@ describe('the words card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save words' }));
     await waitFor(() => expect(screen.getByText(/Could not save those words/)).toBeTruthy());
 
-    expect((screen.getByRole('button', { name: 'Save organization' }) as HTMLButtonElement)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save organization' })
       .disabled).toBe(false);
   });
 });
@@ -162,7 +170,7 @@ describe('the organization card', () => {
 describe('a caller who can read but not update', () => {
   it('sees the words and no way to change them', () => {
     mount(['org.read']);
-    expect((screen.getByLabelText('A part of the organization') as HTMLInputElement).disabled)
+    expect(screen.getByLabelText<HTMLInputElement>('A part of the organization').disabled)
       .toBe(true);
     expect(screen.queryByRole('button', { name: 'Save words' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Save organization' })).toBeNull();

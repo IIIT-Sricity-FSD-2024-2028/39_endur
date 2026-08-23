@@ -60,6 +60,12 @@ export type OrgView = {
   labels: Record<string, { one: string; many: string }>;
   /** True once roles exist. The console redirects to /app/setup while this is false (46). */
   configured: boolean;
+  /**
+   * Where to render the organisation's logo, or null (48). A URL rather than a file id:
+   * every consumer wants `<img src>`, and building the path in three components is three
+   * places to change when storage moves behind a CDN.
+   */
+  logoUrl: string | null;
   createdAt: string;
 };
 

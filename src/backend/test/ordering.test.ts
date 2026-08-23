@@ -63,7 +63,9 @@ describe('chain ordering constraints', () => {
   it('tenantResolver BEFORE the session is loaded cannot resolve an org — N-014', async () => {
     const wrong = express();
     wrong.use(context, requestId);
-    wrong.use(tenantResolver); // session middleware would normally have run already
+    // Router-level now (T-064): the console's variant, mounted where a session has not
+    // been loaded. Same N-014 point — the ORDER is what makes it resolvable, not the link.
+    wrong.use(tenantResolver({ required: true }));
     wrong.post('/api/v1/anything', (_q, res) => res.json({ ok: true }));
     wrong.use(errorFunnel);
 

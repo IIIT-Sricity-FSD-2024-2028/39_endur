@@ -13,6 +13,7 @@ import {
   withCsrf,
   type Session,
 } from './helpers.js';
+import { CSV_MAX_CHARS } from '@endur/shared';
 import { prisma } from '../db/client.js';
 
 describe('GET /people', () => {
@@ -209,6 +210,28 @@ describe('CSV import', () => {
     // "Professor" is not a role in this organisation. The import must not invent it — the
     // capability catalogue and the org structure are things people map onto (11 §3).
     expect(res.body.data.unmatchedRoles).toEqual(['Professor']);
+  });
+
+  /**
+   * D-016 / T-065. The import is a string inside a JSON body, so two caps could reject it:
+   * CSV_MAX_CHARS in validate(), and express.json's 256 kb in the body parser. The DTO's cap
+   * is the SMALLER one, so an oversized CSV must come back as a field error naming the CSV —
+   * never as PAYLOAD_TOO_LARGE, which is what a caller used to get between 256 kb and the
+   * old 1 MB cap and which says nothing about what to fix.
+   */
+  it('rejects an oversized CSV with a FIELD error, not a payload error — D-016', async () => {
+    const founder = await setUpOrg();
+    const row = 'Ada Lovelace,ada@example.test,Tutor,Section A\n';
+    const huge = 'Name,Email,Role,Unit\n' + row.repeat(Math.ceil(CSV_MAX_CHARS / row.length) + 20);
+    expect(huge.length).toBeGreaterThan(CSV_MAX_CHARS);
+    // Still inside the parser's byte limit, which is the whole point of the ordering.
+    expect(Buffer.byteLength(JSON.stringify({ csv: huge }))).toBeLessThan(256 * 1024);
+
+    const res = await withCsrf(founder, 'post', '/api/v1/people/import/preview').send({ csv: huge });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_FAILED');
+    expect(res.body.error.details.fields[0].path).toBe('body.csv');
   });
 
   it('imports the rows it can resolve and reports the ones it skipped', async () => {

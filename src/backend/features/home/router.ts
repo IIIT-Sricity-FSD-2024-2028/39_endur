@@ -1,5 +1,6 @@
 // The home dashboard route. 13 § Home, 46.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
 import { validate } from '../../middleware/validate.js';
 import { requireCapability } from '../../middleware/requireCapability.js';
 import { authenticate } from '../../middleware/authenticate.js';
@@ -8,6 +9,10 @@ import { UnauthenticatedError } from '../../lib/errors.js';
 import { readHome } from './service.js';
 
 export const homeRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+homeRouter.use(tenantChain);
 
 // Deliberately one endpoint rather than six. A dashboard that fires six requests is six
 // chances to be slow on venue wifi, and it is the first screen after login (46).

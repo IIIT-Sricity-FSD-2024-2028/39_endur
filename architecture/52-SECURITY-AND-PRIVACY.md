@@ -122,7 +122,7 @@ record that something happened.
 
 - Every input validated by a shared Zod DTO before reaching a handler (`14`).
 - Unknown keys stripped — which is what blocks `orgId` and `role` smuggling.
-- Body size capped at 256 kb; uploads streamed with a separate 5 MB cap.
+- JSON body capped at 256 kb; binary uploads bypass it with a 2 MB streaming cap (`48`), and CSV import stays inside it at 150,000 characters (`12` §4.4).
 - Parameterised queries throughout. The single raw-SQL file uses parameter binding only,
   never string interpolation (`10` §6).
 - React escapes by default; `dangerouslySetInnerHTML` appears nowhere. Feedback comments are

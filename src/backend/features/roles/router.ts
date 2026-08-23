@@ -3,6 +3,7 @@
 // Roles and grants are mounted separately (`/roles`, `/grants`, `/authz`) but share one
 // router file, because they are one screen and one mental model: the powers grid.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
 import {
   CreateRoleDto,
   DeleteRoleDto,
@@ -37,6 +38,12 @@ import {
 export const rolesRouter: Router = Router();
 export const grantsRouter: Router = Router();
 export const authzRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+rolesRouter.use(tenantChain);
+grantsRouter.use(tenantChain);
+authzRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
   const principal = req.ctx.principal;

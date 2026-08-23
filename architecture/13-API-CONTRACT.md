@@ -213,7 +213,53 @@ No auth, no capability. The only routes a stranger's phone touches.
 | GET | `/campaigns/:token` | The form to render. **No org internals** — see §6 |
 | POST | `/campaigns/:token/responses` | Submit. Rate limited, idempotent per token |
 
-### Platform — P3
+### Billing — `/api/v1/billing` · the organisation's own plan
+
+Tenant routes, session auth, org capabilities. Specified in `49-PAGE-plan-and-billing.md`.
+
+| Method | Path | C | Notes |
+|---|---|---|---|
+| GET | `/billing` | `billing.read` | Current tier, status, period, price |
+| GET | `/billing/usage` | `billing.read` | `billable_seats` with its breakdown (`16` §5) |
+| GET | `/billing/plans` | `billing.read` | The four tiers and what each unlocks. **No prices** — DEC-035 |
+| POST | `/billing/tier` | `billing.update` | **Joins a tier.** Writes `subscriptions.tier` and applies immediately — DEC-035 |
+
+### Endur's own platform — `/api/v1/platform`
+
+**A fourth surface, and the only deliberately cross-tenant one.** No org capability applies
+here and no `tenantResolver` runs; the guard is `requirePlatform()` against the separate
+catalogue in `19` §4. Full specification in `19-PLATFORM-OPERATORS.md` §11; the table is
+restated there rather than here because that document owns the surface.
+
+| Method | Path | C |
+|---|---|---|
+| POST | `/platform/auth/login` · `/platform/auth/logout` | — · MFA, hard rate limit |
+| GET | `/platform/me` | — |
+| GET | `/platform/orgs` · `/platform/orgs/:id` | `platform.org.read` |
+| POST | `/platform/orgs/:id/plan` | `platform.plan.override` |
+| POST | `/platform/orgs/:id/suspend` | `platform.org.suspend` |
+| POST | `/platform/orgs/:id/message` | `platform.message.send` |
+| GET | `/platform/stats` | `platform.usage.read` |
+| GET | `/platform/analytics` | `platform.analytics.read` — **owner only** |
+| GET | `/platform/audit` | `platform.audit.read` |
+| GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` |
+
+**INV-011 constrains every payload above:** counts, names, dates and enums only. No route on
+this prefix may return a response body, an answer, a comment or a respondent identity.
+
+### Uploads — multipart, the one exception to §1's "JSON only"
+
+Specified in `48-FEATURE-file-upload.md`. These routes bypass the JSON body parser and its
+256 kb limit (`12` §4.4) with a streaming multipart parser and their own cap.
+
+| Method | Path | C |
+|---|---|---|
+| POST/DELETE | `/org/logo` | `org.update` |
+| POST/DELETE | `/profile/avatar` | `person.update` · `self` |
+| POST/DELETE | `/people/:id/avatar` | `person.update` · `subtree` |
+| GET | `/files/:id` | — · low-sensitivity, unguessable ids, cached hard |
+
+### Reserved — P3
 
 Prefixes reserved here; the routes under them are specified in their own docs rather than
 restated, so there is one authority per surface:
@@ -221,7 +267,6 @@ restated, so there is one authority per surface:
 | Prefix | Capability | Specified in |
 |---|---|---|
 | `/api/v1/keys`, `/api/v1/webhooks` | `apikey.*` | `45-FEATURE-public-api.md` |
-| `/api/v1/billing`, `/api/v1/billing/usage` | `billing.*` | `16` §8 |
 | `/api/v1/analysis`, `/api/v1/analysis/themes/:id` | `analysis.read` | `43` |
 | `/api/v1/reflect`, `/api/v1/plans`, `/api/v1/checkins` | `reflection.*` `actionplan.*` `checkin.*` | `44` |
 

@@ -12,7 +12,7 @@ import { vocabularyReducer } from '../store/vocabularySlice.js';
 import { RedirectIfSignedIn, RequireCapability, RequireSession } from './guards.js';
 
 const me = (capabilities: Capability[]): MeResponse => ({
-  user: { id: 'u1', name: 'Amara Rao', email: 'a@example.test' },
+  user: { id: 'u1', name: 'Amara Rao', email: 'a@example.test', avatarUrl: null },
   organization: { id: 'o1', name: 'Northfield', slug: 'northfield', industry: 'university' },
   labels: {},
   capabilities,

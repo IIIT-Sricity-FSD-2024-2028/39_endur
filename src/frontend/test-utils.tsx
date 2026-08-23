@@ -45,7 +45,12 @@ export function makeStore(session: SessionFixture = {}) {
     store.dispatch(signedOut());
   } else {
     const me: MeResponse = {
-      user: { id: 'u1', name: session.name ?? 'Amara Rao', email: 'amara@example.test' },
+      user: {
+        id: 'u1',
+        name: session.name ?? 'Amara Rao',
+        email: 'amara@example.test',
+        avatarUrl: null,
+      },
       organization: {
         id: 'o1', name: session.orgName ?? 'Northfield', slug: 'northfield',
         industry: 'university',

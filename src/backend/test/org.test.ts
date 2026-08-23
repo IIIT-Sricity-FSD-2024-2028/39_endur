@@ -384,7 +384,7 @@ describe('the guards are real', () => {
     });
     expect(res.status).toBe(201);
     const session = setCookies(res)
-      .map((c) => c.split(';')[0])
+      .map((c) => c.split(';')[0] ?? '')
       .find((c) => c.startsWith('endur.sid='));
     expect(session).toBeDefined();
 
@@ -395,7 +395,7 @@ describe('the guards are real', () => {
     expect(reissued).toBeDefined();
 
     // And the token it hands back actually works, so "reload and try again" is now true.
-    const token = decodeURIComponent((reissued as string).split('=')[1].split(';')[0]);
+    const token = decodeURIComponent((reissued as string).split('=')[1]?.split(';')[0] ?? '');
     const mutation = await request(app)
       .patch('/api/v1/org/labels')
       .set('Cookie', [session as string, `endur.csrf=${token}`])

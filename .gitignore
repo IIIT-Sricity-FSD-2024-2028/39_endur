@@ -11,6 +11,7 @@ build/
 !.env.example
 
 src/backend/storage/
+src/backend/logs/
 coverage/
 .vite/
 .eslintcache

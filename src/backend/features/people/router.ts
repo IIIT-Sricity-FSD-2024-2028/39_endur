@@ -1,5 +1,9 @@
 // People and assignment routes. 13 § People, 34.
 import { Router } from 'express';
+import { tenantChain } from '../../middleware/chains.js';
+import { imageUpload } from '../../middleware/upload.js';
+import { config } from '../../lib/config.js';
+import { removeAvatar, setAvatar } from '../files/avatar.js';
 import {
   CreateAssignmentDto,
   CreatePersonDto,
@@ -36,6 +40,10 @@ import {
 } from './service.js';
 
 export const peopleRouter: Router = Router();
+
+// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
+// applied to every route below without any of them having to ask.
+peopleRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
   const principal = req.ctx.principal;
@@ -178,6 +186,43 @@ peopleRouter.delete(
     const { params } = req.data as { params: { id: string; edgeId: string } };
     void removeAssignment(req, req.ctx.orgId as string, params.id, params.edgeId, userOf(req), req.ctx.authzVersion ?? 0)
       .then((result) => res.json({ data: result }))
+      .catch(next);
+  },
+);
+
+/**
+ * Somebody else's avatar (48). The same write as `/profile/avatar`, asked as a different
+ * question: `target: 'person'` builds the target from the id in the path, so a caller whose
+ * `person.update` is scoped to their own unit cannot reach somebody in another one — where
+ * the profile route's `target: 'self'` has no id for anyone to point anywhere.
+ *
+ * `imageUpload` sits in link 9's slot, before requireCapability, exactly as validate does.
+ */
+const uploadAvatar = imageUpload({ field: 'file', maxBytes: config.UPLOAD_MAX_MB * 1024 * 1024 });
+
+peopleRouter.post(
+  '/:id/avatar',
+  authenticate,
+  validate(PersonIdDto),
+  uploadAvatar,
+  requireCapability('person.update', { target: 'person', from: 'params.id' }),
+  (req, res, next) => {
+    const { params } = req.data as { params: { id: string } };
+    void setAvatar(req, req.ctx.orgId as string, params.id, userOf(req))
+      .then((file) => res.status(201).json({ data: file }))
+      .catch(next);
+  },
+);
+
+peopleRouter.delete(
+  '/:id/avatar',
+  authenticate,
+  validate(PersonIdDto),
+  requireCapability('person.update', { target: 'person', from: 'params.id' }),
+  (req, res, next) => {
+    const { params } = req.data as { params: { id: string } };
+    void removeAvatar(req, req.ctx.orgId as string, params.id)
+      .then(() => res.status(204).end())
       .catch(next);
   },
 );

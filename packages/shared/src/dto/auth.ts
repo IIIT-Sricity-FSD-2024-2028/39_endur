@@ -30,7 +30,9 @@ export const RegisterDto = dto({ body: RegisterBody });
  * right actions — rather than flashing generic words and then re-rendering.
  */
 export type MeResponse = {
-  user: { id: string; name: string; email: string };
+  /** `avatarUrl` rides along for the same reason the labels do: the shell renders the
+   *  signed-in user on its first paint, and a second request for one image would flash. */
+  user: { id: string; name: string; email: string; avatarUrl: string | null };
   organization: { id: string; name: string; slug: string; industry: string };
   labels: Record<string, { one: string; many: string }>;
   /**

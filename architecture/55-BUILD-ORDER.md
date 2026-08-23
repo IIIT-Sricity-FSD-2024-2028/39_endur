@@ -143,16 +143,64 @@ are cheap now and expensive on 25 Aug.
 
 ---
 
-## After M0
+## Stage E — the first evaluation · ABOVE EVERYTHING BELOW
+
+Opened 23 Aug when the graded criteria arrived: a complete working application, five
+mandatory middleware types — **logging, error handling, file upload, security,
+router-level** — and **logs and error information written to files at regular intervals**.
+
+**COMPLETE — 23 Aug.** All five tasks built, tested and documented in one session. What
+follows is the record; the detail is in `PROGRESS.md`'s session log for that date.
+
+| id | lane | what landed | spec |
+|---|---|---|---|
+| ~~T-061~~ | A | **Multipart parsing and the upload routes.** `middleware/upload.ts` — hand-written rather than `multer`, one file, one field, images only, and mounted **per route** on the four upload routes so the JSON-parser exception cannot spread. Size counted as the bytes arrive; on refusal it unpipes and drains rather than destroying the request, so the 413 gets back. `lib/imageBytes.ts` sniffs format and dimensions from headers and strips metadata (`DEC-036`, resolving `OPEN-008`); `lib/storage.ts` writes tenant-partitioned to disk. Plus `GET /files/:id`, whose chain is the shortest in the app | `48`, `12` §4.4 |
+| ~~T-062~~ | B | **`<FileUpload>` and its two placements** — the logo card in Settings, and the avatar on `/app/profile`, which stops being a placeholder and becomes partially real. `apiUpload()` added to the one client; the browser writes its own `Content-Type` because only it knows the boundary | `48`, `24`, `41`, `47` |
+| ~~T-063~~ | A | **Logs and errors written to files.** `lib/logFile.ts` + `pino.multistream`: `app-<date>.log` and `error-<date>.log` alongside stdout, daily and size rotation, retention by the date in the filename, synchronous writes, and a failure that **fails off rather than taking the app down**. `18` rewritten from its placeholder | `18`, `12` §4.2 |
+| ~~T-064~~ | A | **Router-level middleware pass.** `middleware/chains.ts` — links 6–8 as four different `router.use()` chains. `tenantResolver` became a factory and lost both path-regex exception lists, because the mount point already knows what they were tracking. Repays `D-017` | `12` §2, §5 |
+| ~~T-065~~ | A | **The CSV size contradiction.** One number, `CSV_MAX_CHARS`, **below** the parser's limit so a field error wins over `PAYLOAD_TOO_LARGE`. `12` §4.4 rewritten: it described a streaming CSV parser that was never written. Repays `D-016` | `12` §4.4, `34` |
+
+**What this stage proves, and the order to show it in:** `app.ts` is application-level
+middleware, a feature router is router-level and the chains **differ between routers**, a
+route definition is per-route, and `errorFunnel` is a four-argument error handler registered
+last. `12` §2 carries a table naming which kind each box is.
+
+---
+
+## Stage 6 — P2 build-out · after M0, not before it
+
+Opened 23 Aug from a read-only survey of four questions. **No task here is on the path to the
+26 Aug milestone**; `T-043`, `T-045` and `D-005` are. The ids are fixed here so that
+`PROGRESS.md` and this file cannot drift, and the reasoning behind each is in `PROGRESS.md`'s
+23 Aug session log entry rather than repeated.
+
+| id | lane | needs | what | spec |
+|---|---|---|---|---|
+| T-050 | B | — | **People UI** — list, create, invite, assignments. The one thing that breaks a cold end-to-end run: nine endpoints and CSV import have existed since `T-018`, and `lib/people.ts` exports two read-only hooks. Do this before any other Stage-6 task | `34` |
+| T-051 | B | T-050 | **Person detail and my account.** `47` reuses `34`'s anatomy; building them apart means building the same panel twice | `34`, `47` |
+| T-052 | B | T-050 | **Roles and the powers grid.** Repays `D-008` — `describe()`'s English power labels are this doc's design work, not something to invent from outside it | `33`, `11` §3 |
+| T-053 | A | — | **Mount `POST /authz/simulate`.** `authz/simulate.ts` exports `simulate()`; no router mounts it. `13` §Trust already specifies it. Repays `D-014` | `13`, `11` §6 |
+| T-054 | C | T-053 | **Permission simulator page** | `42` |
+| T-055 | A | — | **RLS policies.** Layer 2 of `10` §8. Repays `D-001` and `D-003` — eleven services currently check `orgId` by hand and one forgotten call is a cross-tenant read | `10` §8, `16` §1 |
+| ~~T-056~~ | X | — | **DONE 23 Aug — `DEC-033`.** An operator is a separate principal kind, not a bigger grant. `19-PLATFORM-OPERATORS.md` written; `OPEN-007` resolved; `INV-011` added | `19` |
+| T-057 | A | — | **Billing surface and seat metering** — `GET /billing`, `/billing/usage`, `/billing/plans`, `POST /billing/tier`, `billable_seats`. Repays `D-012`, `D-013`, `D-015`. `billing.read` and `billing.update` have been in the catalogue since `T-003`; the routes have never existed. **No prices** — DEC-035 | `49`, `16` §5 |
+| T-058 | B | T-057 | **The plan and billing page** — usage with its breakdown, `<PlanPicker>` with a **Join** button per tier (DEC-035, no checkout), the sign-up plan step, and `<OverLimitBanner>` in `<AppShell>`. `16` §6: an over-limit org still collects and still reads results | `49` |
+| T-059 | A | T-057 | **Platform backend** — `platform_users`, `platform_audit_log`, the separate login and cookie, `requirePlatform()`, and the aggregate-only db seam. **`INV-011` is asserted here**, by a test that tries to select `answers` and fails | `19` |
+| T-066 | B | T-059 | **`/ops` platform console** — the estate list, one org's counts, plan override, suspend, and messaging an org's administrators. A **fourth route tree** with its own error boundary | `70` |
+| T-067 | B | T-059 | **`/ops/analytics`** — tier mix, movement, trials and conversion, quiet organisations. Owner-only. The four decisions in `71` § "The decisions inside these numbers" are the point of the task — counts, never money (DEC-035) | `71` |
+| ~~T-068~~ | X | — | **DROPPED 23 Aug — `DEC-035`.** Was "seed `plan_prices`". There is no pricing and no such table; a tier is joined with a button | `49`, `19` §10 |
+| T-060 | X | T-050 | **Cold-start end-to-end pass.** Distinct from `T-045`: that rehearses the *seeded* demo, this starts at `/start` with an empty organisation and walks create org → people → structure → subjects → template → campaign → respond → results | `50`, `01` §4 |
+
+## After Stage 6
 
 Coarser on purpose; re-plan once M0 lands and the real pace is known.
 
-**Remainder of P1** — RLS policies (`10` §8) · idempotency middleware · scoped rate limits ·
-`17` written properly · password reset · audit read surface.
+**Remainder of P1** — RLS (`T-055`) · `17` written properly · password reset · audit read
+surface. *Idempotency middleware and scoped rate limits were on this list and are now built —
+`middleware/idempotency.ts` is mounted on the public, people, templates and campaigns routers.*
 
-**P2** — pages `33` powers grid, `34` people UI, `41` settings, `42` simulator, `47` profile,
-`48` uploads · accessibility pass (`26`) · error handling (`25`) · component tests (`28`) ·
-`54` kept current.
+**Rest of P2** — `48` uploads · accessibility pass (`26`) · error handling (`25`) · component
+tests (`28`) · `54` kept current. *`41` settings was on this list and landed early as `T-046`.*
 
 **P3** — **resolve `OPEN-001` by 15 Oct** (the Redux shape, `23` §4), then the store migration
 · analysis (`43`) · improve loop (`44`) · public API (`45`).
