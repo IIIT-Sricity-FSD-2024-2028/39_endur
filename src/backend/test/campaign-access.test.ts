@@ -427,6 +427,7 @@ describe('access: the CSRF exemption still holds, for a reason worth stating', (
       password: 'a-long-enough-password',
       name: 'Cookie Reader',
       orgName: `Org csrf-${Date.now()}`,
+      tier: 'bronze',
       industry: 'custom',
     });
     const cookies = registered.headers['set-cookie'] as unknown as string[];

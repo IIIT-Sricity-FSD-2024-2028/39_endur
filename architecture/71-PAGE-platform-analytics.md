@@ -3,6 +3,8 @@
 Phase: **P2** · Milestone: — · Owns: `src/frontend/pages/platform/Analytics/**`
 Related: `19-PLATFORM-OPERATORS.md` (INV-011), `16` (tiers, entitlements, seats), `70` (the ops console)
 Decisions: `_MEMORY.md` DEC-035 · Design ref: none yet — see `70` § Design note
+Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-067`). This is the **superuser**
+page the owner named; `70` is the admin one. Needs `T-059`
 
 > **Was `71-PAGE-platform-revenue.md` until 2026-08-23.** DEC-035 removes pricing from the
 > product entirely, so a revenue page had nothing left to compute. What the owner actually

@@ -58,7 +58,21 @@ export const GRANT_MATRIX: Partial<Record<Capability, Row>> = {
   'delegation.read': S('subtree'), 'delegation.create': S('subtree'),
   'delegation.revoke': S('subtree'),
 
-  'subject.read': S('subtree', 'subtree', 'own_unit'),
+  // L4 READS SUBJECTS, and it is the only row in `organize` that reaches that far down.
+  // Added by T-086, closing the smaller half of OPEN-009. The owner's words: "student /
+  // lowest tier shouldn't see roles, people and department pages at all (even if they see
+  // nothing actually in it). ONLY COURSES LIST." Translated out of the university preset
+  // (INV-002): the L4 role sees the SUBJECTS list and nothing else in `organize`.
+  //
+  // `own_unit` rather than `all`: a respondent-level account has a reason to see the
+  // subjects of the section they are in, and no reason at all to enumerate every subject
+  // in the organisation. It is `own_unit` and not `subtree` for the same reason `unit.read`
+  // is at L3 — L4 sits at the bottom, so a subtree below them is usually empty and, when it
+  // is not, they are not the person who should be reading it.
+  //
+  // It is a change to what EVERY organisation gets by default, which is why 50 §1 held it
+  // for the owner rather than a session assuming it.
+  'subject.read': S('subtree', 'subtree', 'own_unit', 'own_unit'),
   'subject.create': S('subtree', 'subtree'),
   'subject.update': S('subtree', 'subtree'),
   'subject.archive': S('subtree', 'subtree'),

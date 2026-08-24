@@ -14,6 +14,7 @@ import { createApp } from '../app.js';
 import { prisma } from '../db/client.js';
 import { hashPassword } from '../auth/password.js';
 import { clearGrantCache } from '../authz/index.js';
+import type { SignupTier } from '@endur/shared';
 
 export const app = createApp();
 
@@ -29,8 +30,19 @@ export type Session = {
 export const withCsrf = (session: Session, method: 'post' | 'patch' | 'put' | 'delete', path: string) =>
   session.agent[method](path).set('X-CSRF-Token', session.csrf);
 
-/** Register an organisation and sign in as its founder. */
-export async function registerOrg(industry = 'custom'): Promise<Session> {
+/**
+ * Register an organisation and sign in as its founder.
+ *
+ * `tier` DEFAULTS TO BRONZE, and that default is chosen to leave every existing test saying
+ * exactly what it said before DEC-048. Until T-088 no organisation had a `Subscription` row at
+ * all and `requireEntitlement` fell through to bronze for all of them (D-012), so bronze is
+ * what these fixtures have always effectively been. Registering at bronze keeps that true
+ * while making it a row somebody chose rather than a fallback nobody noticed.
+ *
+ * A test that needs a paid surface asks for one here, or upserts the row directly the way
+ * results.test.ts does.
+ */
+export async function registerOrg(industry = 'custom', tier: SignupTier = 'bronze'): Promise<Session> {
   const agent = request.agent(app);
   const res = await agent.post('/api/v1/auth/register').send({
     email: `${unique('founder')}@example.test`,
@@ -38,6 +50,7 @@ export async function registerOrg(industry = 'custom'): Promise<Session> {
     name: 'Founder',
     orgName: `Org ${unique('n')}`,
     industry,
+    tier,
   });
   expect(res.status).toBe(201);
   const csrf = await agent.get('/api/v1/auth/csrf');
@@ -82,8 +95,8 @@ export const SETUP_LABELS = {
 };
 
 /** Register, then run the wizard's single commit. The org that comes out is usable. */
-export async function setUpOrg(industry = 'university'): Promise<Session> {
-  const session = await registerOrg(industry);
+export async function setUpOrg(industry = 'university', tier: SignupTier = 'bronze'): Promise<Session> {
+  const session = await registerOrg(industry, tier);
   const res = await withCsrf(session, 'post', '/api/v1/org/setup').send({
     industry,
     roles: SETUP_ROLES,

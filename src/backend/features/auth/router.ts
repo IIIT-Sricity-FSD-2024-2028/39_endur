@@ -15,6 +15,21 @@ import { AppError, ConflictError, UnauthenticatedError } from '../../lib/errors.
 import { heldCapabilities } from '../../authz/held.js';
 import { register } from './service.js';
 
+/**
+ * How many accounts on one address login will check a password against (DEC-049).
+ *
+ * Every candidate costs one argon2 verification — ~100ms and 19 MiB, deliberately — so an
+ * uncapped window would let anybody who can create accounts on an address turn one login
+ * attempt into arbitrary work. Five is far past any honest case: a person belongs to one
+ * organisation, occasionally two.
+ *
+ * The cap is safe because the window is ordered `createdAt asc`. The OLDEST activated
+ * account is always inside it, so no number of accounts created later can push somebody
+ * out of their own. A hypothetical sixth is unreachable until one of the first five is
+ * revoked — which fails toward the incumbent, the right direction.
+ */
+const MAX_LOGIN_CANDIDATES = 5;
+
 export const authRouter: Router = Router();
 
 // Links 6-8, router-level (12 §2). The ONE router whose tenant is optional — signing in
@@ -49,9 +64,9 @@ authRouter.post('/register', validate(RegisterDto), (req, res, next) => {
 authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res, next) => {
   const { body } = req.data as { body: LoginBody };
   void (async () => {
-    // `users` is unique on (org_id, email), NOT on email alone (10), so this lookup can
-    // legitimately match rows in more than one organisation. Until CONF-013 is decided,
-    // two clauses make the choice deterministic and close a live cross-tenant lockout:
+    // `users` is unique on (org_id, email), NOT on email alone (10 §3), so this lookup can
+    // legitimately match rows in more than one organisation. DEC-049 decides what happens
+    // then, and CONF-013 records the two answers it rejected.
     //
     //   passwordHash: not null  — an INVITED row has no hash and can never be signed in
     //     to. Without this, anyone holding `person.create` in any organisation could lock
@@ -59,26 +74,62 @@ authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res,
     //     their email address: the invited row was matched first and the real one was
     //     never reached. Reproduced end-to-end on 2026-08-19 (200 -> 401 after one
     //     unrelated POST /people).
-    //   orderBy createdAt asc  — `findFirst` with no order is whatever Postgres hands
-    //     back, which is not a security property. Oldest wins: the account that existed
-    //     first cannot be displaced by one created later.
+    //   orderBy createdAt asc  — the incumbent is checked first and can never be pushed
+    //     out of the candidate window by accounts created later. That is what makes the
+    //     cap below safe.
     //
-    // Neither clause DECIDES the question — whether an email address is global or
-    // per-tenant is a schema decision and it is still open. They make the current schema
-    // behave safely in the meantime.
-    const user = await prisma.user.findFirst({
-      where: { email: body.email, passwordHash: { not: null } },
+    // WHY ALL CANDIDATES ARE CHECKED AND NOT JUST THE FIRST. Until 2026-08-24 this was a
+    // `findFirst`, and the oldest activated row won outright. That closed the adversarial
+    // lockout above and left an HONEST one, which was measured rather than theorised: a
+    // person with a real account in two organisations activates the second, chooses a
+    // password, is signed in by the activation — and can never log in again. Their correct
+    // password returns 401 forever, because the older row is the only one ever compared
+    // against. T-072 made the path to that state one click and a link.
+    const candidates = await prisma.user.findMany({
+      where: {
+        email: body.email,
+        passwordHash: { not: null },
+        ...(body.orgId ? { orgId: body.orgId } : {}),
+      },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, orgId: true, passwordHash: true, status: true },
+      take: MAX_LOGIN_CANDIDATES,
+      select: { id: true, orgId: true, passwordHash: true, status: true,
+                org: { select: { name: true } } },
     });
 
-    // ONE failure message and one code path, whatever went wrong — unknown address, wrong
-    // password, disabled account. Any difference in wording or timing is a free tool for
-    // working out which addresses are real (15).
-    const ok = await verifyPassword(user?.passwordHash ?? null, body.password);
-    if (!user || !ok || user.status === 'disabled') {
+    // A DUMMY VERIFICATION WHEN THERE ARE NONE, which is the timing half of user
+    // enumeration and the reason verifyPassword takes a nullable hash at all. Returning
+    // instantly for an unknown address is a free oracle for which addresses are real.
+    if (candidates.length === 0) {
+      await verifyPassword(null, body.password);
       throw new UnauthenticatedError('That email or password is not right.');
     }
+
+    // Sequential, not Promise.all: argon2 is deliberately memory-hard (19 MiB each), and
+    // running the window in parallel would multiply the memory a single request can pin.
+    const matched = [];
+    for (const candidate of candidates) {
+      if (await verifyPassword(candidate.passwordHash, body.password)) matched.push(candidate);
+    }
+
+    // A disabled account fails as though it did not exist — one message, one code path,
+    // whatever went wrong. Any difference in wording or timing is a free tool for working
+    // out which addresses are real (15 §2).
+    const usable = matched.filter((candidate) => candidate.status !== 'disabled');
+    if (usable.length === 0) throw new UnauthenticatedError('That email or password is not right.');
+
+    // MORE THAN ONE, and only then, is the caller asked which. It costs nothing on stage:
+    // it can only happen to somebody who holds accounts in several organisations AND uses
+    // the same password for them, so no seeded org and no ordinary sign-in ever sees it.
+    // Naming the organisations here is safe because the caller has, by this line, proved
+    // the password for every one of them.
+    if (usable.length > 1) {
+      throw new AppError('ACCOUNT_AMBIGUOUS', 'That sign-in works for more than one organization.', {
+        organizations: usable.map((candidate) => ({ id: candidate.orgId, name: candidate.org.name })),
+      });
+    }
+
+    const user = usable[0] as (typeof usable)[number];
 
     // Regenerate BEFORE storing anything: session fixation prevention (15 §2).
     await regenerate(req);

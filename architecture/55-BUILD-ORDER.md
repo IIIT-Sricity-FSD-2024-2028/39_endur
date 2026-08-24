@@ -186,14 +186,14 @@ Opened 23 Aug from a read-only survey of four questions. **No task here is on th
 | id | lane | needs | what | spec |
 |---|---|---|---|---|
 | T-050 | B | — | **People UI** — list, create, invite, assignments. The one thing that breaks a cold end-to-end run: nine endpoints and CSV import have existed since `T-018`, and `lib/people.ts` exports two read-only hooks. Do this before any other Stage-6 task | `34` |
-| T-051 | B | T-050 | **Person detail and my account.** `47` reuses `34`'s anatomy; building them apart means building the same panel twice | `34`, `47` |
+| **T-051** ✅ | B | T-050 | **BUILT 2026-08-24. Person detail and my account.** Both pages, and `<PowersByPlace>` is the panel `34` and `47` would otherwise have built twice (`24` §4, INV-009). Backend: `GET`/`PATCH /profile` and `POST /profile/password` — the three routes `13` § Profile had catalogued and nobody had written — plus `features/people/powers.ts`, now the ONE caller of the resolver for this question. **It found a live INV-005 break:** `readPerson` re-found the unit BY NAME, and two units may share one, so a person with a position in each had one unit's powers printed under the other's heading. `Position` gained `unitId`, `roleLevel` and `validTo`; `PersonDetail`'s `powersByPlace` type was named so `ProfileView` could reuse it rather than fork the renderer. `POST /profile/password` is the one authenticated route on the route-enumeration allowlist, argued in place | `34`, `47` |
 | T-052 | B | T-050 | **Roles and the powers grid.** Repays `D-008` — `describe()`'s English power labels are this doc's design work, not something to invent from outside it | `33`, `11` §3 |
 | T-053 | A | — | **Mount `POST /authz/simulate`.** `authz/simulate.ts` exports `simulate()`; no router mounts it. `13` §Trust already specifies it. Repays `D-014` | `13`, `11` §6 |
 | T-054 | C | T-053 | **Permission simulator page** | `42` |
 | T-055 | A | — | **RLS policies.** Layer 2 of `10` §8. Repays `D-001` and `D-003` — eleven services currently check `orgId` by hand and one forgotten call is a cross-tenant read | `10` §8, `16` §1 |
 | ~~T-056~~ | X | — | **DONE 23 Aug — `DEC-033`.** An operator is a separate principal kind, not a bigger grant. `19-PLATFORM-OPERATORS.md` written; `OPEN-007` resolved; `INV-011` added | `19` |
 | **T-057** | A | — | **Billing surface and seat metering. THE HEAVIEST TASK ON THIS BOARD, and it does not look it.** It gates `T-082` and `T-083`, which is *two of the four greyed sidebar items* — and `D-012` means no organisation has ever had a subscription row, so `requireEntitlement` falls back to Bronze and every Gold surface `402`s for every user in the product. Building the improve loop or the analysis page first produces a screen nobody can open.<br><br>**Billing surface and seat metering** — `GET /billing`, `/billing/usage`, `/billing/plans`, `POST /billing/tier`, `billable_seats`. Repays `D-012`, `D-013`, `D-015`. `billing.read` and `billing.update` have been in the catalogue since `T-003`; the routes have never existed. **No prices** — DEC-035 | `49`, `16` §5 |
-| **T-088** | B | — | **THE TIER PICKER AT SIGN-UP — `DEC-048`, and the owner asked for this one by name.** One step between account creation and the setup wizard: three buttons, Bronze / Silver / Gold, and the one pressed is the one you are on. `register` writes the `subscriptions` row with the chosen tier and `status: 'active'`. **Deliberately carved out of `T-057`/`T-058`** — it needs neither the seat meter, nor `/billing/usage`, nor `<OverLimitBanner>`, nor the billing page, and `src/backend/billing/entitlements.ts` (TIERS, TIER_ENTITLEMENTS, `tierIncludes`) plus a mounted `requireEntitlement` already exist. What is missing is **the row ever being written**. **Repays `D-012`, and therefore unblocks `T-082` and `T-083`** — the two greyed pages that `402` for every user today. Enterprise is not on the picker: it is operator-assigned (`19` §4) | `49` § Interactions, `16` §7, `30` |
+| **T-088** ✅ | B | — | **BUILT 2026-08-24. THE TIER PICKER AT SIGN-UP — `DEC-048`, and the owner asked for this one by name.** One step between account creation and the setup wizard: three buttons, Bronze / Silver / Gold, and the one pressed is the one you are on. `register` writes the `subscriptions` row with the chosen tier and `status: 'active'`. **Deliberately carved out of `T-057`/`T-058`** — it needs neither the seat meter, nor `/billing/usage`, nor `<OverLimitBanner>`, nor the billing page, and `src/backend/billing/entitlements.ts` (TIERS, TIER_ENTITLEMENTS, `tierIncludes`) plus a mounted `requireEntitlement` already exist. What is missing is **the row ever being written**. **Repays `D-012`, and therefore unblocks `T-082` and `T-083`** — the two greyed pages that `402` for every user today. Enterprise is not on the picker: it is operator-assigned (`19` §4). **Built as specified, plus two things the spec did not know about:** `account.*` and `billing.*` were in **no tier at all** (`16` §3, now `D-028`), and `requireEntitlement` had **no tests whatsoever** — `test/tiers.test.ts` is new and is why `D-012` could not have survived it | `49` § Interactions, `16` §7, `30` |
 | T-058 | B | T-057, T-088 | **The plan and billing page** — usage with its breakdown, `<PlanPicker>` with a **Join** button per tier (DEC-035, no checkout), ~~the sign-up plan step~~ (**moved to `T-088`**) and `<OverLimitBanner>` in `<AppShell>`. `16` §6: an over-limit org still collects and still reads results | `49` |
 | T-059 | A | T-057 | **Platform backend** — `platform_users`, `platform_audit_log`, the separate login and cookie, `requirePlatform()`, and the aggregate-only db seam. **`INV-011` is asserted here**, by a test that tries to select `answers` and fails | `19` |
 | T-066 | B | T-059 | **`/ops` platform console** — the estate list, one org's counts, plan override, suspend, and messaging an org's administrators. A **fourth route tree** with its own error boundary | `70` |
@@ -247,8 +247,8 @@ recorded. This table is what is left to build.
 | T-079 | A | — | **Inbox backend.** `inbox_state`, five routes, and the queue read **through `features/results/service.ts`** so the k-anonymity gate is not forked | `58` |
 | T-080 | C | T-079 | **`/app/inbox`.** Four tabs, `<ResponseCard>`, the keyboard queue — and **`<ScoreBadge>`, which is catalogued but has never been built** | `58`, `24` §3 |
 | T-081 | A | — | **Analysis backend, rule-based** (DEC-042). Themes, lexicon sentiment, drivers as correlation over `numeric_value`. No outbound HTTP client exists in the feature, and a test asserts its absence | `43` |
-| T-082 | C | T-081, T-057 | **`/app/analysis`.** Needs `T-057` for a real 402 path — the whole 402-vs-403 demonstration is the point of the screen | `43`, `16` §3 |
-| T-083 | A | **T-057** | **Improve-loop backend.** Three tables, the finalisation trigger, and the ordering constraint enforced in the API. **`T-057` is a hard prerequisite**: every capability here is Gold and no org has ever had a subscription row, so today this surface 402s for every user in the product | `44`, `D-012` |
+| T-082 | C | T-081, ~~T-057~~ **T-088 ✅** | **`/app/analysis`.** Needed `T-057` for a real 402 path — the 402-vs-403 demonstration is the point of the screen — and **`T-088` supplied it on 24 Aug** by writing the subscriptions row. An org on Bronze now genuinely `402`s here and an org on Gold genuinely does not, which is the whole demonstration | `43`, `16` §3 |
+| T-083 | A | ~~**T-057**~~ **T-088 ✅** | **Improve-loop backend.** Three tables, the finalisation trigger, and the ordering constraint enforced in the API. ~~`T-057` is a hard prerequisite~~ — **it was, and `T-088` repaid it on 24 Aug.** Every capability here is Gold, and until `D-012` was closed no organisation had ever had a subscription row, so this surface would have `402`d for every user in the product including the demo. It no longer does | `44`, `D-012` |
 | T-084 | B | T-083 | **`/app/reflect`.** My cycles, the reflection form on `<QuestionInput>` (INV-008), the gap view, the plan | `44` |
 | T-085 | B | T-070…T-084 | **Un-disable the sidebar.** Five items lose their `Soon` tag as their pages land, one at a time. `navItems.ts` is the last edit of each task, not a task of its own — an item that navigates to a half-built page is what `design_specs/design/02` §7 forbids | `20` §2 |
 
@@ -276,8 +276,26 @@ scope** — a capability counts as held when there is *any* live allow for it. S
 | Structure | `unit.read` | nothing | hidden ✓ |
 | Roles | `role.read` | nothing | hidden ✓ |
 | **People** | `person.read` | **`person.read: self`** — the UNIVERSAL grant every role gets (`50` §1) | **visible, and lists exactly one person: themselves** |
-| **Settings** | `org.read` | **`org.read: all`** — seeded to all four levels so the vocabulary can load | **visible** |
-| **Subjects** | `subject.read` | nothing | **hidden — and this is the one item they should have** |
+| **Settings** | `org.read` | **`org.read: all`** — seeded to all four levels so the vocabulary can load | **visible — and a scope gate will NOT fix it, see below** |
+| **Subjects** | `subject.read` | **`own_unit` since `T-086`** — it held nothing at all before | **visible ✓** |
+
+**Updated 2026-08-24, after `T-086`.** Subjects is fixed — the seeded matrix now gives L4
+`subject.read: own_unit`, and the existing `needs` gate does the rest with no new machinery.
+People and Settings are still visible for everybody, and are still `T-087`'s to fix: `T-086`
+carried the scope to the client, which is what a gate needs to read, but did not change a
+single `needs` — that is one task deliberately, so the mechanism and the per-tier policy can
+be reviewed apart.
+
+**And they need two different fixes.** Verified live against a real L4 account, whose whole
+capability map is four entries:
+
+| Item | `needs` | bare verb | beyond `self` | what `T-087` does |
+|---|---|---|---|---|
+| **People** | `person.read` | true | **false** | tighten to `person.read` **beyond `self`** — the scope gate is the fix |
+| **Settings** | `org.read` | true | **true** | **a scope gate does nothing.** `org.read` really *is* `all` at L4, correctly — it is seeded to all four levels so the vocabulary loads on first paint. Settings is the **wrong capability**, not a too-wide one: the table above puts it at L1, and `org.update` is L1. Change `needs` to `org.update` |
+
+That distinction is the reason `T-087` is a task rather than a one-line edit, and it would not
+have been visible from the doc — it took reading a real account's map.
 
 Two of the three the owner named are already right. **People is wrong for every account in
 the product**, not only L4, and it is wrong for the same reason Settings is: `needs` means
@@ -292,11 +310,12 @@ not disabled* — applied to the sidebar, where it is currently only half true.
 
 | Task | Lane | Needs | What | Spec |
 |---|---|---|---|---|
-| T-086 | A | — | **Scope-aware capability set.** `MeResponse.capabilities` carries the scope, not just the verb, so a nav gate can say *"`person.read` **beyond `self`**"*. Touches `authz/held.ts`, `13` § Auth's DTO and `useCan()`. **Also adds `subject.read: own_unit` to L4 in `50` §1** — the tier that should see the Subjects list currently cannot | `13` § Auth, `50` §1, `20` §6 |
-| T-087 | B | T-086 | **Per-tier sidebar.** `needs` gains a minimum scope; People and Settings stop appearing for people who can only reach themselves; Subjects appears for L4. One test per tier asserting the exact item list, because *"which of these five is missing"* is not something a reviewer will catch by eye | `20` §2, `24` |
+| **T-086** ✅ | A | — | **BUILT 2026-08-24. Scope-aware capability set — `DEC-050`.** `MeResponse.capabilities` is now a **map of capability → widest held scope**, not a list of verbs, so a nav gate can say *"`person.read` **beyond `self`**"*. `authz/held.ts` reports the widest live allow (unchanged key set — `me.test.ts` asserts that on purpose, because carrying the scope was meant to change what the client KNOWS, never which capabilities it is told about); `useCan(cap, atLeast?)` defaults to `self`, so every existing call site means what it always did. **Added `subject.read: own_unit` to L4 in `50` §1**, closing the smaller half of `OPEN-009` — the level that should see the Subjects list now can, and `org.test.ts` asserts the L4 row exactly so a fifth row cannot join it quietly. `test-utils.tsx` still takes an array of capabilities, meaning `all`, so the fourteen component test files that only ask "does this button render" were untouched | `13` § Auth, `50` §1, `20` §6 |
+| **T-087** ✅ | B | T-086 | **BUILT 2026-08-24. Per-tier sidebar — `DEC-051`, and `OPEN-009` is closed by the owner's own answer.** `NavItem.minScope` (default `self`) says how far `needs` must **reach** before an item is worth showing. **Two gates changed and nothing else**, and the seeded matrix is untouched: People → `person.read` at `own_unit`; Settings → **`org.update`**, which is a capability change rather than a scope one — `org.read` is `all` at every level including the lowest, so no minimum could ever have hidden it. **L3 keeps People** (owner's call: their roster is real). Four tests, one per level, asserting the **exact** item list — and the L1 list is unaffected, which is what stops them being *"everything must change"*. The rest of the L3 row is deliberately left alone: `OPEN-010` | `20` §2, `24` |
 
-**The per-tier shape is not decided — `OPEN-009` holds the question.** A first proposal, to be
-confirmed rather than assumed:
+**Decided 2026-08-24 by the owner — `DEC-051`, and `OPEN-009` is closed.** The table below is
+the first proposal as written; **it was wrong in three cells** and is kept because the
+corrections are the useful part. What shipped is in the two rows beneath it.
 
 | | L1 owner | L2 section head | L3 reviewee-level | L4 lowest |
 |---|---|---|---|---|
@@ -312,10 +331,17 @@ confirmed rather than assumed:
 | Settings | ● | — (`org.update` is L1) | — | — |
 | Profile | ● | ● | ● | ● |
 
-**The one genuinely open cell is L3 × People.** They hold `person.read: own_unit` from the
-seeded matrix, so seeing their colleagues is the matrix working as designed, not an accident —
-tightening it is a product choice about whether a reviewee-level account is a *participant* or
-a *manager of a small area*. The other cells follow from grants that already exist.
+**Where that table was wrong.** *"The other cells follow from grants that already exist"* held
+for most of it and not for three:
+
+| Cell | The draft said | What shipped, and why |
+|---|---|---|
+| **L3 × People** | `?` | **Stays.** The owner's call, asked directly and answered: an L3 holds `person.read: own_unit`, so the page lists their real colleagues rather than themselves. A reviewee-level account is a *manager of a small area* at L3 |
+| **Settings** | *"— (`org.update` is L1)"* | Right about the level and wrong about the mechanism. `org.read` is `all` at **every** level, seeded so the vocabulary loads on first paint — so **no minimum scope could ever hide Settings**. It was the wrong capability, not a too-wide one. `needs` is now `org.update`. Only reading a real L4 account's map showed this |
+| **L3 × Structure, L3 × Templates** | `—` | **Not done.** L3 genuinely holds `unit.read: own_unit` and `template.read: all`, and `template.read` cannot be narrowed by scope at all (`50` §1: templates are org-wide and have no unit, so a unit scope would mean nobody could read them). Deferred by the owner — `OPEN-010` |
+
+Treat the table above as a sketch rather than a spec: it was written before anyone had read a
+real account's capability map, and it has now been wrong three times.
 
 **Ordering that matters, in one place:**
 
@@ -331,6 +357,92 @@ T-088  before  T-082      a real chosen tier before a 402 can be demonstrated on
 T-088  before  T-083      it is D-012 that 402s the improve loop, and T-088 is what repays it
 T-088  not-after T-057    THE POINT OF SPLITTING IT. the picker needs one row written, not
                           the seat meter, the usage breakdown or the billing page
+```
+
+
+## Stage 9 — the second ask · opened 2026-08-24 · CONF-021
+
+**From the owner, verbatim**, after opening the running app and looking at the sidebar:
+
+> *"1. sign in button on homepage is broken — error loading dynamically imported module …
+> 2. roles, analytics, inbox and reflect still need to be built (i asked for this before and
+> you didnt do it) 3. logging should be visible to admins (i havent seen pages for endur
+> admin and superuser yet — so they too)"*
+
+**Item 2 is a repeat instruction and the ledger agrees with the complaint.** `CONF-019` (23
+Aug) was the same ask. It was answered by writing specs — `43` and `44` re-tagged buildable,
+`58` written from nothing — and then sequencing every one of those tasks behind M0. No code
+followed. A spec is not the deliverable; the page is. `CONF-021` records the correction and
+promotes the work above the rest of Stage 6.
+
+Nothing in this stage is new specification. Every task below already existed with a complete
+spec doc; what changes is **the order**, and one genuinely new task (`T-089`) for the bug.
+
+### 9a · The bug — DEC-054
+
+| id | lane | needs | what | spec |
+|---|---|---|---|---|
+| **T-089** ✅ | A | — | **BUILT 2026-08-24. A failed lazy import must offer a hard reload.** `PublicBoundary` renders the raw `Error.message` and its only affordance is a client-side `<Link to="/">` — which re-renders inside the same dead module graph and fails identically. `ConsoleBoundary` already gets this right and its comment says why. `describe()` gains one branch for the import-failure class, and the public boundary's affordance becomes `<a href>`. Repays `D-029`. **Proved by reverting:** put the `<Link>` back and exactly one test goes red — the one that clicks the anchor and asserts the event was not `preventDefault`ed. Every other assertion passes against the broken version, because `<Link>` renders an `<a href>` too | `20` §2, `25`, `DEC-054` |
+
+**This is a lane-A task and it is small, but do not fold it into another one.** It is the
+first thing the owner listed and it is the failure mode with the widest blast radius on demo
+day: every page is lazy, so *any* stale tab loses the *next* route it navigates to, and the
+message it currently shows names a `.tsx` file at a `localhost` URL.
+
+### 9b · The four sidebar pages — the promoted order
+
+Unchanged specs, unchanged task ids, unchanged `needs`. Only the position moved.
+
+| # | id | lane | needs | what | spec |
+|---|---|---|---|---|---|
+| 1 | **T-052** ✅ | B | — | **BUILT 2026-08-24. Roles and the powers grid.** ~~The only one of the four with no backend work at all~~ — **that was wrong and it is worth saying why.** Every route has existed since `T-017`, but **two of the three refusals `33` specifies had never been implemented**: `PUT /grants` carried `requireCapability('grant.update')` and nothing else. Anyone the grid was delegated to could write any role every capability in the catalogue (`DEC-056`), and any administrator could leave the org unadministrable with no undo (`DEC-057`). **A route existing is not a rule existing.** Also repays `D-008` via `DEC-055` — 64 written phrases replacing a four-line derivation that was not merely un-localised but produced *"read resultses"* (`N-059`) | `33`, `11` §3 |
+| 2 | T-079 | A | — | Inbox backend — `inbox_state`, five routes, read **through** `features/results/service.ts` | `58` |
+| 3 | T-080 | C | T-079 | `/app/inbox` + `<ResponseCard>` + `<ScoreBadge>` | `58`, `24` §3 |
+| 4 | T-081 | A | — | Analysis backend, rule-based (`DEC-042`) | `43` |
+| 5 | T-082 | C | T-081 | `/app/analysis` — the 402-vs-403 screen, now demonstrable (`T-088`) | `43`, `16` §3 |
+| 6 | T-083 | A | — | Improve-loop backend | `44` |
+| 7 | T-084 | B | T-083 | `/app/reflect` | `44` |
+| — | T-085 | B | each of the above | **Un-disable the sidebar, one item at a time.** Still the *last edit of each task*, never a task of its own | `20` §2 |
+
+**Why Roles first when the owner listed it first anyway.** It is also the cheapest and the
+only one that needs no new table, no new route and no new capability. If the two days before
+M0 buy exactly one of these four, this is the one that lands.
+
+### 9c · Logs, and Endur's own two consoles — the third item
+
+The owner's third item is **two separate things wearing one word**, and they were already
+specified separately because `19` §4 draws the line: an organisation's administrator sees
+*their own org's* activity; an Endur operator sees the estate and the log **files**. They are
+different principals, different stores, different routes (`INV-011`).
+
+| id | lane | needs | what | spec |
+|---|---|---|---|---|
+| T-075 | A | — | **`GET /audit`** — filters, cursor, `outcome`, and denial rows written for mutating capabilities. `T-074` already made `audit_log.ip` NULL for non-user principals, which is the fix that had to land *before* a page could expose the column | `56`, `13` §Trust |
+| T-076 | B | T-075 | **`/app/logs`** — the table, expand-to-trace, refusals-only toggle, and **`<DecisionTrace>`, which `T-054` also needs: whoever is second extends, never forks** (INV-009). The sidebar item is `system` group, under Settings, hidden without `audit.read` — `56` § Route & access already specifies it | `56`, `24` §6c |
+| T-059 | A | — | **Platform backend** — `platform_users`, the separate login and cookie, `requirePlatform()`, the aggregate-only db seam. **`INV-011` is asserted here**, by a test that tries to select `answers` and fails. See `N-058` about its `T-057` dependency before starting | `19` |
+| T-066 | B | T-059 | **`/ops` — the Endur admin console.** Estate list, one org's counts, plan override, suspend, message an org's administrators. A **fourth route tree** with its own error boundary | `70` |
+| T-067 | B | T-059 | **`/ops/analytics` — the superuser page.** Tier mix, movement, trials, quiet organisations. Counts, never money (`DEC-035`) | `71` |
+| T-077 | A | T-059 | **Platform log routes** — `platform.logs.read`, the file list, the bounded read, the three-way path guard | `72`, `19` §4 |
+| T-078 | B | T-077 | **`/ops/logs`** — `<LogViewer>`, filters in the URL, `requestId` collapse-to-one-request | `72` |
+
+**"I haven't seen pages for endur admin and superuser yet" is correct and expected** — there
+is no way to reach them, by design. `/ops` is a fourth route tree behind a **separate login
+and a separate cookie**, and no link from the customer console points at it. `19` §4 is the
+doc; `T-059` is what makes the door exist at all, and `T-066`/`T-067` are the two pages
+behind it. Until `T-059`, there is nothing to have seen.
+
+**Ordering inside 9c is not negotiable:** `T-059` is a hard prerequisite for four of the six.
+`T-075`/`T-076` have no dependency on it whatsoever and are the half that can start today.
+
+**Ordering added by this stage:**
+
+```
+T-089  first        it is the owner's first item and every lazy route shares the fault
+T-052  before  T-079..T-084   cheapest of the four, and the only one with no backend at all
+T-075  before  T-076          the read surface before the page that renders it
+T-074  before  T-075          ALREADY DONE. the IP fix landed 23 Aug, ahead of both
+T-059  before  T-066, T-067, T-077, T-078    no door, no rooms behind it
+T-085  after   each page      unchanged: the tag comes off as the page lands, never before
 ```
 
 ## After Stage 7

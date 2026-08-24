@@ -47,10 +47,26 @@ switcher. Built **first**, before any page, and handed from track B to track C (
 { items: NavItem[]; currentPath: string }
 type NavItem = { to: string; label: string; icon: IconName;
                  group: 'organize'|'collect'|'understand'|'system';
-                 disabled?: boolean; soonHint?: string };
+                 disabled?: boolean; soonHint?: string;
+                 needs?: Capability; minScope?: Scope };
 ```
 P3 items render disabled with a "Soon" tag and a hover hint. **They never navigate and have
 no page behind them** (`20` §2).
+
+`needs` hides an item the caller does not hold. **`minScope` says how far that hold must
+reach** (`DEC-051`, default `self`) — a nav item promises a *page* is worth opening, which is
+a stronger claim than *"you hold this verb somewhere"*. People carries `person.read` at
+`own_unit`, because `person.read: self` is seeded to every role and the bare verb showed the
+item to every account in the product (`D-027`).
+
+**A minimum scope is not always the right tool, and Settings is the case to remember.**
+`org.read` is `all` at every level, seeded so the vocabulary loads on first paint, so no
+minimum could hide it — the item was gated on the wrong capability and now needs `org.update`.
+When an item shows for someone it should not, check *which* capability before reaching for a
+scope.
+
+Usability, never enforcement (INV-003): every route behind these is guarded server-side, and
+the lists already scope-filter. Removing every gate here exposes nothing.
 
 ### `<TopBar>`
 ```ts
@@ -224,6 +240,40 @@ remember. `onMove` is the keyboard and touch path; the list that owns order hand
 ```
 Role level is always visible as `Role · L{n}`. It makes the hierarchy inspectable during
 questioning, which is exactly when it gets probed (`design_specs/design/02` §5).
+
+### `<PowersByPlace>`  ·  **BUILT 2026-08-24 (`T-051`)**
+```ts
+{ places: PowersAtPlace[]; emptyHint: string;
+  onWhy?: (capability: string, unitId: string) => void }
+```
+**One block, two placements** — `/app/profile` (`47`) and `/app/people/:id` (`34`). Both docs
+independently specify the same thing in the same words: powers grouped by unit, produced by
+the resolver, proving that the same person has different powers in different places. It is
+the INV-009 rule again — the second placement extends, it does not fork.
+
+It renders the places it is given and then, always, a closing line for everywhere else. That
+line is the component's, not the API's: `47` § Interactions writes it as a third row
+(*"Anywhere else — nothing"*) and it is not a row, because inventing a null-unit entry would
+put a place in the data that the organisation does not have. `emptyHint` is that sentence,
+because the two screens say it about different people — *"You hold nothing anywhere else"* is
+not what an administrator reading somebody else's record needs to see.
+
+**It prints the capability KEY, not an English label**, and that is what both page docs
+already specify — `47` § Interactions and `34` § Interactions both draw the block with
+`campaign.launch · results.read · person.read` in it. It is also the better answer here:
+`roles/service.ts`'s `describe()` renders `results.read` as *"read resultses"*, which is
+`D-008` in one line, and a person trying to match what they see to an error message or a doc
+needs the key. Grouped by `CAPABILITY_CATALOGUE[key].module` from `packages/shared`, which is
+where the grouping already lives — so the component reads the catalogue and fetches nothing.
+
+**The scope is rendered, never hidden.** `person.read · self` and `person.read · subtree` are
+different answers to the only question this block exists to answer, and `T-086` is the whole
+argument for why the verb alone is not enough. A person asking *"why can I not see the other
+department's results?"* is answered by the scope, not by the verb.
+
+`onWhy` is the `Why?` link `47` § Interactions specifies — it opens `42` pre-filled. Optional,
+because `42` is `T-054` and a link to a `<Placeholder>` is what `design_specs/design/02` §7
+forbids; the prop exists so that task is a wiring change rather than a redesign.
 
 ### `<PowersGrid>`
 ```ts
@@ -453,24 +503,41 @@ only thing that reliably stops "Are you sure?" from reappearing.
 Five components added 2026-08-23 with `49`, `70` and `71`. Four are customer-facing or
 shared; `<GrowthChart>` and `<MessageComposer>` are internal-only.
 
-### `<PlanPicker>`
+### `<PlanPicker>`  ·  **BUILT 2026-08-24 (`T-088`)**
 ```ts
-{ plans: PlanOption[];
-  current: Tier;
+{ plans: readonly PlanOption[];
+  current: Tier | null;                          // null = nothing chosen yet (sign-up)
   onSelect: (tier: Tier) => void;
-  mode: 'join' | 'override';         // customer joining | operator setting
-  busyTier?: Tier | null;            // the one being joined right now
+  mode: 'signup' | 'join' | 'override';          // founder picking | customer | operator
+  busyTier?: Tier | null;                        // the one being joined right now
   disabled?: boolean }
 ```
-**One component, two worlds** — the customer joining a plan in `49` and an operator overriding
-one in `70`. Same information, different verb, and `mode` is what changes the copy and the
-confirmation. Two implementations would drift within a month; this is INV-008's argument
-applied to a second component.
+**One component, THREE worlds** — a founder choosing at sign-up (`30`, `DEC-048`), a customer
+joining a plan in `49`, an operator overriding one in `70`. Same information, three verbs, and
+`mode` is what changes the copy and the confirmation. Three implementations would drift within
+a month; this is INV-008's argument applied to a third caller.
+
+**`signup` is the mode that differs, and it differs in the CONTROL rather than the copy.** On
+`/start` there is no organisation yet, so there is nothing to change and nothing to confirm —
+the tier is a field on the registration the page is about to POST. Cards are therefore radios
+and the page's own submit button commits them. In `join` and `override` the organisation
+already exists and each card carries its own action, because the click **is** the write.
+
+**`current: Tier | null` and `null` is a real state** — `DEC-048` pre-selects nothing at
+sign-up. A pre-selected card is the product choosing and then attributing the choice to the
+customer, which is how `D-012` looked from the inside for a month.
 
 **`PlanOption` carries no price** — DEC-035 removed pricing from the product, so every tier
-including Enterprise renders the same **Join** action. `includes[]` comes from
-`TIER_ENTITLEMENTS` (`16` §3), resolved once on the server rather than written a second time in
-the component, so a tier that gains a surface gains a bullet with no edit here.
+renders the same **Join** action. It also carries no `includes[]`: the entitlement map stays on
+the server. `/start` has no session and could not fetch `GET /billing/plans` (it is behind
+`billing.read`), and shipping `TIER_ENTITLEMENTS` to the browser would invite a second
+implementation of the `402` decision — which INV-003's whole posture forbids. What the client
+gets is the tier VOCABULARY (`packages/shared/src/tiers.ts`, `PLAN_OPTIONS`: name, what it
+sells, what it adds); what the server keeps is the decision.
+
+**Enterprise renders and cannot be pressed** (`selectable: false`). `16` §4 prices it
+individually, so it is a sales conversation rather than a button — but hiding it would make an
+operator setting it later look like a bug rather than a sale.
 
 ### `<OverLimitBanner>`
 ```ts
@@ -632,7 +699,7 @@ that has been misled about the one thing `52` promises them.
 
 | Track | Builds |
 |---|---|
-| **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersGrid, ResponsiveTable |
+| **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersByPlace, PowersGrid, ResponsiveTable |
 | **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip, FileUpload |
 | **Shared** | EmptyState, Toast, ConfirmDialog, DecisionTrace, InviteLink — whoever needs one first, then announced |
 

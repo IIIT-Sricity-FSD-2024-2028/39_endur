@@ -202,6 +202,9 @@ DEC-019  ACTIVE  2026-08-19  origin:A
            its trace. that is a confusing button, not a hole: INV-003 holds because
            requireCapability() decides on every route and this list decides nothing.
   see      13 § Auth, 20 §6, src/backend/authz/held.ts, src/backend/test/me.test.ts
+  extended DEC-050 (2026-08-24) -- every entry now CARRIES ITS WIDEST HELD SCOPE. the rule
+           above for WHICH capabilities are listed is unchanged, deny subtraction included;
+           what changed is that each one names how far it reaches.
 
 DEC-027  ACTIVE  2026-08-22  origin:owner
   the display and body faces were both replaced. WHICH faces is a design value and is NOT
@@ -796,7 +799,328 @@ DEC-048  ACTIVE  2026-08-24  origin:user  supersedes:49 § Interactions, 16 §7 
            the concept survives anywhere else (a `trialing` status an operator can grant?)
            is not decided here and 16 §7 is annotated rather than deleted -- removing a
            documented feature is larger than what was asked for.
-  see      49 § Interactions, 16 §4 §7, DEC-035, D-012, T-088, billing/entitlements.ts
+  built    2026-08-24, T-088, as decided. `RegisterBody.tier` is REQUIRED WITH NO DEFAULT --
+           a default would have silently re-created D-012, every org on one tier chosen by
+           nobody -- and the row is written INSIDE register's transaction, so an org cannot
+           exist without a tier somebody chose. /start is two steps and ONE POST for that
+           reason; a second page after the account existed would leave the same gap open for
+           however long they took to answer. the seed now gives one demo org per tier, so the
+           402 path is demonstrable on a real organisation instead of only in a test.
+           IT FOUND D-028 ON THE WAY -- account.* and billing.* were in NO TIER AT ALL.
+  see      49 § Interactions, 16 §4 §7, DEC-035, D-012, D-028, T-088, billing/entitlements.ts
+
+DEC-049  ACTIVE  2026-08-24  origin:claude  supersedes:CONF-013  repays:D-007
+  what     AN EMAIL ADDRESS STAYS PER-TENANT, AND LOGIN VERIFIES THE PASSWORD AGAINST EVERY
+           ACTIVATED ACCOUNT ON IT -- capped at 5, ordered createdAt asc.
+           exactly one match -> signed in, no question asked. that is every ordinary case,
+           INCLUDING a person with accounts in two organisations who uses two passwords.
+           more than one match -> 409 ACCOUNT_AMBIGUOUS naming the organisations, and the
+           client re-posts with `orgId`. zero matches -> the one uniform 401, with a dummy
+           verification when there are no candidates so an unknown address costs the same.
+           `orgId` NARROWS, IT NEVER UNLOCKS: the password is checked against that org and
+           nowhere else, so a wrong orgId fails exactly like a wrong password.
+  why      CONF-013 asked whether an address is global or per-tenant and set 24 Aug as the
+           date. the answer came from MEASURING rather than from choosing: the mitigation
+           (findFirst, oldest activated row wins) closed the ADVERSARIAL lockout and left an
+           HONEST one that is worse than the "ambiguity" CONF-013 described.
+           REPRODUCED THROUGH THE REAL ROUTES, 24 Aug, before anything was changed:
+             person has an account in org A. org B adds them (POST /people), provisions a
+             sign-in (T-072, one click), they follow the link and choose a password. the
+             activation signs them in -- and they can NEVER LOG IN AGAIN. their correct
+             password returns 401 forever, because only the older row is ever compared
+             against. measured: org B password 401, org A password 200, lands in A.
+           T-072 shipped the day before and made reaching that state one click and a link.
+  chose    (b) FROM CONF-013, in its disambiguation form rather than its slug-field form.
+           rejected (a) MAKE EMAIL GLOBALLY UNIQUE, for three reasons and the third is the
+             one that decides it: it forbids one person belonging to two organisations,
+             which 10 allows and DEC-009 does not forbid; it needs a MIGRATION plus guards
+             in people/service.ts, the CSV import and T-072's provisioning, two days before
+             a graded demo; and it turns register's 409 "already registered" into a
+             CROSS-TENANT MEMBERSHIP ORACLE -- "is alice@acme.com an Endur user anywhere?"
+             -- in a product whose whole posture is INV-006 and INV-011.
+           rejected (c) KEEP THE MITIGATION AS THE RULE. CONF-013 said "do NOT leave it as
+             (c) by silence", and the measurement is why: (c) is not a documented tradeoff,
+             it is a silent permanent lockout of the newer account.
+           rejected the SLUG FIELD variant of (b) -- CONF-013 calls (b) "worse on stage",
+             and that is true of asking every caller which organisation. asking ONLY when
+             the password genuinely opens several costs nothing on stage: no seeded org
+             shares an address, so the demo never renders the question.
+  cost     an address with several activated accounts costs proportionally more argon2 work
+           than one without -- a timing signal for the NUMBER of accounts on a known
+           address. capped at 5, and register's 409 already discloses that an address is in
+           use, so this adds cardinality rather than existence. stated, not hidden.
+           a hypothetical SIXTH account is unreachable until one of the first five is
+           revoked. oldest-first ordering means that always fails toward the incumbent.
+  measured NO MIGRATION AND NO SCHEMA CHANGE, which is what made it the right answer two
+           days from M0. one handler, one optional DTO field, one error code, one screen.
+  proven   MAX_LOGIN_CANDIDATES reverted to 1 -> three tests in cross-tenant-login.test.ts
+           fail, including "can sign in to the one they just activated". restored -> pass.
+  see      15 §2, 13 §5, 30 § Sign in, CONF-013, D-007, T-072, features/auth/router.ts
+
+DEC-050  ACTIVE  2026-08-24  origin:claude  extends:DEC-019  amends:13 § Auth, 20 §6, 50 §1
+         closes-part-of:OPEN-009  repays:D-027 (half)
+  what     THE CAPABILITY SET /auth/me HANDS THE SPA IS A MAP OF CAPABILITY -> SCOPE, not a
+           list of verbs. `MeResponse.capabilities: HeldCapabilities` = Partial<Record<
+           Capability, Scope>>. absent = not held anywhere. present = THE WIDEST SCOPE ANY
+           LIVE ALLOW REACHES. keys sorted, so a diff between two callers stays readable.
+           `useCan(cap, atLeast?)` compares breadth; atLeast DEFAULTS TO `self`, so every
+           existing call site means exactly what it meant before.
+           AND: the seeded matrix gives L4 `subject.read: own_unit` (50 §1).
+  why      D-027. `person.read: self` is seeded to EVERY role without exception so that
+           /app/profile opens (50 §1, and 11 §10 tests that it is never omitted). held.ts
+           reported the verb only, so `can('person.read')` was TRUE FOR EVERY ACCOUNT IN
+           THE PRODUCT, and the People nav item -- gated on that verb -- showed everybody a
+           page listing exactly one person: the reader. `org.read: all` did the same to
+           Settings. it could not be fixed on the client, because the client was never told
+           the difference. the scope IS the difference.
+  chose    A MAP KEYED BY CAPABILITY, not an array of {capability, scope} pairs: O(1)
+           lookup, duplicate-free structurally rather than by assertion, and it is what
+           useCan already wanted to build. JSON preserves insertion order for keys that are
+           not array indices, and no capability is one, so sorted keys survive the wire.
+           THE WIDEST ALLOW, not the narrowest and not a combination. the question held.ts
+             answers is the same existential one it always answered -- "is there anywhere
+             at all this button could work" -- so the widest reach is the honest answer.
+             two `own_unit` grants at two different units report `own_unit` ONCE; the map
+             cannot say WHICH units and does not pretend to. ask the resolver instead.
+           A UNIT-SCOPED DENY DOES NOT NARROW THE VALUE, for the same reason it has never
+             subtracted the key: an `own_unit` deny on one section is no reason to tell the
+             client that a `subtree` allow stops there. an `all` deny still removes the key
+             entirely. so the KEY SET IS BYTE-FOR-BYTE WHAT THE ARRAY WAS -- me.test.ts
+             asserts that deliberately. T-086 changed what the client KNOWS, never which
+             capabilities it is told about.
+           `own_unit` FOR L4's subject.read: a respondent-level account has a reason to see
+             the subjects of the section they are in and none to enumerate the whole
+             organisation; `own_unit` not `subtree` for the reason unit.read stops there at
+             L3 -- L4 is the bottom, so a subtree below them is usually empty.
+           NO `needs` GATE WAS CHANGED. T-086 carries the scope; T-087 spends it. one task
+             deliberately, so the mechanism and the per-tier policy are reviewed apart.
+  cost     still usability, never enforcement (INV-003) -- requireCapability decides every
+           route and this map decides nothing. the map is one notch more precise than the
+           array and NOT a different kind of answer: "somewhere this reaches this far" is
+           not "here". anything that must be true of a SPECIFIC thing is the server's.
+           the L4 row changes what EVERY organisation gets by default. org.test.ts asserts
+           the L4 grant list exactly, so a fifth capability cannot join it quietly.
+  found    VERIFIED LIVE, end to end on the running API: probe org, POST /people, an L4
+           assignment, POST /people/:id/account, activate, GET /auth/me as that account.
+           the whole map came back as FOUR entries:
+             { "org.read":"all", "person.read":"self", "person.update":"self",
+               "subject.read":"own_unit" }
+           A SCOPE GATE FIXES People AND DOES NOT FIX Settings, and T-087 needs to know:
+             People   needs person.read   bare verb TRUE, beyond self FALSE  -> scope works
+             Settings needs org.read      bare verb TRUE, beyond self TRUE   -> scope does
+                      NOT work. org.read really IS `all` at L4 -- seeded to all four levels
+                      so the vocabulary loads on first paint, and that is correct.
+           so Settings is not a scope problem, it is the WRONG CAPABILITY: 55 § Stage 8's
+           table puts Settings at L1 only, and `org.update` is L1 only. T-087 changes that
+           item's `needs` from org.read to org.update. no scope involved.
+           probe org deleted, 0 users left. API stopped.
+  proven   held.ts flipped to report the NARROWEST allow -> "separates the universal
+           person.read: self from a real one" and "reports the WIDEST allow" both fail.
+           scopeReaches made to ignore `atLeast` (the pre-T-086 behaviour) -> the two
+           useCan scope tests fail. both restored -> 338 backend, 721 frontend, green.
+  see      13 § Auth, 20 §6, 50 §1, 55 § Stage 8, D-027, OPEN-009, T-086, T-087,
+           authz/held.ts, lib/capabilities.ts, packages/shared/src/capabilities.ts
+
+DEC-051  ACTIVE  2026-08-24  origin:user  resolves:OPEN-009  repays:D-027  spends:DEC-050
+  what     WHAT EACH ROLE LEVEL SEES IN THE SIDEBAR, decided. NavItem gains `minScope`,
+           defaulting to `self` -- how far `needs` must REACH before an item is worth
+           showing. two gates changed and NOTHING ELSE:
+             People    person.read, minScope own_unit   (was: the bare verb)
+             Settings  org.update                        (was: org.read)
+           the seeded matrix is UNCHANGED. no grant was added, removed or narrowed.
+  chose    L3 KEEPS People. THE OWNER'S CALL, asked directly on 24 Aug and answered:
+           "hide the item, keep the grant" was offered for L3 and DECLINED in its favour --
+           an L3 holds `person.read: own_unit` from the matrix, so their People page lists
+           their actual colleagues, not themselves. that is a real page. the participant-vs-
+           manager question resolves to MANAGER OF A SMALL AREA at L3.
+           the owner ALSO chose to leave the rest of the L3 row alone for now: L3 still
+           sees Structure and Templates (`unit.read: own_unit`, `template.read: all`), which
+           55 § Stage 8's first-draft table proposed hiding. deliberately not done -- see
+           OPEN-010.
+  fact     SETTINGS WAS NEVER A SCOPE PROBLEM, and this is the part that could not be seen
+           from the docs. `org.read` is `all` at EVERY level including L4, seeded that way
+           so the vocabulary loads on first paint (50 §1) -- so NO minimum scope could ever
+           hide Settings. it was gated on the wrong capability. the page exists to EDIT the
+           organisation; 55 § Stage 8 puts it at L1; `org.update` is L1.
+           <VocabularyChips> had already gated its link there on `org.update`. the chip row
+           reached this answer first and the sidebar was the half that had not caught up.
+           found by reading a REAL L4 account's map off the running API, not from the table.
+  cost     the ROUTE guard on /app/settings stays `org.read`, deliberately. the page already
+           renders read-only without `org.update` (Settings.tsx `editable`), and a
+           directly-typed URL showing a read-only page is a better answer than a 403 to
+           something the caller may in fact read. so the item is absent from the nav and the
+           page is still reachable -- that is 20 §6's stated exception, not a leak.
+           still usability, never enforcement (INV-003). requireCapability refuses these
+           routes and the lists already scope-filter; deleting every gate here exposes
+           nothing.
+  proven   both gates reverted (People to the bare verb, Settings to org.read) -> 5 of the
+           13 sidebar tests fail. THE L1 TEST STILL PASSES, which is what stops the four
+           per-level tests from being "everything must change". restored -> 13 pass.
+  see      20 §2, 24 §2, 55 § Stage 8, 50 §1, OPEN-009, OPEN-010, D-027, DEC-050,
+           components/layout/navItems.ts, components/layout/Sidebar.tsx
+
+DEC-052  ACTIVE  2026-08-24  origin:claude  amends:47 § Data contract  task:T-051
+  what     `ProfileView` REUSES `/people/:id`'s TYPES rather than declaring its own.
+           `Position` and `PowersAtPlace` are named in packages/shared/src/dto/person.ts
+           and both routes return them. 47's own sketch gave each a narrower shape --
+           `capabilities: string[]`, and a positions type without `edgeId` -- and the doc
+           was amended to the code, not the other way round.
+  why      N-005 says the powers view is produced by the SHARED resolver and never a second
+           implementation, and 34 and 47 say it independently, in the same words. the way
+           that promise actually breaks is not somebody writing a second resolver on
+           purpose. it is a second CONSUMER: two response shapes force two renderers, and
+           <PowersByPlace> would have been forked into one per screen. the rule is about the
+           resolver and the failure arrives one layer above it.
+  also     there is now exactly ONE caller of resolve() for this question --
+           features/people/powers.ts -- shared by readPerson and readProfile the way
+           visibility.ts is shared with 57's account routes and positions.ts with the
+           import guard. same pattern, third time.
+  cost     the two routes are coupled: a field added for the profile page appears on every
+           person row. that is the intended direction. they are the same three blocks about
+           the same kind of human being, and the whole point of 47 existing as a separate
+           doc is WHO IS READING, not what is read.
+  see      47 § Data contract, 34 § Interactions, 24 §4, 13 § Profile, N-005, N-057
+
+DEC-053  ACTIVE  2026-08-24  origin:claude  task:T-051  touches:12 §7
+  what     POST /profile/password CARRIES NO requireCapability, and is the one AUTHENTICATED
+           route on the route-enumeration allowlist (test/routes.test.ts).
+  why      13 § Profile and 47 § Capabilities both specify it that way and the reason holds:
+           no capability expresses "you hold this session AND you know the current
+           password". the nearest candidate, `person.update: self`, is seeded to EVERY role
+           (50 §1), so a gate on it would refuse nobody -- it would only make the route look
+           guarded -- and it would imply an organisation could withhold password changes by
+           editing a role, leaving that person unable to rotate a credential they own.
+  fact     what makes it safe is the SHAPE, not the gate: the route takes no id. the only
+           password it can reach is the caller's own, which is 57's rule ("why an
+           administrator still cannot set a password") arriving from the other side. the
+           current password is verified inside the service, where a hash comparison can
+           happen and a Zod schema cannot.
+  cost     the allowlist is named PUBLIC_ROUTES and this entry is not public -- `authenticate`
+           runs and it 401s without a session. the list actually enumerates uncapability-
+           gated routes. renamed in the comment rather than in code, because the constant is
+           referenced by 12 §7 and a rename is a doc edit in three places for no behaviour.
+  proven   the enumeration test FAILED when the route was added, which is the mechanism
+           working exactly as 12 §7 intends: a human had to argue for the entry.
+  see      13 § Profile, 47 § Capabilities, 12 §7, 57 § Revocation, 15 § Password handling
+
+DEC-054  ACTIVE  2026-08-24  origin:owner-report  repairs:D-029  task:T-089  touches:20 §2, 25
+  decision A FAILED MODULE IMPORT IS A STALE-APP FAILURE AND ITS ONLY REMEDY IS A FULL
+           DOCUMENT LOAD. every page is lazy (20 §2), so the browser fetches a route's chunk
+           at CLICK TIME -- minutes or hours after the document loaded. if the module graph
+           moved underneath it, the already-running app keeps working and the NEXT lazy
+           route is the thing that dies.
+  rule     a boundary catching an import failure MUST (a) say the app updated, in those
+           words, and (b) offer a HARD RELOAD, never a client-side <Link>. a router link
+           re-renders inside the same dead module graph and fails identically, turning one
+           failure into a loop the user cannot escape without knowing to press ctrl-F5.
+  why      three different causes produce it -- a deploy replacing hashed chunks, a dev
+           server restart, a vite dep re-optimisation -- and the boundary can identify the
+           CLASS from the thrown value without knowing which one fired. all three want the
+           same remedy, so no diagnosis is required to give the right advice.
+  fact     ConsoleBoundary ALREADY DOES THIS and its comment says why: `<a href="/app">`,
+           "whatever state caused the crash is in memory, and navigating within the same app
+           carries it along". PublicBoundary was the half that had not caught up, and /login
+           is the most-hit lazy route in the product -- it is what the landing page's one
+           call to action points at.
+  cost     the copy stops being literally accurate for the OTHER thing that can throw here
+           (a genuine render bug). accepted: describe() keeps its existing branch for
+           everything that is not an import failure, so this is an added case, not a
+           replacement.
+  homed    HERE BECAUSE 25 IS UNWRITTEN. 25-FRONTEND-ERROR-HANDLING.md is a reserved
+           placeholder whose "what will go here" already lists "error boundaries per world
+           and what each renders". when it is written it inherits this as its first row.
+  see      20 §2, 25, D-029, T-089, router/boundaries.tsx, 30 § Sign in
+
+DEC-055  ACTIVE  2026-08-24  origin:claude  task:T-052  repays:D-008  touches:33, 22 §6
+  decision THREE CAPABILITY OBJECTS ARE THE ORGANISATION'S WORDS AND TWENTY ARE OURS.
+           `unit`, `subject` and `campaign` are what organization.labels renames, so the
+           powers grid's row labels resolve those three per tenant and leave the rest
+           literal. `role`, `person`, `template`, `org`, `grant`, `account`, `audit`,
+           `apikey`, `billing` and the rest are Endur's own furniture -- INV-001's own
+           carve-out ("structural words stay literal"), not an exception to it. 33 §
+           Interactions said deciding this was that document's work; this is the decision.
+  shape    packages/shared/src/capability-labels.ts. ONE PHRASE PER CAPABILITY, WRITTEN OUT
+           -- 64 of them, `Record<Capability, string>` so the compiler refuses a missing or
+           surplus key -- with `{unit}` `{subject}` `{campaign}` filled at render. The server
+           builds them with `nounsOf(req)`; the same function is exported for the client.
+  why not derived  the old rule was four lines in features/roles/service.ts:
+           `${verb} ${object}s`.replace(/ss$/, 'ses'), and it is how `campaign.launch`
+           became "launch campaigns" on the one grid a hotel administrator reads.
+           audit:vocab cannot see it, because the string is ASSEMBLED FROM A KEY rather than
+           written anywhere -- which is why D-008 was filed rather than fixed.
+  found    writing them out showed the derivation was not merely un-localised, it was WRONG
+           for every object added after the rule: `results.read` produced "read resultses",
+           `apikey.create` "create apikeys", `actionplan.read` "read actionplans". Nobody had
+           read the output. THAT IS THE FAILURE MODE OF EVERY CLEVER STRING DERIVATION and
+           the general lesson is worth more than the fix.
+  fallback a capability with no phrase renders its RAW KEY, never a derivation. a key on
+           screen is obvious in one glance; "frobnicate widgets" looks deliberate and ships.
+  one impl the grid's row labels and the grant WARNINGS are the same builder. two would
+           drift, and "Nobody in this organisation can launch campaigns" is the drift
+           arriving -- in a sentence, to an administrator, on the screen whose whole claim is
+           that it explains itself.
+  proven   live against The Grand Palace: "open guest surveys for answers", "add
+           restaurants", "move properties to a different parent".
+  see      33 § Interactions, D-008, 22 §6, lib/vocabulary.ts, T-052
+
+DEC-056  ACTIVE  2026-08-24  origin:claude  task:T-052  extends:INV-012  touches:12 §2, 33
+  decision A GRID CELL IS BOUNDED BY WHAT THE SAVER CAN DO **EVERYWHERE**, NOT BY SCOPE WIDTH.
+           middleware/requireNoGrantEscalation.ts, link 10b on PUT /grants.
+  why      33 § "The escalation bound" specifies it and nothing implemented it: PUT /grants
+           carried requireCapability('grant.update') and nothing else, so anyone the
+           administrator delegated the grid to could write any role every capability in the
+           catalogue. Same shape as D-018, one screen along -- the route's own check passed
+           because nobody had asked the second question. 33 names this screen as the worse of
+           the two: "editing a role's row raises everyone holding it".
+  the rule a cell says nothing about WHERE. it grants C to a role, and that role can later be
+           placed at any unit by anybody holding assignment.create. the saver cannot know
+           where the power will be exercised, so the only honest bound is that they must hold
+           it across the WHOLE organisation themselves.
+  !! THE FIRST VERSION COMPARED SCOPE WIDTHS and was wrong in both directions. the tests
+           caught it by refusing THE FOUNDER: 50 §1 seeds level 1 `campaign.launch: subtree`,
+           not `all`, because a subtree anchored at the ROOT unit already is the whole
+           organisation -- so the owner of a new org could not grant `all` on their own grid.
+           and it is wrong the other way too: `subtree` at Section A is NOT the organisation,
+           and a width comparison cannot tell those two apart, because heldCapabilities()
+           deliberately discards the anchor. so this asks visibleUnits(), the same primitive
+           findEscalation uses, and SCOPE WIDTH IS NOT CONSULTED AT ALL.
+  bounds   ALLOWS ONLY. a deny cell and a `scope: null` cell both REDUCE what a role can do,
+           and refusing those would make the bound a weapon -- a delegate could be prevented
+           from undoing their own mistake.
+  order    a capability not in the catalogue is skipped, so writeMatrix's 409 ("that is not a
+           capability") still wins. without that line the guard reached it first and told an
+           administrator who typed `campaign.obliterate` that they lacked a power that does
+           not exist. EACH REFUSAL OWNED BY THE CHECK THAT CAN EXPLAIN IT.
+  sibling  NOT an extension of requireNoEscalation (INV-009 is about a second PLACEMENT of
+           one thing; this is a second RULE). a position is a role at a unit and resolves
+           through the graph; a cell IS a capability at a scope and needs no graph.
+  see      33 § "The escalation bound", 11 §5b, 12 §2, DEC-039, D-018, T-052
+
+DEC-057  ACTIVE  2026-08-24  origin:claude  task:T-052  touches:33 § "The lockout guard"
+  decision THE LOCKOUT GUARD IS A 409 IN THE SERVICE, NOT A CAPABILITY CHECK, AND IT IS
+           COMPUTED ON THE RESULTING MATRIX. A save leaving no role holding an ALLOW on
+           `grant.update` is refused outright. Specified since round 1 and never built.
+  why here not middleware  it is not an authorisation question. the caller IS permitted to
+           make the change; the resulting STATE is what is refused. same shape as "that is
+           not a capability", which is why it sits beside it.
+  resulting, not submitted  PUT /grants writes the cells it is given and leaves the rest
+           alone, so a body that merely does not MENTION grant.update is fine and one that
+           removes the last holder is not. checking the BODY would refuse the first and allow
+           the second, which is exactly backwards.
+  INV-004  a role both allowed and denied holds NOTHING. a guard counting rows rather than
+           outcomes would wave through a matrix that LOOKS like it has a holder.
+  the one override  33 argues this exception rather than assuming it, and the argument holds:
+           everything else the grid can express is a legal configuration somebody might mean,
+           and blocking on a judgement call is how administrators learn to fight the tool.
+           this is not a judgement call -- it is a state from which the tool cannot be
+           operated, and there is no undo, because undo is a grid edit.
+  THE OTHER HALF IS THE CLIENT'S, and the server cannot do it. handing the grid to somebody
+           else and keeping NONE for yourself is legal, occasionally intended, and still a
+           one-way door for the person pressing the button. only the client knows which roles
+           the reader holds -- which is why Position gained `roleId` (T-052): matching the
+           caller's positions to grid columns BY NAME is N-057 exactly, before the one save
+           in the product that cannot be undone.
+  see      33 § "The lockout guard", 14 § Position, N-057, T-052
 
 ```
 
@@ -1004,6 +1328,32 @@ CONF-019  RESOLVED  2026-08-23  the sidebar's phase tags  vs  the owner's "compl
   "it is P2 now" would have hidden a hard dependency (D-012) behind an easy one.
   see 43, 44, 58, DEC-042, D-012, T-079..T-082.
 
+CONF-021  RESOLVED-BY-OWNER  2026-08-24  55 § Stage 7's "sequenced behind M0"  vs  the owner
+          asking a SECOND time for the greyed sidebar items
+  THE SAME ASK AS CONF-019, MADE AGAIN, WITH THE OBSERVATION THAT NOTHING HAPPENED:
+  "roles, analytics, inbox and reflect still need to be built (i asked for this before and
+  you didnt do it)". THAT IS ACCURATE AND THIS LEDGER IS THE PROOF. CONF-019 (23 Aug)
+  answered the ask by WRITING SPECS -- 43 and 44 re-tagged buildable, 58 written from
+  scratch -- and then sequencing every one of them behind M0. no code followed. from the
+  owner's chair the sidebar is unchanged two days later, because it is.
+  ("analytics" here is the SIDEBAR item, which reads Analysis -> 43. the platform analytics
+  page, 71, is a separate surface and arrives under the owner's third item, not this one.)
+  WHY THE FIRST ANSWER WAS WRONG, precisely: CONF-019 answered "CAN these be built?" when
+  the ask was "BUILD these". a spec is not the deliverable; the page is. everything CONF-019
+  established -- the phase tags, the per-item blocker analysis -- remains correct and is not
+  withdrawn. what is withdrawn is the SEQUENCE those findings were used to justify.
+  RESOLVED -> the four items are promoted ABOVE the remainder of Stage 6 (T-053..T-055,
+  T-057, T-058, T-060) and above T-073. ordering in 55 § Stage 9.
+  WHAT CHANGED SINCE CONF-019, and it is why this is now cheap rather than blocked: T-088
+  wrote the subscriptions row (DEC-048), repaying D-012, so Analysis and Reflect -- both
+  entirely GOLD-entitled -- no longer 402 for every user in the product. CONF-019's one hard
+  blocker is gone. Roles and Inbox never had one.
+  THE COST, STATED ONCE AND NOT RE-ARGUED: M0 is 26 Aug, two days out, and T-045 (three demo
+  rehearsals) is unrun. SEVEN tasks for item 2 alone (T-052, T-079..T-084; T-085 is per-page
+  edits, not a task), sixteen across the whole stage. the owner has asked twice;
+  the sequence is theirs and this entry records the trade rather than re-opening it.
+  see 55 § Stage 9, CONF-019, DEC-042, DEC-048, D-012, T-052, T-079..T-085.
+
 ```
 
 CONF-009  react course vs our stack. teacher's pre-preparation message (2026-08-18) requires
@@ -1158,7 +1508,13 @@ CONF-014  PUBLISH. design_specs/design/05 §5.2 says the builder has NO Save but
           an endpoint first, not a button.
           status   ACTIVE. revisit only with a DEC.
 
-CONF-013  IS AN EMAIL ADDRESS GLOBAL OR PER-TENANT? The schema and the login contract
+CONF-013  RESOLVED 2026-08-24 BY DEC-049 -- PER-TENANT, and login verifies the password
+          against every activated account on the address rather than only the oldest. Read
+          DEC-049 for the reasoning and for the honest lockout the mitigation below left
+          open, which was measured rather than argued. Kept in full because the reproduction
+          is the reasoning, and because option (a) remains available if the product ever
+          decides one person may not belong to two organisations.
+          IS AN EMAIL ADDRESS GLOBAL OR PER-TENANT? The schema and the login contract
           disagree, and the disagreement was exploitable.
           10 makes `users` unique on `(org_id, email)` — the same address may exist in two
           organisations. 15 §2 and 13 § Auth define login as email + password with NO
@@ -1189,6 +1545,9 @@ CONF-013  IS AN EMAIL ADDRESS GLOBAL OR PER-TENANT? The schema and the login con
           -> whoever picks must supersede this entry. Do NOT leave it as (c) by silence.
           BLAST RADIUS if left as-is: two activated accounts on one address remain
           ambiguous. The adversarial case is closed; the honest collision is not.
+          ANSWERED: (b), in its disambiguation form. DEC-049. The blast radius above
+          understated it -- the honest collision was not ambiguity, it was a silent
+          permanent lockout of the newer account, measured 24 Aug.
 
 ---
 
@@ -1305,7 +1664,13 @@ OPEN-007  RESOLVED-BY:DEC-033  2026-08-23   (raised and answered the same day)
   because audit_log.org_id is NOT NULL and belongs to the customer).
   see 19-PLATFORM-OPERATORS.md, 70, 71. PROGRESS.md Stage 6, T-056..T-059.
 
-OPEN-009  OPEN  raised 2026-08-24 by the owner  blocks:T-087  found-by:T-072
+OPEN-009  CLOSED 2026-08-24 by DEC-051, answered by the owner  raised 2026-08-24 by the
+          owner  was-blocking:T-087  found-by:T-072
+  ANSWER, in the owner's own choice, 24 Aug: L3 KEEPS People (they hold
+  `person.read: own_unit`, so the page lists their real colleagues), and the REST of the L3
+  row is left alone for now -- see OPEN-010. L4 gets Subjects and nothing else in
+  `organize`. Settings is L1 only, via `org.update` rather than a scope. DEC-051 has the
+  reasoning; the rest of this entry is kept as the record of how the question was framed.
   WHAT DOES EACH ROLE LEVEL SEE IN THE SIDEBAR? the owner's words: "student / lowest tier
   shouldn't see roles, people and department pages at all (even if they see nothing
   actually in it). only courses list. similar logic for upper tiers."
@@ -1324,6 +1689,9 @@ OPEN-009  OPEN  raised 2026-08-24 by the owner  blocks:T-087  found-by:T-072
     levels so the vocabulary can load. Structure and Roles are already correctly hidden
     for L4; Subjects is already hidden and is the one item they SHOULD have.
     fix: T-086 carries scope to the client so a gate can say "person.read beyond self".
+    DONE 2026-08-24, DEC-050 -- the map is on the wire and useCan(cap, atLeast) reads it.
+    T-086 changed NO `needs` gate, on purpose: the mechanism is reviewable apart from the
+    per-tier policy, and the policy is still this question. T-087 is what spends it.
     NOT an authorisation change -- requireCapability already refuses these routes and the
     lists already scope-filter to nothing. this is design_specs/design/02 §5 (an action
     the caller cannot perform is ABSENT) applied to the sidebar, where it is half true.
@@ -1333,10 +1701,45 @@ OPEN-009  OPEN  raised 2026-08-24 by the owner  blocks:T-087  found-by:T-072
   reviewee-level account is a participant or a manager of a small area, and the owner
   should answer it rather than a session guessing. every other cell in 55 § Stage 8's
   table follows from grants that already exist.
-  ALSO NEEDS AN ANSWER, smaller: L4 has no `subject.read` row at all today, so "only the
-  courses list" needs one added to 50 §1 (proposed: `own_unit`). that is a seeded-matrix
-  change and therefore a change to what every organisation gets by default.
+  CLOSED, the smaller half, 2026-08-24 by DEC-050: L4 had no `subject.read` row at all, so
+  "only the courses list" was unreachable. T-086 added one at `own_unit` -- the owner's own
+  words are the authorisation ("only courses list"), and 55 § Stage 8 put the row inside
+  T-086's scope with no blocker, which is the reading taken where 50 §1 held it for a
+  confirmation. `own_unit` not `all`: a reason to see their own section's subjects, none to
+  enumerate the organisation. org.test.ts now asserts the L4 grant list EXACTLY, so the next
+  row cannot join it quietly. SUBJECTS IS NOW VISIBLE FOR L4 with no new gate machinery.
+  ANSWERED 2026-08-24, DEC-051: L3 KEEPS People. the owner was offered "hide the item,
+  keep the grant" and chose to leave it -- an L3's roster is real, so the participant-vs-
+  manager question resolves to manager-of-a-small-area at that level.
+  AND ONE CLAIM ABOVE TURNED OUT TO BE WRONG, which is worth keeping visible: "every other
+  cell follows from grants that already exist" is NOT true of Settings. `org.read` is `all`
+  at every level including L4, so no scope minimum could ever hide it -- it was the wrong
+  capability, not a too-wide one, and only reading a real L4 account's map showed that.
+  nor is it true of L3 x Structure or L3 x Templates, which 55 § Stage 8's draft table also
+  proposed hiding: L3 genuinely holds `unit.read: own_unit` and `template.read: all`. the
+  owner chose to leave those for now -- OPEN-010.
   see 55 § Stage 8, 20 §2, 50 §1, authz/held.ts, D-027
+
+OPEN-010  OPEN  raised 2026-08-24 by the owner's deferral  blocks:nothing-for-M0
+          found-by:T-087  successor-to:OPEN-009
+  SHOULD THE REST OF THE L3 ROW BE TRIMMED? T-087 answered L3 x People (it stays, DEC-051)
+  and the owner explicitly chose to decide only that cell for now. so an L3 still sees:
+    Structure   `unit.read: own_unit`   -- their own section's node and its children
+    Templates   `template.read: all`    -- templates are org-wide and have no unit (50 §1
+                                           says a unit scope here would mean nobody could
+                                           read them), so this cannot be narrowed by scope
+                                           either -- it would need a different capability,
+                                           exactly like Settings did.
+  55 § Stage 8's FIRST-DRAFT table proposed hiding both at L3. that table was written
+  before anyone had read a real account's capability map, and it has now been wrong twice
+  (Settings, and these two), so it should be treated as a sketch rather than a spec.
+  WHY IT CAN WAIT: an L3 seeing Structure and Templates is not a bug the way People was --
+  both pages have real content for them, neither lists just themselves, and neither is an
+  admin surface they cannot use (an L3 holds `template.clone: all`). it is a product
+  question about how much furniture a reviewee-level account should carry, and the owner
+  is better placed to answer it after seeing the trimmed sidebar on screen.
+  NOT M0. the owner's original ask was about the LOWEST tier and that is fully delivered.
+  see DEC-051, OPEN-009, 55 § Stage 8, 50 §1
 
 OPEN-008  RESOLVED 2026-08-23 -> option (b), narrowed. see DEC-036. kept in full because
           the ARGUMENT for (a) is still the right one if a library is ever approved.
@@ -1387,6 +1790,12 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 11-PERMISSION-ENGINE.md          -> src/backend/authz/**
                                     incl. authz/visibility.ts, the list-side inverse of
                                     resolve(). see N-016.
+                                    also packages/shared/src/capabilities.ts — the
+                                    CATALOGUE and the SCOPE vocabulary (SCOPES,
+                                    SCOPE_BREADTH, and since T-086 HeldCapabilities +
+                                    scopeReaches, which both apps compare with). 11 §3 is
+                                    still the authoritative catalogue; additions go to the
+                                    doc first. see DEC-050.
 12-MIDDLEWARE-STACK.md           -> src/backend/middleware/** src/backend/app.ts
 13-API-CONTRACT.md               -> src/backend/routes/** (router wiring only)
                                     NOTE: routes/ was never created. routers live beside
@@ -1396,6 +1805,12 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 14-DTO-AND-VALIDATION.md         -> packages/shared/src/dto/**
 15-AUTH-AND-SESSIONS.md          -> src/backend/auth/**
 16-TENANCY-BILLING-ENTITLEMENTS  -> src/backend/billing/**
+                                    T-088 also took packages/shared/src/tiers.ts — the
+                                    tier NAMES and selling lines, DATA, for the same
+                                    reason 30 took vocabularies.ts: /start has no session
+                                    and cannot fetch GET /billing/plans. the ENTITLEMENT
+                                    MAP stays server-side and is not shipped. see DEC-048.
+                                    <PlanPicker> is components/billing/**, owned by 24.
 17-BACKGROUND-JOBS.md            -> PLACEHOLDER. no path owned yet. see OPEN-005.
 18-OBSERVABILITY-AND-OPS.md      -> PLACEHOLDER. no path owned yet.
 20-FRONTEND-ARCHITECTURE.md      -> src/frontend/main.tsx App.tsx router/** lib/api.ts
@@ -1538,6 +1953,18 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     it narrowed scripts/audit-vocab.mjs too: N-032.
 46-PAGE-home-dashboard.md        -> src/frontend/pages/console/Home/**
 47-PAGE-profile.md               -> src/frontend/pages/console/Profile/**
+                                    src/frontend/lib/profile.ts
+                                    src/backend/features/profile/**
+                                    packages/shared/src/dto/profile.ts
+                                    T-051 built all four. the backend router already
+                                    existed with the two avatar routes (T-062, 48's) and
+                                    gained GET /, PATCH / and POST /password.
+                                    NOTE readProfile goes THROUGH people/service.ts's
+                                    readPerson rather than round it -- one shape for one
+                                    human being, and it exercises the `self` clause of the
+                                    person scope filter on every load (DEC-047).
+                                    NOTE ProfileView reuses 34's Position and PowersAtPlace
+                                    types. DEC-052. do not narrow them here.
 48-FEATURE-file-upload.md        -> src/backend/features/uploads/**
                                     src/frontend/components/form/FileUpload*
 54-COURSE-DELIVERABLE.md         -> docs only. hand to the react teacher.
@@ -1553,6 +1980,18 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     the ONLY two directories where an education noun may
                                     appear, and then only as DATA (INV-002). Both are
                                     exempt in eslint.config.js and in test/seed.test.ts.
+features/people/powers.ts        -> 34's file, shared with 47's /profile route the way
+                                    visibility.ts is shared with 57's account routes.
+                                    THE ONE CALLER of resolve() for "what can this person
+                                    do, and where". extracted from readPerson by T-051,
+                                    which fixed a unit-by-NAME lookup on the way out
+                                    (N-057). a second caller is the drift N-005 forbids.
+components/org/PowersByPlace.tsx -> owned by 24 §4 like every component. ONE
+                                    implementation, TWO placements: 34's /people/:id and
+                                    47's /profile. the second extends, never forks
+                                    (INV-009). `onWhy` is 42's link and is UNWIRED until
+                                    T-054 -- a link into a <Placeholder> is what
+                                    design_specs/design/02 §7 forbids.
 lib/paginate.ts                  -> owned by 13 §4 (cursor pagination)
 authz/held.ts                    -> owned by 13 § Auth + DEC-019. the UI capability set.
                                     NOT the resolver and must not grow into one.
@@ -1627,6 +2066,31 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     NOTE reads lib/logFile.ts's OUTPUT. 18 owns what is
                                     written; 72 owns who may read it. also EXEMPT from
                                     INV-001 with 70+71.
+
+33-PAGE-roles-and-powers-grid.md -> src/frontend/pages/console/Roles/**
+                                    src/frontend/lib/roles.ts
+                                    ALSO packages/shared/src/capability-labels.ts -- what
+                                    each capability SAYS. the CATALOGUE is 11 §3's; the
+                                    phrasing is 33's design work (DEC-055, repaying D-008).
+                                    src/backend/middleware/requireNoGrantEscalation.ts is
+                                    33's too, mounted on PUT /grants (DEC-056). 12 owns the
+                                    chain; this doc owns the rule.
+                                    NOTE the backend is 11's: features/roles/** exists since
+                                    T-017 and this doc does NOT own it. what 33 owns is the
+                                    grid and the English power labels describe() produces --
+                                    D-008 says those labels are 33's design work, so the
+                                    repayment edits roles/service.ts under 11's roof. ask
+                                    before restructuring that file.
+43-PAGE-analysis.md              -> src/backend/features/analysis/**
+                                    src/frontend/pages/console/Analysis/**
+                                    NOTE rule-based, DEC-042. a test asserts the feature
+                                    imports NO outbound http client -- that absence is the
+                                    decision, so it is enforced rather than remembered.
+44-FEATURE-improve-loop.md       -> src/backend/features/improve/**
+                                    src/frontend/pages/console/Reflect/**
+                                    NOTE every capability here is GOLD-entitled (16 §3). the
+                                    surface is only reachable at all because T-088 wrote the
+                                    subscriptions row -- see D-012.
 
 CONTESTED  src/backend/features/people/** is 34's, but 57 adds three routes to its router
            and DEC-039 adds a guard to its assignment route. rule: 57 owns
@@ -2352,4 +2816,78 @@ N-055  FIRE-AND-FORGET AFTER THE RESPONSE IS A RACE WITH THE CLIENT. Found 21 Au
        Closing it means RESERVING the key before the handler instead of writing it after, which
        introduces an in-flight case that has to answer something — 409, or wait-and-replay.
        Not invented under time pressure five days from a graded demo.
+
+N-056  A NARROWER RESPONSE SHAPE IS A SECOND IMPLEMENTATION IN DISGUISE. 24 Aug, T-051.
+       47 § Data contract and 34 § Interactions both promise the powers view comes from the
+       shared resolver and never a second implementation (N-005). Both then sketched their
+       OWN response shape for it, one with `capabilities: string[]` and one with
+       `{capability, scope}`. Neither doc was wrong about the resolver; taking both literally
+       would still have produced two renderers of one block, because a component cannot read
+       two shapes. THE RULE WAS WRITTEN ABOUT THE LAYER WHERE THE DUPLICATION WAS EXPECTED,
+       and duplication arrived one layer up. When two docs specify the same view, check that
+       they specify the same TYPE — not just the same source. DEC-052.
+
+N-057  A LOOKUP BY NAME IS A LOOKUP BY SOMETHING THAT IS NOT UNIQUE. Found 24 Aug building
+       T-051, in code T-018 wrote and nobody had reason to read since.
+       `readPerson` assembled `powersByPlace` by looping the person's positions and resolving
+       the whole capability catalogue at each one's unit. It had no unit ID to resolve
+       against — `personSelect` fetched position NAMES only — so it re-found the unit:
+
+           where: { orgId, kind: 'position', unit: { name: position.unitName } }
+
+       `nodes` has no unique on (org_id, kind, name) and POST /units does not check, so two
+       units may share a name; "Year 1" under two faculties is the ordinary case, not the
+       exotic one. For a person holding a position in each, both loop passes resolved to
+       whichever row came back first, and one unit's powers printed under the other unit's
+       heading — ON THE ONE SCREEN IN THE PRODUCT BUILT TO DEMONSTRATE THAT POWERS DO NOT
+       LEAK BETWEEN UNITS (INV-005). It also ran one query per position for an id the row
+       already had.
+       WHY IT SURVIVED, and this is the transferable part: every fixture in the repo names
+       its units distinctly — Section A, Section B, Engineering, Mechanical — so every
+       existing test passed, including the one whose name is about INV-005. The test that
+       catches it is the only one in the suite with two same-named units. Proved by reverting
+       the fix: the twin-unit test fails and the INV-005 test still passes.
+       Fixed by putting `unitId` on the position DTO and deleting the lookup. The general
+       shape: WHEN A QUERY RE-FINDS A ROW THE CALLER ALREADY HAD, ask what it is matching on
+       and whether the database enforces that it is unique. DEC-052, 34 § Acceptance.
+
+N-058  T-059's "needs T-057" LOOKS LIKE THE COUPLING DEC-048 ALREADY TOOK APART ONCE. Noted
+       24 Aug while sequencing the owner's third ask (the Endur-admin pages).
+       T-059 is `platform_users`, the separate login and cookie, `requirePlatform()` and the
+       aggregate-only db seam. NONE of those four reads a seat count, a usage breakdown or a
+       plan. the dependency is presumably there because /ops (T-066) DISPLAYS tiers -- but
+       that is T-066's dependency, not T-059's.
+       this is the same conflation that made T-088 look far away: one large task named after
+       its biggest part, with a small independent piece buried inside it. DEC-048 carved that
+       piece out and it took an afternoon.
+       DO NOT re-sequence on this note alone. CHECK IT when T-059 starts; if it holds, split
+       it the way DEC-048 split T-057, and record the split rather than doing it silently.
+       see 55 § Stage 6, § Stage 9, DEC-048, D-012, T-057, T-059, T-066.
+
+N-059  WRITING OUT WHAT A DERIVED STRING ACTUALLY SAYS IS A TEST. 24 Aug, T-052.
+       `describe()` turned a capability key into English in four lines and had done since
+       T-017. It was filed as D-008 for being un-localised. Replacing it with a table showed
+       it was also simply WRONG -- "read resultses", "create apikeys", "read actionplans" --
+       for every object added to the catalogue after the rule was written. Nobody had ever
+       read its output for those keys, because nothing rendered them: the grid that would
+       have shown all 64 rows was the unbuilt screen.
+       THE SHAPE: a derivation is only checked where it is SEEN. a rule covering 64 inputs
+       and rendered for 20 of them is 44 untested strings that look fine in the source.
+       When you replace a derivation with a table, read the table.
+       see DEC-055, D-008, 33 § Interactions.
+
+N-060  THE SEEDED DEMO ORGS ARE FROZEN AT THE MATRIX OF THE DAY THEY WERE MADE, and the
+       seed will not fix them. Found 24 Aug from the powers grid's OWN warnings, which is
+       the screen working: "Nobody in this organisation can give somebody a sign-in."
+       All four demo orgs were seeded 21 Aug and hold 51 capabilities. T-072 added
+       `account.create`, `account.reset` and `account.revoke` to presets/grant-matrix.ts on
+       24 Aug. Existing orgs got no rows, and `npm run db:seed` prints
+       `skip: <name> already exists` -- it creates missing orgs, it does not reconcile
+       present ones.
+       CONSEQUENCE: the invite/accounts flow (T-072, built and tested) is UNREACHABLE in
+       every demo organisation, and T-073's Invite button would 403 for all four on stage.
+       D-031. The remedy is destructive (drop and re-seed) so it is the owner's call.
+       GENERAL SHAPE: a seed that skips is a snapshot, not a migration. any capability added
+       to the matrix after an org exists never reaches it.
+       see D-031, 50 §1, T-072, T-073, presets/grant-matrix.ts.
 ```

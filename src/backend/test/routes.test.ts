@@ -23,6 +23,31 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
   { pattern: /^\/r\//, why: 'respondent flow — a QR scan has no account (DEC-009)' },
   { pattern: /^\/api\/v1\/public\//, why: 'respondent payloads, allowlisted in 13 §6' },
   {
+    // NOT UNAUTHENTICATED — `authenticate` runs, and without a session this 401s. It is
+    // uncapability-GATED, which is what this list actually enumerates.
+    //
+    // 13 § Profile and 47 § Capabilities both specify it with no capability, and the reason
+    // is that no capability could stand in for the check that matters. The obvious
+    // candidate, `person.update: self`, is seeded to every role (50 §1), so gating on it
+    // would refuse nobody — it would only make the route LOOK guarded. Worse, it would
+    // imply an organisation could withhold password changes by editing a role, and the
+    // person it withheld them from would then be unable to rotate a credential they own.
+    //
+    // What authorises this call is holding the session AND knowing the current password,
+    // and the second half is verified inside the service, where a hash comparison can
+    // happen. `57` § "Why an administrator still cannot set a password" is the same rule
+    // from the other side: `person.update` over somebody's subtree must never become a way
+    // to set their password, and the absence of that capability here is what guarantees the
+    // only password this route can change is the caller's own.
+    pattern: /^\/api\/v1\/profile\/password$/,
+    why:
+      'a password change is authorised by holding the session and knowing the current ' +
+      'password (13 § Profile, 47 § Capabilities). No capability expresses that, and the ' +
+      'nearest one is seeded to every role, so a gate would guard nothing while implying ' +
+      'an org could take the right away. The route takes NO id, so the only password it ' +
+      'can reach is the caller\'s own.',
+  },
+  {
     pattern: /^\/api\/v1\/files\/:id$/,
     why:
       'serving a logo or an avatar (48). The unguessable id IS the credential: these render ' +

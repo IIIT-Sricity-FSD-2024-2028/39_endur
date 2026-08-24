@@ -4,6 +4,9 @@ Phase: P2 · Milestone: — · Read `19-PLATFORM-OPERATORS.md` first
 Related: `18` (what the files are and how they are written), `56` (the *other* log, the
 customer's one), `12` §4.1–4.2
 Invariants: **INV-011**, INV-006
+Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-077` routes, `T-078` page). The
+**other** log: `56` is one organisation's audit trail, this is Endur's log files across the
+estate. Needs `T-059`
 
 ## Purpose
 

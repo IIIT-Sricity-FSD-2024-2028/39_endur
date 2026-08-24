@@ -15,17 +15,17 @@ import type {
   PersonSummary,
   UpdatePersonBody,
 } from '@endur/shared';
-import { CAPABILITY_CATALOGUE, type Capability } from '@endur/shared';
 import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
-import { resolve, seesNothing, visibleUnits, clearGrantCache } from '../../authz/index.js';
+import { seesNothing, visibleUnits, clearGrantCache } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
 import { nameMaps, resolveRow } from './positions.js';
 import { assertPersonVisible as assertVisible, personScopeFilter } from './visibility.js';
+import { powersByPlace } from './powers.js';
 import { accountStatusOf } from '../accounts/status.js';
 
 /**
@@ -95,41 +95,11 @@ export async function readPerson(
   if (!person) throw new NotFoundError('That person does not exist.');
 
   const summary = toSummary(person);
-  const powersByPlace: PersonDetail['powersByPlace'] = [];
+  // ONE implementation, shared with `/profile` (powers.ts). It used to be written out here,
+  // and the copy that would have appeared in 47's route is exactly the drift N-005 is about.
+  const places = await powersByPlace(orgId, person.userId, summary.positions, authzVersion);
 
-  // Powers come from the SHARED resolver. A second implementation here would be a second
-  // permission model, and the two would disagree the first time either changed (N-005).
-  if (person.userId) {
-    for (const position of summary.positions) {
-      const unit = await prisma.node.findFirst({
-        where: { orgId, kind: 'position', unit: { name: position.unitName } },
-        select: { unitId: true },
-      });
-      if (!unit?.unitId) continue;
-
-      const capabilities: PersonDetail['powersByPlace'][number]['capabilities'] = [];
-      for (const capability of Object.keys(CAPABILITY_CATALOGUE) as Capability[]) {
-        const decision = await resolve({
-          orgId,
-          userId: person.userId,
-          capability,
-          authzVersion,
-          target: { kind: 'unit', unitId: unit.unitId },
-        });
-        if (decision.allowed && decision.decidedBy) {
-          capabilities.push({ capability, scope: decision.decidedBy.scope });
-        }
-      }
-      powersByPlace.push({
-        unitId: unit.unitId,
-        unitName: position.unitName,
-        roleName: position.roleName,
-        capabilities,
-      });
-    }
-  }
-
-  return { ...summary, powersByPlace };
+  return { ...summary, powersByPlace: places };
 }
 
 export async function createPerson(
@@ -572,7 +542,19 @@ const personSelect = {
     select: {
       id: true,
       isPrimary: true,
-      child: { select: { role: { select: { name: true } }, unit: { select: { name: true } } } },
+      // T-051. `validTo` is 47's "any expiry date"; `unitId` is what stopped powersByPlace
+      // re-finding the unit by NAME, which collapsed two same-named units onto one row
+      // (powers.ts has the full account). `level` is 24's `<PersonChip>` rule that a role
+      // is always shown with its level — ORDERING ONLY (DEC-002), never a comparison.
+      validTo: true,
+      child: {
+        select: {
+          unitId: true,
+          roleId: true,
+          role: { select: { name: true, level: true } },
+          unit: { select: { name: true } },
+        },
+      },
     },
   },
 };
@@ -593,7 +575,13 @@ type PersonRow = {
   edgesAsParent: Array<{
     id: string;
     isPrimary: boolean;
-    child: { role: { name: string } | null; unit: { name: string } | null };
+    validTo: Date | null;
+    child: {
+      unitId: string | null;
+      roleId: string | null;
+      role: { name: string; level: number | null } | null;
+      unit: { name: string } | null;
+    };
   }>;
 };
 
@@ -606,9 +594,15 @@ function toSummary(person: PersonRow): PersonSummary & { createdAt: string } {
     status: person.user?.status ?? 'active',
     positions: person.edgesAsParent.map((edge) => ({
       edgeId: edge.id,
+      roleId: edge.child.roleId,
       roleName: edge.child.role?.name ?? '',
+      roleLevel: edge.child.role?.level ?? null,
+      // Nullable rather than coalesced to '', unlike the names beside it: a name is only
+      // ever printed, and an id can end up in a URL. An empty one would 404 quietly.
+      unitId: edge.child.unitId,
       unitName: edge.child.unit?.name ?? '',
       isPrimary: edge.isPrimary,
+      validTo: edge.validTo?.toISOString() ?? null,
     })),
     createdAt: person.createdAt.toISOString(),
     // 57. Derived in ONE place, shared with the detail route, and the hash is reduced to a

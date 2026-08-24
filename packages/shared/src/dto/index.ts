@@ -9,6 +9,7 @@ export * from './unit.js';
 export * from './role.js';
 export * from './grant.js';
 export * from './person.js';
+export * from './profile.js';
 export * from './account.js';
 export * from './subject.js';
 export * from './campaign.js';
@@ -18,4 +19,4 @@ export * from './home.js';
 
 // Filled as each feature lands:
 //   unit.ts role.ts grant.ts person.ts subject.ts
-//   campaign.ts response.ts results.ts home.ts profile.ts upload.ts authz.ts
+//   campaign.ts response.ts results.ts home.ts upload.ts authz.ts

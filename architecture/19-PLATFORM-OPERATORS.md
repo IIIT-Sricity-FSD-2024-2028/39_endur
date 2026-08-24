@@ -3,7 +3,12 @@
 Phase: **P2** · Milestone: — · Owns: `src/backend/platform/**`, `src/frontend/pages/platform/**`
 Related: `16` (tenancy, tiers, entitlements), `11` (the org permission engine), `12` §3 (principals)
 Decisions: `_MEMORY.md` DEC-033, DEC-034 · Resolves: `OPEN-007` · Invariants: **INV-011**, INV-006, INV-010
-Pages: `70-PAGE-platform-console.md`, `71-PAGE-platform-analytics.md`
+Pages: `70-PAGE-platform-console.md`, `71-PAGE-platform-analytics.md`, `72-PAGE-platform-logs.md`
+Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3.** The owner has *"not seen pages for endur
+admin and superuser"*, which is correct and by design: `/ops` is a fourth route tree behind
+a separate login and a separate cookie, and nothing in `/app` links to it. `T-059` is what
+makes the door exist; `T-066`, `T-067`, `T-077`, `T-078` are what is behind it. See `N-058`
+before accepting `T-059`'s `T-057` dependency
 
 ---
 

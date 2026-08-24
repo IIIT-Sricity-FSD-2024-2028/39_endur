@@ -333,7 +333,7 @@ describe('the detail panel', () => {
             id: 'p1', userId: 'u9', name: 'Meera Iyer', email: 'meera@example.test',
             status: 'active', createdAt: '2026-08-01T00:00:00.000Z',
             account: { state: 'active', lastLoginAt: null },
-            positions: [{ edgeId: 'e1', roleName: 'Head', unitName: 'Engineering', isPrimary: true }],
+            positions: [{ edgeId: 'e1', roleId: 'role-x', roleName: 'Head', roleLevel: 1, unitId: 'u1', unitName: 'Engineering', isPrimary: true, validTo: null }],
           },
         ],
         page: { nextCursor: null, hasMore: true },

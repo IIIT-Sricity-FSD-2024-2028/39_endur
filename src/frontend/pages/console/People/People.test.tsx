@@ -106,8 +106,8 @@ beforeEach(() => {
       person({
         id: 'p1', name: 'Asha Rao',
         positions: [
-          { edgeId: 'e1', roleName: 'Dean', unitName: 'Engineering', isPrimary: true },
-          { edgeId: 'e2', roleName: 'Tutor', unitName: 'Computer Science', isPrimary: false },
+          { edgeId: 'e1', roleId: 'role-x', roleName: 'Dean', roleLevel: 1, unitId: 'u1', unitName: 'Engineering', isPrimary: true, validTo: null },
+          { edgeId: 'e2', roleId: 'role-x', roleName: 'Tutor', roleLevel: 2, unitId: 'u2', unitName: 'Computer Science', isPrimary: false, validTo: null },
         ],
       }),
       person({ id: 'p2', name: 'Bo Chen' }),

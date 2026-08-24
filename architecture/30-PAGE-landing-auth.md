@@ -28,10 +28,10 @@ None. These are the only console-adjacent screens with no capability check.
 
 | Action | Endpoint | DTO in | DTO out |
 |---|---|---|---|
-| Sign in | `POST /api/v1/auth/login` | `LoginBody { email, password }` | `{ ok: true }` + `Set-Cookie: endur.sid`, `endur.csrf` |
+| Sign in | `POST /api/v1/auth/login` | `LoginBody { email, password, orgId? }` | `{ ok: true }` + `Set-Cookie: endur.sid`, `endur.csrf` |
 | Boot session | `GET /api/v1/auth/me` | — | `MeResponse { user, organization, labels, capabilities }` |
 | Where to land | `GET /api/v1/home` | — | `HomeView`, read for `configured` only |
-| Create org | `POST /api/v1/auth/register` | `RegisterBody { orgName, name, email, password }` | `{ organization: { id, slug } }` + `Set-Cookie` |
+| Create org | `POST /api/v1/auth/register` | `RegisterBody { orgName, name, email, password, tier }` | `{ organization: { id, slug } }` + `Set-Cookie` |
 
 **Amended 2026-08-19 (T-031), against what shipped.** Three corrections:
 
@@ -46,6 +46,12 @@ None. These are the only console-adjacent screens with no capability check.
 `POST /register` is atomic — org, owner, preset seed, subscription, audit, one transaction
 (`15` §5). A half-seeded org has no roles, so nobody can do anything, which looks exactly
 like a broken product.
+
+> **The word `subscription` in that sentence was aspirational until 2026-08-24 (`T-088`).**
+> `register` wrote every other row in that list and not that one, so every organisation ever
+> created had no `subscriptions` row, fell through `requireEntitlement`'s bronze backstop, and
+> was silently on the lowest tier — `D-012`, and the reason two whole pages `402`'d for
+> everybody. It is true now, and `tier` in the DTO above is what makes it true.
 
 ## State
 
@@ -80,6 +86,17 @@ what they actually are — advertising copy about the presets — and
 `src/backend/test/vocabularies.test.ts` asserts they still match the presets they advertise.
 See `CONF-011` and `DRIFT-007`.
 
+**Which organization?** — `DEC-049`, and it is the narrowest question the product asks. If the
+address and password open **more than one** organisation the server answers `409
+ACCOUNT_AMBIGUOUS` naming them, and the card swaps its form for one button per organisation.
+Pressing one re-posts the same credentials plus `orgId`; **nothing is retyped**, because the
+password never left component state. `Back` returns to the filled-in form.
+
+It is not an error and is never bannered — the credentials were right. It requires an activated
+account in several organisations **and** the same password for them, so a person with one
+account never sees it, a person using different passwords never sees it, and no seeded
+organisation shares an address, so the demo never sees it.
+
 **Sign in.** Email + password, one submit. On success: `GET /auth/me` hydrates `authSlice`
 and `vocabularySlice`, then `GET /home` is read for `configured` and decides the target —
 `/app`, or `/app/setup` when the org is not set up yet, because an unconfigured org's
@@ -99,6 +116,27 @@ industry picker** (`CONF-011`, amended 2026-08-19): asking here means asking bli
 wizard's step 1 — which shows each preset's role chain and vocabulary pair, and is the
 demo's centrepiece — asks the same question better a moment later. `RegisterBody.industry`
 defaults to `custom` and step 1 overwrites it, so the wire shape is unchanged.
+
+**Then one more step: the plan.** Added 2026-08-24 by `DEC-048` and specified in `49`
+§ Interactions — `<PlanPicker mode="signup">`, three cards, Bronze / Silver / Gold, and the
+one pressed is the tier the organisation is on. Nothing is pre-selected, there is no skip,
+and there is no trial. Enterprise is shown nowhere on this page: `16` §4 prices it
+individually, so it is operator-assigned (`19` §4).
+
+**Two steps, one POST**, and that is the load-bearing part. The tier is a field on
+`RegisterBody`, so the organisation and its subscription are written in the same transaction
+and an organisation cannot exist without a tier somebody chose. Asking on a second page after
+the account already existed would recreate `D-012` exactly — a live organisation with no row,
+silently bronze, for as long as it takes them to answer.
+
+It asks about the tier and does not ask about the industry, which is only inconsistent from
+the outside: **the wizard asks about industry later and nothing asks about the tier later.**
+Each question is asked exactly once, in the place where it can be answered well.
+
+Every error this POST can return names a field on step 1 — `409` the address, `422` a field —
+so a failure returns to step 1 with the tier still selected. Left on the plan step, the person
+would read *"that address is already registered"* beside three tier cards with no input in
+sight.
 
 The password helper states **ten** characters, from a single const mirroring the DTO.
 `design_specs/design/03` §3.3 says eight; that is stale copy quoting a contract value, and

@@ -158,5 +158,34 @@ export const SCOPE_BREADTH: Record<Scope, number> = {
   all: 3,
 };
 
+/**
+ * WHAT A CALLER HOLDS, AND HOW WIDELY — T-086, and the map replaced a bare `Capability[]`.
+ *
+ * A capability absent from this map is not held anywhere. A capability present maps to the
+ * WIDEST scope any live allow reaches, which is a claim about existence and nothing more:
+ * *"there is somewhere this reaches at least this far"*. It is NOT "everything inside that
+ * scope is permitted" — a head of two sections holds `campaign.update: own_unit` twice and
+ * this map says `own_unit` once, with no way to name which two.
+ *
+ * That weakness is deliberate and is the same one the old array carried; the map is one
+ * notch more precise, not a different kind of answer. The reason it had to become one is
+ * `person.read: self` — the universal grant every role gets (`50` §1) — which made the old
+ * array report `person.read` for LITERALLY EVERY ACCOUNT IN THE PRODUCT, so a nav gate
+ * reading it showed a People page listing exactly one person: the reader (`D-027`).
+ *
+ * Still usability, never enforcement (INV-003). `requireCapability()` decides every route.
+ */
+export type HeldCapabilities = Partial<Record<Capability, Scope>>;
+
+/**
+ * Does a held scope reach at least this far? The one comparison both apps make, expressed
+ * once — `useCan(cap, 'own_unit')` is the whole point of `HeldCapabilities` existing.
+ *
+ * `undefined` is "not held", never "held narrowly", so an absent capability reaches nothing
+ * — not even `self`.
+ */
+export const scopeReaches = (held: Scope | undefined, atLeast: Scope): boolean =>
+  held !== undefined && SCOPE_BREADTH[held] >= SCOPE_BREADTH[atLeast];
+
 export const EFFECTS = ['allow', 'deny'] as const;
 export type Effect = (typeof EFFECTS)[number];

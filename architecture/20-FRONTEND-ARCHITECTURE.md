@@ -40,7 +40,7 @@ CONSOLE  (/app, requires session)
   /app                       Organization home                [M0]
   /app/setup                 Setup wizard, 5 steps            [M0]
   /app/structure             Unit tree                        [M0]
-  /app/roles                 Roles, levels & the powers grid  [P2]
+  /app/roles                 Roles, levels & the powers grid  [P2 · built T-052]
   /app/people                People                           [P2]
   /app/people/:id            Person detail                    [P2]
   /app/subjects              Subjects                         [M0]
@@ -56,16 +56,39 @@ CONSOLE  (/app, requires session)
   /app/profile               My account                       [P2]
   /app/simulator             Permission simulator             [P2]
   /app/settings              Org profile, vocabulary, danger  [P2]
+  /app/logs                  Activity log                     [P2]
 
-  /app/analysis              Analysis dashboard               [P3 · disabled]
-  /app/inbox                 Response inbox                   [P3 · disabled]
-  /app/reflect               Self-reflection & gap analysis   [P3 · disabled]
+  /app/inbox                 Response inbox                   [P2 · disabled]
+  /app/analysis              Analysis dashboard               [P2 · disabled]
+  /app/reflect               Self-reflection & gap analysis   [P2 · disabled]
   /app/communities           Communities                      [P3 · disabled]
 
 RESPOND  (no auth, no shell)
   /r/:token                  Fill the form                    [M0]
   /r/:token/done             Thank you                        [M0]
+
+OPS  (/ops, SEPARATE login, SEPARATE cookie — 19 §4, INV-011)
+  /ops/login                 Operator sign in                 [P2]
+  /ops                       Estate console                   [P2]
+  /ops/analytics             Tier mix, movement, quiet orgs   [P2]
+  /ops/logs                  Log files                        [P2]
 ```
+
+**`/app/logs` was missing from this map and `56` has owned it since 23 Aug** — the doc's
+§ Route & access names the route, the `system` group, the position under Settings and the
+`audit.read` gate. A route in a page doc and not in this list is the same class of gap that
+`46` and `58` were: nobody notices until somebody asks why they cannot see it.
+
+**Three items changed phase and one gained a tree, 24 Aug (`CONF-021`).** Inbox, Analysis and
+Reflect are no longer `P3`: `58` was written as `P2`, and `43` and `44` were re-tagged
+buildable by `CONF-019`. They keep `disabled` only until their pages land — that is `T-085`
+and it is per-page, not one flip.
+
+**`/ops` is a FOURTH tree and it is deliberately unreachable from the console.** No link
+anywhere in `/app` points at it, no shared session, no shared cookie. An operator is a
+different principal kind (`DEC-033`), not a bigger grant, and `INV-011` says the platform side
+can read aggregates and never answers. `T-059` is what makes the door exist; `70`, `71` and
+`72` are the three rooms behind it.
 
 **P3 routes are listed so the sidebar can show them disabled with a "Soon" tag.** Rules from
 `design_specs/design/02` §7: disabled items never navigate, always carry the tag, and hovering
@@ -77,21 +100,29 @@ item a `needs` capability and hides it when the caller does not hold one —
 `design_specs/design/02` §5's rule, and it is usability rather than enforcement: `13` and
 INV-003 mean the API returns nothing either way.
 
-**Today that rule is only half true, and `D-027` is the gap.** `needs` names a bare
-capability, and `authz/held.ts` deliberately discards scope — a capability counts as held when
-*any* live allow exists. So `person.read: self`, the **universal** grant every role receives
-(`50` §1), satisfies `People`'s gate for every account in the product, and the page then
-renders exactly one row: the reader. `org.read: all` does the same for `Settings`, because it
-is seeded to all four levels so the vocabulary can load on first paint. What `needs` means is
-*"can act on the organisation"*; what it tests is *"holds this verb anywhere, at any scope"*,
-and those diverge precisely where a grant is `self`-scoped or seeded universally.
+**That rule was only half true until 24 Aug, and `D-027` was the gap — now repaid.** `needs`
+named a bare capability and `authz/held.ts` discarded scope, so a capability counted as held
+when *any* live allow existed. `person.read: self`, the **universal** grant every role
+receives (`50` §1), therefore satisfied `People`'s gate for every account in the product, and
+the page rendered exactly one row: the reader.
 
-`T-086` carries the scope to the client so a gate can say *"`person.read` **beyond `self`**"*;
-`T-087` applies it per tier. The per-tier shape is `OPEN-009` and the owner has to settle one
-cell of it. See `55` § Stage 8 for the table.
+`T-086` (`DEC-050`) made `MeResponse.capabilities` a **map of capability → widest held
+scope**, and `T-087` (`DEC-051`) spent it: `NavItem.minScope` says how far `needs` has to
+reach before an item is worth showing. Two gates changed — People to `person.read` at
+`own_unit`, Settings to `org.update` — and the seeded matrix was not touched. The rest of the
+L3 row is `OPEN-010`, deferred by the owner. See `55` § Stage 8.
 
 React Router v6, `createBrowserRouter`. Each world is a layout route with its own error
 boundary, so a crash in the console cannot take down the respondent flow.
+
+**A boundary must also handle the failure that route-level code splitting creates.** Every
+page here is lazy, so the browser fetches a route's chunk at **click time** — long after the
+document loaded. If the module graph moved underneath the tab in the meantime, the running
+app keeps working and the *next* lazy route is what dies. `DEC-054` is the rule: that class of
+error says **the app updated**, and its only remedy is a **full document load**, never a
+client-side `<Link>` — a router link re-renders inside the same dead graph and fails the same
+way. `ConsoleBoundary` has always done this; `PublicBoundary` had not, and `/login` is the
+most-navigated lazy route in the product. **Built 2026-08-24, `T-089`**, repaying `D-029`.
 
 ## 3. Layout
 
@@ -176,6 +207,24 @@ const can = useCan();
 ```
 
 Backed by the capability set from `/auth/me` (`13` §3).
+
+**`can()` takes a minimum scope** (`DEC-050`, `T-086`). It defaults to `self`, so the call
+above means exactly what it always meant — held somewhere, at any width:
+
+```tsx
+can('person.read')              // held at all — TRUE FOR EVERY ACCOUNT, see below
+can('person.read', 'own_unit')  // reaches past themselves
+```
+
+The default is the common case: most gates guard a button on a page the caller already
+reached, where "holds it somewhere" is the right question. The wider form exists for gates
+that decide whether a **whole page** is worth offering, where it is the only right question:
+`person.read: self` is seeded to every role so `/app/profile` opens (`50` §1), so the bare
+verb showed everybody a People page listing one person — themselves (`D-027`).
+
+What it cannot answer is anything about a **specific** thing. The map carries the widest
+scope of any live allow and nothing about which units; `can(x, 'own_unit')` means "somewhere",
+not "here". A question about a particular row is the server's to answer.
 
 > **This is usability, never enforcement** (INV-003). The API returns only what the caller may
 > see and rejects what they may not do. A wrong capability set causes a confusing button, not

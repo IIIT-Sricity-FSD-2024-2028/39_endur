@@ -7,8 +7,10 @@ import { screen } from '@testing-library/react';
 import { Sidebar } from './Sidebar.js';
 import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
 
+// `org.update` joined this list at T-087, when Settings moved off `org.read` — a fixture
+// called ALL that omits the one capability an item needs is a fixture that lies.
 const ALL = ['unit.read', 'role.read', 'person.read', 'subject.read',
-             'template.read', 'campaign.read', 'org.read'] as const;
+             'template.read', 'campaign.read', 'org.read', 'org.update'] as const;
 
 describe('vocabulary', () => {
   it('reads the domain nouns from the org rather than hardcoding them', () => {
@@ -40,6 +42,110 @@ describe('scope', () => {
     // navigation (design_specs/design/02 §5).
     expect(screen.queryByText('Roles')).toBeNull();
     expect(screen.queryByText('People')).toBeNull();
+  });
+
+});
+
+// T-087 — WHAT EACH ROLE LEVEL SEES. 55 § Stage 8, DEC-051, and OPEN-009 is what it closes.
+//
+// One test per level asserting the EXACT list, because "which of these five is missing" is
+// not something a reviewer catches by eye, and the failure this whole task exists to fix was
+// invisible for exactly that reason: People looked present and correct on every account.
+//
+// THESE FOUR MAPS ARE THE SEEDED MATRIX (50 §1) folded to the widest scope per capability,
+// which is what /auth/me actually sends. They are written out rather than imported because
+// the matrix is backend-owned (presets/grant-matrix.ts) and the frontend does not read it.
+// `me.test.ts` asserts the backend half against real accounts, so drift shows up there.
+describe('what each level sees', () => {
+  const L1 = {
+    'org.read': 'all', 'org.update': 'all', 'unit.read': 'subtree', 'role.read': 'all',
+    'person.read': 'subtree', 'subject.read': 'subtree', 'template.read': 'all',
+    'campaign.read': 'subtree',
+  } as const;
+  const L2 = { ...L1, 'org.update': undefined } as const;
+  const L3 = {
+    'org.read': 'all', 'unit.read': 'own_unit', 'role.read': 'all',
+    'person.read': 'own_unit', 'subject.read': 'own_unit', 'template.read': 'all',
+    'campaign.read': 'own_unit',
+  } as const;
+  const L4 = {
+    'org.read': 'all', 'subject.read': 'own_unit',
+    'person.read': 'self', 'person.update': 'self',
+  } as const;
+
+  /** Every item actually rendered, in order, disabled ones included. */
+  const rendered = (): string[] =>
+    [...document.querySelectorAll('.sidebar-item')].map(
+      (node) => node.querySelector('span:not(.tag)')?.textContent ?? '',
+    );
+
+  const show = (capabilities: Record<string, string | undefined>) =>
+    renderWithProviders(<Sidebar />, { capabilities, labels: NONSENSE_LABELS });
+
+  it('L1 owner — everything, including Settings', () => {
+    show(L1);
+    // `system` is the FIRST group in the sidebar's order, so Home and Settings sit
+    // together at the top — Settings is not a footer item (design_specs/design/02 §3).
+    expect(rendered()).toEqual([
+      'Home', 'Settings', 'Structure', 'Roles', 'People', 'Quaxels',
+      'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
+    ]);
+  });
+
+  it('L2 section head — the same, minus Settings', () => {
+    // The ONLY difference between L1 and L2 in the seeded matrix that a nav item reads.
+    // Settings needs `org.update`, which is L1 alone — that is the whole of this test.
+    show(L2);
+    expect(rendered()).toEqual([
+      'Home', 'Structure', 'Roles', 'People', 'Quaxels',
+      'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
+    ]);
+  });
+
+  it('L3 reviewee-level — KEEPS People, because their roster is real', () => {
+    // OPEN-009's one genuinely open cell, answered by the owner 24 Aug: an L3 holds
+    // `person.read: own_unit` from the matrix, so their People page lists their actual
+    // colleagues rather than themselves. The item stays; the grant stays (DEC-051).
+    show(L3);
+    expect(rendered()).toContain('People');
+    expect(rendered()).toEqual([
+      'Home', 'Structure', 'Roles', 'People', 'Quaxels',
+      'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
+    ]);
+  });
+
+  it('L4 lowest — Subjects, and nothing else in `organize`', () => {
+    // The owner's ask, translated out of the university preset (INV-002): "student /
+    // lowest tier shouldn't see roles, people and department pages at all, even if they
+    // see nothing actually in it. only courses list."
+    show(L4);
+    expect(rendered()).toEqual(['Home', 'Quaxels', 'Analysis', 'Inbox', 'Reflect']);
+  });
+
+  it('drops People for an account that can only reach itself — the whole of D-027', () => {
+    // The single assertion this task exists for. `person.read: self` is seeded to EVERY
+    // role so /app/profile opens, so before T-087 this item appeared for every account in
+    // the product and then listed exactly one person: the reader.
+    show(L4);
+    expect(screen.queryByText('People')).toBeNull();
+    // And it is a SCOPE decision, not a removal: give the same account `own_unit` and the
+    // item comes back. Nothing about the capability changed.
+    show({ ...L4, 'person.read': 'own_unit' });
+    expect(screen.getAllByText('People').length).toBeGreaterThan(0);
+  });
+
+  it('drops Settings on the CAPABILITY, not the scope — org.read is `all` even at L4', () => {
+    // Worth pinning because a scope minimum looks like it should work here and cannot:
+    // `org.read: all` is seeded to all four levels so the vocabulary loads on first paint,
+    // so `org.read` at ANY minimum still passes for the lowest account in the product.
+    show(L4);
+    expect(screen.queryByText('Settings')).toBeNull();
+    // Widening org.read changes nothing — it is already as wide as scopes go.
+    show({ ...L4, 'org.read': 'all' });
+    expect(screen.queryByText('Settings')).toBeNull();
+    // `org.update` is what actually opens it.
+    show({ ...L4, 'org.update': 'all' });
+    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
   });
 });
 

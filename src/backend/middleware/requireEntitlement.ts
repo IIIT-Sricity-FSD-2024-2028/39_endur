@@ -31,8 +31,20 @@ async function check(
   if (!orgId) throw new UnauthenticatedError();
 
   const subscription = await db.subscription.findFirst({ select: { tier: true } });
-  // No subscription row means the trial default, not a lockout. An org that has not been
-  // billed yet must still be able to use the product.
+  // NO ROW MEANS BRONZE, AND THIS IS NOW A BACKSTOP RATHER THAN THE NORMAL PATH (DEC-048).
+  //
+  // It used to be the only path. Nothing wrote a `Subscription` — not register, not setup,
+  // not the seed — so every organisation in the product fell through this line and was
+  // silently bronze, and every silver or gold surface 402'd for everyone, forever. That was
+  // D-012, and the comment that used to sit here called bronze "the trial default", which was
+  // a THIRD answer again: 16 §7 said new orgs start on Gold, this line said bronze, and
+  // neither ever happened. T-088 made `register` write the row with the tier the founder
+  // chose, so a row is now the expected state.
+  //
+  // The fallback stays, and stays BRONZE, for organisations older than that change and for
+  // any future path that creates an org without one. Failing open to the lowest tier is the
+  // right direction: a missing billing row is our bookkeeping problem, and locking a customer
+  // out of a product they are inside is a worse answer to it than giving them the floor.
   const tier = (subscription?.tier ?? 'bronze') as Tier;
 
   if (tierIncludes(tier, capability)) return;

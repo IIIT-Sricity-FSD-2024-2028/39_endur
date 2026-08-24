@@ -6,16 +6,23 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
-import type { Capability, MeResponse } from '@endur/shared';
+import type { Capability, HeldCapabilities, MeResponse } from '@endur/shared';
 import { authReducer, signedIn, signedOut } from '../store/authSlice.js';
 import { vocabularyReducer } from '../store/vocabularySlice.js';
 import { RedirectIfSignedIn, RequireCapability, RequireSession } from './guards.js';
+
+/** `all`, because these tests are about the GUARD, never about how far a scope reaches. */
+const held = (capabilities: Capability[]): HeldCapabilities => {
+  const map: HeldCapabilities = {};
+  for (const capability of capabilities) map[capability] = 'all';
+  return map;
+};
 
 const me = (capabilities: Capability[]): MeResponse => ({
   user: { id: 'u1', name: 'Amara Rao', email: 'a@example.test', avatarUrl: null },
   organization: { id: 'o1', name: 'Northfield', slug: 'northfield', industry: 'university' },
   labels: {},
-  capabilities,
+  capabilities: held(capabilities),
 });
 
 function mount(node: JSX.Element, session?: 'in' | 'out', capabilities: Capability[] = []) {

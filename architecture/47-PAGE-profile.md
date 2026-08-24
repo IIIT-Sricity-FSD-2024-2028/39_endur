@@ -1,6 +1,8 @@
 # 47 — My profile
 
 Phase: P2 · Milestone: — · Design ref: `design_specs/design/04-PAGE-ADMIN-CONSOLE.md` §4.4 (reuses the person-detail anatomy)
+Status: **BUILT 2026-08-24 (`T-051`)** — all four blocks. The `Why?` link waits on `42` (`T-054`)
+Owns: `src/frontend/pages/console/Profile/**`, `src/frontend/lib/profile.ts`, `src/backend/features/profile/**`, `packages/shared/src/dto/profile.ts`
 
 ## Purpose
 
@@ -48,15 +50,32 @@ Password change is deliberately **not** capability-gated: proving you are the se
 export type ProfileView = {
   user: { id: string; name: string; email: string; avatarUrl: string | null;
           lastLoginAt: string | null };
-  positions: { roleName: string; roleLevel: number; unitName: string;
-               isPrimary: boolean; validTo: string | null }[];
-  powersByPlace: { unitId: string | null; unitName: string;
-                   capabilities: string[] }[];
+  /** `PersonSummary['positions']` — the SAME type `/people/:id` returns. */
+  positions: Position[];
+  /** `PowersAtPlace[]` — again the same type, scope included. */
+  powersByPlace: PowersAtPlace[];
 };
 ```
 
+**Amended at `T-051`, and the amendment is the point.** This section originally gave both
+arrays their own shapes — `capabilities: string[]` and a positions type without `edgeId`.
+Both were narrowed copies of what `PersonDetail` already returned, and taking them literally
+would have forked `<PowersByPlace>` into two renderers for one screen apiece. That is exactly
+the second implementation `N-005` forbids, arriving one layer above where the doc was
+watching for it: the rule is about the RESOLVER, and the way it actually breaks is a second
+consumer, not a second resolver. `packages/shared/src/dto/person.ts` now names both types
+(`Position`, `PowersAtPlace`) so there is one of each.
+
+The scope travels with each capability, and that is not decoration. *"You hold `results.read`
+here"* and *"you hold it over everything below here"* are different answers, and answering
+that question for yourself is why this page exists. `T-086` is the argument in full: the verb
+alone cannot tell `person.read: self` from `person.read: subtree`, and every role holds the
+first.
+
 `powersByPlace` comes from the **same resolver the middleware uses** (`11` §6), never a
-second implementation — the same rule that governs the simulator (`_MEMORY.md` N-005).
+second implementation — the same rule that governs the simulator (`_MEMORY.md` N-005). Since
+`T-051` there is literally one caller of it, `features/people/powers.ts`, shared with
+`/people/:id`.
 
 Email is **read-only here.** Changing it is an identity change and belongs to an administrator
 on `34`, with an audit trail. A self-service email change is an account-takeover path.
@@ -108,16 +127,30 @@ opens the simulator (`42`) pre-filled with that capability.
 
 ## Acceptance
 
-- [ ] Openable by a user with **no** administrative capability whatsoever
-- [ ] `powersByPlace` is produced by the shared resolver, not a reimplementation
-- [ ] Powers on unit A do not appear under unit B (INV-005)
-- [ ] Email cannot be changed here
-- [ ] Password change requires the current password and regenerates the session
-- [ ] Positions are read-only; no self-granting path exists
-- [ ] Name and avatar changes update the top-bar chip without a reload
-- [ ] The `Why?` link opens the simulator pre-filled
-- [ ] Every noun from `useLabels()` (INV-001)
-- [ ] Works at 390px
+Ticked items are asserted in `src/backend/test/profile.test.ts` (15 tests),
+`src/frontend/pages/console/Profile/Profile.test.tsx` (9) or
+`src/frontend/components/org/PowersByPlace.test.tsx` (7).
+
+- [x] Openable by a user with **no** administrative capability whatsoever — asserted against
+      a real level-4 account, whose whole capability map is four entries
+- [x] `powersByPlace` is produced by the shared resolver, not a reimplementation — proved by
+      an explicit person-level DENY removing a power from the page. A list assembled from the
+      role's grants could not see that deny, and INV-004 says it wins absolutely
+- [x] Powers on unit A do not appear under unit B (INV-005) — **and this found a real bug.**
+      The version inside `readPerson` re-found the unit BY NAME, and two units may share one.
+      See `34` § Acceptance and `_MEMORY.md` `N-057`
+- [x] Email cannot be changed here — the DTO has no such key, so `validate()` strips it
+- [x] Password change requires the current password and regenerates the session
+- [x] Positions are read-only; no self-granting path exists — asserted as an ABSENCE of any
+      control, not a disabled one
+- [x] Name and avatar changes update the top-bar chip without a reload
+- [ ] The `Why?` link opens the simulator pre-filled — **`42` is `T-054` and unbuilt.**
+      `<PowersByPlace>` takes the `onWhy` prop and nothing passes it: a link into a
+      `<Placeholder>` is what `design_specs/design/02` §7 forbids. Wiring, not redesign
+- [x] Every noun from `useLabels()` (INV-001) — `audit:vocab` clean, and the page's own tests
+      run against nonsense labels
+- [ ] Works at 390px — the CSS collapses the module grid to one column below 640px; the
+      device check is `T-045`
 
 ## Out of scope
 

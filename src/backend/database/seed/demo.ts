@@ -11,6 +11,7 @@ import { grantsForLevel, presetFor, type Level } from '../../presets/index.js';
 import { mintToken } from '../../features/campaigns/token.js';
 import { poolFor, type Tone } from './comments.js';
 import { Rng, skewedNps, skewedRating, skewedTimestamp } from './random.js';
+import type { Tier } from '@endur/shared';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -18,6 +19,18 @@ export type DemoOrg = {
   name: string;
   slug: string;
   industry: string;
+  /**
+   * ONE ORG PER TIER, which is what D-012 asked for and what makes the 402 path demonstrable
+   * on a real organisation rather than only in a test.
+   *
+   * The assignment follows the demo script (50 §5) rather than being alphabetical. Northfield
+   * is opened first and is where the improve loop lives, so it is Gold. The Grand Palace is
+   * step 2 and keeps analysis, so Silver. Riverside is Bronze — somebody has to be, and the
+   * screen that says "that feature is not included in your plan" is only convincing on an org
+   * that genuinely is not on it. Meridian is Enterprise, a tier no picker offers (DEC-048),
+   * which is the only way to see that operator-assigned tiers are real.
+   */
+  tier: Tier;
   /** The RNG seed. Fixed per org, so every run produces the same organisation. */
   seed: number;
   units: Array<{ tempId: string; name: string; parentTempId: string | null }>;
@@ -41,6 +54,7 @@ export const DEMO_ORGS: DemoOrg[] = [
     name: 'Northfield University',
     slug: 'northfield',
     industry: 'university',
+    tier: 'gold',
     seed: 1001,
     units: [
       { tempId: 'root', name: 'Northfield University', parentTempId: null },
@@ -105,6 +119,7 @@ export const DEMO_ORGS: DemoOrg[] = [
     name: 'The Grand Palace',
     slug: 'grand-palace',
     industry: 'hotel',
+    tier: 'silver',
     seed: 2002,
     units: [
       { tempId: 'root', name: 'The Grand Palace', parentTempId: null },
@@ -155,6 +170,7 @@ export const DEMO_ORGS: DemoOrg[] = [
     name: 'Riverside Hospital',
     slug: 'riverside',
     industry: 'hospital',
+    tier: 'bronze',
     seed: 3003,
     units: [
       { tempId: 'root', name: 'Riverside Hospital', parentTempId: null },
@@ -191,6 +207,7 @@ export const DEMO_ORGS: DemoOrg[] = [
     name: 'Meridian Consulting',
     slug: 'meridian',
     industry: 'company',
+    tier: 'enterprise',
     seed: 4004,
     units: [
       { tempId: 'root', name: 'Meridian Consulting', parentTempId: null },
@@ -270,6 +287,17 @@ export async function seedOrg(
     select: { id: true },
   });
   const orgId = org.id;
+
+  // The subscription, written for the same reason `register` writes one (DEC-048): an org
+  // without a row falls through requireEntitlement's bronze backstop, and a demo org silently
+  // on the wrong tier is a demo that proves the opposite of what it claims. A year from today,
+  // billing nothing — see auth/service.ts for why the period is honest but inert.
+  const periodStart = new Date();
+  const periodEnd = new Date(periodStart);
+  periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+  await prisma.subscription.create({
+    data: { orgId, tier: spec.tier, status: 'active', periodStart, periodEnd },
+  });
 
   // 1 · units and the contains edges.
   const unitIds = new Map<string, string>();

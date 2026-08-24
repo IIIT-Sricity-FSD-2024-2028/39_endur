@@ -31,7 +31,23 @@ const fill = (email = 'amara@northfield.test') => {
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-long-enough-one' } });
 };
 
+/** Step 1 → step 2. The button says `Continue`; only the last one says `Continue to setup`. */
+const advance = () => fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+/** Pick a tier on step 2. Matched by role rather than by label text, because the card's
+ *  accessible name is its whole contents — name, pitch and what it adds. */
+const pick = (tier: RegExp = /Gold/) =>
+  fireEvent.click(screen.getByRole('radio', { name: tier }));
+
 const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Continue to setup' }));
+
+/** The whole happy path: fill the fields, advance, pick a tier, submit. */
+const register = (email?: string, tier?: RegExp) => {
+  fill(email);
+  advance();
+  pick(tier);
+  submit();
+};
 
 // Braces are load-bearing. `mockReset()` returns the mock, and vitest treats a function
 // returned from a hook as a teardown callback — so the concise-arrow form registers the
@@ -53,8 +69,7 @@ describe('create organization — 30 §3.3', () => {
   it('defaults industry to custom, because step 1 of the wizard asks properly', async () => {
     registerOrg.mockResolvedValue('/app/setup');
     mount();
-    fill();
-    submit();
+    register();
     await waitFor(() => expect(registerOrg).toHaveBeenCalled());
     expect(registerOrg.mock.calls[0]?.[0]).toEqual({
       orgName: 'Northfield University',
@@ -62,14 +77,14 @@ describe('create organization — 30 §3.3', () => {
       email: 'amara@northfield.test',
       password: 'a-long-enough-one',
       industry: 'custom',
+      tier: 'gold',
     });
   });
 
   it('never drops a new org at an empty console — it always lands on the wizard', async () => {
     registerOrg.mockResolvedValue('/app/setup');
     mount();
-    fill();
-    submit();
+    register();
     await waitFor(() => expect(screen.getByText('WIZARD')).toBeTruthy());
   });
 
@@ -87,8 +102,7 @@ describe('create organization — 30 §3.3', () => {
       }),
     );
     mount();
-    fill();
-    submit();
+    register();
 
     await waitFor(() => expect(screen.getByText(/already registered/)).toBeTruthy());
     expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
@@ -106,8 +120,7 @@ describe('create organization — 30 §3.3', () => {
       }),
     );
     mount();
-    fill();
-    submit();
+    register();
     await waitFor(() => expect(screen.getByText('Too short.')).toBeTruthy());
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -117,8 +130,96 @@ describe('create organization — 30 §3.3', () => {
       new ApiError({ code: 'INTERNAL', status: 500, requestId: 'r1', message: 'Server exploded.' }),
     );
     mount();
-    fill();
-    submit();
+    register();
     expect((await screen.findByRole('alert')).textContent).toBe('Server exploded.');
+  });
+});
+
+/**
+ * T-088 — the tier picker. DEC-048, 49 § Interactions.
+ *
+ * The owner asked for this one by name: *"pick between option / rn, no pricing, just pick the
+ * option (bronze, silver and gold) and you get assigned that."* Every assertion below is one
+ * clause of that sentence.
+ */
+describe('choose a plan — DEC-048', () => {
+  it('does not ask until the details are in', () => {
+    mount();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    fill();
+    advance();
+    expect(screen.getByRole('radiogroup')).toBeTruthy();
+    expect(screen.getByText('Choose a plan')).toBeTruthy();
+  });
+
+  it('offers three tiers and not four — Enterprise is a sales conversation (16 §4)', () => {
+    mount();
+    fill();
+    advance();
+    const names = screen.getAllByRole('radio').map((radio) => radio.getAttribute('value'));
+    expect(names).toEqual(['bronze', 'silver', 'gold']);
+    expect(document.body.textContent).not.toContain('Enterprise');
+  });
+
+  /** NO PRE-SELECTED DEFAULT. A default here is D-012 wearing a nicer coat. */
+  it('pre-selects nothing and will not submit until something is chosen', () => {
+    mount();
+    fill();
+    advance();
+    expect(screen.getAllByRole<HTMLInputElement>('radio').some((radio) => radio.checked)).toBe(false);
+    expect(screen.getByRole('button', { name: 'Continue to setup' }).hasAttribute('disabled')).toBe(true);
+    pick(/Bronze/);
+    expect(screen.getByRole('button', { name: 'Continue to setup' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('sends the tier that was pressed, not the first one', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    mount();
+    register(undefined, /Silver/);
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled());
+    expect((registerOrg.mock.calls[0]?.[0] as { tier: string }).tier).toBe('silver');
+  });
+
+  /** DEC-035, and it is asserted rather than assumed because a price is the sort of thing a
+   *  well-meaning copy edit adds back. */
+  it('shows no prices anywhere', () => {
+    mount();
+    fill();
+    advance();
+    expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month|free trial|14 days/i);
+  });
+
+  it('goes back without losing the answers', () => {
+    mount();
+    fill();
+    advance();
+    pick(/Gold/);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Work email').value).toBe('amara@northfield.test');
+    advance();
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: /Gold/ }).checked).toBe(true);
+  });
+
+  /**
+   * THE ERROR HAS TO REACH THE FIELD IT IS ABOUT. Every failure this POST can return names a
+   * field on step 1 — 409 the address, 422 a field — and the POST happens from step 2. Left
+   * alone, the person reads "that address is already registered" beside three tier cards with
+   * no input in sight.
+   */
+  it('returns to the details when the server rejects one of them', async () => {
+    registerOrg.mockRejectedValue(
+      new ApiError({
+        code: 'CONFLICT', status: 409, requestId: 'r1',
+        message: 'That email address is already registered.',
+      }),
+    );
+    mount();
+    register();
+    await waitFor(() => expect(screen.getByLabelText('Work email')).toBeTruthy());
+    expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
+    // The tier survives the trip. Being told your address is taken is not a reason to
+    // re-answer a question you already answered.
+    advance();
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: /Gold/ }).checked).toBe(true);
   });
 });

@@ -28,6 +28,7 @@ async function registerOrg(industry: string) {
     name: 'Founder',
     orgName: `Test Org ${unique('n')}`,
     industry,
+    tier: 'bronze',
   });
   expect(res.status).toBe(201);
   const csrf = await agent.get('/api/v1/auth/csrf');
@@ -224,11 +225,16 @@ describe('POST /org/setup — one request, one transaction', () => {
       where: { orgId, subjectId: bottom?.id ?? "" },
       select: { capability: true },
     });
-    // L4 is the respondent-level role: org.read, the two self rows, and nothing else.
+    // L4 is the respondent-level role: org.read so the vocabulary loads, `subject.read` so
+    // the one list they should see is reachable (T-086, closing half of OPEN-009), the two
+    // self rows so their profile opens, and nothing else. This list is deliberately exact —
+    // it is what EVERY organisation gets by default, and a row added here without a reason
+    // should fail rather than pass quietly.
     expect(bottomGrants.map((grant) => grant.capability).sort()).toEqual([
       'org.read',
       'person.read',
       'person.update',
+      'subject.read',
     ]);
   });
 
@@ -365,6 +371,7 @@ describe('the guards are real', () => {
       name: 'Founder',
       orgName: `Test Org ${unique('n')}`,
       industry: 'custom',
+      tier: 'bronze',
     });
     expect(res.status).toBe(201);
 
@@ -381,6 +388,7 @@ describe('the guards are real', () => {
       name: 'Founder',
       orgName: `Test Org ${unique('n')}`,
       industry: 'custom',
+      tier: 'bronze',
     });
     expect(res.status).toBe(201);
     const session = setCookies(res)

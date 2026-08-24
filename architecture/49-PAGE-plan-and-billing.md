@@ -143,7 +143,7 @@ which is the argument INV-008 and INV-009 already make twice.
 
 ## Interactions
 
-### Sign-up — plan selection at `/start`
+### Sign-up — plan selection at `/start`  ·  **BUILT 2026-08-24 (`T-088`)**
 
 `30` currently creates the organisation and drops into the setup wizard. Plan selection is
 inserted as a step **between** account creation and the wizard.
@@ -169,11 +169,21 @@ need a scheduler, which `OPEN-005` says nothing in this product owns. The unansw
 stops being unanswerable too: with no amounts, the choice is reversible at zero cost from
 Settings.
 
-**This step is still where `D-012` is repaid** — nothing currently writes a `Subscription` row
-at all, so every organisation in the product is silently Bronze and every Gold surface `402`s
-for everyone. `DEC-048` settles the three-way ambiguity that blocked it: the row is written at
-registration, with the tier the person chose. `T-088`, carved out of `T-058` because it needs
-none of the rest of this page.
+**This step is where `D-012` was repaid, and it is now repaid.** Nothing wrote a `Subscription`
+row at all, so every organisation in the product was silently Bronze and every Silver and Gold
+surface `402`'d for everyone. `DEC-048` settled the three-way ambiguity that blocked it, and
+`T-088` built it: `tier` is a field on `RegisterBody` and the row is written **inside
+`register`'s transaction**, so an organisation cannot exist without a tier somebody chose.
+
+**Two steps, ONE POST**, and asking on a page after the account existed would have recreated
+`D-012` exactly — a live organisation with no row for as long as it takes them to answer. It
+also means every error the POST can return names a field on step 1, so a failure returns there
+with the tier still selected (`30` § Create organization).
+
+`T-088` was carved out of `T-058` because it needs none of the rest of this page — no seat
+meter, no `/billing/usage`, no `<OverLimitBanner>`. What it did need already existed:
+`billing/entitlements.ts` and a correctly mounted `requireEntitlement`. **It also found that
+`account.*` and `billing.*` were in no tier at all** — see `16` §3.
 
 **With no prices the step is genuinely one click**, which is the whole reason DEC-035 is worth
 having: sign-up does not fork into a payment flow that would have to be faked for a demo and

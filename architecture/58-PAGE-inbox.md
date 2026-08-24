@@ -5,6 +5,8 @@ Design ref: `design_specs/design/08-PAGE-RESULTS-AND-ANALYSIS.md` §8.3
 Related: `40` (results, and the gate this page reads through), `43` (the tags it does *not*
 render), `52` §2 (k-anonymity)
 Invariants: **INV-006**, INV-007
+Status: **PROMOTED 2026-08-24 — `CONF-021`** (`T-079` backend, `T-080` page). Never had a
+blocker; it was written on 23 Aug and then sequenced behind M0
 
 ## Purpose
 

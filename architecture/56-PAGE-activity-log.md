@@ -4,6 +4,10 @@ Phase: P2 · Milestone: — · Design ref: `design_specs/design/04` §4 (console
 `design_specs/design/09` §3.1 (`<ResponsiveTable>`)
 Related: `11` §5b, `52` §6, `18` §9, `42` (the same trace, asked forward), `72` (the *other* log)
 Decisions: `_MEMORY.md` DEC-040, DEC-041 · Invariants: **INV-006**, INV-007
+Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-075` read surface, `T-076` page).
+This is the **organisation's** log — an administrator seeing their own org. Endur's own log
+files are `72`, a different principal and a different store (`INV-011`). `T-074` already
+landed the `audit_log.ip` fix that had to come before any page could render the column
 
 ## Purpose
 

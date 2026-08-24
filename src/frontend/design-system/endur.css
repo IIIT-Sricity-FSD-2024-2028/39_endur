@@ -750,6 +750,46 @@
 .preset-chain, .preset-words { line-height: 1.45; }
 .preset-words { color: var(--color-accent-700); }
 
+/* ── organisation choice on sign-in — 30 § Sign in, DEC-049. Only ever rendered when
+      one address and password open several organisations. ───────────────────────── */
+.org-choice { display: flex; flex-direction: column; gap: var(--space-2); }
+.org-choice-item { justify-content: flex-start; text-align: left; }
+
+/* ── plan picker — 24 §6b, 49. Same card grammar as the preset grid, because the
+      two are the same gesture: pick one of a small set and see what you get. ──── */
+.plan-grid {
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+}
+.plan-card {
+  position: relative; display: flex; flex-direction: column; gap: 6px;
+  padding: var(--space-3); cursor: pointer;
+  background: var(--color-card); border: 2px solid transparent;
+  border-radius: calc(var(--radius-lg) * 1.15); box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.plan-card input { position: absolute; opacity: 0; width: 0; height: 0; }
+.plan-card:hover { box-shadow: var(--shadow-md); }
+.plan-card.is-selected {
+  border-color: var(--color-accent); background: var(--color-accent-100);
+  box-shadow: var(--shadow-md);
+}
+.plan-card.is-unavailable { cursor: default; opacity: 0.62; box-shadow: none; }
+.plan-card.is-unavailable:hover { box-shadow: none; }
+.plan-card:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.plan-check {
+  position: absolute; top: 10px; right: 10px; display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--color-accent); color: var(--color-bg);
+}
+.plan-name {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 17px;
+}
+.plan-sells { line-height: 1.45; }
+.plan-adds, .plan-note { line-height: 1.45; }
+.plan-adds { color: var(--color-accent-700); }
+.plan-action { margin-top: var(--space-2); align-self: flex-start; }
+
 /* ── inline rename — 24 §7. Plain text until hovered or focused. ─────────── */
 
 .inline-name {
@@ -2701,10 +2741,257 @@ html:active-view-transition * {
    line so it is never truncated to fit beside the controls. */
 .position-error { flex-basis: 100%; margin: 0; }
 
+/* ── T-051 · person detail, my account, and powers by place ─────────────── */
+/* 34, 47, 24 §4. Tokens only — no literal colour, size or spacing value (DEC-012). */
+
+/* The row's link to the detail page. Its own affordance rather than a wrapped name,
+   because the name is an inline rename and one target cannot do both predictably. */
+.person-open {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  border-radius: var(--radius-sm);
+}
+.person-open:hover { color: var(--color-accent); }
+.person-open:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.person-email-row { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+
+/* ORDERING ONLY (DEC-002). Rendered quietly on purpose: it is a fact about where a role
+   sits in the list, never a comparison anything is decided by. */
+.position-level {
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.position-until { font-size: 11px; }
+
+/* Powers by place. One block, two placements (24 §4) — this is the only declaration of it,
+   which is what stops the profile and the person page drifting apart visually as well. */
+.powers-places { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.powers-place-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.powers-place-unit { margin: 0; font-size: var(--text-body); font-weight: 600; }
+
+/* Indented under the unit heading, because the indent IS the claim: everything inside it
+   applies at that place and nowhere else (INV-005). */
+.powers-place { border-left: 2px solid var(--color-border); padding-left: var(--space-3); }
+
+.powers-modules { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; }
+.powers-module { display: grid; grid-template-columns: 14ch 1fr; gap: var(--space-3); }
+.powers-module dt { margin: 0; padding-top: 3px; }
+.powers-module dd {
+  margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3);
+}
+
+.power { display: inline-flex; align-items: baseline; gap: 6px; }
+.power code { font-size: 12px; }
+/* The scope, never hidden. `person.read · self` and `person.read · subtree` are different
+   answers to the only question this block exists to answer (T-086, D-027). */
+.power-scope {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.power-why {
+  border: 0; background: none; padding: 0; font-size: 11px; cursor: pointer;
+  color: var(--color-accent); text-decoration: underline;
+}
+
+.powers-elsewhere, .powers-none { margin: 0; }
+
+/* One column below the table breakpoint: a 14ch label column plus wrapping keys leaves
+   about six characters for the keys on a 390px screen. */
+@media (max-width: 639px) {
+  .powers-module { grid-template-columns: 1fr; gap: 2px; }
+}
+
 .btn-tiny { padding: 2px var(--space-2); font-size: 12px; }
 .person-form { display: flex; flex-direction: column; gap: var(--space-3); }
 .person-form-note {
   padding: var(--space-2);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+
+/* ── T-052 · roles, the ladder, and the powers grid ──────────────────────── */
+/* 33, design_specs/design/04 §4.3. Tokens only — no literal colour, size or spacing
+   value (DEC-012). */
+
+/* Tabs. Two surfaces on one route (33 § Route & access), not two routes: the ladder and
+   the grid are one decision seen two ways, and a URL each would invite linking to half
+   of it. */
+.tabs {
+  display: flex; gap: var(--space-1);
+  border-bottom: 1px solid var(--color-divider);
+  margin-bottom: var(--space-4);
+}
+.tab {
+  padding: var(--space-2) var(--space-4);
+  border: 0; background: none; cursor: pointer;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--color-text); }
+.tab.is-active { color: var(--color-text); border-bottom-color: var(--color-accent); }
+.tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* A bare icon control. Used where the label is on the row beside it and repeating it
+   would announce the same word twice — every one of them carries an aria-label. */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: var(--space-1); border: 0; background: none; cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.icon-btn:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface); }
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+.icon-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.btn-small { padding: var(--space-1) var(--space-2); font-size: 12px; }
+
+/* One chevron glyph, pointed by rotation. Three separate icons would be three imports for
+   one shape. */
+.flip { transform: rotate(180deg); }
+.flip-right { transform: rotate(-90deg); }
+
+/* ---------------------------------------------------------------- the ladder */
+
+.role-ladder-hint { margin: 0 0 var(--space-4); max-width: 62ch; }
+.role-rows { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+
+.role-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.role-row:last-child { border-bottom: 0; }
+
+/* Ordering only, and drawn to look like it: a quiet monospace tag, never a rank badge.
+   DEC-002 — nothing in the product decides anything by comparing two of these. */
+.role-level {
+  min-width: 2.4em; text-align: center;
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  padding: 2px var(--space-1); border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.role-name { flex: 1; min-width: 0; }
+.role-counts { font-size: 12px; white-space: nowrap; }
+.role-actions { display: flex; gap: var(--space-1); }
+.role-reassign { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* ------------------------------------------------------------------ the grid */
+
+.powers-bar {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-4); margin-bottom: var(--space-3);
+}
+.powers-hint { margin: 0; max-width: 62ch; }
+.powers-actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
+.powers-error { margin-bottom: var(--space-3); }
+
+.powers-copy {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) 0 var(--space-4);
+}
+.powers-copy label { font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
+/* ITS OWN SCROLLING CONTAINER. 64 rows by n roles does not fit a phone and is not meant
+   to — 33 asks for a grid that scrolls sideways, not one that collapses into cards, because
+   a matrix with its columns stacked has stopped being a matrix. The page body must never
+   scroll horizontally; this element does instead. */
+.powers-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+}
+.powers-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+
+.powers-corner, .powers-role {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-2) var(--space-3);
+  text-align: left; font-weight: 600;
+}
+.powers-role { text-align: center; white-space: nowrap; }
+.powers-role-name { display: block; }
+.powers-role-level { display: block; font-size: 11px; font-weight: 400; }
+
+.powers-module th { padding: 0; background: var(--color-surface); }
+.powers-module-toggle {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0; background: none; cursor: pointer; text-align: left;
+  font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.powers-module-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+.powers-row { border-bottom: 1px solid var(--color-divider); }
+.powers-capability {
+  padding: var(--space-2) var(--space-3);
+  text-align: left; font-weight: 400; white-space: nowrap;
+}
+.powers-row-fill {
+  border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit;
+  text-align: left;
+}
+.powers-row-fill:hover { color: var(--color-accent); }
+.powers-row-fill:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.powers-soon { margin-left: var(--space-2); font-size: 10px; }
+
+/* AN ORPHAN ROW IS A STATE YOU SHOULD NOT HAVE TO GO LOOKING FOR (33). Nobody at all can
+   do this, which is usually fine and occasionally means the one role that could launch a
+   campaign was renamed into a role that cannot. */
+.powers-row.is-orphan .powers-capability {
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+
+.powers-cell-wrap { padding: 2px; text-align: center; }
+
+/* INTENSITY TRACKS SCOPE WIDTH, not "is there a grant here" — that is the entire argument
+   for a grid over a list (33 § Interactions). An over-granted role is a visibly dark
+   column and you cannot help seeing it. */
+.powers-cell {
+  --weight: 0;
+  display: block; width: 100%; min-width: 3.6em;
+  padding: var(--space-1) var(--space-2);
+  border: 0; border-radius: var(--radius-sm); cursor: pointer;
+  font: inherit; font-size: 11px;
+  background: color-mix(in srgb, var(--color-accent) calc(var(--weight) * 13%), var(--color-surface));
+  color: var(--color-text);
+}
+.powers-cell:disabled { cursor: default; }
+.powers-cell:hover:not(:disabled) { outline: 1px solid var(--color-accent); }
+.powers-cell:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* A BLOCK RENDERS DISTINCTLY, because it does not merely mean "less" — it BEATS every
+   allow, from any role, group or stand-in (INV-004). A darker shade of the same colour
+   would read as "more", which is exactly backwards. */
+.powers-cell.is-denied {
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--status-bad-800) 16%, transparent);
+  color: var(--status-bad-800);
+}
+
+.powers-cell.has-warning { box-shadow: inset 0 0 0 1px var(--status-warn-800); }
+
+/* AT THE SITE OF THE PROBLEM, never a list at the bottom of the page
+   (customization.md §6). Problem and cure in the same place, or the list becomes the
+   thing people learn to scroll past. */
+.powers-warning {
+  display: block; margin-top: var(--space-1);
+  font-size: 11px; line-height: 1.35; text-align: left; white-space: normal;
+  color: var(--status-warn-800);
+}
+
+@media (max-width: 640px) {
+  .powers-bar { flex-direction: column; }
+  .powers-capability { white-space: normal; min-width: 14ch; }
 }
