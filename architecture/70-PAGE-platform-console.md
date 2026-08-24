@@ -3,6 +3,8 @@
 Phase: **P2** · Milestone: — · Owns: `src/frontend/pages/platform/Console/**`
 Related: `19-PLATFORM-OPERATORS.md` (the model, the guards, INV-011), `71` (analytics), `16` (tiers)
 Design ref: none yet — this surface has no `design_specs` entry; see § Design note
+Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-066`). Needs `T-059`: there is no
+operator principal, no separate cookie and no seam yet, so there is nothing to render
 
 ---
 

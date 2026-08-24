@@ -15,8 +15,8 @@ import type {
   CreateAssignmentBody,
   CreatePersonBody,
   Page,
+  PersonDetail,
   PersonSummary,
-  RoleView,
   UpdatePersonBody,
 } from '@endur/shared';
 import { apiDelete, apiGet, apiPatch, apiPost } from './api.js';
@@ -187,31 +187,95 @@ export function usePeopleList(query: PeopleQuery): PeopleListController {
   return { ...state, reload, create, update, remove, assign, unassign };
 }
 
+/* ------------------------------------------------------------------ the detail page */
+
+export type PersonController = Loadable<PersonDetail> & {
+  reload: () => Promise<void>;
+  rename: (name: string) => Promise<void>;
+  setEmail: (email: string) => Promise<void>;
+  assign: (body: CreateAssignmentBody) => Promise<void>;
+  unassign: (edgeId: string) => Promise<void>;
+};
+
 /**
- * The roles in this organisation, for the position picker's first dropdown.
+ * One person, with their powers. `T-051`, `34` § Interactions.
  *
- * Ordered by level because that is the order an administrator thinks in — and level is
- * ORDERING ONLY, never authorisation (DEC-002, CONF-002). Nothing here compares one to
- * another to decide anything; the server does that, from grants (`11` §5b).
+ * Every write here RE-READS the whole person rather than patching what came back, and that
+ * is not laziness — a position change changes the POWERS, and the powers are resolved
+ * server-side across the whole capability catalogue. There is no client-side way to work out
+ * what adding "Tutor at Section B" grants somebody, and a screen that showed the new chip
+ * beside the old power list would be showing a state that never existed.
  */
-export function useRoles(): Loadable<RoleView[]> {
-  const [state, setState] = useState<Loadable<RoleView[]>>({
+export function usePerson(id: string): PersonController {
+  const [state, setState] = useState<Loadable<PersonDetail>>({
     data: null, loading: true, error: null,
   });
+  const alive = useRef(true);
 
   useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: RoleView[] }>('/roles')
-      .then((response) => {
-        if (!cancelled) setState({ data: response.data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
+    alive.current = true;
     return () => {
-      cancelled = true;
+      alive.current = false;
     };
   }, []);
 
-  return state;
+  const load = useCallback(async () => {
+    setState((current) => ({ ...current, loading: true }));
+    try {
+      const { data } = await apiGet<{ data: PersonDetail }>(`/people/${id}`);
+      if (alive.current) setState({ data, loading: false, error: null });
+    } catch (error) {
+      // The last good copy stays on screen with the error above it, like the list (34).
+      if (alive.current) {
+        setState((current) => ({ ...current, loading: false, error: error as Error }));
+      }
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const patch = useCallback(
+    async (body: UpdatePersonBody) => {
+      await apiPatch<UpdatePersonBody, { data: PersonSummary }>(`/people/${id}`, body);
+      await load();
+    },
+    [id, load],
+  );
+
+  return {
+    ...state,
+    reload: load,
+    rename: useCallback((name: string) => patch({ name }), [patch]),
+    // Editable HERE and nowhere else in the product: an administrator changing somebody's
+    // address is an identity change with an audit row against it, and `/profile` refuses
+    // the same field for the same reason (47 § Data contract).
+    setEmail: useCallback((email: string) => patch({ email }), [patch]),
+    assign: useCallback(
+      async (body: CreateAssignmentBody) => {
+        await apiPost<CreateAssignmentBody, { data: PersonSummary }>(
+          `/people/${id}/assignments`,
+          body,
+        );
+        await load();
+      },
+      [id, load],
+    ),
+    unassign: useCallback(
+      async (edgeId: string) => {
+        await apiDelete(`/people/${id}/assignments/${edgeId}`);
+        await load();
+      },
+      [id, load],
+    ),
+  };
 }
+
+/**
+ * MOVED TO `lib/roles.ts` AT T-052, and re-exported here so this file's callers are
+ * untouched. `33` owns roles; T-034 put the hook here only because the position picker's
+ * first dropdown was the first thing that ever needed it, and two hooks fetching `/roles`
+ * would be two places to fix when the shape changes.
+ */
+export { useRoles } from './roles.js';

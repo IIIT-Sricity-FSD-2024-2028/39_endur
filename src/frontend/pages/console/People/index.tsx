@@ -11,7 +11,7 @@
 // representable without a special case. The unit half of every chip is load-bearing
 // (INV-005) and is never abbreviated away.
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { CreateAssignmentBody, PersonSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
@@ -130,6 +130,13 @@ export default function People(): JSX.Element {
           ) : (
             <span className="person-name-text">{row.name}</span>
           )}
+          {/* T-051. The name itself stays an inline rename — it is the fast path an
+              administrator uses most — so the link to the detail page is its own affordance
+              rather than wrapped around it. A name that both renames and navigates does
+              neither predictably. */}
+          <Link className="person-open" to={`/app/people/${row.id}`} aria-label={`Open ${row.name}`}>
+            <Icon name="disclosure" size={16} />
+          </Link>
           {row.status !== 'active' && <span className="tag tag-neutral">{row.status}</span>}
         </span>
       ),

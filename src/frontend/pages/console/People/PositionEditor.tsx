@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import type { ResolvedLabels, RoleView } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
+import { formatDate } from '../../../lib/format.js';
 
 export type PositionDraft = { roleId: string; unitId: string; isPrimary: boolean };
 
@@ -108,24 +109,49 @@ export function PositionEditor({
   );
 }
 
-/** `Role — Unit`, the only rendering of a position anywhere. 34 § Interactions. */
+/**
+ * `Role — Unit`, the only rendering of a position anywhere. 34 § Interactions.
+ *
+ * EXTENDED BY T-051, not forked (INV-009). `47` § Interactions asks for a position "with the
+ * level and any expiry date", and `24`'s `<PersonChip>` rule is that a role's level is
+ * visible so the hierarchy is inspectable exactly when it gets probed. Both are OPTIONAL
+ * props: the detail pages pass them because the question there is *what does this position
+ * confer*, and the list does not because its Positions column answers the narrower *where do
+ * they sit* — a level badge on every chip in a table cell is noise the detail page has room
+ * for and the row does not.
+ *
+ * The level is ORDERING ONLY (DEC-002, CONF-002). Nothing anywhere compares two of them to
+ * decide anything; the server decides from grants (`11` §5b).
+ */
 export function PositionChip({
   roleName,
+  roleLevel,
   unitName,
   isPrimary,
+  validTo,
   onRemove,
 }: {
   roleName: string;
+  roleLevel?: number | null | undefined;
   unitName: string;
   isPrimary: boolean;
+  /** ISO, or null for open ended. An expiring position is the difference between "they
+   *  have this" and "they have this until March", and it is invisible without saying so. */
+  validTo?: string | null | undefined;
   onRemove?: (() => void) | undefined;
 }): JSX.Element {
   return (
     <span className={`position-chip${isPrimary ? ' is-primary' : ''}`}>
       <span className="position-role">{roleName}</span>
+      {roleLevel !== null && roleLevel !== undefined && (
+        <span className="position-level" title={`Level ${roleLevel}`}>L{roleLevel}</span>
+      )}
       <span className="position-dash" aria-hidden="true">—</span>
       <span className="position-unit">{unitName}</span>
       {isPrimary && <span className="tag tag-neutral">Primary</span>}
+      {validTo && (
+        <span className="tag tag-neutral position-until">Until {formatDate(validTo)}</span>
+      )}
       {onRemove && (
         <button
           type="button"

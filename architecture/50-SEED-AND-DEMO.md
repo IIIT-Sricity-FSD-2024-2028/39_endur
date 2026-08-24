@@ -73,7 +73,7 @@ regeneration never silently reverts an administrator's change (`10` §9).
 | `account.create` `account.reset` | subtree | subtree | — | — |
 | `account.revoke` | subtree | — | — | — |
 | `group.*` `delegation.*` | subtree | — | — | — |
-| `subject.read` | subtree | subtree | own_unit | — |
+| `subject.read` | subtree | subtree | own_unit | **own_unit** |
 | `subject.create` `subject.update` `subject.archive` | subtree | subtree | — | — |
 | `template.read` `template.clone` | all | all | all | — |
 | `template.create` `template.update` | all | all | — | — |
@@ -110,16 +110,26 @@ Notes on four rows that look surprising:
   `57` gives the reason: creating a sign-in is routine and re-issuing is the support path,
   but revoking ends somebody's access in the middle of their working day. The three are
   separate verbs precisely so this row can differ from the two above it.
-- **L4 gets `org.read` and nothing else.** L4 is the respondent-level role. Respondents are
-  not `users` (DEC-009), so this row only matters for the rare case of someone at that level
-  who *does* hold an account.
+- **L4 gets `org.read`, `subject.read: own_unit`, and nothing else** beyond the two universal
+  self rows. L4 is the respondent-level role. Respondents are not `users` (DEC-009), so this
+  row only matters for the case of someone at that level who *does* hold an account.
 
   **That case stopped being rare on 2026-08-24.** `T-072` made provisioning a sign-in for
   anybody in the graph a one-click action, and the owner's first question about it was what
   such an account should see. The answer wanted is *the Subjects list and nothing else in
-  `organize`* — which this row cannot currently produce, because it has **no `subject.read`
-  at all**. `T-086` adds one (proposed `own_unit`); it is a change to what every organisation
-  gets by default, so `OPEN-009` holds it until the owner confirms. See `55` § Stage 8.
+  `organize`*, which this row could not produce, because it had **no `subject.read` at all**.
+
+  **`T-086` added one, at `own_unit`, on 2026-08-24** — closing the smaller half of
+  `OPEN-009`. `own_unit` rather than `all`: a respondent-level account has a reason to see
+  the subjects of the section they are in and no reason to enumerate every subject in the
+  organisation. `own_unit` rather than `subtree` for the reason `unit.read` stops there at
+  L3: L4 sits at the bottom, so a subtree below them is usually empty and, when it is not,
+  they are not the person who should be reading it.
+
+  It is a change to what **every** organisation gets by default, which is why it waited for
+  the owner rather than a session assuming it. `org.test.ts` asserts the L4 row exactly, so a
+  fifth capability cannot join it quietly. The genuinely open cell — L3 × People — is still
+  `OPEN-009`'s and still blocks `T-087`. See `55` § Stage 8.
 
 Presets ship **no deny grants**. A `deny` is a deliberate administrator act, and seeding one
 would teach the wrong lesson about a rule that is absolute (INV-004).
@@ -162,12 +172,22 @@ Library templates are seeded with `orgId = null` (`10` §4.2) and cloned into or
 Four fully populated orgs, each with **historical responses** — not empty shells. An empty org
 proves the schema; a populated one proves the product.
 
-| Org | Preset | Scale |
-|---|---|---|
-| Northfield University | University | 2 schools, 6 departments, 18 courses, ~40 staff, 3 closed campaigns, ~1,800 responses |
-| The Grand Palace | Hotel | 3 properties, 9 units, 12 subjects, ~25 staff, 2 campaigns, ~600 responses |
-| Riverside Hospital | Hospital | 4 wards, 8 subjects, ~30 staff, 1 campaign, ~400 responses |
-| Meridian Consulting | Company | 5 teams, 10 projects, ~35 staff, 2 campaigns, ~500 responses |
+| Org | Preset | Tier | Scale |
+|---|---|---|---|
+| Northfield University | University | **Gold** | 2 schools, 6 departments, 18 courses, ~40 staff, 3 closed campaigns, ~1,800 responses |
+| The Grand Palace | Hotel | **Silver** | 3 properties, 9 units, 12 subjects, ~25 staff, 2 campaigns, ~600 responses |
+| Riverside Hospital | Hospital | **Bronze** | 4 wards, 8 subjects, ~30 staff, 1 campaign, ~400 responses |
+| Meridian Consulting | Company | **Enterprise** | 5 teams, 10 projects, ~35 staff, 2 campaigns, ~500 responses |
+
+**One organisation per tier, added 2026-08-24 (`T-088`), and it is what `D-012` asked for.**
+Until then no demo org had a `Subscription` row at all, so all four were silently Bronze and
+the `402` path could be described but never shown. The assignment follows the demo script in
+§5 rather than being alphabetical: **Northfield** is opened first and is where the improve loop
+lives, so Gold; **The Grand Palace** is step 2 and keeps analysis, so Silver; **Riverside** is
+Bronze, because the screen that says *"that feature is not included in your plan"* is only
+convincing on an organisation that genuinely is not on it; **Meridian** is Enterprise, a tier
+no picker offers (`DEC-048`), which is the only way to see that operator-assigned tiers are
+real.
 
 Response generation rules — realistic data is what makes the results screen convincing:
 

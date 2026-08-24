@@ -11,10 +11,27 @@
 // It also removes a contradiction that could not have been implemented as written: 30's
 // data contract has this page calling `GET /org/presets`, but that route is behind
 // `authenticate` + `requireCapability('org.read')` and nobody on `/start` has a session.
+//
+// TWO STEPS SINCE T-088 — DETAILS, THEN PLAN. DEC-048, and the owner asked for it by name:
+// *"when you login - pick between option / rn, no pricing, just pick the option (bronze,
+// silver and gold) and you get assigned that."*
+//
+// Both steps commit in ONE POST, and that is the point rather than an economy. `register`
+// writes the organisation and the `subscriptions` row in a single transaction (D-012), so an
+// organisation cannot exist without a tier somebody chose. Asking on a second page after the
+// account existed would recreate exactly the state D-012 describes: a live organisation with
+// no row, silently bronze, for however long it takes them to answer.
+//
+// The tier question is asked HERE and the industry question is not (CONF-011), which looks
+// inconsistent and is not: the wizard's step 1 asks about industry properly, with each
+// preset's contents visible, so asking here would be asking twice. Nothing asks about the
+// tier later, so this is the only place it can be asked once.
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
+import { PlanPicker } from '../../components/billing/PlanPicker.js';
 import { ApiError } from '../../lib/api.js';
 import { useRegister } from '../../lib/auth.js';
 import { AuthAside } from './AuthAside.js';
@@ -27,17 +44,34 @@ export default function Start(): JSX.Element {
   const navigate = useNavigate();
   const registerOrg = useRegister();
 
+  const [step, setStep] = useState<'details' | 'plan'>('details');
   const [orgName, setOrgName] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  /** NOTHING IS PRE-SELECTED — DEC-048. There is no default tier to fall back to. */
+  const [tier, setTier] = useState<SignupTier | null>(null);
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+  /**
+   * ONE `onSubmit` FOR BOTH STEPS, so Enter means the same thing as the button under the
+   * cursor. A second `<form>` would be tidier to read and would break that: Enter in the
+   * password field on step 1 would submit a registration with no tier, which the server
+   * correctly refuses with a 422 the person cannot act on.
+   */
+  function onFormSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (busy) return;
+    if (step === 'details') {
+      setStep('plan');
+      return;
+    }
+    void submit();
+  }
+
+  async function submit(): Promise<void> {
+    if (busy || !tier) return;
     setBusy(true);
     setError(null);
     try {
@@ -48,11 +82,19 @@ export default function Start(): JSX.Element {
         password,
         // The wizard's step 1 asks properly, with the contents of each preset visible.
         industry: 'custom',
+        tier,
       });
       navigate(landing, { replace: true });
     } catch (caught) {
       setError(caught as Error);
       setBusy(false);
+      // BACK TO THE FIELDS, because every error this POST can return is about one of them —
+      // 409 is the address, 422 is a field. Leaving the person on the plan step to read
+      // "that address is already registered" next to three tier cards would show them the
+      // message beside the one thing it is not about, with no way to reach the input it
+      // names. The tier they picked survives the trip; nothing is re-chosen.
+      const status = (caught as ApiError).status;
+      if (status === 409 || status === 422) setStep('details');
     }
   }
 
@@ -72,10 +114,18 @@ export default function Start(): JSX.Element {
     <div className="auth">
       <div className="auth-main">
       <div className="card elev-lg auth-card">
-        <h1 className="auth-title">Create your organization</h1>
-        <p className="auth-sub">Takes about two minutes.</p>
+        <h1 className="auth-title">
+          {step === 'details' ? 'Create your organization' : 'Choose a plan'}
+        </h1>
+        <p className="auth-sub">
+          {step === 'details'
+            ? 'Takes about two minutes.'
+            : 'Nothing to pay. Change it any time from settings.'}
+        </p>
 
-        <form onSubmit={(event) => void submit(event)} noValidate>
+        <form onSubmit={onFormSubmit} noValidate>
+          {step === 'details' && (
+          <>
           <div className="field">
             <label htmlFor="orgName">Organization name</label>
             <input
@@ -169,13 +219,50 @@ export default function Start(): JSX.Element {
               </p>
             )}
           </div>
+          </>
+          )}
+
+          {step === 'plan' && (
+            <PlanPicker
+              plans={SIGNUP_PLAN_OPTIONS}
+              current={tier}
+              mode="signup"
+              onSelect={(chosen) => setTier(chosen as SignupTier)}
+              disabled={busy}
+            />
+          )}
 
           {banner && <p className="form-error" role="alert">{banner}</p>}
 
-          <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
-            {busy && <span className="spinner" aria-hidden="true" />}
-            Continue to setup
-          </button>
+          {step === 'details' ? (
+            <button className="btn btn-primary btn-block" type="submit">
+              Continue
+            </button>
+          ) : (
+            <>
+              {/*
+                DISABLED UNTIL A TIER IS CHOSEN, rather than defaulting to one — DEC-048.
+                A pre-selected card would be the product choosing and then attributing the
+                choice to the customer, which is how D-012 looked from the inside for a month.
+              */}
+              <button
+                className="btn btn-primary btn-block"
+                type="submit"
+                disabled={busy || !tier}
+              >
+                {busy && <span className="spinner" aria-hidden="true" />}
+                Continue to setup
+              </button>
+              <button
+                className="btn btn-ghost btn-block"
+                type="button"
+                disabled={busy}
+                onClick={() => setStep('details')}
+              >
+                Back
+              </button>
+            </>
+          )}
         </form>
 
         <p className="auth-alt">

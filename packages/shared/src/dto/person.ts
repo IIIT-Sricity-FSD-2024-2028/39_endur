@@ -126,13 +126,59 @@ export const ImportPeopleDto = dto({ body: ImportPeopleBody });
 export const ImportPreviewDto = dto({ body: ImportPreviewBody });
 
 /** Response shapes. */
+
+/**
+ * A position is a role AT a unit, and this is the only shape it is ever returned in — the
+ * list, the detail page and `ProfileView` all read it, so there is one answer to "what does
+ * the client know about a position".
+ *
+ * `unitId`, `roleLevel` and `validTo` were added by `T-051`, each for a named reader:
+ *
+ * · `unitId` because `powersByPlace` used to re-find the unit BY NAME (`readPerson`, before
+ *   T-051) and nothing stops two units sharing one. Two positions at two same-named units
+ *   collapsed onto whichever row the lookup happened to return first — INV-005 broken by a
+ *   query, on the one screen built to demonstrate INV-005. It is also what makes a position
+ *   chip a link to the unit it names.
+ * · `roleLevel` because `47` § Interactions renders a position "with the level", and `24`'s
+ *   `<PersonChip>` says the level is always visible. It is ORDERING ONLY (DEC-002) and
+ *   nothing anywhere compares two of them to decide anything.
+ * · `validTo` because an expiring position is the difference between "they have this" and
+ *   "they have this until March", and `47` asks for the expiry date by name. `null` is open
+ *   ended, exactly as the column is.
+ *
+ * `unitId` is nullable because the schema's is: a position node's `unit_id` is optional even
+ * though `addAssignment` always sets it. Better a null the client handles than an empty
+ * string it might put in a URL.
+ */
+export type Position = {
+  edgeId: string;
+  /**
+   * ADDED BY T-052, for one named reader — the powers grid's self-lockout prompt.
+   *
+   * `33` requires that removing `grant.update` from your OWN role warn you before saving,
+   * and the grid has role IDs while the caller's positions had only role NAMES. Matching
+   * them by name is `N-057` exactly: `nodes` has no unique on `(org_id, kind, name)`, so a
+   * name lookup is a lookup by something the database does not enforce is unique — and
+   * getting it wrong here means either a warning that never fires or one that fires on the
+   * wrong role, before the one save in the product that has no undo.
+   */
+  roleId: string | null;
+  roleName: string;
+  roleLevel: number | null;
+  unitId: string | null;
+  unitName: string;
+  isPrimary: boolean;
+  /** `null` = open ended. Access expires without anyone having to remember to revoke it. */
+  validTo: string | null;
+};
+
 export type PersonSummary = {
   id: string;
   userId: string | null;
   name: string;
   email: string | null;
   status: string;
-  positions: Array<{ edgeId: string; roleName: string; unitName: string; isPrimary: boolean }>;
+  positions: Position[];
   createdAt: string;
   /**
    * ON THE SUMMARY, not only the detail, and that placement is forced by `57` § States:
@@ -145,18 +191,29 @@ export type PersonSummary = {
   account: AccountStatus;
 };
 
+/**
+ * Effective powers, produced by the SHARED resolver — never a second implementation
+ * (N-005). Grouped BY PLACE, because that is what proves INV-005 to somebody looking at
+ * the screen: the same person, two units, different powers.
+ *
+ * NAMED, and not inlined into `PersonDetail`, since `T-051`: `ProfileView` returns the very
+ * same thing about the caller themselves, and `<PowersByPlace>` renders both. Two shapes
+ * would mean two renderers, which is the second implementation N-005 forbids arriving one
+ * layer higher up than the doc was watching.
+ *
+ * The SCOPE travels with each capability and is not decoration: "you hold `results.read`
+ * here" and "you hold it over everything below here" are different answers, and `47`'s whole
+ * reason for existing is a person answering "why can I not see that?" for themselves.
+ */
+export type PowersAtPlace = {
+  unitId: string;
+  unitName: string;
+  roleName: string;
+  capabilities: Array<{ capability: string; scope: string }>;
+};
+
 export type PersonDetail = PersonSummary & {
-  /**
-   * Effective powers, produced by the SHARED resolver — never a second implementation
-   * (N-005). Grouped BY PLACE, because that is what proves INV-005 to somebody looking at
-   * the screen: the same person, two units, different powers.
-   */
-  powersByPlace: Array<{
-    unitId: string;
-    unitName: string;
-    roleName: string;
-    capabilities: Array<{ capability: string; scope: string }>;
-  }>;
+  powersByPlace: PowersAtPlace[];
 };
 
 export type ImportPreview = {

@@ -1,7 +1,7 @@
 # 34 — People
 
 Phase: P2 · Milestone: — (cut-list item 7 — seed only if behind) · Related: `57` (accounts)
-Status: **LIST BUILT 2026-08-23 (`T-050`)** — detail page is `T-051`, accounts are `T-073`, CSV import UI is unbuilt
+Status: **LIST BUILT 2026-08-23 (`T-050`) · DETAIL PAGE BUILT 2026-08-24 (`T-051`)** — accounts are `T-073`, CSV import UI is unbuilt
 Owns: `src/frontend/pages/console/People/**`, `src/frontend/lib/people.ts`
 Design ref: `design_specs/design/04` §4.4, `customization.md` §9 screen 9
 
@@ -169,8 +169,21 @@ or in the backend suite where the guarantee is the API's.
 - [x] A person with **no** position says so in words — an empty cell would not
 - [ ] Adding a two-hat person via preset takes under 60 seconds — **presets not built**; the
       two dropdowns are, and a second position is four interactions
-- [ ] Effective powers on the detail page are produced by the shared resolver — `T-051`
-- [ ] The powers view proves INV-005: powers on unit A do not appear under unit B — `T-051`
+- [x] Effective powers on the detail page are produced by the shared resolver — one caller
+      of it, `features/people/powers.ts`, shared with `/profile` (`47`). Proved by a
+      person-level DENY removing a power from the page: a list built from the role's grants
+      cannot see that deny, and INV-004 says it wins
+- [x] The powers view proves INV-005: powers on unit A do not appear under unit B — **and
+      building it found a live break of exactly that.** `readPerson` had no unit id to work
+      with (`personSelect` fetched position NAMES only), so it re-found the unit by name:
+      `where: { orgId, kind: 'position', unit: { name: position.unitName } }`. Nothing stops
+      two units sharing a name — `nodes` has no unique on `(org_id, kind, name)` and
+      `POST /units` does not check — so a person holding a position in each of two same-named
+      units had both resolved to whichever row came back first, and one unit's powers printed
+      under the other's heading. On the one screen in the product built to show that powers do
+      not leak between units. Fixed by putting `unitId` on the position DTO; the test that
+      catches it is the only one in the repo with two same-named units, because every other
+      fixture names them distinctly (`profile.test.ts`, `_MEMORY.md` `N-057`)
 - [x] Create-person requests cannot carry a role or capability — the DTO refuses it and the
       form does not ask, and **says on screen why the position comes next**
 - [x] Every assignment change writes an audit row (INV-007, backend since `T-018`)
@@ -185,7 +198,8 @@ or in the backend suite where the guarantee is the API's.
       `T-045`
 - [ ] A caller cannot assign a role resolving to a capability they lack at that unit —
       `403 WOULD_ESCALATE`, naming it (INV-012)
-- [ ] The account panel shows all four states, and revoke leaves positions intact
+- [ ] The account panel shows all four states, and revoke leaves positions intact — `T-073`.
+      The page it hangs on now exists
 - [x] Every noun from `useLabels()` (INV-001) — `audit:vocab` clean, and the page's own tests
       run against nonsense labels
 

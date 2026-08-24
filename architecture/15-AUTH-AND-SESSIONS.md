@@ -48,6 +48,48 @@ at 10:00, not whenever a token happens to expire.
 is strictly better than the previous in-memory access token: it closes the same XSS
 token-theft class *and* removes the silent-refresh dance on every page load.
 
+### One address, more than one organisation — DEC-049
+
+`users` is unique on **`(org_id, email)`** (`10` §3), not on `email`, so a person may hold an
+activated account in several organisations. Login takes an address and a password with no
+organisation, which is right for the overwhelmingly common case and cannot be right for that
+one.
+
+**How it resolves, in order:**
+
+1. Every **activated** account on that address is a candidate — `passwordHash: not null`,
+   ordered `createdAt asc`, capped at **five**.
+2. The password is verified against each. No match, or only disabled matches → the one
+   uniform `401`, with a dummy verification when there are no candidates at all so an unknown
+   address costs the same as a known one.
+3. **Exactly one match → signed in.** This is every ordinary case, including a person with two
+   accounts who uses two passwords: nothing is asked.
+4. **More than one match → `409 ACCOUNT_AMBIGUOUS`**, naming the organisations, and the client
+   re-posts with `orgId`. It requires the same password in several organisations, so no seeded
+   org and no ordinary sign-in ever reaches it.
+
+**Why all candidates and not the first.** Until 2026-08-24 this was a `findFirst` ordered
+oldest-first. That closed an adversarial lockout (`CONF-013`) and left an honest one, which was
+**measured through the real routes rather than theorised**: a person activates a second account,
+chooses a password, is signed in by the activation — and can never log in again, because only
+the older row was ever compared against. `T-072` made reaching that state one click and a link.
+
+**Two properties the cap and the ordering buy.** Oldest-first means the incumbent account is
+always inside the window, so no number of accounts created later can push somebody out of their
+own. The cap means one login attempt cannot be turned into arbitrary argon2 work by anybody who
+can create accounts on an address. A hypothetical sixth account is unreachable until one of the
+first five is revoked — which fails toward the incumbent, the right direction.
+
+**`orgId` narrows, it never unlocks.** The password is verified against that organisation and
+nowhere else, so a wrong `orgId` fails exactly like a wrong password, same status and same
+words. It cannot make a login succeed that would otherwise have failed, and it is not a way to
+probe which organisations an address belongs to.
+
+**Known and bounded:** an address with several activated accounts costs proportionally more
+argon2 work than one without, which is a timing signal for the *number* of accounts on a known
+address. It is capped at five, and registration's `409` already discloses that an address is in
+use, so this adds cardinality rather than existence.
+
 ### Session hygiene
 
 - **Regenerate the session id on login.** Without this, an attacker who can set a cookie

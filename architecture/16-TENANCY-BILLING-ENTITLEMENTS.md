@@ -51,6 +51,7 @@ export const TIER_ENTITLEMENTS: Record<Tier, readonly Capability[]> = {
   bronze: [
     'org.*', 'unit.*', 'role.*', 'grant.*', 'person.*', 'assignment.*',
     'group.*', 'delegation.*', 'subject.*', 'template.*', 'campaign.*',
+    'account.*', 'billing.*',                    // added 2026-08-24 — see below
     'response.read', 'results.read', 'simulator.run',
   ],
   silver:     [...bronze, 'analysis.read', 'results.export', 'response.export'],
@@ -58,6 +59,19 @@ export const TIER_ENTITLEMENTS: Record<Tier, readonly Capability[]> = {
   enterprise: [...gold,   'audit.read', 'apikey.*', 'api.*'],
 };
 ```
+
+> **`account.*` and `billing.*` were in NO TIER AT ALL until `T-088` found them (2026-08-24).**
+> Two bugs of the same shape. `account.*` arrived with `T-072` and this table was simply not
+> updated — but an organisation that cannot provision a sign-in for its own people cannot use
+> the product at any price, and §3's first assertion below is that the whole permission surface
+> is in Bronze. `billing.*` had been uncovered since `T-003` and is the worse of the two: with
+> `billing.update` in no tier, mounting `requireEntitlement` on `POST /billing/tier` would
+> `402` every attempt to LEAVE the tier you are on — a paywall in front of the upgrade button.
+> Neither had fired: the account routes are not entitlement-gated and `POST /billing/tier` does
+> not exist yet. `src/backend/test/tiers.test.ts` now asserts that every capability in the
+> catalogue appears in at least one tier, so the next module cannot be forgotten the same way.
+> **A capability in no tier is always a bug, never a decision** — an operator-only power belongs
+> in `19`'s separate platform catalogue, which this table does not describe.
 
 Two things this table asserts, and both are deliberate:
 

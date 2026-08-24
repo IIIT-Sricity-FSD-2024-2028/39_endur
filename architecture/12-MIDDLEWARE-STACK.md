@@ -48,6 +48,7 @@ per endpoint and eventually got wrong.
 │  9  validate(Dto)      zod over body/query/params → typed req.data       │
 │ 10  requireCapability  the GRANT resolver         → req.ctx.decision     │
 │ 10b requireNoEscalation you cannot hand out what you do not hold (INV-012)│
+│     requireNoGrantEscalation  ..the same rule on the powers grid (DEC-056)│
 │ 10c requireMembership  respondent gate on organization-access campaigns  │
 │ 11  requireEntitlement subscription tier gate                            │
 │ 12  rateLimit(scoped)  tighter bucket for expensive or abusable routes   │
@@ -342,10 +343,36 @@ power out"* is an authorisation decision. Putting it in `people/service.ts` woul
 the one authorisation rule in the product you cannot see by reading the route, which is the
 property §2 exists to protect.
 
-It runs **after** `requireCapability`, never instead of it, and it can only refuse. Three
-routes carry it: `POST /people/:id/assignments`, `POST /people/:id/account` (`57`) and the
-powers-grid write (`33`). Refusal is `403 WOULD_ESCALATE` naming the capability, because a
-bare 403 on a button the caller just used successfully one row above reads as a bug.
+It runs **after** `requireCapability`, never instead of it, and it can only refuse. Refusal
+is `403 WOULD_ESCALATE` naming the capability, because a bare 403 on a button the caller just
+used successfully one row above reads as a bug.
+
+Three routes carry it: `POST /people/:id/assignments`, `POST /people/import` and
+`POST /people/:id/account` (`57`).
+
+**This paragraph used to name the powers-grid write as the third, and that was false from
+the day it was written until 2026-08-24.** `PUT /grants` carried `requireCapability` and
+nothing else. The grid does not take a role-at-a-unit pair — a cell *is* a capability at a
+scope — so it needs a **sibling**, not this function, and `T-052` wrote one:
+
+#### 10b′ · `requireNoGrantEscalation` — the same rule, on the powers grid (DEC-056)
+
+```ts
+grantsRouter.put('/', authenticate, validate(PutGrantsDto),
+                 requireCapability('grant.update'), requireNoGrantEscalation(), …)
+```
+
+`33` names this screen as the higher-leverage of the two: *"editing a role's row raises
+everyone holding it"*. The bound is **everywhere**, not a scope comparison — a cell says
+nothing about where, so the saver must hold the capability across the whole organisation
+themselves. It asks `visibleUnits()`, the same primitive `findEscalation` uses, because a
+width comparison cannot tell `subtree`-at-the-root (the whole org, and what level 1 is
+actually seeded with) from `subtree`-at-Section-A (not the whole org). Only **allows** are
+bounded: refusing a deny or a removal would stop a delegate undoing their own mistake.
+
+A **sibling and not an extension** — INV-009 governs a second *placement* of one thing, and
+these are two *rules* whose inputs do not meet. One resolves a position through the graph;
+the other reads a capability and a scope and needs no graph at all.
 
 It is the same shape as `requireEntitlement` below — an extra reason to say no, composed onto
 a route that already carries its capability — which is why it sits between them rather than

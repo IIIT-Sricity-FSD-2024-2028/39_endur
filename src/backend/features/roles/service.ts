@@ -4,7 +4,8 @@
 // number. A GRANT is a row saying that node may do something at some scope. Levels order
 // roles for the seeded defaults and for nothing else — the enforcement is always the grant
 // (DEC-002, CONF-002).
-import { CAPABILITY_CATALOGUE, type Capability } from '@endur/shared';
+import { CAPABILITY_CATALOGUE, describeCapability, type Capability } from '@endur/shared';
+import type { ResolvedLabels } from '@endur/shared';
 import type {
   CapabilityMeta,
   CreateRoleBody,
@@ -212,6 +213,8 @@ export async function writeMatrix(
     }
   }
 
+  await assertSomebodyCanStillEditPowers(orgId, body);
+
   await runInTransaction(req, async (tx) => {
     for (const cell of body.cells) {
       if (cell.scope === null) {
@@ -250,11 +253,69 @@ export async function writeMatrix(
 }
 
 /**
+ * THE LOCKOUT GUARD — 33 § "The lockout guard". `409`, never a warning.
+ *
+ * A grid that leaves no role holding `grant.update` is the one unrecoverable mistake on that
+ * screen: the organisation can still be used and can never be re-configured, because the
+ * capability that would fix it is the capability nobody holds any more. There is no undo,
+ * because undo is a grid edit.
+ *
+ * It is the ONLY place in the product where an administrator's explicit intent is overridden,
+ * and 33 argues the exception rather than assuming it: everything else the grid can express
+ * is a legal configuration somebody might mean, and blocking on a judgement call is how
+ * administrators learn to fight the tool. This one is not a judgement call — it is a state
+ * from which the tool cannot be operated at all.
+ *
+ * COMPUTED ON THE RESULTING MATRIX, NOT ON THE SUBMITTED CELLS. `PUT /grants` writes the
+ * cells it is given and leaves the rest alone, so a body that merely does not MENTION
+ * `grant.update` is fine, and a body that removes the last holder is not. Checking the body
+ * would refuse the first and allow the second, which is exactly backwards.
+ *
+ * Not middleware, unlike the escalation bound next to it, and the difference is real: this is
+ * not an authorisation question. The caller is permitted to make this change; the resulting
+ * state is the thing that is refused. `409`, the same shape as "that is not a capability".
+ */
+async function assertSomebodyCanStillEditPowers(
+  orgId: string,
+  body: PutGrantsBody,
+): Promise<void> {
+  // Only a body that TOUCHES grant.update can remove the last holder. Every other save skips
+  // the query entirely, which matters because the grid saves the whole visible matrix.
+  const touches = body.cells.some((cell) => cell.capability === 'grant.update');
+  if (!touches) return;
+
+  const current = await prisma.grant.findMany({
+    where: { orgId, capability: 'grant.update', subject: { kind: 'role' } },
+    select: { subjectId: true, effect: true },
+  });
+
+  const after = new Map<string, 'allow' | 'deny' | 'none'>();
+  for (const grant of current) after.set(grant.subjectId, grant.effect);
+  for (const cell of body.cells) {
+    if (cell.capability !== 'grant.update') continue;
+    after.set(cell.roleId, cell.scope === null ? 'none' : cell.effect);
+  }
+
+  // INV-004: a deny beats an allow, so a role holding both holds nothing. A holder is a
+  // role whose resulting cell is an allow and nothing else.
+  const holders = [...after.values()].filter((effect) => effect === 'allow');
+  if (holders.length > 0) return;
+
+  throw new ConflictError(
+    'That would leave no role able to change powers, and nobody could undo it. ' +
+      'Keep at least one role with “change what every role is allowed to do”.',
+  );
+}
+
+/**
  * What the grid warns about. None of these is an error — they are all legal states that
  * are usually mistakes, and the difference matters: an administrator who is blocked from a
  * legal configuration stops trusting the tool.
  */
-export async function grantWarnings(orgId: string): Promise<GrantWarning[]> {
+export async function grantWarnings(
+  orgId: string,
+  labels: ResolvedLabels,
+): Promise<GrantWarning[]> {
   const [roles, grants] = await Promise.all([
     prisma.node.findMany({ where: { orgId, kind: 'role' }, select: { id: true, name: true } }),
     prisma.grant.findMany({
@@ -275,7 +336,7 @@ export async function grantWarnings(orgId: string): Promise<GrantWarning[]> {
     warnings.push({
       kind: 'nobody_can',
       capability,
-      message: `Nobody in this organisation can ${describe(capability)}.`,
+      message: `Nobody in this organisation can ${describeCapability(capability, labels)}.`,
     });
   }
 
@@ -294,7 +355,7 @@ export async function grantWarnings(orgId: string): Promise<GrantWarning[]> {
       kind: 'deny_shadows_allow',
       capability: grant.capability,
       roleId: grant.subjectId,
-      message: `${roleName.get(grant.subjectId) ?? 'A role'} is both allowed and denied ${describe(grant.capability)}. The deny wins.`,
+      message: `${roleName.get(grant.subjectId) ?? 'A role'} is both allowed and denied “${describeCapability(grant.capability, labels)}”. The deny wins.`,
     });
   }
 
@@ -313,20 +374,20 @@ export async function grantWarnings(orgId: string): Promise<GrantWarning[]> {
   return warnings;
 }
 
-/** The catalogue, for the grid. Grouped exactly as 11 §3 groups it. */
-export const capabilityCatalogue = (): CapabilityMeta[] =>
+/**
+ * The catalogue, for the grid. Grouped exactly as 11 §3 groups it.
+ *
+ * TAKES THE TENANT'S NOUNS SINCE T-052 (`D-008`). The row labels of the powers grid are
+ * user-facing domain nouns, so INV-001 applies to them exactly as it applies to a component:
+ * a hotel's grid reads *"open guest surveys for answers"*, not *"launch campaigns"*.
+ */
+export const capabilityCatalogue = (labels: ResolvedLabels): CapabilityMeta[] =>
   Object.entries(CAPABILITY_CATALOGUE).map(([key, meta]) => ({
     key,
     module: meta.module,
-    label: describe(key),
+    label: describeCapability(key, labels),
     phase: meta.phase,
   }));
-
-/** "campaign.launch" -> "launch campaigns". Readable in a sentence, which is where it goes. */
-function describe(capability: string): string {
-  const [object = '', verb = ''] = capability.split('.');
-  return `${verb} ${object}s`.replace(/ss$/, 'ses');
-}
 
 async function assertRole(orgId: string, roleId: string): Promise<void> {
   // D-001 again: the tenant client cannot scope a by-id where, so this is checked by hand

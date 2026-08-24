@@ -1,6 +1,9 @@
 # 44 — The improve loop
 
 Phase: **P3, re-tagged buildable 2026-08-23 — CONF-019** · Milestone: —
+Status: **PROMOTED 2026-08-24 — `CONF-021`** (`T-083` backend, `T-084` page). `D-012` was
+the hard blocker here and `T-088` repaid it: this surface would have `402`d for **every
+user in the product** if it had been built before 24 Aug
 Source: `design_specs/SCOPE.md` §"Improve", `_MEMORY.md` § GLOSSARY
 
 > **Status changed 2026-08-23.** This document said *"do not build before P3"* and the owner

@@ -67,6 +67,7 @@ describe('the error envelope', () => {
       name: 'Ada',
       orgName: freshOrgName('strip'),
       industry: 'custom',
+      tier: 'bronze',
       // The forgery INV-010 exists for. If it were merged rather than stripped, the new
       // organisation would carry an id somebody else chose.
       orgId: '00000000-0000-0000-0000-0000000000ff',

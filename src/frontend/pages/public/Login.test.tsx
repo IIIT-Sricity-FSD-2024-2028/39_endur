@@ -215,3 +215,85 @@ describe('sign in — 30 §3.2', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Password').value.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * DEC-049 — one address, two organisations. The narrowest question the product asks.
+ *
+ * It can only be reached by somebody who holds an activated account in more than one
+ * organisation AND uses the same password for them: with different passwords the server
+ * signs them straight in, and with one account it never comes up. No seeded organisation
+ * shares an address, so the demo never sees this screen.
+ */
+const AMBIGUOUS = () =>
+  new ApiError({
+    code: 'ACCOUNT_AMBIGUOUS',
+    status: 409,
+    message: 'That sign-in works for more than one organization.',
+    requestId: 'req-1',
+    details: {
+      // Deliberately NOT the seeded org names: the demo affordance renders those as
+      // prefill chips on this very page, and two buttons with one name is an ambiguous
+      // query rather than an ambiguous account.
+      organizations: [
+        { id: 'org-a', name: 'Aster Health Partners' },
+        { id: 'org-b', name: 'Borden Institute' },
+      ],
+    },
+  });
+
+describe('one address, two organisations — DEC-049', () => {
+  it('asks which, naming them, instead of failing', async () => {
+    signIn.mockRejectedValueOnce(AMBIGUOUS());
+    mount();
+    fill();
+    submit();
+
+    await waitFor(() => expect(screen.getByText('Which organization?')).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Aster Health Partners' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Borden Institute' })).toBeTruthy();
+    // NOT an error. The credentials were right; one more fact is missing.
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('answers with the org and does not make them retype anything', async () => {
+    signIn.mockRejectedValueOnce(AMBIGUOUS()).mockResolvedValueOnce('/app');
+    mount();
+    fill();
+    submit();
+
+    await waitFor(() => expect(screen.getByText('Which organization?')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Borden Institute' }));
+
+    await waitFor(() => expect(screen.getByText('CONSOLE')).toBeTruthy());
+    expect(signIn).toHaveBeenCalledTimes(2);
+    // The SAME credentials, plus the answer. The password never left component state.
+    expect(signIn.mock.calls[1]?.[0]).toEqual({
+      email: 'admin@northfield.endur.test',
+      password: 'endur-demo-password',
+      orgId: 'org-b',
+    });
+  });
+
+  /** `orgId` is an answer, never an unprompted hint — an ordinary sign-in sends two fields. */
+  it('never sends an orgId on the first attempt', async () => {
+    signIn.mockResolvedValue('/app');
+    mount();
+    fill();
+    submit();
+    await waitFor(() => expect(signIn).toHaveBeenCalled());
+    expect(signIn.mock.calls[0]?.[0]).not.toHaveProperty('orgId');
+  });
+
+  it('goes back to the form with everything still filled in', async () => {
+    signIn.mockRejectedValueOnce(AMBIGUOUS());
+    mount();
+    fill();
+    submit();
+
+    await waitFor(() => expect(screen.getByText('Which organization?')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByLabelText<HTMLInputElement>('Email').value).toBe('admin@northfield.endur.test');
+    expect(screen.getByLabelText<HTMLInputElement>('Password').value).toBe('endur-demo-password');
+  });
+});

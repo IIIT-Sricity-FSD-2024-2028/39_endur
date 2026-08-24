@@ -19,7 +19,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: (() => void) | undefined 
   // Out-of-scope navigation is ABSENT, not greyed out — greying it out would be a list of
   // everything the caller cannot do (design_specs/design/02 §5). "Soon" is a different
   // thing entirely: it means nobody can do it yet.
-  const items = navItems(labels).filter((item) => !item.needs || can(item.needs));
+  const items = navItems(labels).filter(
+    (item) => !item.needs || can(item.needs, item.minScope),
+  );
 
   return (
     <nav className="sidebar" aria-label="Sections">

@@ -37,6 +37,7 @@ describe('POST /auth/register rolls back completely — 30 § Acceptance, 15 §5
       emails.map((email) =>
         request(app).post('/api/v1/auth/register').send({
           email, password: 'a-long-enough-password', name: 'Founder', orgName, industry: 'custom',
+          tier: 'bronze',
         }),
       ),
     );

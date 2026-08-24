@@ -29,6 +29,18 @@ export const ERROR_CODES = {
   NOT_A_MEMBER: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  /**
+   * DEC-049. The email and password are RIGHT, and they are right for more than one
+   * organisation — `users` is unique on `(org_id, email)` (`10`), so one address can hold
+   * an activated account in several. Login therefore cannot name the account on its own.
+   *
+   * Its own code rather than a plain CONFLICT because it is the only 409 that is not a
+   * failure: the caller has authenticated successfully and is being asked ONE more
+   * question. `details.organizations` carries `{ id, name }` for each — safe to disclose
+   * precisely because it is only ever sent to somebody who has just proved the password
+   * for every organisation in the list. The client re-posts `/auth/login` with `orgId`.
+   */
+  ACCOUNT_AMBIGUOUS: 409,
   PAYLOAD_TOO_LARGE: 413,
   VALIDATION_FAILED: 422,
   RATE_LIMITED: 429,
@@ -61,6 +73,8 @@ export type ErrorEnvelope = {
       fields?: FieldError[];
       decidedBy?: DecidedBy;
       requiredTier?: string;
+      /** 409 ACCOUNT_AMBIGUOUS — which organisations this address and password open. */
+      organizations?: Array<{ id: string; name: string }>;
       [key: string]: unknown;
     };
     requestId: string;

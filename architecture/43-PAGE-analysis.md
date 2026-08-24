@@ -1,6 +1,9 @@
 # 43 — Analysis dashboard
 
 Phase: **P3, re-tagged buildable 2026-08-23 — CONF-019** · Milestone: —
+Status: **PROMOTED 2026-08-24 — `CONF-021`** (`T-081` backend, `T-082` page). The owner
+asked a second time. `T-088` wrote the subscriptions row, so `T-082`'s 402-vs-403
+demonstration is now real rather than universal
 Design ref: `design_specs/design/08` §8.2
 Decisions: `_MEMORY.md` **DEC-042 — the engine is rule-based**, resolving `OPEN-003`
 

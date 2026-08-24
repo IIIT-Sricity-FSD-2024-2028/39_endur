@@ -99,6 +99,32 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
               isPrimary: true },
     });
 
+    // THE SUBSCRIPTION ROW — D-012 repaid, DEC-048. IN THE SAME TRANSACTION as everything
+    // else, for the reason this whole function exists: an organisation that exists without one
+    // is a half-created organisation, and the half that is missing is the one every
+    // entitlement decision reads. `requireEntitlement` would answer for it by falling back to
+    // bronze, which is precisely how D-012 stayed invisible for a month — a default that looks
+    // like an answer.
+    //
+    // `status: 'active'` FROM THE FIRST REQUEST. There is no `trialing` on this path: DEC-048
+    // removed it, and 16 §7 records why — both arguments for a 14-day Gold trial were
+    // arguments about PRICE, and DEC-035 removed price. A free trial of a free tier is a
+    // countdown to nothing, and expiring it would need a scheduler OPEN-005 says nobody owns.
+    //
+    // THE PERIOD IS A YEAR AND IT BILLS NOTHING. `periodStart`/`periodEnd` are NOT NULL in the
+    // schema (10, `subscriptions`) and a subscription genuinely has a period, so the column is
+    // filled honestly rather than with a sentinel — but with no amount and no currency
+    // (DEC-035) nothing happens when it ends. Whatever renews it is the same unbuilt scheduler
+    // as above; until then the only thing reading these two columns is a human looking at the
+    // row. `seats` stays at its default 0 because D-013's meter does not exist yet, and a
+    // number nothing recomputes is worse than a zero that is obviously unbuilt.
+    const periodStart = new Date();
+    const periodEnd = new Date(periodStart);
+    periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    await tx.subscription.create({
+      data: { orgId: org.id, tier: input.tier, status: 'active', periodStart, periodEnd },
+    });
+
     // Level-1 grants, on the ROLE. Anchoring comes from the position at resolve time —
     // that is INV-005, and it is why these rows carry no unit of their own.
     await tx.grant.createMany({

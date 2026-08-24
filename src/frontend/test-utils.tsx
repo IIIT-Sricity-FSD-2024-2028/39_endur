@@ -9,13 +9,21 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import type { ReactNode } from 'react';
-import type { Capability, LabelSet, MeResponse } from '@endur/shared';
+import type { Capability, HeldCapabilities, LabelSet, MeResponse } from '@endur/shared';
 import { authReducer, signedIn, signedOut } from './store/authSlice.js';
 import { labelsLoaded, vocabularyReducer } from './store/vocabularySlice.js';
 
 export type SessionFixture = {
-  /** Absent means signed out. `undefined` status is what boot-in-flight looks like. */
-  capabilities?: Capability[];
+  /**
+   * Absent means signed out. `undefined` status is what boot-in-flight looks like.
+   *
+   * AN ARRAY STILL WORKS AND MEANS `all` — T-086 turned the capability set into a scoped
+   * map, and the array form is kept because most component tests are asking "does this
+   * button render", for which the widest scope is the right fixture and the scope is
+   * noise. Pass the map form when the SCOPE is the thing under test, which is what the
+   * per-tier sidebar tests need (`T-087`).
+   */
+  capabilities?: readonly Capability[] | HeldCapabilities;
   labels?: LabelSet;
   name?: string;
   orgName?: string;
@@ -34,6 +42,20 @@ export const NONSENSE_LABELS: LabelSet = {
   respondent: { one: 'Frimble', many: 'Frimbles' },
   reviewee: { one: 'Vandor', many: 'Vandors' },
   campaign: { one: 'Plithe', many: 'Plithes' },
+};
+
+const heldFrom = (
+  capabilities: readonly Capability[] | HeldCapabilities | undefined,
+): HeldCapabilities => {
+  if (!capabilities) return {};
+  // `Array.isArray` does not narrow a READONLY array out of a union, so the branch is
+  // written positively and the map form is the fall-through.
+  if (Array.isArray(capabilities)) {
+    const held: HeldCapabilities = {};
+    for (const capability of capabilities as readonly Capability[]) held[capability] = 'all';
+    return held;
+  }
+  return capabilities as HeldCapabilities;
 };
 
 export function makeStore(session: SessionFixture = {}) {
@@ -56,7 +78,7 @@ export function makeStore(session: SessionFixture = {}) {
         industry: 'university',
       },
       labels: session.labels ?? {},
-      capabilities: session.capabilities ?? [],
+      capabilities: heldFrom(session.capabilities),
     };
     store.dispatch(signedIn(me));
     store.dispatch(labelsLoaded(session.labels));

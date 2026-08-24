@@ -3,7 +3,7 @@
 // It holds no credential. The session is an httpOnly cookie the browser manages, so
 // there is nothing here to leak to devtools and nothing to persist by accident (20 §5).
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { Capability, MeResponse } from '@endur/shared';
+import type { HeldCapabilities, MeResponse } from '@endur/shared';
 
 /**
  * `unknown` is the state before /auth/me answers, and it is the reason the console
@@ -16,15 +16,16 @@ export type AuthState = {
   status: SessionStatus;
   user: MeResponse['user'] | null;
   org: MeResponse['organization'] | null;
-  /** Usability only, never enforcement (INV-003). A wrong set is a confusing button. */
-  capabilities: Capability[];
+  /** Usability only, never enforcement (INV-003). A wrong set is a confusing button.
+   *  Capability to the WIDEST scope it is held at since T-086 — absent means not held. */
+  capabilities: HeldCapabilities;
 };
 
 const initialState: AuthState = {
   status: 'unknown',
   user: null,
   org: null,
-  capabilities: [],
+  capabilities: {},
 };
 
 const authSlice = createSlice({
@@ -42,7 +43,7 @@ const authSlice = createSlice({
       state.status = 'anonymous';
       state.user = null;
       state.org = null;
-      state.capabilities = [];
+      state.capabilities = {};
     },
   },
 });

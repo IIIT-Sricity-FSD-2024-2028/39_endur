@@ -1,6 +1,18 @@
 # 33 — Roles and the powers grid
 
 Phase: P2 · Milestone: — · Invariants: INV-004, **INV-012** · Design ref: `design_specs/design/04` §4.3, `design_specs/customization.md` §9 screens 1, 3–8
+Status: **BUILT 2026-08-24 (`T-052`)** — first of `CONF-021`'s four sidebar pages.
+Owns: `src/frontend/pages/console/Roles/**`, `src/frontend/lib/roles.ts`,
+`packages/shared/src/capability-labels.ts`, `src/backend/middleware/requireNoGrantEscalation.ts`
+
+> **"No backend work at all" was wrong, and the error was mine.** The board said so on the
+> strength of "every route exists", which is true — `T-017` built all nine. What did not
+> exist is **two of the three refusals this document specifies**: § The lockout guard and
+> § The escalation bound were written in round 1 and never implemented, so `PUT /grants`
+> carried `requireCapability('grant.update')` and nothing else. Anyone the administrator
+> delegated the grid to could write any role every capability in the catalogue, and any
+> administrator could leave the organisation unadministrable with no undo. `DEC-056`,
+> `DEC-057`. A route existing is not a rule existing.
 
 ## Purpose
 
@@ -164,22 +176,46 @@ its refusals.
 
 ## Acceptance
 
-- [ ] Levels derive from row order and are never sent to the API
-- [ ] Cell click cycles scope; the change is visible without a reload
-- [ ] Shift-click produces a deny that beats an allow from a group and a delegation
-- [ ] Column copy fills a role from another in one action
-- [ ] Colour intensity makes an over-granted column and an orphan row visually obvious
-- [ ] Saving is one bulk request in one transaction
-- [ ] Self-approval loop is detected and offers a pre-filled fix
-- [ ] Warnings render at the offending cell, not in a list
-- [ ] A save that would remove the last `grant.update` holder is refused with a clear reason
-- [ ] Removing your own `grant.update` prompts before saving
-- [ ] Every grid change writes an audit row with `decidedBy` (INV-007)
-- [ ] Without `grant.update`, the grid is visibly read-only rather than absent
-- [ ] Usable at 390px — the grid scrolls horizontally inside its own container
-- [ ] **Row labels use the org's vocabulary** — `D-008`. `capabilityCatalogue()` currently
-      derives *"launch campaigns"* from the key, and four of its objects have no label to
-      derive from
+Ticked items are asserted in `src/frontend/pages/console/Roles/Roles.test.tsx` (18 tests) or
+`src/backend/test/powers-grid.test.ts` (15 tests) — the guards are the API's, so they are
+proved there.
+
+- [x] Levels derive from row order and are never sent to the API — the reorder call sends
+      `orderedIds` and the test asserts the body has no `level` key at all
+- [x] Cell click cycles scope; the change is visible without a reload
+- [x] Shift-click produces a deny that beats an allow from a group and a delegation — and a
+      plain click does **not** cycle into one. Cycling *through* a deny would arm the grid's
+      most consequential state by accident, four clicks into a scope walk
+- [x] Column copy fills a role from another in one action
+- [x] Colour intensity makes an over-granted column and an orphan row visually obvious —
+      `--weight` on the cell tracks scope width, not "is there a grant here"
+- [x] Saving is one bulk request in one transaction — and it sends a **diff**. `33`'s
+      "replaces the whole matrix" describes the transaction, not the payload: `PUT /grants`
+      writes what it is given and leaves the rest alone, so sending every cell would clear
+      `derived` on every row and make the audit entry claim a change nobody made
+- [ ] Self-approval loop is detected and offers a pre-filled fix — **the detection exists**
+      (`grantWarnings`, `kind: 'self_approval'`) and renders at the cell. The **pre-filled
+      fix button does not**, because there is no rule editor to pre-fill: the sentence
+      builder is `P3` in § Out of scope below
+- [x] Warnings render at the offending cell, not in a list
+- [x] A save that would remove the last `grant.update` holder is refused with a clear
+      reason — `409`, `DEC-057`, computed on the **resulting** matrix. A `deny` counts as
+      not holding it (INV-004), so a matrix that *looks* like it has a holder does not pass
+- [x] Removing your own `grant.update` prompts before saving — the half the server cannot
+      do, and the reason `Position` gained `roleId`: matching the reader's positions to grid
+      columns by role **name** is `N-057` exactly, before the one save with no undo
+- [x] Every grid change writes an audit row with `decidedBy` (INV-007) — and a **refused**
+      save writes nothing, because the guard is middleware and runs before the transaction
+      opens
+- [x] Without `grant.update`, the grid is visibly read-only rather than absent
+- [x] Usable at 390px — the grid scrolls horizontally inside its own container, and the page
+      body never does. Not cards: a matrix with its columns stacked has stopped being a matrix
+- [x] **Row labels use the org's vocabulary** — `D-008` repaid by `DEC-055`. Verified live
+      against The Grand Palace: *"open guest surveys for answers"*, *"add restaurants"*,
+      *"move properties to a different parent"*
+- [ ] Drag to reorder — **buttons instead**, recorded rather than glossed. A keyboard-
+      reachable move is what `26` requires anyway, so a drag surface would need these as its
+      fallback; what is missing is the drag affordance, not the capability
 
 ## Out of scope
 

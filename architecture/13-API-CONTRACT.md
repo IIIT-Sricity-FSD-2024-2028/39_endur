@@ -36,14 +36,37 @@ scopes rather than a parallel API. A second API surface is a second thing to kee
 
 | Method | Path | C | Notes |
 |---|---|---|---|
-| POST | `/register` | — | Creates org + owner. Rate limited hard |
-| POST | `/login` | — | Sets the `endur.sid` session cookie. Regenerates the session id |
+| POST | `/register` | — | Creates org + owner + **subscription at the chosen tier** (`DEC-048`). Rate limited hard |
+| POST | `/login` | — | `LoginBody { email, password, orgId? }`. Sets the `endur.sid` session cookie. Regenerates the session id. `orgId` is sent **only** to answer a `409 ACCOUNT_AMBIGUOUS` (`DEC-049`) |
 | POST | `/logout` | — | Destroys the server-side session row, clears the cookie |
 | GET | `/me` | — | Session, org, labels, **and the caller's capability set**. The only boot call |
 | GET | `/csrf` | — | Issues the `endur.csrf` double-submit cookie (`12` §4.8) |
 
 `GET /me` returning the capability set is what lets the UI hide actions the caller cannot
 perform. It is a *usability* affordance only — the API still enforces (INV-003).
+
+**The set is a map of capability → scope, not a list of verbs** (`DEC-050`, `T-086`):
+
+```jsonc
+"capabilities": {
+  "campaign.read": "subtree",
+  "person.read":   "self",     // held by EVERY account — the reason this is not a list
+  "subject.read":  "own_unit"
+}
+```
+
+Each value is the **widest scope any live allow reaches**, so the claim is existential —
+*"there is somewhere this reaches at least this far"* — and never *"everything inside that
+scope is permitted"*. Absent means not held anywhere. Keys are sorted; a capability denied
+**org-wide** is absent, and a deny at a narrower scope neither removes the key nor narrows
+its value, because the server refuses that particular target with its decision trace and
+that is where the decision belongs.
+
+The verb alone could not carry the one question the sidebar asks. `person.read: self` is
+seeded to every role so that `/app/profile` opens (`50` §1), so a gate on the bare verb was
+true for every account in the product and showed everybody a People page listing exactly one
+person — themselves (`D-027`). The scope is what tells a respondent-level account apart from
+a head of department.
 
 ### Organisation — `/api/v1/org`
 
@@ -162,6 +185,12 @@ parameter in this surface that **tolerates** a bad value instead of returning a 
 is a display preference, nothing is written or authorised from it, and a stale bookmark must
 not break the first screen after sign-in.
 
+**`PersonSummary.positions` carries `unitId`, `roleLevel` and `validTo` since `T-051`**, each
+for a named reader: the unit id because `powersByPlace` used to re-find the unit by NAME and
+two units may share one (`34` § Acceptance); the level because `47` and `24`'s `<PersonChip>`
+both render a position with it; the expiry because "they have this" and "they have this until
+March" are different facts. `unitId` is nullable, matching the column.
+
 ### Profile — `/api/v1/profile`
 
 The caller's own account (`47`). Everything here resolves under `self` scope (`11` §4).
@@ -175,7 +204,23 @@ The caller's own account (`47`). Everything here resolves under `self` scope (`1
 | DELETE | `/avatar` | `person.update` · `self` |
 
 **Email is not editable here.** Changing it is an identity change and belongs to an
-administrator on `/people/:id`, with an audit trail.
+administrator on `/people/:id`, with an audit trail. `UpdateProfileBody` has no such key, so
+`validate()` strips one rather than the handler ignoring it — the same shape `PATCH
+/people/:id` uses for `status` (`DEC-046`).
+
+**`POST /password` carries no capability, and that is specified rather than omitted** (`47` §
+Capabilities). Holding the session is the authorisation and no capability could stand in for
+it: the nearest candidate, `person.update: self`, is seeded to every role (`50` §1), so a gate
+on it would refuse nobody while implying an organisation could take the right away by editing
+a role. The route also takes **no id**, which is what guarantees the only password it can
+reach is the caller's own — `57` § *"Why an administrator still cannot set a password"* is the
+same rule from the other side. It is therefore the one authenticated route on the
+route-enumeration allowlist (`12` §7), with that argument written beside it.
+
+**Since `T-051` `ProfileView` reuses `/people/:id`'s types** — `Position` and `PowersAtPlace`
+from `dto/person.ts` — rather than declaring narrower lookalikes. `47` § Data contract has the
+reasoning; the short version is that two shapes would fork the one component that renders
+them, which is `N-005`'s rule breaking one layer above where it was written.
 
 ### Uploads
 
@@ -367,6 +412,7 @@ One envelope, produced only by `errorFunnel` (`12` §4.15).
 | 402 | `PAYMENT_REQUIRED` | Entitlement. `details.requiredTier` |
 | 403 | `FORBIDDEN` | Capability. `details.decidedBy` |
 | 403 | `NOT_A_MEMBER` | Signed in, but to a different organisation than the campaign's (DEC-037) |
+| 409 | `ACCOUNT_AMBIGUOUS` | The email and password are correct **for more than one organisation** (`DEC-049`). `users` is unique on `(org_id, email)`, so one address can hold an activated account in several. The only 409 that is not a failure: the caller has authenticated and is being asked one more question. `details.organizations` carries `{ id, name }` for each — safe to disclose because it reaches only somebody who has just proved the password for every one of them. The client re-posts `/auth/login` with `orgId` |
 | 403 | `WOULD_ESCALATE` | The request would create a position or account holding a power the caller does not hold at that unit (INV-012, `11` §5b). `details.capability` names which one |
 | 403 | `CSRF_FAILED` | Missing or invalid CSRF token on a cookie-authenticated mutation (`12` §4.8). Distinct from `FORBIDDEN` so the two are separable in logs |
 | 404 | `NOT_FOUND` | Absent, **or out of scope** — see below |

@@ -19,8 +19,10 @@ import type {
   UpdateRoleBody,
 } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
+import { nounsOf } from '../../lib/vocabulary.js';
 import { requireCapability } from '../../middleware/requireCapability.js';
 import { requireEntitlement } from '../../middleware/requireEntitlement.js';
+import { requireNoGrantEscalation } from '../../middleware/requireNoGrantEscalation.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { UnauthenticatedError } from '../../lib/errors.js';
 import {
@@ -124,7 +126,9 @@ grantsRouter.get('/', authenticate, requireCapability('grant.read'), (req, res, 
 // Registered before nothing in particular, but kept above the bulk PUT so the two are read
 // together: the warnings are what the grid shows next to the save button.
 grantsRouter.get('/warnings', authenticate, requireCapability('grant.read'), (req, res, next) => {
-  void grantWarnings(req.ctx.orgId as string)
+  // The tenant's nouns, because a warning is a SENTENCE shown to an administrator — the
+  // same INV-001 rule as the grid's row labels, and the same one implementation (D-008).
+  void grantWarnings(req.ctx.orgId as string, nounsOf(req))
     .then((warnings) => res.json({ data: warnings }))
     .catch(next);
 });
@@ -134,6 +138,11 @@ grantsRouter.put(
   authenticate,
   validate(PutGrantsDto),
   requireCapability('grant.update'),
+  // Link 10b — INV-012 on the grid, T-052. `grant.update` says you may EDIT the matrix; it
+  // does not say you may write a row more powerful than yourself into it. Until this line
+  // the route asked only the first question, which is `D-018`'s shape one screen along.
+  // AFTER requireCapability and never instead of it: it can only ever refuse.
+  requireNoGrantEscalation(),
   // Entitlements answer a different question from capabilities: "has this org paid for
   // it", not "may this person" (DEC-011). grant.update is Bronze — correct handling of
   // who-can-see-what is never an upgrade (01 §6) — so this passes for every tier, and it
@@ -152,6 +161,6 @@ grantsRouter.put(
 // The catalogue the grid renders its rows from. Guarded by org.read rather than left open
 // (DEC-018): org.read is seeded to every role, so everyone who can sign in can read it,
 // and the route-enumeration allowlist stays as small as it was built to be.
-authzRouter.get('/capabilities', authenticate, requireCapability('org.read'), (_req, res) => {
-  res.json({ data: capabilityCatalogue() });
+authzRouter.get('/capabilities', authenticate, requireCapability('org.read'), (req, res) => {
+  res.json({ data: capabilityCatalogue(nounsOf(req)) });
 });

@@ -5,7 +5,7 @@
 // Home, Structure, Roles, People, Templates, Settings describe the product, not the
 // customer's world (22 §1).
 import type { ResolvedLabels } from '@endur/shared';
-import type { Capability } from '@endur/shared';
+import type { Capability, Scope } from '@endur/shared';
 import type { IconName } from '../Icon.js';
 
 export type NavGroup = 'organize' | 'collect' | 'understand' | 'system';
@@ -24,6 +24,20 @@ export type NavItem = {
   soonHint?: string;
   /** Hides the item when the caller does not hold it. Usability, never enforcement. */
   needs?: Capability;
+  /**
+   * How far `needs` has to REACH before the item is worth showing — T-087, and it defaults
+   * to `self`, which is what every item meant before.
+   *
+   * A nav item is a promise that a PAGE is worth opening, which is a stronger claim than
+   * "you hold this verb somewhere". `person.read` is seeded to every role at `self` so
+   * `/app/profile` opens (`50` §1), so People passed its gate for **every account in the
+   * product** and then rendered a list of exactly one person: the reader (`D-027`). The
+   * minimum scope is how an item says "and not only about yourself".
+   *
+   * Set it only where a NARROW hold genuinely means an empty page. Most items need no
+   * minimum: `campaign.read: own_unit` is a real campaigns list, just a short one.
+   */
+  minScope?: Scope;
 };
 
 export const GROUP_LABELS: Record<NavGroup, string | null> = {
@@ -48,8 +62,13 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
       soonHint: 'Roles, and the grid of what each one is allowed to do.' },
     // Un-disabled by T-050. It is the LAST edit of that task and not a task of its own:
     // an item that navigates to a half-built page is the one thing 02 §7 forbids.
+    //
+    // `own_unit` MINIMUM SINCE T-087 (DEC-051). `person.read: self` is the universal seeded
+    // grant, so the bare verb showed this item to everybody and the page then listed one
+    // person: the reader. Above `self` the list is real — L3 holds `own_unit` and sees
+    // their own section's roster, which the owner confirmed is right for that level.
     { to: '/app/people', label: 'People', icon: 'people', group: 'organize',
-      needs: 'person.read' },
+      needs: 'person.read', minScope: 'own_unit' },
     { to: '/app/subjects', label: labels.subject.many, icon: 'subject', group: 'organize',
       needs: 'subject.read' },
 
@@ -71,7 +90,18 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
       disabled: true,
       soonHint: 'Compare how you rate yourself against how others rate you.' },
 
+    // `org.update`, NOT `org.read` AT A WIDER SCOPE — T-087, and this one is not a scope
+    // problem at all. `org.read` is genuinely `all` at every level including the lowest,
+    // seeded that way so the vocabulary loads on first paint (`50` §1), so no minimum scope
+    // could ever hide this item. It was simply gated on the wrong capability: this page
+    // exists to EDIT the organisation, `55` § Stage 8 puts it at L1, and `org.update` is
+    // L1. <VocabularyChips> already gates its link here on `org.update` — the chip row
+    // reached this answer first and the sidebar was the half that had not caught up.
+    //
+    // The ROUTE guard stays `org.read` on purpose: the page renders read-only without
+    // `org.update` already, and a directly-typed URL showing a read-only page is a better
+    // answer than a 403 to something the caller may in fact read.
     { to: '/app/settings', label: 'Settings', icon: 'settings', group: 'system',
-      needs: 'org.read' },
+      needs: 'org.update' },
   ];
 }
