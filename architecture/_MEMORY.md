@@ -1122,6 +1122,59 @@ DEC-057  ACTIVE  2026-08-24  origin:claude  task:T-052  touches:33 § "The locko
            in the product that cannot be undone.
   see      33 § "The lockout guard", 14 § Position, N-057, T-052
 
+
+DEC-058  ACTIVE  2026-08-25  origin:claude  task:T-079  touches:58, 13 § Inbox, 10 §5
+  decision THE INBOX OWNS `inbox_state` AND NOTHING ELSE. Every word it renders comes from
+           features/results/service.ts's readComments(), which is where the k-anonymity gate
+           already lives. features/inbox/ does not query `responses` and must not learn how.
+  why      38 § "Not built" refused a per-subject breakdown in these words: "a second ungated
+           path to them is what INV-007 exists to prevent". The inbox is the same mistake
+           made larger -- a list of INDIVIDUAL COMMENTS ACROSS CAMPAIGNS, which is precisely
+           what the gate exists to withhold. A feature folder that cannot reach `responses`
+           cannot grow a second path to one by accident later.
+  the merge is where a UNION would be wrong  the threshold is applied PER CAMPAIGN before
+           anything is combined. two campaigns of four responses each do not become a
+           readable eight. asserted directly, because it is the failure a naive
+           cross-campaign query makes and it looks correct while making it.
+  one scope predicate  canSee() is shared by assertVisible (40's path) and readableCampaigns
+           (58's). 58 § Acceptance asks that the two match for the same caller; sharing the
+           function is how that is true BY CONSTRUCTION rather than by two people writing
+           the same `some()` twice.
+  the writes are gated too  POST /inbox/:id/read on a guessed uuid would otherwise be an
+           oracle -- 204 for a response that exists, 404 for one that does not, in a campaign
+           the caller cannot read. one readComments() call per mark, same 404 for all three
+           reasons (absent / out of scope / below threshold), because a distinct message for
+           the third announces that suppressed data exists.
+  see      58, 10 §5, features/inbox/service.ts, test/inbox.test.ts
+
+DEC-059  ACTIVE  2026-08-25  origin:claude  task:T-079  amends:58 § Data contract
+  decision `InboxResponse` CARRIES TWO FIELDS 58 DID NOT SPECIFY: `questionId` and
+           `scoreMax`. Both are forced by the table, not chosen.
+  questionId  `id` IS THE RESPONSE ID -- inbox_state is keyed (user_id, response_id) and the
+           routes are /inbox/:responseId/read, so nothing else can mark anything. A response
+           answering two free-text questions therefore produces two cards SHARING one read
+           state, which is correct ("I have dealt with this response" is one fact), and
+           leaves them without distinct React keys. questionId is the key.
+  scoreMax the rating's scale. `score: 3` is meaningless without knowing whether the top is
+           5 or 10, and a template can use either. Read from the question's own config.
+  what is still NOT there  any respondent attribute, and any of 43's four tags. The first is
+           impossible (INV-006, no column could supply one) and the second is refused until
+           43 exists (24 §6c).
+  see      58 § Data contract, packages/shared/src/dto/inbox.ts
+
+DEC-060  ACTIVE  2026-08-25  origin:claude  task:T-080  touches:58 § State
+  decision READING IS NOT TRIAGING. A card marked read BY BEING OPENED stays where it is;
+           a card the reader ticks, archives, or hits `u`/`e` on leaves the tab. The unread
+           COUNT drops either way.
+  found by its own test  the first version filtered every marked card out of the tab
+           immediately, which is right for a tick and wrong for an expand: on the Unread tab
+           the detail appeared and vanished in the same frame, because opening the card marks
+           it read and read cards do not belong in Unread. The test that caught it was
+           written to assert the expansion, not the eviction.
+  why not "never evict"  the eviction is the feature. 58 opens by calling this the only
+           TRIAGE-shaped screen in the product; a tick that leaves the card sitting there is
+           a tick that did nothing. Only the side effect of reading is exempt.
+  see      58 § State, lib/inbox.ts mark(), pages/console/Inbox/Inbox.test.tsx
 ```
 
 ---
@@ -1438,6 +1491,33 @@ CONF-017  <TrendChip> IS THE SECOND ONE. 46 § Components puts a trend chip on t
           a component that page can use — check what the rest of that document says about
           the thing before building it.
 
+CONF-022  <ScoreBadge> HAS A LEGITIMATE CALLER NOW, AND CONF-016 REFUSED IT ON A PREMISE
+          THAT HAS CHANGED. 24 Aug -> 25 Aug, found building T-080.
+          CONF-016 refused to build it, and every word of its argument was right ABOUT 40:
+          24 §3 defined the component as a score "with threshold colours", 40 § Interactions
+          forbids exactly that -- "Do not colour rating 1 red and rating 5 green, that is
+          interpretation" -- and 40 was the only would-be caller. A component whose single
+          use is the one place the docs rule out is one that eventually acquires an
+          illegitimate one. That reasoning is untouched.
+          58 § Components lists <ScoreBadge> too, and its number is a DIFFERENT number:
+            40's is an AVERAGE over responses. Deciding 3.8 is bad is an inference.
+            58's is ONE PERSON'S OWN RATING on the response their comment came from.
+            "2/5 - the projector in Room 4 has never worked" is a fact somebody stated, and
+            reporting what they said is not judging it.
+          So the two halves of CONF-016 come apart, and only one of them was ever about the
+          badge:
+            THE COLOURS were the interpretation. They are not built, at any value.
+            THE BADGE was refused for having no legitimate caller. It has one.
+          RESOLVED -> BUILT, COLOURLESS. One surface at every score, and the prohibition now
+          lives INSIDE the component rather than in a doc nobody reads before importing it
+          -- which is a stronger place for it than "not built" ever was, because the next
+          page that wants a score gets the safe one instead of writing its own.
+          Its test asserts `className === 'score-badge'` exactly, so a well-meant `.is-bad`
+          is a failing test rather than a code review nobody runs.
+          status   ACTIVE. 43 may still define a JUDGED score against a rubric; that is a
+                   different component and CONF-016's last paragraph still describes it.
+          see      CONF-016, CONF-004, 24 §3, 58 § Components, components/data/ScoreBadge.tsx
+
 CONF-016  <ScoreBadge> IS A COMPONENT THAT DOES THE THING ITS OWN PAGE FORBIDS.
           24 §3 defines it as `{ score, max }` with "threshold colours", and 40 §
           Components lists it among the results page's components.
@@ -1454,7 +1534,11 @@ CONF-016  <ScoreBadge> IS A COMPONENT THAT DOES THE THING ITS OWN PAGE FORBIDS.
           is a component that will eventually acquire an illegitimate one.
           Nothing is lost: the Analyze layer (43, P3) is where a judged score belongs, and
           it can define its own thresholds against a rubric rather than against arithmetic.
-          status   ACTIVE. revisit when 43 is built, with a rubric.
+          status   NARROWED 2026-08-25 BY CONF-022 -- the PROHIBITION stands unchanged and is
+                   now enforced inside the component. The "not built" half lapsed when 58
+                   produced a second, legitimate caller. It was revisited earlier than
+                   expected and for a different reason than expected: not a rubric, but a
+                   number that was never an average in the first place.
 
 CONF-015  39 CONTRADICTS ITSELF ABOUT THE EDGE STATES, and the two halves cannot both
           be built.
@@ -2055,12 +2139,21 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     requirePersonVisible, which the account routes mount
                                     BEFORE requireNoEscalation -- reversed, WOULD_ESCALATE
                                     becomes an oracle for who outranks you.
-58-PAGE-inbox.md                 -> src/backend/features/inbox/**
-                                    src/frontend/pages/console/Inbox/**
+58-PAGE-inbox.md                 -> src/backend/features/inbox/**   (BUILT T-079)
+                                    src/frontend/pages/console/Inbox/** (BUILT T-080)
                                     src/frontend/components/feedback/ResponseCard.tsx
+                                    src/frontend/lib/inbox.ts
+                                    packages/shared/src/dto/inbox.ts
                                     NOTE reads THROUGH features/results/service.ts and must
                                     not query responses itself -- the k-anon gate lives
                                     there and a second path around it is the whole risk.
+                                    ENFORCED, not just asked for: features/inbox/service.ts
+                                    imports readComments() and prisma.inboxState, and
+                                    touches no other table. DEC-058.
+                                    readComments/readableCampaigns/canSee are 40's, in
+                                    features/results/service.ts, and 40 owns them -- 58 is
+                                    the second CALLER, not a second owner (INV-009).
+                                    <ScoreBadge> is 24's, built here. CONF-022.
 72-PAGE-platform-logs.md         -> src/backend/platform/logs/**
                                     src/frontend/pages/platform/Logs/**
                                     NOTE reads lib/logFile.ts's OUTPUT. 18 owns what is
@@ -2794,6 +2887,32 @@ N-054  A RETRY THAT SCANS TURNS ONE COLLISION INTO A QUEUE. D-006, repaid 21 Aug
        organisation behind would show as an org count exceeding the number of winners. The six
        DISTINCT SLUGS are what prove the retry ran: all six derive the same base before any
        commits, so six slugs can only mean five collisions were caught.
+
+N-061  SCOPE ON A RESPONSE IS DECIDED AT THE CAMPAIGN, NOT AT THE SUBJECT, AND THE INBOX
+       IS WHERE THAT BECOMES VISIBLE. Found 25 Aug verifying T-080 live against The Grand
+       Palace. NOT INTRODUCED BY T-079/T-080 -- it is 40's behaviour, reached by 58 because
+       58 shares 40's predicate deliberately.
+       A campaign is visible when ANY of its subjects sits in a unit the caller can reach
+       (assertVisible, and now canSee). Once it is visible, EVERY response in it is returned:
+       readResponses filters by campaignId alone, and readResults aggregates the whole
+       campaign unless the CLIENT passes a subject or unit filter.
+       Live: grand-palace-3, a level 3 anchored at Lakeside Property with `response.read` at
+       `own_unit`, reads all 229 comments including every one about City Property — and
+       /campaigns/:id/responses hands them the same 210 rows it hands the administrator, 12
+       distinct subjects apiece. Same answer through both surfaces, which is the acceptance
+       criterion 58 asked for and got.
+       SO THE INVARIANT HOLDS AT THE GRANULARITY THE CODE CHOSE and the question is whether
+       that granularity is the right one. INV-003 says the API returns only what the caller
+       may see; at campaign granularity that is true, at subject granularity it is not. An
+       org-wide campaign is the common case, not an exotic one, and the inbox puts the other
+       property's subject name on the card in plain sight where 40's aggregate hid it in an
+       average.
+       NOT FIXED IN T-080, DELIBERATELY. 58 § Acceptance requires the inbox to match 40 for
+       the same caller. Making the inbox stricter would satisfy a different reading of
+       INV-003 and BREAK the one 58 asked for, leaving two answers to one question -- which
+       is the state DEC-058's shared predicate exists to prevent. Filed as D-032; it is a
+       change to 40 first and 58 second, and the owner's call.
+       see    D-032, 40, 58 § Acceptance, features/results/service.ts canSee()
 
 N-055  FIRE-AND-FORGET AFTER THE RESPONSE IS A RACE WITH THE CLIENT. Found 21 Aug while
        checking T-049 for flakiness, in middleware/idempotency.ts — not in anything that task

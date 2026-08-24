@@ -109,6 +109,7 @@ model Organization {
   apiKeys         ApiKey[]
   idempotencyKeys IdempotencyKey[]
   accountInvites  AccountInvite[]
+  inboxState      InboxState[]
   subscription    Subscription?
 
   @@map("organizations")
@@ -147,6 +148,7 @@ model User {
   auditEntries     AuditLog[]
   accountInvites   AccountInvite[]       @relation("AccountInviteUser")
   invitesSent      AccountInvite[]       @relation("AccountInviteCreatedBy")
+  inboxState       InboxState[]
 
   @@unique([orgId, email])
   @@map("users")
@@ -460,10 +462,41 @@ model Response {
   /// NEVER identity.
   meta        Json     @default("{}")
 
-  answers Answer[]
+  answers    Answer[]
+  inboxState InboxState[]
 
   @@index([campaignId, submittedAt(sort: Desc)])
   @@map("responses")
+}
+
+/// Per-caller inbox triage (58, 10 §5).
+///
+/// Keyed by USER, not by org: read state is a READER'S, not the organisation's, so two
+/// administrators triaging one campaign never mark each other's queue. That is also why
+/// there is no `inbox.*` capability in 11 §3 — a capability would imply a shared queue
+/// somebody can be excluded from, and there is no such thing here.
+///
+/// It holds no response CONTENT — no comment, no score, no question. So it is not a second
+/// path to a response and cannot become one by accident (INV-006). Everything the inbox
+/// SHOWS comes from features/results/service.ts, which owns the k-anonymity gate.
+model InboxState {
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  responseId String   @map("response_id") @db.Uuid
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  /// Both nullable and both a TIMESTAMP rather than a boolean: "when did you read this"
+  /// answers a question "have you read this" cannot, and costs the same column.
+  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@id([userId, responseId])
+  @@index([userId, orgId])
+  @@map("inbox_state")
 }
 
 model Answer {

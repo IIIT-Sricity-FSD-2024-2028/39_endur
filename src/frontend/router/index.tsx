@@ -37,6 +37,7 @@ const Campaigns = lazy(() => import('../pages/console/Campaigns/index.js'));
 const CampaignNew = lazy(() => import('../pages/console/Campaigns/New.js'));
 const CampaignDetail = lazy(() => import('../pages/console/Campaigns/Detail.js'));
 const Results = lazy(() => import('../pages/console/Results/index.js'));
+const Inbox = lazy(() => import('../pages/console/Inbox/index.js'));
 const Profile = lazy(() => import('../pages/console/Profile/index.js'));
 const Simulator = lazy(() => import('../pages/console/Simulator.js'));
 const Settings = lazy(() => import('../pages/console/Settings.js'));
@@ -103,6 +104,10 @@ export const routes: RouteObject[] = [
       { path: 'campaigns/new', element: hold(<CampaignNew />) },
       { path: 'campaigns/:id', element: hold(<CampaignDetail />) },
       { path: 'campaigns/:id/results', element: hold(<Results />) },
+      // No RequireCapability wrapper: the page renders its own 403 panel, because the
+      // capability it needs (`response.read`) is one somebody can hold for SOME campaigns
+      // and not others, and a route-level gate cannot say that (58 § States).
+      { path: 'inbox', element: hold(<Inbox />) },
       { path: 'profile', element: hold(<Profile />) },
       { path: 'simulator', element: hold(<Simulator />) },
       { path: 'settings', element: hold(<RequireCapability capability="org.read"><Settings /></RequireCapability>) },

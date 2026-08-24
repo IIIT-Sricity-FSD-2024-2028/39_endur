@@ -32,6 +32,7 @@ describe('the three route trees', () => {
     '/app/forms/:id/build', '/app/forms/:id/preview',
     '/app/campaigns', '/app/campaigns/new', '/app/campaigns/:id', '/app/campaigns/:id/results',
     '/app/profile', '/app/simulator', '/app/settings',
+    '/app/inbox',
     '/r/:token', '/r/:token/done',
   ])('serves %s', (path) => {
     expect(paths.has(path)).toBe(true);
@@ -40,7 +41,9 @@ describe('the three route trees', () => {
   // A disabled sidebar item with a "Soon" tag is correct. A stub page behind it is not:
   // a dead link that renders something is worse than one that visibly does not navigate
   // (design_specs/design/02 §7).
-  it.each(['/app/analysis', '/app/inbox', '/app/reflect', '/app/communities'])(
+  // Inbox left this list at T-080, when its page was built. The three that remain have no
+  // page and must not acquire a stub one.
+  it.each(['/app/analysis', '/app/reflect', '/app/communities'])(
     'has no stub page behind the P3 route %s',
     (path) => {
       expect(paths.has(path)).toBe(false);

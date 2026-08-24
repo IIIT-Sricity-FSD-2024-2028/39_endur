@@ -57,8 +57,8 @@ CONSOLE  (/app, requires session)
   /app/simulator             Permission simulator             [P2]
   /app/settings              Org profile, vocabulary, danger  [P2]
   /app/logs                  Activity log                     [P2]
+  /app/inbox                 Response inbox                   [P2 · built T-080]
 
-  /app/inbox                 Response inbox                   [P2 · disabled]
   /app/analysis              Analysis dashboard               [P2 · disabled]
   /app/reflect               Self-reflection & gap analysis   [P2 · disabled]
   /app/communities           Communities                      [P3 · disabled]

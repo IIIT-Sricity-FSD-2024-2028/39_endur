@@ -5,7 +5,77 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-24  (T-089 + T-052 BUILT — THE BOUNDARY, AND THE POWERS GRID.
+UPDATED   2026-08-25  (T-079 + T-080 BUILT — THE RESPONSE INBOX, BACK AND FRONT.
+                       Stage 9's second and third rows. /app/inbox is real: four tabs,
+                       optimistic marking that reverts ON THE CARD, j/k/e/u each with a
+                       visible button, and three empty screens of which two are IDENTICAL
+                       ON PURPOSE (52 §2 — a "3 hidden" placeholder would announce that
+                       suppressed data exists).
+                       THE BACKEND'S POINT IS WHAT IT CANNOT DO. 38 § "Not built" already
+                       refused a per-subject breakdown in these words: "a second ungated
+                       path to them is what INV-007 exists to prevent". An inbox is the
+                       same mistake made larger — a list of INDIVIDUAL COMMENTS ACROSS
+                       CAMPAIGNS is precisely what the k-anon gate exists to withhold. So
+                       features/inbox/ owns ONE TABLE (inbox_state: two ids and two
+                       timestamps, no content) and imports readComments() from
+                       features/results/service.ts. It does not query `responses` and
+                       cannot grow a path to one by accident later. DEC-058.
+                       The threshold is applied PER CAMPAIGN BEFORE THE MERGE — two
+                       campaigns of four responses each do not become a readable eight,
+                       which is the mistake a naive cross-campaign UNION makes and it
+                       looks right while making it. Asserted directly.
+                       assertVisible and readableCampaigns now share ONE predicate, so
+                       "the inbox's scope matches 40's" is true BY CONSTRUCTION rather
+                       than by two people writing the same `some()` twice.
+                       THE WRITE ROUTES ARE GATED TOO. Without it POST /inbox/:id/read on
+                       a guessed uuid is an ORACLE: 204 for a response that exists, 404
+                       for one that does not, inside a campaign the caller cannot read.
+                       Same 404 for all three refusal reasons.
+                       !! DEC-060 CAME FROM ITS OWN TEST, and the bug was mine. Opening a
+                       card marks it read; the first version then filtered every marked
+                       card out of the tab, so on Unread THE DETAIL APPEARED AND VANISHED
+                       IN THE SAME FRAME. Reading is not triaging: a card leaves when the
+                       reader ticks or archives it, never as a side effect of being read.
+                       The test that caught it was written to assert the expansion.
+                       !! <ScoreBadge> IS BUILT, AND CONF-016 WAS RIGHT ABOUT 40. It
+                       refused the component because 40's number is an AVERAGE and
+                       colouring one is interpretation, and 40 was its only caller. 58's
+                       number is ONE PERSON'S OWN RATING on the response their comment
+                       came from — "2/5 · the projector in Room 4 has never worked" is a
+                       fact somebody stated. So the two halves come apart: the BADGE had
+                       no legitimate caller and now has one; the THRESHOLD COLOURS were
+                       the interpretation and are still not built, at any value. The
+                       prohibition now lives INSIDE the component, which is stronger than
+                       "not built" ever was. CONF-022, and its test asserts the className
+                       is exactly `score-badge`.
+                       !! AND /app/roles WAS STILL GREYED WITH A "Soon" TAG. T-052 shipped
+                       the ladder and the powers grid on 24 Aug and the LAST EDIT — the
+                       one T-085 exists to name — was missed, so a built page was
+                       reachable for a day only by typing the address. Nothing asserted
+                       the POSITIVE direction: Sidebar.test.tsx counted "Soon" tags and
+                       tested that scaffold items refuse to navigate, and had one
+                       hand-written check that People DOES navigate. It is a table now,
+                       one row per built page.
+                       FOUND N-061 / D-032 — NOT OURS, AND SAID SO. Response scope is
+                       decided at the CAMPAIGN, not the subject: a campaign is visible if
+                       ANY of its subjects is in reach, and then every response in it is
+                       returned. Live, grand-palace-3 (level 3, anchored at Lakeside
+                       Property, response.read: own_unit) reads all 229 comments including
+                       every one about City Property — and /campaigns/:id/responses hands
+                       them the same 210 rows it hands the administrator. That is 40's
+                       behaviour and 58 § Acceptance REQUIRES the inbox to match it. A
+                       stricter inbox would break the criterion that asked for consistency
+                       and leave two answers to one question. Owner's call; it is a change
+                       to 40 first.
+                       DTO gained questionId and scoreMax (DEC-059) — both forced by the
+                       table, not chosen: `id` must be the RESPONSE id because inbox_state
+                       is keyed on it, so two free-text answers on one response share a
+                       read state and need a second key.
+                       386 backend (+18) + 807 frontend (+23) = 1,193 tests, all green.
+                       Live-verified against The Grand Palace: 229 comments, real hotel
+                       nouns on the cards, and the full read → archive → unarchive →
+                       unread round trip returning the org to 229 unread exactly.
+                       Earlier: T-089 + T-052 BUILT — THE BOUNDARY, AND THE POWERS GRID.
                        Items 1 and 2 of the owner's second ask, in the order they asked.
                        T-089: a failed lazy import now says THE APP UPDATED and offers a
                        HARD RELOAD of the page you were opening. PublicBoundary printed the
@@ -741,8 +811,8 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
 [ ] T-076  B  /app/logs + <DecisionTrace>   ← T-054 needs the SAME component. Extend it
 [ ] T-077  A  platform.logs.read + the file routes + path guard (72)     ← needs T-059
 [ ] T-078  B  /ops/logs + <LogViewer>                                    ← needs T-077
-[ ] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)
-[ ] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>  ← ScoreBadge has NEVER been built
+[x] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)   BUILT 25 Aug
+[x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
 [ ] T-081  A  analysis backend, RULE-BASED (43, DEC-042)
 [ ] T-082  C  /app/analysis                              ← needs T-057 for a real 402
 [ ] T-083  A  improve-loop backend (44)                  ← needs T-057. NOT NEGOTIABLE
@@ -806,8 +876,13 @@ Full tables in `55` § Stage 9.
                 un-localised, it said "read resultses". N-059
               FOUND D-031 from the grid's own warnings: the demo orgs predate T-072's
                 account.* capabilities and db:seed skips them. N-060
-[ ] T-079  A  inbox backend — inbox_state, 5 routes, read THROUGH results/service.ts
-[ ] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>   ← ScoreBadge NEVER built
+[x] T-079  A  inbox backend — inbox_state, 5 routes, read THROUGH results/service.ts
+              BUILT 25 Aug. features/inbox/ CANNOT REACH `responses` — it imports
+              readComments() and prisma.inboxState and nothing else (DEC-058).
+              Threshold applied PER CAMPAIGN before the merge. Writes gated too.
+[x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>
+              BUILT 25 Aug. <ScoreBadge> built COLOURLESS — CONF-022 narrows CONF-016.
+              Also un-disabled /app/roles: T-052's last edit had been missed.
 [ ] T-081  A  analysis backend, RULE-BASED (43, DEC-042)
 [ ] T-082  C  /app/analysis     ← 402-vs-403 is now REAL, T-088 wrote the tier row
 [ ] T-083  A  improve-loop backend (44)   ← was blocked on D-012; T-088 repaid it
@@ -851,7 +926,7 @@ withdrawn.** All four are promoted — Stage 9 above.
 | Sidebar item | Lands with | Blocked by | Status |
 |---|---|---|---|
 | **Roles** | `T-052` | ~~nothing — sequenced after M0~~ **nothing. PROMOTED, goes first** | spec is `33`, complete since round 1. The only one with no backend work at all. Repays `D-008` |
-| **Inbox** | `T-079` → `T-080` | ~~nothing — sequenced after M0~~ **nothing. PROMOTED** | spec is `58`. Reads **through** `features/results/service.ts` so the k-anonymity gate is not forked |
+| ~~**Inbox**~~ | ~~`T-079` → `T-080`~~ | **BUILT 25 Aug** | spec is `58`. Reads **through** `features/results/service.ts` so the k-anonymity gate is not forked — and `features/inbox/` cannot reach `responses` at all, which is what makes that true next month as well as today (`DEC-058`) |
 | **Analysis** | `T-081` → `T-082` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | `T-081` (rule-based engine, `DEC-042`) is unblocked. `T-082`'s screen needs a real `402` path — the 402-vs-403 demonstration *is* the point of it |
 | **Reflect** | `T-083` → `T-084` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | every capability in the improve loop is Gold, and `D-012` meant no organisation had ever had a subscription row. Built before `T-088`, this surface would have `402`d for **every user in the product**, demo included |
 
@@ -976,6 +1051,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | ~~`D-024`~~ | **REPAID 24 Aug by `DEC-046`.** ~~`PATCH /people/:id` was a second, worse way to disable an account~~ | Found 24 Aug while building `T-072`, deciding what `AccountStatus.disabled` could honestly report. `UpdatePersonBody` had accepted `status: 'active' \| 'invited' \| 'disabled'` since `T-033`, behind **`person.update`** — seeded to L2 `subtree` — where `57` puts revocation behind **`account.revoke`**, L1 only, *precisely* so it can be withheld from a coordinator while the other two verbs are granted. And it did two thirds of the job: it left `sessions` untouched, and **`authenticate` never reads `users.status`**, so the target's open browser kept working until the session expired on its own — the administrator saw *"disabled"* and believed access had ended. It also left `password_hash` in place, so flipping the status back restored their **old password**, the thing `57` says cannot exist. Fixed by **removing the field**, not by teaching `PATCH` to do the other two things: an account's lifecycle belongs to `account.*`, and two routes that both end access is two places for the next one to be forgotten. Deliberately did **not** make `authenticate` re-read `users.status` per request — real defence in depth, but a query on every request in the product to close a window that now has no opener. **The hole had no user and no test**: the frontend has never sent `status` | ~~`T-072`~~ — **done** |
 | ~~`D-026`~~ | **REPAID 24 Aug by `DEC-047`.** ~~A person you had just created was invisible to you~~ | Found 24 Aug when `T-072`'s first test run failed on every case involving a person with no positions — and `57` says explicitly that *"a person with no positions can always be given an account… invite first, assign afterwards"* is **the common one**. `POST /people` creates a person and **no position** (`14` §8 requires that), so the person it returned had no unit, matched no unit-scoped caller, and vanished. **Verified end to end before the fix**, on a brand-new organisation, as its founder: `POST /people` → `201` with an id; `GET /people` → total 2 and the new person is not in it; `GET /people/:id` → `404`. The founder holds `person.read: subtree` at the root, **not `all`**, which is the ordinary shape — so this was every organisation, on the most common action in `34`, and every route that could give them a position had first to see them. **A deadlock, not a policy.** It had no test because the create test never read the person back. Fixed by adding one clause — **no member edges at all** — to a predicate that is now written **once** in `features/people/visibility.ts` and evaluated by the database for both the list and the detail route; the two used to be hand-written copies and had already drifted in wording. The asymmetry with `11` §4 is deliberate and is written down: for a **grant**, no anchor means no claim; for a **target**, no anchor means nobody's territory | ~~`T-072`~~ — **done** |
 | `D-030` | **Three CSS custom properties are used and never defined** | Noticed 24 Aug while writing `T-052`'s stylesheet. `--color-border`, `--color-surface-2` and `--space-5` appear in `endur.css` (`.position-chip`, `.powers-place`, `.tsection`) and exist in no token file. An undefined `var()` makes the whole declaration compute to its initial value, so those borders render as **no border at all** and `.tsection` gets no margin. Subtle, shipped, and cheap: they belong to `T-050`/`T-051`/earlier, so `T-052` used real tokens and left the others alone rather than editing three tasks' styles in passing | one pass over `endur.css` |
+| `D-032` | **Response scope is decided at the campaign, not at the subject** | Found 25 Aug verifying `T-080` live. **Not introduced by it** — this is `40`'s behaviour, and `58` § Acceptance requires the inbox to match `40` for the same caller, which it does. A campaign is visible when *any* of its subjects sits in a unit the caller can reach; once visible, **every** response in it is returned. `readResponses` filters on `campaignId` alone and `readResults` aggregates the whole campaign unless the *client* passes a filter. Live proof: `grand-palace-3`, a level 3 anchored at **Lakeside Property** holding `response.read: own_unit`, reads all 229 comments including every one about **City Property**, and `/campaigns/:id/responses` hands them the same 210 rows and 12 distinct subjects it hands the administrator. INV-003 holds at campaign granularity and does not at subject granularity — and an org-wide campaign is the common case, not an exotic one. The inbox is where it becomes *visible*, because it puts the other property's subject name on the card where `40`'s average hid it. **Deliberately not fixed inside `T-080`:** a stricter inbox would satisfy one reading of INV-003 and break the acceptance criterion that asked for consistency, leaving two answers to one question. `N-061` | **owner's call.** It is a change to `40` first and `58` second, and it touches the k-anonymity reasoning in `52` §2 |
 | `D-031` | **The four demo organisations cannot use the invite/accounts flow, and re-seeding will not fix it** | Found 24 Aug from the powers grid's own warnings — *"Nobody in this organisation can give somebody a sign-in."* All four were seeded **21 Aug** and hold 51 capabilities; `T-072` added `account.create`, `account.reset` and `account.revoke` to `presets/grant-matrix.ts` on **24 Aug**, and existing orgs got no grant rows. `npm run db:seed` prints `skip: <name> already exists` — it creates missing orgs, it does not reconcile present ones. So a built-and-tested feature is **unreachable on stage**, and `T-073`'s Invite button would `403` for every demo org. `N-060` | **owner's call — the remedy (drop and re-seed the four) destroys any demo data entered since 21 Aug.** Before `T-045` |
 | `D-025` | **`$executeRaw` slips past the DEC-007 lint rule** | Noticed 24 Aug while writing `revokeAccount()`. `DEC-007` confines raw SQL to `db/graph.ts`, and `eslint.config.js`'s selector matches **`$queryRaw`/`$queryRawUnsafe` only** — `$executeRaw` is raw SQL and is not checked. The one call that uses it today is legitimate and unavoidable: revocation deletes the target's rows from `sessions`, which is connect-pg-simple's table and **deliberately not a Prisma model** (`10` §5), so there is no ORM path to it at all. But it passes because of a **gap in the rule, not an exemption**, and that is worth writing down rather than quietly relying on. The fix is one selector plus one `eslint-disable` with a reason — small, and it belongs to whoever next touches `DEC-007` rather than to a feature task | with `DEC-007`'s scheduled revisit (2026-10-01), or sooner if a second `$executeRaw` appears |
 | ~~`D-027`~~ | **REPAID 24 Aug by `T-086` + `T-087` (`DEC-050`, `DEC-051`).** ~~Every account in the product sees a `People` item that lists only itself~~ | Raised 24 Aug by the owner (*"lowest tier shouldn't see roles, people and department pages at all, even if they see nothing actually in it"*), and the mechanism turned out to be wider than the tier they asked about. `navItems.ts` gates each item on a bare capability (`needs`), and `authz/held.ts` **deliberately discards scope** — a capability is held when *any* live allow exists. So `person.read: self`, the **universal** grant every role gets (`50` §1, and `11` §10 has a test insisting it is never omitted), satisfies `People`'s gate for **everybody**; the page then renders one row. `org.read: all` does the same for `Settings`, seeded to all four levels so the vocabulary can load on first paint. Of the three pages the owner named, **Structure and Roles are already correctly hidden for L4** — the matrix gives that level neither `unit.read` nor `role.read`. The one they want *shown*, `Subjects`, is hidden, because L4 has no `subject.read` row at all. **Not a security hole and INV-003 is untouched**: `requireCapability` refuses these routes and the list endpoints already scope-filter to nothing — `held.ts`'s own header admits the class (*"a confusing button, not a security hole"*); this is that error landing on a whole page. Fix is `T-086` (carry scope to the client so a gate can say *"`person.read` beyond `self`"*) then `T-087`. **Why it surfaced now:** `50` §1 says the L4 row *"only matters for the rare case of someone at that level who does hold an account"* — `T-072` made that one click, so the case stopped being rare. **`T-086` landed the mechanical half on 24 Aug**: `capabilities` is a map of capability → widest held scope, and `useCan(cap, atLeast?)` compares breadth, so the gate *can* now say *"beyond `self`"*. **`Subjects` is fixed outright** — the seeded matrix gives L4 `subject.read: own_unit` and the existing `needs` gate does the rest. **`T-087` closed the rest the same day**, once the owner answered `OPEN-009`: `NavItem.minScope` gates People on `person.read` **beyond `self`**, and **Settings turned out not to be a scope problem at all** — `org.read` is `all` at every level including the lowest, seeded so the vocabulary loads on first paint, so no minimum could ever have hidden it. It was the wrong capability; `needs` is now `org.update`, which is what `<VocabularyChips>` had already been using for its link to the same page. **L3 keeps People** — the owner's call, and the right one: an L3 holds `person.read: own_unit`, so their page lists real colleagues rather than themselves. The seeded matrix was not touched | ~~`T-086`~~, ~~`T-087`~~ — **done**. `OPEN-010` carries the deferred part of the L3 row |
@@ -998,7 +1074,112 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-24 (latest) · T-089 and T-052 — the boundary, and the powers grid
+### 2026-08-25 (latest) · T-079 and T-080 — the response inbox
+
+Stage 9's second and third rows, back and front. **386 backend (+18) + 807 frontend (+23) =
+1,193 tests, all green.** Typecheck, lint, `audit:drift`, `audit:vocab` clean.
+
+#### The backend's point is what it cannot do
+
+`38` § "Not built" refused a per-subject breakdown on the campaign page in these words: *"a
+second ungated path to them is what INV-007 exists to prevent."* An inbox is that mistake made
+larger — a list of **individual comments across campaigns** is precisely what the k-anonymity
+gate exists to withhold.
+
+So `features/inbox/` owns **one table**. `inbox_state` is two ids and two timestamps and holds
+no response content at all; everything the page renders comes from `readComments()` in
+`features/results/service.ts`, where the gate already lived. The feature folder does not query
+`responses` and cannot grow a path to one by accident in three weeks' time. `DEC-058`.
+
+Three things fell out of writing it that way:
+
+- **The threshold is applied per campaign, before the merge.** Two campaigns of four responses
+  each do not become a readable eight. That is the mistake a naive cross-campaign `UNION`
+  makes, and it looks correct while making it, so it is asserted directly with the arithmetic
+  (`2 × (k−1) ≥ k`) checked in the test so it cannot go stale.
+- **One scope predicate.** `assertVisible` (`40`'s path) and `readableCampaigns` (`58`'s) now
+  call the same `canSee()`. `58` § Acceptance asks that the two match for the same caller;
+  sharing the function is how that is true by construction rather than by two people writing
+  the same `some()`.
+- **The write routes are gated too.** Without it, `POST /inbox/:id/read` on a guessed uuid is
+  an oracle — 204 for a response that exists, 404 for one that does not, inside a campaign the
+  caller cannot read. One extra query, and the same 404 for all three refusal reasons, because
+  a distinct message for "below threshold" announces that suppressed data exists.
+
+#### `DEC-060` came from its own test, and the bug was mine
+
+Opening a card marks it read. The first version then filtered every marked card out of the
+current tab — correct for a tick, wrong for an expand: on **Unread**, the detail appeared and
+vanished in the same frame. **Reading is not triaging.** A card leaves when the reader ticks,
+archives, or hits `u`/`e`; never as a side effect of being read. The unread count drops either
+way, because it is a count of unread and one genuinely just stopped being.
+
+The test that caught it was written to assert the expansion, not the eviction.
+
+#### `<ScoreBadge>` is built, and `CONF-016` was right about `40`
+
+`CONF-016` refused this component and every word of its argument holds **about `40`**: that
+page's number is an *average*, colouring one is interpretation, `40` § Interactions forbids it
+in as many words, and `40` was the only would-be caller.
+
+`58`'s number is a different number — **one person's own rating on the response their comment
+came from.** *"2/5 · the projector in Room 4 has never worked"* is a fact somebody stated, and
+reporting it is not judging it. So the two halves of `CONF-016` come apart:
+
+| | |
+|---|---|
+| The **badge** | had no legitimate caller. It has one now |
+| The **threshold colours** | were the interpretation. Still not built, at any value |
+
+Built colourless. The prohibition now lives *inside* the component rather than in a doc nobody
+reads before importing it — which is a stronger place for it than "not built" ever was,
+because the next page that wants a score gets the safe one instead of writing its own. Its
+test asserts the `className` is exactly `score-badge`, so a well-meant `.is-bad` is a failing
+test. `CONF-022`.
+
+#### `/app/roles` was still greyed out with a "Soon" tag
+
+`T-052` shipped the ladder and the powers grid on 24 Aug. The **last edit** — the one `T-085`
+exists to name — was missed, so for a day a built page was reachable only by typing the
+address.
+
+Nothing asserted the *positive* direction. `Sidebar.test.tsx` counted "Soon" tags and checked
+that scaffold items refuse to navigate, and had exactly one hand-written test that People
+*does* navigate. It is a table now, one row per built page, and Roles and Inbox are both in
+it.
+
+#### `N-061` / `D-032` — found live, not ours, and said so
+
+Response scope is decided at the **campaign**, not the subject. A campaign is visible when
+*any* of its subjects is in reach; once visible, every response in it comes back.
+
+Live, against The Grand Palace: `grand-palace-3`, a level 3 anchored at **Lakeside Property**
+holding `response.read: own_unit`, reads all 229 comments including every one about **City
+Property** — and `/campaigns/:id/responses` hands them the same 210 rows and 12 distinct
+subjects it hands the administrator.
+
+That is `40`'s behaviour, and `58` § Acceptance *requires* the inbox to match `40` for the same
+caller. A stricter inbox would satisfy one reading of INV-003 and break the criterion that
+asked for consistency, leaving two answers to one question. **Filed, not fixed** — it is a
+change to `40` first, and it touches `52` §2's reasoning.
+
+#### Verification
+
+Live against The Grand Palace: 229 comments, real hotel nouns on the cards (*Valet Parking*,
+*Concierge*, *Lakeside Dining*), the DTO's key set exactly as specified with nothing
+respondent-shaped in it, and the full **read → archive → unarchive → unread** round trip
+returning the org to 229 unread exactly. The probe's one `inbox_state` row was deleted; the
+table is empty and the four demo orgs are untouched.
+
+**Written:** `DEC-058`, `DEC-059`, `DEC-060`, `CONF-022` (narrowing `CONF-016`), `N-061`,
+`D-032`; `58` status + acceptance, `24` §3 and §6c, `20` §2, `55` § Stage 9, MAP.
+
+**What the next session should know.** Stage 9 continues with **Analysis** (`T-081` backend,
+`T-082` page) and then **Reflect** (`T-083`/`T-084`). Item 3 of the owner's ask is still
+entirely untouched: `T-075`/`T-076` (`/app/logs`) has no dependency on the platform side and
+can start immediately. `D-031` still needs an owner decision before `T-045`.
+
+### 2026-08-24 · T-089 and T-052 — the boundary, and the powers grid
 
 Items 1 and 2 of the owner's second ask, in the order they asked. **368 backend (+15) + 784
 frontend (+31) = 1,152 tests, all green.** Typecheck, lint, `audit:drift`, `audit:vocab`
@@ -1902,7 +2083,7 @@ today. A blanket *"it is P2 now"* would have hidden that behind the easy items.
   is unknown. Add them with `T-072` or `DRIFT-004` is a lie.
 - `<DecisionTrace>` is needed by **both** `T-076` and `T-054`. Whoever is second **extends**;
   the `INV-009` rule applies to it.
-- `<ScoreBadge>` is in the `24` catalogue and has never been built. `T-080` needs it.
+- ~~`<ScoreBadge>` is in the `24` catalogue and has never been built. `T-080` needs it.~~ **Built 25 Aug at `T-080`, without the threshold colours `CONF-016` refused — `CONF-022`.**
 - `58` must read through `features/results/service.ts`. A second query against `responses`
   forks the k-anonymity gate, which is the whole risk of that page.
 - Stage 7 is **not M0**. `T-043`, `T-045` and `D-005` still come first.

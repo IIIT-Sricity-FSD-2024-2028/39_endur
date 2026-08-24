@@ -16,6 +16,7 @@ export * from './campaign.js';
 export * from './response.js';
 export * from './results.js';
 export * from './home.js';
+export * from './inbox.js';
 
 // Filled as each feature lands:
 //   unit.ts role.ts grant.ts person.ts subject.ts

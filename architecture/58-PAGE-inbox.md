@@ -5,8 +5,14 @@ Design ref: `design_specs/design/08-PAGE-RESULTS-AND-ANALYSIS.md` §8.3
 Related: `40` (results, and the gate this page reads through), `43` (the tags it does *not*
 render), `52` §2 (k-anonymity)
 Invariants: **INV-006**, INV-007
-Status: **PROMOTED 2026-08-24 — `CONF-021`** (`T-079` backend, `T-080` page). Never had a
-blocker; it was written on 23 Aug and then sequenced behind M0
+Status: **BUILT 2026-08-25** — `T-079` (backend, `inbox_state` + five routes) and `T-080`
+(page, `<ResponseCard>`, `<ScoreBadge>`). Promoted on 24 Aug by `CONF-021`; it never had a
+blocker, having been written on 23 Aug and then sequenced behind M0.
+Decisions taken while building: `DEC-058` (the inbox owns one table and reads everything
+else through `40`'s service), `DEC-059` (`questionId` and `scoreMax` on the DTO),
+`DEC-060` (reading is not triaging), `CONF-022` (`<ScoreBadge>` built, colourless).
+Found while building: `N-061` / `D-032` — response scope is decided at the **campaign**, not
+the subject. Pre-existing in `40`; this page is where it becomes visible
 
 ## Purpose
 
@@ -178,21 +184,44 @@ and every one of them is also reachable as a button (`26`).
 
 ## Acceptance
 
-- [ ] The queue reads through the results service; a campaign below the k-anonymity threshold
+- [x] The queue reads through the results service; a campaign below the k-anonymity threshold
       contributes **no rows** — asserted by dropping a campaign under threshold and observing
       the count fall to zero rather than to a suppressed placeholder
-- [ ] Two below-threshold campaigns do not become readable when listed together
-- [ ] Scope filtering matches `40`'s for the same caller — asserted by comparing the two
-- [ ] `InboxResponse` carries no respondent attribute, asserted against the DTO
-- [ ] Read state is per user: two callers marking the same response do not affect each other
-- [ ] Archiving does not modify or delete the response
-- [ ] `state` defaults to `unread`
-- [ ] Marking read is optimistic and reverts visibly on failure
-- [ ] Read is not marked by scrolling
-- [ ] `j`/`k`/`e`/`u` work, and every one has a visible button equivalent
-- [ ] Cards collapse correctly at 390px
-- [ ] `<ResponseCard>` has no prop that requires the Analyze layer
-- [ ] Every noun from `useLabels()` (INV-001)
+- [x] Two below-threshold campaigns do not become readable when listed together — asserted
+      directly, with `2 × (k−1) ≥ k` checked in the test so the arithmetic cannot go stale
+- [x] Scope filtering matches `40`'s for the same caller — asserted by comparing the two
+      through both endpoints. They share one predicate (`canSee`), so the test is a
+      regression guard on anybody re-implementing it. **See `N-061`:** they match, and what
+      they both do is campaign-level rather than subject-level
+- [x] `InboxResponse` carries no respondent attribute, asserted against the DTO — as an
+      **allowlist** of keys, so a new field fails the test rather than sliding past it
+- [x] Read state is per user: two callers marking the same response do not affect each other
+- [x] Archiving does not modify or delete the response — asserted by comparing the row and
+      the answer count either side of an archive
+- [x] `state` defaults to `unread`
+- [x] Marking read is optimistic and reverts visibly on failure, **on the card**
+- [x] Read is not marked by scrolling
+- [x] `j`/`k`/`e`/`u` work, and every one has a visible button equivalent — plus one the
+      spec did not ask for: they never fire while a field has focus
+- [x] `<ResponseCard>` has no prop that requires the Analyze layer, asserted by rendering the
+      page and grepping its output for all four tag names
+- [x] Every noun from `useLabels()` (INV-001) — `audit:vocab` caught one on the first run
+      (*"Go to campaigns"* in the empty state) and it is routed now
+
+Not asserted by an automated test, and said plainly rather than ticked:
+
+- [ ] **Cards collapse correctly at 390px.** The CSS is written (`@media (max-width: 640px)`,
+      actions drop below the comment) and jsdom cannot check a layout. Wants an eye on a
+      phone before M0
+
+Two behaviours worth recording that the acceptance list did not ask for:
+
+- **The write routes are gated too** (`DEC-058`). `POST /inbox/:id/read` on a guessed uuid
+  would otherwise answer 204 for a real response and 404 for a fake one, in a campaign the
+  caller cannot read — an oracle. Same 404 for all three refusal reasons.
+- **Reading is not triaging** (`DEC-060`). Opening a card marks it read but does not evict it
+  from Unread; the tick, the archive and `u`/`e` do. The first version evicted on every mark
+  and the detail vanished in the frame it appeared.
 
 ## Out of scope
 

@@ -22,8 +22,9 @@ import { prisma } from '../../db/client.js';
 import { config } from '../../lib/config.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { nounsOf } from '../../lib/vocabulary.js';
-import { afterCursorOn, orderOn, pageOf, type Paged } from '../../lib/paginate.js';
+import { afterCursorOn, decodeCursor, orderOn, pageOf, type Paged } from '../../lib/paginate.js';
 import { visibleUnits } from '../../authz/index.js';
+import type { Visibility } from '../../authz/visibility.js';
 import { unitSubtree } from '../../db/graph.js';
 import { countAudience, ruleOf } from '../campaigns/audience.js';
 
@@ -379,12 +380,10 @@ async function assertVisible(
   if (!campaign) throw new NotFoundError(missing);
 
   const visibility = await visibleUnits({ orgId, userId, capability, authzVersion });
-  if (visibility.all) return campaign;
-
-  const units = campaign.subjects
-    .map(({ subject }) => subject.unitId)
-    .filter((unitId): unitId is string => Boolean(unitId));
-  if (units.some((unitId) => visibility.unitIds.includes(unitId))) return campaign;
+  // The SAME predicate the inbox's readableCampaigns uses, from one implementation. 58 §
+  // Acceptance asks that the two match for the same caller; sharing the function is how
+  // that is true by construction rather than by two people writing the same `some()`.
+  if (canSee(visibility, campaign.subjects)) return campaign;
 
   throw new NotFoundError(missing);
 }
@@ -438,4 +437,179 @@ function renderAnswer(value: unknown): string {
 /** RFC 4180: quote anything containing a comma, a quote or a newline, and double the quotes. */
 function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/* ------------------------------------------------- the inbox's read path (58) */
+
+/**
+ * ONE FREE-TEXT COMMENT, across campaigns. The inbox's entire source of content.
+ *
+ * This lives here rather than in `features/inbox/` because the k-anonymity gate lives here,
+ * and `38` § "Not built" already refused a per-subject breakdown for exactly this reason:
+ * *"a second ungated path to them is what INV-007 exists to prevent"*. The inbox is a far
+ * more tempting version of the same mistake — it is a list of individual comments, which is
+ * precisely what the gate exists to withhold. So `features/inbox/` touches `inbox_state`
+ * and nothing else; every word it renders comes from this function.
+ *
+ * THE SUPPRESSION IS NOT UNDONE BY AGGREGATION. The threshold is applied per campaign
+ * BEFORE the merge, which is the mistake a naive UNION across campaigns would make: two
+ * campaigns of two responses each do not become a readable four.
+ */
+export type CommentRow = {
+  responseId: string;
+  questionId: string;
+  submittedAt: Date;
+  campaign: { id: string; name: string };
+  subject: { id: string; name: string } | null;
+  comment: string;
+  questionText: string;
+  score: number | null;
+  scoreMax: number | null;
+};
+
+export type CommentFilter = {
+  campaignId?: string | undefined;
+  subjectId?: string | undefined;
+  /** The inbox's per-caller state, expressed as ids. It never reaches into this query. */
+  responseIds?: { in: string[] } | { notIn: string[] } | undefined;
+  cursor?: string | undefined;
+  limit: number;
+};
+
+export async function readComments(
+  orgId: string,
+  userId: string,
+  authzVersion: number,
+  filter: CommentFilter,
+): Promise<Paged<CommentRow>> {
+  const campaignIds = await readableCampaigns(orgId, userId, authzVersion, filter.campaignId);
+  if (campaignIds.length === 0) {
+    return { data: [], page: { nextCursor: null, hasMore: false }, meta: { total: 0 } };
+  }
+
+  const where = {
+    question: { kind: 'text' as const },
+    response: {
+      campaignId: { in: campaignIds },
+      ...(filter.subjectId ? { subjectId: filter.subjectId } : {}),
+      ...(filter.responseIds ? { id: filter.responseIds } : {}),
+    },
+  };
+
+  const total = await prisma.answer.count({ where });
+
+  // Paged over ANSWERS ordered by their response's timestamp, which lib/paginate.ts's
+  // afterCursorOn cannot express — it filters a column on the queried model, and this one
+  // is a column on a relation. The cursor is the same encoding, so a client cannot tell.
+  const point = filter.cursor ? decodeCursor(filter.cursor) : null;
+  const rows = await prisma.answer.findMany({
+    where: {
+      ...where,
+      ...(point
+        ? {
+            OR: [
+              { response: { ...where.response, submittedAt: { lt: point.createdAt } } },
+              { response: { ...where.response, submittedAt: point.createdAt }, id: { lt: point.id } },
+            ],
+          }
+        : {}),
+    },
+    take: filter.limit + 1,
+    orderBy: [{ response: { submittedAt: 'desc' } }, { id: 'desc' }],
+    select: {
+      id: true,
+      value: true,
+      questionId: true,
+      question: { select: { text: true } },
+      response: {
+        select: {
+          id: true,
+          submittedAt: true,
+          campaign: { select: { id: true, name: true } },
+          subject: { select: { id: true, name: true } },
+          // The rating on the SAME response. Not an average, not across responses — this
+          // is what one person said alongside what they wrote.
+          answers: {
+            where: { question: { kind: 'rating' } },
+            take: 1,
+            orderBy: { question: { position: 'asc' } },
+            select: { numericValue: true, question: { select: { config: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  return pageOf(
+    rows,
+    filter.limit,
+    total,
+    (row): CommentRow => {
+      const rating = row.response.answers[0];
+      const config_ = rating ? (rating.question.config as QuestionConfig) : undefined;
+      return {
+        responseId: row.response.id,
+        questionId: row.questionId,
+        submittedAt: row.response.submittedAt,
+        campaign: row.response.campaign,
+        subject: row.response.subject,
+        comment: (row.value as { text?: string }).text ?? '',
+        questionText: row.question.text,
+        score: rating?.numericValue == null ? null : Number(rating.numericValue),
+        scoreMax: config_?.kind === 'rating' ? config_.max : null,
+      };
+    },
+    (row) => ({ createdAt: row.response.submittedAt, id: row.id }),
+  );
+}
+
+/**
+ * The campaigns whose comments this caller may read: visible under `response.read`, AND at
+ * or above the k-anonymity threshold. Both halves, in one place, so neither can be applied
+ * without the other.
+ */
+export async function readableCampaigns(
+  orgId: string,
+  userId: string,
+  authzVersion: number,
+  onlyCampaignId?: string,
+): Promise<string[]> {
+  const campaigns = await prisma.campaign.findMany({
+    where: { orgId, ...(onlyCampaignId ? { id: onlyCampaignId } : {}) },
+    select: {
+      id: true,
+      subjects: { select: { subject: { select: { unitId: true } } } },
+    },
+  });
+  if (campaigns.length === 0) return [];
+
+  // EXACTLY 40's scope test, from exactly one implementation of it (INV-003).
+  const visibility = await visibleUnits({ orgId, userId, capability: 'response.read', authzVersion });
+  const visible = campaigns.filter((campaign) => canSee(visibility, campaign.subjects));
+  if (visible.length === 0) return [];
+
+  // PER CAMPAIGN, before anything is merged. A groupBy rather than a count each, but the
+  // arithmetic is the same one 40 does — and it is the whole reason this list is short.
+  const counts = await prisma.response.groupBy({
+    by: ['campaignId'],
+    where: { campaignId: { in: visible.map((campaign) => campaign.id) } },
+    _count: true,
+  });
+  const above = new Set(
+    counts
+      .filter((row) => row._count >= config.K_ANON_THRESHOLD)
+      .map((row) => row.campaignId),
+  );
+  return visible.filter((campaign) => above.has(campaign.id)).map((campaign) => campaign.id);
+}
+
+/** The one scope predicate, shared by assertVisible and readableCampaigns. */
+function canSee(
+  visibility: Visibility,
+  subjects: Array<{ subject: { unitId: string | null } }>,
+): boolean {
+  if (visibility.all) return true;
+  return subjects.some(
+    ({ subject }) => subject.unitId !== null && visibility.unitIds.includes(subject.unitId),
+  );
 }
