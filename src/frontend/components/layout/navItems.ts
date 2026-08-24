@@ -54,12 +54,11 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
 
     { to: '/app/structure', label: 'Structure', icon: 'structure', group: 'organize',
       needs: 'unit.read' },
-    // P2, after M0. Disabled for the same reason the P3 items are: the route exists as a
-    // contract with 20 §2, but the page behind it is scaffold, and a sidebar that
-    // navigates to "Not built yet" is the one thing 02 §7 tells us not to build.
-    { to: '/app/roles', label: 'Roles', icon: 'role', group: 'organize', needs: 'role.read',
-      disabled: true,
-      soonHint: 'Roles, and the grid of what each one is allowed to do.' },
+    // Un-disabled by T-052, which is the LAST edit of that task. It was MISSED when the
+    // page shipped on 24 Aug: the ladder and the powers grid were live at /app/roles and
+    // the only way to reach them was to type the address. A built page behind a "Soon" tag
+    // is the mirror image of the mistake 02 §7 warns about, and just as invisible.
+    { to: '/app/roles', label: 'Roles', icon: 'role', group: 'organize', needs: 'role.read' },
     // Un-disabled by T-050. It is the LAST edit of that task and not a task of its own:
     // an item that navigates to a half-built page is the one thing 02 §7 forbids.
     //
@@ -83,9 +82,14 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     { to: '/app/analysis', label: 'Analysis', icon: 'results', group: 'understand',
       disabled: true,
       soonHint: 'Themes, sentiment and key drivers across every response.' },
+    // Un-disabled by T-080 — the last edit of that task, never a task of its own.
+    //
+    // `response.read` and NOT a minimum scope (DEC-051): unlike People, a narrow hold here
+    // is a real queue and not a list of one. `own_unit` on `response.read` means the
+    // comments from your own section's campaigns, which is exactly what a section head
+    // should open this page to read.
     { to: '/app/inbox', label: 'Inbox', icon: 'inbox', group: 'understand',
-      disabled: true,
-      soonHint: 'Every response as it arrives, in one reviewable stream.' },
+      needs: 'response.read' },
     { to: '/app/reflect', label: 'Reflect', icon: 'reflect', group: 'understand',
       disabled: true,
       soonHint: 'Compare how you rate yourself against how others rate you.' },

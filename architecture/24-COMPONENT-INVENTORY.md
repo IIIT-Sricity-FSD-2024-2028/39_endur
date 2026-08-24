@@ -130,17 +130,32 @@ Always paired with a legend or numbers — never colour alone (`21` §8). Built 
 rather than a judgement, because the instrument itself names promoters and detractors
 (`CONF-004`). Using it anywhere else on `40` would be the interpretation that page refuses.
 
-### `<ScoreBadge>` — **not built, and not stubbed**
+### `<ScoreBadge>` — **built at T-080, and deliberately colourless**
 ```ts
-{ score: number; max?: number }   // threshold colours from design_specs/design/01 §2b
+{ score: number; max?: number }
 ```
-`40` § Components lists it and `40` § Interactions forbids exactly what it does — threshold
-colours on an average are interpretation, and *"results states what happened; it does not
-judge it"* is that page's opening line. `design_specs/design/08` §8.1 agrees with the
-prohibition and not with the list: it draws the average as display type beside the answer
-count, with no badge. Resolved as `CONF-016`; T-040 renders the number. It has no other
-caller, so building it would mean shipping a component whose only use is one the docs rule
-out.
+One score, one neutral surface, at every value.
+
+**`CONF-016` refused to build this and was right about `40`.** That page's number is an
+*average*, `40` § Interactions forbids colouring one, and it was the only would-be caller — a
+component whose single use is the place the docs rule out is one that eventually acquires an
+illegitimate use.
+
+`58` changed the premise. The number on an inbox card is **one person's own rating on the
+response their comment came from** — *"2/5 · the projector in Room 4 has never worked"* is a
+fact somebody stated, and reporting it is not judging it. So the two halves of `CONF-016`
+came apart: the **badge** had no caller and now has one; the **threshold colours** were the
+interpretation and are not built, at any value. `CONF-022`.
+
+The prohibition now lives inside the component rather than in a doc nobody reads before
+importing it, which is a stronger place for it than "not built" ever was — the next page
+that wants a score gets the safe one instead of writing its own. Its test asserts the
+`className` is exactly `score-badge`, so a well-meant `.is-bad` is a failing test rather than
+a code review nobody runs.
+
+`40` still renders its average as plain display type (`CONF-016`, `design_specs/design/08`
+§8.1) and does not use this. A *judged* score against a rubric remains `43`'s, and a
+different component.
 
 ### `<TrendChip>` — **not built in P1-P2**
 ```ts
@@ -643,11 +658,19 @@ person who cannot sign in and a support call nobody can answer without regenerat
 (`account.reset`); when absent the component shows no regenerate affordance rather than a
 disabled one.
 
-### `<ResponseCard>`
+### `<ResponseCard>` — built at T-080
 ```ts
 { response: InboxResponse; read: boolean; archived: boolean;
-  onToggleRead: () => void; onArchive: () => void; subjectWord: string }
+  expanded: boolean; onToggleExpand: () => void;
+  onToggleRead: () => void; onArchive: () => void; subjectWord: string;
+  selected?: boolean; error?: string | undefined }
 ```
+**Four props more than this was catalogued with, and each is the page refusing to own state
+the card renders.** `expanded`/`onToggleExpand` because expanding is what marks a card read
+(`58` § State) and only the page knows which one card is open; `selected` because `j`/`k`
+move a cursor through the list; `error` because an optimistic mark that fails must say so
+**on the card** and never in a toast (`58` § States). All three of the new booleans are
+presentation — the component still holds no state and still fetches nothing.
 One free-text response in the inbox (`58`), following `design_specs/design/08` §8.3: score
 badge, the comment, the subject tag, and the read/unread state.
 
@@ -723,6 +746,9 @@ that has been misled about the one thing `52` promises them.
 |---|---|
 | **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersByPlace, PowersGrid, ResponsiveTable |
 | **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip, FileUpload |
+
+`<ScoreBadge>` left lane C's *unbuilt* column at T-080 (`CONF-022`); `<TrendChip>` has not,
+and its entry above still holds.
 | **Shared** | EmptyState, Toast, ConfirmDialog, DecisionTrace, InviteLink — whoever needs one first, then announced |
 
 Track B ships AppShell and PageHeader before starting the wizard, or track C is blocked or

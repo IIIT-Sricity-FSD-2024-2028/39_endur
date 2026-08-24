@@ -12,7 +12,8 @@
 // Never emoji. The mockups use them as placeholders; they render differently on the
 // projector machine and read as unfinished. audit-drift greps for them in JSX.
 import {
-  ArrowRight, BarChart3, Building2, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff,
+  Archive, ArchiveRestore, ArrowRight, BarChart3, Building2, Check, ChevronDown, ChevronRight,
+  Copy, Eye, EyeOff, Mail,
   GripVertical, Home,
   Inbox, LayoutTemplate, Maximize2, Monitor as MonitorSmartphone, Moon, Pencil, Play,
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
@@ -70,6 +71,11 @@ const ICONS = {
   arrow: ArrowRight,
   play: Play,
   preview: Maximize2,
+  // T-080. The inbox's two toggles. `unread` is the envelope you put a comment BACK into,
+  // named for the action like `show`/`hide` above and not for the state it is in.
+  archive: Archive,
+  restore: ArchiveRestore,
+  unread: Mail,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
