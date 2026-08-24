@@ -221,11 +221,23 @@ Assign it to one person. It is the component most likely to be rewritten three t
 ### `<RoleRow>`
 ```ts
 { name: string; level: number; total: number; autoFocus?: boolean;
+  peopleCount?: number; grantCount?: number; editable?: boolean; busy?: boolean;
   onRename: (name: string) => void; onDelete: (() => void) | undefined;
   onMove?: (direction: -1 | 1) => void }
 
 export function seesText(level: number, total: number): string
 ```
+**Extended at T-052, not forked (INV-009).** `/app/roles` is the second placement — same
+rung, same generated "Sees…" line, same undeletable bottom row. It adds four **optional**
+props and the wizard passes none of them: the two counts (the wizard is creating roles nobody
+holds yet), `editable` because `33` § States requires the tab to render read-only rather than
+absent without `role.update`, and `busy` so a reorder in flight cannot queue a second one.
+
+**Its CSS was already written and stayed written.** `endur.css` § "step 2 · roles" owns
+`.role-row`, `.role-level`, `.role-sees`, `.role-grip` and `.role-move`. `T-052` added only
+`.role-counts` and `.role-name-static`; re-declaring the shared selectors would have won the
+cascade and quietly restyled wizard step 2. **A component shared by two screens has its CSS
+shared too, or INV-009 is true of the markup and false of the appearance.**
 **Level is derived from row order, never entered.** The "Sees…" description is generated from
 the level, not stored — `seesText` is exported so `33`'s grid states the rule the same way.
 
@@ -277,15 +289,25 @@ forbids; the prop exists so that task is a wiring change rather than a redesign.
 
 ### `<PowersGrid>`
 ```ts
-{ capabilities: CapabilityMeta[]; roles: Role[]; grants: GrantCell[];
-  onChange: (next: GrantCell[]) => void; warnings: GrantWarning[] }
-type GrantCell = { roleId: string; capability: string;
-                   scope: GrantScope | null; effect: GrantEffect; params?: Params };
+{ grid: GridController; editable: boolean; myRoleIds: string[] }
 ```
 The most complex component in the product. Full interaction spec in
 `33-PAGE-roles-and-powers-grid.md`. Colour intensity tracks scope width, so an over-granted
 role is a visibly dark column and an orphan capability is a visibly empty row — mistakes are
 *visible* rather than discoverable.
+
+**Amended at T-052 from the controlled shape** `{ capabilities, roles, grants, onChange,
+warnings }`. The catalogue is authoritative and additions go here first, so the divergence is
+recorded rather than left to be discovered: the working copy, the undo stack and the **last
+saved matrix** have to live together, because the save sends a *diff* and a diff needs both
+sides. A controlled `onChange(next: GrantCell[])` would push all three into the page, and
+every page placing this grid would have to reimplement them identically. `usePowersGrid()` in
+`lib/roles.ts` holds them; the component renders them.
+
+`myRoleIds` is the reader's own roles, for the self-lockout prompt — the half of `33`'s
+lockout guard the server cannot do, because only the client knows which column is the
+reader's. It is why `Position` gained `roleId`: matching by role **name** is `N-057` exactly,
+before the one save in the product that has no undo.
 
 ### `<WordsEditor>`
 ```ts

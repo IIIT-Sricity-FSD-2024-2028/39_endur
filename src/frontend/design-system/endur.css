@@ -2840,49 +2840,31 @@ html:active-view-transition * {
 .tab.is-active { color: var(--color-text); border-bottom-color: var(--color-accent); }
 .tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-/* A bare icon control. Used where the label is on the row beside it and repeating it
-   would announce the same word twice — every one of them carries an aria-label. */
-.icon-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: var(--space-1); border: 0; background: none; cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
-}
-.icon-btn:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface); }
-.icon-btn:disabled { opacity: 0.35; cursor: default; }
-.icon-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-
 .btn-small { padding: var(--space-1) var(--space-2); font-size: 12px; }
 
-/* One chevron glyph, pointed by rotation. Three separate icons would be three imports for
-   one shape. */
-.flip { transform: rotate(180deg); }
+/* One chevron glyph, pointed by rotation — a collapsed module points right, an open one
+   points down. A second icon import for the same shape rotated is not a saving. */
 .flip-right { transform: rotate(-90deg); }
 
 /* ---------------------------------------------------------------- the ladder */
 
+/* `<RoleRow>` IS ALREADY STYLED — "step 2 · roles" above owns `.role-row`, `.role-level`,
+   `.role-sees`, `.role-grip` and `.role-move`, because the wizard placed the component
+   first. T-052 is the SECOND placement and adds only what the ladder needs that the wizard
+   never did. Re-declaring `.role-row` here would have won the cascade and quietly restyled
+   wizard step 2 — a component shared by two screens has its CSS shared too, or INV-009 is
+   true of the markup and false of the appearance. */
+
 .role-ladder-hint { margin: 0 0 var(--space-4); max-width: 62ch; }
-.role-rows { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.role-rows { display: grid; gap: 6px; margin: 0 0 var(--space-4); }
 
-.role-row {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-3) var(--space-2);
-  border-bottom: 1px solid var(--color-divider);
-}
-.role-row:last-child { border-bottom: 0; }
+/* The two counts, which only the ladder knows — the wizard is creating roles nobody holds
+   yet, so it passes neither and this never renders there. */
+.role-counts { flex: none; font-size: 12px; white-space: nowrap; }
 
-/* Ordering only, and drawn to look like it: a quiet monospace tag, never a rank badge.
-   DEC-002 — nothing in the product decides anything by comparing two of these. */
-.role-level {
-  min-width: 2.4em; text-align: center;
-  font-size: 11px; font-variant-numeric: tabular-nums;
-  padding: 2px var(--space-1); border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-}
-.role-name { flex: 1; min-width: 0; }
-.role-counts { font-size: 12px; white-space: nowrap; }
-.role-actions { display: flex; gap: var(--space-1); }
+/* Read-only mode: the name as a fact rather than a field (33 § States). */
+.role-name-static { flex: 1; min-width: 0; }
+
 .role-reassign { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
 
 /* ------------------------------------------------------------------ the grid */
