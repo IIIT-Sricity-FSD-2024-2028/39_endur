@@ -121,5 +121,14 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     // answer than a 403 to something the caller may in fact read.
     { to: '/app/settings', label: 'Settings', icon: 'settings', group: 'system',
       needs: 'org.update' },
+    // T-076. `56` § Route & access puts it here by name: system group, under Settings,
+    // HIDDEN without `audit.read`.
+    //
+    // No `minScope`. `audit.read` is seeded at L1 and nowhere else (`50` §1), so the item
+    // is already rare — and where an organisation grants it narrower, a scoped log is a
+    // real log of a real subtree, not the list-of-one that made People need a minimum
+    // (`DEC-051`).
+    { to: '/app/logs', label: 'Activity log', icon: 'log', group: 'system',
+      needs: 'audit.read' },
   ];
 }

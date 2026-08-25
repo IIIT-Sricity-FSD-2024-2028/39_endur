@@ -95,6 +95,12 @@ model Organization {
   logoFileId String? @map("logo_file_id") @db.Uuid
   logo       File?   @relation("OrganizationLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
 
+  /// 19 §6, 70 § Interactions. Set by `platform.org.suspend`, owner only. It stops the
+  /// customer's STAFF signing in and NOTHING ELSE: campaigns keep running and the
+  /// respondent surface keeps answering, because a QR code on a wall belongs to people who
+  /// did not choose the plan and must not be punished for it (16 §6).
+  suspendedAt DateTime? @map("suspended_at") @db.Timestamptz(6)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   users           User[]
@@ -114,6 +120,7 @@ model Organization {
   actionPlans     ActionPlan[]
   checkins        Checkin[]
   subscription    Subscription?
+  platformAudit   PlatformAuditLog[]
 
   @@map("organizations")
 }
@@ -626,8 +633,16 @@ model AuditLog {
   targetType String? @map("target_type")
   targetId   String? @map("target_id") @db.Uuid
 
+  /// DEC-041. 'allowed' | 'denied'. A row used to mean SOMETHING HAPPENED, so the log
+  /// could only ever answer half of what an administrator asks it. Denials of MUTATING
+  /// capabilities only — a 403 on a GET is the permission system working correctly,
+  /// thousands of times a day, and writing all of them produces a table nobody reads.
+  outcome String @default("allowed")
+
   /// WHICH GRANT decided it (INV-007). This is what turns "access denied" from an
   /// assertion into evidence, and it is what the simulator replays (42).
+  /// On a DENIAL it is the most useful it ever is: the narrowest deny that stopped it,
+  /// which is the answer to "whom do I ask".
   decidedBy Json?   @map("decided_by")
   requestId String? @map("request_id")
   ip        String? @db.Inet
@@ -635,6 +650,8 @@ model AuditLog {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([orgId, createdAt(sort: Desc)])
+  /// The refusals-only toggle (56) runs on every visit and is the selective half.
+  @@index([orgId, outcome, createdAt(sort: Desc)])
   @@map("audit_log")
 }
 
@@ -746,4 +763,97 @@ model Checkin {
 
   @@index([orgId, actionPlanId])
   @@map("checkins")
+}
+
+// ---------------------------------------------------------------------------
+// THE PLATFORM SIDE. 19, T-059.
+//
+// Everything above this line describes the product A CUSTOMER uses, and every model above
+// carries `org_id` for that reason. The three models below are the only ones in the schema
+// that deliberately do not — they are Endur's own side of the product, and that ABSENCE is
+// the design (19 §10).
+//
+// DEC-033: an operator is a separate principal kind with a separate account table, a
+// separate authentication surface, a separate capability catalogue and a separate database
+// seam. It is never a `User`, never a `Grant` and never a flag — because `users` is
+// `@@unique([org_id, email])` with `org_id` NOT NULL, so an operator hosted there would
+// need a fake home organisation, and that fake org would then appear in the estate list,
+// the seat count and the revenue figures it exists to report on.
+// ---------------------------------------------------------------------------
+
+model PlatformUser {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Unique on EMAIL ALONE, unlike `users` — there is no tenant to disambiguate by, so
+  /// DEC-049's ambiguous-login problem cannot arise here and login needs no candidate window.
+  email        String @unique @db.Citext
+  passwordHash String @map("password_hash")
+  name         String
+
+  /// 'owner' | 'staff'. Two named roles, not a grid (19 §3) — a second GRANT engine for a
+  /// four-person internal team is over-engineering, and it invites confusion with the real one.
+  role   String
+  /// active | disabled
+  status String @default("active")
+
+  /// 19 §9. NOT NULL: every operator has one from the moment the account exists, so there
+  /// is no "MFA not set up yet" state for a login to fall through. Base32, TOTP.
+  mfaSecret String @map("mfa_secret")
+
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sessions   PlatformSession[]
+  auditLog   PlatformAuditLog[]
+
+  @@map("platform_users")
+}
+
+/// The operator session store — NOT the `sessions` table, and not a second express-session.
+///
+/// DEC-072. `req.session` is single-valued: two express-session instances on one app fight
+/// over it, and whichever ran last wins. "One session, two meanings" is exactly the
+/// privilege confusion 19 §7 mounts a second cookie name to prevent, so mounting a second
+/// session middleware to achieve it would defeat the purpose. An opaque id in its own table
+/// cannot be confused for `endur.sid` by any code path, because nothing else reads it.
+model PlatformSession {
+  /// 32 random bytes, base64url. The id IS the credential — unguessable and server-side,
+  /// so there is nothing to sign and nothing a signature would add.
+  id String @id
+
+  operatorId String       @map("operator_id") @db.Uuid
+  operator   PlatformUser @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([operatorId])
+  @@map("platform_sessions")
+}
+
+/// SEPARATE from `audit_log`, whose `org_id` rows belong to the customer and are theirs to
+/// export. An operator's actions are OUR record; mixing them would put Endur's internal
+/// activity inside a customer's exportable audit trail (19 §10).
+model PlatformAuditLog {
+  id BigInt @id @default(autoincrement())
+
+  actorId String       @map("actor_id") @db.Uuid
+  actor   PlatformUser @relation(fields: [actorId], references: [id])
+
+  action String
+
+  /// Nullable: an estate-wide action — creating an operator, reading analytics — is about
+  /// no single organisation.
+  targetOrgId String?       @map("target_org_id") @db.Uuid
+  targetOrg   Organization? @relation(fields: [targetOrgId], references: [id], onDelete: SetNull)
+
+  /// The old and new tier, the suspension reason, the message subject and body (70).
+  payload   Json?
+  requestId String? @map("request_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([targetOrgId, createdAt(sort: Desc)])
+  @@map("platform_audit_log")
 }

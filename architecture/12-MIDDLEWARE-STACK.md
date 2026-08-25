@@ -516,6 +516,9 @@ These are the reason the chain is a chain. Each is worth being able to state out
 | `requireCapability` → `requireNoEscalation` | The escalation bound can only refuse. Running it first would answer *"you cannot hand that out"* to someone who was never allowed to hand anything out — a more specific refusal than the truth |
 | `requireCapability` → `requireEntitlement` | 403 outranks 402: never tell someone to buy an upgrade for something they would not be allowed to use anyway |
 | token resolution → `requireMembership` | Gating before resolving turns a restricted campaign into an existence oracle. An invalid token must 404 before `access` is ever consulted (`13` §6) |
+| `requirePlatformAuth` **instead of** `tenantResolver` | A platform route has no tenant. Reaching the resolver with no organisation produces a confusing 400 where a clean 401 is the truth (`19` §9) |
+| `validate` → `requirePlatform` | Exactly as for `requireCapability`, and for the same reason |
+| **`requireCapability` and `requirePlatform` never both** | A route is either a tenant route or a platform route. Both is a route whose authorisation model nobody can state in one sentence, which is §1's whole argument. **`routes.test.ts` asserts it** — "must never" without a test is a comment |
 | handler → `auditWriter` assertion | Only the handler knows what actually happened |
 | everything → `errorFunnel` | Registered last, or Express will not route errors to it |
 
@@ -538,6 +541,10 @@ src/backend/middleware/
   chains.ts           links 6-8 composed per router: tenant | auth | respondent | asset
   upload.ts           multipart, images only. The one bypass of express.json (48)
   validate.ts         the DTO pipe
+  requirePlatform.ts  THE FOURTH GUARD (19 §9). requirePlatformAuth() attaches the
+                      operator principal from `endur.ops`; requirePlatform(cap) is one
+                      lookup against 19 §4's fixed role table — there is no second
+                      resolver here and there must not be one
   requireCapability.ts
   requireEntitlement.ts
   rateLimit.ts        factory: global + scoped buckets

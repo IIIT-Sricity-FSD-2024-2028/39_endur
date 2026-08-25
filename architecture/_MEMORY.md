@@ -1329,6 +1329,123 @@ DEC-067  ACTIVE  2026-08-25  origin:claude  task:T-083
            update once finalised_at is set. 44 asks for a trigger test rather than a service
            test by name, and improve.test.ts writes to the row directly to get it.
   see      44 § Purpose, 13 § Improve loop, migrations/20260825170000_improve_loop
+
+DEC-068  ACTIVE  2026-08-25  origin:claude  task:T-075  amends:DEC-041
+  decision A REFUSAL IS RECORDED WHEN THE METHOD IS NOT GET **AND** THE CAPABILITY IS NOT
+           A *.read. two conditions, not one.
+  why      DEC-041 says "denials of mutating capabilities only" and 56 gives the reason in
+           terms of the METHOD -- "a 403 on a GET is the permission system working as
+           designed, thousands of times a day". both readings are right about different
+           mistakes: the method catches the volume, and the capability catches the read
+           that is SHAPED like a write. POST /authz/simulate asks a question and changes
+           nothing; a simulator run somebody may not perform is not a security event.
+  also     A 404 IS RECORDED TOO. from the caller's side it is indistinguishable from a 403
+           by design (13 §5), but from the ORGANISATION'S side it is the more interesting
+           of the two -- somebody reached for a resource so far outside their scope that we
+           would not confirm it exists.
+  where    writeDenial() in db/tx.ts, BESIDE flushAudit and not in the middleware. `ip` and
+           `actor` are decided by DEC-040 and DEC-045 there and nowhere else, and a second
+           writer is a second place those rules have to be remembered -- which is DEC-040's
+           whole lesson. NOT in a transaction: INV-007 binds a row to the mutation it
+           describes and a refusal describes a mutation that never happened.
+  safety   it can never replace the 403. the write is swallowed on failure, because a log
+           that turns a refusal into a 500 makes the product LESS safe than not having one.
+  verify   audit.test.ts asserts both directions -- a refused POST /roles writes a row, and
+           a refused GET /audit writes nothing.
+  see      56 § Which refusals get written, DEC-041, db/tx.ts
+
+DEC-069  ACTIVE  2026-08-25  origin:claude  task:T-075
+  decision ONE `DecidedBy` TYPE, IN packages/shared/src/errors.ts, CARRYING BOTH the 403
+           body's trace and an audit row's. it was two shapes under one name until T-075.
+  found    writing the audit DTO. errors.ts already exported `DecidedBy` = {via, subjectName?,
+           scope?} for the 403 detail; the resolver's describe() emits {grantId, via,
+           subjectName, scope, anchorUnitId?, anchorUnitName?, effect} and BOTH cross the
+           wire from the same function. the second declaration would have compiled and
+           drifted.
+  why      it is the same sentence in two tenses, which is exactly the argument 24 §6c makes
+           for <DecisionTrace> being ONE COMPONENT. a second type underneath a shared
+           component is the fork the component was written to prevent.
+  shape    everything but `via` optional -- the 403 body is the weaker carrier and always
+           was. an audit row fills all of it.
+  see      24 §6c, 56 § Data contract, packages/shared/src/errors.ts
+
+DEC-070  ACTIVE  2026-08-25  origin:claude  task:T-075
+  decision THE ACTIVITY LOG IS SCOPE-FILTERED OVER THE TARGET, IN SQL, BEFORE THE PAGE
+           QUERY. four target types live in a unit -- unit, subject, person/user, campaign
+           -- and EVERYTHING ELSE IS ORG-LEVEL, visible only at scope `all`.
+  why      56 is explicit that a row is visible when the THING ACTED UPON is in scope, not
+           when the actor is: "an owner acting on your department is your business". a
+           campaign's unit is its SUBJECTS' units, which is the predicate 40 and 58 already
+           share rather than a third reading of the same question.
+  org-level a role, a template, the organisation itself. an org-level target is one a
+           unit-scoped grant deliberately cannot reach (11 §4) -- buildTarget() reaches the
+           same answer on the WRITE side, so the read side agreeing is not a coincidence.
+           default stays deny.
+  before   three id lookups and one OR, run BEFORE the page query. meta.total then counts
+           what the caller may see rather than counting what exists and dropping rows after
+           (13 §4). filtering per row would have made the total a lie.
+  note     audit.read is seeded `all` AT L1 AND NOWHERE ELSE (50 §1), so no seeded caller
+           exercises this. the test grants it at own_unit to prove the promise is real.
+  see      56 § Scope, INV-003
+
+DEC-071  ACTIVE  2026-08-26  origin:claude  task:T-059
+  decision T-059 DOES NOT DEPEND ON T-057, AND THE DEPENDENCY IS REMOVED RATHER THAN
+           WAITED OUT. N-058 predicted this on 24 Aug and asked for it to be CHECKED when
+           T-059 started rather than acted on blind. It was checked, and it holds.
+  why      T-059 is `platform_users`, the separate login and cookie, requirePlatform() and
+           the aggregate-only seam. NONE of those four reads a seat count, a usage
+           breakdown or a plan. the dependency was there because /ops (T-066) DISPLAYS
+           tiers -- which is T-066's dependency, not T-059's.
+  same     the conflation DEC-048 already took apart once: one large task named after its
+           biggest part, with a small independent piece buried inside it.
+  what     the estate list DOES show a tier, read straight off `subscriptions` -- the rows
+           T-088 has been writing since 24 Aug. `seats` is computed live from 16 §5's
+           formula rather than read from the CACHED `subscriptions.seats`, which T-057
+           owns and which nothing has ever written: reading it would show 0 seats for
+           every organisation and look like a broken screen rather than an unbuilt meter.
+           `seatLimit` is null for the same honesty -- there is no ceiling in the product
+           yet, and a 0 would render "over seats" for every customer.
+  see      N-058, DEC-048, T-057, T-066, 19, 70
+
+DEC-072  ACTIVE  2026-08-26  origin:claude  task:T-059
+  decision THE OPERATOR SESSION IS ITS OWN STORE AND ITS OWN READER, NOT A SECOND
+           express-session. `platform_sessions` holds an opaque 32-byte id; `endur.ops`
+           carries it; `platform/session.ts` is the only file that reads either.
+  why      19 §7 mandates a second COOKIE NAME, and the argument it gives is that "one
+           session, two meanings is how privilege confusion bugs happen". mounting a
+           second express-session to achieve that would have reintroduced exactly the
+           thing: `req.session` IS SINGLE-VALUED, so two instances both write it and
+           whichever ran last wins. the second name would have been decoration over a
+           shared object.
+  gain     nothing else in the codebase reads `endur.ops`, and `authenticate` cannot
+           attach an operator by accident because it reads `req.session` and an operator
+           never has one. the guards then fail closed in both directions for free.
+  cookie   path-scoped to /api/v1/platform, so a console request carries no operator
+           cookie at all -- which is why an operator reaching a tenant route gets
+           UNRESOLVED_TENANT rather than a considered refusal. 12h, not 7d: this session
+           reaches every customer's plan data.
+  signing  none, and none is needed. the id is 32 random bytes held server-side, so a
+           forged id is a row that does not exist.
+  see      19 §7, 15 §2, DEC-014
+
+DEC-073  ACTIVE  2026-08-26  origin:claude  task:T-059
+  decision SUSPENSION IS ENFORCED IN tenantResolver, ON THE RESOLUTION SOURCE. a tenant
+           resolved FROM THE SESSION is refused when `organizations.suspended_at` is set;
+           a tenant resolved from a respondent token, an activation token or the slug
+           header is not.
+  why      19 §6 and 70 both say a suspension must stop the customer's STAFF signing in
+           and must NOT stop the respondent surface -- a QR code on a wall belongs to
+           people who did not choose the plan (16 §6). tenantResolver is the ONLY place in
+           the codebase that knows HOW a tenant was resolved, so it is the only place that
+           can express that sentence at all.
+  not-login checking at login would make a suspension take effect at the next sign-in
+           rather than the next REQUEST, leaving every live staff session working. this is
+           the same property permissions get from being resolved per request instead of
+           read off a session claim (15 §2).
+  cost     `resolve()` returns `{ orgId, via }` instead of a bare id, and `factsOf()` reads
+           one more column on a query that was already happening -- the same trade T-044
+           made for `labels`.
+  see      19 §6, 70 § Interactions, 16 §6, INV-010
 ```
 
 ---
@@ -2375,9 +2492,42 @@ CONTESTED  src/backend/features/people/** is 34's, but 57 adds three routes to i
            people/service.ts except to insert the guard.
 CONTESTED  src/backend/db/tx.ts is 10 §5's. DEC-040 changes ONE line in it (ip written only
            for user principals). anyone touching flushAudit reads DEC-040 first.
+           T-075 ADDED writeDenial() BESIDE IT (DEC-068) rather than a second writer in the
+           middleware -- same reason, same file, same rules.
+MAP        src/backend/features/audit/**       -> 56 (T-075)
+MAP        packages/shared/src/dto/audit.ts    -> 56 (T-075)
+MAP        src/frontend/pages/console/Logs/**  -> 56 (T-076)
+MAP        src/frontend/lib/audit.ts           -> 56 (T-076)
+MAP        src/frontend/components/org/DecisionTrace.tsx -> 24 §6c (T-076).
+           T-054 EXTENDS IT for 42's simulator. IT DOES NOT FORK IT (INV-009).
+
+--- added 2026-08-26 with T-059, the platform backend ---
+
+MAP        src/backend/platform/**             -> 19 (T-059)
+           session.ts (DEC-072) · db.ts, THE AGGREGATE-ONLY SEAM (INV-011) ·
+           audit.ts · totp.ts
+MAP        src/backend/features/platform/**    -> 19 §11 (T-059)
+MAP        src/backend/middleware/requirePlatform.ts -> 19 §9 (T-059).
+           THE FOURTH GUARD. it and requireCapability must NEVER appear on one route --
+           routes.test.ts asserts it.
+MAP        packages/shared/src/platform-capabilities.ts -> 19 §4 (T-059).
+           A SECOND CATALOGUE, AND IT STAYS SECOND. a `platform.` string in
+           CAPABILITY_CATALOGUE would be swept into TIER_ENTITLEMENTS and rendered as an
+           assignable row in the powers grid. two tests say so.
+MAP        packages/shared/src/dto/platform.ts -> 19 §11 (T-059)
+MAP        src/backend/database/seed/operators.ts, ops-code.ts -> 19 §3, 50 (T-059)
+CONTESTED  src/backend/middleware/tenantResolver.ts is 12's. DEC-073 changes its RETURN
+           SHAPE (`{ orgId, via }`) so suspension can distinguish a staff session from a
+           respondent token. 19 owns the suspension rule; 12 owns the file.
+CONTESTED  database/schema.prisma gains platform_users, platform_sessions,
+           platform_audit_log and organizations.suspended_at. 10 owns the file; 19 owns
+           the four. THEY ARE THE ONLY TABLES IN THE SCHEMA WITH NO org_id, and that
+           absence is DEC-033 rather than an omission.
 CONTESTED  database/schema.prisma gains campaigns.access, campaign_participants,
            account_invites, inbox_state and audit_log.outcome in one migration. 10 owns the
            file; four docs own the models. WRITE THEM IN ONE MIGRATION, not four.
+           SETTLED for audit_log.outcome: it landed on its own at T-075, with its reader.
+           a column no writer sets is a column no reader can trust, so it waited for one.
 
 ```
 
@@ -3182,6 +3332,11 @@ N-058  T-059's "needs T-057" LOOKS LIKE THE COUPLING DEC-048 ALREADY TOOK APART 
        DO NOT re-sequence on this note alone. CHECK IT when T-059 starts; if it holds, split
        it the way DEC-048 split T-057, and record the split rather than doing it silently.
        see 55 § Stage 6, § Stage 9, DEC-048, D-012, T-057, T-059, T-066.
+       CLOSED 2026-08-26. checked at the start of T-059, and it held exactly as written.
+       recorded as DEC-071 rather than done silently, which is what the note asked for.
+       THE NOTE WAS WORTH WRITING: T-059 was the last unbuilt A-task and it was carrying a
+       dependency on a task that has never been built. following the board would have
+       parked the whole /ops tree behind T-057 with a day left.
 
 N-059  WRITING OUT WHAT A DERIVED STRING ACTUALLY SAYS IS A TEST. 24 Aug, T-052.
        `describe()` turned a capability key into English in four lines and had done since

@@ -1,0 +1,230 @@
+// The platform route tree. 19 §11.
+//
+// ONE PREFIX, and every route under it is platform-only. That is what makes the surface
+// greppable and what lets the route-enumeration test assert that no `platform.` capability
+// appears anywhere else in the app — and that no route here carries `requireCapability`.
+//
+// THE CHAIN IS DELIBERATELY DIFFERENT FROM EVERY OTHER ROUTER, and each difference is a
+// requirement rather than a saving (19 §9):
+//
+//   NO tenantResolver   — a platform request resolves no organisation. Reaching the
+//                         resolver with none produces a confusing 400 where 401 is the truth
+//   NO authenticate     — that link reads `req.session` and would attach a `user`. The
+//                         operator principal comes from `endur.ops` and nowhere else
+//   NO csrfProtection   — replaced by the cookie's own `sameSite: 'lax'` plus the fact that
+//                         every mutating route here is a POST/PATCH from an operator's own
+//                         console on the same origin. See the note on the login route
+//   requirePlatformAuth — instead of all three
+import { Router } from 'express';
+import {
+  CreateOperatorDto,
+  EstateListDto,
+  OrgMessageDto,
+  OverridePlanDto,
+  PlatformAuditListDto,
+  PlatformLoginDto,
+  PlatformOrgDto,
+  SuspendDto,
+  UpdateOperatorDto,
+  capabilitiesForRole,
+  type PlatformLoginBody,
+  type PlatformMeResponse,
+  type PlatformRole,
+} from '@endur/shared';
+import { prisma } from '../../db/client.js';
+import { verifyPassword } from '../../auth/password.js';
+import { verifyCode } from '../../platform/totp.js';
+import { endSession, loadOperator, startSession } from '../../platform/session.js';
+import { requirePlatform, requirePlatformAuth } from '../../middleware/requirePlatform.js';
+import { validate } from '../../middleware/validate.js';
+import { scopedRateLimits } from '../../middleware/rateLimit.js';
+import { UnauthenticatedError } from '../../lib/errors.js';
+import {
+  createOperator,
+  estate,
+  listOperators,
+  messageAdministrators,
+  orgDetail,
+  overridePlan,
+  readPlatformAudit,
+  setSuspended,
+  stats,
+  updateOperator,
+} from './service.js';
+
+export const platformRouter: Router = Router();
+
+/**
+ * ONE MESSAGE FOR EVERY FAILURE, and it does not say which half was wrong.
+ *
+ * The org login makes the same choice for user enumeration (15 §2). Here it matters more:
+ * an attacker who learns that a password is right but the code is wrong has learned that
+ * the password is right, and this is the account that reaches every customer's plan data.
+ */
+const REFUSED = 'That email, password or code is not right.';
+
+platformRouter.post(
+  '/auth/login',
+  scopedRateLimits.platformLogin,
+  validate(PlatformLoginDto),
+  (req, res, next) => {
+    const { body } = req.data as { body: PlatformLoginBody };
+    void (async () => {
+      const operator = await prisma.platformUser.findUnique({
+        where: { email: body.email },
+        select: { id: true, passwordHash: true, status: true, mfaSecret: true },
+      });
+
+      // The dummy verification for an unknown address, same as the org side: returning
+      // instantly is a free oracle for which addresses are real.
+      const passwordOk = await verifyPassword(operator?.passwordHash ?? null, body.password);
+      if (!operator || operator.status !== 'active' || !passwordOk) {
+        throw new UnauthenticatedError(REFUSED);
+      }
+      if (!verifyCode(operator.mfaSecret, body.code)) throw new UnauthenticatedError(REFUSED);
+
+      await startSession(res, operator.id);
+      await prisma.platformUser.update({
+        where: { id: operator.id },
+        data: { lastLoginAt: new Date() },
+      });
+      res.json({ ok: true });
+    })().catch(next);
+  },
+);
+
+platformRouter.post('/auth/logout', (req, res, next) => {
+  void endSession(req, res)
+    .then(() => res.json({ ok: true }))
+    .catch(next);
+});
+
+/**
+ * NO CAPABILITY, and it is the platform twin of `/auth/me`: the question "who am I" cannot
+ * be gated on a permission held by the person asking it. `requirePlatformAuth` is the
+ * whole check, and without the cookie this 401s.
+ */
+platformRouter.get('/me', requirePlatformAuth(), (req, res, next) => {
+  void (async () => {
+    const operator = await loadOperator(req);
+    if (!operator) throw new UnauthenticatedError();
+    const role = operator.role as PlatformRole;
+    const body: PlatformMeResponse = {
+      operator: { id: operator.id, name: operator.name, email: operator.email, role },
+      capabilities: capabilitiesForRole(role),
+    };
+    res.json(body);
+  })().catch(next);
+});
+
+// Everything below needs an operator. Mounted once rather than repeated per route, so a
+// route added later cannot be added unauthenticated by omission.
+platformRouter.use(requirePlatformAuth());
+
+platformRouter.get(
+  '/orgs',
+  validate(EstateListDto),
+  requirePlatform('platform.org.read'),
+  (req, res, next) => {
+    const { query } = req.data as { query: Parameters<typeof estate>[0] };
+    void estate(query).then((page) => res.json(page)).catch(next);
+  },
+);
+
+platformRouter.get(
+  '/orgs/:id',
+  validate(PlatformOrgDto),
+  requirePlatform('platform.org.read'),
+  (req, res, next) => {
+    const { params } = req.data as { params: { id: string } };
+    void orgDetail(params.id).then((detail) => res.json({ data: detail })).catch(next);
+  },
+);
+
+platformRouter.get('/stats', requirePlatform('platform.usage.read'), (_req, res, next) => {
+  void stats().then((data) => res.json({ data })).catch(next);
+});
+
+platformRouter.post(
+  '/orgs/:id/plan',
+  validate(OverridePlanDto),
+  requirePlatform('platform.plan.override'),
+  (req, res, next) => {
+    const { params, body } = req.data as {
+      params: { id: string };
+      body: { tier: 'bronze' | 'silver' | 'gold' | 'enterprise'; reason?: string };
+    };
+    void overridePlan(req, params.id, body.tier, body.reason)
+      .then((data) => res.json({ data }))
+      .catch(next);
+  },
+);
+
+platformRouter.post(
+  '/orgs/:id/suspend',
+  validate(SuspendDto),
+  requirePlatform('platform.org.suspend'),
+  (req, res, next) => {
+    const { params, body } = req.data as {
+      params: { id: string };
+      body: { suspended: boolean; reason?: string };
+    };
+    void setSuspended(req, params.id, body.suspended, body.reason)
+      .then((data) => res.json({ data }))
+      .catch(next);
+  },
+);
+
+platformRouter.post(
+  '/orgs/:id/message',
+  validate(OrgMessageDto),
+  requirePlatform('platform.message.send'),
+  (req, res, next) => {
+    const { params, body } = req.data as {
+      params: { id: string };
+      body: { subject: string; body: string };
+    };
+    void messageAdministrators(req, params.id, body.subject, body.body)
+      .then((data) => res.json({ data }))
+      .catch(next);
+  },
+);
+
+platformRouter.get(
+  '/audit',
+  validate(PlatformAuditListDto),
+  requirePlatform('platform.audit.read'),
+  (req, res, next) => {
+    const { query } = req.data as { query: Parameters<typeof readPlatformAudit>[0] };
+    void readPlatformAudit(query).then((page) => res.json(page)).catch(next);
+  },
+);
+
+platformRouter.get('/operators', requirePlatform('platform.operator.manage'), (_req, res, next) => {
+  void listOperators().then((data) => res.json({ data })).catch(next);
+});
+
+platformRouter.post(
+  '/operators',
+  validate(CreateOperatorDto),
+  requirePlatform('platform.operator.manage'),
+  (req, res, next) => {
+    const { body } = req.data as {
+      body: { email: string; name: string; password: string; role: 'owner' | 'staff' };
+    };
+    void createOperator(req, body).then((data) => res.status(201).json({ data })).catch(next);
+  },
+);
+
+platformRouter.patch(
+  '/operators/:id',
+  validate(UpdateOperatorDto),
+  requirePlatform('platform.operator.manage'),
+  (req, res, next) => {
+    const { params, body } = req.data as {
+      params: { id: string };
+      body: { role?: 'owner' | 'staff'; status?: 'active' | 'disabled' };
+    };
+    void updateOperator(req, params.id, body).then((data) => res.json({ data })).catch(next);
+  },
+);

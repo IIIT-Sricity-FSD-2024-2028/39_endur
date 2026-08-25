@@ -14,6 +14,7 @@ import { estimateSeconds } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { PRESET_LIST } from '../../presets/index.js';
 import { DEMO_ORGS, seedOrg, type SeededLogin } from './demo.js';
+import { seedOperators } from './operators.js';
 
 /** Printed at the end of the run, and the same one the dev login affordance prefills (30). */
 const DEMO_PASSWORD = 'endur-demo-password';
@@ -92,6 +93,10 @@ async function main(): Promise<void> {
   console.log(
     `seeded ${orgs} organisations · ${subjects} subjects · ${campaigns} campaigns · ${responses} responses in ${Date.now() - started} ms`,
   );
+
+  // T-059. Endur's own accounts, not a customer's — printed separately for the same
+  // reason they live in their own table (19 §10).
+  await seedOperators(prisma);
 
   if (logins.length > 0) {
     console.log('');

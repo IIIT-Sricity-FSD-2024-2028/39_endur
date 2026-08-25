@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { CAPABILITY_TAG } from '../middleware/requireCapability.js';
+import { PLATFORM_TAG } from '../middleware/requirePlatform.js';
 import { mountedRouters } from '../lib/mount.js';
 import { grantsForLevel } from '../presets/grant-matrix.js';
 
@@ -49,6 +50,18 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
       'can reach is the caller\'s own.',
   },
   {
+    // T-059, 19 §11. Two routes, and both are the platform's own front door: you cannot
+    // gate signing in on a permission held by the person signing in, and `/platform/me`
+    // answers "who am I", which is the same question one layer on. `requirePlatformAuth`
+    // is the real guard on `/me` — without the `endur.ops` cookie it 401s — so what this
+    // entry actually enumerates is "not capability-gated", exactly as it does for
+    // /auth/ above. Every OTHER route under this prefix carries `requirePlatform()`.
+    pattern: /^\/api\/v1\/platform\/(auth\/(login|logout)|me)$/,
+    why:
+      'the operator login and "who am I" — authentication cannot require a principal, and ' +
+      '/me is gated by requirePlatformAuth rather than by a capability (19 §11)',
+  },
+  {
     pattern: /^\/api\/v1\/files\/:id$/,
     why:
       'serving a logo or an avatar (48). The unguessable id IS the credential: these render ' +
@@ -58,7 +71,14 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
   },
 ];
 
-type Route = { method: string; path: string; guarded: boolean; capabilities: string[] };
+type Route = {
+  method: string;
+  path: string;
+  guarded: boolean;
+  capabilities: string[];
+  /** T-059. The FOURTH guard's tag, collected separately — see the two tests below. */
+  platform: string[];
+};
 
 /**
  * Walks the app's own stack plus every mounted router, using the prefixes recorded by
@@ -72,17 +92,21 @@ function enumerateRoutes(app: ReturnType<typeof createApp>): Route[] {
     for (const raw of layers) {
       const route = (raw as { route?: { path: string; methods: Record<string, boolean>; stack: { handle: unknown }[] } }).route;
       if (!route) continue;
-      const capabilities = route.stack.flatMap((entry) =>
-        typeof entry.handle === 'function' && CAPABILITY_TAG in entry.handle
-          ? [(entry.handle as Record<symbol, string>)[CAPABILITY_TAG] as string]
-          : [],
-      );
+      const tagged = (tag: symbol) =>
+        route.stack.flatMap((entry) =>
+          typeof entry.handle === 'function' && tag in entry.handle
+            ? [(entry.handle as unknown as Record<symbol, string>)[tag] as string]
+            : [],
+        );
+      const capabilities = tagged(CAPABILITY_TAG);
+      const platform = tagged(PLATFORM_TAG);
       for (const method of Object.keys(route.methods)) {
         routes.push({
           method: method.toUpperCase(),
           path: prefix + route.path,
-          guarded: capabilities.length > 0,
+          guarded: capabilities.length > 0 || platform.length > 0,
           capabilities,
+          platform,
         });
       }
     }
@@ -147,6 +171,37 @@ describe('route enumeration — INV-003', () => {
       unreachable,
       'these routes can never be reached by anybody: add the row to 50 §1 and grant-matrix.ts',
     ).toEqual([]);
+  });
+
+  /**
+   * 19 §9's hardest rule, and it is the reason this test knows about the fourth guard at
+   * all: `requireCapability` and `requirePlatform` MUST NEVER BOTH APPEAR ON ONE ROUTE.
+   *
+   * A route is either a tenant route or a platform route. Both is a route whose
+   * authorisation model nobody can state in one sentence — and worse, one whose two guards
+   * would each be satisfied by a principal the other refuses, so the pair reads as "either
+   * an operator or an administrator" when every word of 19 says they share nothing.
+   */
+  it('no route carries both guards', () => {
+    const both = routes.filter((route) => route.capabilities.length > 0 && route.platform.length > 0);
+    expect(both.map((route) => `${route.method} ${route.path}`)).toEqual([]);
+  });
+
+  /**
+   * The greppability claim in 19 §11, asserted rather than asserted-in-prose: a single
+   * prefix is what lets this file check that no `platform.` capability leaks into the
+   * tenant surface, and that no tenant capability guards a platform route.
+   */
+  it('platform capabilities live under /api/v1/platform, and only there', () => {
+    for (const route of routes) {
+      const isPlatform = route.path.startsWith('/api/v1/platform');
+      if (route.platform.length > 0) {
+        expect(isPlatform, `${route.path} uses requirePlatform outside the prefix`).toBe(true);
+      }
+      if (isPlatform) {
+        expect(route.capabilities, `${route.path} uses an ORG capability`).toEqual([]);
+      }
+    }
   });
 
   it('every public route is public for a stated reason', () => {

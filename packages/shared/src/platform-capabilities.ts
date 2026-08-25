@@ -1,0 +1,70 @@
+// The PLATFORM capability catalogue — Endur's own side of the product. 19 §4.
+//
+// SEPARATE FROM `capabilities.ts`, AND THE SEPARATION IS THE POINT. If these strings
+// entered CAPABILITY_CATALOGUE then the per-module wildcard expansion in TIER_ENTITLEMENTS
+// would sweep them up, the powers grid (33) would render them as assignable rows, and an
+// organisation administrator could be granted `platform.analytics.read`. Two files is what
+// makes that mistake impossible rather than merely unlikely.
+//
+// The `platform.` prefix is the second half of the same defence: a string that leaks into
+// the org catalogue is visibly wrong at a glance, and a test asserts it never has.
+
+/** 19 §3. Two named roles, deliberately NOT a grid — see the note at the bottom. */
+export type PlatformRole = 'owner' | 'staff';
+
+type Entry = {
+  /** Which roles hold it. A fixed set per capability; there is no resolver here. */
+  roles: readonly PlatformRole[];
+  note: string;
+};
+
+const OWNER_ONLY = ['owner'] as const;
+const BOTH = ['staff', 'owner'] as const;
+
+export const PLATFORM_CAPABILITY_CATALOGUE = {
+  'platform.org.read': {
+    roles: BOTH,
+    note: 'The estate list, and one org’s METADATA. Never its content (INV-011)',
+  },
+  'platform.org.suspend': {
+    roles: OWNER_ONLY,
+    note: 'Suspends staff sign-in for an org. Destructive, so owner only',
+  },
+  'platform.plan.read': { roles: BOTH, note: 'What an org is on, and since when' },
+  'platform.plan.override': {
+    roles: BOTH,
+    note: 'Set a tier administratively — a support action, and the reason `billing.update` must not mean this (19 §8)',
+  },
+  'platform.analytics.read': {
+    roles: OWNER_ONLY,
+    note: 'The whole estate at once. Support helps one customer at a time and `platform.org.read` is what that needs (71)',
+  },
+  'platform.usage.read': { roles: BOTH, note: 'Seats, campaign counts, response volume — as NUMBERS' },
+  'platform.message.send': { roles: BOTH, note: 'Contact an org’s administrators (70 § Interactions)' },
+  'platform.audit.read': { roles: BOTH, note: 'The platform’s own audit trail — ours, not a customer’s' },
+  'platform.logs.read': {
+    roles: BOTH,
+    note: 'The rotating application log files (18 §2) through 72. Safe under INV-011 because 18 §3 already guarantees no body, no credential and no respondent identity reaches a log line',
+  },
+  'platform.operator.manage': { roles: OWNER_ONLY, note: 'Create, disable and re-role operator accounts' },
+} as const satisfies Record<string, Entry>;
+
+export type PlatformCapability = keyof typeof PLATFORM_CAPABILITY_CATALOGUE;
+
+export const PLATFORM_CAPABILITIES = Object.keys(
+  PLATFORM_CAPABILITY_CATALOGUE,
+) as PlatformCapability[];
+
+/**
+ * The whole authorisation decision for the platform surface, and it is one line.
+ *
+ * There is NO second GRANT engine here and there must not be one (19 §14): a permission
+ * grid for a four-person internal team is over-engineering, and a second resolver invites
+ * confusion with the real one. Two fixed roles, a fixed set each, and a lookup.
+ */
+export const platformRoleHas = (role: PlatformRole, capability: PlatformCapability): boolean =>
+  (PLATFORM_CAPABILITY_CATALOGUE[capability].roles as readonly PlatformRole[]).includes(role);
+
+/** What an operator holds, for `/platform/me` — the client renders tabs from this. */
+export const capabilitiesForRole = (role: PlatformRole): PlatformCapability[] =>
+  PLATFORM_CAPABILITIES.filter((capability) => platformRoleHas(role, capability));

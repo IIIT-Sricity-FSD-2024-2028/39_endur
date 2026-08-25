@@ -93,6 +93,13 @@ export const scopedRateLimits = {
   activate: bucket({ windowMs: 15 * 60_000, max: 10, keyBy: activationKey }),
   respondentSubmit: bucket({ windowMs: 60_000, max: 120 }),
   simulator: bucket({ windowMs: 60_000, max: 30 }),
+  /**
+   * 19 §11 — "rate limited hard", and harder than the org login above on purpose. Ten
+   * attempts protects ONE tenant's account; this endpoint's blast radius is every
+   * customer's plan data at once (19 §9), and there are four legitimate users of it in the
+   * world, so five attempts costs an operator nothing and costs an attacker the endpoint.
+   */
+  platformLogin: bucket({ windowMs: 15 * 60_000, max: 5, keyBy: loginKey }),
 };
 
 /** Exported so a test can build a tight bucket and prove the 429 path still works. */

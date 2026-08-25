@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx database/seed/index.ts",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "ops:code": "tsx database/seed/ops-code.ts"
   },
   "dependencies": {
     "@endur/shared": "*",

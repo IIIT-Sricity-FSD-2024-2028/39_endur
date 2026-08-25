@@ -91,3 +91,46 @@ async function flushAudit(req: Request, tx: Tx): Promise<void> {
   req.ctx.audit = [];
   req.ctx.auditWritten = true;
 }
+
+/**
+ * DEC-041, T-075. THE REFUSAL ROW.
+ *
+ * It lives here, beside flushAudit, for one reason: `ip` and `actor` are decided by the
+ * rules above and nowhere else (DEC-040, DEC-045). A second writer in the middleware would
+ * be a second place those rules have to be remembered, and DEC-040's whole lesson is that
+ * the rule belongs at the writer.
+ *
+ * NOT in a transaction, and that is not an oversight. INV-007 binds an audit row to the
+ * mutation it describes; a refusal describes a mutation that never happened, so there is
+ * no transaction to be bound to and nothing to roll back with.
+ *
+ * It must never replace the 403. A log that can turn a refusal into a 500 is a log that
+ * makes the product less safe than not having one — the caller is told no either way.
+ */
+export async function writeDenial(
+  req: Request,
+  action: string,
+  decidedBy?: unknown,
+): Promise<void> {
+  const { orgId, principal, requestId } = req.ctx;
+  if (!orgId) return;
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        actorUserId: principal?.kind === 'user' ? principal.id : null,
+        action,
+        outcome: 'denied',
+        // The refusal has no target row to name. `targetType` stays null rather than
+        // guessing: the capability plus the actor plus the time is the security event,
+        // and an id invented here would be an id that points at nothing.
+        ...(decidedBy ? { decidedBy: decidedBy as never } : {}),
+        requestId,
+        ip: principal?.kind === 'user' && !ANONYMOUS_ACTIONS.has(action) ? (req.ip ?? null) : null,
+      },
+    });
+  } catch {
+    // Deliberately swallowed. See above.
+  }
+}

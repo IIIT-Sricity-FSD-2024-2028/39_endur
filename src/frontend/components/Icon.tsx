@@ -13,7 +13,7 @@
 // projector machine and read as unfinished. audit-drift greps for them in JSX.
 import {
   Archive, ArchiveRestore, ArrowRight, BarChart3, Building2, Check, ChevronDown, ChevronRight,
-  Copy, Eye, EyeOff, Mail,
+  Copy, Eye, EyeOff, History, Mail,
   GripVertical, Home,
   Inbox, LayoutTemplate, Maximize2, Monitor as MonitorSmartphone, Moon, Pencil, Play,
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
@@ -76,6 +76,10 @@ const ICONS = {
   archive: Archive,
   restore: ArchiveRestore,
   unread: Mail,
+  // T-076. The activity log. NOT `settings`, even though the item sits beside Settings in
+  // the same group: rule 2 above is one icon per concept, and two items in one group
+  // sharing a glyph is how a sidebar starts looking like a mistake.
+  log: History,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

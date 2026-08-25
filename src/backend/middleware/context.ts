@@ -8,7 +8,7 @@ import type { RequestHandler } from 'express';
 // authz/ existed; two definitions of the same shape is exactly the drift the DTO approach
 // is meant to prevent.
 import type { Decision } from '../authz/types.js';
-import type { ResolvedLabels } from '@endur/shared';
+import type { PlatformRole, ResolvedLabels } from '@endur/shared';
 
 export type { Decision };
 
@@ -16,7 +16,16 @@ export type { Decision };
 export type Principal =
   | { kind: 'user'; id: string; orgId: string }
   | { kind: 'apiKey'; id: string; orgId: string; scopes: string[] }
-  | { kind: 'respondent'; campaignId: string; orgId: string };
+  | { kind: 'respondent'; campaignId: string; orgId: string }
+  /**
+   * T-059, DEC-033. THE ONLY PRINCIPAL WITH NO `orgId`, and that absence is the design:
+   * an operator belongs to Endur rather than to a customer, so there is no organisation
+   * for `tenantResolver` to resolve and none for a grant to be anchored in (19 §7).
+   *
+   * It carries a ROLE rather than a set of capabilities because the platform side has two
+   * fixed roles and no resolver (19 §3) — `platformRoleHas()` is the whole decision.
+   */
+  | { kind: 'platform'; id: string; role: PlatformRole };
 
 export type AuditIntent = {
   action: string;

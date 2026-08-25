@@ -279,7 +279,7 @@ reader, it does not replace the check.
 |---|---|---|
 | POST | `/authz/simulate` | `simulator.run` — full `Decision` incl. `considered` |
 | GET | `/authz/capabilities` | `org.read` — the catalogue, for the grid (DEC-018) |
-| GET | `/audit` | `audit.read` — the organisation's activity log (`56`). `?actorId&action&targetType&outcome&from&to&cursor`. Returns **allows and denies** (DEC-041) |
+| GET | `/audit` | **BUILT `T-075`.** `audit.read` — the organisation's activity log (`56`). `?actorId&action&targetType&outcome&from&to&cursor&limit`. Returns **allows and denies** (DEC-041), scope-filtered over the TARGET, and carries no `ip` for any principal (DEC-040) |
 
 ### Public respondent — `/api/v1/public`
 
@@ -318,18 +318,21 @@ here and no `tenantResolver` runs; the guard is `requirePlatform()` against the 
 catalogue in `19` §4. Full specification in `19-PLATFORM-OPERATORS.md` §11; the table is
 restated there rather than here because that document owns the surface.
 
-| Method | Path | C |
-|---|---|---|
-| POST | `/platform/auth/login` · `/platform/auth/logout` | — · MFA, hard rate limit |
-| GET | `/platform/me` | — |
-| GET | `/platform/orgs` · `/platform/orgs/:id` | `platform.org.read` |
-| POST | `/platform/orgs/:id/plan` | `platform.plan.override` |
-| POST | `/platform/orgs/:id/suspend` | `platform.org.suspend` |
-| POST | `/platform/orgs/:id/message` | `platform.message.send` |
-| GET | `/platform/stats` | `platform.usage.read` |
-| GET | `/platform/analytics` | `platform.analytics.read` — **owner only** |
-| GET | `/platform/audit` | `platform.audit.read` |
-| GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` |
+**BUILT `T-059`, 2026-08-26**, except the two rows marked otherwise.
+
+| Method | Path | C | |
+|---|---|---|---|
+| POST | `/platform/auth/login` · `/platform/auth/logout` | — · MFA, hard rate limit | ✅ |
+| GET | `/platform/me` | — | ✅ |
+| GET | `/platform/orgs` · `/platform/orgs/:id` | `platform.org.read` | ✅ |
+| POST | `/platform/orgs/:id/plan` | `platform.plan.override` | ✅ |
+| POST | `/platform/orgs/:id/suspend` | `platform.org.suspend` | ✅ |
+| POST | `/platform/orgs/:id/message` | `platform.message.send` | ✅ |
+| GET | `/platform/stats` | `platform.usage.read` | ✅ |
+| GET | `/platform/analytics` | `platform.analytics.read` — **owner only** | `T-067` |
+| GET | `/platform/audit` | `platform.audit.read` | ✅ |
+| GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` | ✅ |
+| GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` | `T-077` |
 
 **INV-011 constrains every payload above:** counts, names, dates and enums only. No route on
 this prefix may return a response body, an answer, a comment or a respondent identity.

@@ -40,6 +40,7 @@ const Results = lazy(() => import('../pages/console/Results/index.js'));
 const Inbox = lazy(() => import('../pages/console/Inbox/index.js'));
 const Analysis = lazy(() => import('../pages/console/Analysis/index.js'));
 const Reflect = lazy(() => import('../pages/console/Reflect/index.js'));
+const Logs = lazy(() => import('../pages/console/Logs/index.js'));
 const Profile = lazy(() => import('../pages/console/Profile/index.js'));
 const Simulator = lazy(() => import('../pages/console/Simulator.js'));
 const Settings = lazy(() => import('../pages/console/Settings.js'));
@@ -123,6 +124,11 @@ export const routes: RouteObject[] = [
       { path: 'profile', element: hold(<Profile />) },
       { path: 'simulator', element: hold(<Simulator />) },
       { path: 'settings', element: hold(<RequireCapability capability="org.read"><Settings /></RequireCapability>) },
+      // T-076. WRAPPED, unlike Analysis and Reflect, and for the opposite reason: there is
+      // no 402 here — the log is not a tier feature — and `56` § States asks for a
+      // full-page 403 on direct navigation. The page renders its own 403 as well, because
+      // a caller can hold `audit.read` and still be refused by the API.
+      { path: 'logs', element: hold(<RequireCapability capability="audit.read"><Logs /></RequireCapability>) },
     ],
   },
   {
