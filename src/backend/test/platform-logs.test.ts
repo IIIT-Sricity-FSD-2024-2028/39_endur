@@ -218,3 +218,65 @@ describe('the file list', () => {
     expect(res.body.data).toEqual([]);
   });
 });
+
+// T-090 — `DEC-074`. The export is a second entry point into the same filesystem read, so
+// the guard cases matter here as much as they do on the read route: a name allowlist that is
+// only applied on one of two routes is not an allowlist.
+describe('exporting a file', () => {
+  it('runs the same name allowlist as the read route', async () => {
+    const owner = await makeOperator('owner');
+    for (const name of ['../../etc/passwd', '/etc/passwd', 'not-a-log-file.txt']) {
+      const res = await owner.agent.get(`/api/v1/platform/logs/${encodeURIComponent(name)}/export`);
+      expect(res.status, name).toBe(404);
+    }
+  });
+
+  it('is refused for an org user whatever they hold in grants', async () => {
+    const session = await setUpOrg();
+    const res = await session.agent.get(`/api/v1/platform/logs/${APP_FILE}/export`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns ndjson chronologically, as an attachment, and audits the copy', async () => {
+    const owner = await makeOperator('owner');
+    const res = await owner.agent.get(`/api/v1/platform/logs/${APP_FILE}/export?format=ndjson`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/x-ndjson');
+    expect(res.headers['content-disposition']).toContain('attachment');
+
+    const lines = res.text.trim().split('\n').map((raw) => JSON.parse(raw) as { msg: string });
+    expect(lines.length).toBeGreaterThan(0);
+
+    // FILE ORDER, OLDEST FIRST — the exact reverse of the viewer's newest-first page, which
+    // is the reason this is its own read rather than `tailRead` with a header (`DEC-074`).
+    // Asserted against the read route rather than against sorted timestamps, because an
+    // unparseable line's `at` is a synthetic fallback and sorting on it would be asserting
+    // the parser's fallback rather than the export's order.
+    const page = await owner.agent.get(`/api/v1/platform/logs/${APP_FILE}`);
+    expect(page.status).toBe(200);
+    const viewer = (page.body.data as { msg: string }[]).map((l) => l.msg);
+    expect(lines.map((l) => l.msg)).toEqual([...viewer].reverse());
+
+    // The audit row is the whole reason `72` could reverse its "no download" position.
+    const rows = await prisma.platformAuditLog.findMany({
+      where: { actorId: owner.id, action: 'logs.export' },
+    });
+    expect(rows.length).toBe(1);
+    const payload = rows[0]?.payload as { file?: string; format?: string; lines?: number } | null;
+    expect(payload?.file).toBe(APP_FILE);
+    expect(payload?.format).toBe('ndjson');
+    expect(payload?.lines).toBe(lines.length);
+  });
+
+  it('returns csv with a fixed header row and quotes a cell that would break the shape', async () => {
+    const owner = await makeOperator('owner');
+    const res = await owner.agent.get(`/api/v1/platform/logs/${ERROR_FILE}/export?format=csv`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/csv');
+    const rows = res.text.trim().split('\n');
+    expect(rows[0]).toBe(
+      'at,level,msg,requestId,method,path,status,durationMs,orgId,principal,err.type,err.message',
+    );
+    expect(rows.length).toBeGreaterThan(1);
+  });
+});

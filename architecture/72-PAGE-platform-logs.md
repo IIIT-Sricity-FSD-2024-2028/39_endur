@@ -5,7 +5,8 @@ Related: `18` (what the files are and how they are written), `56` (the *other* l
 customer's one), `12` §4.1–4.2
 Invariants: **INV-011**, INV-006
 Status: **`T-077` and `T-078` BUILT 2026-08-25 — routes, path guard, reader, `/ops/logs`,
-`<LogViewer>`.** The **other** log: `56` is one organisation's audit trail, this is Endur's
+`<LogViewer>`. `T-090` BUILT 2026-08-26 — the export (`DEC-074`), the viewer's CSS, and the
+store location on the page.** The **other** log: `56` is one organisation's audit trail, this is Endur's
 log files across the estate. Needs `T-059`
 
 ## Purpose
@@ -32,6 +33,7 @@ a number the database already knows (`18` §9).
 | Action | Capability | `staff` | `owner` |
 |---|---|---|---|
 | List files, read a file | `platform.logs.read` | ✔ | ✔ |
+| Export a file | `platform.logs.export` | ✔ | ✔ |
 
 Added to `19` §4, in the **platform** catalogue, never `11` §3.
 
@@ -68,8 +70,17 @@ days of retained files *and* an internal screen, and the acceptance list below t
 
 | Action | Endpoint | DTO |
 |---|---|---|
-| Files | `GET /api/v1/platform/logs` | → `LogFileMeta[]` |
+| Files | `GET /api/v1/platform/logs` | → `{ data: LogFileMeta[]; meta: LogStoreMeta }` |
 | One file | `GET /api/v1/platform/logs/:file?level&status&path&orgId&requestId&q&cursor` | → paginated `LogLine[]` |
+| Export | `GET /api/v1/platform/logs/:file/export?format&<same filters>` | → `text/x-ndjson` \| `text/csv` attachment |
+
+`meta` is where the files are and how long they last, read off the live config — `18` §2 says
+they are written and rotated automatically, and an operator should not have to open a config
+file to find out where that disk is:
+
+```ts
+export type LogStoreMeta = { dir: string; enabled: boolean; retentionDays: number; maxSizeMb: number };
+```
 
 ```ts
 export type LogFileMeta = {
@@ -93,6 +104,14 @@ export type LogLine = {
 `extra` is not laziness. It is what makes an **unexpected** field visible *as* an unexpected
 field, which is the difference between a viewer that would have surfaced the `audit_log.ip`
 class of mistake and one that would have rendered it as though it belonged (`56` § Anonymity).
+
+**Where a `LogLine` comes from — two formats, one record.** Since `DEC-075` the files are
+written in the bracketed human form described in `18` §2, and `platform/logs/parser.ts` reads
+**both** it and the pino JSON that files written before the change still hold. The grammar and
+its encoding helpers live in `lib/logFormat.ts` and are imported, never restated: the writer
+and the reader of a format have to be the same source or they drift, which is the same argument
+as the filename regex below. `extra` carries the `x.<key>=` tail, so an unnamed field is still
+unnamed after a round trip; an unparseable line is still rendered raw and flagged, never skipped.
 
 ## The file name is the whole attack surface
 
@@ -141,7 +160,25 @@ rather than document the grep.
 **A `5xx` line expands to its stack trace.** Stacks go to the file and never to a client
 (`12` §4.16); an operator is not a client, and this is where they become readable.
 
-**No writes.** No delete, no rotate-now, no download. The page reads.
+**No writes.** No delete, no rotate-now. The page reads — and, since `DEC-074`, copies.
+
+**Export.** The current file with the current filters, as `ndjson` or `csv`, `Content-Disposition:
+attachment`. Three things make it a different read from the screen's rather than the same one with
+a header bolted on:
+
+- **Chronological, oldest first** — the opposite of the viewer's newest-first page. A file handed
+  to somebody else is read top to bottom.
+- **Capped**, at `EXPORT_MAX_LINES`. An export that would have been larger ends with a trailing
+  `{"truncated":true,...}` line (or a `# truncated` row in `csv`) rather than stopping silently,
+  because a diagnostic file that quietly lost its tail is worse than no file.
+- **Audited as its own action**, `logs.export`, with the format and every filter — that record is
+  the entire reason the original *"no download"* position could be reversed rather than argued
+  around (`DEC-074`).
+
+`csv` is a fixed column set — `at, level, msg, requestId, method, path, status, durationMs, orgId,
+principal, err.type, err.message`. `extra` is **not** a csv column and that is the one honest
+limitation of the format: a spreadsheet cannot carry an open-ended key set, so `ndjson` is the
+lossless export and `csv` is the one you can hand to somebody who will open it in Excel.
 
 ## States
 
@@ -189,6 +226,13 @@ rather than document the grep.
       has been written yet" when `GET /platform/logs` returns `{ data: [] }`, distinct from
       the `forbidden` and `notFound` states
 
+- [x] `GET /platform/logs/:file/export` needs `platform.logs.export` and runs the **same**
+      name allowlist as the reader — the traversal, absolute-path and symlink cases are asserted
+      against the export route too, not only the read route (`DEC-074`)
+- [x] An export writes a `logs.export` `platform_audit_log` row carrying the file, format,
+      filters and line count — the record that makes the copy accountable
+- [x] A capped export ends with an explicit truncation marker rather than stopping silently
+
 ## Out of scope
 
 | Not building | Why |
@@ -198,4 +242,4 @@ rather than document the grep.
 | Search across all files at once | The date is in the filename; picking one is the search. A cross-file scan is a full-text index nobody needs yet |
 | Charts of log volume | Counting log lines is the wrong source for a number the database knows (`18` §9). `71` owns counts |
 | Showing an org administrator their slice of these files | **`56` is their log.** Filtering a shared file by `orgId` and serving it to a customer is one bug away from serving somebody else's, and the two logs have genuinely different subjects — evidence versus diagnostics |
-| Download | A download is a copy of retained diagnostics leaving the machine, with no audit of where it went. Read on screen |
+| ~~Download~~ | **Superseded by `DEC-074` on 26 Aug — the owner asked for export directly.** The objection here was never *"diagnostics must not leave"*, it was *"with no audit of where it went"*, and that is answerable: the export writes a `logs.export` row carrying the file, the format, every filter and the line count, so a copy leaving is a recorded operator action exactly like a read (`19` §10) |

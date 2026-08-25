@@ -4,6 +4,7 @@ export * from './capabilities.js';
 // 33's, not 11's: the CATALOGUE is the permission engine's, what each row SAYS is the
 // powers grid's design work. See D-008.
 export * from './capability-labels.js';
+export * from './scope-labels.js';
 // 19 §4. A SECOND, SEPARATE catalogue, and the separation is load-bearing: these strings
 // must never reach TIER_ENTITLEMENTS or the powers grid. Exported beside the org one so
 // that the two being different is visible here, at the package's front door.

@@ -230,7 +230,12 @@ export type LogReadOptions = LogFilters & {
   limit: number;
 };
 
-export function readLogFile(fileName: string, opts: LogReadOptions): LogReadResult {
+/**
+ * The three guards, in one place, for every entry point that turns a client-supplied name
+ * into a filesystem read. `readLogFile` and `exportLogFile` both call THIS rather than each
+ * carrying a copy — a second implementation of an allowlist is how an allowlist drifts.
+ */
+function assertReadableName(fileName: string): { resolved: string; stream: 'app' | 'error'; date: string } {
   if (!isAllowedName(fileName)) throw new NotFoundError('That file has rotated away.');
 
   const resolved = path.resolve(logDir, fileName);
@@ -252,10 +257,151 @@ export function readLogFile(fileName: string, opts: LogReadOptions): LogReadResu
   const meta = streamAndDateOf(fileName);
   if (!meta) throw new NotFoundError('That file has rotated away.');
 
+  return { resolved, stream: meta.stream, date: meta.date };
+}
+
+export function readLogFile(fileName: string, opts: LogReadOptions): LogReadResult {
+  const { resolved, date } = assertReadableName(fileName);
+
   if (opts.requestId) {
-    const data = crossStreamRequestRead(meta.date, opts.requestId);
+    const data = crossStreamRequestRead(date, opts.requestId);
     return { data, page: { nextCursor: null, hasMore: false } };
   }
 
-  return tailRead(resolved, opts, opts.cursor, opts.limit, meta.date);
+  return tailRead(resolved, opts, opts.cursor, opts.limit, date);
+}
+
+// ---------------------------------------------------------------------------
+// Export — DEC-074, 72 § Interactions
+// ---------------------------------------------------------------------------
+
+/** A hard ceiling on one export. 18 §5 caps a rotation at LOG_MAX_SIZE_MB (10 MB default),
+ *  which at ~200 bytes a line is ~50k lines — so this is the whole of a normal file and a
+ *  bound on an abnormal one. A capped export SAYS SO in a trailing marker rather than
+ *  ending silently: a diagnostic file that quietly lost its tail is worse than no file. */
+export const EXPORT_MAX_LINES = 50_000;
+
+export type LogExportOptions = LogFilters & { format: 'ndjson' | 'csv' };
+
+export type LogExportResult = {
+  body: string;
+  contentType: string;
+  fileName: string;
+  lines: number;
+  truncated: boolean;
+};
+
+/** 72 § Interactions — csv is a FIXED column set, and `extra` is deliberately not one of
+ *  them. A spreadsheet cannot carry an open-ended key set, so ndjson is the lossless export
+ *  and csv is the one you hand to somebody who will open it in Excel. */
+const CSV_COLUMNS = [
+  'at', 'level', 'msg', 'requestId', 'method', 'path', 'status', 'durationMs',
+  'orgId', 'principal', 'err.type', 'err.message',
+] as const;
+
+function csvCell(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  // A csv cell is a scalar by construction — CSV_COLUMNS names only scalar fields, and
+  // `extra` is deliberately not one of them (72 § Interactions). Anything else is stringified
+  // as JSON rather than as `[object Object]`, so a column that changes shape is still legible.
+  const text =
+    typeof value === 'string' ? value
+    : typeof value === 'number' || typeof value === 'boolean' ? String(value)
+    : JSON.stringify(value);
+  // Quote when it could otherwise change the shape of the row, and double any inner quote.
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function csvRow(line: LogLine): string {
+  return CSV_COLUMNS.map((column) => {
+    if (column === 'err.type') return csvCell(line.err?.type);
+    if (column === 'err.message') return csvCell(line.err?.message);
+    return csvCell((line as unknown as Record<string, unknown>)[column]);
+  }).join(',');
+}
+
+/**
+ * Reads `fullPath` FORWARD, oldest line first — the opposite of `tailRead`, and the
+ * difference is the point (`DEC-074`). A page on a screen wants the newest line at the top;
+ * a file handed to somebody else is read top to bottom.
+ */
+function forwardRead(
+  fullPath: string,
+  filters: LogFilters,
+  fallbackDate: string,
+): { lines: LogLine[]; truncated: boolean } {
+  const size = fs.statSync(fullPath).size;
+  const fd = fs.openSync(fullPath, 'r');
+  try {
+    const lines: LogLine[] = [];
+    let position = 0;
+    let leftover = '';
+    let truncated = false;
+
+    while (position < size) {
+      const readSize = Math.min(CHUNK_BYTES, size - position);
+      const buf = Buffer.alloc(readSize);
+      fs.readSync(fd, buf, 0, readSize, position);
+      position += readSize;
+      const rows = (leftover + buf.toString('utf8')).split('\n');
+      // The last element is whatever is still mid-line, unless this was the final chunk.
+      leftover = position < size ? (rows.pop() ?? '') : '';
+
+      for (const raw of rows) {
+        if (raw.length === 0) continue;
+        const parsed = parseLogLine(raw, fallbackDate);
+        if (!matchesFilters(parsed, raw, filters)) continue;
+        if (lines.length >= EXPORT_MAX_LINES) {
+          truncated = true;
+          break;
+        }
+        lines.push(parsed);
+      }
+      if (truncated) break;
+    }
+
+    if (!truncated && leftover.length > 0 && lines.length < EXPORT_MAX_LINES) {
+      const parsed = parseLogLine(leftover, fallbackDate);
+      if (matchesFilters(parsed, leftover, filters)) lines.push(parsed);
+    }
+
+    return { lines, truncated };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * `DEC-074`. The same file, the same filters, chronological, as a download.
+ *
+ * Reuses `readLogFile`'s guards by calling `assertReadableName` — the name allowlist is the
+ * one dangerous thing this module does (`72` § "The file name is the whole attack surface")
+ * and a second entry point that re-implemented it would be the way the guard drifts.
+ */
+export function exportLogFile(fileName: string, opts: LogExportOptions): LogExportResult {
+  const { resolved, date } = assertReadableName(fileName);
+  const { lines, truncated } = forwardRead(resolved, opts, date);
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  if (opts.format === 'csv') {
+    const rows = [CSV_COLUMNS.join(','), ...lines.map(csvRow)];
+    if (truncated) rows.push(`# truncated at ${EXPORT_MAX_LINES} lines`);
+    return {
+      body: `${rows.join('\n')}\n`,
+      contentType: 'text/csv; charset=utf-8',
+      fileName: `${fileName}.${stamp}.csv`,
+      lines: lines.length,
+      truncated,
+    };
+  }
+
+  const rows = lines.map((line) => JSON.stringify(line));
+  if (truncated) rows.push(JSON.stringify({ truncated: true, limit: EXPORT_MAX_LINES }));
+  return {
+    body: `${rows.join('\n')}\n`,
+    contentType: 'application/x-ndjson; charset=utf-8',
+    fileName: `${fileName}.${stamp}.ndjson`,
+    lines: lines.length,
+    truncated,
+  };
 }

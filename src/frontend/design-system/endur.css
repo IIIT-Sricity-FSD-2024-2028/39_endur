@@ -2882,6 +2882,25 @@ html:active-view-transition * {
   padding: var(--space-2) 0 var(--space-4);
 }
 .powers-copy label { font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.powers-copy .input { width: auto; }
+.powers-copied { font-size: 12px; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+
+/* THE LEGEND. Six words carry every cell on this screen and one of them behaves unlike the
+   other five, so it is spelled out ONCE, at the top, rather than living in tooltips somebody
+   has to go hunting for (DEC-076). It is written in the tenant's own vocabulary, because the
+   cells are (INV-001). */
+.powers-legend {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-4); padding: var(--space-3);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 12px;
+}
+.powers-legend-item { display: flex; align-items: center; gap: var(--space-2); }
+.powers-legend-item dt { margin: 0; }
+.powers-legend-item dd {
+  margin: 0; color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
 
 /* ITS OWN SCROLLING CONTAINER. 64 rows by n roles does not fit a phone and is not meant
    to — 33 asks for a grid that scrolls sideways, not one that collapses into cards, because
@@ -2894,6 +2913,11 @@ html:active-view-transition * {
 }
 .powers-table { border-collapse: collapse; width: 100%; font-size: 13px; }
 
+/* THE LABEL COLUMN TAKES THE SLACK. Without this the browser hands the leftover width to
+   whichever role column it likes, and the first role's cells stretch into metre-wide bars
+   that read as a progress meter rather than as one choice among six. */
+.powers-corner { width: 100%; }
+
 .powers-corner, .powers-role {
   position: sticky; top: 0; z-index: 1;
   background: var(--color-surface);
@@ -2905,28 +2929,41 @@ html:active-view-transition * {
 .powers-role-name { display: block; }
 .powers-role-level { display: block; font-size: 11px; font-weight: 400; }
 
-.powers-module th { padding: 0; background: var(--color-surface); }
-.powers-module-toggle {
+/* `.powers-group`, NOT `.powers-module` — T-051's "powers by place" already owns that name
+   for a `display: grid` list on the person page, and a global stylesheet does not care that
+   one of them is a <tr>. The module header row was being laid out as a two-column CSS grid
+   by a rule written for a different screen, which is why it rendered as a small box floating
+   at the left of the table instead of a band across it. */
+.powers-group th { padding: 0; background: var(--color-surface); }
+.powers-group-toggle {
   display: flex; align-items: center; gap: var(--space-2); width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 0; background: none; cursor: pointer; text-align: left;
   font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
-.powers-module-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.powers-group-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
 .powers-row { border-bottom: 1px solid var(--color-divider); }
 .powers-capability {
   padding: var(--space-2) var(--space-3);
   text-align: left; font-weight: 400; white-space: nowrap;
 }
-.powers-row-fill {
-  border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit;
-  text-align: left;
-}
-.powers-row-fill:hover { color: var(--color-accent); }
-.powers-row-fill:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.powers-capability-label { vertical-align: middle; }
 .powers-soon { margin-left: var(--space-2); font-size: 10px; }
+
+/* "Set all…" — the row-wide control. It USED TO BE THE ROW LABEL ITSELF: clicking the words
+   "delete the entire organisation" granted it to every role at once, with nothing on screen
+   saying that would happen. A visible control that says what it does is not a bigger
+   interface, it is the same interface admitted to. */
+.powers-all {
+  margin-left: var(--space-3); padding: 2px var(--space-2);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
+  background: none; color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  font: inherit; font-size: 11px; cursor: pointer;
+}
+.powers-all:hover { color: var(--color-text); border-color: var(--color-accent); }
+.powers-all:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
 /* AN ORPHAN ROW IS A STATE YOU SHOULD NOT HAVE TO GO LOOKING FOR (33). Nobody at all can
    do this, which is usually fine and occasionally means the one role that could launch a
@@ -2935,34 +2972,52 @@ html:active-view-transition * {
   color: color-mix(in srgb, var(--color-text) 45%, transparent);
 }
 
-.powers-cell-wrap { padding: 2px; text-align: center; }
+.powers-cell-wrap { padding: 2px; text-align: center; position: relative; }
 
 /* INTENSITY TRACKS SCOPE WIDTH, not "is there a grant here" — that is the entire argument
    for a grid over a list (33 § Interactions). An over-granted role is a visibly dark
-   column and you cannot help seeing it. */
-.powers-cell {
+   column and you cannot help seeing it.
+
+   `.powers-cell` is a <select> and `.powers-chip` is the same thing when there is nothing to
+   choose (read-only). They share every rule but the pointer, because a rule you can read and
+   a rule you can change should not look like two different rules. */
+.powers-cell, .powers-chip {
   --weight: 0;
-  display: block; width: 100%; min-width: 3.6em;
+  display: block; width: 100%; min-width: 6em;
   padding: var(--space-1) var(--space-2);
-  border: 0; border-radius: var(--radius-sm); cursor: pointer;
+  border: 0; border-radius: var(--radius-sm);
   font: inherit; font-size: 11px;
   background: color-mix(in srgb, var(--color-accent) calc(var(--weight) * 13%), var(--color-surface));
   color: var(--color-text);
+  text-align: center;
 }
-.powers-cell:disabled { cursor: default; }
-.powers-cell:hover:not(:disabled) { outline: 1px solid var(--color-accent); }
-.powers-cell:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.powers-cell {
+  /* Native arrow off, our own caret on the cell below — the native one is drawn at a size
+     the browser chooses and swamps an 11px cell. */
+  appearance: none; -webkit-appearance: none;
+  cursor: pointer; padding-right: var(--space-4);
+}
+.powers-cell-wrap:has(select)::after {
+  content: '▾'; position: absolute; right: var(--space-2); top: 50%; transform: translateY(-50%);
+  font-size: 9px; pointer-events: none;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.powers-cell:hover { outline: 1px solid var(--color-accent); }
+.powers-cell:focus-visible, .powers-all:focus-visible {
+  outline: 2px solid var(--color-accent); outline-offset: 1px;
+}
 
 /* A BLOCK RENDERS DISTINCTLY, because it does not merely mean "less" — it BEATS every
    allow, from any role, group or stand-in (INV-004). A darker shade of the same colour
    would read as "more", which is exactly backwards. */
-.powers-cell.is-denied {
-  display: flex; align-items: center; justify-content: center;
+.powers-cell.is-denied, .powers-chip.is-denied {
   background: color-mix(in srgb, var(--status-bad-800) 16%, transparent);
   color: var(--status-bad-800);
 }
 
-.powers-cell.has-warning { box-shadow: inset 0 0 0 1px var(--status-warn-800); }
+.powers-cell.has-warning, .powers-chip.has-warning {
+  box-shadow: inset 0 0 0 1px var(--status-warn-800);
+}
 
 /* AT THE SITE OF THE PROBLEM, never a list at the bottom of the page
    (customization.md §6). Problem and cure in the same place, or the list becomes the
@@ -3465,4 +3520,87 @@ html:active-view-transition * {
 
 @media (max-width: 640px) {
   .sim-sentence-text { font-size: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   T-090 · /ops/logs — the viewer and the export bar. 72, DEC-074
+
+   The viewer's markup landed with T-078 and none of its classes had a rule, so
+   the page rendered as an unstyled stack. These are the rules, and they are
+   deliberately plain: this is a support tool read during an incident, so
+   density and a monospaced column beat decoration.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.log-viewer { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-4); }
+.log-viewer-main { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+
+.log-file-picker { display: flex; flex-direction: column; gap: var(--space-3); }
+.log-file-group { display: flex; flex-direction: column; gap: var(--space-1); }
+.log-file-group h4 { margin: 0 0 var(--space-1); text-transform: uppercase; letter-spacing: .06em; }
+.log-file-row {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: var(--space-2); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm); background: var(--color-card);
+  cursor: pointer; color: inherit; font: inherit;
+}
+.log-file-row:hover { border-color: var(--color-accent-400); }
+.log-file-row.is-selected { border-color: var(--color-accent-500); background: var(--color-accent-100); }
+.log-file-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-meta); }
+
+.log-filter-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.log-filter-bar .input { min-height: 34px; font-size: var(--text-meta); }
+
+.log-lines {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
+  background: var(--color-card); overflow-x: auto;
+}
+.log-lines.is-dimmed { opacity: .55; }
+
+.log-line { padding: 6px var(--space-2); border-bottom: 1px solid var(--color-divider); }
+.log-line:last-child { border-bottom: none; }
+.log-line-main {
+  display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-meta);
+}
+.log-line-at { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.log-line-level { text-transform: uppercase; font-weight: 700; letter-spacing: .04em; }
+.log-line-method { font-weight: 700; }
+.log-line-path { color: var(--color-neutral-700); }
+.log-line-status { font-variant-numeric: tabular-nums; }
+.log-line-msg { flex: 1 1 240px; min-width: 0; }
+.log-line-requestid {
+  border: none; background: none; padding: 0; cursor: pointer;
+  color: var(--color-accent-600); font: inherit; text-decoration: underline;
+}
+/* warn and above are the reason error-*.log exists as a separate file (18 §2) — the same
+   distinction, one row at a time. */
+.log-level-warn  { background: var(--status-warn-100); }
+.log-level-error,
+.log-level-fatal { background: var(--status-bad-100); }
+
+.log-line-extra { margin-top: var(--space-1); display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* An UNEXPECTED field is the one worth seeing (72 § Data contract), so `extra` is tinted
+   rather than tucked away — a careless logger.info({ user }) should look wrong here. */
+.log-line-extra-field {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-micro);
+  background: var(--status-warn-100); border-radius: var(--radius-sm); padding: 1px 6px;
+}
+.log-line-stack {
+  margin: var(--space-1) 0 0; padding: var(--space-2);
+  background: var(--color-neutral-100); border-radius: var(--radius-sm);
+  font-size: var(--text-micro); overflow-x: auto; white-space: pre;
+}
+.log-line-expand { margin-top: var(--space-1); }
+
+.log-export {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.log-export p { margin: 0; }
+
+@media (max-width: 900px) {
+  .log-viewer { grid-template-columns: minmax(0, 1fr); }
 }

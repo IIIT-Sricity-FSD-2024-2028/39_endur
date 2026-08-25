@@ -13,7 +13,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type {
   Capability, CapabilityMeta, GrantCell, GrantWarning, PutGrantsBody, RoleView,
 } from '@endur/shared';
-import { renderWithProviders } from '../../../test-utils.js';
+import { NONSENSE_LABELS, renderWithProviders } from '../../../test-utils.js';
 import Roles from './index.js';
 
 const roles: RoleView[] = [
@@ -69,16 +69,24 @@ vi.mock('../../../lib/api.js', () => ({
 const ALL: Capability[] = ['role.read', 'role.update', 'role.create', 'role.delete',
   'grant.read', 'grant.update'];
 
+// The NONSENSE VOCABULARY, because the cells are user-facing domain text too (`DEC-076`).
+// A cell that reads "Their unit" when the tenant calls it a Zblorn has hardcoded a noun on
+// the one screen whose entire job is explaining the rules (INV-001).
 const mount = (capabilities: Capability[] = ALL) =>
-  renderWithProviders(<Roles />, { capabilities, path: '/app/roles' });
+  renderWithProviders(<Roles />, { capabilities, labels: NONSENSE_LABELS, path: '/app/roles' });
 
 const openPowers = async (): Promise<void> => {
   fireEvent.click(screen.getByRole('tab', { name: 'Powers' }));
-  await screen.findByRole('button', { name: /Tutor: cannot open plithes for answers/i });
+  await screen.findByRole('combobox', { name: /Tutor: cannot open plithes for answers/i });
 };
 
 /** One cell, by the sentence its aria-label makes. */
-const cell = (name: RegExp) => screen.getByRole('button', { name });
+const cell = (name: RegExp) => screen.getByRole<HTMLSelectElement>('combobox', { name });
+
+/** Pick a value in one cell, the way an administrator does. */
+const choose = (name: RegExp, option: string): void => {
+  fireEvent.change(cell(name), { target: { value: option } });
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -177,45 +185,76 @@ describe('the powers grid', () => {
     expect(screen.queryByText(/launch campaigns/i)).toBeNull();
   });
 
-  it('cycles a cell through the scopes and stops at nothing', async () => {
+  it('says what a cell means IN WORDS, in the tenant’s vocabulary — DEC-076', async () => {
     mount();
     await openPowers();
 
-    // `—` → self → own_unit → subtree → all → `—`. Four clicks in and it is the widest.
-    fireEvent.click(cell(/Learner: cannot open plithes/i));
-    expect(cell(/Learner: may open plithes for answers across only their own/i)).toBeTruthy();
+    // Not `tree`, which is the shape of the data structure the scope walks, and not `unit`
+    // on an organisation that calls them Zblorns.
+    const tutor = cell(/Tutor: may close plithes to further answers, only in their own zblorn/i);
+    expect(tutor.value).toBe('own_unit');
+    expect([...tutor.options].map((option) => option.text)).toEqual([
+      'No', 'Themselves', 'Their zblorn', 'Their zblorn + below', 'Everywhere', 'Blocked',
+    ]);
+    expect(screen.queryByText('tree')).toBeNull();
+  });
 
-    fireEvent.click(cell(/Learner: may open plithes for answers across only their own/i));
-    fireEvent.click(cell(/Learner: may open plithes for answers across their own unit/i));
-    fireEvent.click(cell(/Learner: may open plithes for answers across their unit and everything under it/i));
-    expect(cell(/Learner: may open plithes for answers across the whole organisation/i)).toBeTruthy();
+  it('explains all six choices ONCE, at the top, rather than in tooltips', async () => {
+    mount();
+    await openPowers();
 
-    fireEvent.click(cell(/Learner: may open plithes for answers across the whole organisation/i));
+    // The legend, in the tenant's words. Somebody meeting this page should not have to
+    // hover over a cell to learn that a block is not merely "less".
+    expect(screen.getByText('in their own zblorn and every zblorn under it')).toBeTruthy();
+    expect(
+      screen.getByText(/never — this beats an allow from any other role, group or stand-in/i),
+    ).toBeTruthy();
+  });
+
+  it('sets a cell from the dropdown, in one action', async () => {
+    mount();
+    await openPowers();
+
+    // One choice, by name. The click-cycle it replaced could only reach `all` by walking
+    // through three states the administrator did not ask for — and could not be reached at
+    // all on a touch screen.
+    choose(/Learner: cannot open plithes/i, 'all');
+    expect(cell(/Learner: may open plithes for answers, anywhere in the organisation/i)).toBeTruthy();
+
+    choose(/Learner: may open plithes for answers, anywhere in the organisation/i, 'none');
     expect(cell(/Learner: cannot open plithes/i)).toBeTruthy();
   });
 
-  it('shift-click is a BLOCK, and a plain click does not cycle into one', async () => {
+  it('a BLOCK is one of the six choices, and says why it is different', async () => {
     mount();
     await openPowers();
 
-    fireEvent.click(cell(/Learner: cannot open plithes/i), { shiftKey: true });
+    choose(/Learner: cannot open plithes/i, 'blocked');
     const blocked = cell(/Learner: blocked from “open plithes for answers”/i);
-    expect(blocked).toBeTruthy();
-    // The one resolution rule an administrator benefits from knowing (INV-004), where they
-    // will actually meet it.
-    expect(blocked.getAttribute('title')).toMatch(/always beats an allow/i);
+    // The one resolution rule an administrator genuinely benefits from knowing (INV-004),
+    // carried by the label itself rather than by a tooltip on a modifier key nobody found.
+    expect(blocked.getAttribute('title')).toMatch(/beats an allow from any other role/i);
+  });
 
-    // Cycling THROUGH a deny would arm the grid's most consequential state by accident,
-    // four clicks into a scope walk. A plain click clears it instead.
-    fireEvent.click(blocked);
-    expect(cell(/Learner: cannot open plithes/i)).toBeTruthy();
+  it('sets a whole row for every role from a visible control', async () => {
+    mount();
+    await openPowers();
+
+    // WAS A HIDDEN ACTION ON THE ROW LABEL: clicking the words granted the power to every
+    // role at once with nothing on screen saying so.
+    fireEvent.change(
+      screen.getByRole('combobox', { name: /Set “open plithes for answers” for every role at once/i }),
+      { target: { value: 'own_unit' } },
+    );
+    expect(cell(/Principal: may open plithes for answers, only in their own zblorn/i)).toBeTruthy();
+    expect(cell(/Learner: may open plithes for answers, only in their own zblorn/i)).toBeTruthy();
   });
 
   it('SAVES A DIFF, not the whole matrix', async () => {
     mount();
     await openPowers();
 
-    fireEvent.click(cell(/Learner: cannot open plithes/i));
+    choose(/Learner: cannot open plithes/i, 'self');
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(put).not.toBeNull());
@@ -231,10 +270,8 @@ describe('the powers grid', () => {
     mount();
     await openPowers();
 
-    // Tutor holds campaign.close at own_unit. Cycle it round to nothing.
-    fireEvent.click(cell(/Tutor: may close plithes to further answers across their own unit/i));
-    fireEvent.click(cell(/Tutor: may close plithes to further answers across their unit and everything under it/i));
-    fireEvent.click(cell(/Tutor: may close plithes to further answers across the whole organisation/i));
+    // Tutor holds campaign.close at own_unit. Set it back to No.
+    choose(/Tutor: may close plithes to further answers, only in their own zblorn/i, 'none');
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(put).not.toBeNull());
@@ -243,25 +280,28 @@ describe('the powers grid', () => {
     );
   });
 
-  it('copies a whole column in one action', async () => {
+  it('copies a whole column — two dropdowns and a button, not a row of buttons', async () => {
     mount();
     await openPowers();
 
-    fireEvent.change(screen.getByLabelText(/Copy a whole role’s powers/i), {
-      target: { value: 'r1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Learner' }));
+    fireEvent.change(screen.getByLabelText(/Copy every power from/i), { target: { value: 'r1' } });
+    // The destination is CHOSEN, not pressed. What stood here was a row of role-named
+    // buttons that rewrote a whole column the moment one was clicked.
+    fireEvent.change(screen.getByLabelText(/^onto$/i), { target: { value: 'r3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
 
     // Principal holds grant.update: all and campaign.launch: subtree. Learner now does too.
-    expect(cell(/Learner: may open plithes for answers across their unit and everything under it/i)).toBeTruthy();
-    expect(cell(/Learner: may change what every role is allowed to do across the whole organisation/i)).toBeTruthy();
+    expect(cell(/Learner: may open plithes for answers, in their own zblorn and every zblorn under it/i)).toBeTruthy();
+    expect(cell(/Learner: may change what every role is allowed to do, anywhere in the organisation/i)).toBeTruthy();
+    // And it says what it did, because the change is invisible until you scroll to it.
+    expect(screen.getByRole('status').textContent).toMatch(/Copied Principal’s powers onto Learner/);
   });
 
   it('undoes the last change', async () => {
     mount();
     await openPowers();
 
-    fireEvent.click(cell(/Learner: cannot open plithes/i));
+    choose(/Learner: cannot open plithes/i, 'self');
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save changes' }).disabled).toBe(false);
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
@@ -286,7 +326,7 @@ describe('the powers grid', () => {
     expect(note.textContent).toMatch(/The deny wins/);
     const owner = note.closest('td');
     expect(owner).not.toBeNull();
-    expect(owner?.querySelector('button')?.getAttribute('aria-label'))
+    expect(owner?.querySelector('select')?.getAttribute('aria-label'))
       .toMatch(/Principal: may open plithes/i);
   });
 
@@ -300,13 +340,13 @@ describe('the powers grid', () => {
     mount();
     await openPowers();
 
-    fireEvent.click(cell(/Learner: cannot open plithes/i));
+    choose(/Learner: cannot open plithes/i, 'self');
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toMatch(/no role able to change powers/i);
     // The edit is still there.
-    expect(cell(/Learner: may open plithes for answers across only their own/i)).toBeTruthy();
+    expect(cell(/Learner: may open plithes for answers, only where it is about them/i)).toBeTruthy();
   });
 
   it('WARNS BEFORE you take the grid away from your own role', async () => {
@@ -317,7 +357,7 @@ describe('the powers grid', () => {
     mount();
     await openPowers();
 
-    fireEvent.click(cell(/Principal: may change what every role is allowed to do across the whole organisation/i));
+    choose(/Principal: may change what every role is allowed to do, anywhere in the organisation/i, 'none');
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(await screen.findByRole('alertdialog')).toBeTruthy();
@@ -334,7 +374,7 @@ describe('the powers grid', () => {
     mount();
     await openPowers();
 
-    fireEvent.click(cell(/Learner: cannot open plithes/i));
+    choose(/Learner: cannot open plithes/i, 'self');
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(put).not.toBeNull());
@@ -347,8 +387,10 @@ describe('the powers grid', () => {
     await screen.findByText('open plithes for answers');
 
     // Visible, and visibly not editable. An empty screen looks broken; a hidden grid teaches
-    // that the rules are secret, on the one page whose claim is that they are not.
-    expect((cell(/Tutor: cannot open plithes/i) as HTMLButtonElement).disabled).toBe(true);
+    // that the rules are secret, on the one page whose claim is that they are not. A FACT,
+    // not a disabled dropdown: a greyed-out control reads as "you are doing this wrong".
+    expect(screen.queryByRole('combobox', { name: /Tutor: cannot open plithes/i })).toBeNull();
+    expect(screen.getByLabelText(/Tutor: cannot open plithes/i).textContent).toBe('No');
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull();
     expect(screen.getByText(/read this grid but not change it/i)).toBeTruthy();
   });

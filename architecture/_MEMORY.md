@@ -1446,6 +1446,93 @@ DEC-073  ACTIVE  2026-08-26  origin:claude  task:T-059
            one more column on a query that was already happening -- the same trade T-044
            made for `labels`.
   see      19 §6, 70 § Interactions, 16 §6, INV-010
+
+DEC-074  ACTIVE  2026-08-26  origin:user  task:T-090
+  decision AN OPERATOR CAN EXPORT A LOG FILE, AND THE EXPORT IS AUDITED AS A COPY LEAVING.
+           supersedes 72 § Out of scope's "Download" row, which said no. a new capability
+           `platform.logs.export` (BOTH roles, like `platform.logs.read`) and one route,
+           GET /platform/logs/:file/export?format=ndjson|csv, streaming an attachment.
+  why      the user asked for it directly. and 72's objection was never "diagnostics must
+           not leave" -- it was "with NO AUDIT of where it went". that objection is
+           answerable rather than absolute: the export writes a `logs.export` row into
+           platform_audit_log carrying the file, the format, EVERY filter and the line
+           count, so the copy is a recorded operator action exactly like the read (19 §10)
+           and 72 § Acceptance's audit line already established the shape.
+  own-cap  NOT folded into `platform.logs.read`. a read is bounded to a page on a screen
+           somebody is looking at; an export is a file on a laptop that outlives the
+           session and the retention window. one capability for both would make them
+           impossible to separate later without a migration, and separating them is the
+           first thing anybody will want after an incident.
+  inv-011  UNCHANGED, and the reason is 72's, unedited: the files contain no body, no
+           credential and no respondent identity because lib/logger.ts's redact list
+           removes them AT THE WRITER. an export is INV-011-compatible for exactly the
+           same reason the screen is, and if that ever stops being true the fix is in
+           lib/logger.ts, not in a filter over the export.
+  bounded  the export is capped (EXPORT_MAX_LINES) and reads FORWARD, oldest first --
+           chronological is what a file handed to somebody else has to be, and it is the
+           opposite of the viewer's newest-first page. a truncated export says so in a
+           trailing meta line rather than silently ending.
+  see      72 § Interactions, 72 § Out of scope (superseded row), 19 §4, 19 §13, 18 §3
+
+DEC-075  ACTIVE  2026-08-26  origin:user  task:T-063
+  decision THE LOG FILES ARE WRITTEN FOR A PERSON; STDOUT KEEPS THE JSON. one logger, one
+           record, two RENDERINGS. the file line is
+           `[<local time+offset>] [<pid>] [<LEVEL>] [<TAG>] <summary> <key=value …>`.
+           amends 18 §2's "exactly one logger and one format" -- one logger still, and one
+           set of FIELDS, but the rendering now follows the destination's reader.
+  why      the user asked for it. and the reason it is right: a file of `{"level":30,…}` is
+           the same information as the bracketed line and practically unreadable, while a
+           pipeline reading stdout wants exactly the opposite. the two destinations were
+           only ever sharing a format because nobody had separated them.
+  lossless THE FORMAT MUST BE REVERSIBLE, and that is the whole safety argument. /ops/logs
+           and the T-090 export read these files through platform/logs/parser.ts, so a
+           format that were merely prettier would have silently broken the viewer. one
+           record is one line whatever a stack trace contains (values that could hold a
+           space, a quote or an `=` are JSON-quoted), and lib/logFormat.ts OWNS the grammar
+           -- the parser imports it rather than restating it, the same rule that makes the
+           log reader borrow the writer's filename regex (72).
+  pid      printed from the record (loggerOptions.base gained `pid`), `-` when absent.
+           never process.pid at format time: a log file spans restarts and a converted
+           older line stamped with today's pid is a fabricated fact.
+  compat   THE PARSER STILL READS PINO JSON and keeps doing so while any pre-change file is
+           inside the 14-day retention window. changing a log format is not a reason to
+           blank a week of history. the files already on disk were converted in place, each
+           line verified to parse back to the same record before it was rewritten.
+  see      18 §2 "The line on disk", 18 §7, 72 § Data contract, DEC-032
+
+DEC-076  ACTIVE  2026-08-26  origin:user  task:T-052
+  decision THE POWERS GRID SAYS WHAT IT MEANS. cells read No / Themselves / Their {unit} /
+           Their {unit} + below / Everywhere / Blocked -- in the tenant's own noun -- and are
+           set from a DROPDOWN of those six, not by clicking a cell repeatedly. supersedes
+           33 § Interactions' cycle row, shift-click row and row-header row.
+  why      the owner called the screen "too jargon based even for a superuser". they were
+           right and it was not a labelling slip: `tree` is the SHAPE OF THE DATA STRUCTURE
+           the scope walks, `self` reads as "their own department" to everybody who has not
+           read 11 §4, and `L1` invites the one belief the whole GRANT model exists to deny
+           -- that a lower number means more power (DEC-002). a grid whose argument is that
+           mistakes become VISIBLE only works if the reader can read it.
+  inv-001  APPLIES TO BOTH AXES OF THE GRID, and only one of them had been done. D-008 fixed
+           the row labels (capability-labels.ts) and left the cells saying "unit" on an
+           organisation that calls them something else. scope-labels.ts is the same table for
+           the other axis and lives beside it in packages/shared. the nonsense-label fixture
+           now covers the cells, so a hardcoded noun there fails the build.
+  control  A NATIVE <select>, not a popover. the grid lives in a horizontal scroll container,
+           which clips anything absolutely positioned inside it -- a custom menu would have
+           needed a portal, a focus trap and a keyboard map to arrive at what the browser
+           already ships, correct on a phone and to a screen reader. the most intuitive
+           control here is the one nobody had to invent.
+  cycle    THE CLICK-CYCLE IS GONE, not merely supplemented. it could only reach a state by
+           passing through states nobody asked for, it was unusable on touch, and its
+           companion -- shift-click for a hard block -- hid the page's most consequential
+           action behind a modifier key. `cycle()` and `block()` collapse into `setCell()`.
+  rowlabel THE ROW LABEL IS NO LONGER A BUTTON. clicking the words "delete the entire
+           organisation" used to grant it to every role at once with nothing on screen saying
+           so. the same dropdown, visibly labelled "Set all…", now does it.
+  found    `.powers-module` was TWO CLASSES WITH ONE NAME -- T-051's powers-by-place list
+           (display:grid) and T-052's module header row (a <tr>) -- so the grid's group
+           headers were being laid out by a rule written for a different screen. the table
+           row is `.powers-group` now.
+  see      33 § Interactions, 33 § "What a cell says", packages/shared/src/scope-labels.ts
 ```
 
 ---
