@@ -59,7 +59,7 @@ CONSOLE  (/app, requires session)
   /app/logs                  Activity log                     [P2]
   /app/inbox                 Response inbox                   [P2 · built T-080]
 
-  /app/analysis              Analysis dashboard               [P2 · disabled]
+  /app/analysis              Analysis dashboard               [P2 · built T-082]
   /app/reflect               Self-reflection & gap analysis   [P2 · disabled]
   /app/communities           Communities                      [P3 · disabled]
 

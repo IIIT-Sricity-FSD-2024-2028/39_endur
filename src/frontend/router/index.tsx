@@ -38,6 +38,7 @@ const CampaignNew = lazy(() => import('../pages/console/Campaigns/New.js'));
 const CampaignDetail = lazy(() => import('../pages/console/Campaigns/Detail.js'));
 const Results = lazy(() => import('../pages/console/Results/index.js'));
 const Inbox = lazy(() => import('../pages/console/Inbox/index.js'));
+const Analysis = lazy(() => import('../pages/console/Analysis/index.js'));
 const Profile = lazy(() => import('../pages/console/Profile/index.js'));
 const Simulator = lazy(() => import('../pages/console/Simulator.js'));
 const Settings = lazy(() => import('../pages/console/Settings.js'));
@@ -108,6 +109,13 @@ export const routes: RouteObject[] = [
       // capability it needs (`response.read`) is one somebody can hold for SOME campaigns
       // and not others, and a route-level gate cannot say that (58 § States).
       { path: 'inbox', element: hold(<Inbox />) },
+      // No RequireCapability wrapper, and here there are TWO reasons rather than one.
+      // The first is the inbox's: `analysis.read` is scoped, so a route-level gate cannot
+      // say which campaigns. The second is `43`'s whole point — this page has a 402 as well
+      // as a 403 (DEC-011), the guard knows nothing about entitlements, and wrapping it
+      // would answer a Bronze customer's "upgrade to see this" with "you do not have
+      // access". The page renders both states itself and keeps them apart.
+      { path: 'analysis', element: hold(<Analysis />) },
       { path: 'profile', element: hold(<Profile />) },
       { path: 'simulator', element: hold(<Simulator />) },
       { path: 'settings', element: hold(<RequireCapability capability="org.read"><Settings /></RequireCapability>) },

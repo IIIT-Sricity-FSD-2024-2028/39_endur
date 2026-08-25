@@ -1247,6 +1247,49 @@ DEC-063  ACTIVE  2026-08-25  origin:claude  task:T-081  touches:50 §1  repays:D
            drill-through is separately gated on response.read, so this does not widen who
            may read verbatim comments.
   see      50 §1, presets/grant-matrix.ts, test/routes.test.ts, D-012, D-028, D-033, 43
+
+DEC-064  ACTIVE  2026-08-25  origin:claude  task:T-082  supersedes:24 §10, 43 § Components
+  decision NO CHARTING LIBRARY. The analysis dashboard's two visuals -- the sentiment donut
+           and the sentiment-over-time line -- are a CSS conic gradient and an inline SVG
+           polyline, written here. Recharts is not installed and no dependency was added.
+  what     it supersedes  24 §10 reserved "Recharts for the P3 analysis dashboard only" and
+           43 § Components repeated it as "Recharts is acceptable here and only here". Both
+           are superseded rather than quietly ignored; nothing else in either table changes.
+  why      THERE WAS NOTHING TO CONVERT. design_specs/design/08 §8.2 already draws this page
+           with "the conic-gradient donut, the inline-SVG line chart", and lists its
+           corrections as three token swaps. The mockup is the implementation. Adding a
+           library to redraw a picture we had would be indirection without benefit -- 24 §1's
+           own rule, one layer down -- and it is ~90KB in the console bundle for two shapes.
+  second   AND A DEPENDENCY IS A DECISION THE OWNER HAS RESERVED. DEC-036 is the same shape:
+           the privacy property was obtained without the library. The owner has also said
+           plainly not to install things unasked. A charting library would have been the
+           first runtime dependency added to this repo since T-003.
+  cost     stated rather than hidden: axes are two labels, there is no tooltip, and no
+           zoom. 43's chart needs none of those. If a later chart does -- 71's <GrowthChart>
+           is the candidate -- that is the moment to weigh a library again, with a real
+           second caller, which is the argument this decision has and that one did not.
+  a11y     the SVG is aria-hidden and the SAME NUMBERS are emitted as a real <table>,
+           visually hidden. A chart with no text equivalent is a blank region to a screen
+           reader, and the numbers exist either way.
+  see      24 §3 <TrendLine>, 24 §10, 43 § Components, DEC-036, DEC-012
+
+DEC-065  ACTIVE  2026-08-25  origin:claude  task:T-082
+  decision A PAGE MAY OWN A VISUAL THE CATALOGUE DOES NOT LIST, and 43's page owns four:
+           the sentiment donut, the driver rows, the drill-through panel and the upgrade
+           card. Catalogued from 43 § Components: <TrendLine> and <ThemeTable>, which is
+           exactly the two that section names ("a line chart for sentiment over time, and a
+           theme table"). No more, and no fewer.
+  why      24's preamble says a page doc may not INVENT a component, and that rule is about
+           a screen quietly acquiring a shared contract nobody agreed. It is not a rule that
+           every <div> with a class becomes an inventory entry. 58 set the precedent in the
+           other direction at T-080 -- "a control used by one page is not a component" -- and
+           39 set it before that for its progress bar.
+  test     the question is whether a SECOND caller is plausible. A theme table and a trend
+           line are shapes another page could want; a donut of THIS payload's three
+           sentiment counts, and a card explaining THIS capability's 402, are not.
+  cost     if a second caller ever appears for one of the four, it moves into 24 then --
+           which is cheaper than a prop contract fixed today around a single use.
+  see      24 §1, 24 § preamble, 43 § Components, DEC-058, 58 § Components
 ```
 
 ---
@@ -1983,6 +2026,9 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     what it looks for)
 23-STATE-AND-REDUX.md            -> src/frontend/store/**
 24-COMPONENT-INVENTORY.md        -> src/frontend/components/**
+                                    components/data/{TrendChip,TrendLine,ThemeTable}.tsx
+                                    added T-082 for 43. NO CHARTING LIBRARY (DEC-064) --
+                                    §10's Recharts row is superseded, not merely unused.
                                     components/Icon.tsx owns the closed icon vocabulary
                                     (design_specs/design/01 §5). a concept without an
                                     agreed icon must be added THERE before it is used.
@@ -2259,6 +2305,16 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     asserts the word does not appear. DEC-062.
                                     lexicon.ts is DATA and is the half that needs tuning;
                                     engine.ts is arithmetic and imports only the lexicon.
+                                    PAGE BUILT 2026-08-25, T-082. it also owns
+                                    src/frontend/lib/analysis.ts, and TWO catalogued
+                                    components live under 24's roof rather than this one:
+                                    components/data/TrendLine.tsx and ThemeTable.tsx (plus
+                                    TrendChip.tsx, catalogued since T-003 and built here).
+                                    the donut, the driver rows, the drill-through panel and
+                                    the 402 card are page-local on purpose -- DEC-065.
+                                    NO CHARTING LIBRARY, DEC-064: do not add one to make a
+                                    chart "proper"; the SVG is the implementation and the
+                                    hidden <table> beside it is not optional.
 44-FEATURE-improve-loop.md       -> src/backend/features/improve/**
                                     src/frontend/pages/console/Reflect/**
                                     NOTE every capability here is GOLD-entitled (16 §3). the

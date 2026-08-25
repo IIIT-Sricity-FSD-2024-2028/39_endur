@@ -3,7 +3,8 @@
 Phase: P2 · Milestone: M0 · Owns: `src/frontend/components/**`
 Design ref: `design_specs/design/09-COMPONENTS-AND-PATTERNS.md` — **authoritative for anatomy**
 
-Twenty-six components. **A page doc may not invent a component** — if a screen needs something
+Twenty-eight components — `<TrendLine>` and `<ThemeTable>` joined at `T-082`, where
+`<TrendChip>` was also finally built. **A page doc may not invent a component** — if a screen needs something
 not listed here, that is a design decision and it gets added here first
 (`design_specs/design/09` preamble).
 
@@ -157,19 +158,71 @@ a code review nobody runs.
 §8.1) and does not use this. A *judged* score against a rubric remains `43`'s, and a
 different component.
 
-### `<TrendChip>` — **not built in P1-P2**
+### `<TrendChip>` — **built at T-082, and the colour is now optional**
 ```ts
-{ delta: number; suffix?: string }
+{ delta: number; suffix?: string; valence?: Valence; label?: string }
 ```
 **The arrow is mandatory**, not decorative — it is the non-colour cue that keeps trend
 readable for colour-blind users and in print.
 
 Its only P2 caller was `46` § Components, and `46` § Out of scope rules trends off that page
 (*"that is `43`, and it is P3"*) while its payload carries nothing to compare "today"
-against. Resolved as `CONF-017` at T-041; the remaining caller is `43`, which is P3. Second
-component after `<ScoreBadge>` to be listed by a page that forbids what it does — both were
-catalogued from `43`'s needs and then borrowed by a P2 page that only looked like it needed
-one.
+against. Resolved as `CONF-017` at T-041; the caller it was catalogued for is `43`, and
+`T-082` is that page.
+
+**Two props more than it was catalogued with, and the first is the interesting one.**
+`valence` is OPTIONAL and absent means **uncoloured**. The arrow is a direction, which is a
+fact; a colour is a claim that the direction is good or bad, and that claim is the server's
+to make or nobody's (`CONF-004`). Its first caller passes none: a theme mentioned twelve
+more times this month is not thereby better or worse, and `43`'s payload states a valence
+for the theme's **score** and states none for its delta. `label` names what the number is a
+change in, for a screen reader reaching the chip out of the context of its row.
+
+Second component after `<ScoreBadge>` where the prohibition lives **inside the component**
+rather than in a doc nobody reads before importing: there, colour at any value; here, colour
+without a stated valence. Both were catalogued from `43`'s needs, and both had to wait for a
+caller that could fill them honestly.
+
+### `<TrendLine>` — new at T-082
+```ts
+{ labels: string[]; series: TrendSeries[]; caption: string; empty?: ReactNode }
+type TrendSeries = { key: string; label: string;
+                     tone: 'good' | 'neutral' | 'bad'; points: number[] };
+```
+The line chart `43` § Components names. Inline SVG polylines — **no charting library**, and
+that is `DEC-064` superseding §10's Recharts row rather than ignoring it: the mockup this
+ports is already an inline SVG, so there was nothing to convert.
+
+**One shared scale across all three lines.** Scaling each series to its own maximum would
+draw a negative line along the top of the chart while it counted four comments, which is a
+picture of the opposite of what happened.
+
+**The `<svg>` is `aria-hidden` and the same numbers are emitted as a real `<table>`,
+visually hidden.** A chart with no text equivalent is a blank region to a screen reader, and
+the numbers exist either way — refusing to send them is a choice, not a limitation. `tone`
+is named for the status ramp and never for the accent: blue is the product and cannot also
+mean somebody is unhappy (`CONF-004`).
+
+### `<ThemeTable>` — new at T-082
+```ts
+{ themes: ThemeSummary[]; onOpen: (id: string) => void;
+  openId?: string | null; empty: ReactNode; caption?: string }
+```
+The theme table `43` § Components names, built on `<ResponsiveTable>` rather than beside it.
+
+**Every row opens, and the opener is a `<button>`.** `43` § Interactions is blunt about why
+the drill-through is the component's reason to exist: *"if a user cannot see why 'pace of
+delivery' scored badly, the theme is an assertion rather than a finding."* `<ResponsiveTable>`
+offers `onRowClick` and it is **not used here** — a `<tr>` is not focusable, not announced as
+actionable, and not reachable by keyboard, on the one table in the product whose whole point
+is that you can open a row.
+
+**No sub-themes.** `design_specs/design/08` §8.2 draws "Themes & sub-themes" indented two
+deep; the payload has one level, because the engine merges a facet into its host rather than
+nesting it (`43` § The engine). An indent with nothing to put in it is a shape promising data
+that does not exist.
+
+A `null` `delta` renders as an em dash and never as a zero (`DEC-061`).
 
 ### `<ResponsiveTable>`
 ```ts
@@ -770,6 +823,9 @@ builds a second shell.
 - [ ] `<DecisionTrace>` has exactly one implementation, used by `42` and `56`
 - [ ] `<DecisionTrace compact>` renders correctly when `considered` is absent
 - [ ] `<ResponseCard>` has no prop that requires the Analyze layer
+- [x] `<TrendChip>` renders no colour when no `valence` is passed — `T-082`
+- [x] `<ThemeTable>` opens a row from a `<button>`, never from a row click — `T-082`
+- [x] `<TrendLine>` emits the same numbers as a table for a screen reader — `T-082`
 - [ ] `<InviteLink>` cannot be dismissed without an explicit action
 - [ ] `<ResponsiveTable>` collapses correctly for all four tables at 390px
 - [ ] No component filters data for permission reasons
@@ -780,7 +836,7 @@ builds a second shell.
 | Not building | Why |
 |---|---|
 | A generic `<Form>` abstraction | Four forms, all different. A generic one would fit none |
-| A charting library | The three data components cover every visual in scope. Recharts for the P3 analysis dashboard only |
+| A charting library | **Superseded 2026-08-25 by `DEC-064`.** This row used to end *"Recharts for the P3 analysis dashboard only"*. That dashboard was built at `T-082` with a CSS conic gradient and an inline SVG polyline, because `design_specs/design/08` §8.2 already draws it that way — there was nothing to convert, and a library to redraw a picture we had is §1's indirection one layer down. No dependency was added. If a later chart genuinely needs axes, tooltips or zoom (`71`'s `<GrowthChart>` is the candidate), weigh it again **with that caller in hand** |
 | Drag-and-drop beyond tree reparent and question reorder | Two uses, both specified. A third would be scope creep |
 | Virtualised lists | Lists are scoped and paginated |
 | A component that wraps a base class without adding behaviour | Indirection with no benefit (§1) |

@@ -1,7 +1,7 @@
 # 43 — Analysis dashboard
 
 Phase: **P3, re-tagged buildable 2026-08-23 — CONF-019** · Milestone: —
-Status: **BACKEND BUILT 2026-08-25 (`T-081`)** · page is `T-082`, next. Promoted
+Status: **BUILT 2026-08-25** — backend `T-081`, page `T-082`. Promoted
 2026-08-24 by `CONF-021` — the owner asked a second time. `T-088` wrote the subscriptions
 row, so the 402-vs-403 demonstration is real rather than universal
 Design ref: `design_specs/design/08` §8.2
@@ -28,7 +28,22 @@ This is the Silver tier's entire value proposition (`01` §6).
 
 ## Route & access
 
-`/app/analysis` — console world. Disabled with a "Soon" tag until P3.
+`/app/analysis` — console world. **Live since `T-082`**; the sidebar item lost its "Soon" tag
+in the same commit, which is `T-085`'s rule (the tag comes off as the page lands, never
+before, and never as a task of its own).
+
+**No `RequireCapability` wrapper on the route, and here there are two reasons.** The first is
+the inbox's: `analysis.read` is scoped, so a route-level gate cannot say *which* campaigns.
+The second is this page's own — it has a **402 as well as a 403**, the guard knows nothing
+about entitlements, and wrapping it would answer a Bronze customer's *"upgrade to see this"*
+with *"you do not have access"*, which is the exact confusion `DEC-011` exists to prevent.
+The page renders both states itself and keeps them apart.
+
+**The sidebar item is not gated on the tier**, deliberately. A Bronze organisation's
+administrators hold the capability and get the upgrade card, which is the demonstration this
+page exists for; hiding the item would replace it with an absence nobody can ask a question
+about. The client is also the wrong place to decide an entitlement — it never receives the
+map (`packages/shared/src/tiers.ts`).
 
 ## Capabilities
 
@@ -165,11 +180,50 @@ forecloses it: the engine sits behind one interface with one function, the same 
 P3, and shaped by the `23` decision (OPEN-001). Under Option A this is RTK Query with a long
 cache — analysis is expensive to compute and does not change minute to minute.
 
-## Components
+**Built at `T-082` as a plain hook, and it deliberately DOES NOT POLL.** `40` polls because
+the demo beat is a number moving while somebody watches. This is a corpus-wide recomputation
+on every call, and a ten-second timer would re-run the engine over every comment in the
+organisation six times a minute for a screen nobody is watching for movement. A Refresh
+button says the same thing honestly and costs one click. That is the *only* difference from
+`40`'s controller; the P3 move to RTK Query stays additive.
 
-Existing: `<StatCard>` `<BarRow>` `<StackedBar>` `<TrendChip>` `<ScoreBadge>`.
-New for P3: a line chart for sentiment over time, and a theme table. Recharts is acceptable
-here and only here (`24` §10).
+**Every filter lives in the URL, and so does the open theme.** A filtered analysis is a link
+somebody pastes into a message, and `?theme=parking` makes a finding sendable rather than a
+sequence of clicks. Changing a filter **closes** an open theme rather than asking for it in a
+window it may not exist in.
+
+## Components — BUILT
+
+Existing and used: `<StatCard>` `<ResponsiveTable>` `<ScoreBadge>` `<EmptyState>`
+`<PageHeader>`. `<BarRow>` and `<StackedBar>` are **not** used here — see below.
+
+New, and catalogued in `24` §3 first: **`<TrendLine>`** (the line chart this section named)
+and **`<ThemeTable>`** (the theme table it named). **`<TrendChip>` was finally built**, after
+being catalogued at `T-003` and refused twice by pages that only looked like they needed it
+(`CONF-017`).
+
+**NO RECHARTS — `DEC-064`, superseding this section's own sentence and `24` §10.** The
+mockup this ports (`design_specs/design/08` §8.2) is *already* "the conic-gradient donut, the
+inline-SVG line chart", and its listed corrections are three token swaps. There was nothing
+to convert, and a library to redraw a picture we had is `24` §1's indirection one layer
+down. No dependency was added.
+
+**Four visuals are page-local and are not inventory entries — `DEC-065`.** The sentiment
+donut, the driver rows, the drill-through panel and the 402 card each have exactly one
+plausible caller in the product; `58` set that precedent at `T-080` and `39` before it. What
+`24` forbids is a page quietly acquiring a *shared contract* nobody agreed, not a `<div>`
+with a class becoming a catalogue row.
+
+**Why `<BarRow>` is not the driver bar.** `<BarRow>` draws a share of a total — a quantity
+that starts at zero and grows. A driver is a **correlation**: signed, in -1..+1, with zero in
+the middle. Rendering it in the component built for shares would put -0.4 and +0.4 at the
+same place with different colours, which is colour carrying the meaning on its own (`21` §8).
+The driver rows diverge from the centre and print the value to two decimals.
+
+**Why `<StackedBar>` is not the sentiment split.** `24` §3 is explicit that NPS is its only
+legitimate caller — the instrument itself defines a detractor. A lexicon defines a negative
+word, which licenses the *colour*, but the mockup draws this as a donut and a second caller
+for the NPS bar is exactly what that entry says to check before adding.
 
 ## Interactions
 
@@ -181,15 +235,27 @@ Each theme drills into its source comments, which is what stops a theme from bei
 unfalsifiable label. If a user cannot see *why* "pace of delivery" scored badly, the theme is
 an assertion rather than a finding.
 
-## Corrections required when porting the mockup
+## Corrections required when porting the mockup — MADE
 
-`design_specs/design/08` §"corrections required" lists these, and they are not optional:
+`design_specs/design/08` §"corrections required" lists these, and they are not optional. All
+four were made at `T-082`:
 
-- Swap the mockup's `:root` for the canonical token block (CONF-003)
-- **Negative sentiment must use the status ramp, never the brand accent** (CONF-004) — blue is
-  the product and cannot also mean "a student is unhappy"
-- Replace emoji placeholders with real icons
-- Every valence indicator carries a number or label alongside colour (`21` §8)
+- [x] Swap the mockup's `:root` for the canonical token block (CONF-003)
+- [x] **Negative sentiment uses the status ramp, never the brand accent** (CONF-004) — blue is
+      the product and cannot also mean somebody is unhappy. The accent appears in this page's
+      whole style block only on focus rings and the theme button, and a test asserts no
+      negative indicator anywhere carries an accent class
+- [x] No emoji placeholders — the icons come from `<Icon>`'s closed vocabulary
+- [x] Every valence indicator carries a number or a word alongside colour (`21` §8): the
+      donut has its legend, the trend has its own, each theme carries **Positive / Mixed /
+      Negative** beside its gradient bar, and `<TrendChip>`'s arrow is mandatory
+
+One more, found while porting rather than listed: **every custom property used must exist.**
+A "neutral" member of the status ramp is the obvious one to reach for on a three-part
+sentiment split and there is no such token; a property that resolves to nothing paints
+nothing, silently. That is
+`D-030`'s family of bugs and it is one template literal away at all times, so the donut names
+its three tokens explicitly instead of interpolating a key into them.
 
 ## States
 
@@ -223,12 +289,42 @@ Backend, `T-081`, 2026-08-25 — 36 tests in `src/backend/test/analysis.test.ts`
 - [x] The drill-through is gated on `response.read` as well, so it cannot become a way around
       `40`'s split between an average and what one person wrote
 
-Page, `T-082`, outstanding:
+Page, `T-082`, 2026-08-25 — 29 tests in `src/frontend/pages/console/Analysis/Analysis.test.tsx`:
 
-- [ ] Negative sentiment never renders in the brand accent
-- [ ] Reliability is **shown** alongside every headline number
+- [x] Negative sentiment never renders in the brand accent — asserted as a class rule, which
+      is the only part of a colour rule a test can see: no `.fill-bad`, `.stroke-bad` or
+      `.tag-bad` carries an accent class, and `.fill-accent` appears nowhere on the page
+- [x] Reliability is **shown** alongside every headline number — the strip above everything,
+      **and** a confidence tag on every panel heading, because the strip scrolls away and a
+      screenshot of the themes table does not carry it
+- [x] **402 and 403 are different screens** (`DEC-011`). A Bronze customer with every
+      permission in the product is never told their account has no access; somebody without
+      the capability is never shown a plan. Asserted in both directions
+- [x] The drill-through's 403 renders **inside the panel**, with the analysis still on
+      screen — `40`'s rule for its comments, on the route that carries the same capability
+- [x] A `null` `delta` renders as absent, never as a zero (`DEC-061`); a delta carries **no
+      valence**, because more mentions is not thereby better or worse
+- [x] Suppression renders `40`'s card and there is nothing on the page that could render a
+      theme, because the body carried none. An organisation with **no** responses gets the
+      empty state instead — different facts, different screens
+- [x] No domain noun is hardcoded (INV-001), asserted against `NONSENSE_LABELS` in the
+      filters, the empty state and the drill-through
 - [ ] If an LLM is ever used, the org setting is opt-in and the disclosure is visible to the
-      customer
+      customer — **still open, and stays open**: nothing was built, `DEC-042` holds, and this
+      line is the condition on any future reversal (`REVISIT:2026-11-01`)
+
+### What the page cannot show yet, stated rather than discovered
+
+- **The drivers panel is empty on the seeded demo data**, and honestly so. `demo.ts` draws a
+  comment's tone and its rating as two independent throws, so every correlation lands inside
+  the engine's deadband and is correctly reported `neutral`. A neutral "key driver" would
+  present a non-finding as a finding, so the panel says in words that nothing moves the
+  score. Fixing the *seed* is the change that would light it up, not the engine.
+- **The four demo organisations still cannot open this page.** They were seeded on 21 Aug
+  with zero `analysis.read` grants (`D-033`) **and** no subscription row (`D-012`), so it
+  403s *and* 402s for all four. `db:seed` skips organisations that already exist; only the
+  destructive `db:reset` repairs them, and that is `D-031` — the owner's call, not a
+  session's.
 
 ## Out of scope
 
