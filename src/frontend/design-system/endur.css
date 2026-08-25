@@ -3285,3 +3285,55 @@ html:active-view-transition * {
   .analysis-filters .field-inline { width: 100%; }
   .analysis-filters .input { flex: 1; }
 }
+
+/* ── T-084 · the improve loop ────────────────────────────────────────────── */
+/* 44. Tokens only (DEC-012). NO STATUS RAMP ON A GAP: 44 § The gap view says a gap view
+   that reads as an accusation guarantees the next reflection is gamed, so `self` and
+   `received` are two neutral weights of the same hue rather than good and bad. */
+
+.cycle-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.cycle-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+}
+.cycle-open {
+  background: none; border: 0; padding: 0; cursor: pointer; margin-right: auto;
+  font: inherit; font-weight: 600; color: var(--color-accent); text-align: left;
+}
+.cycle-open:hover { text-decoration: underline; }
+
+.reflect-form, .reflect-gap, .reflect-plan {
+  display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3);
+}
+.reflect-form h3, .reflect-gap h3, .reflect-plan h3 { margin: 0; }
+.reflect-form p, .reflect-gap p, .reflect-plan p { margin: 0; }
+
+.gap-row {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding-top: var(--space-3); border-top: 1px solid var(--color-divider);
+}
+.gap-row:first-of-type { border-top: 0; padding-top: 0; }
+.gap-label { font-weight: 600; }
+.gap-pair { display: grid; grid-template-columns: 6ch minmax(0, 1fr) 5ch; align-items: center; gap: var(--space-2); }
+.gap-key { font-size: var(--text-meta); }
+.gap-track {
+  height: 10px; border-radius: var(--radius-sm);
+  background: var(--color-neutral-100); overflow: hidden;
+}
+.gap-fill { display: block; height: 100%; border-radius: var(--radius-sm); }
+/* The person's own reading is the accent; everybody else's is neutral. Two weights of the
+   same idea — NOT good and bad, which is what a status ramp here would say. */
+.gap-fill.is-self { background: var(--color-accent); }
+.gap-fill.is-received { background: var(--color-neutral-400); }
+.gap-value { text-align: right; font-size: var(--text-meta); }
+.gap-delta { margin-top: var(--space-1); }
+
+.plan-item { display: flex; gap: var(--space-2); }
+.plan-item .input:first-child { flex: 1; }
+.plan-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.plan-list { margin: 0; padding-left: var(--space-4); }
+.checkin-list { border-top: 1px solid var(--color-divider); padding-top: var(--space-3); }
+.checkin-list h4 { margin: 0 0 var(--space-2); }
+
+@media (max-width: 640px) {
+  .plan-item { flex-direction: column; }
+}

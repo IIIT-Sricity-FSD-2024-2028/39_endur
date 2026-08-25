@@ -3,8 +3,8 @@
 Phase: P2 · Milestone: M0 · Owns: `src/frontend/components/**`
 Design ref: `design_specs/design/09-COMPONENTS-AND-PATTERNS.md` — **authoritative for anatomy**
 
-Twenty-eight components — `<TrendLine>` and `<ThemeTable>` joined at `T-082`, where
-`<TrendChip>` was also finally built. **A page doc may not invent a component** — if a screen needs something
+Thirty components — `<TrendLine>` and `<ThemeTable>` joined at `T-082` (where `<TrendChip>`
+was also finally built), `<GapBar>` and `<UpgradeCard>` at `T-084`. **A page doc may not invent a component** — if a screen needs something
 not listed here, that is a design decision and it gets added here first
 (`design_specs/design/09` preamble).
 
@@ -223,6 +223,24 @@ nesting it (`43` § The engine). An indent with nothing to put in it is a shape 
 that does not exist.
 
 A `null` `delta` renders as an em dash and never as a zero (`DEC-061`).
+
+### `<GapBar>` — new at T-084
+```ts
+{ label: string; self: number | null; received: number | null; max: number | null }
+```
+Two bars on **one axis**, which is the whole requirement: self and received have to be
+directly comparable or the gap is two numbers in a row rather than a finding. `44` § The gap
+view asked for it here before it was built, and this is that entry.
+
+**It names no winner, and that is a prop it does not have.** Self higher than received is a
+blind spot, self lower is under-confidence, both are worth knowing and **neither is a grade**
+— *"a gap view that reads as an accusation guarantees the next reflection is gamed."* So
+there is no `valence`, and the fills are the accent for the person's own reading and neutral
+for everybody else's, never the status ramp. The delta is stated as a plain sentence with a
+signed number.
+
+`null` on both halves renders a **sentence, not an empty bar**: a written answer has no
+average, and a zero-length bar would say "scored nothing" about a question nobody scored.
 
 ### `<ResponsiveTable>`
 ```ts
@@ -629,6 +647,27 @@ sells, what it adds); what the server keeps is the decision.
 individually, so it is a sales conversation rather than a button — but hiding it would make an
 operator setting it later look like a bug rather than a sale.
 
+### `<UpgradeCard>` — built page-local at T-082, lifted here at T-084
+```ts
+{ requiredTier: Tier | null; currentTier: Tier | null;
+  icon?: IconName; sells?: string }
+```
+The **402**, on any surface that has one. Not an error page: no alert role, no status ramp,
+no red. The account is fine, the permissions are fine, and the remedy is a plan (`DEC-011`).
+
+**The tier is the server's answer, never a guess.** `requiredTier` arrives in the 402
+envelope; the entitlement map deliberately does not ship to the browser
+(`packages/shared/src/tiers.ts`), so this card can name a tier and can never re-decide a 402.
+
+**No button, in any caller.** The plan page and its per-tier action are `T-058`, and there is
+no checkout in any phase (`DEC-035`). A primary button that navigates nowhere is what
+`design_specs/design/02` §7 refuses in the sidebar and it would be worse here — on the one
+card whose whole job is to make an upgrade path legible.
+
+It was page-local for exactly one task. `43` needed it, `44` needed the same card one tier
+up, and two callers with an identical shape and one differing value is the test `DEC-065`
+sets for the catalogue. It passed the moment the second page existed.
+
 ### `<OverLimitBanner>`
 ```ts
 { over: number; limit: number; noun: string; onUpgrade: () => void }
@@ -826,6 +865,8 @@ builds a second shell.
 - [x] `<TrendChip>` renders no colour when no `valence` is passed — `T-082`
 - [x] `<ThemeTable>` opens a row from a `<button>`, never from a row click — `T-082`
 - [x] `<TrendLine>` emits the same numbers as a table for a screen reader — `T-082`
+- [x] `<GapBar>` has no `valence` prop and paints no status ramp — `T-084`
+- [x] `<UpgradeCard>` renders no action button while `T-058` does not exist — `T-084`
 - [ ] `<InviteLink>` cannot be dismissed without an explicit action
 - [ ] `<ResponsiveTable>` collapses correctly for all four tables at 390px
 - [ ] No component filters data for permission reasons

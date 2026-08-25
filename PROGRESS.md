@@ -5,7 +5,56 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-25  (T-082 BUILT — /app/analysis. THE ANALYZE LAYER IS A SCREEN.
+UPDATED   2026-08-25  (T-083 + T-084 + T-085 BUILT — THE IMPROVE LOOP, AND STAGE 9 IS
+                       DONE. THERE IS NO "Soon" TAG LEFT IN THE SIDEBAR: every item now
+                       goes somewhere real. 433 backend (+10) + 843 frontend (+7) =
+                       1,276 tests green.
+                       THE ORDERING CONSTRAINT IS ENFORCED BY AN ABSENT ROUTE, not only
+                       by a 404 (DEC-067). 44 calls it "the most defensible novelty claim
+                       in the product after the permission engine": you record your own
+                       assessment BEFORE you see what anybody said, or the reflection
+                       becomes a rationalisation of the scores and the gap cannot exist.
+                       GET /reflect/:id/gap 404s until the reflection is written — and
+                       there is NO ROUTE AND NO DTO ANYWHERE that returns a reviewee's
+                       received scores on their own. A 404 is a check somebody can relax
+                       later; a missing endpoint is not. DEC-062's shape one feature over.
+                       The page collapsed 44's five addresses into two for the same
+                       reason: /app/reflect/:id/gap as its own address would be a link
+                       somebody could open early.
+                       !! ONE ACCEPTANCE LINE WAS NARROWED ON PURPOSE (DEC-066). 44 says
+                       "a supervisor reads their subtree's reflections" — and one
+                       paragraph earlier the SAME DOC says getting this scope wrong
+                       "exposes someone's private self-assessment to a peer". A reflection
+                       is a person's own written account of their own weaknesses, recorded
+                       before they are allowed to see anything. So reflection.read is
+                       seeded `self` AND NOTHING WIDER at every level that holds it. What
+                       a supervisor gets is the CHECK-IN — the conversation, which is what
+                       step 4 of the loop actually describes. An org that disagrees can
+                       write the grant; the resolver supports it. It is their call, not
+                       ours to seed.
+                       NOT L4 EITHER: L3 is the reviewee and L4 is the respondent-level
+                       role, so somebody nobody reviews has nothing to reflect on. The
+                       item would have shown for every account and opened an empty page —
+                       D-027 again.
+                       IMMUTABILITY IS THREE DATABASE TRIGGERS, and 44 asks for a trigger
+                       test BY NAME rather than a service test. reflections refuse UPDATE
+                       outright (submitting IS finalising); plans and check-ins refuse any
+                       change once finalised. improve.test.ts writes to the row directly
+                       and the database still says no.
+                       <GapBar> NAMES NO WINNER and has no `valence` prop — self higher is
+                       a blind spot, self lower is under-confidence, and 44 is explicit
+                       that a gap view reading as an accusation guarantees the next
+                       reflection is gamed. Accent for your own reading, neutral for
+                       everybody else's, never the status ramp.
+                       <UpgradeCard> LEFT /app/analysis and joined 24 §6b — two callers,
+                       identical shape, one differing tier, which is the test DEC-065 sets.
+                       WHAT IS NOT BUILT AND IS NOT PRETENDED: the check-in text chat (the
+                       `notes` field is the seam), step 5's cycle-over-cycle measurement
+                       (needs two closed cycles; the seed has one), item-level overdue
+                       (nothing schedules), and "reflection due" on /app home (46's
+                       payload has no field and that is 46's task).
+                       Earlier the same day: T-082 BUILT — /app/analysis. THE ANALYZE
+                       LAYER IS A SCREEN.
                        Stage 9's fifth row, and Analysis is off the "Soon" list.
                        423 backend + 837 frontend (+30) = 1,260 tests green.
                        TWO FAILURES, TWO SCREENS — this is what DEC-011 was for. 403 is
@@ -919,11 +968,9 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
 [x] T-081  A  analysis backend, RULE-BASED (43, DEC-042)               BUILT 25 Aug
 [x] T-082  C  /app/analysis                                           BUILT 25 Aug
-[ ] T-083  A  improve-loop backend (44)                  ← needs T-057. NOT NEGOTIABLE
-[ ] T-084  B  /app/reflect                               ← needs T-083
-[ ] T-085  B  un-disable the sidebar, one item per page as it lands
-              ← Roles + Inbox done at T-080, ANALYSIS at T-082. Only Reflect is left,
-                and it comes off when T-084 lands. Never a task of its own.
+[x] T-083  A  improve-loop backend (44)                               BUILT 25 Aug
+[x] T-084  B  /app/reflect                                            BUILT 25 Aug
+[x] T-085  B  un-disable the sidebar — DONE. No "Soon" tag is left anywhere.
 
 Stage 8 — WHAT EACH TIER SEES.  Owner ask, 24 Aug.  DOCS ONLY so far (55 § Stage 8).
 [x] T-086  A  scope-aware MeResponse.capabilities + subject.read for L4 (13, 50 §1)
@@ -1003,9 +1050,15 @@ Full tables in `55` § Stage 9.
               LIBRARY — DEC-064 supersedes 24 §10; no dependency added. <TrendChip>
               finally built, uncoloured by default. DEC-065: two components
               catalogued, four left page-local.
-[ ] T-083  A  improve-loop backend (44)   ← was blocked on D-012; T-088 repaid it
-[ ] T-084  B  /app/reflect
-[ ] T-085  B  un-disable the sidebar — LAST EDIT OF EACH TASK, never its own task
+[x] T-083  A  improve-loop backend (44)                               BUILT 25 Aug
+              3 tables, 3 TRIGGERS. The ordering constraint is enforced by an ABSENT
+              ROUTE as well as the gap's 404 (DEC-067). reflection.read seeded `self`
+              and nothing wider — 44's "supervisor reads the subtree's" narrowed on
+              purpose (DEC-066).
+[x] T-084  B  /app/reflect                                            BUILT 25 Aug
+              Form → gap → plan, order decided by the server. <GapBar> names no
+              winner. <UpgradeCard> lifted out of 43 on its second caller.
+[x] T-085  B  un-disable the sidebar — DONE. STAGE 9 IS COMPLETE.
 
 --- item 3 · logs, and Endur's own two consoles ----------------------------------
     TWO DIFFERENT THINGS WEARING ONE WORD. 19 §4 draws the line: an ORG's admin sees
@@ -1046,7 +1099,9 @@ withdrawn.** All four are promoted — Stage 9 above.
 | **Roles** | `T-052` | ~~nothing — sequenced after M0~~ **nothing. PROMOTED, goes first** | spec is `33`, complete since round 1. The only one with no backend work at all. Repays `D-008` |
 | ~~**Inbox**~~ | ~~`T-079` → `T-080`~~ | **BUILT 25 Aug** | spec is `58`. Reads **through** `features/results/service.ts` so the k-anonymity gate is not forked — and `features/inbox/` cannot reach `responses` at all, which is what makes that true next month as well as today (`DEC-058`) |
 | ~~**Analysis**~~ | ~~`T-081` → `T-082`~~ | **BUILT 25 Aug, both halves** | rule-based engine (`DEC-042`), two k-anon gates, drill-through behind `response.read` as well — and the screen, with a real `402` path (`T-088`) and, since `D-033`, a capability somebody can actually hold. **No dependency was added to draw it** (`DEC-064`) |
-| **Reflect** | `T-083` → `T-084` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | every capability in the improve loop is Gold, and `D-012` meant no organisation had ever had a subscription row. Built before `T-088`, this surface would have `402`d for **every user in the product**, demo included |
+| ~~**Reflect**~~ | ~~`T-083` → `T-084`~~ | **BUILT 25 Aug, both halves** | every capability in the improve loop is Gold, and `D-012` meant no organisation had ever had a subscription row — built before `T-088` this would have `402`d for every user in the product. The ordering constraint is enforced by an **absent route** as well as a 404 (`DEC-067`), and `reflection.read` is seeded `self` and nothing wider (`DEC-066`) |
+
+**All four are built. The sidebar has no "Soon" tag left.**
 
 **So the tiers are not a separate missing thing — they are the blocker for half the list.**
 That gate was filed as `T-057`, a large Stage-6 API task, which made it look far away. It is
@@ -1193,7 +1248,78 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-25 (latest) · T-082 — /app/analysis
+### 2026-08-25 (latest) · T-083, T-084, T-085 — the improve loop, and the last "Soon" tag
+
+Stage 9 is complete. **433 backend (+10) + 843 frontend (+7) = 1,276 tests, all green.**
+Typecheck, lint, `audit:drift`, `audit:vocab` clean. One migration applied locally.
+
+**The ordering constraint is enforced by an absent route, not only by a 404** (`DEC-067`).
+`44` calls it the most defensible novelty claim in the product after the permission engine:
+you record your own assessment *before* you see what anybody else said, or the reflection
+becomes a rationalisation of the scores and the gap — the actually useful output — cannot
+exist. `GET /reflect/:id/gap` 404s until the reflection is written, **and there is no route
+and no DTO anywhere that returns a reviewee's received scores on their own.** A 404 is a
+check somebody can relax later; a missing endpoint is not. The page collapsed `44`'s five
+addresses into two for the same reason — `/app/reflect/:id/gap` as its own address would be
+a link somebody could open early.
+
+**One acceptance line was narrowed on purpose** (`DEC-066`). `44` § Capabilities says *"a
+supervisor reads their subtree's [reflections]"*, and one paragraph earlier the same document
+says getting this scope wrong *"exposes someone's private self-assessment to a peer"*. Those
+two sentences cannot both be honoured. A reflection is a person's own written account of
+their own weaknesses, recorded before they are allowed to see anything — so `reflection.read`
+is seeded **`self` and nothing wider**, at every level that holds it. What a supervisor gets
+is the **check-in**: the conversation about the plan, which is what step 4 of the loop
+actually describes. An organisation that disagrees can write that grant — the resolver
+supports it — and that is their decision to make explicitly rather than ours to seed.
+
+**Not L4 either**, on the same reading of the ladder `results.read` already takes: L3 is the
+reviewee and L4 is the respondent-level role. Somebody nobody reviews has nothing to reflect
+on, and the nav item would have shown for every account in the product and opened an empty
+page — `D-027`'s exact shape, a third time.
+
+**Immutability is three database triggers**, because `44` asks for a *trigger* test by name
+rather than a service test — the Enterprise tier sells these records as evidence, and a
+record that can be rewritten after the conversation is not evidence. `reflections` refuse
+`UPDATE` outright (submitting *is* finalising, so a second write is a rewrite after the
+fact); plans and check-ins refuse any change once `finalised_at` is set. The test goes around
+the service entirely and writes to the row directly, and the database still says no.
+
+**`<GapBar>` names no winner and has no `valence` prop.** Self higher than received is a
+blind spot, self lower is under-confidence, both are worth knowing and neither is a grade:
+*"a gap view that reads as an accusation guarantees the next reflection is gamed."* Accent
+for the person's own reading, neutral for everybody else's, never the status ramp.
+
+**`<UpgradeCard>` left `/app/analysis` and joined `24` §6b** — two callers, identical shape,
+one differing tier, which is exactly the test `DEC-065` sets for the catalogue.
+
+**`T-085` is done and there is no "Soon" tag left anywhere.** `Sidebar.test.tsx`'s count
+assertion is now zero, plus every item on the positive-navigation table. The three roadmap
+tests that asserted disabled behaviour were **deleted rather than skipped** — there is
+nothing left for them to describe.
+
+**What is not built, and is not pretended** (all four written into `44` § What is not built):
+the check-in text chat — `notes` is the seam; step 5's cycle-over-cycle measurement, which
+needs two closed cycles on one subject and the seed has one; item-level "plan overdue",
+because nothing schedules (`OPEN-005` still owns no scheduler); and "reflection due" on
+`/app` home, whose payload has no field for it and which is `46`'s task.
+
+**And the demo organisations still cannot open it** — same pair as Analysis. They hold no
+improve-loop grants and no subscription row, so it 403s *and* 402s for all four. `D-031`.
+
+**Written:** `DEC-066`, `DEC-067`; `44` (status, route, acceptance, what-is-not-built),
+`13` § Improve loop (out of § Reserved), `24` (`<GapBar>`, `<UpgradeCard>`, §7), `50` §1,
+`20` §2, `55` § Stage 9, MAP.
+
+**What the next session should know.** Stage 9 is finished and every sidebar item is live.
+**Item 3 of the owner's ask is the only untouched block left**: `T-075`/`T-076`
+(`GET /audit` + `/app/logs`, spec `56`) can start immediately, then the `/ops` tree
+(`T-059` → `T-066`/`T-067`/`T-077`/`T-078`). `D-031` (destructive re-seed so the demo orgs
+can open the two new pages) and `D-032` are still owner decisions; `D-030` is unrepaid.
+
+---
+
+### 2026-08-25 · T-082 — /app/analysis
 
 Stage 9's fifth row, and the Analyze layer is now a screen. **423 backend + 837 frontend
 (+30) = 1,260 tests, all green.** Typecheck, lint, `audit:drift`, `audit:vocab` clean.

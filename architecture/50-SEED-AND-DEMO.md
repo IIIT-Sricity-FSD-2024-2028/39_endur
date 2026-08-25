@@ -84,6 +84,9 @@ regeneration never silently reverts an administrator's change (`10` §9).
 | `response.read` `results.read` | subtree | subtree | own_unit | — |
 | `response.export` `results.export` | subtree | subtree | — | — |
 | `analysis.read` | subtree | subtree | own_unit | — |
+| `reflection.create` `reflection.read` | **self** | **self** | **self** | — |
+| `actionplan.create` `actionplan.read` | **self** | **self** | **self** | — |
+| `checkin.create` `checkin.read` | subtree | subtree | own_unit | — |
 | `simulator.run` | all | subtree | — | — |
 | `audit.read` | all | — | — | — |
 | `billing.read` `billing.update` | all | — | — | — |
@@ -107,6 +110,15 @@ Notes on four rows that look surprising:
 - **L3 gets `results.read own_unit`.** A reviewee seeing their own feedback is the product
   working. In P3 the improve loop adds a gate on top — results stay locked until the
   self-reflection is submitted (`44`) — but that is an additional check, not a different grant.
+- **The improve-loop rows are `self` and stay `self` — added at `T-083`.** These are the nine
+  capabilities `D-033` deliberately left, and their scopes are **not** copied from the block
+  above. A reflection is a person's own account of their own weaknesses, and `44` says
+  getting this wrong *"exposes someone's private self-assessment to a peer"*. There is no
+  seeded value that opens somebody else's. What a supervisor gets is the **check-in** — the
+  conversation about the plan — and that is the only row here that reaches past the caller.
+  **Not L4**, for the same reading of the ladder `results.read` already takes: L3 is the
+  reviewee and L4 is the respondent-level role, and somebody nobody reviews has nothing to
+  reflect on.
 - **`analysis.read` matches `results.read` exactly, and it was MISSING ALTOGETHER until
   `T-081` (2026-08-25, `D-033`).** Not restricted, not deliberately withheld — absent, so no
   seeded role in the product had ever held it and `/api/v1/analysis` would have returned 403

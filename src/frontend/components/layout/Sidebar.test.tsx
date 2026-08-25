@@ -12,7 +12,7 @@ import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
 // `response.read` joined at T-080, when Inbox stopped being a "Soon" item.
 const ALL = ['unit.read', 'role.read', 'person.read', 'subject.read',
              'template.read', 'campaign.read', 'response.read',
-             'analysis.read',
+             'analysis.read', 'reflection.read',
              'org.read', 'org.update'] as const;
 
 describe('vocabulary', () => {
@@ -69,6 +69,9 @@ describe('what each level sees', () => {
     // hand-written levels were right to omit it and are only right to carry it now that
     // `grant-matrix.ts` does. L4 still holds none, which is why Analysis leaves that list.
     'analysis.read': 'subtree',
+    // `self`, not `subtree` — a reflection is somebody's private assessment of themselves
+    // and there is no legitimate wider read (T-083, `50` §1).
+    'reflection.read': 'self',
   } as const;
   const L2 = { ...L1, 'org.update': undefined } as const;
   const L3 = {
@@ -76,6 +79,7 @@ describe('what each level sees', () => {
     'person.read': 'own_unit', 'subject.read': 'own_unit', 'template.read': 'all',
     'campaign.read': 'own_unit', 'response.read': 'own_unit',
     'analysis.read': 'own_unit',
+    'reflection.read': 'self',
   } as const;
   // NO `response.read` — the matrix gives level 4 none (50 §1, presets/grant-matrix.ts).
   // So the lowest account does not get an Inbox, which is right: a queue of everybody
@@ -136,7 +140,10 @@ describe('what each level sees', () => {
     // ANALYSIS LEFT THIS LIST AT T-082, for the third time the same way: the item is now
     // gated on a capability level 4 does not hold (`analysis.read` is `subtree`/`subtree`/
     // `own_unit` and nothing at L4), rather than shown-disabled to everybody.
-    expect(rendered()).toEqual(['Home', 'Quaxels', 'Reflect']);
+    // REFLECT LEFT THIS LIST AT T-084, and for the reason `50` §1 gives: L3 is the
+    // reviewee, L4 is the respondent-level role, and somebody nobody reviews has nothing to
+    // reflect on. The lowest account's sidebar is now Home and one list.
+    expect(rendered()).toEqual(['Home', 'Quaxels']);
   });
 
   it('drops People for an account that can only reach itself — the whole of D-027', () => {
@@ -166,31 +173,15 @@ describe('what each level sees', () => {
   });
 });
 
-describe('roadmap items', () => {
-  it('shows them, tagged, and refuses to navigate', () => {
+describe('roadmap items — there are none left', () => {
+  it('has none left — every item in the sidebar goes somewhere real', () => {
+    // T-084 took the last "Soon" tag off. THE COUNT IS STILL THE ASSERTION, and zero is the
+    // strongest version of it: an item goes back to being disabled only if somebody adds a
+    // page that does not exist yet, and this test would say so.
     renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
-    const reflect = screen.getByText('Reflect').closest('.sidebar-item');
-
-    expect(reflect).toBeTruthy();
-    expect(reflect?.getAttribute('aria-disabled')).toBe('true');
-    // Not an <a>: there is no href to follow and nothing to tab into, so the behaviour is
-    // structural rather than styled-on.
-    expect(reflect?.tagName).not.toBe('A');
-    // ONE now: Reflect. **People left this list at T-050**, **Roles and Inbox at T-080** —
-    // Roles because its page had been live since 24 Aug and the sidebar had simply never
-    // caught up, which is precisely the drift this count exists to catch — and **Analysis
-    // at T-082**. The count is the assertion: an item goes back to being a link when its
-    // page exists, and never before (design_specs/design/02 §7). If this number goes UP,
-    // something regressed; if it goes down, check the page behind it is real first.
-    expect(screen.getAllByText('Soon').length).toBe(1);
-  });
-
-  it('does not navigate to a page that is only scaffold', () => {
-    renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
-    for (const label of ['Reflect']) {
-      const item = screen.getByText(label).closest('.sidebar-item');
-      expect(item?.getAttribute('aria-disabled')).toBe('true');
-      expect(item?.tagName).not.toBe('A');
+    expect(screen.queryAllByText('Soon').length).toBe(0);
+    for (const item of document.querySelectorAll('.sidebar-item')) {
+      expect(item.getAttribute('aria-disabled')).toBeNull();
     }
   });
 
@@ -207,18 +198,13 @@ describe('roadmap items', () => {
     // T-082. The positive direction, asserted the same day the page landed rather than a
     // day later — which is the whole argument for this half of the rule existing.
     ['Analysis', '/app/analysis'],
+    // T-084, and the last one. Every item in the sidebar is now on this list.
+    ['Reflect', '/app/reflect'],
   ])('DOES navigate to %s, whose page exists', (label, href) => {
     renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
     const item = screen.getByText(label).closest('.sidebar-item');
     expect(item?.tagName).toBe('A');
     expect(item?.getAttribute('href')).toBe(href);
     expect(item?.getAttribute('aria-disabled')).toBeNull();
-  });
-
-  it('explains itself on hover — a greyed item with no reason is a broken link', () => {
-    renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
-    const hint = screen.getByText('Reflect').closest('.sidebar-item')?.getAttribute('title');
-    expect(hint).toBeTruthy();
-    expect(hint?.length).toBeGreaterThan(20);
   });
 });

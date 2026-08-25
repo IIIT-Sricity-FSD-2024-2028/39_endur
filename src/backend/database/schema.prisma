@@ -110,6 +110,9 @@ model Organization {
   idempotencyKeys IdempotencyKey[]
   accountInvites  AccountInvite[]
   inboxState      InboxState[]
+  reflections     Reflection[]
+  actionPlans     ActionPlan[]
+  checkins        Checkin[]
   subscription    Subscription?
 
   @@map("organizations")
@@ -149,6 +152,8 @@ model User {
   accountInvites   AccountInvite[]       @relation("AccountInviteUser")
   invitesSent      AccountInvite[]       @relation("AccountInviteCreatedBy")
   inboxState       InboxState[]
+  reflections      Reflection[]          @relation("ReflectionAuthor")
+  checkinsHeld     Checkin[]             @relation("CheckinSupervisor")
 
   @@unique([orgId, email])
   @@map("users")
@@ -334,8 +339,9 @@ model Subject {
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  campaigns CampaignSubject[]
-  responses Response[]
+  campaigns   CampaignSubject[]
+  responses   Response[]
+  reflections Reflection[]
 
   @@map("subjects")
 }
@@ -428,6 +434,7 @@ model Campaign {
   responses    Response[]
   invitations  Invitation[]
   participants CampaignParticipant[]
+  reflections  Reflection[]
 
   @@index([orgId, startsAt, endsAt])
   @@map("campaigns")
@@ -664,4 +671,79 @@ model Subscription {
   status      String   @default("trialing")
 
   @@map("subscriptions")
+}
+
+/// The improve loop. 44, T-083.
+///
+/// ONE REFLECTION PER (campaign, subject), and the unique constraint is the feature rather
+/// than hygiene: the whole mechanism is that the self-assessment is recorded ONCE, before
+/// the results are seen. A second row would be a rewrite after the fact, which is exactly
+/// what makes a gap meaningless.
+model Reflection {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subjectId  String   @map("subject_id") @db.Uuid
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  /// WHO WROTE IT, and it is not anonymous — the opposite of `responses`. A reflection is
+  /// the author's own statement about themselves; hiding the author would make the gap
+  /// unattributable and the record useless as evidence.
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation("ReflectionAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  /// The same AnswerValue union the campaign's own answers use (14 §4). Self and received
+  /// are the same shapes, which is what makes the gap arithmetic mean anything.
+  answers     Json
+  submittedAt DateTime @map("submitted_at") @db.Timestamptz(6)
+
+  plan ActionPlan?
+
+  @@unique([campaignId, subjectId])
+  @@index([orgId, authorUserId])
+  @@map("reflections")
+}
+
+model ActionPlan {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  reflectionId String     @unique @map("reflection_id") @db.Uuid
+  reflection   Reflection @relation(fields: [reflectionId], references: [id], onDelete: Cascade)
+
+  /// [{ text, dueAt, status }]
+  items Json
+
+  /// **Immutable once set**, enforced by a trigger and not by service discipline (44). A
+  /// record that can be rewritten after the conversation is not evidence.
+  finalisedAt DateTime? @map("finalised_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  checkins Checkin[]
+
+  @@map("action_plans")
+}
+
+model Checkin {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  actionPlanId String     @map("action_plan_id") @db.Uuid
+  actionPlan   ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  supervisorUserId String @map("supervisor_user_id") @db.Uuid
+  supervisor       User   @relation("CheckinSupervisor", fields: [supervisorUserId], references: [id], onDelete: Cascade)
+
+  notes       String?
+  heldAt      DateTime? @map("held_at") @db.Timestamptz(6)
+  finalisedAt DateTime? @map("finalised_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orgId, actionPlanId])
+  @@map("checkins")
 }
