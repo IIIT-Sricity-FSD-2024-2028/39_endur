@@ -346,6 +346,22 @@ Specified in `48-FEATURE-file-upload.md`. These routes bypass the JSON body pars
 | POST/DELETE | `/people/:id/avatar` | `person.update` · `subtree` |
 | GET | `/files/:id` | — · low-sensitivity, unguessable ids, cached hard |
 
+### Analysis — `43`, BUILT `T-081`
+
+| Method | Path | Capability |
+|---|---|---|
+| GET | `/analysis?from&to&campaignId&unitId&subjectId` | `analysis.read` · **Silver** |
+| GET | `/analysis/themes/:id` | `analysis.read` **and `response.read`** · **Silver** |
+
+Both carry `requireEntitlement('analysis.read')` **after** `requireCapability`, so a 403
+always beats a 402 (DEC-011). The theme route's second capability is not decoration: it
+returns verbatim comments, and `40` puts those behind `response.read` on purpose. `43`
+§ "The drill-through needs a second capability" has the argument.
+
+`:id` is **derived from the theme**, not stored — the stemmed key term, so `valet parking` is
+`valet-parking`. The route recomputes the corpus and filters to it, which is why the engine's
+determinism is load-bearing rather than a nicety.
+
 ### Reserved — P3
 
 Prefixes reserved here; the routes under them are specified in their own docs rather than
@@ -354,7 +370,6 @@ restated, so there is one authority per surface:
 | Prefix | Capability | Specified in |
 |---|---|---|
 | `/api/v1/keys`, `/api/v1/webhooks` | `apikey.*` | `45-FEATURE-public-api.md` |
-| `/api/v1/analysis`, `/api/v1/analysis/themes/:id` | `analysis.read` | `43` |
 | `/api/v1/reflect`, `/api/v1/plans`, `/api/v1/checkins` | `reflection.*` `actionplan.*` `checkin.*` | `44` |
 
 **A P3 route must still be listed in its own doc before it is built.** This table exists so

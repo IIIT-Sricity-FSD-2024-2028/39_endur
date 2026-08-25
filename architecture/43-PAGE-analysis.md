@@ -1,9 +1,9 @@
 # 43 — Analysis dashboard
 
 Phase: **P3, re-tagged buildable 2026-08-23 — CONF-019** · Milestone: —
-Status: **PROMOTED 2026-08-24 — `CONF-021`** (`T-081` backend, `T-082` page). The owner
-asked a second time. `T-088` wrote the subscriptions row, so `T-082`'s 402-vs-403
-demonstration is now real rather than universal
+Status: **BACKEND BUILT 2026-08-25 (`T-081`)** · page is `T-082`, next. Promoted
+2026-08-24 by `CONF-021` — the owner asked a second time. `T-088` wrote the subscriptions
+row, so the 402-vs-403 demonstration is real rather than universal
 Design ref: `design_specs/design/08` §8.2
 Decisions: `_MEMORY.md` **DEC-042 — the engine is rule-based**, resolving `OPEN-003`
 
@@ -39,32 +39,68 @@ This is the Silver tier's entire value proposition (`01` §6).
 The clean 402-vs-403 split (DEC-011) is worth demonstrating on exactly this surface: a Bronze
 customer with full permissions gets a 402 and an upgrade path, not a confusing 403.
 
-## Data contract — provisional
+## Data contract — BUILT
 
 | Action | Endpoint | DTO |
 |---|---|---|
-| Overview | `GET /api/v1/analysis?from&to&unitId&subjectId` | → `AnalysisView` |
+| Overview | `GET /api/v1/analysis?from&to&campaignId&unitId&subjectId` | → `AnalysisView` |
 | Theme detail | `GET /api/v1/analysis/themes/:id` | → `ThemeDetail` with source comments |
 
-```ts
-export type AnalysisView = {
-  sentiment: { positive: number; neutral: number; negative: number };
-  trend:     { date: string; positive: number; neutral: number; negative: number }[];
-  themes:    { id: string; label: string; mentions: number; score: number;
-               valence: Valence; delta: number }[];
-  drivers:   { label: string; impact: number; valence: Valence }[];
-  reliability: { responseCount: number; audienceEstimate: number;
-                 confidence: 'low' | 'medium' | 'high' };
-};
-```
+Authoritative shape: `packages/shared/src/dto/analysis.ts`. It differs from the provisional
+sketch this document carried in four places, and **each difference was forced by the data
+rather than chosen** (`DEC-061`):
+
+| Field | Sketch | Built | Because |
+|---|---|---|---|
+| `suppressed` `threshold` | absent | present, and the analysis fields are **optional** | § States already required suppression *"identically to `40`"*, and `40` suppresses by OMITTING the body, not by flagging it. The sketch had no way to express an absent analysis |
+| `reliability.audienceEstimate` | `number` | `number \| null` | An `anyone` audience has no denominator, and neither does a filtered slice. `40` learned this at `T-040` (`N-044`) and the field is the same one |
+| `themes[].delta` | `number` | `number \| null` | `delta` measures against the window immediately before this one, and both `from` and `to` are optional. `0` would be a claim that nothing changed, which we would not know |
+| `drivers[].id` | absent | present | The list is sorted by `|impact|` and the themes table by mentions, so a driver row has to be able to say *which* theme it is about without matching on a label |
 
 Every charted value carries an explicit `valence` (CONF-004). The client never infers good or
-bad from a number's sign.
+bad from a number's sign — and the reason the server may is that a lexicon **defines** which
+words are good, the same way an NPS band defines promoters. It is a definition, not an
+inference from arithmetic.
 
 **`reliability` is not decoration.** A 4.6 average from 8 responses and from 800 responses are
 different facts, and presenting them identically is the most common way a feedback dashboard
 lies. Showing confidence alongside every number is a genuine differentiator and costs almost
 nothing.
+
+Confidence is read from the response count (`30` / `100`), then **downgraded one step** when a
+response rate is known and under 20% — forty replies to a thousand invitations is forty people
+who felt strongly enough to write, which is a different population from forty out of fifty. It
+can only ever lower the reading: a high rate on nine responses is still nine people.
+
+### Where the numbers come from
+
+`features/analysis/` **holds no query.** It calls `readCorpus()` in the results service and
+`analyse()` in the engine beside it, and nothing else — the same shape `58` gave the inbox
+(`DEC-058`), for the same reason: a list of individual comments is what the k-anonymity gate
+exists to withhold, and analysis is a list of individual comments with arithmetic on top.
+
+`readCorpus` returns a **discriminated union** whose `comments` field exists only on the
+unsuppressed branch, so the gate is not a check that could be forgotten — it is the type
+(`DEC-062`). There are two gates, and the second one is what the filters make necessary:
+
+1. **per campaign**, by `readableCampaigns()` — the same function and the same scope predicate
+   the inbox uses, so *"the analysis matches `40`"* is true by construction;
+2. **over the filtered slice**, exactly as `readResults` counts its own threshold. Without it,
+   `?subjectId=…` is a per-subject breakdown of three people — the request `38` § "Not built"
+   refused, arrived at through a query parameter rather than a route.
+
+### The drill-through needs a second capability
+
+`GET /analysis/themes/:id` carries **`response.read` as well as `analysis.read`**, because it
+returns verbatim comments and `40` already decided what those cost: *"seeing that the average
+is 4.3 and reading what one person wrote are different levels of access."* Gating it on
+`analysis.read` alone would have made this page a way around the split `40` exists to draw —
+quietly, because the seeded matrix hands both to the same three levels and nothing would have
+gone wrong yet.
+
+The overview needs no such line. Its corpus scope is already `response.read`'s, so a caller
+holding `analysis.read` and no `response.read` anywhere gets an empty analysis rather than
+somebody else's.
 
 ## The engine — DEC-042, resolving OPEN-003
 
@@ -96,6 +132,28 @@ free-text answers of a campaign, clustered by co-occurrence into at most twelve 
 sentiment lexicon scored per comment and aggregated per theme; `drivers` computed as the
 correlation between a theme's presence and the response's own rating — which is arithmetic
 over `numeric_value` (`10` §4.4), not inference.
+
+**Built 2026-08-25, and four things only the real corpora showed.** The engine passed twelve
+hand-written fixtures and then produced this from The Grand Palace's 229 seeded comments:
+
+- **Four themes, confidently.** `room` appears in 113 of 229 comments — 49% of the corpus — so
+  a flat 50% containment bar merged nearly everything into it, because a term in ten documents
+  overlaps a theme covering half the corpus about five times by coincidence. The bar now has to
+  **beat chance**: `max(0.5, 2 × the host's share)`, capped at 1 so a ubiquitous theme can
+  still have facets.
+- **`Comfortable`, sitting in the themes table beside `Checkout`.** A theme is *what* people
+  talked about; the lexicon is *how they felt*. A term every part of which is an opinion word
+  is no longer a candidate — `comfortable` goes, `comfortable bed` stays.
+- **`Twice` and `Dropped`.** Real words from real sentences, and not topics. The stop list is
+  the file that needed the change, which is what it is for.
+- **`called` stemmed to `cal` while `call` stemmed to `call`.** The double-consonant rule fired
+  on `-ll`, `-ff` and `-ss`, which are ordinary English word endings. Narrowed to the doublings
+  that only ever arise from a suffix.
+
+What is left after those is **vocabulary coverage**, and it is the weakness this section
+already promised: Riverside's 115 comments read 101 neutral, because a hotel lexicon does not
+know a hospital's words. § Reliability is the answer, and it is a better one than a confident
+wrong theme.
 
 **LLM stays available as a later opt-in**, per-org, with a visible disclosure and a per-org
 setting — unchanged from the original recommendation. `REVISIT:2026-11-01`. Nothing here
@@ -143,20 +201,32 @@ an assertion rather than a finding.
 | 402 | Upgrade card explaining what Silver adds — not an error page |
 | 403 | Full-page 403 |
 
-## Acceptance — P3
+## Acceptance
 
-- [ ] `analysis.read` returns 402 below Silver and 403 without the capability, never confused
-- [ ] Every charted value carries an explicit `valence`
+Backend, `T-081`, 2026-08-25 — 36 tests in `src/backend/test/analysis.test.ts`:
+
+- [x] `analysis.read` returns 402 below Silver and 403 without the capability, never confused —
+      **and 403 beats 402**, so nobody is invited to buy something they still could not open
+- [x] Every charted value carries an explicit `valence`
+- [x] Reliability is returned alongside every headline number
+- [x] Themes drill through to their source comments, and every comment genuinely contains the
+      theme — asserted, because a theme whose sources do not mention it is a label, not a finding
+- [x] k-anonymity suppression applies here as on `40` — **twice**: per campaign, and over the
+      filtered slice. Proved by disabling the second gate and watching the test go red
+- [x] **No comment text leaves the process** — asserted by the absence of any outbound HTTP
+      client across the whole feature folder, with comments stripped before the scan so the
+      check cannot be satisfied by deleting its own explanation (DEC-042)
+- [x] The same input produces the same themes twice — asserted under a **shuffled** corpus, and
+      verified against all four seeded demo organisations under reversal
+- [x] `analysis.read` returns 402 for a Bronze org **that has a subscription row** — `D-012`
+      was repaid by `T-088`, and `setUpOrg(…, 'bronze')` writes one
+- [x] The drill-through is gated on `response.read` as well, so it cannot become a way around
+      `40`'s split between an average and what one person wrote
+
+Page, `T-082`, outstanding:
+
 - [ ] Negative sentiment never renders in the brand accent
-- [ ] Reliability is shown alongside every headline number
-- [ ] Themes drill through to their source comments
-- [ ] k-anonymity suppression applies here as on `40`
-- [ ] **No comment text leaves the process** — asserted by the absence of any outbound HTTP
-      client in the analysis feature, not by reading the code (DEC-042)
-- [ ] The same input produces the same themes twice — determinism, which is what makes the
-      rest of this list testable at all
-- [ ] `analysis.read` returns 402 for a Bronze org **that has a subscription row** — which
-      requires `D-012` to be repaid first, and is the reason this page cannot ship before it
+- [ ] Reliability is **shown** alongside every headline number
 - [ ] If an LLM is ever used, the org setting is opt-in and the disclosure is visible to the
       customer
 

@@ -1175,6 +1175,78 @@ DEC-060  ACTIVE  2026-08-25  origin:claude  task:T-080  touches:58 § State
            TRIAGE-shaped screen in the product; a tick that leaves the card sitting there is
            a tick that did nothing. Only the side effect of reading is exempt.
   see      58 § State, lib/inbox.ts mark(), pages/console/Inbox/Inbox.test.tsx
+
+DEC-061  ACTIVE  2026-08-25  origin:claude  task:T-081  touches:43 § Data contract
+  decision THE ANALYSIS DTO DIFFERS FROM 43's PROVISIONAL SKETCH IN FOUR PLACES, AND EVERY
+           ONE WAS FORCED BY THE DATA RATHER THAN CHOSEN.
+             suppressed + threshold   ADDED, and every analysis field made optional
+             reliability.audienceEstimate   number -> number | null
+             themes[].delta                 number -> number | null
+             drivers[].id                   ADDED
+  why      the sketch could not express AN ABSENT ANALYSIS. 43 § States already required
+           suppression "identically to 40", and 40 suppresses by OMITTING the body -- not
+           zeroed, not flagged, absent, because a client cannot render what it never
+           received (52 §2). A DTO with required `themes` has no way to do that.
+  null     audienceEstimate: an `anyone` audience has no denominator, and neither does a
+           filtered slice -- summing across campaigns where one is `anyone` would understate
+           the denominator and overstate the rate. THIS IS N-044 AGAIN, the bug T-040 found
+           when the response rate rendered between 1750% and 4675%: a rate whose halves are
+           measured differently is not a low rate, it is a wrong one.
+           delta: it measures against the window immediately BEFORE this one, and both
+           `from` and `to` are optional. 0 would be a claim that nothing changed, and we
+           would not know that.
+  drivers  the list is sorted by |impact| and the themes table by mentions, so a driver row
+           has to say WHICH theme it is about without matching on a display label.
+  see      43 § Data contract, packages/shared/src/dto/analysis.ts, N-044, DEC-011
+
+DEC-062  ACTIVE  2026-08-25  origin:claude  task:T-081  successor-to:DEC-058
+  decision THE K-ANONYMITY GATE IS THE TYPE. `readCorpus()` returns a DISCRIMINATED UNION
+           whose `comments` field exists only on the `suppressed: false` branch, so a caller
+           cannot read a below-threshold corpus even by forgetting to check. The compiler
+           refuses.
+  why      DEC-058 made features/inbox/ hold one content-free table so it COULD NOT query
+           `responses`. Analysis is the same danger one step further on -- a list of
+           individual comments with arithmetic over it -- so features/analysis/ holds no
+           query at all, and a test asserts the word `prisma` does not appear in it.
+           40 and 58 both had to REMEMBER their gate. This one cannot be forgotten.
+  second   AND THERE ARE TWO GATES, WHICH THE FILTERS MAKE NECESSARY. readableCampaigns()
+           decides which campaigns may be read; the second decides whether the SLICE somebody
+           asked for is big enough to be safe. Without it `?subjectId=` is a per-subject
+           breakdown of three people -- the request 38 § "Not built" refused -- arrived at
+           through a query parameter instead of a route. It is the same arithmetic
+           readResults already does over its own filtered responseWhere.
+  proved   by disabling the second gate: exactly one test goes red, the one that narrows a
+           readable eight-response campaign to its three-response subject.
+  see      DEC-058, 43 § Where the numbers come from, 38 § Not built, 52 §2,
+           features/results/service.ts readCorpus()
+
+DEC-063  ACTIVE  2026-08-25  origin:claude  task:T-081  touches:50 §1  repays:D-033
+  decision `analysis.read` IS SEEDED subtree/subtree/own_unit, MATCHING `results.read` -- and
+           A MOUNTED ROUTE MAY NEVER AGAIN REQUIRE A CAPABILITY NO SEEDED ROLE HOLDS.
+  found    building T-081. `analysis.read` was in 11 §3 since T-003, entitled at Silver in
+           16 §3 since T-088 -- and in NO ROW of GRANT_MATRIX. Not restricted. ABSENT. So no
+           role in any organisation had ever held it, and /api/v1/analysis would have
+           returned 403 to every user of every org INCLUDING A GOLD ONE, on the surface 43
+           exists to demonstrate the 402-vs-403 split on.
+  shape    IT IS D-012 AND D-028 A THIRD TIME. D-012: nothing wrote a subscriptions row, so
+           every org was silently bronze. D-028: account.* and billing.* were in no tier at
+           all. Here: THE ENTITLEMENT SAID YES AND THE GRANT SAID NOTHING, which is exactly
+           what made it look built.
+  ten      analysis.read was one of TEN catalogued capabilities absent from the matrix. The
+           other nine are reflection.* actionplan.* checkin.* (T-083's, 44) and apikey.*
+           (45, not on the M0 board). They are LEFT for the task that mounts their routes: a
+           grant to a route that does not exist cannot be tested, and would be a second
+           thing to remember.
+  guard    test/routes.test.ts now asserts every capability a MOUNTED route requires is
+           seeded to at least one level. That pair is the invariant -- a capability with no
+           holder is fine while it has no route. T-083 meets this test the day it mounts
+           /api/v1/reflect, rather than the day somebody opens the page.
+  proved   by removing the row: the new test fails with ['analysis.read'].
+  scope    matches results.read because the argument is the same one 50 §1 already makes for
+           it -- the themes in a reviewee's own feedback are their own feedback. The
+           drill-through is separately gated on response.read, so this does not widen who
+           may read verbatim comments.
+  see      50 §1, presets/grant-matrix.ts, test/routes.test.ts, D-012, D-028, D-033, 43
 ```
 
 ---
@@ -2179,6 +2251,14 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     NOTE rule-based, DEC-042. a test asserts the feature
                                     imports NO outbound http client -- that absence is the
                                     decision, so it is enforced rather than remembered.
+                                    BACKEND BUILT 2026-08-25, T-081. features/analysis/
+                                    holds NO QUERY: it calls readCorpus() in the results
+                                    service and analyse() next door. readCorpus lives in
+                                    40's file because THE GATE LIVES THERE -- do not move
+                                    it, and do not add prisma to features/analysis/. a test
+                                    asserts the word does not appear. DEC-062.
+                                    lexicon.ts is DATA and is the half that needs tuning;
+                                    engine.ts is arithmetic and imports only the lexicon.
 44-FEATURE-improve-loop.md       -> src/backend/features/improve/**
                                     src/frontend/pages/console/Reflect/**
                                     NOTE every capability here is GOLD-entitled (16 §3). the
@@ -2887,6 +2967,22 @@ N-054  A RETRY THAT SCANS TURNS ONE COLLISION INTO A QUEUE. D-006, repaid 21 Aug
        organisation behind would show as an org count exceeding the number of winners. The six
        DISTINCT SLUGS are what prove the retry ran: all six derive the same base before any
        commits, so six slugs can only mean five collisions were caught.
+
+N-062  TEN CATALOGUED CAPABILITIES WERE IN NO ROW OF THE SEEDED GRANT MATRIX, and one of
+       them had a mounted route waiting for it.  found 2026-08-25 building T-081
+       11 §3 declares 64 capabilities. presets/grant-matrix.ts seeded 54. The gap:
+         analysis.read                       <- 43, T-081's. FIXED, DEC-063.
+         reflection.* actionplan.* checkin.*  <- 44, T-083's. five, still absent.
+         apikey.*                             <- 45, no route on the M0 board. four.
+       A capability with no seeded holder is NOT automatically a bug -- apikey.* has no
+       route to reach. What is always a bug is a MOUNTED ROUTE requiring one, because that
+       route can never be reached by anybody and every test of it will have been written
+       with a fixture that granted the capability by hand.
+       This survived T-003, T-088 and three security passes because the two halves live in
+       different files and neither one is wrong on its own: 11 §3 correctly catalogues a P3
+       capability, and grant-matrix.ts correctly seeds what exists. Nothing compared them.
+       routes.test.ts compares them now -- see DEC-063.
+       see    DEC-063, D-033, 50 §1, 11 §3, test/routes.test.ts
 
 N-061  SCOPE ON A RESPONSE IS DECIDED AT THE CAMPAIGN, NOT AT THE SUBJECT, AND THE INBOX
        IS WHERE THAT BECOMES VISIBLE. Found 25 Aug verifying T-080 live against The Grand

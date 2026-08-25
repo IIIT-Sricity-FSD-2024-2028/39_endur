@@ -83,6 +83,7 @@ regeneration never silently reverts an administrator's change (`10` §9).
 | `campaign.delete` | subtree | — | — | — |
 | `response.read` `results.read` | subtree | subtree | own_unit | — |
 | `response.export` `results.export` | subtree | subtree | — | — |
+| `analysis.read` | subtree | subtree | own_unit | — |
 | `simulator.run` | all | subtree | — | — |
 | `audit.read` | all | — | — | — |
 | `billing.read` `billing.update` | all | — | — | — |
@@ -106,6 +107,26 @@ Notes on four rows that look surprising:
 - **L3 gets `results.read own_unit`.** A reviewee seeing their own feedback is the product
   working. In P3 the improve loop adds a gate on top — results stay locked until the
   self-reflection is submitted (`44`) — but that is an additional check, not a different grant.
+- **`analysis.read` matches `results.read` exactly, and it was MISSING ALTOGETHER until
+  `T-081` (2026-08-25, `D-033`).** Not restricted, not deliberately withheld — absent, so no
+  seeded role in the product had ever held it and `/api/v1/analysis` would have returned 403
+  to every user of every organisation including a Gold one. It is the same shape as `D-012`,
+  where every org was silently Bronze because nothing wrote a `subscriptions` row, and as
+  `D-028`, where `account.*` and `billing.*` were in no tier at all: **the entitlement said
+  yes and the grant said nothing.** `analysis.read` is entitled at Silver (`16` §3), which is
+  what made it look built.
+
+  Nine more are still absent and they are the same bug waiting: `reflection.*`,
+  `actionplan.*`, `checkin.*` (`T-083`'s, `44`) and `apikey.*` (`45`, not on the M0 board).
+  They are left for the task that mounts their routes, because a grant to a route that does
+  not exist cannot be tested and would just be a second thing to remember. What is NOT left
+  to memory is the discovery: `test/routes.test.ts` now asserts that **every capability a
+  mounted route requires is seeded to at least one role**, so the next one fails a test the
+  day its router is mounted rather than the day someone opens the page.
+
+  The scope matches `results.read` for the same reason `results.read` has it: the themes in
+  a reviewee's own feedback are their own feedback. The drill-through is separately gated —
+  see below.
 - **`account.revoke` stops at L1, where `account.create` and `account.reset` reach L2.**
   `57` gives the reason: creating a sign-in is routine and re-issuing is the support path,
   but revoking ends somebody's access in the middle of their working day. The three are

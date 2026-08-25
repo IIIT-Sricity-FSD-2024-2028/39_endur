@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { CAPABILITY_TAG } from '../middleware/requireCapability.js';
 import { mountedRouters } from '../lib/mount.js';
+import { grantsForLevel } from '../presets/grant-matrix.js';
 
 /**
  * Routes that are public BY DESIGN, each with the reason. Adding an entry here is a
@@ -57,7 +58,7 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
   },
 ];
 
-type Route = { method: string; path: string; guarded: boolean };
+type Route = { method: string; path: string; guarded: boolean; capabilities: string[] };
 
 /**
  * Walks the app's own stack plus every mounted router, using the prefixes recorded by
@@ -71,11 +72,18 @@ function enumerateRoutes(app: ReturnType<typeof createApp>): Route[] {
     for (const raw of layers) {
       const route = (raw as { route?: { path: string; methods: Record<string, boolean>; stack: { handle: unknown }[] } }).route;
       if (!route) continue;
-      const guarded = route.stack.some(
-        (entry) => typeof entry.handle === 'function' && CAPABILITY_TAG in entry.handle,
+      const capabilities = route.stack.flatMap((entry) =>
+        typeof entry.handle === 'function' && CAPABILITY_TAG in entry.handle
+          ? [(entry.handle as Record<symbol, string>)[CAPABILITY_TAG] as string]
+          : [],
       );
       for (const method of Object.keys(route.methods)) {
-        routes.push({ method: method.toUpperCase(), path: prefix + route.path, guarded });
+        routes.push({
+          method: method.toUpperCase(),
+          path: prefix + route.path,
+          guarded: capabilities.length > 0,
+          capabilities,
+        });
       }
     }
   };
@@ -101,6 +109,43 @@ describe('route enumeration — INV-003', () => {
     expect(
       unguarded.map((route) => `${route.method} ${route.path}`),
       'add requireCapability() to these, or justify an entry in PUBLIC_ROUTES',
+    ).toEqual([]);
+  });
+
+  /**
+   * FOUND AT T-081, AND IT HAD BEEN TRUE SINCE T-003 (`D-033`).
+   *
+   * `analysis.read` was catalogued in `11` §3, entitled at Silver in `16` §3, and in NO ROW
+   * of the seeded grant matrix — so no role in any organisation had ever held it, and the
+   * route would have returned 403 to every user of every org including a Gold one. The
+   * entitlement said yes and the grant said nothing, which is exactly `D-012`'s shape (no
+   * org had a subscription row) and `D-028`'s (`account.*` and `billing.*` were in no tier).
+   *
+   * A capability with no seeded holder is not always wrong — `45`'s `apikey.*` has no route
+   * yet, and a grant to a route that does not exist cannot be tested. What is always wrong
+   * is a MOUNTED ROUTE requiring one. That is the pair this asserts, so the next occurrence
+   * fails on the day the router is mounted rather than the day somebody opens the page.
+   *
+   * `reflection.*`, `actionplan.*` and `checkin.*` are the next five, and `T-083` will meet
+   * this test the moment it mounts `/api/v1/reflect`.
+   */
+  it('no mounted route requires a capability that no seeded role holds', () => {
+    const seeded = new Set(
+      ([1, 2, 3, 4] as const).flatMap((level) =>
+        grantsForLevel(level).map((grant) => grant.capability as string),
+      ),
+    );
+    const unreachable = [
+      ...new Set(
+        routes.flatMap((route) =>
+          route.capabilities.filter((capability) => !seeded.has(capability)),
+        ),
+      ),
+    ].sort();
+
+    expect(
+      unreachable,
+      'these routes can never be reached by anybody: add the row to 50 §1 and grant-matrix.ts',
     ).toEqual([]);
   });
 

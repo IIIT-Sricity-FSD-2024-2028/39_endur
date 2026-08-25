@@ -50,6 +50,7 @@ import { resultsRouter } from './features/results/router.js';
 import { homeRouter } from './features/home/router.js';
 import { filesRouter } from './features/files/router.js';
 import { profileRouter } from './features/profile/router.js';
+import { analysisRouter } from './features/analysis/router.js';
 import { inboxRouter } from './features/inbox/router.js';
 import { mount } from './lib/mount.js';
 
@@ -132,6 +133,7 @@ export function createApp() {
   mount(app, '/api/v1/home', homeRouter);
   mount(app, '/api/v1/profile', profileRouter);
   mount(app, '/api/v1/inbox', inboxRouter);
+  mount(app, '/api/v1/analysis', analysisRouter);
   // Serving uploaded bytes. Its own chain — no tenant, no principal, no CSRF (48).
   mount(app, '/api/v1/files', filesRouter);
 
