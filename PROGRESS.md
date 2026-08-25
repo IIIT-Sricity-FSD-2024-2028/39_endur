@@ -5,7 +5,62 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-25  (T-079 + T-080 BUILT — THE RESPONSE INBOX, BACK AND FRONT.
+UPDATED   2026-08-25  (T-081 BUILT — THE ANALYSIS BACKEND, RULE-BASED. Stage 9's
+                       fourth row. 423 backend (+37) + 807 frontend = 1,230 tests green.
+                       THE GATE IS THE TYPE. DEC-058 made features/inbox/ hold one
+                       content-free table so it COULD NOT query `responses`. Analysis is
+                       the same danger one step on — a list of individual comments with
+                       arithmetic over it — so features/analysis/ holds NO QUERY AT ALL
+                       and a test asserts the word `prisma` is absent from it.
+                       readCorpus() returns a UNION whose `comments` field exists only on
+                       the unsuppressed branch: 40 and 58 both had to REMEMBER their gate,
+                       this one is refused by the compiler. DEC-062.
+                       TWO gates, and the filters are why. readableCampaigns() decides
+                       which campaigns may be read; the second decides whether the SLICE
+                       asked for is big enough. Without it `?subjectId=` is a per-subject
+                       breakdown of three people — the request 38 § "Not built" refused,
+                       reached through a query parameter instead of a route. Proved by
+                       disabling it: exactly one test goes red.
+                       THE DRILL-THROUGH IS response.read, NOT ANALYSIS. It returns
+                       verbatim comments and 40 already priced those — "seeing that the
+                       average is 4.3 and reading what one person wrote are different
+                       levels of access". Gating on analysis.read alone would have made
+                       this page a way around the split 40 draws, QUIETLY, because the
+                       seeded matrix hands both to the same three levels.
+                       !! FOUND D-033 BEFORE A LINE OF THE FEATURE EXISTED. analysis.read
+                       has been in 11 §3 since T-003 and entitled at Silver in 16 §3 since
+                       T-088 — and in NO ROW of the seeded grant matrix. Not restricted.
+                       ABSENT. So /api/v1/analysis would have returned 403 TO EVERY USER OF
+                       EVERY ORG INCLUDING A GOLD ONE, on the exact surface 43 exists to
+                       demonstrate the 402-vs-403 split on. It is D-012 and D-028 a third
+                       time: THE ENTITLEMENT SAID YES AND THE GRANT SAID NOTHING, which is
+                       what made it look built. Ten capabilities were absent; the other
+                       nine are T-083's and 45's and are left ON PURPOSE — a grant to a
+                       route that does not exist cannot be tested. routes.test.ts now
+                       asserts the pair that IS always a bug: a MOUNTED route requiring a
+                       capability nobody holds. T-083 meets it the day it mounts /reflect.
+                       DEC-063, N-062.
+                       !! FOUR ENGINE FLAWS THAT TWELVE FIXTURES COULD NOT SHOW, found by
+                       running it read-only over the real seeded corpora. `room` is in 113
+                       of Grand Palace's 229 comments — 49% — so a flat 50% merge bar ate
+                       everything and returned four confident themes; the bar must BEAT
+                       CHANCE now, capped at 1 or a ubiquitous theme can never have a
+                       facet. `Comfortable` sat in the themes table beside `Checkout` — a
+                       theme is WHAT people talked about, the lexicon is HOW THEY FELT.
+                       `Twice` and `Dropped` are real words and not topics. And `called`
+                       stemmed to `cal` while `call` stemmed to `call`, so the two never
+                       met. Each fix has its own regression test.
+                       All four demo orgs now read plausibly — Room/Checkout/Breakfast/
+                       Staff/Night/Location for the hotel, Nurses/Discharge/Ward/Food for
+                       the hospital. What is LEFT is vocabulary coverage, and that is the
+                       weakness 43 § Reliability promised: Riverside reads 101 of 115
+                       neutral because a hotel lexicon does not know a hospital's words.
+                       AND THE DEMO ORGS STILL CANNOT OPEN IT. Seeded 21 Aug, they hold
+                       zero analysis.read grants AND no subscription row, so it 403s and
+                       402s for all four. db:seed skips existing orgs; only db:reset
+                       repairs them, and that is D-031 — the owner's call. Nothing was
+                       re-seeded.
+                       Earlier: T-079 + T-080 BUILT — THE RESPONSE INBOX, BACK AND FRONT.
                        Stage 9's second and third rows. /app/inbox is real: four tabs,
                        optimistic marking that reverts ON THE CARD, j/k/e/u each with a
                        visible button, and three empty screens of which two are IDENTICAL
@@ -813,7 +868,7 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
 [ ] T-078  B  /ops/logs + <LogViewer>                                    ← needs T-077
 [x] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)   BUILT 25 Aug
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
-[ ] T-081  A  analysis backend, RULE-BASED (43, DEC-042)
+[x] T-081  A  analysis backend, RULE-BASED (43, DEC-042)               BUILT 25 Aug
 [ ] T-082  C  /app/analysis                              ← needs T-057 for a real 402
 [ ] T-083  A  improve-loop backend (44)                  ← needs T-057. NOT NEGOTIABLE
 [ ] T-084  B  /app/reflect                               ← needs T-083
@@ -883,7 +938,12 @@ Full tables in `55` § Stage 9.
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>
               BUILT 25 Aug. <ScoreBadge> built COLOURLESS — CONF-022 narrows CONF-016.
               Also un-disabled /app/roles: T-052's last edit had been missed.
-[ ] T-081  A  analysis backend, RULE-BASED (43, DEC-042)
+[x] T-081  A  analysis backend, RULE-BASED (43, DEC-042)               BUILT 25 Aug
+              BUILT 25 Aug. features/analysis/ HOLDS NO QUERY — readCorpus() returns a
+              union whose `comments` exist only on the unsuppressed branch, so the gate
+              is the TYPE (DEC-062). TWO gates: per campaign, and over the filtered
+              slice. Drill-through carries response.read as well as analysis.read.
+              FOUND D-033: analysis.read was in no row of the seeded matrix.
 [ ] T-082  C  /app/analysis     ← 402-vs-403 is now REAL, T-088 wrote the tier row
 [ ] T-083  A  improve-loop backend (44)   ← was blocked on D-012; T-088 repaid it
 [ ] T-084  B  /app/reflect
@@ -927,7 +987,7 @@ withdrawn.** All four are promoted — Stage 9 above.
 |---|---|---|---|
 | **Roles** | `T-052` | ~~nothing — sequenced after M0~~ **nothing. PROMOTED, goes first** | spec is `33`, complete since round 1. The only one with no backend work at all. Repays `D-008` |
 | ~~**Inbox**~~ | ~~`T-079` → `T-080`~~ | **BUILT 25 Aug** | spec is `58`. Reads **through** `features/results/service.ts` so the k-anonymity gate is not forked — and `features/inbox/` cannot reach `responses` at all, which is what makes that true next month as well as today (`DEC-058`) |
-| **Analysis** | `T-081` → `T-082` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | `T-081` (rule-based engine, `DEC-042`) is unblocked. `T-082`'s screen needs a real `402` path — the 402-vs-403 demonstration *is* the point of it |
+| **Analysis** | ~~`T-081`~~ → `T-082` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | **`T-081` BUILT 25 Aug** — rule-based engine (`DEC-042`), two k-anon gates, drill-through behind `response.read` as well. `T-082`'s screen is next, and it now has both a real `402` path (`T-088`) and, since `D-033`, a capability somebody can actually hold |
 | **Reflect** | `T-083` → `T-084` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | every capability in the improve loop is Gold, and `D-012` meant no organisation had ever had a subscription row. Built before `T-088`, this surface would have `402`d for **every user in the product**, demo included |
 
 **So the tiers are not a separate missing thing — they are the blocker for half the list.**
@@ -1051,6 +1111,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | ~~`D-024`~~ | **REPAID 24 Aug by `DEC-046`.** ~~`PATCH /people/:id` was a second, worse way to disable an account~~ | Found 24 Aug while building `T-072`, deciding what `AccountStatus.disabled` could honestly report. `UpdatePersonBody` had accepted `status: 'active' \| 'invited' \| 'disabled'` since `T-033`, behind **`person.update`** — seeded to L2 `subtree` — where `57` puts revocation behind **`account.revoke`**, L1 only, *precisely* so it can be withheld from a coordinator while the other two verbs are granted. And it did two thirds of the job: it left `sessions` untouched, and **`authenticate` never reads `users.status`**, so the target's open browser kept working until the session expired on its own — the administrator saw *"disabled"* and believed access had ended. It also left `password_hash` in place, so flipping the status back restored their **old password**, the thing `57` says cannot exist. Fixed by **removing the field**, not by teaching `PATCH` to do the other two things: an account's lifecycle belongs to `account.*`, and two routes that both end access is two places for the next one to be forgotten. Deliberately did **not** make `authenticate` re-read `users.status` per request — real defence in depth, but a query on every request in the product to close a window that now has no opener. **The hole had no user and no test**: the frontend has never sent `status` | ~~`T-072`~~ — **done** |
 | ~~`D-026`~~ | **REPAID 24 Aug by `DEC-047`.** ~~A person you had just created was invisible to you~~ | Found 24 Aug when `T-072`'s first test run failed on every case involving a person with no positions — and `57` says explicitly that *"a person with no positions can always be given an account… invite first, assign afterwards"* is **the common one**. `POST /people` creates a person and **no position** (`14` §8 requires that), so the person it returned had no unit, matched no unit-scoped caller, and vanished. **Verified end to end before the fix**, on a brand-new organisation, as its founder: `POST /people` → `201` with an id; `GET /people` → total 2 and the new person is not in it; `GET /people/:id` → `404`. The founder holds `person.read: subtree` at the root, **not `all`**, which is the ordinary shape — so this was every organisation, on the most common action in `34`, and every route that could give them a position had first to see them. **A deadlock, not a policy.** It had no test because the create test never read the person back. Fixed by adding one clause — **no member edges at all** — to a predicate that is now written **once** in `features/people/visibility.ts` and evaluated by the database for both the list and the detail route; the two used to be hand-written copies and had already drifted in wording. The asymmetry with `11` §4 is deliberate and is written down: for a **grant**, no anchor means no claim; for a **target**, no anchor means nobody's territory | ~~`T-072`~~ — **done** |
 | `D-030` | **Three CSS custom properties are used and never defined** | Noticed 24 Aug while writing `T-052`'s stylesheet. `--color-border`, `--color-surface-2` and `--space-5` appear in `endur.css` (`.position-chip`, `.powers-place`, `.tsection`) and exist in no token file. An undefined `var()` makes the whole declaration compute to its initial value, so those borders render as **no border at all** and `.tsection` gets no margin. Subtle, shipped, and cheap: they belong to `T-050`/`T-051`/earlier, so `T-052` used real tokens and left the others alone rather than editing three tasks' styles in passing | one pass over `endur.css` |
+| ~~`D-033`~~ | **REPAID 25 Aug by `T-081` (`DEC-063`), in the task that found it.** ~~`analysis.read` is in no row of the seeded grant matrix~~ | Found 25 Aug building `T-081`, before a line of the feature existed. `analysis.read` has been in `11` §3 since `T-003` and entitled at **Silver** in `16` §3 since `T-088` — and in **no row** of `presets/grant-matrix.ts`. Not restricted, not deliberately withheld: **absent.** So no role in any organisation had ever held it, and `/api/v1/analysis` would have returned **403 to every user of every org including a Gold one** — on the exact surface `43` exists to demonstrate the clean 402-vs-403 split on. **It is `D-012` and `D-028` a third time**: `D-012` was nothing writing a subscriptions row so every org was silently Bronze; `D-028` was `account.*` and `billing.*` being in no tier at all. Here **the entitlement said yes and the grant said nothing**, which is precisely what made it look built. It survived three security passes because neither half is wrong on its own — `11` §3 correctly catalogues a P3 capability, `grant-matrix.ts` correctly seeds what exists — and **nothing compared them.** `analysis.read` was one of **ten** absent capabilities; the other nine are `reflection.*` `actionplan.*` `checkin.*` (`T-083`'s) and `apikey.*` (`45`, no route on the M0 board), and they are **left alone on purpose** — a grant to a route that does not exist cannot be tested. What is *not* left to memory: `test/routes.test.ts` now asserts that **every capability a mounted route requires is seeded to at least one level**, so `T-083` meets it the day it mounts `/api/v1/reflect` rather than the day somebody opens the page. Proved by removing the row and watching the new test fail with `['analysis.read']`. `N-062` | ~~`T-081`~~ — **done** |
 | `D-032` | **Response scope is decided at the campaign, not at the subject** | Found 25 Aug verifying `T-080` live. **Not introduced by it** — this is `40`'s behaviour, and `58` § Acceptance requires the inbox to match `40` for the same caller, which it does. A campaign is visible when *any* of its subjects sits in a unit the caller can reach; once visible, **every** response in it is returned. `readResponses` filters on `campaignId` alone and `readResults` aggregates the whole campaign unless the *client* passes a filter. Live proof: `grand-palace-3`, a level 3 anchored at **Lakeside Property** holding `response.read: own_unit`, reads all 229 comments including every one about **City Property**, and `/campaigns/:id/responses` hands them the same 210 rows and 12 distinct subjects it hands the administrator. INV-003 holds at campaign granularity and does not at subject granularity — and an org-wide campaign is the common case, not an exotic one. The inbox is where it becomes *visible*, because it puts the other property's subject name on the card where `40`'s average hid it. **Deliberately not fixed inside `T-080`:** a stricter inbox would satisfy one reading of INV-003 and break the acceptance criterion that asked for consistency, leaving two answers to one question. `N-061` | **owner's call.** It is a change to `40` first and `58` second, and it touches the k-anonymity reasoning in `52` §2 |
 | `D-031` | **The four demo organisations cannot use the invite/accounts flow, and re-seeding will not fix it** | Found 24 Aug from the powers grid's own warnings — *"Nobody in this organisation can give somebody a sign-in."* All four were seeded **21 Aug** and hold 51 capabilities; `T-072` added `account.create`, `account.reset` and `account.revoke` to `presets/grant-matrix.ts` on **24 Aug**, and existing orgs got no grant rows. `npm run db:seed` prints `skip: <name> already exists` — it creates missing orgs, it does not reconcile present ones. So a built-and-tested feature is **unreachable on stage**, and `T-073`'s Invite button would `403` for every demo org. `N-060` | **owner's call — the remedy (drop and re-seed the four) destroys any demo data entered since 21 Aug.** Before `T-045` |
 | `D-025` | **`$executeRaw` slips past the DEC-007 lint rule** | Noticed 24 Aug while writing `revokeAccount()`. `DEC-007` confines raw SQL to `db/graph.ts`, and `eslint.config.js`'s selector matches **`$queryRaw`/`$queryRawUnsafe` only** — `$executeRaw` is raw SQL and is not checked. The one call that uses it today is legitimate and unavoidable: revocation deletes the target's rows from `sessions`, which is connect-pg-simple's table and **deliberately not a Prisma model** (`10` §5), so there is no ORM path to it at all. But it passes because of a **gap in the rule, not an exemption**, and that is worth writing down rather than quietly relying on. The fix is one selector plus one `eslint-disable` with a reason — small, and it belongs to whoever next touches `DEC-007` rather than to a feature task | with `DEC-007`'s scheduled revisit (2026-10-01), or sooner if a second `$executeRaw` appears |
@@ -1074,7 +1135,108 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-25 (latest) · T-079 and T-080 — the response inbox
+### 2026-08-25 (latest) · T-081 — the analysis backend
+
+Stage 9's fourth row. **423 backend (+37) + 807 frontend = 1,230 tests, all green.**
+Typecheck, lint, `audit:drift`, `audit:vocab` clean.
+
+#### The gate is the type, not a check somebody remembers
+
+`DEC-058` made `features/inbox/` hold one content-free table so it *could not* query
+`responses`. Analysis is the same danger one step further on — **a list of individual comments
+with arithmetic over it** — so `features/analysis/` holds **no query at all**, and a test
+asserts the word `prisma` does not appear in it.
+
+`readCorpus()` returns a **discriminated union** whose `comments` field exists only on the
+`suppressed: false` branch. `40` and `58` both had to *remember* their gate; this one is
+refused by the compiler (`DEC-062`).
+
+**And there are two gates**, which the filters make necessary. `readableCampaigns()` decides
+which campaigns may be read; the second decides whether the **slice** somebody asked for is
+big enough to be safe. Without it, `?subjectId=…` is a per-subject breakdown of three people —
+the request `38` § "Not built" refused, arrived at through a query parameter instead of a
+route. Proved by disabling it: exactly one test goes red, the one that narrows a readable
+eight-response campaign down to its three-response subject.
+
+#### `D-033` — the route could never have been reached by anybody
+
+`analysis.read` has been in `11` §3 since `T-003` and entitled at Silver in `16` §3 since
+`T-088`, and it was **in no row of the seeded grant matrix.** Not restricted — absent. So no
+role in any organisation had ever held it, and `/api/v1/analysis` would have returned **403 to
+every user of every org including a Gold one**, on the surface `43` exists to demonstrate the
+402-vs-403 split on.
+
+It is `D-012` and `D-028` a third time: **the entitlement said yes and the grant said nothing**,
+which is exactly what made it look built. It survived three security passes because neither
+half is wrong on its own and **nothing compared them**. Ten capabilities were absent; the other
+nine belong to `T-083` and `45` and are deliberately left, because a grant to a route that does
+not exist cannot be tested. `routes.test.ts` now asserts the pair that *is* always a bug — a
+**mounted** route requiring a capability nobody is seeded — so `T-083` meets it the day it
+mounts `/api/v1/reflect`. Proved by removing the row: the new test fails with
+`['analysis.read']`.
+
+#### The drill-through is `response.read`, not analysis
+
+`GET /analysis/themes/:id` returns verbatim comments, and `40` already decided what those cost:
+*"seeing that the average is 4.3 and reading what one person wrote are different levels of
+access."* Gating it on `analysis.read` alone would have made this page a way around the split
+`40` exists to draw — **quietly**, because the seeded matrix hands both to the same three levels
+and nothing would have gone wrong yet. Asserted by denying `response.read` to someone who keeps
+`analysis.read`: the drill-through 403s, and the overview keeps working but analyses nothing,
+because the corpus scope was `response.read`'s all along.
+
+#### Four engine flaws that twelve fixtures could not show
+
+The engine passed its unit tests and was then run over the **real seeded corpora**, read-only.
+The Grand Palace's 229 comments returned:
+
+- **Four themes, confidently.** `room` appears in 113 of 229 — 49% of the corpus — so a flat
+  50% containment bar merges nearly anything into it, because a term in ten documents overlaps
+  a theme covering half the corpus about five times **by coincidence**. The bar now has to beat
+  chance: `max(0.5, 2 × the host's share)`, **capped at 1** — without the cap a ubiquitous theme
+  demands a containment of 2 and can never have a facet, which is the same bug mirrored.
+- **`Comfortable`, in the themes table beside `Checkout`.** A theme is *what* people talked
+  about; the lexicon is *how they felt*. A term every part of which is an opinion word is no
+  longer a candidate — `comfortable` goes, `comfortable bed` stays.
+- **`Twice` and `Dropped`** — real words from real sentences, and not topics.
+- **`called` stemmed to `cal` while `call` stemmed to `call`**, so the two never met. The
+  double-consonant rule fired on `-ll`, `-ff` and `-ss`, which are ordinary English endings.
+
+After those, all four demo orgs read plausibly: *Room · Checkout · Breakfast · Staff · Night ·
+Location* for the hotel, *Nurses · Discharge · Ward · Food* for the hospital, *Context ·
+Decisions · Change · Tooling · Meetings* for the consultancy. Each of the four fixes has its own
+regression test.
+
+**What is left is vocabulary coverage, and it is the weakness `43` § Reliability promised.**
+Riverside's 115 comments read 101 neutral, because a hotel's lexicon does not know a hospital's
+words. That is the engine being honestly weak, which `DEC-042` chose over a confident wrong
+theme.
+
+**Also worth knowing: the drivers panel has almost nothing to show on the demo data.** Every
+correlation lands inside the ±0.1 deadband and reports `neutral`, which is correct — the seed
+draws a comment's tone and its rating as two independent throws (`demo.ts:606,633`), so there
+is genuinely no association to find. Not a bug, and not fixable from this side.
+
+#### What the demo database still cannot do
+
+`analysis.read` is fixed **for organisations registered from now on.** The four seeded demo orgs
+have **zero** `analysis.read` grants and **no subscription row at all**, so `/app/analysis` will
+403 *and* 402 for all of them. `db:seed` prints `skip: … already exists`; only `db:reset` — drop,
+migrate, re-seed — repairs it, and that is **`D-031`, still the owner's call.** Nothing was
+re-seeded. Verified live, read-only, against all four.
+
+**Written:** `DEC-061`, `DEC-062`, `DEC-063`, `N-062`, `D-033`; `43` (status, contract,
+engine, acceptance), `13` § Analysis, `50` §1 + its notes, `55` § Stage 9, MAP.
+
+**What the next session should know.** Stage 9 continues with **`T-082`** — `/app/analysis`,
+whose backend is now live and 36 tests deep. Then `T-083`/`T-084` (Reflect), and `T-085` takes
+the "Soon" tags off Analysis and Reflect as each lands. **Item 3 of the owner's ask is still
+entirely untouched**: `T-075`/`T-076` (`/app/logs`) can start immediately, and the `/ops` tree
+(`T-059` → `T-066`/`T-067`/`T-077`/`T-078`) after it.
+
+---
+
+### 2026-08-25 · T-079 and T-080 — the response inbox
 
 Stage 9's second and third rows, back and front. **386 backend (+18) + 807 frontend (+23) =
 1,193 tests, all green.** Typecheck, lint, `audit:drift`, `audit:vocab` clean.

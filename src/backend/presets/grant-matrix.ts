@@ -97,6 +97,12 @@ export const GRANT_MATRIX: Partial<Record<Capability, Row>> = {
   'results.read': S('subtree', 'subtree', 'own_unit'),
   'response.export': S('subtree', 'subtree'),
   'results.export': S('subtree', 'subtree'),
+  // T-081, D-033. This row DID NOT EXIST and its absence was not a restriction — no seeded
+  // role in the product held `analysis.read`, so /api/v1/analysis would have 403'd for every
+  // user of every organisation, Gold included, while `16` §3 entitled it at Silver. Same
+  // shape as D-012 and D-028: the entitlement said yes and the grant said nothing.
+  // routes.test.ts now asserts no mounted route can require a capability nobody is seeded.
+  'analysis.read': S('subtree', 'subtree', 'own_unit'),
 
   'simulator.run': S('all', 'subtree'),
   'audit.read': S('all'),

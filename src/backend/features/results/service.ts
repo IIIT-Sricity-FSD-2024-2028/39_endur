@@ -515,52 +515,77 @@ export async function readComments(
         : {}),
     },
     take: filter.limit + 1,
-    orderBy: [{ response: { submittedAt: 'desc' } }, { id: 'desc' }],
-    select: {
-      id: true,
-      value: true,
-      questionId: true,
-      question: { select: { text: true } },
-      response: {
-        select: {
-          id: true,
-          submittedAt: true,
-          campaign: { select: { id: true, name: true } },
-          subject: { select: { id: true, name: true } },
-          // The rating on the SAME response. Not an average, not across responses — this
-          // is what one person said alongside what they wrote.
-          answers: {
-            where: { question: { kind: 'rating' } },
-            take: 1,
-            orderBy: { question: { position: 'asc' } },
-            select: { numericValue: true, question: { select: { config: true } } },
-          },
-        },
-      },
-    },
+    orderBy: COMMENT_ORDER,
+    select: COMMENT_SELECT,
   });
 
-  return pageOf(
-    rows,
-    filter.limit,
-    total,
-    (row): CommentRow => {
-      const rating = row.response.answers[0];
-      const config_ = rating ? (rating.question.config as QuestionConfig) : undefined;
-      return {
-        responseId: row.response.id,
-        questionId: row.questionId,
-        submittedAt: row.response.submittedAt,
-        campaign: row.response.campaign,
-        subject: row.response.subject,
-        comment: (row.value as { text?: string }).text ?? '',
-        questionText: row.question.text,
-        score: rating?.numericValue == null ? null : Number(rating.numericValue),
-        scoreMax: config_?.kind === 'rating' ? config_.max : null,
-      };
+  return pageOf(rows, filter.limit, total, toCommentRow, (row) => ({
+    createdAt: row.response.submittedAt,
+    id: row.id,
+  }));
+}
+
+/**
+ * ONE selection and ONE mapper, shared by the inbox's page and the analysis corpus. Two
+ * copies of this would be two answers to "what is a comment", and the second one would be
+ * the one that quietly grew a respondent-shaped field.
+ */
+const COMMENT_SELECT = {
+  id: true,
+  value: true,
+  questionId: true,
+  question: { select: { text: true } },
+  response: {
+    select: {
+      id: true,
+      submittedAt: true,
+      campaign: { select: { id: true, name: true } },
+      subject: { select: { id: true, name: true } },
+      // The rating on the SAME response. Not an average, not across responses — this is
+      // what one person said alongside what they wrote.
+      answers: {
+        where: { question: { kind: 'rating' as const } },
+        take: 1,
+        orderBy: { question: { position: 'asc' as const } },
+        select: { numericValue: true, question: { select: { config: true } } },
+      },
     },
-    (row) => ({ createdAt: row.response.submittedAt, id: row.id }),
-  );
+  },
+} as const;
+
+const COMMENT_ORDER = [
+  { response: { submittedAt: 'desc' as const } },
+  { id: 'desc' as const },
+];
+
+type CommentQueryRow = {
+  id: string;
+  value: unknown;
+  questionId: string;
+  question: { text: string };
+  response: {
+    id: string;
+    submittedAt: Date;
+    campaign: { id: string; name: string };
+    subject: { id: string; name: string } | null;
+    answers: Array<{ numericValue: unknown; question: { config: unknown } }>;
+  };
+};
+
+function toCommentRow(row: CommentQueryRow): CommentRow {
+  const rating = row.response.answers[0];
+  const config_ = rating ? (rating.question.config as QuestionConfig) : undefined;
+  return {
+    responseId: row.response.id,
+    questionId: row.questionId,
+    submittedAt: row.response.submittedAt,
+    campaign: row.response.campaign,
+    subject: row.response.subject,
+    comment: (row.value as { text?: string }).text ?? '',
+    questionText: row.question.text,
+    score: rating?.numericValue == null ? null : Number(rating.numericValue),
+    scoreMax: config_?.kind === 'rating' ? config_.max : null,
+  };
 }
 
 /**
@@ -612,4 +637,129 @@ function canSee(
   return subjects.some(
     ({ subject }) => subject.unitId !== null && visibility.unitIds.includes(subject.unitId),
   );
+}
+
+/* ------------------------------------------- the analysis corpus (43, T-081) */
+
+export type CorpusFilter = {
+  campaignId?: string | undefined;
+  unitId?: string | undefined;
+  subjectId?: string | undefined;
+  from?: Date | undefined;
+  to?: Date | undefined;
+};
+
+/**
+ * THE GATE IS THE TYPE. `comments` exists only on the `suppressed: false` branch, so a
+ * caller cannot read a below-threshold corpus even by forgetting to check — the compiler
+ * refuses. `40` and `58` both had to remember; this one cannot be forgotten.
+ *
+ * `features/analysis/` therefore holds no query at all, exactly as `features/inbox/` holds
+ * none (DEC-058). It receives text, and everything it does to that text is arithmetic.
+ */
+export type Corpus = {
+  responseCount: number;
+  audienceEstimate: number | null;
+  threshold: number;
+} & ({ suppressed: true } | { suppressed: false; comments: CommentRow[] });
+
+/**
+ * A hard ceiling on what one request will analyse. Ordered newest first, so a very large
+ * corpus analyses the most recent slice rather than an arbitrary one — and the ordering is
+ * total (`submittedAt desc, id desc`), so the slice is the same slice twice, which is what
+ * `43` § Acceptance means by determinism.
+ */
+const MAX_CORPUS = 5_000;
+
+export async function readCorpus(
+  orgId: string,
+  userId: string,
+  authzVersion: number,
+  filter: CorpusFilter,
+): Promise<Corpus> {
+  const threshold = config.K_ANON_THRESHOLD;
+  const campaignIds = await readableCampaigns(orgId, userId, authzVersion, filter.campaignId);
+  if (campaignIds.length === 0) {
+    return { suppressed: true, responseCount: 0, audienceEstimate: null, threshold };
+  }
+
+  const subjectWhere = filter.subjectId
+    ? { subjectId: filter.subjectId }
+    : filter.unitId
+      ? { subject: { unitId: { in: await unitSubtree(orgId, filter.unitId) } } }
+      : {};
+
+  const responseWhere = {
+    campaignId: { in: campaignIds },
+    ...subjectWhere,
+    ...(filter.from || filter.to
+      ? {
+          submittedAt: {
+            ...(filter.from ? { gte: filter.from } : {}),
+            ...(filter.to ? { lt: filter.to } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const responseCount = await prisma.response.count({ where: responseWhere });
+  const audienceEstimate = await estimateAudience(orgId, campaignIds, subjectWhere, filter);
+
+  // THE SECOND GATE, and it is the one the filters make necessary. `readableCampaigns`
+  // decides which campaigns may be read at all; this decides whether the SLICE somebody
+  // asked for is big enough to be safe. Without it, "analysis for this one subject" is a
+  // per-subject breakdown of three people, which is the request `38` § "Not built" refused.
+  //
+  // It is the same arithmetic `readResults` does over its own filtered `responseWhere`.
+  if (responseCount < threshold) {
+    return { suppressed: true, responseCount, audienceEstimate, threshold };
+  }
+
+  const rows = await prisma.answer.findMany({
+    where: { question: { kind: 'text' as const }, response: responseWhere },
+    take: MAX_CORPUS,
+    orderBy: COMMENT_ORDER,
+    select: COMMENT_SELECT,
+  });
+
+  return {
+    suppressed: false,
+    responseCount,
+    audienceEstimate,
+    threshold,
+    comments: rows.map(toCommentRow),
+  };
+}
+
+/**
+ * The denominator, or an honest `null`.
+ *
+ * `null` on three occasions, and each of them is a case where a number would be worse than
+ * nothing: an `anyone` campaign has no audience to count; a subject or unit filter narrows
+ * the numerator but not the rule, so the pair would no longer describe the same population;
+ * and a date filter cuts the responses but not the invitations.
+ *
+ * This is `T-040`'s lesson (`N-044`) applied before it could happen again: a response rate
+ * whose halves are measured differently is not a low rate, it is a wrong one.
+ */
+async function estimateAudience(
+  orgId: string,
+  campaignIds: string[],
+  subjectWhere: Record<string, unknown>,
+  filter: CorpusFilter,
+): Promise<number | null> {
+  if (Object.keys(subjectWhere).length > 0 || filter.from || filter.to) return null;
+
+  const campaigns = await prisma.campaign.findMany({
+    where: { id: { in: campaignIds } },
+    select: { audienceRule: true },
+  });
+
+  let total = 0;
+  for (const campaign of campaigns) {
+    const count = await countAudience(orgId, ruleOf(campaign.audienceRule));
+    if (count === null) return null;
+    total += count;
+  }
+  return total;
 }
