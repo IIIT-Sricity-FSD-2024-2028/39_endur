@@ -36,6 +36,7 @@ describe('the three route trees', () => {
     // Added at T-082. No RequireCapability wrapper on it, deliberately: the page owns both
     // a 403 and a 402 and a route guard knows nothing about entitlements.
     '/app/analysis',
+    '/app/reflect',
     '/r/:token', '/r/:token/done',
   ])('serves %s', (path) => {
     expect(paths.has(path)).toBe(true);
@@ -44,9 +45,10 @@ describe('the three route trees', () => {
   // A disabled sidebar item with a "Soon" tag is correct. A stub page behind it is not:
   // a dead link that renders something is worse than one that visibly does not navigate
   // (design_specs/design/02 §7).
-  // Inbox left this list at T-080 and ANALYSIS LEFT IT AT T-082, each when its page was
-  // built. The two that remain have no page and must not acquire a stub one.
-  it.each(['/app/reflect', '/app/communities'])(
+  // Inbox left this list at T-080, Analysis at T-082 and REFLECT AT T-084, each when its
+  // page was built. `/app/communities` is the only one left — it is P3-stretch (`60`) and
+  // must not acquire a stub page.
+  it.each(['/app/communities'])(
     'has no stub page behind the P3 route %s',
     (path) => {
       expect(paths.has(path)).toBe(false);

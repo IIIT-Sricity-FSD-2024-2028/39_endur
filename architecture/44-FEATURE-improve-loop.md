@@ -1,9 +1,9 @@
 # 44 — The improve loop
 
 Phase: **P3, re-tagged buildable 2026-08-23 — CONF-019** · Milestone: —
-Status: **PROMOTED 2026-08-24 — `CONF-021`** (`T-083` backend, `T-084` page). `D-012` was
-the hard blocker here and `T-088` repaid it: this surface would have `402`d for **every
-user in the product** if it had been built before 24 Aug
+Status: **BUILT 2026-08-25** — backend `T-083`, page `T-084`. `D-012` was the hard blocker
+here and `T-088` repaid it: this surface would have `402`d for **every user in the product**
+if it had been built before 24 Aug
 Source: `design_specs/SCOPE.md` §"Improve", `_MEMORY.md` § GLOSSARY
 
 > **Status changed 2026-08-23.** This document said *"do not build before P3"* and the owner
@@ -41,15 +41,20 @@ permission engine (`53`).
 
 ## Route & access
 
-Console world, session required. Disabled with a "Soon" tag until P3.
+Console world, session required. **Live since `T-084` — the last "Soon" tag in the sidebar
+came off with it.**
 
 ```
-/app/reflect                   my reviews, by cycle
-/app/reflect/:cycleId          submit self-reflection    — before results unlock
-/app/reflect/:cycleId/gap      self vs. received
-/app/reflect/:cycleId/plan     write an improvement plan
-/app/checkins/:id              the supervisor conversation
+/app/reflect                   my cycles
+/app/reflect?campaign=<id>     the form, then the gap, then the plan — in that order
 ```
+
+**One route, three views, chosen by what the server returns.** The built page collapsed the
+spec's five addresses into two, and the reason is the ordering constraint rather than
+economy: `/reflect/:id/gap` as its own address would be a link somebody could open *before*
+writing their reflection, and it would answer 404. A view the URL cannot reach early is a
+view nobody has to be told not to reach. The check-in is rendered inside the plan it belongs
+to for the same reason `/plans` is not a top-level API prefix.
 
 ## Capabilities
 
@@ -168,18 +173,47 @@ Scoped to one check-in, it stays a feature; unscoped, it becomes a product.
 
 ## Acceptance
 
-- [ ] **`D-012` is repaid first** — an org has a real `subscriptions` row and a Gold org can
+- [x] **`D-012` is repaid first** — an org has a real `subscriptions` row and a Gold org can
       open this at all. Assert it by opening the page as a Bronze org and getting `402`, and
       as a Gold org and getting the page: two orgs, two outcomes, which is impossible while
       every org is silently Bronze
-- [ ] Results for a reviewee are refused by the **API** until their reflection is submitted
-- [ ] A reviewee cannot read another reviewee's reflection at the same level
-- [ ] A supervisor reads their subtree's reflections and nothing outside it (INV-005)
-- [ ] Finalised records cannot be edited — trigger test, not a service test
-- [ ] The gap view uses the same question set as the campaign
-- [ ] Reflection reuses `<QuestionInput>` (INV-008)
-- [ ] Chat is scoped to a check-in and cannot be opened standalone
-- [ ] `402` below Gold, distinct from `403`
+- [x] Results for a reviewee are refused by the **API** until their reflection is submitted —
+      `GET /reflect/:id/gap` 404s, and there is no sibling route that returns the received
+      scores alone
+- [x] A reviewee cannot read another reviewee's reflection at the same level — asserted with
+      a peer at the same level **in the same unit**, which is the case a scope string alone
+      would have let through. 404, not 403
+- [x] A supervisor reads their subtree's **check-ins** and nothing outside it (INV-005), via
+      `visibleUnits()` rather than a hand-written walk. **They do not read the reflection** —
+      see the note below, which is a deliberate narrowing of this line
+- [x] Finalised records cannot be edited — **trigger test**, asserted by going around the
+      service entirely and writing to the row directly
+- [x] The gap view uses the same question set as the campaign
+- [x] Reflection reuses `<QuestionInput>` (INV-008)
+- [ ] Chat is scoped to a check-in and cannot be opened standalone — **not built**; see below
+- [x] `402` below Gold, distinct from `403`, with `403` first
+
+### One acceptance line was narrowed, deliberately
+
+*"A supervisor reads their subtree's reflections"* is **not** what was built, and the reason
+is one line further up this document: getting the scope wrong here *"exposes someone's
+private self-assessment to a peer"*. A reflection is a person's own account of their own
+weaknesses. `reflection.read` is therefore seeded **`self` at every level that holds it, and
+nothing wider** — there is no scope value that opens somebody else's.
+
+What a supervisor gets is the **check-in**: the conversation about the plan, which is the
+thing `44` § Purpose step 4 actually describes. If an organisation later wants a supervisor
+to read the reflection itself, that is a grant they can write — the resolver already supports
+it — and it is their decision to make explicitly rather than ours to seed.
+
+### What is not built, and is not pretended
+
+| Not built | Why |
+|---|---|
+| **Text chat on a check-in** | `44` § Text chat scopes it to one check-in so it stays a feature. The check-in carries `notes`, which is the shared-note half; a threaded conversation needs a message table and a read model, and neither is on the M0 board. The `notes` field is the seam |
+| **Step 5 — cycle-over-cycle measurement** | Still P3, exactly as the status note reserved. It needs two closed cycles on the same subject and the seed has one |
+| **Plan overdue, item-level** | `44` § States lists it. `dueAt` is stored and rendered; nothing computes overdue, because nothing schedules (`OPEN-005` owns no scheduler) |
+| **"Reflection due" on `/app` home** | `46`'s payload has no field for it and adding one is `46`'s task, not this one |
 
 ## Out of scope
 

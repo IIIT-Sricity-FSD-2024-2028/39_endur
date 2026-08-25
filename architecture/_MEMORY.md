@@ -1290,6 +1290,45 @@ DEC-065  ACTIVE  2026-08-25  origin:claude  task:T-082
   cost     if a second caller ever appears for one of the four, it moves into 24 then --
            which is cheaper than a prop contract fixed today around a single use.
   see      24 §1, 24 § preamble, 43 § Components, DEC-058, 58 § Components
+
+DEC-066  ACTIVE  2026-08-25  origin:claude  task:T-083  narrows:44 § Acceptance
+  decision `reflection.read` AND `reflection.create` ARE SEEDED `self` AND NOTHING WIDER, at
+           every level that holds them. There is no seeded scope that opens another person's
+           reflection. What a supervisor gets is the CHECK-IN.
+  why      44 § Capabilities says "a supervisor reads their subtree's" and 44 § Acceptance
+           repeats it -- and the same document says, one paragraph earlier, that getting this
+           wrong "exposes someone's private self-assessment to a peer". A reflection is a
+           person's own written account of their own weaknesses, recorded before they are
+           allowed to see what anybody else said. A `subtree` read on it is a manager reading
+           that. The conversation ABOUT it is step 4 of the loop and is exactly what a
+           check-in is; that is what `checkin.*` is seeded subtree/subtree/own_unit for.
+  not-L4   reflection.* and actionplan.* stop at L3, which is the same reading of the ladder
+           `results.read` already takes: L3 is the REVIEWEE and L4 is the RESPONDENT-level
+           role. Somebody nobody reviews has nothing to reflect on, and the nav item would
+           have appeared for every account in the product and opened an empty page -- D-027's
+           exact shape.
+  escape   an organisation that wants a supervisor to read the reflection itself can write
+           that grant; the resolver already supports it. It is their decision to make
+           explicitly, not ours to seed.
+  see      50 §1, 44 § Acceptance ("one acceptance line was narrowed"), presets/grant-matrix.ts
+
+DEC-067  ACTIVE  2026-08-25  origin:claude  task:T-083
+  decision THE ORDERING CONSTRAINT IS ENFORCED BY AN ABSENT ROUTE, not only by a 404.
+           `GET /reflect/:campaignId/gap` 404s until the reflection exists -- and there is no
+           route and no DTO ANYWHERE that returns a reviewee's received scores on their own.
+  why      44 calls the ordering "the most defensible novelty claim in the product after the
+           permission engine", and says it is enforced in the API rather than the UI. A 404
+           alone is a check somebody could later relax; a missing endpoint is not. It is
+           DEC-062's shape one feature over: the safe thing is the only thing that exists.
+  page     /app/reflect collapsed 44's five addresses into two for the same reason.
+           `/app/reflect/:id/gap` as its own address would be a link somebody could open
+           before writing their reflection. A view the URL cannot reach early is a view
+           nobody has to be told not to reach.
+  db       three triggers back it: reflections are UPDATE-refusing (submitting IS finalising,
+           so a second write is a rewrite after the fact) and action_plans/checkins refuse any
+           update once finalised_at is set. 44 asks for a trigger test rather than a service
+           test by name, and improve.test.ts writes to the row directly to get it.
+  see      44 § Purpose, 13 § Improve loop, migrations/20260825170000_improve_loop
 ```
 
 ---
@@ -2317,6 +2356,15 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     hidden <table> beside it is not optional.
 44-FEATURE-improve-loop.md       -> src/backend/features/improve/**
                                     src/frontend/pages/console/Reflect/**
+                                    src/frontend/lib/reflect.ts
+                                    BUILT 2026-08-25, T-083 + T-084. reflection.read is
+                                    SEEDED `self` AND MUST STAY SO -- DEC-066. do NOT add a
+                                    route that returns a reviewee's received scores without
+                                    their own: the ordering constraint is enforced by that
+                                    route's ABSENCE, not only by the gap's 404 (DEC-067).
+                                    immutability is THREE DATABASE TRIGGERS, not service
+                                    code; 44 asks for a trigger test by name.
+                                    <GapBar> and <UpgradeCard> live under 24's roof.
                                     NOTE every capability here is GOLD-entitled (16 §3). the
                                     surface is only reachable at all because T-088 wrote the
                                     subscriptions row -- see D-012.

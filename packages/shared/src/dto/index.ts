@@ -18,6 +18,7 @@ export * from './results.js';
 export * from './home.js';
 export * from './inbox.js';
 export * from './analysis.js';
+export * from './improve.js';
 
 // Filled as each feature lands:
 //   unit.ts role.ts grant.ts person.ts subject.ts

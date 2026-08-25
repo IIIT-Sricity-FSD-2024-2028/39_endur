@@ -104,6 +104,31 @@ export const GRANT_MATRIX: Partial<Record<Capability, Row>> = {
   // routes.test.ts now asserts no mounted route can require a capability nobody is seeded.
   'analysis.read': S('subtree', 'subtree', 'own_unit'),
 
+  // T-083, and these are the nine rows D-033 deliberately LEFT — a grant to a route that
+  // does not exist cannot be tested, so they land the day the router mounts. That is also
+  // the day routes.test.ts starts checking them.
+  //
+  // THE SCOPES ARE NOT COPIED FROM THE ROW ABOVE, and two things about them are decisions.
+  //
+  // `self`, at every level that has it: a reflection is somebody's private assessment OF
+  // THEMSELVES, and there is no legitimate wider read. A `subtree` on `reflection.read`
+  // would put a supervisor inside a person's own words about their own weaknesses, which is
+  // the one thing 44 says getting wrong "exposes someone's private self-assessment to a
+  // peer". What a supervisor gets is the CHECK-IN — the conversation — and that is the only
+  // row here that reaches past the caller.
+  //
+  // NOT L4, and that is the same reading of the ladder `results.read` already takes one
+  // block up: L3 is the REVIEWEE (the person feedback is about) and L4 is the
+  // RESPONDENT-level role (the person who gives it). Somebody nobody reviews has nothing to
+  // reflect on, and the item would appear for every account in the product and open an
+  // empty page — D-027's exact shape.
+  'reflection.create': S('self', 'self', 'self'),
+  'reflection.read': S('self', 'self', 'self'),
+  'actionplan.create': S('self', 'self', 'self'),
+  'actionplan.read': S('self', 'self', 'self'),
+  'checkin.create': S('subtree', 'subtree', 'own_unit'),
+  'checkin.read': S('subtree', 'subtree', 'own_unit'),
+
   'simulator.run': S('all', 'subtree'),
   'audit.read': S('all'),
   'billing.read': S('all'), 'billing.update': S('all'),

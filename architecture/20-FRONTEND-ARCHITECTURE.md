@@ -60,7 +60,7 @@ CONSOLE  (/app, requires session)
   /app/inbox                 Response inbox                   [P2 · built T-080]
 
   /app/analysis              Analysis dashboard               [P2 · built T-082]
-  /app/reflect               Self-reflection & gap analysis   [P2 · disabled]
+  /app/reflect               Self-reflection & gap analysis   [P2 · built T-084]
   /app/communities           Communities                      [P3 · disabled]
 
 RESPOND  (no auth, no shell)

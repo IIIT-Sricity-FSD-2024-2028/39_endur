@@ -98,9 +98,15 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     // should open this page to read.
     { to: '/app/inbox', label: 'Inbox', icon: 'inbox', group: 'understand',
       needs: 'response.read' },
+    // Un-disabled by T-084 — THE LAST "Soon" TAG IN THE SIDEBAR. Every item now goes
+    // somewhere real.
+    //
+    // `reflection.read`, seeded `self` at L1-L3 and nothing at L4 (`50` §1): L3 is the
+    // REVIEWEE and L4 is the respondent-level role, and somebody nobody reviews has nothing
+    // to reflect on. No `minScope` — `self` IS the scope this surface has, and a minimum
+    // above it would hide the item from everybody.
     { to: '/app/reflect', label: 'Reflect', icon: 'reflect', group: 'understand',
-      disabled: true,
-      soonHint: 'Compare how you rate yourself against how others rate you.' },
+      needs: 'reflection.read' },
 
     // `org.update`, NOT `org.read` AT A WIDER SCOPE — T-087, and this one is not a scope
     // problem at all. `org.read` is genuinely `all` at every level including the lowest,

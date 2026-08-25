@@ -51,6 +51,7 @@ import { homeRouter } from './features/home/router.js';
 import { filesRouter } from './features/files/router.js';
 import { profileRouter } from './features/profile/router.js';
 import { analysisRouter } from './features/analysis/router.js';
+import { checkinsRouter, reflectRouter } from './features/improve/router.js';
 import { inboxRouter } from './features/inbox/router.js';
 import { mount } from './lib/mount.js';
 
@@ -134,6 +135,10 @@ export function createApp() {
   mount(app, '/api/v1/profile', profileRouter);
   mount(app, '/api/v1/inbox', inboxRouter);
   mount(app, '/api/v1/analysis', analysisRouter);
+  // T-083. Two routers rather than one: /reflect is the reviewee's own loop and /checkins
+  // is the supervisor's side of it, and 44 § Route & access names them separately.
+  mount(app, '/api/v1/reflect', reflectRouter);
+  mount(app, '/api/v1/checkins', checkinsRouter);
   // Serving uploaded bytes. Its own chain — no tenant, no principal, no CSRF (48).
   mount(app, '/api/v1/files', filesRouter);
 

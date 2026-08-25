@@ -39,6 +39,7 @@ const CampaignDetail = lazy(() => import('../pages/console/Campaigns/Detail.js')
 const Results = lazy(() => import('../pages/console/Results/index.js'));
 const Inbox = lazy(() => import('../pages/console/Inbox/index.js'));
 const Analysis = lazy(() => import('../pages/console/Analysis/index.js'));
+const Reflect = lazy(() => import('../pages/console/Reflect/index.js'));
 const Profile = lazy(() => import('../pages/console/Profile/index.js'));
 const Simulator = lazy(() => import('../pages/console/Simulator.js'));
 const Settings = lazy(() => import('../pages/console/Settings.js'));
@@ -116,6 +117,9 @@ export const routes: RouteObject[] = [
       // would answer a Bronze customer's "upgrade to see this" with "you do not have
       // access". The page renders both states itself and keeps them apart.
       { path: 'analysis', element: hold(<Analysis />) },
+      // Same two reasons as Analysis: a scoped capability, and a 402 a route guard cannot
+      // express. T-084.
+      { path: 'reflect', element: hold(<Reflect />) },
       { path: 'profile', element: hold(<Profile />) },
       { path: 'simulator', element: hold(<Simulator />) },
       { path: 'settings', element: hold(<RequireCapability capability="org.read"><Settings /></RequireCapability>) },

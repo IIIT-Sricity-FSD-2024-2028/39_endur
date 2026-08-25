@@ -40,7 +40,7 @@ import { ConfidenceTag, ReliabilityStrip } from './Confidence.js';
 import { Sentiment } from './Sentiment.js';
 import { Drivers } from './Drivers.js';
 import { ThemePanel } from './ThemePanel.js';
-import { Upgrade } from './Upgrade.js';
+import { UpgradeCard } from '../../../components/billing/UpgradeCard.js';
 
 const FILTER_KEYS = ['from', 'to', 'campaignId', 'unitId', 'subjectId'] as const;
 
@@ -145,9 +145,11 @@ export default function Analysis(): JSX.Element {
     return (
       <div className="page">
         {header}
-        <Upgrade
+        <UpgradeCard
           requiredTier={analysis.upgrade.requiredTier}
           currentTier={analysis.upgrade.currentTier}
+          icon="results"
+          sells="the layer that says why the numbers moved, not just what they are"
         />
       </div>
     );

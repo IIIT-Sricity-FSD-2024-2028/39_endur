@@ -362,6 +362,32 @@ returns verbatim comments, and `40` puts those behind `response.read` on purpose
 `valet-parking`. The route recomputes the corpus and filters to it, which is why the engine's
 determinism is load-bearing rather than a nicety.
 
+### Improve loop — `44`, BUILT `T-083`
+
+| Method | Path | Capability |
+|---|---|---|
+| GET | `/reflect` | `reflection.read` · **Gold** |
+| GET | `/reflect/:campaignId` | `reflection.read` · Gold — the form, on the campaign's own questions |
+| POST | `/reflect/:campaignId` | `reflection.create` · Gold — **write-once**, 409 on a second |
+| GET | `/reflect/:campaignId/gap` | `reflection.read` · Gold — **404 until the reflection exists** |
+| POST | `/reflect/:campaignId/plan` | `actionplan.create` · Gold |
+| POST | `/reflect/plans/:id/finalise` | `actionplan.create` · Gold — irreversible |
+| POST | `/checkins` · PATCH `/checkins/:id` | `checkin.create` · Gold |
+
+**The 404 on the gap is the ordering constraint, not a missing resource.** `44` § Purpose:
+the reviewee records their own assessment before seeing anybody else's, *"enforced in the
+API, not in the UI"*. There is deliberately **no route and no DTO** that returns a reviewee's
+received scores on their own, so a client that ignores the lock has nothing to ask for.
+
+`/reflect/*` is `self` in the only sense that matters: the caller's own linked subject, not a
+scope string. `/checkins` is the supervisor's side and its reach is `visibleUnits()` — one
+implementation of scope, shared (INV-003). Everything outside the caller's reach answers 404
+rather than 403 (`13` §5).
+
+`/plans` is **not** a top-level prefix. Finalising lives at `/reflect/plans/:id/finalise`
+because a plan has no meaning outside the cycle it belongs to, and a second root would have
+implied it does.
+
 ### Reserved — P3
 
 Prefixes reserved here; the routes under them are specified in their own docs rather than
@@ -370,7 +396,6 @@ restated, so there is one authority per surface:
 | Prefix | Capability | Specified in |
 |---|---|---|
 | `/api/v1/keys`, `/api/v1/webhooks` | `apikey.*` | `45-FEATURE-public-api.md` |
-| `/api/v1/reflect`, `/api/v1/plans`, `/api/v1/checkins` | `reflection.*` `actionplan.*` `checkin.*` | `44` |
 
 **A P3 route must still be listed in its own doc before it is built.** This table exists so
 that a route cannot appear in the codebase without appearing in some contract doc.
