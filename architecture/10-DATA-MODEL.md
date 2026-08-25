@@ -542,6 +542,29 @@ writing all of them would produce a table nobody can read — the same reasoning
 `decided_by` is populated on a denial too, and on a denial it is the *most useful* — the
 narrowest deny that stopped it, which is the answer to "whom do I ask".
 
+### The four tables with no `org_id` — `19` §10, built `T-059`
+
+`platform_users`, `platform_sessions` and `platform_audit_log` are in
+`database/schema.prisma` and are **specified in `19`, which owns the surface**. They are named
+here so that a reader of this document is not surprised by them, and because their one shared
+property is a statement about this document rather than about that one:
+
+> **Every table above carries `org_id`. These three carry none, and the absence is the
+> design (DEC-033).** An operator hosted in `users` — which is `@@unique([org_id, email])`
+> with `org_id` NOT NULL — would need a fake home organisation, and that fake organisation
+> would then appear in the estate list, the seat count and the revenue figures it exists to
+> report on. `CONF-013`'s cross-tenant lockout is what that class of shortcut looks like when
+> it goes wrong.
+
+`organizations.suspended_at` is the fourth change and it is a real column on a real tenant
+table: set by `platform.org.suspend`, read by `tenantResolver`, and refusing **only** a tenant
+resolved from a staff session (`DEC-073`).
+
+`platform_audit_log` is separate from `audit_log` for a customer-facing reason rather than a
+tidy one: `audit_log` rows carry an `org_id` and belong to the organisation that can export
+them (`56`). Writing *"Endur changed your plan"* into a customer's exportable trail would put
+our internal activity inside their evidence.
+
 ---
 
 ## 6. Recursive queries — the raw-SQL seam

@@ -58,11 +58,26 @@ export type FieldError = {
   message: string;
 };
 
-/** 403 FORBIDDEN detail — the decision trace, which is what makes a denial actionable. */
+/**
+ * WHICH GRANT decided it — the resolver's `describe()`, crossing the wire.
+ *
+ * ONE TYPE, TWO CARRIERS, and it became one at T-075. It is the `details.decidedBy` of a
+ * 403 (what makes a denial actionable: whom to ask) and it is `AuditEntry.decidedBy` (what
+ * makes a past allow evidence rather than an assertion, INV-007). Those are the same
+ * sentence in two tenses, which is exactly the argument `24` §6c makes for `<DecisionTrace>`
+ * being one component — a second type here would have let the two drift underneath it.
+ *
+ * Everything but `via` is optional because the 403 body is the weaker of the two carriers
+ * and always has been. An audit row fills all of it.
+ */
 export type DecidedBy = {
   via: 'role' | 'position' | 'group' | 'person' | 'delegation' | 'default';
+  grantId?: string;
   subjectName?: string;
   scope?: string;
+  anchorUnitId?: string;
+  anchorUnitName?: string;
+  effect?: 'allow' | 'deny';
 };
 
 export type ErrorEnvelope = {

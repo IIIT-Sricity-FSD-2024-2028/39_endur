@@ -195,7 +195,7 @@ Opened 23 Aug from a read-only survey of four questions. **No task here is on th
 | **T-057** | A | — | **Billing surface and seat metering. THE HEAVIEST TASK ON THIS BOARD, and it does not look it.** It gates `T-082` and `T-083`, which is *two of the four greyed sidebar items* — and `D-012` means no organisation has ever had a subscription row, so `requireEntitlement` falls back to Bronze and every Gold surface `402`s for every user in the product. Building the improve loop or the analysis page first produces a screen nobody can open.<br><br>**Billing surface and seat metering** — `GET /billing`, `/billing/usage`, `/billing/plans`, `POST /billing/tier`, `billable_seats`. Repays `D-012`, `D-013`, `D-015`. `billing.read` and `billing.update` have been in the catalogue since `T-003`; the routes have never existed. **No prices** — DEC-035 | `49`, `16` §5 |
 | **T-088** ✅ | B | — | **BUILT 2026-08-24. THE TIER PICKER AT SIGN-UP — `DEC-048`, and the owner asked for this one by name.** One step between account creation and the setup wizard: three buttons, Bronze / Silver / Gold, and the one pressed is the one you are on. `register` writes the `subscriptions` row with the chosen tier and `status: 'active'`. **Deliberately carved out of `T-057`/`T-058`** — it needs neither the seat meter, nor `/billing/usage`, nor `<OverLimitBanner>`, nor the billing page, and `src/backend/billing/entitlements.ts` (TIERS, TIER_ENTITLEMENTS, `tierIncludes`) plus a mounted `requireEntitlement` already exist. What is missing is **the row ever being written**. **Repays `D-012`, and therefore unblocks `T-082` and `T-083`** — the two greyed pages that `402` for every user today. Enterprise is not on the picker: it is operator-assigned (`19` §4). **Built as specified, plus two things the spec did not know about:** `account.*` and `billing.*` were in **no tier at all** (`16` §3, now `D-028`), and `requireEntitlement` had **no tests whatsoever** — `test/tiers.test.ts` is new and is why `D-012` could not have survived it | `49` § Interactions, `16` §7, `30` |
 | T-058 | B | T-057, T-088 | **The plan and billing page** — usage with its breakdown, `<PlanPicker>` with a **Join** button per tier (DEC-035, no checkout), ~~the sign-up plan step~~ (**moved to `T-088`**) and `<OverLimitBanner>` in `<AppShell>`. `16` §6: an over-limit org still collects and still reads results | `49` |
-| T-059 | A | T-057 | **Platform backend** — `platform_users`, `platform_audit_log`, the separate login and cookie, `requirePlatform()`, and the aggregate-only db seam. **`INV-011` is asserted here**, by a test that tries to select `answers` and fails | `19` |
+| **T-059** ✅ | A | ~~T-057~~ **none** | **BUILT 2026-08-26. Platform backend.** `platform_users`, `platform_sessions`, `platform_audit_log`, `organizations.suspended_at`, the `endur.ops` cookie, `requirePlatform()`, and the aggregate-only db seam. **`INV-011` is asserted by a test that tries to select `answers` and fails**, and by two more that try through a nested `include` and by writing inside a tenant. `N-058` was checked before starting and held — **`DEC-071`** drops the `T-057` dependency rather than waiting it out | `19` |
 | T-066 | B | T-059 | **`/ops` platform console** — the estate list, one org's counts, plan override, suspend, and messaging an org's administrators. A **fourth route tree** with its own error boundary | `70` |
 | T-067 | B | T-059 | **`/ops/analytics`** — tier mix, movement, trials and conversion, quiet organisations. Owner-only. The four decisions in `71` § "The decisions inside these numbers" are the point of the task — counts, never money (DEC-035) | `71` |
 | ~~T-068~~ | X | — | **DROPPED 23 Aug — `DEC-035`.** Was "seed `plan_prices`". There is no pricing and no such table; a tier is joined with a button | `49`, `19` §10 |
@@ -235,8 +235,8 @@ recorded. This table is what is left to build.
 | id | lane | needs | what | spec |
 |---|---|---|---|---|
 | ~~T-074~~ | A | — | **DONE 23 Aug — and superseded in part by `DEC-045`, which re-keys the rule on the ACTION rather than the principal.** `audit_log.ip` is NULL for non-user principals. One line in `db/tx.ts` and two tests. **Do this before `T-075` renders anything**, because the page is what makes the leak live | `10` §5, `52` §6, DEC-040 |
-| T-075 | A | T-074 | **The audit read surface.** `GET /audit` with its filters and cursor, `outcome` on the row, denials written for mutating capabilities | `56`, `13` §Trust |
-| T-076 | B | T-075 | **`/app/logs`.** The table, the expand-to-trace, the refusals-only toggle, and **`<DecisionTrace>` — which `T-054` also needs, so whoever is second extends rather than forks** | `56`, `24` §6c |
+| ~~T-075~~ ✅ | A | T-074 | **BUILT 2026-08-25. The audit read surface.** `GET /audit` with its filters and cursor, `outcome` on the row, denials written for mutating capabilities | `56`, `13` §Trust |
+| ~~T-076~~ ✅ | B | T-075 | **BUILT 2026-08-25. `/app/logs`.** The table, the expand-to-trace, the refusals-only toggle, and **`<DecisionTrace>` — which `T-054` also needs, so whoever is second extends rather than forks** | `56`, `24` §6c |
 | T-077 | A | T-059 | **Platform log routes.** `platform.logs.read`, the file list, the bounded read, and the three-way path guard | `72`, `19` §4 |
 | T-078 | B | T-077 | **`/ops/logs`.** `<LogViewer>`, filters in the URL, `requestId` collapse-to-one-request | `72` |
 
@@ -417,9 +417,9 @@ different principals, different stores, different routes (`INV-011`).
 
 | id | lane | needs | what | spec |
 |---|---|---|---|---|
-| T-075 | A | — | **`GET /audit`** — filters, cursor, `outcome`, and denial rows written for mutating capabilities. `T-074` already made `audit_log.ip` NULL for non-user principals, which is the fix that had to land *before* a page could expose the column | `56`, `13` §Trust |
-| T-076 | B | T-075 | **`/app/logs`** — the table, expand-to-trace, refusals-only toggle, and **`<DecisionTrace>`, which `T-054` also needs: whoever is second extends, never forks** (INV-009). The sidebar item is `system` group, under Settings, hidden without `audit.read` — `56` § Route & access already specifies it | `56`, `24` §6c |
-| T-059 | A | — | **Platform backend** — `platform_users`, the separate login and cookie, `requirePlatform()`, the aggregate-only db seam. **`INV-011` is asserted here**, by a test that tries to select `answers` and fails. See `N-058` about its `T-057` dependency before starting | `19` |
+| **T-075** ✅ | A | — | **BUILT 2026-08-25. `GET /audit`** — filters, cursor, `outcome`, and denial rows. `audit_log.outcome` did not exist in the database: `10` §5 has carried it since 23 Aug and the table had not, because **a column no writer sets is a column no reader can trust**, so it landed with its reader. Denials are written when the method is not GET **and** the capability is not a `*.read` (`DEC-068`) — two conditions catching different mistakes, and `writeDenial()` sits beside `flushAudit` in `db/tx.ts` so `ip` and `actor` stay decided in ONE place (`DEC-040`'s lesson). **404s are recorded too**: indistinguishable from a 403 to the caller, but the more interesting of the two to the organisation. Scope filtering is over the TARGET, in SQL, before the page query, so `meta.total` is not a lie (`DEC-070`). Found `DEC-069`: `DecidedBy` was two shapes under one name | `56`, `13` §Trust |
+| **T-076** ✅ | B | T-075 | **BUILT 2026-08-25. `/app/logs`** — the table, expand-to-trace, refusals-only toggle, and **`<DecisionTrace>` built at last**, catalogued since 23 Aug with no caller. `T-054` **extends it, never forks it** (INV-009), and it took a `tense` prop so one component can say *"Allowed by"* of a real event and *"Would be allowed by"* of a hypothetical one. The row expands **inside its own cell** rather than into a second `<tr>`: `<ResponsiveTable>` renders one DOM in both shapes and a spanning row would need two. **WRAPPED in `RequireCapability`, unlike Analysis and Reflect** — there is no 402 on a log, so a route guard can say everything there is to say | `56`, `24` §6c |
+| **T-059** ✅ | A | — | **BUILT 2026-08-26.** `platform_users`, the separate login and cookie, `requirePlatform()`, the aggregate-only db seam. **`INV-011` asserted by a test that tries.** `N-058` checked and confirmed: `DEC-071` drops the `T-057` dependency. Three new decisions came out of it — `DEC-071` (the dependency), `DEC-072` (its own session store, not a second express-session), `DEC-073` (suspension enforced on the resolution source) | `19` |
 | T-066 | B | T-059 | **`/ops` — the Endur admin console.** Estate list, one org's counts, plan override, suspend, message an org's administrators. A **fourth route tree** with its own error boundary | `70` |
 | T-067 | B | T-059 | **`/ops/analytics` — the superuser page.** Tier mix, movement, trials, quiet organisations. Counts, never money (`DEC-035`) | `71` |
 | T-077 | A | T-059 | **Platform log routes** — `platform.logs.read`, the file list, the bounded read, the three-way path guard | `72`, `19` §4 |
@@ -431,8 +431,15 @@ and a separate cookie**, and no link from the customer console points at it. `19
 doc; `T-059` is what makes the door exist at all, and `T-066`/`T-067` are the two pages
 behind it. Until `T-059`, there is nothing to have seen.
 
+**`T-059` landed 26 Aug, so the door exists now.** Everything on the `/api/v1/platform`
+prefix is reachable today with `curl` and a cookie — which is exactly what that means. The
+four remaining tasks are the rooms: `T-066`, `T-067` (and its `/platform/analytics`
+endpoint, deliberately left with the page that argues its four decisions), `T-077`,
+`T-078`.
+
 **Ordering inside 9c is not negotiable:** `T-059` is a hard prerequisite for four of the six.
-`T-075`/`T-076` have no dependency on it whatsoever and are the half that can start today.
+`T-075`/`T-076` had no dependency on it whatsoever and are the half that could start today —
+**both are done.** What is left of 9c is the four behind `T-059`.
 
 **Ordering added by this stage:**
 
@@ -441,7 +448,7 @@ T-089  first        it is the owner's first item and every lazy route shares the
 T-052  before  T-079..T-084   cheapest of the four, and the only one with no backend at all
 T-075  before  T-076          the read surface before the page that renders it
 T-074  before  T-075          ALREADY DONE. the IP fix landed 23 Aug, ahead of both
-T-059  before  T-066, T-067, T-077, T-078    no door, no rooms behind it
+T-059  before  T-066, T-067, T-077, T-078    no door, no rooms behind it  [DOOR OPEN 26 Aug]
 T-085  after   each page      unchanged: the tag comes off as the page lands, never before
 ```
 

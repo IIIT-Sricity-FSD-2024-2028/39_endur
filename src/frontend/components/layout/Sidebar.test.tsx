@@ -13,6 +13,8 @@ import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
 const ALL = ['unit.read', 'role.read', 'person.read', 'subject.read',
              'template.read', 'campaign.read', 'response.read',
              'analysis.read', 'reflection.read',
+             // `audit.read` joined at T-076, when /app/logs became a real page.
+             'audit.read',
              'org.read', 'org.update'] as const;
 
 describe('vocabulary', () => {
@@ -72,8 +74,12 @@ describe('what each level sees', () => {
     // `self`, not `subtree` — a reflection is somebody's private assessment of themselves
     // and there is no legitimate wider read (T-083, `50` §1).
     'reflection.read': 'self',
+    // T-076. `audit.read` is seeded `all` AT L1 AND NOWHERE ELSE (`50` §1), so the
+    // Activity log is the only item in the sidebar that L1 has and L2 does not besides
+    // Settings — which is exactly what the matrix says.
+    'audit.read': 'all',
   } as const;
-  const L2 = { ...L1, 'org.update': undefined } as const;
+  const L2 = { ...L1, 'org.update': undefined, 'audit.read': undefined } as const;
   const L3 = {
     'org.read': 'all', 'unit.read': 'own_unit', 'role.read': 'all',
     'person.read': 'own_unit', 'subject.read': 'own_unit', 'template.read': 'all',
@@ -103,7 +109,7 @@ describe('what each level sees', () => {
     // `system` is the FIRST group in the sidebar's order, so Home and Settings sit
     // together at the top — Settings is not a footer item (design_specs/design/02 §3).
     expect(rendered()).toEqual([
-      'Home', 'Settings', 'Structure', 'Roles', 'People', 'Quaxels',
+      'Home', 'Settings', 'Activity log', 'Structure', 'Roles', 'People', 'Quaxels',
       'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
     ]);
   });
@@ -198,8 +204,11 @@ describe('roadmap items — there are none left', () => {
     // T-082. The positive direction, asserted the same day the page landed rather than a
     // day later — which is the whole argument for this half of the rule existing.
     ['Analysis', '/app/analysis'],
-    // T-084, and the last one. Every item in the sidebar is now on this list.
+    // T-084. Every item in the sidebar was on this list by then.
     ['Reflect', '/app/reflect'],
+    // T-076 added a NEW item rather than un-disabling one — the first since the "Soon"
+    // tags ran out — so it joins on the same day it ships.
+    ['Activity log', '/app/logs'],
   ])('DOES navigate to %s, whose page exists', (label, href) => {
     renderWithProviders(<Sidebar />, { capabilities: [...ALL] });
     const item = screen.getByText(label).closest('.sidebar-item');

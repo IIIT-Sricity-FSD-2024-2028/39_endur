@@ -5,7 +5,107 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-25  (T-083 + T-084 + T-085 BUILT — THE IMPROVE LOOP, AND STAGE 9 IS
+UPDATED   2026-08-26  (T-059 BUILT — THE PLATFORM BACKEND. /ops HAS A DOOR. a separate
+                       account table with NO org_id, a separate cookie (endur.ops), a
+                       separate capability catalogue, a separate database seam and 13
+                       routes under /api/v1/platform. 459 backend (+19) + 852 frontend
+                       = 1,311 tests green.
+                       INV-011 IS ENFORCED BY THE SEAM, NOT BY A CAREFUL HANDLER. 19 §5
+                       is explicit that it must be "enforced by the platform client
+                       returning aggregates only, not by a UI that declines to render
+                       them", so platform/db.ts refuses `Answer` in ANY operation
+                       including a nested include, allows `Response` only count/
+                       aggregate/groupBy, and allows writes to exactly four models. it
+                       throws PlatformSeamViolation — NOT a 403, because an INV-011
+                       breach is a line of code to delete rather than a refusal to
+                       render, and a tidy 403 is something somebody later allowlists.
+                       N-058 WAS CHECKED BEFORE STARTING AND IT HELD (DEC-071). T-059
+                       was the last unbuilt A-task and it was carrying a dependency on
+                       T-057, which has never been built. none of platform_users, the
+                       cookie, requirePlatform() or the seam reads a seat count or a
+                       plan — that was /ops's dependency, not the door's. following the
+                       board would have parked the whole tree with a day left.
+                       DEC-072: THE OPERATOR SESSION IS ITS OWN STORE, NOT A SECOND
+                       express-session. 19 §7 asks for a second cookie NAME because
+                       "one session, two meanings is how privilege confusion bugs
+                       happen" — and req.session IS SINGLE-VALUED, so mounting a second
+                       instance would have reintroduced exactly that under a nicer
+                       name. platform_sessions holds an opaque 32-byte id and
+                       platform/session.ts is the only file that reads endur.ops.
+                       DEC-073: SUSPENSION IS ENFORCED ON THE RESOLUTION SOURCE. 19 §6
+                       and 70 both require it to cut the customer's STAFF and not their
+                       respondents — a QR code on a wall belongs to people who did not
+                       choose the plan (16 §6). tenantResolver is the only file that
+                       knows HOW a tenant was resolved, so `via === 'session'` is the
+                       only place that sentence can be written. checking at login would
+                       have left every live staff session working.
+                       MFA IS BUILT, NOT DEFERRED — 19 §9's blast-radius argument, kept.
+                       RFC 6238 in 40 lines of node:crypto and NO dependency; mfa_secret
+                       NOT NULL so there is no "not set up yet" state to fall through;
+                       one message for all three login failures. `npm run ops:code -w
+                       @endur/api` prints a live code so the demo can show it.
+                       NOT BUILT AND SAID SO IN 19 §13b: /platform/analytics is T-067's
+                       (71's four decisions ARE that task), the log routes are T-077's,
+                       and the message endpoint stores the RECORD without sending mail
+                       because there is no mail transport in this product.
+                       Earlier: T-075 + T-076 BUILT — /app/logs, AND audit_log HAS A READER AT
+                       LAST. it has been written on every state change since T-013 and
+                       had never once been read: a whole invariant's worth of evidence
+                       (INV-007, the transaction-bound row carrying decided_by) sitting
+                       in a table with no reader. 440 backend (+7) + 852 frontend (+9)
+                       = 1,292 tests green.
+                       audit_log.outcome DID NOT EXIST IN THE DATABASE. 10 §5 has
+                       carried the column since 23 Aug and the table had not, because
+                       nothing had ever read audit_log — and a column no writer sets is
+                       a column no reader can trust. it landed WITH ITS READER, DEFAULT
+                       'allowed', because every row written before today described
+                       something that happened. backfilling any other way would be
+                       inventing history.
+                       !! TWO CONDITIONS DECIDE WHICH REFUSALS ARE WRITTEN (DEC-068).
+                       DEC-041 says "mutating capabilities only"; 56 gives the reason in
+                       terms of the METHOD — "a 403 on a GET is the permission system
+                       working as designed, thousands of times a day". both are right
+                       about DIFFERENT mistakes, so both apply: nothing for a GET, and
+                       nothing for a *.read. the second is the belt to the first, because
+                       a read is occasionally shaped like a write and POST
+                       /authz/simulate asks a question and changes nothing.
+                       A 404 IS RECORDED TOO. indistinguishable from a 403 to the caller
+                       by design (13 §5), and the more interesting of the two to the
+                       ORGANISATION: somebody reached for a resource so far outside
+                       their scope that we would not confirm it exists.
+                       THE WRITER SITS BESIDE flushAudit IN db/tx.ts, never in the
+                       middleware. ip and actor are decided by DEC-040/DEC-045 there and
+                       nowhere else, and a second writer is a second place those rules
+                       have to be remembered — which is DEC-040's whole lesson. NOT in a
+                       transaction: INV-007 binds a row to the mutation it describes and
+                       a refusal describes a mutation that never happened. and it can
+                       never replace the 403 — a log that turns a refusal into a 500
+                       makes the product LESS safe than not having one.
+                       DecidedBy WAS TWO SHAPES UNDER ONE NAME (DEC-069). errors.ts had
+                       {via, subjectName?, scope?} for the 403 detail; the resolver's
+                       describe() emits seven fields, and BOTH cross the wire from the
+                       same function. one type now — which is 24 §6c's argument for
+                       <DecisionTrace> being one component, made one layer down.
+                       <DecisionTrace> IS FINALLY BUILT, catalogued 23 Aug with no
+                       caller. it took a `tense` prop so one component says "Allowed by"
+                       of a real event and "Would be allowed by" of a hypothetical one;
+                       T-054 EXTENDS IT, never forks it (INV-009). the full form says the
+                       scope IN WORDS — "that ward and everything under it", never
+                       own_unit.
+                       SCOPE IS FILTERED OVER THE TARGET, IN SQL, BEFORE THE PAGE QUERY
+                       (DEC-070) — 56: a row is visible when the THING ACTED UPON is in
+                       scope, not when the actor is. before, not after, so meta.total is
+                       a real count rather than a count of what exists with rows dropped.
+                       WRAPPED in RequireCapability, unlike Analysis and Reflect: there
+                       is no 402 on a log, so a route guard can say everything there is
+                       to say.
+                       NOT BUILT AND NOT PRETENDED: the actor filter has no picker (the
+                       query parameter works), <PersonChip> was never built anywhere, and
+                       the expanded trace has NO `considered` list to show — decided_by
+                       stores the deciding grant, and storing the rejected candidates
+                       would multiply the row size of the one table kept forever.
+                       Earlier the same day: T-083 + T-084 + T-085 BUILT — THE IMPROVE
+                       LOOP, AND STAGE 9 IS
                        DONE. THERE IS NO "Soon" TAG LEFT IN THE SIDEBAR: every item now
                        goes somewhere real. 433 backend (+10) + 843 frontend (+7) =
                        1,276 tests green.
@@ -933,9 +1033,10 @@ Opened 23 Aug from a four-item survey. Nothing here is M0: **do not start any of
 [x] T-056  X  DECIDE: what an Endur operator IS (OPEN-007)     ← DEC-033. Doc 19 written
 [ ] T-057  A  billing read surface + seat metering (16 §5, §8) ← repays D-012, D-013
 [ ] T-058  B  plan + billing page, JOIN buttons, over-limit banner (49)  ← DEC-035
-[ ] T-059  A  platform backend — platform_users, requirePlatform, seam (19)  ← needs T-057
-[ ] T-066  B  /ops console — estate, plan override, messaging (70)   ← needs T-059
-[ ] T-067  B  /ops/analytics — tier mix, movement, trials, quiet (71) ← needs T-059
+[x] T-059  A  platform backend — platform_users, requirePlatform, seam (19)  BUILT 26 Aug
+              ← the T-057 dependency was DROPPED, not waited out (DEC-071, closing N-058)
+[ ] T-066  B  /ops console — estate, plan override, messaging (70)   ← T-059 DONE
+[ ] T-067  B  /ops/analytics — tier mix, movement, trials, quiet (71) ← T-059 DONE
 [x] T-068  X  DROPPED 23 Aug — DEC-035. No pricing, no plan_prices table at all
 [ ] T-060  X  cold-start end-to-end pass                       ← needs T-050. NOT T-045
 ```
@@ -960,9 +1061,9 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
 [x] T-074  A  audit_log.ip NULL for non-user principals  ← D-019 REPAID
               ← RE-KEYED THE SAME DAY BY DEC-045: the rule is on the ACTION, not the
                 principal, because DEC-037 made a respondent a `user` principal
-[ ] T-075  A  GET /audit — filters, cursor, outcome, denial rows (56, DEC-041)
-[ ] T-076  B  /app/logs + <DecisionTrace>   ← T-054 needs the SAME component. Extend it
-[ ] T-077  A  platform.logs.read + the file routes + path guard (72)     ← needs T-059
+[x] T-075  A  GET /audit — filters, cursor, outcome, denial rows (56, DEC-041) BUILT 25 Aug
+[x] T-076  B  /app/logs + <DecisionTrace>   ← T-054 needs the SAME component. EXTEND it
+[ ] T-077  A  platform.logs.read + the file routes + path guard (72)  ← T-059 DONE 26 Aug
 [ ] T-078  B  /ops/logs + <LogViewer>                                    ← needs T-077
 [x] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)   BUILT 25 Aug
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
@@ -1064,18 +1165,45 @@ Full tables in `55` § Stage 9.
     TWO DIFFERENT THINGS WEARING ONE WORD. 19 §4 draws the line: an ORG's admin sees
     their own org's activity; an ENDUR operator sees the estate and the log FILES.
     Different principals, different stores, different routes. INV-011.
-[ ] T-075  A  GET /audit — filters, cursor, outcome, denial rows (56)
-              ← NO dependency on the platform side. This half can start today
-[ ] T-076  B  /app/logs + <DecisionTrace>  ← T-054 needs the SAME component. EXTEND
-              ← the sidebar item is already specified: `system` group, under
-                Settings, hidden without audit.read (56 § Route & access)
-[ ] T-059  A  platform backend — platform_users, requirePlatform, aggregate-only seam
-              ← THE DOOR. Nothing in /app links to /ops and nothing should: separate
-                login, separate cookie, fourth route tree. "I haven't seen the endur
-                admin pages" is correct AND BY DESIGN. See N-058 about its T-057 dep
-[ ] T-066  B  /ops — the ENDUR ADMIN console (70)          ← needs T-059
-[ ] T-067  B  /ops/analytics — the SUPERUSER page (71)     ← needs T-059
-[ ] T-077  A  platform.logs.read + the file routes (72)    ← needs T-059
+[x] T-075  A  GET /audit — filters, cursor, outcome, denial rows (56)  BUILT 25 Aug
+              audit_log.outcome DID NOT EXIST in the database. 10 §5 has carried the
+              column since 23 Aug and the table had not, because a column no writer
+              sets is a column no reader can trust — it landed with its reader.
+              Denials written when the method is not GET AND the capability is not a
+              *.read (DEC-068). 404s recorded too. writeDenial() sits BESIDE
+              flushAudit in db/tx.ts, never in the middleware — ip and actor are
+              decided in one place and DEC-040's lesson is exactly that.
+              DEC-069: `DecidedBy` was TWO SHAPES UNDER ONE NAME. DEC-070: the scope
+              filter is over the TARGET, in SQL, before the page query.
+[x] T-076  B  /app/logs + <DecisionTrace>  ← T-054 needs the SAME component. EXTEND
+              BUILT 25 Aug. <DecisionTrace> catalogued 23 Aug with no caller; built
+              here, with a `tense` prop so ONE component says "Allowed by" of a real
+              event and "Would be allowed by" of a hypothetical one. The row expands
+              INSIDE ITS OWN CELL, never a second <tr>. WRAPPED in RequireCapability,
+              unlike Analysis and Reflect: there is no 402 on a log, so a route guard
+              can say everything there is to say. New sidebar item, new `log` icon.
+[x] T-059  A  platform backend — platform_users, requirePlatform, aggregate-only seam
+              BUILT 26 Aug. THE DOOR IS OPEN. Separate table, separate cookie
+              (endur.ops), separate catalogue, separate seam, 13 routes, 17 tests.
+              N-058 CHECKED AND IT HELD — DEC-071 drops the T-057 dependency rather
+              than waiting it out; T-059 was the last unbuilt A-task and it was
+              carrying a dep on a task that has never been built.
+              DEC-072: its own session store, NOT a second express-session —
+              req.session is single-valued, so two instances would have reintroduced
+              the exact "one session, two meanings" confusion the second cookie name
+              exists to prevent.
+              DEC-073: suspension is enforced in tenantResolver ON THE RESOLUTION
+              SOURCE. A tenant resolved FROM THE SESSION is refused; one resolved from
+              a respondent token is not — so a suspended org's QR codes keep working,
+              which is what 19 §6 and 16 §6 both ask for and what no other file could
+              express.
+              MFA IS BUILT, not deferred: RFC 6238 in 40 lines of node:crypto, no
+              dependency, mfa_secret NOT NULL so there is no "not set up yet" state to
+              fall through. `npm run ops:code -w @endur/api` prints a live code.
+[ ] T-066  B  /ops — the ENDUR ADMIN console (70)          ← T-059 DONE
+[ ] T-067  B  /ops/analytics — the SUPERUSER page (71)     ← T-059 DONE. Owns its
+                own /platform/analytics endpoint: 71's four decisions ARE the task
+[ ] T-077  A  platform.logs.read + the file routes (72)    ← T-059 DONE
 [ ] T-078  B  /ops/logs + <LogViewer>                      ← needs T-077
 ```
 **The cost, stated once and not re-argued.** M0 is 26 Aug, two days out; `T-045` (three demo
@@ -1101,7 +1229,9 @@ withdrawn.** All four are promoted — Stage 9 above.
 | ~~**Analysis**~~ | ~~`T-081` → `T-082`~~ | **BUILT 25 Aug, both halves** | rule-based engine (`DEC-042`), two k-anon gates, drill-through behind `response.read` as well — and the screen, with a real `402` path (`T-088`) and, since `D-033`, a capability somebody can actually hold. **No dependency was added to draw it** (`DEC-064`) |
 | ~~**Reflect**~~ | ~~`T-083` → `T-084`~~ | **BUILT 25 Aug, both halves** | every capability in the improve loop is Gold, and `D-012` meant no organisation had ever had a subscription row — built before `T-088` this would have `402`d for every user in the product. The ordering constraint is enforced by an **absent route** as well as a 404 (`DEC-067`), and `reflection.read` is seeded `self` and nothing wider (`DEC-066`) |
 
-**All four are built. The sidebar has no "Soon" tag left.**
+**All four are built. The sidebar has no "Soon" tag left** — and `T-076` added the first
+genuinely NEW item since the tags ran out: **Activity log**, `system` group, under Settings,
+hidden without `audit.read`.
 
 **So the tiers are not a separate missing thing — they are the blocker for half the list.**
 That gate was filed as `T-057`, a large Stage-6 API task, which made it look far away. It is
@@ -1248,7 +1378,127 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-25 (latest) · T-083, T-084, T-085 — the improve loop, and the last "Soon" tag
+### 2026-08-26 (latest) · T-059 — the platform backend, and `/ops` gets a door
+
+**459 backend (+19) + 852 frontend = 1,311 tests, all green.** Typecheck, lint,
+`audit:drift`, `audit:vocab` clean. One migration applied locally
+(`20260826090000_platform_operators`). Nothing committed.
+
+**`N-058` was checked before starting, and it held.** The note was written on 24 Aug and asked
+for exactly this: *"DO NOT re-sequence on this note alone. CHECK IT when T-059 starts."*
+`T-059` is `platform_users`, the separate login and cookie, `requirePlatform()` and the
+aggregate-only seam — **none of which reads a seat count, a usage breakdown or a plan.** The
+`T-057` dependency was `/ops`'s, not the door's. `DEC-071` drops it. Worth saying plainly:
+`T-059` was the last unbuilt A-task on the board and it was blocked on a task that has never
+been built, so following the board would have parked the whole `/ops` tree with a day left.
+
+**INV-011 is enforced by the seam, not by a careful handler.** `19` §5 says it in the
+invariant itself — *"enforced by the platform client returning aggregates only, not by a UI
+that declines to render them"* — so `platform/db.ts` refuses `Answer` in any operation
+including a nested `include`, permits `Response` only `count`/`aggregate`/`groupBy`, and
+permits writes to four models. It throws a `PlatformSeamViolation`, **not a 403**: an INV-011
+breach is a line of code to delete rather than a refusal to render, and a tidy 403 is
+something somebody later adds to an allowlist.
+
+**`DEC-072` — a second cookie name, but not a second `express-session`.** `19` §7 argues for
+the second name because *"one session, two meanings is how privilege confusion bugs happen"*.
+`req.session` is single-valued, so mounting a second instance would have reintroduced exactly
+that under a nicer name. `platform_sessions` holds an opaque 32-byte id and
+`platform/session.ts` is the only file in the codebase that reads `endur.ops`.
+
+**`DEC-073` — suspension is enforced on the resolution source.** `19` §6 and `70` both require
+it to cut the customer's staff and not their respondents. `tenantResolver` is the only file
+that knows *how* a tenant was resolved, so `via === 'session'` is the only place that sentence
+can be written at all. Checking at login would have left every live staff session working.
+
+**MFA is built, not deferred.** RFC 6238 in forty lines of `node:crypto` and no dependency —
+an HMAC, a counter and a modulo. `mfa_secret` is NOT NULL so there is no "not set up yet"
+state to fall through, and login answers one message for all three failures. `npm run ops:code
+-w @endur/api` prints a live code, so the demo can show MFA rather than apologise for it.
+
+**Not built, and written into `19` §13b rather than left to discover:** `/platform/analytics`
+is `T-067`'s (its four decisions *are* that task), the log routes are `T-077`'s, and the
+message endpoint stores the record without sending mail — there is no mail transport in this
+product, and the record is the half `70` actually argues for.
+
+**Next:** `T-066` (`/ops`), `T-067` (`/ops/analytics` + endpoint), `T-077` → `T-078`.
+
+---
+
+### 2026-08-25 · T-075 + T-076 — the activity log, and its first reader
+
+**`audit_log` has been written on every state change since `T-013` and had never once been
+read.** That is a whole invariant's worth of evidence — INV-007, the transaction-bound row
+carrying `decided_by` — sitting in a table with no reader. `/app/logs` is the reader.
+
+**440 backend (+7) + 852 frontend (+9) = 1,292 tests, all green.** Typecheck, lint,
+`audit:drift`, `audit:vocab` clean. One migration applied locally.
+
+**`audit_log.outcome` did not exist in the database.** `10` §5 has carried the column since
+23 Aug and the table had not, because nothing had ever read `audit_log` — and a column no
+writer sets is a column no reader can trust. It landed **with its reader**, `DEFAULT 'allowed'`:
+every row written before today described something that happened, which is exactly what
+`allowed` means. Backfilling it any other way would be inventing history.
+
+**Which refusals get written — two conditions, not one (`DEC-068`).** `DEC-041` says
+*"mutating capabilities only"* and `56` gives the reason in terms of the **method**: a 403 on
+a GET is the permission system working correctly, thousands of times a day. Both readings are
+right about different mistakes, so both are applied — nothing is written for a `GET`, and
+nothing for a `*.read`. The second is the belt to the first: a read is occasionally shaped
+like a write, and `POST /authz/simulate` asks a question and changes nothing.
+
+**A 404 is recorded too.** To the caller it is indistinguishable from a 403 by design (`13`
+§5). To the organisation it is the more interesting of the two: somebody reached for a
+resource so far outside their scope that we would not confirm it exists.
+
+**The writer sits beside `flushAudit`, in `db/tx.ts`, not in the middleware.** `ip` and
+`actor` are decided by `DEC-040` and `DEC-045` there and nowhere else, and a second writer is
+a second place those rules have to be remembered — which is `DEC-040`'s entire lesson. It is
+**not in a transaction**: INV-007 binds a row to the mutation it describes, and a refusal
+describes a mutation that never happened. And it **can never replace the 403** — a log that
+turns a refusal into a 500 makes the product less safe than not having one, so the write is
+swallowed on failure.
+
+**`DecidedBy` was two shapes under one name (`DEC-069`).** `errors.ts` exported
+`{via, subjectName?, scope?}` for the 403 detail; the resolver's `describe()` emits seven
+fields, and **both cross the wire from the same function**. A second declaration would have
+compiled and drifted. They are now one type — which is exactly the argument `24` §6c makes for
+`<DecisionTrace>` being one component, made one layer down.
+
+**`<DecisionTrace>` is finally built**, catalogued 23 Aug with no caller. It took a `tense`
+prop so one component can say *"Allowed by the Dean role"* about a real event and *"Would be
+allowed by"* about a hypothetical one — `42` is the other tense and `T-054` **extends this,
+never forks it** (INV-009). Its full form says the scope **in words**: *"that ward and
+everything under it"*, never `own_unit`, because a raw column name on screen is a leak of a
+different kind.
+
+**Scope is filtered over the TARGET, in SQL, before the page query (`DEC-070`).** `56` is
+explicit: a row is visible when the thing acted upon is in scope, not when the actor is —
+*an owner acting on your department is your business*. Four target types live in a unit and a
+campaign's is its **subjects'** units, the predicate `40` and `58` already share. Everything
+else is org-level and only `all` sees it. Running it before the query is what makes
+`meta.total` a real count of what the caller may see rather than a count of what exists with
+rows dropped afterwards.
+
+**Wrapped in `RequireCapability`, unlike Analysis and Reflect.** Those two are unwrapped
+because each has a 402 a route guard cannot express. There is none here — a log is not a tier
+feature — so the guard can say everything there is to say. The page renders its own 403 as
+well, because a caller can hold `audit.read` in the `/auth/me` map and still be refused by the
+API, and the client never decides that.
+
+**What is not built and is not pretended:** the actor filter has no picker (the query
+parameter works, so a link with one in it works today), `<PersonChip>` was never built
+anywhere and the actor cell renders the name, and the expanded trace has **no `considered`
+list to show** — `decided_by` stores the deciding grant, and storing the rejected candidates
+would multiply the row size of the one table that is kept forever. All three are written into
+`56` § What is not built.
+
+**`audit.read` is seeded `all` at L1 and nowhere else**, so no demo account below the founder
+sees the item at all. That is the matrix, not an oversight.
+
+---
+
+### 2026-08-25 · T-083, T-084, T-085 — the improve loop, and the last "Soon" tag
 
 Stage 9 is complete. **433 backend (+10) + 843 frontend (+7) = 1,276 tests, all green.**
 Typecheck, lint, `audit:drift`, `audit:vocab` clean. One migration applied locally.

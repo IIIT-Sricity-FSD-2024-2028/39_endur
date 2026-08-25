@@ -4,7 +4,8 @@ Phase: P2 · Milestone: M0 · Owns: `src/frontend/components/**`
 Design ref: `design_specs/design/09-COMPONENTS-AND-PATTERNS.md` — **authoritative for anatomy**
 
 Thirty components — `<TrendLine>` and `<ThemeTable>` joined at `T-082` (where `<TrendChip>`
-was also finally built), `<GapBar>` and `<UpgradeCard>` at `T-084`. **A page doc may not invent a component** — if a screen needs something
+was also finally built), `<GapBar>` and `<UpgradeCard>` at `T-084`. `<DecisionTrace>` was
+**built at `T-076`**, having been catalogued since 2026-08-23 with no caller. **A page doc may not invent a component** — if a screen needs something
 not listed here, that is a design decision and it gets added here first
 (`design_specs/design/09` preamble).
 
@@ -715,10 +716,25 @@ that machinery, not a second charting approach.
 Four components added 2026-08-23 with `56`, `57`, `58` and `72`. `<LogViewer>` is
 internal-only; the other three are customer-facing.
 
-### `<DecisionTrace>`
+### `<DecisionTrace>` — BUILT `T-076`
 ```ts
-{ decision: Decision; compact?: boolean }
+{ decision: Trace; compact?: boolean }
+
+type Trace = {
+  decidedBy: DecidedBy | null;
+  /** Present tense for the simulator, past tense for the log. Defaults to past. */
+  tense?: 'past' | 'present';
+  considered?: Array<{ grantId; via; scope; effect; rejectedBecause? }>;
+};
 ```
+**Looser than the resolver's `Decision`, and deliberately so.** An audit row carries the
+deciding grant and nothing else — no `capability`, no `allowed`, no `considered` — so a prop
+typed as the full `Decision` would have forced `56` to fabricate three fields to render one.
+`DecidedBy` itself is now **one type in `packages/shared/src/errors.ts`** carrying both a 403
+body's trace and an audit row's; it was two shapes under one name until `T-076`.
+
+`tense` is what stops one component saying *"Allowed by the Dean role"* about something that
+has not happened. `42` passes `present`; `56` takes the default.
 Renders a resolver `Decision` (`11` § The decision trace) as readable prose: what was asked,
 what answered, and — when `compact` is false — the `considered` list with each grant's
 `rejectedBecause`.
@@ -849,8 +865,9 @@ builds a second shell.
 ## 9. Acceptance
 
 - [~] Thirty-one components exist with the documented prop types — twenty-six through
-      2026-08-23 morning, plus the `<AccessNotice>` pattern in §7 (`T-070`). `<DecisionTrace>`,
-      `<InviteLink>`, `<ResponseCard>` and `<LogViewer>` are still unbuilt
+      2026-08-23 morning, plus the `<AccessNotice>` pattern in §7 (`T-070`). `<InviteLink>`
+      and `<LogViewer>` are still unbuilt; `<ResponseCard>` landed at `T-080` and
+      `<DecisionTrace>` at `T-076`
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
 - [ ] `<WordsEditor>` has exactly one implementation, used by wizard step 4 and by `41`
@@ -859,8 +876,15 @@ builds a second shell.
       rather than by reading the imports
 - [ ] `<ConfirmDialog>` cannot be rendered without a `consequence` — it is a required prop
 - [ ] `<TrendChip>` always renders an arrow
-- [ ] `<DecisionTrace>` has exactly one implementation, used by `42` and `56`
-- [ ] `<DecisionTrace compact>` renders correctly when `considered` is absent
+- [~] `<DecisionTrace>` has exactly one implementation — `T-076` built it for `56`. `42` is
+      unbuilt, so the second caller does not exist yet and the claim is half-tested; `T-054`
+      **extends this component, never forks it** (INV-009)
+- [x] `<DecisionTrace compact>` renders correctly when `considered` is absent — `T-076`.
+      It is absent from EVERY audit row, not only from a production 403, so the compact form
+      never had a caller that supplied one
+- [x] `<DecisionTrace>` renders a row with no recorded grant rather than a blank cell —
+      `T-076`. A log that drops the rows it cannot fully explain is a log that can be edited
+      by confusing it
 - [ ] `<ResponseCard>` has no prop that requires the Analyze layer
 - [x] `<TrendChip>` renders no colour when no `valence` is passed — `T-082`
 - [x] `<ThemeTable>` opens a row from a `<button>`, never from a row click — `T-082`

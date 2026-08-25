@@ -13,6 +13,7 @@ import {
 } from '../authz/index.js';
 import { AppError, ForbiddenError, NotFoundError, UnauthenticatedError } from '../lib/errors.js';
 import { isProd } from '../lib/config.js';
+import { writeDenial } from '../db/tx.js';
 
 export type CapabilityOptions = {
   /**
@@ -64,6 +65,7 @@ async function guard(req: Request, capability: Capability, opts: CapabilityOptio
       memo: (req.ctx.visibilityMemo ??= new Map()) as never,
     });
     if (seesNothing(visibility)) {
+      await record(req, capability);
       throw new ForbiddenError('You do not have permission to do this.');
     }
     return;
@@ -92,9 +94,31 @@ async function guard(req: Request, capability: Capability, opts: CapabilityOptio
   // but may not act on answers 403 WITH the trace, because that is actionable — it tells
   // them whom to ask.
   if (decision.reason === 'out_of_scope' && (await invisible(req, capability, opts))) {
+    await record(req, capability, decision);
     throw new NotFoundError();
   }
+  await record(req, capability, decision);
   throw forbidden(decision);
+}
+
+/**
+ * DEC-041. Write the refusal — for MUTATING capabilities only.
+ *
+ * Two conditions, and they catch different mistakes. The METHOD is the doc's own wording:
+ * *"a 403 on a GET is the permission system working as designed, thousands of times a
+ * day"*, and logging those produces a table nobody can read. The CAPABILITY is the belt to
+ * that brace, because a read is occasionally shaped like a write — `POST /authz/simulate`
+ * asks a question and changes nothing, and a simulator run that a caller may not perform
+ * is not a security event.
+ *
+ * A 404 is recorded too. From the caller's side it is indistinguishable from a 403 by
+ * design (13 §5), but from the ORGANISATION'S side it is the more interesting of the two:
+ * somebody reached for a resource so far outside their scope that we would not confirm it
+ * exists.
+ */
+async function record(req: Request, capability: Capability, decision?: Decision): Promise<void> {
+  if (req.method === 'GET' || capability.endsWith('.read')) return;
+  await writeDenial(req, capability, decision?.decidedBy);
 }
 
 /**

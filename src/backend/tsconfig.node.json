@@ -10,6 +10,7 @@
   // only; it emits declarations and nothing else.
   "include": ["*.config.ts", "database/seed/**/*.ts", "test/**/*.ts",
               "*.ts", "auth/**/*.ts", "authz/**/*.ts", "billing/**/*.ts", "db/**/*.ts",
-              "features/**/*.ts", "lib/**/*.ts", "middleware/**/*.ts", "presets/**/*.ts"],
+              "features/**/*.ts", "lib/**/*.ts", "middleware/**/*.ts", "platform/**/*.ts",
+              "presets/**/*.ts"],
   "exclude": ["dist", "dist-config", "node_modules"]
 }

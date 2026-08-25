@@ -37,6 +37,9 @@ describe('the three route trees', () => {
     // a 403 and a 402 and a route guard knows nothing about entitlements.
     '/app/analysis',
     '/app/reflect',
+    // T-076. WRAPPED in RequireCapability, unlike the two above — there is no 402 on the
+    // log, so a route guard can say everything there is to say (56 § States).
+    '/app/logs',
     '/r/:token', '/r/:token/done',
   ])('serves %s', (path) => {
     expect(paths.has(path)).toBe(true);

@@ -61,11 +61,29 @@ export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
     if (req.ctx.orgId) return next();
 
     void resolve(req, opts)
-      .then(async (orgId) => {
+      .then(async ({ orgId, via }) => {
         if (orgId) {
+          const tenant = await factsOf(orgId);
+          // T-059, 19 §6. SUSPENSION CUTS THE STAFF SESSION AND NOTHING ELSE, and this is
+          // the one line in the codebase that can express that distinction — because it is
+          // the only place that knows HOW the tenant was resolved.
+          //
+          // A suspended organisation's campaigns keep running and its QR codes keep
+          // answering: a respondent token (strategy 3) resolves the same org through the
+          // same middleware and is deliberately not refused here. Punishing the customer's
+          // respondents for the customer's billing problem is the mistake `16` §6 already
+          // rules out, and `70` says so again in words.
+          //
+          // Checking here rather than at login is what makes a suspension take effect on
+          // the next REQUEST rather than at the next sign-in — the same property permissions
+          // get from being resolved per request instead of read from a session claim.
+          if (via === 'session' && tenant.suspendedAt) {
+            return next(
+              new AppError('FORBIDDEN', 'This organization has been suspended. Contact Endur support.'),
+            );
+          }
           req.ctx.orgId = orgId;
           req.db = tenantClient(orgId);
-          const tenant = await factsOf(orgId);
           req.ctx.authzVersion = tenant.authzVersion;
           req.ctx.labels = tenant.labels;
           return next();
@@ -89,20 +107,29 @@ export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
  * a column to a read that runs anyway is the difference between doing it and deciding it
  * costs a query per request.
  */
-async function factsOf(orgId: string): Promise<{ authzVersion: number; labels: ResolvedLabels }> {
+async function factsOf(
+  orgId: string,
+): Promise<{ authzVersion: number; labels: ResolvedLabels; suspendedAt: Date | null }> {
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { settings: true, labels: true },
+    // `suspendedAt` rides along for the same reason `labels` did (T-044): this query was
+    // already happening, so the check costs nothing per request.
+    select: { settings: true, labels: true, suspendedAt: true },
   });
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
   return {
     authzVersion: typeof settings.authzVersion === 'number' ? settings.authzVersion : 0,
     labels: resolveLabels(org?.labels as LabelSet | null),
+    suspendedAt: org?.suspendedAt ?? null,
   };
 }
 
+/** Which strategy answered. `via` is what lets a suspension cut staff without cutting
+ *  respondents — see the check in the factory above. */
+type Resolved = { orgId?: string | undefined; via?: 'activation' | 'session' | 'token' | 'slug' };
+
 /** Strict priority. Each source is a credential the caller could not have forged. */
-async function resolve(req: Request, opts: TenantResolverOptions): Promise<string | undefined> {
+async function resolve(req: Request, opts: TenantResolverOptions): Promise<Resolved> {
   // 0 · ACTIVATION TOKEN — /api/v1/auth/activate/:token (57). THE ONE STRATEGY THAT
   //     OUTRANKS A SESSION, and it needs the argument spelled out because "strict priority"
   //     is otherwise the whole rule.
@@ -123,13 +150,13 @@ async function resolve(req: Request, opts: TenantResolverOptions): Promise<strin
       where: { tokenHash: hashInviteToken(activation) },
       select: { orgId: true },
     });
-    return invite?.orgId;
+    return { orgId: invite?.orgId, via: 'activation' };
   }
 
   // 1 · API key  — T-007 attaches the parsed key; its org_id wins.
   // 2 · Session  — the signed-in user's orgId, set by express-session (T-007).
   const session = (req as { session?: { orgId?: string } }).session;
-  if (session?.orgId) return session.orgId;
+  if (session?.orgId) return { orgId: session.orgId, via: 'session' };
 
   // 3 · Respondent token — the campaign's org. The token is in the PATH, never a body.
   // The FULL prefix, including /campaigns/. The earlier pattern matched the segment after
@@ -148,7 +175,7 @@ async function resolve(req: Request, opts: TenantResolverOptions): Promise<strin
     });
     // A bad token resolves to nothing here and becomes a uniform 404 later (13 §6) —
     // never a "wrong organisation" hint that would confirm the token's shape.
-    return campaign?.orgId;
+    return { orgId: campaign?.orgId, via: 'token' };
   }
 
   // 4 · Slug header — ONLY where the router said so, so it can never widen the access of
@@ -157,8 +184,8 @@ async function resolve(req: Request, opts: TenantResolverOptions): Promise<strin
     const slug = req.get('x-org-slug');
     if (slug) {
       const org = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });
-      return org?.id;
+      return { orgId: org?.id, via: 'slug' };
     }
   }
-  return undefined;
+  return {};
 }

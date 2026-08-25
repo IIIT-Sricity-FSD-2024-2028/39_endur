@@ -52,7 +52,9 @@ import { filesRouter } from './features/files/router.js';
 import { profileRouter } from './features/profile/router.js';
 import { analysisRouter } from './features/analysis/router.js';
 import { checkinsRouter, reflectRouter } from './features/improve/router.js';
+import { auditRouter } from './features/audit/router.js';
 import { inboxRouter } from './features/inbox/router.js';
+import { platformRouter } from './features/platform/router.js';
 import { mount } from './lib/mount.js';
 
 export function createApp() {
@@ -139,6 +141,15 @@ export function createApp() {
   // is the supervisor's side of it, and 44 § Route & access names them separately.
   mount(app, '/api/v1/reflect', reflectRouter);
   mount(app, '/api/v1/checkins', checkinsRouter);
+  // T-075. The organisation's OWN log — audit_log, read with audit.read. Endur's log FILES
+  // are a different principal, a different store and a different route tree (72, DEC-043).
+  mount(app, '/api/v1/audit', auditRouter);
+  // T-059. THE FOURTH WORLD (19). A separate account table, a separate cookie, a separate
+  // capability catalogue and a separate database seam — mounted here beside the others and
+  // sharing nothing with them but the error funnel. It runs NO tenantResolver, NO
+  // authenticate and NO csrfProtection: a platform request resolves no organisation, and
+  // its principal comes from `endur.ops`, which nothing else in this file reads.
+  mount(app, '/api/v1/platform', platformRouter);
   // Serving uploaded bytes. Its own chain — no tenant, no principal, no CSRF (48).
   mount(app, '/api/v1/files', filesRouter);
 

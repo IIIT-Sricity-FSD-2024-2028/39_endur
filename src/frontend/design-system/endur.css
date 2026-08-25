@@ -3337,3 +3337,64 @@ html:active-view-transition * {
 @media (max-width: 640px) {
   .plan-item { flex-direction: column; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   T-076 · the activity log — 56, design_specs/design/04 §4
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.logs-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+/* A TOGGLE, not a buried dropdown. Refusals-only is what turns this page from a business
+   record into a security screen, and 56 § Interactions puts it in the open for that
+   reason. */
+.logs-filters { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+.logs-when { white-space: nowrap; }
+.logs-action { font-weight: 600; }
+.logs-actor { font-weight: 600; }
+
+.logs-why { display: flex; flex-direction: column; gap: var(--space-1); }
+.logs-expand {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: var(--color-accent); text-align: left;
+}
+.logs-expand:hover { text-decoration: underline; }
+.logs-trace {
+  margin-top: var(--space-1); padding: var(--space-2);
+  border-radius: var(--radius-sm); background: var(--color-neutral-100);
+}
+.logs-request { margin: var(--space-1) 0 0; font-variant-numeric: tabular-nums; }
+
+.logs-skeleton { display: flex; flex-direction: column; gap: 6px; }
+.logs-skeleton .skeleton-row { max-width: none; }
+
+.logs-more {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* ── <DecisionTrace> — 24 §6c ───────────────────────────────────────────────
+   ONE component, two placements: 42's simulator and 56's log. The styles live here
+   rather than in either page for the same reason the component does. */
+
+.trace-compact { font-size: 12px; line-height: 1.4; }
+.trace-verb { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+/* Never colour alone (21 §8): a deny already SAYS "Blocked by", and the tint only
+   confirms what the word already carried. */
+.trace.is-deny .trace-verb { color: var(--status-bad-800); }
+.trace-none { font-style: italic; }
+
+.trace-full { display: flex; flex-direction: column; gap: var(--space-2); }
+.trace-sentence { margin: 0; }
+.trace-heading { margin: 0; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.trace-considered { margin: 0; padding-left: var(--space-4); display: flex;
+  flex-direction: column; gap: var(--space-1); }
+.trace-considered-what { font-size: 12px; }
+
+@media (max-width: 640px) {
+  .logs-controls { flex-direction: column; align-items: stretch; }
+}
