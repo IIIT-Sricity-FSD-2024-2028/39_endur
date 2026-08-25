@@ -46,6 +46,10 @@ export const PLATFORM_CAPABILITY_CATALOGUE = {
     roles: BOTH,
     note: 'The rotating application log files (18 §2) through 72. Safe under INV-011 because 18 §3 already guarantees no body, no credential and no respondent identity reaches a log line',
   },
+  'platform.logs.export': {
+    roles: BOTH,
+    note: 'A filtered COPY of a log file, downloaded (72 § Interactions, DEC-074). Separate from platform.logs.read on purpose: a read is a page on a screen, an export is a file that outlives the session and the retention window',
+  },
   'platform.operator.manage': { roles: OWNER_ONLY, note: 'Create, disable and re-role operator accounts' },
 } as const satisfies Record<string, Entry>;
 

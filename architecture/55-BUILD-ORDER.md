@@ -469,6 +469,12 @@ drill-through quality, and cycle-over-cycle measurement. *Analysis and the impro
 themselves moved into Stage 7 by `CONF-019`; `OPEN-003` was resolved by `DEC-042` to unblock
 the first of them.*
 
+### 9c · The log export — DEC-074
+
+| id | lane | needs | what | spec |
+|---|---|---|---|---|
+| **T-090** ✅ | A | T-077, T-078 | **BUILT 2026-08-26. An operator can export a log file, and the copy is audited.** Asked for by the owner directly, and it **supersedes `72` § Out of scope's "no download" row** — whose objection was never *"diagnostics must not leave"* but *"with no audit of where it went"* (`DEC-074`). New capability `platform.logs.export` (BOTH roles, its own capability rather than folded into `platform.logs.read`, because a read is a page on a screen and an export is a file that outlives the session and the retention window), one route, `ndjson` and `csv`, the **same** filters as the view and the **same** name allowlist as the read — a guard applied on one of two routes is not a guard. Chronological and capped, and a capped export says so. Also: `<LogViewer>`'s classes had **no CSS at all** since `T-078`, and the page now names the directory the files are written to (`18` §2) | `72`, `19` §4, `DEC-074` |
+
 ---
 
 ## Rules

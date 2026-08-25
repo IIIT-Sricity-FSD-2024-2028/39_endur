@@ -9,8 +9,10 @@ import type { Request } from 'express';
 import type {
   AnalyticsQuery,
   EstateQuery,
+  LogExportQuery,
   LogFileMeta,
   LogLine,
+  LogStoreMeta,
   LogReadQuery,
   PlatformAnalytics,
   PlatformAuditEntry,
@@ -25,7 +27,10 @@ import { platformClient } from '../../platform/db.js';
 import { writeAudit } from '../../platform/audit.js';
 import { hashPassword } from '../../auth/password.js';
 import { generateSecret, otpauthUrl } from '../../platform/totp.js';
-import { listLogFiles, readLogFile } from '../../platform/logs/index.js';
+import { listLogFiles, readLogFile, exportLogFile } from '../../platform/logs/index.js';
+import { logDir, logToFile } from '../../lib/logger.js';
+import { config } from '../../lib/config.js';
+import type { LogExportResult } from '../../platform/logs/index.js';
 import { ConflictError, NotFoundError, UnauthenticatedError } from '../../lib/errors.js';
 import { afterCursor, encodeCursor, decodeCursor, type Paged } from '../../lib/paginate.js';
 
@@ -765,6 +770,18 @@ export function listOperatorLogFiles(): LogFileMeta[] {
   return listLogFiles();
 }
 
+/** `18` §2 — where the files are written, how big a rotation gets and how long one survives.
+ *  Read straight off the live config rather than restated, so the screen cannot claim a
+ *  retention the writer is not honouring. */
+export function logStoreMeta(): LogStoreMeta {
+  return {
+    dir: logDir,
+    enabled: logToFile,
+    retentionDays: config.LOG_RETENTION_DAYS,
+    maxSizeMb: config.LOG_MAX_SIZE_MB,
+  };
+}
+
 /**
  * `72` § Acceptance — "reading logs writes a `platform_audit_log` row. Reading is an operator
  * action and is audited like one." This is the one place in the platform surface a GET writes:
@@ -784,6 +801,40 @@ export async function readOperatorLogFile(
     writeAudit(tx, req, 'logs.read', null, {
       file: fileName,
       ...(query.requestId ? { requestId: query.requestId } : {}),
+    }),
+  );
+
+  return result;
+}
+
+/**
+ * `DEC-074` — the export, and its audit row is the entire reason `72` § Out of scope could
+ * reverse its "no download" position rather than argue around it. A read is a page on a
+ * screen; this is a file that outlives both the session and the fourteen-day retention
+ * window, so the row carries the format, EVERY filter and how many lines actually left.
+ *
+ * Written after a successful export for the same reason `logs.read`'s is: the copy is disk,
+ * not the database, so there is no mutation for INV-007 to bind the row to.
+ */
+export async function exportOperatorLogFile(
+  req: Request,
+  fileName: string,
+  query: LogExportQuery,
+): Promise<LogExportResult> {
+  const result = exportLogFile(fileName, query);
+
+  await db.$transaction((tx) =>
+    writeAudit(tx, req, 'logs.export', null, {
+      file: fileName,
+      format: query.format,
+      lines: result.lines,
+      truncated: result.truncated,
+      ...(query.level !== undefined ? { level: query.level } : {}),
+      ...(query.status !== undefined ? { status: query.status } : {}),
+      ...(query.path ? { path: query.path } : {}),
+      ...(query.orgId ? { orgId: query.orgId } : {}),
+      ...(query.requestId ? { requestId: query.requestId } : {}),
+      ...(query.q ? { q: query.q } : {}),
     }),
   );
 

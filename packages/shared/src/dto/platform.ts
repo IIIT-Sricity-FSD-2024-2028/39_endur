@@ -120,6 +120,21 @@ export const LogReadQuery = PageQuery.extend({
 export type LogReadQuery = z.infer<typeof LogReadQuery>;
 export const LogReadDto = dto({ params: LogFileParam, query: LogReadQuery });
 
+/**
+ * `72` § Interactions, `DEC-074`. The same filters as a read — an export is the screen you
+ * are looking at, as a file, and a second filter vocabulary would make the two diverge — minus
+ * `cursor`, because an export is not paginated, and plus a format.
+ *
+ * `ndjson` is the lossless one and is the default: it carries `extra`, which is the field that
+ * makes an unexpected key on a log line visible AS unexpected (`72` § Data contract). `csv` is
+ * a fixed column set for somebody who will open it in a spreadsheet.
+ */
+export const LogExportQuery = LogReadQuery.omit({ cursor: true, limit: true }).extend({
+  format: z.enum(['ndjson', 'csv']).default('ndjson'),
+});
+export type LogExportQuery = z.infer<typeof LogExportQuery>;
+export const LogExportDto = dto({ params: LogFileParam, query: LogExportQuery });
+
 // ---------------------------------------------------------------------------
 // Responses
 // ---------------------------------------------------------------------------
@@ -236,6 +251,18 @@ export type LogFileMeta = {
   /** `null` when the file is larger than the count threshold — counting is not free */
   lines: number | null;
   modifiedAt: string;
+};
+
+/**
+ * Where the files ARE, alongside the list of them. `18` §2 says logs are written to disk
+ * automatically and rotated; an operator looking at a log screen should not have to read a
+ * config file to find out where that disk is, or how long what they are looking at survives.
+ */
+export type LogStoreMeta = {
+  dir: string;
+  enabled: boolean;
+  retentionDays: number;
+  maxSizeMb: number;
 };
 
 /**

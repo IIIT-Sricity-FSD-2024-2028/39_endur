@@ -80,3 +80,40 @@ export const opsPost = <TIn, TOut>(path: string, body?: TIn): Promise<TOut> =>
   request<TOut>('POST', path, body);
 export const opsPatch = <TIn, TOut>(path: string, body: TIn): Promise<TOut> =>
   request<TOut>('PATCH', path, body);
+
+/**
+ * `DEC-074` — an export is a file, not JSON, so it does not go through `request()`: it needs
+ * the Blob and the server's filename rather than a parsed body.
+ *
+ * The download is triggered from a Blob URL rather than by pointing the browser at the URL,
+ * because the response is only authorised by the `endur.ops` cookie and a plain navigation
+ * to a 403 would replace the page the operator is working in with an error envelope.
+ */
+export async function opsDownload(path: string): Promise<{ name: string; lines: number; truncated: boolean }> {
+  const response = await fetch(BASE + path, { method: 'GET', credentials: 'include' });
+  if (!response.ok) {
+    const error = toError(response, await parse(response));
+    if (error.status === 401) onUnauthenticated?.();
+    throw error;
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const name = match?.[1] ?? 'export.ndjson';
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+
+  return {
+    name,
+    lines: Number(response.headers.get('X-Log-Lines') ?? 0),
+    truncated: response.headers.get('X-Log-Truncated') === 'true',
+  };
+}

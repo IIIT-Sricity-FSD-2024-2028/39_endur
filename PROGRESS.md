@@ -5,7 +5,105 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-26  (T-059 BUILT — THE PLATFORM BACKEND. /ops HAS A DOOR. a separate
+UPDATED   2026-08-26  (D-031 REPAID — THE DEMO DATABASE RECREATED, AND IT WAS WIDER
+                       THAN FILED. the four demo orgs had 103 grants, ZERO account.* and
+                       NO SUBSCRIPTION ROW AT ALL — so it was never only the invite flow,
+                       every tier-gated screen was dead too. requireEntitlement fell
+                       through to its BRONZE backstop on an org the seed calls GOLD,
+                       which is the failure demo.ts's own comment warns about.
+                       AFTER: gold / silver / bronze / enterprise, active, 130 grants and
+                       5 account.* each. seedOrg SKIPS an existing slug by design, so no
+                       re-seed could have reconciled them — the reset was the fix and it
+                       was the owner's call. prisma refused the destructive command from
+                       an agent, correctly, and the owner ran it.
+                       THE OPERATORS NEEDED NOTHING: owner@endur.test (superuser) and
+                       support@endur.test (Endur admin) have been in operators.ts since
+                       T-059, deterministic TOTP so MFA works at rehearsal.
+                       FOUND D-037, LIVE: 65 junk orgs and 36 stray platform users dated
+                       25 Aug — FOUR DAYS AFTER T-048 closed D-004. the guard is not weak,
+                       it is SKIPPABLE. globalSetup/setupFiles live in src/backend/
+                       vitest.config.ts and THERE IS NO VITEST CONFIG AT THE REPO ROOT, so
+                       `npx vitest run` from the root points a suite that truncates and
+                       rewrites at the DEVELOPMENT database. npm test is safe; the
+                       DANGEROUS COMMAND IS THE SHORTER ONE. fix before T-045 or the fresh
+                       seed is re-polluted before the rehearsal.
+                       Earlier: DEC-076 — THE POWERS GRID NOW SAYS WHAT IT MEANS.
+                       the owner called /app/roles "too jargon based even for a superuser"
+                       and was right: `tree` is the SHAPE OF THE DATA STRUCTURE the scope
+                       walks, `self` reads as "their own department" to anybody who has not
+                       read 11 §4, and `L1` invites the one belief the GRANT model exists to
+                       deny — that a lower number means more power. a grid whose whole
+                       argument is that mistakes become VISIBLE only works if the reader can
+                       read it.
+                       CELLS NOW READ: No / Themselves / Their {unit} / Their {unit} + below
+                       / Everywhere / Blocked — in the TENANT'S noun. INV-001 applies to both
+                       axes of this grid and only one of them had ever been done: D-008 fixed
+                       the row labels and left the cells saying "unit" to an organisation that
+                       calls them something else. scope-labels.ts is the same table for the
+                       other axis, and the nonsense-label fixture now covers the cells.
+                       THE CLICK-CYCLE IS GONE, not supplemented. it could only reach a state
+                       by passing through states nobody asked for, it did not work on touch at
+                       all, and its companion — shift-click for a hard block — hid the page's
+                       most consequential action behind a modifier key. one dropdown of six
+                       named choices, a legend above the grid explaining all six once, and a
+                       visible "Set all…" where a click on the ROW LABEL used to silently
+                       grant a power to every role.
+                       A NATIVE <select>, not a popover: the grid lives in a horizontal scroll
+                       container that clips anything positioned inside it, so a custom menu
+                       would have needed a portal, a focus trap and a keyboard map to arrive
+                       at what the browser already ships correct on a phone and to a screen
+                       reader.
+                       FOUND: `.powers-module` was TWO CLASSES WITH ONE NAME — T-051's
+                       powers-by-place list and T-052's module header <tr> — so the grid's
+                       group headers were laid out by a rule written for another screen.
+                       21 tests on the page, green.
+                       Earlier: DEC-075 — THE LOG FILES ARE NOW WRITTEN FOR A PERSON TO READ.
+                       the owner asked for the bracketed form and that is what is on disk:
+                       [2026-08-26 01:34:58 UTC+05:30] [11996] [INFO] [HTTP] GET /healthz
+                       200 7ms req=… — local time with the offset, pid, level, a TAG the
+                       eye can scan (HTTP / the error code / APP), the human sentence, then
+                       everything else as key=value. STDOUT STILL GETS THE JSON: one logger,
+                       one record, two renderings, because a pipeline and a person at 2am
+                       want opposite things.
+                       THE FORMAT IS REVERSIBLE AND THAT IS THE WHOLE SAFETY ARGUMENT.
+                       /ops/logs and the T-090 export read these files back through
+                       platform/logs/parser.ts, so a format that were merely prettier would
+                       have silently broken the viewer. lib/logFormat.ts owns the grammar
+                       and the parser IMPORTS it rather than restating it. one record is
+                       one line whatever a stack trace holds. 10 new tests, all round trips.
+                       THE PARSER STILL READS PINO JSON — files written before the change
+                       are inside the 14-day window and blanking a week of history is not
+                       an acceptable way to change a log format. the 1,548 lines already on
+                       disk were converted in place, each one verified to parse back to the
+                       same record BEFORE it was rewritten.
+                       PID COMES FROM THE RECORD (loggerOptions.base gained it), and prints
+                       `-` when there is none — never process.pid at format time, because a
+                       log file spans restarts and a converted old line stamped with today's
+                       pid is a fabricated fact.
+                       Earlier: T-090 BUILT — THE LOG EXPORT, AND DEC-074 REVERSES A "NO" IN 72.
+                       an operator can now download a filtered log file as ndjson or csv,
+                       and EVERY EXPORT IS AUDITED — which is the whole reason the refusal
+                       could be reversed rather than argued around: 72 § Out of scope did
+                       not say "diagnostics must not leave", it said "a copy with NO AUDIT
+                       of where it went". platform.logs.export is its OWN capability (both
+                       roles) because a read is a page on a screen and an export is a file
+                       that outlives the session AND the 14-day retention window.
+                       THE OTHER HALF OF THE ASK WAS ALREADY TRUE. logs have been written
+                       to src/backend/logs/app-<date>.log and error-<date>.log, rotated
+                       and retained, since Stage E. what was missing is that the SCREEN
+                       never said where — the page header now names the directory, the
+                       rotation size and the retention, read off live config.
+                       THE EXPORT SHARES THE READER'S NAME ALLOWLIST, never a second copy:
+                       a guard applied on one of two routes is not a guard. it reads
+                       FORWARD where the viewer reads backwards, and a capped export says
+                       so rather than losing its tail silently.
+                       FOUND: <LogViewer> HAD NO CSS AT ALL since T-078 — every class it
+                       shipped had no rule anywhere. /ops/logs rendered as an unstyled
+                       stack and now does not.
+                       NOT MINE AND SAID SO: 4 pre-existing tsc errors (D-035) and one
+                       pre-existing failing pagination test (D-036), both confirmed
+                       against a stashed tree.
+                       Earlier: T-059 BUILT — THE PLATFORM BACKEND. /ops HAS A DOOR. a separate
                        account table with NO org_id, a separate cookie (endur.ops), a
                        separate capability catalogue, a separate database seam and 13
                        routes under /api/v1/platform. 459 backend (+19) + 852 frontend
@@ -989,6 +1087,7 @@ Both were built the same day, along with the router-level pass.
               lib/storage.ts, features/files/**. 4 routes + serving. 15 tests. DEC-036
 [x] T-062  B  <FileUpload> + apiUpload() + logo in Settings + /app/profile (partial, 47)
 [x] T-063  A  LOG + ERROR FILES. lib/logFile.ts, pino.multistream, rotation, retention
+              + lib/logFormat.ts — the on-disk line is human-readable (DEC-075, 26 Aug)
 [x] T-064  A  router-level pass. middleware/chains.ts — 4 chains, 12 routers. D-017 repaid
 [x] T-065  A  CSV size: ONE number, CSV_MAX_CHARS, BELOW the parser's. D-016 repaid
 ```
@@ -1097,6 +1196,7 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
 [x] T-076  B  /app/logs + <DecisionTrace>   ← T-054 needs the SAME component. EXTEND it
 [x] T-077  A  platform.logs.read + the file routes + path guard (72)  BUILT 25 Aug
 [x] T-078  B  /ops/logs + <LogViewer>                                    BUILT 25 Aug
+[x] T-090  A  log EXPORT + platform.logs.export (72, DEC-074)          BUILT 26 Aug
 [x] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)   BUILT 25 Aug
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
 [x] T-081  A  analysis backend, RULE-BASED (43, DEC-042)               BUILT 25 Aug
@@ -1237,6 +1337,7 @@ Full tables in `55` § Stage 9.
                 own /platform/analytics endpoint: 71's four decisions ARE the task
 [x] T-077  A  platform.logs.read + the file routes (72)    BUILT 25 Aug
 [x] T-078  B  /ops/logs + <LogViewer>                      BUILT 25 Aug
+[x] T-090  A  the EXPORT, + the viewer's missing CSS (DEC-074)  BUILT 26 Aug
 ```
 **The cost, stated once and not re-argued.** M0 is 26 Aug, two days out; `T-045` (three demo
 rehearsals) is unrun; this stage is 16 tasks — 1 + 8 + 7. The owner has asked twice and the sequence is
@@ -1370,6 +1471,9 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 | id | What | Why | Repay by |
 |---|---|---|---|
+| `D-037` | **`D-004`'s guard is bypassed by running vitest from the repo root, and that is where the 65 junk orgs came from** | Found 26 Aug while repaying `D-031`. The development database held **65 organisations named `org-n-<epoch>-<random>` and 38 platform users**, all dated **25 Aug** — four days AFTER `T-048` supposedly closed `D-004`. The slug is `test/helpers.ts`'s `unique('n')` verbatim, so the backend suite wrote them. `T-048`'s guard is real and it is not weak — but it lives in `globalSetup`/`setupFiles`, which are declared in **`src/backend/vitest.config.ts`**, and **there is no vitest config at the repo root at all**. So `npx vitest run` from the root loads no config, runs no `setupFiles`, and `lib/config.ts` reads `.env` — pointing a suite that truncates and rewrites at the **development** database, which is the precise failure `test/database.ts`'s own header calls *"losing the demo data an hour before presenting it"*. `npm test` is safe (it delegates per workspace); the ad-hoc root invocation is not, and it is the natural thing to type. **A guard that a shorter command skips is not a guard** — the same sentence `T-090` had to write about a route. Fix is small and structural: a root `vitest.config.ts` with `projects` for both workspaces, so the root command becomes correct rather than dangerous. **Until it exists, run backend tests from `src/backend` and frontend tests from `src/frontend`** | **before `T-045`** — a rehearsal against a re-polluted database is not evidence about the demo |
+| `D-035` | **Four `tsc -b` errors on the branch, none of them from a task** | Found 26 Aug during `T-090`. Three in `features/roles/service.ts` and one in `pages/console/Simulator.tsx`, all `exactOptionalPropertyTypes` — an optional property being handed `T | undefined`. **Confirmed pre-existing**: the same four appear on a stashed tree, so they arrived with the `Update codebase` commit rather than with the export. They do not block `npm run dev` (tsx does not typecheck) but they **will fail `npm run build`**, which is what a deploy and a graded checkout run. Each is a one-line `...(x ? { x } : {})` or an explicit `| undefined` on the target type | **before any build-based demo** — small, but it is the kind of thing that is discovered on stage |
+| `D-036` | **`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing** | Found 26 Aug during `T-090` and **verified pre-existing on a stashed tree**. The backwards-pagination test asserts `page1.body.page.nextCursor` is truthy and gets a falsy value, meaning the fixture no longer produces more than one page — most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing rather than the reader being wrong. The reader itself is exercised live (a 775-line export and a 45-line filtered read both came back correct). Fix is to size the fixture past one chunk deliberately, not to relax the assertion | whoever next touches `72`'s reader |
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
 | ~~`D-004`~~ | **REPAID 21 Aug by `T-048`.** `vitest.config.ts` gained a `globalSetup` (create `endur_test` if absent, then `prisma migrate deploy`) and a `setupFiles` that points each worker's `DATABASE_URL` at it **before `lib/config.ts` reads `.env`** — which works because `process.loadEnvFile()` does not overwrite an already-set variable. `TEST_DATABASE_URL` is optional; absent, it derives by appending `_test`. Two guards in `test/database.ts` refuse to run rather than trust the config: the name must end in `_test`, and it must not be the `DATABASE_URL` written in `.env`. `test/test-database.test.ts` asserts both by their failure. **The leak is closed; the puddle is not mopped** — `endur` still holds 2,880 organisations, and `npm run db:reset` is yours to run because it also drops anything you made by hand | ~~before `T-045`~~ — **done** |
@@ -1388,7 +1492,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-030` | **Three CSS custom properties are used and never defined** | Noticed 24 Aug while writing `T-052`'s stylesheet. `--color-border`, `--color-surface-2` and `--space-5` appear in `endur.css` (`.position-chip`, `.powers-place`, `.tsection`) and exist in no token file. An undefined `var()` makes the whole declaration compute to its initial value, so those borders render as **no border at all** and `.tsection` gets no margin. Subtle, shipped, and cheap: they belong to `T-050`/`T-051`/earlier, so `T-052` used real tokens and left the others alone rather than editing three tasks' styles in passing | one pass over `endur.css` |
 | ~~`D-033`~~ | **REPAID 25 Aug by `T-081` (`DEC-063`), in the task that found it.** ~~`analysis.read` is in no row of the seeded grant matrix~~ | Found 25 Aug building `T-081`, before a line of the feature existed. `analysis.read` has been in `11` §3 since `T-003` and entitled at **Silver** in `16` §3 since `T-088` — and in **no row** of `presets/grant-matrix.ts`. Not restricted, not deliberately withheld: **absent.** So no role in any organisation had ever held it, and `/api/v1/analysis` would have returned **403 to every user of every org including a Gold one** — on the exact surface `43` exists to demonstrate the clean 402-vs-403 split on. **It is `D-012` and `D-028` a third time**: `D-012` was nothing writing a subscriptions row so every org was silently Bronze; `D-028` was `account.*` and `billing.*` being in no tier at all. Here **the entitlement said yes and the grant said nothing**, which is precisely what made it look built. It survived three security passes because neither half is wrong on its own — `11` §3 correctly catalogues a P3 capability, `grant-matrix.ts` correctly seeds what exists — and **nothing compared them.** `analysis.read` was one of **ten** absent capabilities; the other nine are `reflection.*` `actionplan.*` `checkin.*` (`T-083`'s) and `apikey.*` (`45`, no route on the M0 board), and they are **left alone on purpose** — a grant to a route that does not exist cannot be tested. What is *not* left to memory: `test/routes.test.ts` now asserts that **every capability a mounted route requires is seeded to at least one level**, so `T-083` meets it the day it mounts `/api/v1/reflect` rather than the day somebody opens the page. Proved by removing the row and watching the new test fail with `['analysis.read']`. `N-062` | ~~`T-081`~~ — **done** |
 | `D-032` | **Response scope is decided at the campaign, not at the subject** | Found 25 Aug verifying `T-080` live. **Not introduced by it** — this is `40`'s behaviour, and `58` § Acceptance requires the inbox to match `40` for the same caller, which it does. A campaign is visible when *any* of its subjects sits in a unit the caller can reach; once visible, **every** response in it is returned. `readResponses` filters on `campaignId` alone and `readResults` aggregates the whole campaign unless the *client* passes a filter. Live proof: `grand-palace-3`, a level 3 anchored at **Lakeside Property** holding `response.read: own_unit`, reads all 229 comments including every one about **City Property**, and `/campaigns/:id/responses` hands them the same 210 rows and 12 distinct subjects it hands the administrator. INV-003 holds at campaign granularity and does not at subject granularity — and an org-wide campaign is the common case, not an exotic one. The inbox is where it becomes *visible*, because it puts the other property's subject name on the card where `40`'s average hid it. **Deliberately not fixed inside `T-080`:** a stricter inbox would satisfy one reading of INV-003 and break the acceptance criterion that asked for consistency, leaving two answers to one question. `N-061` | **owner's call.** It is a change to `40` first and `58` second, and it touches the k-anonymity reasoning in `52` §2 |
-| `D-031` | **The four demo organisations cannot use the invite/accounts flow, and re-seeding will not fix it** | Found 24 Aug from the powers grid's own warnings — *"Nobody in this organisation can give somebody a sign-in."* All four were seeded **21 Aug** and hold 51 capabilities; `T-072` added `account.create`, `account.reset` and `account.revoke` to `presets/grant-matrix.ts` on **24 Aug**, and existing orgs got no grant rows. `npm run db:seed` prints `skip: <name> already exists` — it creates missing orgs, it does not reconcile present ones. So a built-and-tested feature is **unreachable on stage**, and `T-073`'s Invite button would `403` for every demo org. `N-060` | **owner's call — the remedy (drop and re-seed the four) destroys any demo data entered since 21 Aug.** Before `T-045` |
+| ~~`D-031`~~ | **REPAID 26 Aug — the owner reset and re-seeded, and it was WIDER THAN FILED.** ~~The four demo organisations cannot use the invite/accounts flow, and re-seeding will not fix it~~ | Found 24 Aug from the powers grid's own warnings — *"Nobody in this organisation can give somebody a sign-in."* All four were seeded **21 Aug**; `T-072` added `account.create`/`reset`/`revoke` to `presets/grant-matrix.ts` on **24 Aug**, and existing orgs got no grant rows. `npm run db:seed` prints `skip: <name> already exists` — it creates missing orgs, it does not reconcile present ones. **Measured before the reset, the hole was bigger than the entry claimed:** the four held **103 grants, 0 × `account.*`, and NO `subscriptions` row at all** — so every tier-gated screen was dead too, not only the invite flow. `T-088` writes the subscription inside `register`'s transaction and these orgs predate it, so `requireEntitlement` was falling through to its bronze backstop on an org the seed calls Gold — a demo proving the opposite of what it claims, which is the exact failure `demo.ts`'s own comment warns about. **After `db:reset` + `db:seed`: 130 grants each, 5 × `account.*` (`create`/`reset` on both top levels, `revoke` on the top only), and `gold`/`silver`/`bronze`/`enterprise` `active` on Northfield/Grand Palace/Riverside/Meridian.** The reset also cleared **65 junk organisations and 36 stray platform users** — see `D-037`, which is how they got there | ~~before `T-045`~~ — **done** |
 | `D-025` | **`$executeRaw` slips past the DEC-007 lint rule** | Noticed 24 Aug while writing `revokeAccount()`. `DEC-007` confines raw SQL to `db/graph.ts`, and `eslint.config.js`'s selector matches **`$queryRaw`/`$queryRawUnsafe` only** — `$executeRaw` is raw SQL and is not checked. The one call that uses it today is legitimate and unavoidable: revocation deletes the target's rows from `sessions`, which is connect-pg-simple's table and **deliberately not a Prisma model** (`10` §5), so there is no ORM path to it at all. But it passes because of a **gap in the rule, not an exemption**, and that is worth writing down rather than quietly relying on. The fix is one selector plus one `eslint-disable` with a reason — small, and it belongs to whoever next touches `DEC-007` rather than to a feature task | with `DEC-007`'s scheduled revisit (2026-10-01), or sooner if a second `$executeRaw` appears |
 | ~~`D-027`~~ | **REPAID 24 Aug by `T-086` + `T-087` (`DEC-050`, `DEC-051`).** ~~Every account in the product sees a `People` item that lists only itself~~ | Raised 24 Aug by the owner (*"lowest tier shouldn't see roles, people and department pages at all, even if they see nothing actually in it"*), and the mechanism turned out to be wider than the tier they asked about. `navItems.ts` gates each item on a bare capability (`needs`), and `authz/held.ts` **deliberately discards scope** — a capability is held when *any* live allow exists. So `person.read: self`, the **universal** grant every role gets (`50` §1, and `11` §10 has a test insisting it is never omitted), satisfies `People`'s gate for **everybody**; the page then renders one row. `org.read: all` does the same for `Settings`, seeded to all four levels so the vocabulary can load on first paint. Of the three pages the owner named, **Structure and Roles are already correctly hidden for L4** — the matrix gives that level neither `unit.read` nor `role.read`. The one they want *shown*, `Subjects`, is hidden, because L4 has no `subject.read` row at all. **Not a security hole and INV-003 is untouched**: `requireCapability` refuses these routes and the list endpoints already scope-filter to nothing — `held.ts`'s own header admits the class (*"a confusing button, not a security hole"*); this is that error landing on a whole page. Fix is `T-086` (carry scope to the client so a gate can say *"`person.read` beyond `self`"*) then `T-087`. **Why it surfaced now:** `50` §1 says the L4 row *"only matters for the rare case of someone at that level who does hold an account"* — `T-072` made that one click, so the case stopped being rare. **`T-086` landed the mechanical half on 24 Aug**: `capabilities` is a map of capability → widest held scope, and `useCan(cap, atLeast?)` compares breadth, so the gate *can* now say *"beyond `self`"*. **`Subjects` is fixed outright** — the seeded matrix gives L4 `subject.read: own_unit` and the existing `needs` gate does the rest. **`T-087` closed the rest the same day**, once the owner answered `OPEN-009`: `NavItem.minScope` gates People on `person.read` **beyond `self`**, and **Settings turned out not to be a scope problem at all** — `org.read` is `all` at every level including the lowest, seeded so the vocabulary loads on first paint, so no minimum could ever have hidden it. It was the wrong capability; `needs` is now `org.update`, which is what `<VocabularyChips>` had already been using for its link to the same page. **L3 keeps People** — the owner's call, and the right one: an L3 holds `person.read: own_unit`, so their page lists real colleagues rather than themselves. The seeded matrix was not touched | ~~`T-086`~~, ~~`T-087`~~ — **done**. `OPEN-010` carries the deferred part of the L3 row |
 | `D-023` | **`campaigns.anonymous` changes copy and nothing else** | Found 23 Aug while building `<AccessNotice>` (`T-070`), which needed to know what each half of the `anonymous` × `access` pair actually guarantees. **`anonymous` branches nowhere in the backend** — grep it: every occurrence is a `select`, a DTO mapping, or a copy string. That is not itself a bug, because `52` §1 is explicit that the answer is anonymous **"Always. It is INV-006 and it is in the schema"** — `responses` has no respondent column to populate either way, so the flag *cannot* make a response attributable. It means the toggle is a **promise switch, not a behaviour switch**, and two places imply otherwise: the wizard's hint reads *"We never store who submitted what"*, which invites the reader to conclude that turning it off means we do; and an administrator who turns it off gets **exactly the same data** they would have got with it on, having been led to expect more. `copy.ts` reached half of this independently at `T-039` and left the non-anonymous sentence deliberately blank for the same reason. **Never exercised**: all 13 campaigns in the dev database are `anonymous: true`, so the misleading path has no user. The fix is a copy decision plus a line in `38` saying what the flag is for — not code, and not something to invent from outside the doc that owns it | with `T-051`, or whenever `38`'s copy is next revisited |
@@ -1410,7 +1514,212 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-25 (latest) · T-050 (CSV import) + T-073 — accounts, end to end
+### 2026-08-26 (latest) · D-031 REPAID — the database recreated, and D-037 found underneath it
+
+**The owner asked for the demo database to be recreated with a real tier mix and Endur's own
+two accounts. `D-031` is repaid, and measuring it first showed it was wider than it was filed.**
+
+The entry said the four demo orgs were missing `account.*`. They were also missing something
+nobody had written down:
+
+```
+before:  northfield  tier=-  grants=103  account.*=0   seeded 21 Aug
+after:   northfield  gold        active  grants=130  account.*=5
+         grand-palace  silver    active  grants=130  account.*=5
+         riverside     bronze    active  grants=130  account.*=5
+         meridian      enterprise active grants=130  account.*=5
+```
+
+**NO `subscriptions` ROW AT ALL, on any of the four.** So it was never only the invite flow —
+every tier-gated screen was dead as well. `T-088` writes the subscription inside `register`'s
+transaction and these orgs predate it by three days, so `requireEntitlement` fell through to
+its **bronze** backstop on an organisation the seed calls **Gold**. `demo.ts`'s own comment
+warns about exactly this: *"a demo org silently on the wrong tier is a demo that proves the
+opposite of what it claims."* It had been true since 24 Aug and no test could see it, because
+the tests run against a database the seed builds correctly.
+
+**THE FIX WAS A RESET, NOT A PATCH, AND THAT WAS THE OWNER'S CALL TO MAKE.** `seedOrg` skips
+any slug that already exists — by design, so that a re-seed cannot produce a second Northfield —
+so no amount of re-seeding reconciles a present org. A reconcile path was the alternative and
+is the wrong thing to build: it would be a second implementation of the grant matrix, live only
+on demo data, and wrong the moment the matrix changes again. Prisma refused the destructive
+command from an agent and demanded explicit consent, which is correct; the owner ran
+`db:reset` + `db:seed` themselves.
+
+**THE TIER MIX WAS ALREADY WRITTEN AND HAD NEVER ONCE EXISTED.** `DemoOrg.tier` has carried
+gold/silver/bronze/enterprise since `T-088`, with a comment explaining why each org gets the
+one it gets. Meridian keeps **enterprise** rather than being trimmed to the three the owner
+named: it is a tier no sign-up picker offers (`DEC-048`), so it is the only way to show on
+stage that an operator-assigned tier is real.
+
+**THE TWO OPERATOR ACCOUNTS NEEDED NOTHING** — `operators.ts` has seeded `owner@endur.test`
+(superuser) and `support@endur.test` (Endur admin) since `T-059`, with deterministic TOTP
+secrets so MFA works at rehearsal without anybody scanning a QR. They came back with the seed;
+`platformUsers` went from **38 to 2**, which is the other half of the story below.
+
+**FOUND — `D-037`, AND IT IS LIVE.** The database held **65 organisations named
+`org-n-<epoch>-<random>` and 38 platform users, all dated 25 Aug** — four days after `T-048`
+closed `D-004`. The slug is `test/helpers.ts`'s `unique('n')` verbatim, so the backend suite
+wrote them. The guard is not weak; it is **skippable**: `globalSetup` and `setupFiles` are
+declared in `src/backend/vitest.config.ts`, and **there is no vitest config at the repo root**,
+so `npx vitest run` from the root loads no config, runs no setup, and lets `lib/config.ts` read
+`.env` — pointing a suite that truncates and rewrites at the **development** database. That is
+word for word the disaster `test/database.ts`'s header exists to prevent. `npm test` is safe.
+The dangerous command is the shorter one. **A guard a shorter command skips is not a guard**,
+and the repair — a root `vitest.config.ts` with `projects` for both workspaces — is small and
+belongs before `T-045`, or the freshly-seeded database gets re-polluted before the rehearsal.
+
+Nothing in `src/` changed this session. `PROGRESS.md` only: `D-031` struck, `D-037` filed.
+
+### 2026-08-26 · DEC-076 — the powers grid, in English
+
+**The owner looked at `/app/roles` and said it was too jargon-based even for a superuser.**
+They were right, and it was not a labelling slip:
+
+| Was | Is |
+|---|---|
+| `all` `tree` `unit` `self` `—` | **Everywhere** · **Their {unit} + below** · **Their {unit}** · **Themselves** · **No** · **Blocked** |
+| `L1` `L2` `L3` | *"1st in the list"*, with the sentence that says the order never decides what a role can do |
+| Click a cell to cycle five states; shift-click to block | One dropdown, six named choices, a legend above the grid explaining all six |
+| Click the row LABEL to grant a power to every role | A visible **"Set all…"** control on the row |
+| *"Copy a whole role's powers · From… · onto · [Manager] [Staff]"* | **Copy every power from [role] onto [role] · Copy** |
+
+`tree` was the shape of the data structure the scope walks. `self` reads as "their own
+department" to anybody who has not read `11` §4. `L1` invites the one belief the whole GRANT
+model exists to deny — that a lower number means more power (`DEC-002`).
+
+**INV-001 applies to both axes of this grid, and only one of them had been done.** `D-008`
+fixed the row labels and left the cells saying "unit" to an organisation that calls them
+something else. `packages/shared/src/scope-labels.ts` is the same table for the other axis,
+beside `capability-labels.ts`, and the nonsense-label fixture now covers the cells — a
+hardcoded "unit" there fails the build exactly like a hardcoded row label.
+
+**The click-cycle is gone rather than supplemented.** It could only reach the state you wanted
+by passing through ones you did not, it was unusable on a touch screen, and its companion — a
+modifier key for the page's most consequential action — was undiscoverable. `cycle()` and
+`block()` collapse into one `setCell()`. The control is a **native `<select>`**: the grid sits
+in a horizontal scroll container, which clips anything absolutely positioned inside it, so a
+custom popover would have needed a portal, a focus trap and a keyboard map to arrive at what
+the browser already ships correct on a phone and to a screen reader.
+
+**Found on the way:** `.powers-module` was two classes with one name — T-051's powers-by-place
+list (`display: grid`) and T-052's module header row (a `<tr>`) — so the grid's group headers
+were being laid out by a rule written for a different screen, which is why they rendered as a
+small box at the left instead of a band across the table. The table row is `.powers-group` now.
+
+Tests: `Roles.test.tsx` 21 (5 new, the interaction ones rewritten). Frontend suite otherwise
+unchanged; `router/routes.test.tsx` still carries its two pre-existing failures (a fourth
+world, `/ops`, that the test's count was never updated for) and `audit:vocab` its three
+pre-existing hits, none in files this touched.
+
+### 2026-08-26 · DEC-075 — the log files, written for a person
+
+**The owner asked that the files in `src/backend/logs/` read like a log and not like a
+newline-delimited JSON dump.** They now do:
+
+```
+[2026-08-26 01:34:58 UTC+05:30] [11996] [INFO]  [HTTP]     GET /api/v1/roles 200 27ms req=77a3f5aa-… org=e8b39d25-…
+[2026-08-26 01:35:19 UTC+05:30] [11996] [WARN]  [CONFLICT] Keep at least one role able to change powers. req=2536c858-… status=409 err=ConflictError stack="…"
+```
+
+`lib/logFormat.ts` is new and owns the grammar. `lib/logger.ts` wraps **only the two file
+streams** in it, so stdout is byte-for-byte the JSON it always was — one logger, one record,
+two renderings for two readers. `18` §2 gained "The line on disk"; `72` § Data contract says
+where a `LogLine` now comes from.
+
+**The load-bearing property is that it round-trips.** `/ops/logs` and the export built this
+morning read these files back through `platform/logs/parser.ts`; a nicer-looking format that
+the parser could not reverse would have broken the viewer quietly. So `parser.ts` imports the
+grammar from `logFormat.ts` instead of restating it — the same rule that already makes the log
+reader borrow the writer's filename regex — and the 10 new tests in `test/log-format.test.ts`
+are all round trips: a request line, an error line with its stack, an unnamed field, a message
+that itself ends in `req=abc`, a record the formatter cannot read (returned **unchanged**, never
+dropped), and a pre-`DEC-075` JSON line.
+
+**The files already on disk were converted, not abandoned.** 1,548 lines across six files, each
+one parsed before and after and rewritten only when the two records matched. The JSON branch of
+the parser stays regardless, for as long as a pre-change file can be inside the 14-day window.
+
+Tests: `log-format.test.ts` 10 new, `logging.test.ts` 10 (one added — the same `log.info` reaching
+disk bracketed and stdout as JSON). Backend suite otherwise unchanged; `platform-logs.test.ts`
+still carries the one pre-existing pagination failure (`D-036`) and `tsc -b` the four pre-existing
+errors (`D-035`), neither touched by this work.
+
+### 2026-08-26 · T-090 — the log export, and where the files live
+
+**The owner asked for two things: that Endur's operators can SEE and EXPORT logs, and that
+logs are written to a location automatically. The second was already true and had been since
+`18`/Stage E** — `lib/logger.ts` writes every line to stdout AND to
+`src/backend/logs/app-<date>.log`, with `warn` and above additionally to `error-<date>.log`,
+rotated daily and at `LOG_MAX_SIZE_MB`, kept `LOG_RETENTION_DAYS`. Six files were on disk when
+this session started. Nothing was rebuilt for it; what was missing was that **the screen never
+said where they were**, so the page header now names the directory, the rotation size and the
+retention, read off the live config rather than restated (a screen that claims a retention the
+writer is not honouring is worse than a screen that says nothing).
+
+**Seeing them was already built too** (`T-077`/`T-078`). **Exporting was explicitly refused** —
+`72` § Out of scope carried a `Download` row saying no.
+
+**`DEC-074` reverses it, and the reason it could be reversed is that the original objection was
+answerable.** That row did not say *"diagnostics must not leave"*; it said *"a copy with no
+audit of where it went"*. So the export writes a `logs.export` row into `platform_audit_log`
+carrying the file, the format, **every filter** and the line count — the copy is a recorded
+operator action exactly like the read, which `72` § Acceptance had already established the
+shape for.
+
+**`platform.logs.export` is its own capability, not `platform.logs.read` with a query
+parameter.** A read is a page on a screen somebody is looking at; an export is a file on a
+laptop that outlives both the session and the fourteen-day retention window. One capability for
+both could not be separated later without a migration, and separating them is the first thing
+anybody will want after an incident. **Both roles hold it**, for the same reason both hold
+`platform.logs.read`: an on-call tool the on-call person cannot open is not a tool.
+
+**The name allowlist is shared, not re-implemented.** The export is a SECOND entry point into
+the same filesystem read, and a guard applied on one of two routes is not a guard — so
+`readLogFile` and `exportLogFile` both call one `assertReadableName()`, and the traversal cases
+are asserted against the export route too.
+
+**The export reads FORWARD; the viewer reads backwards.** That is the whole reason it is its own
+read rather than `tailRead` with a `Content-Disposition` header bolted on: a page on a screen
+wants the newest line at the top, a file handed to somebody else is read top to bottom. Capped
+at `EXPORT_MAX_LINES`, and a capped export ends with an explicit truncation marker — a
+diagnostic file that quietly lost its tail is worse than no file.
+
+`ndjson` is the lossless format and the default: it carries `extra`, which is the field that
+makes an unexpected key on a log line visible AS unexpected. `csv` is a fixed column set for
+somebody who will open it in a spreadsheet, and that limitation is stated in `72` rather than
+papered over.
+
+**INV-011 is untouched and the argument is `72`'s, unedited:** the files contain no body, no
+credential and no respondent identity because `lib/logger.ts`'s redact list removes them AT THE
+WRITER. An export is INV-011-compatible for exactly the same reason the screen is.
+
+**Found on the way: `<LogViewer>` had no CSS at all.** Every class `T-078` shipped —
+`.log-viewer`, `.log-line`, `.log-file-row`, all of them — had no rule anywhere in
+`design-system/endur.css`, so `/ops/logs` rendered as an unstyled stack. That is now a styled
+block, deliberately plain (a support tool read during an incident wants density and a
+monospaced column, not decoration), with `warn` and `error` rows tinted from the status ramp and
+`extra` tinted rather than tucked away.
+
+**Verified live, not asserted.** Owner and staff operators both logged in through the real MFA
+path; `ndjson` came back 775 lines with `Content-Disposition: attachment`; a `level=40` `csv`
+came back with its header row and a quoted cell containing commas and curly quotes; the
+`platform_audit_log` row carried `{file, format, level, lines, truncated}`; a traversal name 404s
+and an unauthenticated call 401s on the export route.
+
+**Tests.** Four new cases in `platform-logs.test.ts` (allowlist on the export route, org-user
+401, ndjson order asserted against the read route's reverse plus the audit row, csv header).
+13 of 14 pass. **The 14th failure is PRE-EXISTING and not mine** — `reading a file > a bounded
+page from the end` fails identically on a stashed tree, so it predates this session; recorded
+under Debt as `D-036`. **No frontend test was added** — `T-078` shipped `/ops/logs` without one and building
+that harness is not what the day before the demo is for.
+
+**`npx tsc -b` has 4 errors and all 4 are pre-existing**, in `features/roles/service.ts` (3,
+`exactOptionalPropertyTypes`) and `pages/console/Simulator.tsx` (1). Same count on a stashed
+tree. They arrived with the `Update codebase` commit and are **not** from this work — but they
+are on the branch and they will fail a clean `npm run build`, so they are in Debt too.
+
+### 2026-08-25 · T-050 (CSV import) + T-073 — accounts, end to end
 
 The frontend half of `57`. Backend was already complete (`T-072`); nothing server-side
 changed.

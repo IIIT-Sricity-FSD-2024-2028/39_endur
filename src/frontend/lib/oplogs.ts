@@ -5,8 +5,8 @@
 // NO POLLING, NO LIVE TAIL (`72` § Out of scope). The one control that refreshes a file is
 // the one the reader presses.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LogFileMeta, LogLine, Page } from '@endur/shared';
-import { OpsError, opsGet } from './ops.js';
+import type { LogFileMeta, LogLine, LogStoreMeta, Page } from '@endur/shared';
+import { OpsError, opsDownload, opsGet } from './ops.js';
 import type { Loadable } from './estate.js';
 
 export type LogFilter = {
@@ -18,18 +18,52 @@ export type LogFilter = {
   q?: string | undefined;
 };
 
-export function useLogFiles(): Loadable<LogFileMeta[]> & { forbidden: boolean } {
+/**
+ * `DEC-074` — the export. Same filters as the view, so what lands on the operator's disk is
+ * what was on their screen; `logSearch` is reused rather than copied for exactly that reason.
+ */
+export function useLogExport(): {
+  run: (file: string, filter: LogFilter, format: 'ndjson' | 'csv') => Promise<void>;
+  busy: boolean;
+  error: Error | null;
+  last: { name: string; lines: number; truncated: boolean } | null;
+} {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [last, setLast] = useState<{ name: string; lines: number; truncated: boolean } | null>(null);
+
+  const run = useCallback(async (file: string, filter: LogFilter, format: 'ndjson' | 'csv') => {
+    setBusy(true);
+    setError(null);
+    try {
+      const search = logSearch(filter);
+      const joiner = search ? '&' : '?';
+      const result = await opsDownload(`/logs/${encodeURIComponent(file)}/export${search}${joiner}format=${format}`);
+      setLast(result);
+    } catch (caught) {
+      setError(caught as Error);
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  return { run, busy, error, last };
+}
+
+export function useLogFiles(): Loadable<LogFileMeta[]> & { forbidden: boolean; store: LogStoreMeta | null } {
   const [state, setState] = useState<Loadable<LogFileMeta[]>>({ data: null, loading: true, error: null });
   const [forbidden, setForbidden] = useState(false);
+  const [store, setStore] = useState<LogStoreMeta | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
     setState((current) => ({ ...current, loading: true }));
-    opsGet<{ data: LogFileMeta[] }>('/logs')
+    opsGet<{ data: LogFileMeta[]; meta?: LogStoreMeta }>('/logs')
       .then((response) => {
         if (!alive.current) return;
         setForbidden(false);
+        setStore(response.meta ?? null);
         setState({ data: response.data, loading: false, error: null });
       })
       .catch((error: unknown) => {
@@ -43,7 +77,7 @@ export function useLogFiles(): Loadable<LogFileMeta[]> & { forbidden: boolean } 
     };
   }, []);
 
-  return { ...state, forbidden };
+  return { ...state, forbidden, store };
 }
 
 /** Fixed key order — the same fix every other `/ops` search string needed. */

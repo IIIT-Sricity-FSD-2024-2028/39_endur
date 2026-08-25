@@ -93,11 +93,43 @@ Rows are capabilities grouped by module and collapsible; columns are roles.
 
 | Interaction | Effect |
 |---|---|
-| **Click a cell** | Cycle the scope: `—` → `self` → `own_unit` → `subtree` → `all` → `—` |
+| **Choose in a cell** | A dropdown of the six things a cell can say. One choice, by name |
 | **Type a number** | Set a param limit in place — no side panel, no separate form |
-| **Shift-click** | Hard block (`effect: deny`). Renders distinctly and **beats every other grant** |
-| **Click a column header** | Copy an entire column from another role, then edit |
-| **Click a row header** | Grant a capability to everyone or nobody |
+| **"Set all…" on a row** | Set that power for every role at once |
+| **Copy powers from … onto …** | Copy an entire column from another role, then edit |
+
+> **Superseded by `DEC-076` on 26 Aug.** This table used to read *"click a cell to cycle
+> `—` → `self` → `own_unit` → `subtree` → `all`"*, *"shift-click to hard block"* and *"click a
+> row header to grant to everyone or nobody"*. All three were replaced, for one reason each:
+> a cycle can only reach the state you want by passing through states you do not (and cannot
+> be operated at all on a touch screen); a modifier key is not discoverable, and the state it
+> armed is the most consequential one on the page; and a row label that silently rewrote every
+> column when clicked was a destructive action disguised as a heading.
+
+### What a cell says — `DEC-076`
+
+**A cell is a sentence about a person, in this organisation's words.** The six choices, and
+the legend that is rendered above the grid so nobody has to hover to learn them:
+
+| Stored | Cell reads | Means |
+|---|---|---|
+| absent | **No** | cannot do this at all |
+| `self` | **Themselves** | only where it is about them |
+| `own_unit` | **Their {unit}** | only in their own {unit} |
+| `subtree` | **Their {unit} + below** | in their own {unit} and every {unit} under it |
+| `all` | **Everywhere** | anywhere in the organisation |
+| `deny` | **Blocked** | beats an allow from any other role, group or stand-in |
+
+`{unit}` is the tenant's own noun, filled from `organization.labels` and **singular** — a scope
+is about the one place somebody stands, where a capability row is about a class of thing.
+`scope-labels.ts` in `packages/shared` owns these words exactly as `capability-labels.ts` owns
+the row phrases, and for the same reason: INV-001 applies to both axes of this grid. The cells
+previously read `self`, `unit`, `tree`, `all` — where `tree` is the shape of the data structure
+the scope walks, a word no administrator has ever used for *"and everything under it"*.
+
+The role column header names the role's **place in the list** (*"2nd in the list"*), not `L2`,
+and carries the sentence that kills the misconception the number invites: the order decides who
+is shown above whom and never what a role can do. That is what this grid is for (`DEC-002`).
 
 **The row labels are not written yet, and INV-001 applies to them** (`D-008`). The backend's
 `capabilityCatalogue()` builds them from the capability key — `campaign.launch` becomes
@@ -111,9 +143,15 @@ either, because the string is assembled from a key rather than written down.
 column; an orphan capability appears as a visibly empty row. Mistakes are *visible* rather
 than discoverable, which is the entire argument for a grid over a list of permissions.
 
-The hard-block cell carries a tooltip stating the one resolution rule an administrator
-genuinely benefits from knowing: **a deny always beats an allow** (INV-004). It is what makes
-a block on external vendors safe even after someone adds them to a committee.
+The block carries the one resolution rule an administrator genuinely benefits from knowing —
+**a deny always beats an allow** (INV-004) — in the legend, in the choice's own description and
+in the cell's title, rather than only in a tooltip on a cell they would have to have already
+found. It is what makes a block on external vendors safe even after someone adds them to a
+committee.
+
+Without `grant.update` a cell is **a chip, not a disabled dropdown** (`§ States`). A greyed-out
+control reads as *"you are doing this wrong"*; a plain phrase reads as the rule it is, which is
+what somebody who can only read the grid came here for.
 
 ## Warnings
 
@@ -182,11 +220,17 @@ proved there.
 
 - [x] Levels derive from row order and are never sent to the API — the reorder call sends
       `orderedIds` and the test asserts the body has no `level` key at all
-- [x] Cell click cycles scope; the change is visible without a reload
-- [x] Shift-click produces a deny that beats an allow from a group and a delegation — and a
-      plain click does **not** cycle into one. Cycling *through* a deny would arm the grid's
-      most consequential state by accident, four clicks into a scope walk
-- [x] Column copy fills a role from another in one action
+- [x] A cell is set from a dropdown of six named choices, in one action; the change is
+      visible without a reload (`DEC-076`, replacing the click-cycle)
+- [x] A block is one of those six, produces a deny that beats an allow from a group and a
+      delegation, and says so **in its own description** rather than only in a tooltip
+- [x] Every cell reads in the tenant's vocabulary — the nonsense-label fixture proves it, so
+      a hardcoded "unit" fails the build the same way a hardcoded row label would (INV-001)
+- [x] The six choices are explained once, in a legend above the grid
+- [x] "Set all…" sets one power for every role from a **visible, labelled** control — it was
+      a hidden action on the row label, which rewrote a column when the heading was clicked
+- [x] Column copy fills a role from another in one action, from two dropdowns and a Copy
+      button, and says what it did
 - [x] Colour intensity makes an over-granted column and an orphan row visually obvious —
       `--weight` on the cell tracks scope width, not "is there a grant here"
 - [x] Saving is one bulk request in one transaction — and it sends a **diff**. `33`'s

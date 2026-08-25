@@ -62,6 +62,38 @@ The directory is created at boot if absent. **A logging failure must never take 
 application** — if the file stream cannot be opened, the process logs that fact to stdout and
 continues. Availability lost to an observability feature is the worst possible trade.
 
+### The line on disk — `DEC-075`, 2026-08-26
+
+**stdout keeps pino's JSON. The files are written for a person.** Same logger, same record,
+same fields; two renderings, because the two destinations have different readers. A pipeline
+wants JSON. Somebody opening `app-2026-08-26.log` at 2am does not.
+
+```
+[2026-08-26 01:34:58 UTC+05:30] [11996] [INFO]  [HTTP]     GET /api/v1/roles 200 27ms req=77a3f5aa-… org=e8b39d25-… principal=user:ff9bef15-…
+[2026-08-26 01:35:19 UTC+05:30] [11996] [WARN]  [CONFLICT] Keep at least one role able to change powers. req=2536c858-… status=409 err=ConflictError stack="…"
+[2026-08-26 01:36:02 UTC+05:30] [11996] [ERROR] [APP]      audit write failed req=6399c5f7-…
+```
+
+    [<local time with UTC offset>] [<pid>] [<LEVEL>] [<TAG>] <summary> <key=value …>
+
+| Part | Rule |
+|---|---|
+| Time | **Local, with the offset spelled out.** The file is already named by the local day, and a reader comparing a line to *"when did that happen"* is looking at their own wall clock. The offset is what keeps it usable once the file leaves the machine |
+| Pid | From the record (`base.pid`), and `-` when there is none. Never `process.pid` at format time — a file spans restarts, and a guessed pid is a lie |
+| Tag | `HTTP` for a request, the **error code** for anything the funnel logged, `APP` otherwise. It is what the eye lands on when scanning a page of lines |
+| Summary | The human sentence. For a request it *is* the structured fields (`GET /path 200 27ms`); for an error it is the error's own message |
+| Tail | Everything the summary does not carry, as `key=value`. Unnamed fields travel as `x.<key>=` so they still look unusual (`72` § Data contract). Values that could contain a space, a quote or an `=` are JSON-quoted — which is also what keeps **one record on one line** however many newlines a stack trace has |
+
+**The format is lossless and reversible, and that is not decoration.** `/ops/logs` and the log
+export read these files back through `platform/logs/parser.ts` (`72`), so a format that were
+merely prettier would have quietly broken the viewer. `lib/logFormat.ts` owns the grammar and
+the parser borrows it — the same discipline as the reader borrowing the writer's filename regex
+rather than restating it.
+
+The parser **still reads pino JSON**, and must keep doing so while any pre-change file is
+inside the 14-day retention window. Changing a log format is not a reason to blank a week of
+history.
+
 ## 3. What is never written
 
 Inherited from `12` §4.2 and now more important, because disk is permanent and stdout is not.
@@ -147,6 +179,13 @@ composes it with stdout through `pino.multistream`. Ticked boxes are asserted in
 - [ ] A respondent submit logs `campaignId` and no respondent-identifying field — the code
       does this (`requestLogger` logs `principal` as `kind:campaignId`), but no test asserts it
 - [x] Stack traces appear in `error-*.log` and in no HTTP response
+- [x] A file line reads `[time] [pid] [LEVEL] [TAG] …` while the same record reaches stdout as
+      JSON — one `log.info`, two renderings (`DEC-075`)
+- [x] Every formatted line round-trips through `platform/logs/parser.ts` back to the record
+      that produced it, including a stack trace, an unnamed field, and a message that itself
+      ends in something shaped like `key=value`
+- [x] A record the formatter cannot make sense of is written **unchanged** rather than dropped
+- [x] Files written before `DEC-075` still parse — the JSON branch stays until they age out
 
 ### A note on synchronous writes
 

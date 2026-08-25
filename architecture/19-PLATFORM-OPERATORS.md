@@ -100,6 +100,7 @@ access.
 | `platform.message.send` | ✔ | ✔ | Contact an org's administrators (`70` §Interactions) |
 | `platform.audit.read` | ✔ | ✔ | The platform's own audit trail |
 | `platform.logs.read` | ✔ | ✔ | **The rotating application log files** (`18` §2) through `72`. Diagnostics, so support needs it as much as the owner does. Safe under INV-011 **because `18` §3 already guarantees no body, no credential and no respondent identity ever reaches a log line** — the viewer inherits that property, it does not create it |
+| `platform.logs.export` | ✔ | ✔ | **A copy of a log file, filtered, as a download** (`72` § Interactions, `DEC-074`). Separate from `platform.logs.read` on purpose: a read is a page on a screen, an export is a file that outlives the session and the retention window, and one capability for both could not be separated later without a migration. Audited as `logs.export` with the file, format, filters and line count |
 | `platform.operator.manage` | — | ✔ | Create, disable and re-role operator accounts |
 
 Naming rule matches `11` §3 — `platform.<object>.<verb>` — with the `platform.` prefix as the
@@ -342,6 +343,7 @@ route-enumeration test (`12` §7) assert that no `platform.` capability appears 
 | POST | `/platform/orgs/:id/message` | `platform.message.send` · `70` §Interactions | ✅ |
 | GET | `/platform/audit` | `platform.audit.read` | ✅ |
 | GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` · `72`. The file list, and one file tailed or filtered | **`T-077`** |
+| GET | `/platform/logs/:file/export` | `platform.logs.export` · `72`, `DEC-074`. One file, same filters, chronological, as an `ndjson` or `csv` attachment | **`T-090`** |
 | GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` | ✅ |
 
 **The chain under this prefix is different from every other router's, and each difference is

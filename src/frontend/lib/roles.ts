@@ -15,10 +15,10 @@ import type {
   CapabilityMeta,
   CreateRoleBody,
   GrantCell,
+  GrantChoice,
   GrantWarning,
   PutGrantsBody,
   RoleView,
-  Scope,
   UpdateRoleBody,
 } from '@endur/shared';
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './api.js';
@@ -142,8 +142,9 @@ export type CellKey = string;
 export const cellKey = (roleId: string, capability: string): CellKey =>
   `${roleId}|${capability}`;
 
-/** The cycle a click walks. `33`: `—` → self → own_unit → subtree → all → `—`. */
-export const SCOPE_CYCLE: Array<Scope | null> = [null, 'self', 'own_unit', 'subtree', 'all'];
+/** What one cell currently says, as the menu's own vocabulary (`scope-labels.ts`). */
+export const choiceOf = (cell: GrantCell | undefined): GrantChoice =>
+  !cell ? null : cell.effect === 'deny' ? 'blocked' : cell.scope;
 
 export type GridState = {
   catalogue: CapabilityMeta[];
@@ -162,14 +163,16 @@ export type GridController = {
   dirty: boolean;
   saving: boolean;
   saveError: string | null;
-  /** Cycle one cell's scope. */
-  cycle: (roleId: string, capability: string) => void;
-  /** Shift-click — a hard block. INV-004: it beats every allow, from any source. */
-  block: (roleId: string, capability: string) => void;
+  /**
+   * Set one cell to one of the six things a cell can say (`DEC-076`). ONE mutation, chosen
+   * by name — the click-cycle it replaced could only be reached by walking through states
+   * the administrator did not want, and could not be reached at all on a touch screen.
+   */
+  setCell: (roleId: string, capability: string, choice: GrantChoice) => void;
   /** Copy a whole role's column onto another (`33` § Interactions). */
   copyColumn: (fromRoleId: string, toRoleId: string) => void;
-  /** Grant or clear a whole capability row across every role. */
-  fillRow: (capability: string, scope: Scope | null) => void;
+  /** Set a whole capability row, across every role, to the same thing. */
+  fillRow: (capability: string, choice: GrantChoice) => void;
   undo: () => void;
   canUndo: boolean;
   save: () => Promise<void>;
@@ -238,34 +241,21 @@ export function usePowersGrid(): GridController {
     [],
   );
 
-  const cycle = useCallback(
-    (roleId: string, capability: string) => {
-      edit((cells) => {
-        const key = cellKey(roleId, capability);
-        const existing = cells.get(key);
-        // A deny is not part of the cycle — shift-click sets it and a plain click clears it,
-        // because cycling THROUGH a deny would arm the grid's most consequential state by
-        // accident, four clicks into a scope walk.
-        if (existing?.effect === 'deny') {
-          cells.delete(key);
-          return;
-        }
-        const at = SCOPE_CYCLE.indexOf(existing?.scope ?? null);
-        const next = SCOPE_CYCLE[(at + 1) % SCOPE_CYCLE.length] ?? null;
-        if (next === null) cells.delete(key);
-        else cells.set(key, { roleId, capability, scope: next, effect: 'allow' });
-      });
-    },
-    [edit],
-  );
+  /** The one place a cell's value is written, whatever asked for it. */
+  const writeCell = (
+    cells: Map<CellKey, GrantCell>, roleId: string, capability: string, choice: GrantChoice,
+  ): void => {
+    const key = cellKey(roleId, capability);
+    if (choice === null) cells.delete(key);
+    // A block is stored at `all` because it is not a narrow refusal: it is "not this, ever",
+    // and a deny at a narrower scope would leave the wider part of the tree still allowed.
+    else if (choice === 'blocked') cells.set(key, { roleId, capability, scope: 'all', effect: 'deny' });
+    else cells.set(key, { roleId, capability, scope: choice, effect: 'allow' });
+  };
 
-  const block = useCallback(
-    (roleId: string, capability: string) => {
-      edit((cells) => {
-        const key = cellKey(roleId, capability);
-        if (cells.get(key)?.effect === 'deny') cells.delete(key);
-        else cells.set(key, { roleId, capability, scope: 'all', effect: 'deny' });
-      });
+  const setCell = useCallback(
+    (roleId: string, capability: string, choice: GrantChoice) => {
+      edit((cells) => writeCell(cells, roleId, capability, choice));
     },
     [edit],
   );
@@ -291,15 +281,13 @@ export function usePowersGrid(): GridController {
   const roleIds = useMemo(() => (state?.roles ?? []).map((role) => role.id), [state?.roles]);
 
   const fillRow = useCallback(
-    (capability: string, scope: Scope | null) => {
+    (capability: string, choice: GrantChoice) => {
       edit((cells) => {
         for (const [key, cell] of [...cells]) {
           if (cell.capability === capability) cells.delete(key);
         }
-        if (scope === null) return;
-        for (const roleId of roleIds) {
-          cells.set(cellKey(roleId, capability), { roleId, capability, scope, effect: 'allow' });
-        }
+        if (choice === null) return;
+        for (const roleId of roleIds) writeCell(cells, roleId, capability, choice);
       });
     },
     [edit, roleIds],
@@ -363,6 +351,6 @@ export function usePowersGrid(): GridController {
 
   return {
     loading, error, state, savedCells: saved, dirty, saving, saveError,
-    cycle, block, copyColumn, fillRow, undo, canUndo: history.length > 0, save, reload: load,
+    setCell, copyColumn, fillRow, undo, canUndo: history.length > 0, save, reload: load,
   };
 }

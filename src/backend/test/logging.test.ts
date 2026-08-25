@@ -128,14 +128,47 @@ describe('the two streams', () => {
     const app = read(`app-${today}.log`);
     const err = read(`error-${today}.log`);
 
-    expect(app).toContain('"requestId":"r1"');
-    expect(app).toContain('"requestId":"r2"');
-    expect(app).toContain('"requestId":"r3"');
+    expect(app).toContain('req=r1');
+    expect(app).toContain('req=r2');
+    expect(app).toContain('req=r3');
 
     // The point of a second file: no 200s in it.
-    expect(err).not.toContain('"requestId":"r1"');
-    expect(err).toContain('"requestId":"r2"');
-    expect(err).toContain('"requestId":"r3"');
+    expect(err).not.toContain('req=r1');
+    expect(err).toContain('req=r2');
+    expect(err).toContain('req=r3');
+  });
+
+  it('writes the bracketed line to disk and JSON to stdout, from ONE record', () => {
+    const out: string[] = [];
+    const log = pino(
+      loggerOptions,
+      multistream(
+        createLogStreams({
+          dir,
+          level: 'info',
+          maxBytes: 1024 * 1024,
+          retentionDays: 14,
+          toFile: true,
+          stdout: { write: (chunk: string) => void out.push(chunk) },
+        }),
+        { dedupe: false },
+      ),
+    );
+    log.info(
+      { requestId: 'r9', method: 'GET', path: '/api/v1/roles', status: 200, durationMs: 27 },
+      'request',
+    );
+
+    // 18 §2 — the pipeline's rendering is unchanged; only the file's reader is a person.
+    expect(out[0]).toContain('"requestId":"r9"');
+
+    const line = read(`app-${today}.log`).trim();
+    expect(line).toMatch(
+      /^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC[+-]\d{2}:\d{2}\] \[\d+\] \[INFO\] \[HTTP\] /,
+    );
+    expect(line).toContain('GET /api/v1/roles 200 27ms');
+    expect(line).toContain('req=r9');
+    expect(line).not.toContain('{');
   });
 
   it('redacts credentials before they reach disk', () => {

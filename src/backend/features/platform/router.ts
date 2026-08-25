@@ -20,6 +20,7 @@ import {
   AnalyticsListDto,
   CreateOperatorDto,
   EstateListDto,
+  LogExportDto,
   LogListDto,
   LogReadDto,
   OrgMessageDto,
@@ -30,6 +31,7 @@ import {
   SuspendDto,
   UpdateOperatorDto,
   capabilitiesForRole,
+  type LogExportQuery,
   type LogReadQuery,
   type PlatformLoginBody,
   type PlatformMeResponse,
@@ -47,8 +49,10 @@ import {
   analytics,
   createOperator,
   estate,
+  exportOperatorLogFile,
   listOperators,
   listOperatorLogFiles,
+  logStoreMeta,
   messageAdministrators,
   orgDetail,
   overridePlan,
@@ -227,7 +231,10 @@ platformRouter.get(
  * list; it never supplies a pattern the server turns into a directory scan.
  */
 platformRouter.get('/logs', validate(LogListDto), requirePlatform('platform.logs.read'), (_req, res) => {
-  res.json({ data: listOperatorLogFiles() });
+  // `meta` carries WHERE the files are and how long they last (`18` §2). It rides on the list
+  // rather than a route of its own because it is the same question — "what is on disk" — and
+  // a second call to answer half of it is a second thing to authorise.
+  res.json({ data: listOperatorLogFiles(), meta: logStoreMeta() });
 });
 
 /**
@@ -243,6 +250,34 @@ platformRouter.get(
     const { params, query } = req.data as { params: { file: string }; query: LogReadQuery };
     void readOperatorLogFile(req, params.file, query)
       .then((result) => res.json(result))
+      .catch(next);
+  },
+);
+
+/**
+ * `DEC-074` — the export. Mounted BEFORE `/logs/:file` would be a concern if `:file` could
+ * ever match `x/export`, and it cannot: a path segment does not contain a slash and the name
+ * allowlist rejects anything that is not `app|error-<date>[.n].log` anyway.
+ *
+ * `platform.logs.export`, not `platform.logs.read`: a read is a page on a screen, an export
+ * is a file that outlives the session and the retention window (`19` §4).
+ */
+platformRouter.get(
+  '/logs/:file/export',
+  validate(LogExportDto),
+  requirePlatform('platform.logs.export'),
+  (req, res, next) => {
+    const { params, query } = req.data as { params: { file: string }; query: LogExportQuery };
+    void exportOperatorLogFile(req, params.file, query)
+      .then((result) => {
+        res.setHeader('Content-Type', result.contentType);
+        // The filename is server-built from an already-allowlisted name plus a timestamp, so
+        // there is nothing user-supplied left in this header to escape.
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        res.setHeader('X-Log-Lines', String(result.lines));
+        if (result.truncated) res.setHeader('X-Log-Truncated', 'true');
+        res.send(result.body);
+      })
       .catch(next);
   },
 );

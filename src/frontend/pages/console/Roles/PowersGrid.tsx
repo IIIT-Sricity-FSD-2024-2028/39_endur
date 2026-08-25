@@ -1,33 +1,38 @@
-// The powers grid. 33 § "Interactions — the powers grid".
+// The powers grid. 33 § "Interactions — the powers grid", rewritten for plain language by
+// `DEC-076`.
 //
 // THE ARGUMENT FOR A GRID OVER A LIST OF PERMISSIONS is that mistakes become VISIBLE rather
 // than discoverable. An over-granted role is a visibly dark column; a capability nobody
 // holds is a visibly empty row. Neither is something you go looking for — they are things
 // you cannot help seeing, and that is the whole design.
 //
-// Colour intensity therefore tracks SCOPE WIDTH, not "is there a grant here". A grid where
-// every filled cell looked the same would answer "who has this" and lose "how far", which is
-// the half that actually decides what somebody can reach (INV-005).
+// WHAT `DEC-076` CHANGED, and why it is the same argument: a grid can only make a mistake
+// visible if the reader can read it. The cells said `self`, `unit`, `tree`, `all` — `tree`
+// being the shape of the data structure the scope walks, which is not a word anybody outside
+// this repository has ever used for "and everything under it" — and the only way to change
+// one was to click it repeatedly and watch what happened. Now a cell is a phrase in the
+// organisation's own words (`scope-labels.ts`), and changing one is picking from a list of
+// six named choices. Nothing about what the grid MEANS moved; the whole change is that it
+// says it out loud.
+//
+// Colour intensity still tracks SCOPE WIDTH, not "is there a grant here". A grid where every
+// filled cell looked the same would answer "who has this" and lose "how far", which is the
+// half that actually decides what somebody can reach (INV-005).
 import { useMemo, useState } from 'react';
-import type { CapabilityMeta, GrantCell, GrantWarning, RoleView, Scope } from '@endur/shared';
+import type {
+  CapabilityMeta, GrantCell, GrantChoice, GrantWarning, RoleView,
+} from '@endur/shared';
+import { GRANT_CHOICES, choiceWord, describeCell, describeChoice } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
-import { cellKey, type GridController } from '../../../lib/roles.js';
+import { useLabels } from '../../../lib/labels.js';
+import { cellKey, choiceOf, type GridController } from '../../../lib/roles.js';
 
 /** Width, not identity — 0 is an empty cell and 4 is `all`. Drives the CSS custom property. */
-const WEIGHT: Record<Scope, number> = { self: 1, own_unit: 2, subtree: 3, all: 4 };
+const WEIGHT: Record<string, number> = { self: 1, own_unit: 2, subtree: 3, all: 4 };
 
-/** What a cell says when it is not empty. Short, because there are 64 rows of them. */
-const SHORT: Record<Scope, string> = {
-  self: 'self', own_unit: 'unit', subtree: 'tree', all: 'all',
-};
-
-const LONG: Record<Scope, string> = {
-  self: 'only their own',
-  own_unit: 'their own unit',
-  subtree: 'their unit and everything under it',
-  all: 'the whole organisation',
-};
+const weightOf = (choice: GrantChoice): number =>
+  choice === null || choice === 'blocked' ? 0 : (WEIGHT[choice] ?? 0);
 
 export function PowersGrid({ grid, editable, myRoleIds }: {
   grid: GridController;
@@ -35,8 +40,11 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   /** The roles the READER holds, for the self-lockout prompt below. */
   myRoleIds: string[];
 }): JSX.Element {
+  const labels = useLabels();
   const [openModules, setOpenModules] = useState<Set<string>>(new Set());
   const [copyFrom, setCopyFrom] = useState('');
+  const [copyTo, setCopyTo] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const state = grid.state;
@@ -95,14 +103,17 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
     });
   };
 
+  const roleName = (id: string): string =>
+    state.roles.find((role) => role.id === id)?.name ?? 'that role';
+
   return (
     <div className="powers">
       <div className="powers-bar">
         <p className="text-muted powers-hint">
           {editable ? (
             <>
-              Click a cell to widen how far it reaches. <strong>Shift-click</strong> to block
-              it outright — a block beats every allow, from any role, group or stand-in.
+              Every box is a dropdown: pick <strong>how far</strong> that role may take that
+              power. Nothing is saved until you press <strong>Save changes</strong>.
             </>
           ) : (
             'You can read this grid but not change it. Nothing here is hidden from you.'
@@ -137,6 +148,25 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
         )}
       </div>
 
+      {/* THE LEGEND IS NOT DECORATION (`DEC-076`). Six words carry every cell on the screen,
+          and one of them — a block — behaves unlike the other five. Somebody meeting this
+          page for the first time should not have to hover over a cell to find that out. */}
+      <dl className="powers-legend">
+        {GRANT_CHOICES.map((choice) => (
+          <div key={String(choice)} className="powers-legend-item">
+            <dt>
+              <span
+                className={`powers-chip${choice === 'blocked' ? ' is-denied' : ''}`}
+                style={{ ['--weight' as string]: weightOf(choice) }}
+              >
+                {choiceWord(choice, labels)}
+              </span>
+            </dt>
+            <dd>{describeChoice(choice, labels)}</dd>
+          </div>
+        ))}
+      </dl>
+
       {confirming && (
         <ConfirmDialog
           title="You will not be able to edit powers after this"
@@ -164,31 +194,55 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
       )}
 
       {editable && (
+        // TWO DROPDOWNS AND A BUTTON, not a sentence made of buttons. What stood here was
+        // "Copy a whole role's powers · From… · onto · [Manager] [Staff] [Guest]", where the
+        // role buttons WERE the action — a row of things that look like navigation and
+        // rewrite a whole column when pressed.
         <div className="powers-copy">
-          <label htmlFor="powers-copy-from">Copy a whole role’s powers</label>
+          <label htmlFor="powers-copy-from">Copy every power from</label>
           <select
             id="powers-copy-from"
             className="input"
             value={copyFrom}
-            onChange={(event) => setCopyFrom(event.target.value)}
+            onChange={(event) => {
+              setCopyFrom(event.target.value);
+              setCopied(null);
+            }}
           >
-            <option value="">From…</option>
+            <option value="">Choose a role…</option>
             {state.roles.map((role) => (
               <option key={role.id} value={role.id}>{role.name}</option>
             ))}
           </select>
-          <span className="text-muted">onto</span>
-          {state.roles.map((role) => (
-            <button
-              key={role.id}
-              type="button"
-              className="btn btn-ghost btn-small"
-              disabled={copyFrom === '' || copyFrom === role.id}
-              onClick={() => grid.copyColumn(copyFrom, role.id)}
-            >
-              {role.name}
-            </button>
-          ))}
+          <label htmlFor="powers-copy-to">onto</label>
+          <select
+            id="powers-copy-to"
+            className="input"
+            value={copyTo}
+            onChange={(event) => {
+              setCopyTo(event.target.value);
+              setCopied(null);
+            }}
+          >
+            <option value="">Choose a role…</option>
+            {state.roles.map((role) => (
+              <option key={role.id} value={role.id} disabled={role.id === copyFrom}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn-ghost btn-small"
+            disabled={copyFrom === '' || copyTo === '' || copyFrom === copyTo}
+            onClick={() => {
+              grid.copyColumn(copyFrom, copyTo);
+              setCopied(`Copied ${roleName(copyFrom)}’s powers onto ${roleName(copyTo)}. Nothing is saved yet — press Save changes, or Undo.`);
+            }}
+          >
+            Copy
+          </button>
+          {copied && <span className="powers-copied" role="status">{copied}</span>}
         </div>
       )}
 
@@ -201,9 +255,19 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
             <tr>
               <th scope="col" className="powers-corner">Power</th>
               {state.roles.map((role) => (
-                <th key={role.id} scope="col" className="powers-role">
+                <th
+                  key={role.id}
+                  scope="col"
+                  className="powers-role"
+                  // THE MISCONCEPTION THIS TITLE EXISTS TO KILL: that a lower number means
+                  // more power. It does not, and never has (DEC-002) — the number is the
+                  // role's place in the list, and THIS GRID is where power comes from.
+                  title={`${role.name} is ${ordinal(role.level)} in the list of roles. The order decides who is shown above whom — it never decides what a role can do. That is this grid.`}
+                >
                   <span className="powers-role-name">{role.name}</span>
-                  <span className="powers-role-level text-muted">L{role.level}</span>
+                  <span className="powers-role-level text-muted">
+                    {ordinal(role.level)} in the list
+                  </span>
                 </th>
               ))}
             </tr>
@@ -213,11 +277,11 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
             const open = openModules.size === 0 || openModules.has(moduleName);
             return (
               <tbody key={moduleName}>
-                <tr className="powers-module">
+                <tr className="powers-group">
                   <th scope="colgroup" colSpan={state.roles.length + 1}>
                     <button
                       type="button"
-                      className="powers-module-toggle"
+                      className="powers-group-toggle"
                       aria-expanded={open}
                       onClick={() => toggleModule(moduleName)}
                     >
@@ -248,6 +312,12 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   );
 }
 
+const ordinal = (n: number): string => {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th'
+    : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th';
+  return `${n}${suffix}`;
+};
+
 function Row({
   entry, roles, cells, editable, grid, rowWarnings, cellWarnings,
 }: {
@@ -259,6 +329,8 @@ function Row({
   rowWarnings: GrantWarning[];
   cellWarnings: Map<string, GrantWarning[]>;
 }): JSX.Element {
+  const labels = useLabels();
+
   // An ORPHAN ROW — nobody at all can do this — is a state you should not have to look for.
   const orphan = roles.every((role) => {
     const cell = cells.get(cellKey(role.id, entry.key));
@@ -268,21 +340,21 @@ function Row({
   return (
     <tr className={`powers-row${orphan ? ' is-orphan' : ''}`}>
       <th scope="row" className="powers-capability">
-        {editable ? (
-          <button
-            type="button"
-            className="powers-row-fill"
-            // Grant to everyone, or take it from everyone (33 § Interactions). One click,
-            // because the alternative on a 64-row grid is n clicks and a missed column.
-            title={orphan ? 'Give this to every role' : 'Take this from every role'}
-            onClick={() => grid.fillRow(entry.key, orphan ? 'own_unit' : null)}
-          >
-            {entry.label}
-          </button>
-        ) : (
-          entry.label
-        )}
+        <span className="powers-capability-label">{entry.label}</span>
         {entry.phase === 'P3' && <span className="tag tag-neutral powers-soon">Soon</span>}
+        {editable && (
+          // WAS A HIDDEN ACTION ON THE ROW LABEL — clicking the words "delete the entire
+          // organisation" granted it to every role at once, with nothing on screen saying so.
+          // Now it is the same dropdown as a cell, visibly labelled, sitting where a "set all
+          // of these at once" control belongs.
+          <ChoicePicker
+            className="powers-all"
+            value={null}
+            placeholder="Set all…"
+            ariaLabel={`Set “${entry.label}” for every role at once`}
+            onChoose={(choice) => grid.fillRow(entry.key, choice)}
+          />
+        )}
         {rowWarnings.map((warning) => (
           <span key={warning.message} className="powers-warning" role="note">
             {warning.message}
@@ -292,36 +364,34 @@ function Row({
 
       {roles.map((role) => {
         const key = cellKey(role.id, entry.key);
-        const cell = cells.get(key);
-        const denied = cell?.effect === 'deny';
-        const scope = cell?.scope ?? null;
+        const choice = choiceOf(cells.get(key));
         const warnings = cellWarnings.get(key) ?? [];
-
-        const label = denied
-          ? `${role.name}: blocked from “${entry.label}”`
-          : scope
-            ? `${role.name}: may ${entry.label} across ${LONG[scope]}`
-            : `${role.name}: cannot ${entry.label}`;
+        const sentence = describeCell(role.name, entry.label, choice, labels);
 
         return (
           <td key={role.id} className="powers-cell-wrap">
-            <button
-              type="button"
-              className={`powers-cell${denied ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
-              style={{ ['--weight' as string]: denied ? 0 : scope ? WEIGHT[scope] : 0 }}
-              aria-label={label}
-              // The DENY tooltip carries the one resolution rule an administrator genuinely
-              // benefits from knowing (33, INV-004). It is what makes a block on external
-              // vendors safe even after somebody adds them to a committee.
-              title={denied ? 'Blocked. A block always beats an allow, wherever the allow comes from.' : label}
-              disabled={!editable}
-              onClick={(event) => {
-                if (event.shiftKey) grid.block(role.id, entry.key);
-                else grid.cycle(role.id, entry.key);
-              }}
-            >
-              {denied ? <Icon name="close" size={16} /> : scope ? SHORT[scope] : '—'}
-            </button>
+            {editable ? (
+              <ChoicePicker
+                className={`powers-cell${choice === 'blocked' ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
+                style={{ ['--weight' as string]: weightOf(choice) }}
+                value={choice}
+                ariaLabel={sentence}
+                title={sentence}
+                onChoose={(next) => grid.setCell(role.id, entry.key, next)}
+              />
+            ) : (
+              // Read-only is a FACT, not a disabled control (33 § States). A greyed-out
+              // dropdown reads as "you are doing this wrong"; a plain chip reads as the rule
+              // it is, which is what somebody without `grant.update` came here to see.
+              <span
+                className={`powers-chip${choice === 'blocked' ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
+                style={{ ['--weight' as string]: weightOf(choice) }}
+                title={sentence}
+                aria-label={sentence}
+              >
+                {choiceWord(choice, labels)}
+              </span>
+            )}
             {warnings.map((warning) => (
               <span key={warning.message} className="powers-warning" role="note">
                 {warning.message}
@@ -333,3 +403,51 @@ function Row({
     </tr>
   );
 }
+
+/**
+ * One cell, as a NATIVE SELECT. `DEC-076`.
+ *
+ * A custom popover would have needed its own focus trap, its own keyboard map and its own
+ * escape from the grid's horizontal scroll container — which clips anything absolutely
+ * positioned inside it. A `<select>` is rendered by the browser outside the page entirely:
+ * it cannot be clipped, it works on a phone, it is already keyboard- and screen-reader-
+ * correct, and every administrator alive has used one. The most intuitive control here is
+ * the one nobody had to invent.
+ */
+function ChoicePicker({
+  value, onChoose, ariaLabel, className, style, title, placeholder,
+}: {
+  value: GrantChoice;
+  onChoose: (choice: GrantChoice) => void;
+  ariaLabel: string;
+  className: string;
+  style?: Record<string, string | number>;
+  title?: string;
+  /** Only the row control has one: it shows an instruction rather than a current value. */
+  placeholder?: string;
+}): JSX.Element {
+  const labels = useLabels();
+  return (
+    <select
+      className={className}
+      style={style}
+      value={placeholder ? '' : keyOf(value)}
+      aria-label={ariaLabel}
+      {...(title ? { title } : {})}
+      onChange={(event) => {
+        const chosen = GRANT_CHOICES.find((choice) => keyOf(choice) === event.target.value);
+        if (chosen !== undefined) onChoose(chosen);
+      }}
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {GRANT_CHOICES.map((choice) => (
+        <option key={keyOf(choice)} value={keyOf(choice)}>
+          {choiceWord(choice, labels)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** `null` cannot be an option value, so the absent grant travels as the word it reads as. */
+const keyOf = (choice: GrantChoice): string => (choice === null ? 'none' : choice);
