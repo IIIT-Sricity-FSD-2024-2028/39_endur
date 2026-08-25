@@ -3364,4 +3364,85 @@ N-060  THE SEEDED DEMO ORGS ARE FROZEN AT THE MATRIX OF THE DAY THEY WERE MADE, 
        GENERAL SHAPE: a seed that skips is a snapshot, not a migration. any capability added
        to the matrix after an org exists never reaches it.
        see D-031, 50 §1, T-072, T-073, presets/grant-matrix.ts.
+
+N-063  A CATALOGUED PLACEHOLDER PROP SHAPE IS A GUESS, NOT A CONTRACT — `<GrowthChart>` had
+       to change shape at build time. 25 Aug, `T-067`.
+       `24` catalogued `<GrowthChart>` as `{ series: { period, byTier: Record<Tier,
+       number> }[] }` — organisations-by-tier, over time. Building `71`'s real
+       `PlatformAnalytics` endpoint found there is no data to fill it: `subscriptions` holds
+       only the CURRENT tier (no history, no `updatedAt`, `schema.prisma:677`) and
+       `platform_audit_log`'s `plan.override` rows are the only tier-change record that
+       exists. A per-period tier snapshot would have to re-project TODAY's audit trail
+       backwards onto months it does not describe — exactly what `71`'s own rule forbids
+       ("historic figures must not move retroactively").
+       `<GrowthChart>` was built plotting `movement` instead (new/upgraded/downgraded/churned
+       per period) — the estate's actual history, and still four lines never netted (decision
+       2). `24`'s entry was corrected to the real shape rather than left describing code that
+       does not exist.
+       GENERAL SHAPE: a catalogue-first placeholder written before the data contract it
+       depends on is a best guess. When the real contract lands and the guess does not fit
+       the data that exists, correct the catalogue entry at build time rather than inventing
+       a fake history to fill the original shape.
+       see 24 §6b (`<GrowthChart>`), 71 § Data contract, `T-059`, `T-067`.
+
+N-064  `isQuietOrg` MOVED TO `packages/shared` SO TWO SCREENS COULD SHARE ONE DEFINITION.
+       25 Aug, `T-067`.
+       `71` decision 4 requires `orgsQuiet30d` (the analytics count) to match, exactly, `70`'s
+       estate list "Quiet" chip for the same organisations — "one definition, two screens, or
+       the two screens will disagree in front of a customer." The predicate
+       (`responsesLast30d === 0 && lastActivityAt !== null`, deliberately excluding an org
+       that has never collected — that is onboarding, not churn) was already written once,
+       inline, inside `<OrgRow>`'s `orgChips()` at `T-066`. Rather than writing it a second
+       time inside `service.ts`'s new `analytics()`, it was extracted to
+       `packages/shared/src/platform-quiet.ts` and both the frontend chip and the backend
+       count now import the same function.
+       see 71 § The decisions inside these numbers (4), src/frontend/components/platform/OrgRow.tsx,
+       src/backend/features/platform/service.ts.
+
+N-065  `node_modules/@endur/shared` INSIDE EACH WORKSPACE IS A REAL COPY, NOT A SYMLINK, ON
+       THIS MACHINE — AND IT GOES STALE. Found 25 Aug, `T-067`, same broken-install
+       environment `T-066`'s session log already flagged.
+       `npm install` normally symlinks a workspace package into the consumers that depend on
+       it; here `src/backend/node_modules/@endur/shared` and
+       `src/frontend/node_modules/@endur/shared` are ordinary directories holding a snapshot
+       of `packages/shared/src` from whenever `npm install` last completed. Editing
+       `packages/shared/src` (adding `AnalyticsQuery`, `PlatformAnalytics`, `isQuietOrg`)
+       compiled clean in `packages/shared` itself but `tsc -b` at the repo root kept reporting
+       "no exported member" for the new names — it was resolving `@endur/shared` to the stale
+       copy, not the edited source.
+       WORKED AROUND, NOT FIXED: copied `packages/shared/{src,package.json,tsconfig.json}`
+       over both stale copies (`Copy-Item -Recurse -Force`, additive — nothing already there
+       was deleted). `npm install` remains broken for the reason `T-066`'s log already gives
+       (`EISDIR` on the `@endur/web` symlink) and was not re-attempted.
+       CONSEQUENCE FOR THE NEXT SESSION: any edit to `packages/shared/src` will again need
+       this copy repeated before `tsc -b` at the root sees it, until `npm install` is fixed
+       for real. Check `src/backend/node_modules/@endur/shared/src` and
+       `src/frontend/node_modules/@endur/shared/src` against `packages/shared/src` before
+       trusting a "no exported member" error from the shared package.
+       see N-018 (the original build-environment note), T-066's PROGRESS.md session log
+       (the `@rollup/rollup-win32-x64-msvc` / `EISDIR` history).
+
+N-066  TWO SEPARATE, NEWLY-DISCOVERED LOCAL BLOCKERS, both found 25 Aug running `T-077`'s
+       checks — recorded apart from N-018/N-065 because they are different failures on the
+       same broken-install machine, not the same one recurring.
+       (1) THE LOCAL POSTGRES CONTAINER WAS STOPPED, NOT MISSING. `docker compose up -d`
+       refused with a name conflict ("`/endur-db` already in use") because the container
+       existed from an earlier session but was not running. `docker start endur-db` brought
+       it up in about two seconds; `docker ps` is the one-line check for whether this is the
+       blocker before reaching for `docker compose up`.
+       (2) `test/globalSetup.ts` RUNS MIGRATIONS VIA `execFileSync('npx', [...])` WITH NO
+       `shell` OPTION, WHICH `npx` NEEDS ON WINDOWS. Node's `child_process` will not resolve a
+       `.cmd` shim (which is what `npx` is on Windows) without `shell: true` or the exact
+       `npx.cmd` name; this line almost certainly works as written on the Linux/macOS machines
+       this project was mostly built on, and fails with `spawnSync npx ENOENT` on every native
+       Windows shell tried this session (Git Bash and PowerShell both, invoked directly and
+       through `npm run test`). NOT FIXED — `test/globalSetup.ts` is shared test
+       infrastructure outside `T-077`'s file list, and patching it was judged out of scope for
+       a task scoped to `src/backend/platform/logs/**` and `src/backend/features/platform/**`.
+       CONSEQUENCE: with the DB now reachable (blocker 1 resolved), `npm run test` on this
+       machine still cannot run ANY backend test file, not just the new one — this is a wider
+       problem than `T-066`/`T-067`'s original `@rollup/rollup-win32-x64-msvc` finding, which
+       blocked `npm install` itself; this one is downstream of a working install. `T-077`'s new
+       tests (`platform-logs.test.ts`) are typechecked and linted clean but were not run.
+       see N-018, N-065, `test/globalSetup.ts:32`.
 ```

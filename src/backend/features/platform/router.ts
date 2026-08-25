@@ -17,8 +17,11 @@
 //   requirePlatformAuth — instead of all three
 import { Router } from 'express';
 import {
+  AnalyticsListDto,
   CreateOperatorDto,
   EstateListDto,
+  LogListDto,
+  LogReadDto,
   OrgMessageDto,
   OverridePlanDto,
   PlatformAuditListDto,
@@ -27,6 +30,7 @@ import {
   SuspendDto,
   UpdateOperatorDto,
   capabilitiesForRole,
+  type LogReadQuery,
   type PlatformLoginBody,
   type PlatformMeResponse,
   type PlatformRole,
@@ -40,12 +44,15 @@ import { validate } from '../../middleware/validate.js';
 import { scopedRateLimits } from '../../middleware/rateLimit.js';
 import { UnauthenticatedError } from '../../lib/errors.js';
 import {
+  analytics,
   createOperator,
   estate,
   listOperators,
+  listOperatorLogFiles,
   messageAdministrators,
   orgDetail,
   overridePlan,
+  readOperatorLogFile,
   readPlatformAudit,
   setSuspended,
   stats,
@@ -145,6 +152,21 @@ platformRouter.get('/stats', requirePlatform('platform.usage.read'), (_req, res,
   void stats().then((data) => res.json({ data })).catch(next);
 });
 
+/**
+ * `71` § Route & access — OWNER ONLY, and the reason survives DEC-035's removal of money:
+ * this is the estate-wide shape of the business's own position, and `platform.org.read`
+ * (both roles) is what support needs one organisation at a time.
+ */
+platformRouter.get(
+  '/analytics',
+  validate(AnalyticsListDto),
+  requirePlatform('platform.analytics.read'),
+  (req, res, next) => {
+    const { query } = req.data as { query: Parameters<typeof analytics>[0] };
+    void analytics(query).then((data) => res.json({ data })).catch(next);
+  },
+);
+
 platformRouter.post(
   '/orgs/:id/plan',
   validate(OverridePlanDto),
@@ -197,6 +219,31 @@ platformRouter.get(
   (req, res, next) => {
     const { query } = req.data as { query: Parameters<typeof readPlatformAudit>[0] };
     void readPlatformAudit(query).then((page) => res.json(page)).catch(next);
+  },
+);
+
+/**
+ * `72` § "The file name is the whole attack surface" — the client picks a name from THIS
+ * list; it never supplies a pattern the server turns into a directory scan.
+ */
+platformRouter.get('/logs', validate(LogListDto), requirePlatform('platform.logs.read'), (_req, res) => {
+  res.json({ data: listOperatorLogFiles() });
+});
+
+/**
+ * `72` § Acceptance — both roles hold `platform.logs.read` (unlike analytics): the person
+ * who needs a stack trace at 2am is support, and an on-call tool the on-call person cannot
+ * open is not a tool.
+ */
+platformRouter.get(
+  '/logs/:file',
+  validate(LogReadDto),
+  requirePlatform('platform.logs.read'),
+  (req, res, next) => {
+    const { params, query } = req.data as { params: { file: string }; query: LogReadQuery };
+    void readOperatorLogFile(req, params.file, query)
+      .then((result) => res.json(result))
+      .catch(next);
   },
 );
 

@@ -21,6 +21,7 @@ export * from './analysis.js';
 export * from './improve.js';
 export * from './audit.js';
 export * from './platform.js';
+export * from './authz.js';
 
 // Filled as each feature lands:
 //   unit.ts role.ts grant.ts person.ts subject.ts

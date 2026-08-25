@@ -7,7 +7,12 @@
 // rather than a refusal to render.
 import type { Request } from 'express';
 import type {
+  AnalyticsQuery,
   EstateQuery,
+  LogFileMeta,
+  LogLine,
+  LogReadQuery,
+  PlatformAnalytics,
   PlatformAuditEntry,
   PlatformOperator,
   PlatformOrgDetail,
@@ -15,11 +20,12 @@ import type {
   PlatformStats,
   Tier,
 } from '@endur/shared';
-import { TIERS } from '@endur/shared';
+import { TIERS, isQuietOrg } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
 import { writeAudit } from '../../platform/audit.js';
 import { hashPassword } from '../../auth/password.js';
 import { generateSecret, otpauthUrl } from '../../platform/totp.js';
+import { listLogFiles, readLogFile } from '../../platform/logs/index.js';
 import { ConflictError, NotFoundError, UnauthenticatedError } from '../../lib/errors.js';
 import { afterCursor, encodeCursor, decodeCursor, type Paged } from '../../lib/paginate.js';
 
@@ -344,6 +350,170 @@ export async function stats(): Promise<PlatformStats> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Analytics. `71` — the estate at once, for the owner. `T-067`.
+// ---------------------------------------------------------------------------
+
+/** `YYYY-MM` or `YYYY-Qn`, so a period is both sortable as a string and readable as a label. */
+function periodKeyOf(date: Date, granularity: 'month' | 'quarter'): string {
+  if (granularity === 'quarter') {
+    return `${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`;
+  }
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** The ordered list of period keys covering `[from, to]`, inclusive — so a period with no
+ *  activity still renders as a zero row rather than vanishing from the table (`71` decision 2:
+ *  movement is reported per period, and a missing period reads as "nothing happened" only if
+ *  it is actually there to read). */
+function periodsBetween(from: Date, to: Date, granularity: 'month' | 'quarter'): string[] {
+  const step = granularity === 'quarter' ? 3 : 1;
+  const periods: string[] = [];
+  const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+  while (cursor <= end) {
+    const key = periodKeyOf(cursor, granularity);
+    if (periods[periods.length - 1] !== key) periods.push(key);
+    cursor.setUTCMonth(cursor.getUTCMonth() + step);
+  }
+  return periods;
+}
+
+const TIER_RANK = new Map(TIERS.map((tier, index) => [tier, index]));
+
+export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytics> {
+  const now = new Date();
+  const to = query.to ?? now;
+  // Twelve months back by default (`71` § Interactions) — a year of monthly movement is the
+  // window the owner opens the page to see, and quarter granularity reads the same range as
+  // four quarters rather than a shorter one.
+  const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
+  const granularity = query.granularity;
+
+  const [organizations, trialing, cancelled, tierRows, movementNew, planOverrides, suspensions] =
+    await Promise.all([
+      db.organization.count(),
+      db.subscription.count({ where: { status: 'trialing' } }),
+      db.subscription.count({ where: { status: 'cancelled' } }),
+      // Excludes `trialing` — decision 1. An org with no subscription row folds into bronze,
+      // the same convention `stats()` already uses (D-012).
+      db.organization.findMany({
+        where: { OR: [{ subscription: null }, { subscription: { status: { not: 'trialing' } } }] },
+        select: { id: true, subscription: { select: { tier: true } } },
+      }),
+      db.organization.findMany({
+        where: { createdAt: { gte: from, lte: to } },
+        select: { createdAt: true },
+      }),
+      db.platformAuditLog.findMany({
+        where: { action: 'plan.override', createdAt: { gte: from, lte: to } },
+        select: { createdAt: true, payload: true },
+      }),
+      db.platformAuditLog.findMany({
+        where: { action: 'org.suspend', createdAt: { gte: from, lte: to } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+  const joined = organizations - trialing - cancelled;
+
+  const seats = await seatsFor(tierRows.map((row) => row.id));
+  const byTierMap = new Map<Tier, { orgs: number; seats: number }>(
+    TIERS.map((tier) => [tier, { orgs: 0, seats: 0 }]),
+  );
+  for (const row of tierRows) {
+    const tier = (row.subscription?.tier ?? 'bronze') as Tier;
+    const entry = byTierMap.get(tier);
+    if (!entry) continue;
+    entry.orgs += 1;
+    entry.seats += seats.get(row.id) ?? 0;
+  }
+  const byTier = TIERS.map((tier) => ({ tier, ...byTierMap.get(tier)! }));
+
+  const periods = periodsBetween(from, to, granularity);
+  const movementMap = new Map(
+    periods.map((period) => [period, { new: 0, upgraded: 0, downgraded: 0, churned: 0 }]),
+  );
+  for (const row of movementNew) {
+    const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
+    if (bucket) bucket.new += 1;
+  }
+  for (const row of planOverrides) {
+    const payload = row.payload as { from?: string; to?: string } | null;
+    const fromRank = payload?.from ? TIER_RANK.get(payload.from as Tier) : undefined;
+    const toRank = payload?.to ? TIER_RANK.get(payload.to as Tier) : undefined;
+    if (fromRank === undefined || toRank === undefined || fromRank === toRank) continue;
+    const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
+    if (!bucket) continue;
+    if (toRank > fromRank) bucket.upgraded += 1;
+    else bucket.downgraded += 1;
+  }
+  for (const row of suspensions) {
+    const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
+    if (bucket) bucket.churned += 1;
+  }
+  const movement = periods.map((period) => ({ period, ...movementMap.get(period)! }));
+
+  // Trials. `19` §13b / `Mithil/plan.md`: register never writes `trialing` (DEC-048), so
+  // only a seeded operator-created org can be. `started`/`expired` read the only start/end
+  // dates the model has (`periodStart`/`periodEnd`); `converted` has NO SOURCE — nothing
+  // records a trialing-to-active TRANSITION, only a tier override, which carries no prior
+  // status. Reporting a guessed conversion would be exactly the fabricated confidence
+  // decision 3 exists to refuse, so it stays honestly zero until a real signal exists.
+  const [trialsStarted, trialsExpired] = await Promise.all([
+    db.subscription.count({ where: { status: 'trialing', periodStart: { gte: from, lte: to } } }),
+    db.subscription.count({
+      where: { status: 'trialing', periodEnd: { gte: from, lte: to, lt: now } },
+    }),
+  ]);
+  const trialsConverted = 0;
+  const completed = trialsConverted + trialsExpired;
+  const conversionRate = completed === 0 ? null : trialsConverted / completed;
+
+  const [orgsWithACampaign, orgsWithAResponse, allOrgIds] = await Promise.all([
+    db.organization.count({ where: { campaigns: { some: {} } } }),
+    db.organization.count({ where: { campaigns: { some: { responses: { some: {} } } } } }),
+    db.organization.findMany({ select: { id: true } }),
+  ]);
+  const activity = await responseFacts(allOrgIds.map((row) => row.id));
+  let orgsQuiet30d = 0;
+  for (const id of allOrgIds.map((row) => row.id)) {
+    if (
+      isQuietOrg({
+        responsesLast30d: activity.recent.get(id) ?? 0,
+        lastActivityAt: (activity.lastAt.get(id) ?? null)?.toISOString() ?? null,
+      })
+    ) {
+      orgsQuiet30d += 1;
+    }
+  }
+
+  const allSeats = await seatsFor(allOrgIds.map((row) => row.id));
+  const [campaignsTotal, responsesTotal] = await Promise.all([
+    db.campaign.count(),
+    db.response.count(),
+  ]);
+
+  return {
+    window: { from: from.toISOString(), to: to.toISOString(), granularity },
+    orgs: { total: organizations, joined, trialing, cancelled },
+    byTier,
+    movement,
+    trials: {
+      started: trialsStarted,
+      converted: trialsConverted,
+      expired: trialsExpired,
+      conversionRate,
+    },
+    adoption: { orgsWithACampaign, orgsWithAResponse, orgsQuiet30d },
+    totals: {
+      seats: [...allSeats.values()].reduce((sum, value) => sum + value, 0),
+      campaigns: campaignsTotal,
+      responses: responsesTotal,
+    },
+  };
+}
+
 export async function overridePlan(
   req: Request,
   orgId: string,
@@ -587,4 +757,35 @@ export async function updateOperator(
     return row;
   });
   return toOperator(updated);
+}
+
+/** `72` § Interactions — the file picker's data. Pure filesystem read; no audit row, because
+ *  listing what exists is not the operator action `19` §10 means (reading a file's content is). */
+export function listOperatorLogFiles(): LogFileMeta[] {
+  return listLogFiles();
+}
+
+/**
+ * `72` § Acceptance — "reading logs writes a `platform_audit_log` row. Reading is an operator
+ * action and is audited like one." This is the one place in the platform surface a GET writes:
+ * the file read itself is not transactional (it is disk, not the database), so the audit row
+ * is written in its own one-statement transaction immediately after a successful read rather
+ * than wrapped around the read — INV-007's "same transaction as the mutation" has nothing to
+ * synchronise with here, there being no database mutation to race against.
+ */
+export async function readOperatorLogFile(
+  req: Request,
+  fileName: string,
+  query: LogReadQuery,
+): Promise<{ data: LogLine[]; page: { nextCursor: string | null; hasMore: boolean } }> {
+  const result = readLogFile(fileName, query);
+
+  await db.$transaction((tx) =>
+    writeAudit(tx, req, 'logs.read', null, {
+      file: fileName,
+      ...(query.requestId ? { requestId: query.requestId } : {}),
+    }),
+  );
+
+  return result;
 }

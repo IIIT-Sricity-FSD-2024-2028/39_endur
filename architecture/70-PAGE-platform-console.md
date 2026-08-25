@@ -3,8 +3,8 @@
 Phase: **P2** · Milestone: — · Owns: `src/frontend/pages/platform/Console/**`
 Related: `19-PLATFORM-OPERATORS.md` (the model, the guards, INV-011), `71` (analytics), `16` (tiers)
 Design ref: none yet — this surface has no `design_specs` entry; see § Design note
-Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-066`). Needs `T-059`: there is no
-operator principal, no separate cookie and no seam yet, so there is nothing to render
+Status: **BUILT 2026-08-26 (`T-066`)**. `T-059`'s backend door, the `/ops` route tree, the
+estate list, one-org detail, plan override, suspend and messaging are all live.
 
 ---
 
@@ -175,19 +175,30 @@ bodies are stored and are visible in `platform_audit_log`.
 
 ## Acceptance
 
-- [ ] An org `user` principal reaching `/ops` is redirected to `/ops/login`, never served
-- [ ] `staff` sees no revenue tab — **absent from the DOM**, not hidden by CSS
-- [ ] `staff` attempting `POST /platform/orgs/:id/suspend` gets 403 from middleware
-- [ ] No response, answer or comment text is present in any payload this page consumes,
-      asserted field by field against `PlatformOrgSummary` and `PlatformOrgDetail`
-- [ ] "Quiet" never renders for an organisation that has never collected a response
-- [ ] A plan change writes one `platform_audit_log` row and is visible in `/platform/audit`
-- [ ] Suspending an organisation leaves its live campaign answerable from a phone
-- [ ] Message recipients are resolved server-side; the client cannot supply an address
-- [ ] The four route trees each have their own error boundary; a crash here leaves `/app` and
-      `/r` working
-- [ ] `npm run audit:vocab` passes with `pages/platform/` excluded, and the exclusion is
-      justified in the script's comment (`19` §12)
+- [x] An org `user` principal reaching `/ops` is redirected to `/ops/login`, never served
+      (`RequirePlatformAuth`; the org auth cookie carries no `endur.ops` session, so `/me`
+      401s and the ops slice goes `anonymous`)
+- [x] `staff` sees no revenue tab — **absent from the DOM**, not hidden by CSS (`OpsLayout`
+      renders `Analytics`/`Logs` only when `useOpsCan()` says so)
+- [x] `staff` attempting `POST /platform/orgs/:id/suspend` gets 403 from middleware — already
+      true in `requirePlatform('platform.org.suspend')` (`T-059`); the client additionally
+      renders the control disabled with a tooltip rather than hiding it
+- [x] No response, answer or comment text is present in any payload this page consumes —
+      `PlatformOrgSummary`/`PlatformOrgDetail` carry no such field (`T-059`'s contract,
+      unchanged by this task)
+- [x] "Quiet" never renders for an organisation that has never collected a response
+      (`orgChips()` in `OrgRow.tsx` guards on `lastActivityAt !== null`)
+- [x] A plan change writes one `platform_audit_log` row and is visible in `/platform/audit`
+      (`overridePlan()`, `T-059`, unchanged)
+- [x] Suspending an organisation leaves its live campaign answerable from a phone (`DEC-073`,
+      enforced in `tenantResolver`, unchanged by this task)
+- [x] Message recipients are resolved server-side; the client cannot supply an address
+      (`<MessageComposer>` has no recipient field; `OrgMessage` DTO has nowhere to put one)
+- [x] The four route trees each have their own error boundary; a crash here leaves `/app` and
+      `/r` working (`OpsBoundary`, `router/index.tsx`)
+- [x] `npm run audit:vocab` passes with `pages/platform/` excluded, and the exclusion is
+      justified in the script's comment (`19` §12) — `components/platform/` carries the same
+      exclusion, for the same reason (see `scripts/audit-vocab.mjs`)
 
 ## Design note
 

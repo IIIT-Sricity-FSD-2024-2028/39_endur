@@ -15,13 +15,14 @@ import type {
   PutGrantsBody,
   ReorderRolesBody,
   RoleView,
+  SimulateBody,
   UpdateRoleBody,
 } from '@endur/shared';
 import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
-import { clearGrantCache } from '../../authz/index.js';
+import { clearGrantCache, simulate, type Decision, type Target } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
 
 export async function listRoles(orgId: string): Promise<RoleView[]> {
@@ -388,6 +389,50 @@ export const capabilityCatalogue = (labels: ResolvedLabels): CapabilityMeta[] =>
     label: describeCapability(key, labels),
     phase: meta.phase,
   }));
+
+/**
+ * `POST /authz/simulate` — 42. Resolves the DTO's target into the resolver's own `Target`
+ * and calls `simulate()`, which is `resolve()` itself (`authz/simulate.ts`). Nothing here
+ * touches the algorithm; it only turns a subject or campaign id into the unit `resolve()`
+ * already knows how to scope against.
+ */
+export async function runSimulation(
+  orgId: string,
+  authzVersion: number,
+  body: SimulateBody,
+): Promise<Decision> {
+  return simulate({
+    orgId,
+    userId: body.principalUserId,
+    capability: body.capability as never,
+    target: await resolveSimTarget(orgId, body.target),
+    at: body.at,
+    authzVersion,
+  });
+}
+
+async function resolveSimTarget(orgId: string, target: SimulateBody['target']): Promise<Target> {
+  if (target.kind === 'org') return { kind: 'org' };
+  if (target.kind === 'unit') return { kind: 'unit', unitId: target.unitId };
+  if (target.kind === 'person') return { kind: 'person', userId: target.userId };
+
+  if (target.kind === 'subject') {
+    const subject = await prisma.subject.findFirst({
+      where: { id: target.subjectId, orgId },
+      select: { unitId: true },
+    });
+    if (!subject) throw new NotFoundError('That subject does not exist.');
+    return { kind: 'subject', unitId: subject.unitId ?? undefined };
+  }
+
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: target.campaignId, orgId },
+    select: { audienceRule: true },
+  });
+  if (!campaign) throw new NotFoundError('That campaign does not exist.');
+  const rule = campaign.audienceRule as { unitId?: string } | null;
+  return { kind: 'campaign', unitId: rule?.unitId };
+}
 
 async function assertRole(orgId: string, roleId: string): Promise<void> {
   // D-001 again: the tenant client cannot scope a by-id where, so this is checked by hand

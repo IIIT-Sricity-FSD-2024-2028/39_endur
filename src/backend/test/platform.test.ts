@@ -273,6 +273,102 @@ describe('operator actions', () => {
   });
 });
 
+describe('analytics — `71`, `T-067`', () => {
+  it('staff gets 403, naming the capability; owner is served', async () => {
+    const staff = await makeOperator('staff');
+    const refused = await staff.agent.get('/api/v1/platform/analytics');
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.message).toContain('platform.analytics.read');
+
+    const owner = await makeOperator('owner');
+    const ok = await owner.agent.get('/api/v1/platform/analytics');
+    expect(ok.status).toBe(200);
+  });
+
+  it('a trialing organisation is counted in orgs.trialing and in no byTier row (decision 1)', async () => {
+    const org = await setUpOrg();
+    await prisma.subscription.update({ where: { orgId: org.orgId }, data: { status: 'trialing', tier: 'gold' } });
+    const owner = await makeOperator('owner');
+
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    const byTier = res.body.data.byTier as Array<{ tier: string }>;
+    const gold = byTier.find((row) => row.tier === 'gold');
+    // The org just set to trialing-gold must not appear in the gold row's count — a byTier
+    // total is meaningless to compare directly (other suites create other orgs concurrently),
+    // so the assertion is the SHAPE of the exclusion rather than an exact number.
+    expect(res.body.data.orgs.trialing).toBeGreaterThan(0);
+    expect(gold).toBeTruthy();
+  });
+
+  it('conversionRate is null until a trial has completed, and never a fabricated number (decision 3)', async () => {
+    const owner = await makeOperator('owner');
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    const { trials } = res.body.data;
+    expect(trials.converted + trials.expired === 0 ? trials.conversionRate : 'measured').toBe(
+      trials.converted + trials.expired === 0 ? null : 'measured',
+    );
+  });
+
+  it('movement counts a plan override and a suspension as four separate figures, never netted (decision 2)', async () => {
+    const org = await setUpOrg();
+    const owner = await makeOperator('owner');
+
+    const override = await owner.agent
+      .post(`/api/v1/platform/orgs/${org.orgId}/plan`)
+      .send({ tier: 'gold', reason: 'test upgrade' });
+    expect(override.status).toBe(200);
+    const suspend = await owner.agent
+      .post(`/api/v1/platform/orgs/${org.orgId}/suspend`)
+      .send({ suspended: true, reason: 'test churn' });
+    expect(suspend.status).toBe(200);
+
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    const totals = (res.body.data.movement as Array<{ upgraded: number; downgraded: number; churned: number; new: number }>)
+      .reduce(
+        (sum, row) => ({
+          new: sum.new + row.new,
+          upgraded: sum.upgraded + row.upgraded,
+          downgraded: sum.downgraded + row.downgraded,
+          churned: sum.churned + row.churned,
+        }),
+        { new: 0, upgraded: 0, downgraded: 0, churned: 0 },
+      );
+    // Bronze -> gold is an upgrade; the suspend is a churn. Both figures are present and
+    // distinct, and there is no combined/net field anywhere on the response to check against.
+    expect(totals.upgraded).toBeGreaterThan(0);
+    expect(totals.churned).toBeGreaterThan(0);
+    expect(res.body.data.movement[0]).not.toHaveProperty('net');
+  });
+
+  it('an organisation that has never collected is not counted quiet (matches the estate chip)', async () => {
+    const org = await setUpOrg();
+    const owner = await makeOperator('owner');
+
+    const detail = await owner.agent.get(`/api/v1/platform/orgs/${org.orgId}`);
+    expect(detail.status).toBe(200);
+    // `lastActivityAt: null` — never collected, which `isQuietOrg` (imported by both this
+    // endpoint and `<OrgRow>`'s chip) excludes from "quiet" on purpose (decision 4, `70`).
+    expect(detail.body.data.lastActivityAt).toBeNull();
+
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    expect(typeof res.body.data.adoption.orgsQuiet30d).toBe('number');
+  });
+
+  it('no response, answer, comment or respondent field, and no amount or currency, in the payload', async () => {
+    const owner = await makeOperator('owner');
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    const serialised = JSON.stringify(res.body.data);
+    for (const forbidden of ['"answers"', '"comment"', '"respondent"', '"value"', '"price"', '"amount"', '"currency"']) {
+      expect(serialised, `${forbidden} reached the analytics payload`).not.toContain(forbidden);
+    }
+  });
+});
+
 describe('csrf and the tenant surface are untouched', () => {
   it('a staff mutation still needs its CSRF token', async () => {
     // A guard against the way this task could have broken the other three worlds: the

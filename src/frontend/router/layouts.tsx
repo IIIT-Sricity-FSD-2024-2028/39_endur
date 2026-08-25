@@ -4,9 +4,14 @@
 // differently for three audiences accumulates `if`s until nobody can say what a
 // respondent actually sees — and that is a privacy risk, not only a code smell.
 import { lazy, Suspense } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { RequireSession, SessionLoading } from './guards.js';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { RequirePlatformAuth, RequireSession, SessionLoading } from './guards.js';
 import { AmbientBackground } from '../components/AmbientBackground.js';
+import { useAppDispatch, useAppSelector } from '../store/index.js';
+import { opsSignedOut } from '../store/opsSlice.js';
+import { opsPost } from '../lib/ops.js';
+import { useOpsCan } from '../lib/opsCapabilities.js';
+import { useBootOpsSession } from '../lib/opsSession.js';
 
 /**
  * LAZY, and it is not a micro-optimisation — it is 20 §8's "the respondent bundle must not
@@ -108,6 +113,66 @@ export function ConsoleLayout(): JSX.Element {
         </AppShell>
       </Suspense>
     </RequireSession>
+  );
+}
+
+/**
+ * `/ops`'s own chrome — plain furniture, deliberately (`70` § Design note: it should look
+ * plainer than the customer console, and the personality of the product belongs on the
+ * customer's side of it). NO `<AmbientBackground>`, NO `<VocabularyChips>`, NO
+ * `useLabels()` — this surface says "Organizations", "Plan", "Tier" outright (`19` §12).
+ *
+ * `/ops/login` is OUTSIDE the guard, the same way `/login` is outside `RequireSession` — but
+ * here it is one path INSIDE this layout rather than a separate top-level tree, because the
+ * route table nests it under `/ops` (`Mithil/plan.md` Step 0.3). Checked by pathname, the
+ * same device `PublicLayout` already uses for its own form-only screens.
+ */
+export function OpsLayout(): JSX.Element {
+  const { pathname } = useLocation();
+  useBootOpsSession();
+  const operator = useAppSelector((s) => s.ops.operator);
+  const can = useOpsCan();
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+
+  if (pathname === '/ops/login') {
+    return (
+      <div className="ops-shell">
+        <Outlet />
+      </div>
+    );
+  }
+
+  const signOut = (): void => {
+    void opsPost('/auth/logout').finally(() => {
+      dispatch(opsSignedOut());
+      navigate('/ops/login', { replace: true });
+    });
+  };
+
+  return (
+    <RequirePlatformAuth>
+      <div className="ops-shell">
+        <nav className="nav ops-nav">
+          <Link className="nav-brand" to="/ops">
+            <span className="nav-mark" aria-hidden="true" />
+            Endur
+          </Link>
+          <NavLink to="/ops" end>Estate</NavLink>
+          {/* Absent for `staff`, not disabled — `70` § Acceptance. */}
+          {can('platform.analytics.read') && <NavLink to="/ops/analytics">Analytics</NavLink>}
+          {can('platform.logs.read') && <NavLink to="/ops/logs">Logs</NavLink>}
+          <span className="ops-nav-spacer" />
+          {operator && <span className="text-meta">{operator.name}</span>}
+          <button type="button" className="btn btn-secondary" onClick={signOut}>
+            Sign out
+          </button>
+        </nav>
+        <main className="ops-main">
+          <Outlet />
+        </main>
+      </div>
+    </RequirePlatformAuth>
   );
 }
 

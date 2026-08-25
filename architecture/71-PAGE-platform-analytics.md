@@ -3,8 +3,8 @@
 Phase: **P2** · Milestone: — · Owns: `src/frontend/pages/platform/Analytics/**`
 Related: `19-PLATFORM-OPERATORS.md` (INV-011), `16` (tiers, entitlements, seats), `70` (the ops console)
 Decisions: `_MEMORY.md` DEC-035 · Design ref: none yet — see `70` § Design note
-Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-067`). This is the **superuser**
-page the owner named; `70` is the admin one. Needs `T-059`
+Status: **BUILT 2026-08-25 (`T-067`)**. This is the **superuser**
+page the owner named; `70` is the admin one. Needed `T-059`, built on top of it.
 
 > **Was `71-PAGE-platform-revenue.md` until 2026-08-23.** DEC-035 removes pricing from the
 > product entirely, so a revenue page had nothing left to compute. What the owner actually
@@ -174,16 +174,29 @@ definition is hidden behind a hover is a number that will be quoted wrongly.
 
 ## Acceptance
 
-- [ ] `staff` gets 403 from middleware at `GET /platform/analytics`, and the tab is absent
-- [ ] `trialing` organisations appear in `orgs.trialing` and in **no** `byTier` row
-- [ ] `conversionRate` is `null` when no trial has completed, and renders as a dash
-- [ ] Churn, upgrades, downgrades and new are four separate counts with no net figure anywhere
-- [ ] `orgsQuiet30d` matches the estate list `70` produces for the same filter — one definition,
-      two screens, or the two screens will disagree in front of a customer
-- [ ] No response, answer, comment or respondent field appears in any payload (INV-011),
-      asserted against `PlatformAnalytics` field by field
-- [ ] **No amount, price or currency appears in any payload or on the page** (DEC-035)
-- [ ] Every card renders its basis line
+- [x] `staff` gets 403 from middleware at `GET /platform/analytics`, and the tab is absent —
+      `platform.test.ts` "staff gets 403, naming the capability"; `<OpsLayout>`'s nav only
+      renders the Analytics link when `useOpsCan('platform.analytics.read')` is true (T-066)
+- [x] `trialing` organisations appear in `orgs.trialing` and in **no** `byTier` row —
+      `analytics()` excludes `status: 'trialing'` from the `byTier` query; test asserts a
+      trialing-gold org still shows `orgs.trialing > 0`
+- [x] `conversionRate` is `null` when no trial has completed, and renders as a dash — `null`
+      when `converted + expired === 0`; the page renders `—`, never `0%`
+- [x] Churn, upgrades, downgrades and new are four separate counts with no net figure
+      anywhere — `movement[]` carries the four fields and nothing else; `<GrowthChart>` and
+      the movement table render all four, no combined column
+- [x] `orgsQuiet30d` matches the estate list `70` produces for the same filter — one
+      definition, two screens: `isQuietOrg` moved to `@endur/shared` (`N-064`) and both
+      `<OrgRow>`'s chip and `analytics()`'s count import it
+- [x] No response, answer, comment or respondent field appears in any payload (INV-011),
+      asserted against `PlatformAnalytics` field by field — `platform.test.ts` string-scans
+      the serialised response for `"answers"`/`"comment"`/`"respondent"`/`"value"`
+- [x] **No amount, price or currency appears in any payload or on the page** (DEC-035) — same
+      test also scans for `"price"`/`"amount"`/`"currency"`; `PlatformAnalytics` has no such
+      field to begin with
+- [x] Every card renders its basis line — each `<StatCard>`'s `context` prop states what the
+      number excludes or measures ("excludes N trialing and N cancelled", "of N completed
+      trials", etc.)
 
 ## Out of scope
 

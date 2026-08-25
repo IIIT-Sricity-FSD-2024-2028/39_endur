@@ -2015,6 +2015,35 @@ p { text-wrap: pretty; }
   .card, .input   { background: var(--color-card); }
 }
 
+/* A user who has turned transparency down does not want it turned back up by
+   a feature they can't see the toggle for. Same fallback shape as the
+   @supports block above — solid tokens, no blur — triggered by preference
+   instead of capability. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .dialog, .topbar, .menu, .drawer {
+    background: var(--color-surface);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .card, .input, .shell-rail {
+    background: var(--color-card);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .dialog-backdrop, .drawer-backdrop {
+    background: color-mix(in srgb, var(--color-neutral-900) 55%, transparent);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+
+/* Near-solid chrome with a defined edge, in place of the tint doing the
+   separating. Reuses --glass-edge rather than a new border colour. */
+@media (prefers-contrast: more) {
+  .glass, .dialog, .card, .input, .topbar, .menu, .drawer, .shell-rail {
+    background: var(--color-surface);
+    border-color: var(--color-divider);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+
 /* ── The ambient field — DEC-029 ───────────────────────────────────────────
    Fixed, behind everything, never interactive. It is the only element in the
    product allowed to animate indefinitely; the global reduced-motion rule at
@@ -2045,27 +2074,22 @@ p { text-wrap: pretty; }
 .ambient-field-1 {
   top: -32vmax; left: -26vmax; width: 96vmax; height: 96vmax;
   background: radial-gradient(circle at 50% 50%, var(--ambient-1) 0%, transparent 68%);
-  animation: ambient-drift-a 43s ease-in-out infinite alternate;
 }
 .ambient-field-2 {
   bottom: -36vmax; right: -24vmax; width: 100vmax; height: 100vmax;
   background: radial-gradient(circle at 50% 50%, var(--ambient-2) 0%, transparent 66%);
-  animation: ambient-drift-b 57s ease-in-out infinite alternate;
 }
 .ambient-field-3 {
   top: 18%; right: 10%; width: 58vmax; height: 58vmax;
   background: radial-gradient(circle at 50% 50%, var(--ambient-3) 0%, transparent 70%);
-  animation: ambient-drift-c 71s ease-in-out infinite alternate;
 }
 .ambient-field-4 {
   bottom: -30vmax; left: -24vmax; width: 88vmax; height: 88vmax;
   background: radial-gradient(circle at 50% 50%, var(--ambient-4) 0%, transparent 67%);
-  animation: ambient-drift-d 89s ease-in-out infinite alternate;
 }
 .ambient-field-5 {
   top: -28vmax; right: -26vmax; width: 80vmax; height: 80vmax;
   background: radial-gradient(circle at 50% 50%, var(--ambient-5) 0%, transparent 64%);
-  animation: ambient-drift-e 101s ease-in-out infinite alternate;
 }
 
 .ambient-hero .ambient-field { filter: blur(56px) saturate(126%); opacity: 1; }
@@ -2073,65 +2097,6 @@ p { text-wrap: pretty; }
    ground shows through again, which was the whole problem. */
 .ambient-default .ambient-field { opacity: .72; }
 
-@keyframes ambient-drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(14vmax, 9vmax, 0) scale(1.15); }
-}
-@keyframes ambient-drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1.1); }
-  to   { transform: translate3d(-12vmax, -8vmax, 0) scale(1); }
-}
-@keyframes ambient-drift-c {
-  from { transform: translate3d(0, 0, 0) scale(.9); }
-  to   { transform: translate3d(-9vmax, 12vmax, 0) scale(1.2); }
-}
-@keyframes ambient-drift-d {
-  from { transform: translate3d(0, 0, 0) scale(1.05); }
-  to   { transform: translate3d(11vmax, -10vmax, 0) scale(.92); }
-}
-@keyframes ambient-drift-e {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(-8vmax, 11vmax, 0) scale(1.18); }
-}
-
-/* The lattice — the organisation graph, at wallpaper strength. */
-.ambient-lattice { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ambient-lattice-drift {
-  transform-origin: 50% 50%;
-  animation: ambient-rotate 180s linear infinite;
-}
-@keyframes ambient-rotate {
-  from { transform: rotate(0deg)   scale(1.35); }
-  to   { transform: rotate(360deg) scale(1.35); }
-}
-.ambient-edge {
-  stroke: var(--color-accent); stroke-width: .07; opacity: .13;
-}
-.ambient-node {
-  fill: var(--color-accent); opacity: .22;
-  animation: ambient-breathe 9s ease-in-out infinite;
-}
-@keyframes ambient-breathe {
-  0%, 100% { opacity: .12; }
-  50%      { opacity: .3; }
-}
-/* A pulse travelling an edge: a short dash, drawn the length of the line and
-   then run off the end of it. Feedback moving through the graph. */
-.ambient-pulse {
-  stroke: var(--color-accent-2); stroke-width: .3; stroke-linecap: round;
-  stroke-dasharray: 2 100; opacity: .55;
-  animation: ambient-travel 11s cubic-bezier(.5, 0, .5, 1) infinite;
-}
-@keyframes ambient-travel {
-  0%        { stroke-dashoffset: 2;    opacity: 0; }
-  8%        { opacity: .6; }
-  36%       { opacity: .6; }
-  44%, 100% { stroke-dashoffset: -34;  opacity: 0; }
-}
-/* The wash carries more colour than it used to, and the lattice has to give way by the
-   same amount or the two compete — the graph is meant to be noticed on the second look,
-   not the first. */
-.ambient-default .ambient-lattice { opacity: .38; }
 
 /* ── The appearance control — DEC-028 ──────────────────────────────────────
    The thumb is a sibling that slides, not a background on the checked segment,
@@ -2817,6 +2782,41 @@ html:active-view-transition * {
   background: color-mix(in srgb, var(--color-accent) 6%, transparent);
 }
 
+/* Two action buttons on one page-header, side by side — Import beside Add a person (T-050). */
+.page-header-action { display: flex; align-items: center; gap: var(--space-2); }
+
+/* ── T-073 · the account panel and the sign-in link ──────────────────────── */
+/* 57. Tokens only — no literal colour, size or spacing value (DEC-012). */
+
+.account-panel-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-2);
+}
+.account-panel-row p { margin: 0; display: flex; align-items: center; gap: var(--space-2); }
+.account-panel-actions { display: flex; gap: var(--space-2); }
+
+/* The credential itself. `readOnly` and selectable, never editable. */
+.invite-link .field { margin-top: var(--space-3); }
+
+/* ── T-050 · CSV import wizard ────────────────────────────────────────────── */
+.import-wizard { width: min(640px, 100%); }
+.import-sample {
+  width: 100%; border-collapse: collapse; margin: var(--space-3) 0;
+  font-size: var(--text-small);
+}
+.import-sample th, .import-sample td {
+  text-align: left; padding: 6px var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.import-mapping-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); padding: 6px 0;
+}
+.import-mapping-row select { width: auto; min-width: 16ch; }
+
+/* ── /activate/:token ─────────────────────────────────────────────────────── */
+.auth-org-logo { width: 40px; height: 40px; border-radius: var(--radius-md); object-fit: contain; }
+
 /* ── T-052 · roles, the ladder, and the powers grid ──────────────────────── */
 /* 33, design_specs/design/04 §4.3. Tokens only — no literal colour, size or spacing
    value (DEC-012). */
@@ -3171,6 +3171,22 @@ html:active-view-transition * {
 .stroke-good    { stroke: var(--status-good-500); }
 .stroke-neutral { stroke: var(--color-neutral-400); }
 .stroke-bad     { stroke: var(--status-bad-500); }
+
+/* `<GrowthChart>` — `71`, T-067. Four movement lines, never netted (decision 2). Good/bad
+   only for the two that genuinely are one: a downgrade or a churn is a real loss, a new or
+   upgraded org is a real gain — `CONF-004` permits colour here because the instrument
+   (the audit action itself) names the direction, the same argument `<StackedBar>` makes for
+   NPS. */
+.stroke-movement-new        { stroke: var(--status-good-500); }
+.stroke-movement-upgraded   { stroke: var(--color-accent-500); }
+.stroke-movement-downgraded { stroke: var(--color-neutral-400); }
+.stroke-movement-churned    { stroke: var(--status-bad-500); }
+/* Both properties on each rule: `.trend-key` is a `<span>` (needs `background`) and the
+   single-point dot is an `<svg><circle>` (needs `fill`) — the same class marks both. */
+.fill-movement-new        { background: var(--status-good-500);    fill: var(--status-good-500); }
+.fill-movement-upgraded   { background: var(--color-accent-500);   fill: var(--color-accent-500); }
+.fill-movement-downgraded { background: var(--color-neutral-400);  fill: var(--color-neutral-400); }
+.fill-movement-churned    { background: var(--status-bad-500);     fill: var(--status-bad-500); }
 .trend-legend {
   list-style: none; margin: 0; padding: 0;
   display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-meta);
@@ -3397,4 +3413,56 @@ html:active-view-transition * {
 
 @media (max-width: 640px) {
   .logs-controls { flex-direction: column; align-items: stretch; }
+}
+
+/* ── Permission simulator — 42, T-054 ───────────────────────────────────── */
+
+.sim-sentence { display: flex; flex-direction: column; gap: var(--space-2); }
+.sim-sentence-text {
+  margin: 0; font-size: 18px; line-height: 2.2; display: flex; flex-wrap: wrap;
+  align-items: center; gap: var(--space-1);
+}
+
+.sim-blank { position: relative; display: inline-flex; align-items: center; gap: var(--space-1); }
+.sim-blank-filled {
+  padding: 2px var(--space-2); border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-weight: 600;
+}
+.input-inline { display: inline-flex; width: auto; min-width: 8em; }
+
+.sim-blank-results {
+  position: absolute; top: 100%; left: 0; z-index: 5; margin: var(--space-1) 0 0;
+  padding: var(--space-1); list-style: none; min-width: 14em; max-height: 12em;
+  overflow-y: auto; background: var(--color-card); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+}
+.sim-blank-results li button { width: 100%; text-align: left; }
+
+.sim-blank-unit { display: inline-block; min-width: 16em; }
+
+.sim-test { margin-left: var(--space-2); }
+
+.sim-verdict { display: flex; flex-direction: column; gap: var(--space-2); }
+.sim-verdict-headline { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
+.sim-verdict.is-allow .sim-verdict-headline { color: var(--status-good-800); }
+.sim-verdict.is-deny .sim-verdict-headline { color: var(--status-bad-800); }
+.sim-verdict-line { margin: 0; }
+.sim-counterfactual {
+  margin: 0; padding: var(--space-2); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  font-style: italic;
+}
+
+.sim-history { margin-top: var(--space-4); }
+.sim-history-heading { text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 var(--space-2); }
+.sim-history ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.sim-history-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+@media (max-width: 640px) {
+  .sim-sentence-text { font-size: 16px; }
 }

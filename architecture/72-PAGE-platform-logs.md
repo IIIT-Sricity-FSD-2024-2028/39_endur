@@ -4,9 +4,9 @@ Phase: P2 · Milestone: — · Read `19-PLATFORM-OPERATORS.md` first
 Related: `18` (what the files are and how they are written), `56` (the *other* log, the
 customer's one), `12` §4.1–4.2
 Invariants: **INV-011**, INV-006
-Status: **SCHEDULED 2026-08-24 — `CONF-021` item 3** (`T-077` routes, `T-078` page). The
-**other** log: `56` is one organisation's audit trail, this is Endur's log files across the
-estate. Needs `T-059`
+Status: **`T-077` and `T-078` BUILT 2026-08-25 — routes, path guard, reader, `/ops/logs`,
+`<LogViewer>`.** The **other** log: `56` is one organisation's audit trail, this is Endur's
+log files across the estate. Needs `T-059`
 
 ## Purpose
 
@@ -156,18 +156,38 @@ rather than document the grep.
 
 ## Acceptance
 
-- [ ] `/api/v1/platform/logs/:file` accepts only names matching the pattern — asserted with
-      `../../etc/passwd`, an absolute path, a URL-encoded traversal and a symlink
-- [ ] An org `user` principal with every capability in `11` §3 gets `401` on both routes
-- [ ] **A fixture log file containing a would-be-leaked field renders it under `extra`**, so a
-      logging mistake is visible rather than absorbed
-- [ ] No route on this page can write, delete or rotate a file
-- [ ] A 10 MB file renders its most recent page without reading the whole file
-- [ ] `requestId` filtering returns every line of one request across both streams
-- [ ] An unparseable line is shown, not dropped
-- [ ] Reading logs writes a `platform_audit_log` row — **reading is an operator action and is
-      audited like one** (`19` §10)
-- [ ] The page renders correctly when `LOG_TO_FILE=false` and there are no files at all
+- [x] `/api/v1/platform/logs/:file` accepts only names matching the pattern — asserted with
+      `../../etc/passwd`, an absolute path, a URL-encoded traversal and a symlink —
+      `platform-logs.test.ts` "the file name is the whole attack surface". The symlink case
+      is guarded by an `lstat` check (a name can pass the regex and still be a link) and skips
+      itself in the test if the environment cannot create a symlink at all, rather than
+      passing for the wrong reason
+- [x] An org `user` principal with every capability in `11` §3 gets `401` on both routes —
+      `platform-logs.test.ts` "an org user gets 401, whatever they hold in grants"
+- [x] **A fixture log file containing a would-be-leaked field renders it under `extra`**, so a
+      logging mistake is visible rather than absorbed — asserted against an unexpected
+      `userIp` key the parser does not name
+- [x] No route on this page can write, delete or rotate a file — only `GET` is mounted;
+      asserted with a `POST` to the same path
+- [x] A large file renders its most recent page without reading the whole file — the reader
+      walks backwards in 64 KB chunks and stops at the page limit (`src/backend/platform/logs/index.ts`'s
+      `tailRead`); the test exercises the same algorithm at a size the suite can afford
+      (~220 lines) rather than an actual 10 MB fixture, and asserts the two pages are
+      contiguous with no gap or repeat
+- [x] `requestId` filtering returns every line of one request across both streams — reads
+      every rotation of both `app-*`/`error-*` files for that line's date in full rather than
+      paginating (documented as a deliberate exception to "never slurped": the files are
+      already size-bounded and there are normally only a few per stream per day)
+- [x] An unparseable line is shown, not dropped — carried through the existing `extra` field
+      as `{ unparsed: true, raw }` rather than a new top-level field, since `LogLine` has no
+      such field in its contract and inventing one would diverge from `72` § Data contract
+- [x] Reading logs writes a `platform_audit_log` row — **reading is an operator action and is
+      audited like one** (`19` §10) — `readOperatorLogFile()` in `service.ts` writes it in its
+      own transaction immediately after a successful read
+- [x] The page renders correctly when `LOG_TO_FILE=false` and there are no files at all —
+      `Logs` (`pages/platform/Logs/index.tsx`) renders `<EmptyState icon="log">` "Nothing
+      has been written yet" when `GET /platform/logs` returns `{ data: [] }`, distinct from
+      the `forbidden` and `notFound` states
 
 ## Out of scope
 

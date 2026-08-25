@@ -4,11 +4,13 @@ import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector, type TypedUseSelectorHook } from 'react-redux';
 import { authReducer } from './authSlice.js';
 import { vocabularyReducer } from './vocabularySlice.js';
+import { opsReducer } from './opsSlice.js';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     vocabulary: vocabularyReducer,
+    ops: opsReducer,
   },
 });
 
@@ -21,3 +23,4 @@ export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
 export * from './authSlice.js';
 export * from './vocabularySlice.js';
+export * from './opsSlice.js';

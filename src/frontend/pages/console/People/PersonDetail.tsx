@@ -12,10 +12,11 @@
 // the org chart (13 §5).
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { CreateAssignmentBody } from '@endur/shared';
+import type { AccountInvite, AccountStatus, CreateAssignmentBody } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
+import { InviteLink } from '../../../components/feedback/InviteLink.js';
 import { InlineName } from '../../../components/org/InlineName.js';
 import { PowersByPlace } from '../../../components/org/PowersByPlace.js';
 import { Icon } from '../../../components/Icon.js';
@@ -23,9 +24,10 @@ import { ApiError } from '../../../lib/api.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { usePerson, useRoles } from '../../../lib/people.js';
+import { inviteAccount, resetAccount, revokeAccount } from '../../../lib/accounts.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
-import { formatDate } from '../../../lib/format.js';
+import { formatDate, formatRelative } from '../../../lib/format.js';
 import { PositionChip, PositionEditor, type PositionDraft } from './PositionEditor.js';
 
 export default function PersonDetail(): JSX.Element {
@@ -44,6 +46,10 @@ export default function PersonDetail(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{ edgeId: string; label: string } | null>(null);
   const [editingEmail, setEditingEmail] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [invite, setInvite] = useState<AccountInvite | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   const message = (caught: unknown, fallback: string): string =>
     caught instanceof ApiError ? caught.message : fallback;
@@ -83,6 +89,34 @@ export default function PersonDetail(): JSX.Element {
         setAssignError(message(caught, 'That position could not be added.'));
       })
       .finally(() => setAssignBusy(false));
+  };
+
+  const provision = (mode: 'create' | 'reset'): void => {
+    setAccountBusy(true);
+    setAccountError(null);
+    const call = mode === 'create' ? inviteAccount : resetAccount;
+    void call(id)
+      .then((result) => setInvite(result))
+      .catch((caught: unknown) => {
+        // Usually INV-012's `WOULD_ESCALATE` — named and verbatim, same reasoning as the
+        // position editor's error above (34 § States).
+        setAccountError(message(caught, 'That link could not be created.'));
+      })
+      .finally(() => setAccountBusy(false));
+  };
+
+  const revoke = (): void => {
+    setRevoking(false);
+    setAccountBusy(true);
+    setAccountError(null);
+    void revokeAccount(id)
+      .then(() => person.reload())
+      .catch((caught: unknown) => {
+        // The lockout guard's 409 ("Sign out instead.") lands here too, and it is the
+        // caller's own sentence — 57 § Revocation.
+        setAccountError(message(caught, 'That account could not be revoked.'));
+      })
+      .finally(() => setAccountBusy(false));
   };
 
   return (
@@ -179,6 +213,26 @@ export default function PersonDetail(): JSX.Element {
                 <p className="field-help">Added {formatDate(data.createdAt)}.</p>
               )}
               {error && <p className="field-error" role="alert">{error}</p>}
+            </div>
+          </section>
+
+          {/* 57. Two separate actions on two separate audit rows — positions are the
+              powers, the account is the key, and the panel never merges them into one
+              button (57 § Purpose). */}
+          <section className="settings-card" aria-labelledby="person-account">
+            <h3 className="utility" id="person-account">Account</h3>
+            <div className="card">
+              <AccountPanel
+                account={data?.account}
+                busy={accountBusy}
+                canCreate={can('account.create')}
+                canReset={can('account.reset')}
+                canRevoke={can('account.revoke')}
+                onInvite={() => provision('create')}
+                onReissue={() => provision('reset')}
+                onRevoke={() => setRevoking(true)}
+              />
+              {accountError && <p className="field-error" role="alert">{accountError}</p>}
             </div>
           </section>
 
@@ -280,6 +334,118 @@ export default function PersonDetail(): JSX.Element {
           onCancel={() => setPending(null)}
         />
       )}
+
+      {revoking && (
+        <ConfirmDialog
+          title={`Revoke ${data?.name ?? 'their'} sign-in?`}
+          consequence="They can no longer sign in, and any live session ends on their next request. Their positions, past activity and audit rows stay exactly as they are — this is not the same as removing them."
+          verb="Revoke"
+          destructive
+          onConfirm={revoke}
+          onCancel={() => setRevoking(false)}
+        />
+      )}
+
+      {invite && (
+        <InviteLink
+          url={invite.url}
+          expiresAt={invite.expiresAt}
+          label={invite.personName}
+          onClose={() => {
+            setInvite(null);
+            void person.reload();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** 57 § States, in the order the doc tests them (`features/accounts/status.ts`). */
+function AccountPanel({
+  account,
+  busy,
+  canCreate,
+  canReset,
+  canRevoke,
+  onInvite,
+  onReissue,
+  onRevoke,
+}: {
+  account: AccountStatus | undefined;
+  busy: boolean;
+  canCreate: boolean;
+  canReset: boolean;
+  canRevoke: boolean;
+  onInvite: () => void;
+  onReissue: () => void;
+  onRevoke: () => void;
+}): JSX.Element {
+  if (!account || account.state === 'none') {
+    return canCreate ? (
+      <button type="button" className="btn btn-secondary" disabled={busy} onClick={onInvite}>
+        {busy ? 'Inviting…' : 'Invite'}
+      </button>
+    ) : (
+      <p className="text-muted">No account. They cannot sign in.</p>
+    );
+  }
+
+  if (account.state === 'invited') {
+    return (
+      <div className="account-panel-row">
+        <p>
+          <span className="tag tag-neutral">Pending</span> — expires{' '}
+          {formatRelative(account.expiresAt)}
+        </p>
+        <div className="account-panel-actions">
+          {canReset && (
+            <button type="button" className="btn btn-secondary btn-tiny" disabled={busy} onClick={onReissue}>
+              Re-issue
+            </button>
+          )}
+          {canRevoke && (
+            <button type="button" className="btn btn-ghost btn-tiny" disabled={busy} onClick={onRevoke}>
+              Revoke
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (account.state === 'active') {
+    return (
+      <div className="account-panel-row">
+        <p>
+          <span className="tag tag-good">Active</span> —{' '}
+          {account.lastLoginAt ? `last signed in ${formatRelative(account.lastLoginAt)}` : 'has not signed in yet'}
+        </p>
+        <div className="account-panel-actions">
+          {canRevoke && (
+            <button type="button" className="btn btn-ghost btn-tiny" disabled={busy} onClick={onRevoke}>
+              Revoke
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 'disabled'
+  return (
+    <div className="account-panel-row">
+      <p>
+        <span className="tag tag-muted">Disabled</span>
+        {account.disabledAt ? ` — ${formatDate(account.disabledAt)}` : ''}
+      </p>
+      <div className="account-panel-actions">
+        {canReset && (
+          <button type="button" className="btn btn-secondary btn-tiny" disabled={busy} onClick={onReissue}>
+            Re-issue
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

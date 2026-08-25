@@ -13,13 +13,14 @@
 // (design_specs/design/02 §7).
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
-import { ConsoleLayout, PublicLayout, RespondLayout } from './layouts.js';
-import { ConsoleBoundary, PublicBoundary, RespondBoundary } from './boundaries.js';
+import { ConsoleLayout, OpsLayout, PublicLayout, RespondLayout } from './layouts.js';
+import { ConsoleBoundary, OpsBoundary, PublicBoundary, RespondBoundary } from './boundaries.js';
 import { RedirectIfSignedIn, RequireCapability, SessionLoading } from './guards.js';
 
 const Landing = lazy(() => import('../pages/public/Landing.js'));
 const Login = lazy(() => import('../pages/public/Login.js'));
 const Start = lazy(() => import('../pages/public/Start.js'));
+const Activate = lazy(() => import('../pages/public/Activate.js'));
 
 const Home = lazy(() => import('../pages/console/Home/index.js'));
 const Setup = lazy(() => import('../pages/console/Setup/index.js'));
@@ -47,6 +48,16 @@ const Settings = lazy(() => import('../pages/console/Settings.js'));
 
 const Fill = lazy(() => import('../pages/respond/Fill.js'));
 const Done = lazy(() => import('../pages/respond/Done.js'));
+
+// `19`, `70`. THE FOURTH WORLD — never imported by anything in `/app`, `/` or `/r`, so
+// nothing here reaches the console or respondent bundles (`pages/respond/bundle.test.ts` is
+// the existing guard for the respondent half; `T-066` adds no equivalent for this one
+// because nothing outside this file imports these paths at all — 20 §2's whole argument).
+const OpsLogin = lazy(() => import('../pages/platform/Login.js'));
+const OpsConsole = lazy(() => import('../pages/platform/Console/index.js'));
+const OpsOrgDetail = lazy(() => import('../pages/platform/Console/OrgDetail.js'));
+const OpsAnalytics = lazy(() => import('../pages/platform/Analytics/index.js'));
+const OpsLogs = lazy(() => import('../pages/platform/Logs/index.js'));
 
 /** One Suspense per route, so a chunk still downloading in the console never blanks the
  *  respondent's form. */
@@ -77,6 +88,10 @@ export const routes: RouteObject[] = [
       { path: '/', element: <RedirectIfSignedIn>{hold(<Landing />)}</RedirectIfSignedIn> },
       { path: '/login', element: <RedirectIfSignedIn>{hold(<Login />)}</RedirectIfSignedIn> },
       { path: '/start', element: <RedirectIfSignedIn>{hold(<Start />)}</RedirectIfSignedIn> },
+      // No `<RedirectIfSignedIn>` — 57 § Interactions: the activation is filed under the
+      // INVITE's organisation even when a different tenant's session is live on this
+      // browser, so a signed-in stranger must still reach this page rather than bounce.
+      { path: '/activate/:token', element: hold(<Activate />) },
       // An unmatched path is a PUBLIC 404. Answering it inside the console would leak
       // that a console exists, and would bounce a stranger to /login for a typo.
       { path: '*', element: <NotFound /> },
@@ -138,6 +153,34 @@ export const routes: RouteObject[] = [
     children: [
       { path: ':token', element: hold(<Fill />) },
       { path: ':token/done', element: hold(<Done />) },
+    ],
+  },
+  {
+    path: '/ops',
+    element: <OpsLayout />,
+    errorElement: <OpsBoundary />,
+    children: [
+      // `/ops/login` is OUTSIDE `RequirePlatformAuth` (`OpsLayout` wraps the whole tree in
+      // it) — so this route must not be nested under the guard a second time. It is not:
+      // `OpsLayout` gates its `<Outlet>`, and `Login` itself redirects an already-
+      // authenticated operator onward, which is the same shape `RedirectIfSignedIn` gives
+      // `/login` — done inside the page here because the guard lives on the wrong side of
+      // the layout for this one route to opt out of it.
+      { path: 'login', element: hold(<OpsLogin />) },
+      { index: true, element: hold(<OpsConsole />) },
+      { path: 'orgs/:id', element: hold(<OpsOrgDetail />) },
+      // `T-067`. `staff` reaching this by URL still gets served the chunk — the route
+      // itself has no capability gate (`70` § States precedent: `Analysis`/`Reflect` do the
+      // same for a scoped capability) — but the page's own request 403s and it renders that,
+      // naming `platform.analytics.read`, rather than an empty screen.
+      { path: 'analytics', element: hold(<OpsAnalytics />) },
+      // `T-078`. No capability gate on the route itself — same precedent as `analytics`
+      // above — the page's own request 403s and it renders that.
+      { path: 'logs', element: hold(<OpsLogs />) },
+      // A direct visit to anything else falls through to this catch-all rather than the
+      // PUBLIC 404 — `/ops/anything-wrong` must resolve inside the ops tree, never leak
+      // that a console exists by 404-ing through the marketing site's not-found page.
+      { path: '*', element: <NotFound /> },
     ],
   },
 ];

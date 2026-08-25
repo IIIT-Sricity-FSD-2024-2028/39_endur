@@ -9,6 +9,7 @@
 import { useCallback } from 'react';
 import type { HomeView, LoginBody, MeResponse, RegisterBody } from '@endur/shared';
 import { apiGet, apiPost } from './api.js';
+import { activate as activateToken } from './accounts.js';
 import { useAppDispatch } from '../store/index.js';
 import { labelsLoaded, signedIn } from '../store/index.js';
 import type { AppDispatch } from '../store/index.js';
@@ -70,6 +71,26 @@ export function useSignIn(): (credentials: LoginBody) => Promise<string> {
       await apiPost<LoginBody, { ok: true }>('/auth/login', credentials, {
         suppress401Handler: true,
       });
+      await hydrate(dispatch);
+      return await landingRoute();
+    },
+    [dispatch],
+  );
+}
+
+/**
+ * Consume an activation link. 57 § Interactions: the server signs the browser in as part of
+ * the same response (`Set-Cookie` + `{ ok: true }`, the same payload shape login answers),
+ * so the client side is `useSignIn`'s shape reused rather than duplicated: hydrate, then
+ * land wherever a freshly signed-in session lands. There is no `orgId` choice here — an
+ * activation token belongs to exactly one account.
+ */
+export function useActivate(): (token: string, password: string) => Promise<string> {
+  const dispatch = useAppDispatch();
+
+  return useCallback(
+    async (token: string, password: string) => {
+      await activateToken(token, password);
       await hydrate(dispatch);
       return await landingRoute();
     },

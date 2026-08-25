@@ -134,6 +134,29 @@ export function ConsoleBoundary(): JSX.Element {
   );
 }
 
+/**
+ * The fourth boundary (`70` § Acceptance: a crash here leaves `/app` and `/r` working).
+ * Same stale-module-graph remedy as `ConsoleBoundary` (DEC-054) — a lazy route dies exactly
+ * the same way in every world, and `/ops` is no exception.
+ */
+export function OpsBoundary(): JSX.Element {
+  const { title, detail, stale } = describe(useRouteError());
+  const here = useHere();
+  return (
+    <div className="fullpage">
+      <div>
+        <h3>{title}</h3>
+        <p className="text-muted">{detail}</p>
+        {stale ? (
+          <a className="btn btn-primary" href={here}>Reload this page</a>
+        ) : (
+          <a className="btn btn-secondary" href="/ops">Reload the console</a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function RespondBoundary(): JSX.Element {
   const here = useHere();
   // Still shows LESS than the other two, and still says nothing about versions, consoles or
