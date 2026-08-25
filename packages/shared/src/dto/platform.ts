@@ -86,6 +86,40 @@ export const UpdateOperatorDto = dto({ params: OrgIdParam, body: UpdateOperator 
 
 export const PlatformOperatorListDto = dto({});
 
+/**
+ * `71` § State — window and granularity are URL params on the FRONTEND so a figure quoted
+ * in a message is re-openable; here they are just an optional range the service defaults
+ * when absent (last 12 months, monthly — `71` § Interactions).
+ */
+export const AnalyticsQuery = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  granularity: z.enum(['month', 'quarter']).default('month'),
+});
+export type AnalyticsQuery = z.infer<typeof AnalyticsQuery>;
+export const AnalyticsListDto = dto({ query: AnalyticsQuery });
+
+export const LogListDto = dto({});
+
+/**
+ * `72` § "The file name is the whole attack surface" — bounded, but deliberately NOT the
+ * real allowlist. The regex that decides which names are readable lives once, in
+ * `src/backend/lib/logFile.ts`'s `filePattern`, and is applied by the reader. A second regex
+ * here would be a second copy to keep in sync with the writer's.
+ */
+export const LogFileParam = z.object({ file: z.string().min(1).max(80) });
+
+export const LogReadQuery = PageQuery.extend({
+  level: z.coerce.number().int().optional(),
+  status: z.coerce.number().int().optional(),
+  path: z.string().max(200).optional(),
+  orgId: Id.optional(),
+  requestId: z.string().max(64).optional(),
+  q: z.string().max(200).optional(),
+});
+export type LogReadQuery = z.infer<typeof LogReadQuery>;
+export const LogReadDto = dto({ params: LogFileParam, query: LogReadQuery });
+
 // ---------------------------------------------------------------------------
 // Responses
 // ---------------------------------------------------------------------------
@@ -150,4 +184,78 @@ export type PlatformOperator = {
   role: PlatformRole;
   status: string;
   lastLoginAt: string | null;
+};
+
+/**
+ * `71` § Data contract, copied field for field. There is no `price`, `amount`, or `currency`
+ * anywhere in this shape — DEC-035 — and no field that could carry a response, an answer or
+ * a respondent identity — INV-011. Every number here is a COUNT.
+ */
+export type PlatformAnalytics = {
+  window: { from: string; to: string; granularity: 'month' | 'quarter' };
+
+  orgs: {
+    total: number;
+    /** A tier was chosen — never includes a `trialing` or `cancelled` org. */
+    joined: number;
+    /** Counted APART from joined, everywhere on this page — decision 1, never folded in. */
+    trialing: number;
+    cancelled: number;
+  };
+
+  /** `trialing` organisations excluded — decision 1. */
+  byTier: { tier: Tier; orgs: number; seats: number }[];
+
+  /** Four counts per period, never netted into one — decision 2. */
+  movement: { period: string; new: number; upgraded: number; downgraded: number; churned: number }[];
+
+  /** `conversionRate` is `null`, not `0`, until a trial has completed — decision 3. */
+  trials: { started: number; converted: number; expired: number; conversionRate: number | null };
+
+  adoption: {
+    orgsWithACampaign: number;
+    orgsWithAResponse: number;
+    /** Decision 4 — must match `70`'s estate list "Quiet" chip for the same organisations,
+     *  because both read `isQuietOrg` from `@endur/shared`. */
+    orgsQuiet30d: number;
+  };
+
+  /** COUNTS ONLY — INV-011. */
+  totals: { seats: number; campaigns: number; responses: number };
+};
+
+/**
+ * `72` § Data contract. One entry per rotating file — the list a client picks a name from,
+ * never a directory listing the client asked for by pattern.
+ */
+export type LogFileMeta = {
+  name: string;
+  stream: 'app' | 'error';
+  date: string;
+  bytes: number;
+  /** `null` when the file is larger than the count threshold — counting is not free */
+  lines: number | null;
+  modifiedAt: string;
+};
+
+/**
+ * `72` § Data contract, copied field for field. `extra` is not laziness — it is what makes
+ * an unexpected field on a log line visible AS unexpected, which is the whole reason a
+ * catch-all beats a fixed list of named columns here (`56` § Anonymity, `72` § Data contract).
+ * The same field carries an UNPARSEABLE line's raw text, flagged rather than dropped — see
+ * the parser in `src/backend/platform/logs/`.
+ */
+export type LogLine = {
+  at: string;
+  level: number;
+  msg: string;
+  requestId?: string;
+  method?: string;
+  path?: string;
+  status?: number;
+  durationMs?: number;
+  orgId?: string;
+  principal?: string;
+  err?: { type: string; message: string; stack?: string };
+  extra?: Record<string, unknown>;
 };

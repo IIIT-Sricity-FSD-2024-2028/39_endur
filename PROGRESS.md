@@ -1018,7 +1018,8 @@ Opened 23 Aug from a four-item survey. Nothing here is M0: **do not start any of
 `T-043` and `T-045`.** Stage 6 is what P2 is, written down.
 ```
 [~] T-050  B  people — list, create, assignments (34)   ← THE E2E HOLE, CLOSED.
-              CSV import wizard and the invite/account panel are NOT built (see Debt)
+              CSV import wizard BUILT 25 Aug (below, with T-073). Only the two-hat
+              preset buttons remain unbuilt on this task (see Debt)
 [x] T-051  B  person detail + my account (34, 47)
               ← BUILT. Both pages, plus GET/PATCH /profile and POST /profile/password
                 (13 § Profile catalogued them in round 1; nobody had written them).
@@ -1026,17 +1027,42 @@ Opened 23 Aug from a four-item survey. Nothing here is M0: **do not start any of
                 FOUND AND FIXED A LIVE INV-005 BREAK: powersByPlace re-found the unit
                 BY NAME and two units may share one, so one unit's powers printed under
                 the other's heading. N-057. DEC-052, DEC-053
-[ ] T-052  B  roles + the powers grid (33)                     ← repays D-008
-[ ] T-053  A  POST /authz/simulate — the route does not exist  ← blocks T-054
-[ ] T-054  C  permission simulator page (42)                   ← needs T-053
+[x] T-052  B  roles + the powers grid (33)                     ← repays D-008
+              ← BUILT 24 Aug, see Stage 9 item 2 for the full entry
+[x] T-053  A  POST /authz/simulate — the route does not exist  ← blocks T-054
+              ← BUILT 25 Aug. Mounted on authzRouter, guarded by requireCapability
+                ('simulator.run') — already seeded S('all','subtree') in grant-matrix.ts,
+                so the route-enumeration test's unreachable-capability check was already
+                satisfied. `runSimulation()` (features/roles/service.ts) maps SimulateBody's
+                target onto authz's own Target and calls `simulate()` — still three lines,
+                still just resolve() — with ONE resolution step ahead of it: a subject or
+                campaign id has no `unitId` of its own in `authz/types.ts`'s Target, so the
+                service reads the subject's `unitId` / the campaign's `audienceRule.unitId`
+                from Prisma first. New DTO: `packages/shared/src/dto/authz.ts`
+                (SimulateBody/SimulateTarget/SimulateDto)
+[x] T-054  C  permission simulator page (42)                   ← needs T-053
+              ← BUILT 25 Aug. `/app/simulator` replaces the `<Placeholder>`. Sentence
+                builder (person → capability → target-kind → target, every blank a
+                real-object dropdown/search, `at` optional), verdict card, and
+                `<DecisionTrace>` EXTENDED rather than forked (INV-009) — same component
+                `56`'s log renders, `tense="present"`. Explicit lines for a hard block and
+                for "no rule grants this"; a best-effort counterfactual derived from
+                `considered` for an out-of-scope block. Last five simulations kept in
+                `useSimulator()` state. NOT BUILT: the many-hats glowing-chart view and the
+                embedded panel on `/app/roles` (42 says both placements) — scoped out here,
+                left for a follow-up. New: `lib/simulator.ts`. Typecheck clean on both
+                packages; the backend vitest suite needs a local Postgres + `npx` on PATH
+                that this session's shell did not have, so `routes.test.ts` (route-
+                enumeration, INV-003) was read by hand rather than run — worth an actual
+                run before this is called done
 [ ] T-055  A  RLS policies                                     ← repays D-001 + D-003
 [x] T-056  X  DECIDE: what an Endur operator IS (OPEN-007)     ← DEC-033. Doc 19 written
 [ ] T-057  A  billing read surface + seat metering (16 §5, §8) ← repays D-012, D-013
 [ ] T-058  B  plan + billing page, JOIN buttons, over-limit banner (49)  ← DEC-035
 [x] T-059  A  platform backend — platform_users, requirePlatform, seam (19)  BUILT 26 Aug
               ← the T-057 dependency was DROPPED, not waited out (DEC-071, closing N-058)
-[ ] T-066  B  /ops console — estate, plan override, messaging (70)   ← T-059 DONE
-[ ] T-067  B  /ops/analytics — tier mix, movement, trials, quiet (71) ← T-059 DONE
+[x] T-066  B  /ops console — estate, plan override, messaging (70)   BUILT 26 Aug
+[x] T-067  B  /ops/analytics — tier mix, movement, trials, quiet (71) BUILT 25 Aug
 [x] T-068  X  DROPPED 23 Aug — DEC-035. No pricing, no plan_prices table at all
 [ ] T-060  X  cold-start end-to-end pass                       ← needs T-050. NOT T-045
 ```
@@ -1055,16 +1081,22 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
               ← AN ORGANISATION CAN MAKE ITS OWN ACCOUNTS. Found and repaid TWO live
                 holes on the way: D-024 (a fake revoke) and D-026 (a person you created
                 was INVISIBLE to you). DEC-046, DEC-047. Verified against the running API
-[ ] T-073  B  Invite action, account panel, <InviteLink>, /activate page  ← needs T-050
+[x] T-073  B  Invite action, account panel, <InviteLink>, /activate page  BUILT 25 Aug
               ← UNBLOCKED PROPERLY BY T-051: the account panel hangs on person detail,
-                which now exists rather than being a <Placeholder>
+                which now exists rather than being a <Placeholder>. Backend was already
+                complete (T-072); this was the frontend half. List row shows Invite /
+                Pending / Active / Disabled; the detail page carries the full panel with
+                re-issue and revoke. `<InviteLink>` never dismisses silently — no backdrop
+                click, no Escape (57 § Interactions). `/activate/:token` carries no
+                `<RedirectIfSignedIn>`, on purpose: a stranger from another tenant must
+                still reach it (57's own acceptance list)
 [x] T-074  A  audit_log.ip NULL for non-user principals  ← D-019 REPAID
               ← RE-KEYED THE SAME DAY BY DEC-045: the rule is on the ACTION, not the
                 principal, because DEC-037 made a respondent a `user` principal
 [x] T-075  A  GET /audit — filters, cursor, outcome, denial rows (56, DEC-041) BUILT 25 Aug
 [x] T-076  B  /app/logs + <DecisionTrace>   ← T-054 needs the SAME component. EXTEND it
-[ ] T-077  A  platform.logs.read + the file routes + path guard (72)  ← T-059 DONE 26 Aug
-[ ] T-078  B  /ops/logs + <LogViewer>                                    ← needs T-077
+[x] T-077  A  platform.logs.read + the file routes + path guard (72)  BUILT 25 Aug
+[x] T-078  B  /ops/logs + <LogViewer>                                    BUILT 25 Aug
 [x] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)   BUILT 25 Aug
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
 [x] T-081  A  analysis backend, RULE-BASED (43, DEC-042)               BUILT 25 Aug
@@ -1200,11 +1232,11 @@ Full tables in `55` § Stage 9.
               MFA IS BUILT, not deferred: RFC 6238 in 40 lines of node:crypto, no
               dependency, mfa_secret NOT NULL so there is no "not set up yet" state to
               fall through. `npm run ops:code -w @endur/api` prints a live code.
-[ ] T-066  B  /ops — the ENDUR ADMIN console (70)          ← T-059 DONE
-[ ] T-067  B  /ops/analytics — the SUPERUSER page (71)     ← T-059 DONE. Owns its
+[x] T-066  B  /ops — the ENDUR ADMIN console (70)          BUILT 26 Aug
+[x] T-067  B  /ops/analytics — the SUPERUSER page (71)     BUILT 25 Aug. Built its
                 own /platform/analytics endpoint: 71's four decisions ARE the task
-[ ] T-077  A  platform.logs.read + the file routes (72)    ← T-059 DONE
-[ ] T-078  B  /ops/logs + <LogViewer>                      ← needs T-077
+[x] T-077  A  platform.logs.read + the file routes (72)    BUILT 25 Aug
+[x] T-078  B  /ops/logs + <LogViewer>                      BUILT 25 Aug
 ```
 **The cost, stated once and not re-argued.** M0 is 26 Aug, two days out; `T-045` (three demo
 rehearsals) is unrun; this stage is 16 tasks — 1 + 8 + 7. The owner has asked twice and the sequence is
@@ -1378,7 +1410,281 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-26 (latest) · T-059 — the platform backend, and `/ops` gets a door
+### 2026-08-25 (latest) · T-050 (CSV import) + T-073 — accounts, end to end
+
+The frontend half of `57`. Backend was already complete (`T-072`); nothing server-side
+changed.
+
+`lib/accounts.ts` — `inviteAccount`/`resetAccount`/`revokeAccount`, plus
+`useActivationPreview` and `useActivate` (the latter added to `lib/auth.ts`, reusing
+`useSignIn`'s hydrate-then-land shape rather than duplicating it — the activation route
+answers the same payload login does).
+
+`<InviteLink>` (`24` §6c) built to spec: no backdrop click, no Escape — the one dialog in
+the product that cannot be dismissed silently, because closing it discards a credential
+that cannot be recovered. `/app/people` gets an Account column (Invite / Pending / Active /
+Disabled); `/app/people/:id` gets a full account panel with re-issue and revoke. Revoke
+goes through `<ConfirmDialog>` and surfaces the lockout 409 ("Sign out instead") verbatim.
+
+`/activate/:token` — new public page, no `<RedirectIfSignedIn>` on purpose: `57`'s own
+acceptance list requires the activation to file under the invite's organisation even when a
+different tenant's session is live on the same browser, so a signed-in stranger must still
+reach it.
+
+CSV import wizard (T-050's remaining piece): file → `POST /people/import/preview` → a
+review step resolving unmatched role/unit names by dropdown → commit. The full row parse
+for commit is done client-side (`ImportWizard.tsx`'s `parseCsvRows`, deliberately mirroring
+`features/people/service.ts`'s `parseCsv` header-synonym table) because the preview route
+only ever returns five sample rows and the commit needs every row the file contains.
+Idempotency key is derived from the file's own content so a retried commit hits the same
+replay guard.
+
+`PersonDetail.test.tsx`'s heading-order assertion updated: `Identity, Account, Positions,
+powers`. T-050's two-hat preset buttons are still unbuilt — the two dropdowns are, and
+that is the only acceptance line still open on either task.
+
+### 2026-08-25 · T-078 — `/ops/logs` and `<LogViewer>`
+
+Frontend only, needs `T-077` (landed same day, see entry below). `T-066`'s Step 0 foundation
+(`lib/ops.ts`, `opsSlice`, `OpsLayout`, `RequirePlatformAuth`, `OpsBoundary`, the `/ops` route
+tree) already existed and already carried a `Logs` nav link gated on `can('platform.logs.read')`
+— nothing to add there.
+
+**Files.** `src/frontend/lib/oplogs.ts` (new) — `useLogFiles()` and `useLogLines(file, filter)`,
+modelled on `lib/audit.ts`/`lib/estate.ts`: `Loadable<T>`, a fixed-key-order search string so
+the effect dependency is stable, a `loadMore` that appends rather than replaces, `forbidden`
+(403) and `notFound` (404 — "that file has rotated away") kept as two distinct flags rather
+than folded into one generic error, since `72` § States treats them as different messages.
+`src/frontend/components/platform/LogViewer.tsx` (new) — built to the exact prop shape already
+recorded in `24` §6c (`{ files, selected, lines, filter, onSelect, onFilter, loading? }`):
+grouped file picker (`error-*.log` listed first), a server-side filter bar (level/status/path/
+free text), a monospace line list with parsed fields in columns (never a raw blob — `extra`
+renders explicitly below the row so an unexpected field looks unexpected), the `requestId`
+click-to-collapse, and a `5xx` line's stack trace behind an expand toggle. `src/frontend/pages/platform/Logs/index.tsx`
+(new) — wires the hook to the component; selected file and every filter live in the URL
+(`?file=&level=&status=&path=&orgId=&requestId=&q=`); the empty/forbidden/rotated-away/
+no-match states are each their own branch, matching `72` § States one for one, including
+`LOG_TO_FILE=false` → `<EmptyState icon="log">` "Nothing has been written yet". Router: added
+`{ path: 'logs', element: hold(<OpsLogs />) }` to the `/ops` tree in
+`src/frontend/router/index.tsx`, no capability gate on the route itself (same precedent as
+`analytics` — the page's own request 403s and renders that).
+
+**Docs.** `24-COMPONENT-INVENTORY.md`: `<LogViewer>` marked BUILT `T-078`, §9 acceptance line
+updated. `72-PAGE-platform-logs.md`: status line now says both `T-077` and `T-078` built, last
+acceptance box (the `LOG_TO_FILE=false` render) ticked.
+
+**Checks.** `tsc -b --force`, full-repo `eslint .`, `audit:vocab`, `audit:drift` all clean. No
+new backend surface, so no new backend test file; `T-077`'s `N-066` (`npx` ENOENT blocking
+`npm run test` on this machine) still stands and was not touched this turn — this task had no
+test suite of its own to run against it. `T-078` had no acceptance items needing a `vitest`
+assertion beyond what `72`'s existing acceptance list already covers via the backend suite.
+
+Nothing committed, per standing instruction.
+
+**Next:** both halves of `72` (`T-077`, `T-078`) are done. `T-066` and `T-067` were already
+complete from prior sessions — all four Stage 9 item-3 tasks in `Mithil/plan.md` are now built.
+
+### 2026-08-25 · T-077 — `platform.logs.read`, the log routes, the path guard
+
+Backend only, as the plan scopes it. Two new routes: `GET /platform/logs` (the file list) and
+`GET /platform/logs/:file` (one file, tailed and filtered). Both roles hold
+`platform.logs.read` — unlike analytics, this is diagnostics and the person who needs a stack
+trace at 2am is support, not just the owner.
+
+**Where the code lives, and why it is not where the plan's own file list said.** `Mithil/plan.md`
+names `src/backend/features/platform/logs.ts`; `_MEMORY.md`'s MAP table — the actual lock —
+names `src/backend/platform/logs/**` for `72`. MAP wins (CLAUDE.md is explicit that it is the
+file-ownership lock, and a session-scratch plan is not an architecture doc), so the reader,
+guard and parser live at `src/backend/platform/logs/index.ts` and `parser.ts`, called from
+`service.ts` the same way every other platform route calls its logic — router.ts never talks
+to `platform/*` directly, same convention `T-067` used for `platform/db.ts` and `platform/audit.ts`.
+
+**The three-way path guard, plus a fourth belt.** `72`'s three rules (allowlist by pattern,
+resolve-and-compare, no directory listing from user input) are all there — the allowlist
+*reuses* `lib/logFile.ts`'s own `filePattern`, newly exported, rather than a second regex that
+could drift from what the writer actually names files. Added a fourth check the doc's acceptance
+list implies but its three numbered rules don't quite cover: an `lstat` check that refuses
+anything that isn't a plain file, so a symlink at an otherwise-legal name (which passes the
+regex and the resolve-compare check, since the *link's own path* is inside `LOG_DIR`) still
+gets refused rather than followed to wherever it points.
+
+**Reading is a real backward-chunked tail, not a full read.** `tailRead()` in
+`platform/logs/index.ts` reads 64 KB chunks from the end of the file, parses and filters as it
+goes, and stops once it has `limit` matching lines or hits an 8 MB per-call ceiling (added so a
+maximally unhelpful filter over a huge file can't block the event loop for one request — it
+just returns a cursor and the client pages again). The cursor is the exact byte offset the
+previous page stopped at.
+
+**`requestId` collapse is the one deliberate exception to "never slurped".** `72` § Interactions
+asks for every line of one request across both streams. A request's files are same-date,
+size-bounded, and normally one to a few rotations per stream — so `crossStreamRequestRead()`
+reads those files in full rather than paginating, and says so in a comment rather than pretending
+it fits the "bounded window" rule the rest of the reader follows.
+
+**Unparseable lines use `extra`, not a new field.** `LogLine`'s contract (`72` § Data contract)
+has no "this failed to parse" flag. Rather than diverging from the contract the way `T-067` had
+to for `<GrowthChart>` (`N-063`), the parser carries `{ unparsed: true, raw }` through the same
+`extra` catch-all that already exists for "a field nobody expected" — an unparseable line *is*
+an unexpected shape, so the same mechanism fits without a new one.
+
+**Reading writes the audit row.** `72` § Acceptance is explicit that this is the one GET in the
+whole platform surface that audits itself. `readOperatorLogFile()` does the read, then writes
+`platform_audit_log` (`action: 'logs.read'`) in its own one-statement transaction — there is no
+database mutation for it to be transactional *with*, so INV-007's "same transaction as the
+change" has nothing to synchronise against here.
+
+**Tests:** `src/backend/test/platform-logs.test.ts`, new — path-guard rejection (traversal,
+absolute path, URL-encoded traversal, symlink), org-user 401 on both routes, a fixture leaked
+field surfacing under `extra`, an unparseable line rendered not dropped, `requestId` collapse
+across both streams, backward pagination with no gap or duplicate at a size the suite can
+afford (~220 lines, standing in for the acceptance line's 10 MB — same algorithm, smaller
+input), no write route existing, the audit row, and the empty-list state when `LOG_TO_FILE` is
+off. Typecheck and lint both pass.
+
+**Could not execute the tests, for two NEW reasons — not `T-066`/`T-067`'s already-documented
+one.** `docker ps` showed the local Postgres container (`endur-db`) present but stopped;
+`docker start endur-db` fixed that in about two seconds. With the database reachable, every
+attempt to run `vitest` (via `npm run test`, via the vitest binary directly, in Git Bash and in
+PowerShell) still failed with `spawnSync npx ENOENT` inside `test/globalSetup.ts`'s
+`execFileSync('npx', ['prisma', 'migrate', 'deploy', ...])` — Node's `child_process` will not
+resolve a Windows `.cmd` shim without `shell: true`, so this line cannot run migrations on
+native Windows at all, on any backend test file, not just the new one. This is a DIFFERENT
+blocker from `N-065`'s stale-`node_modules` issue and from `T-066`'s original
+`@rollup/rollup-win32-x64-msvc` `npm install` failure — recorded as `N-066` rather than folded
+into either, since it is a third distinct failure on the same machine. `test/globalSetup.ts` is
+shared infrastructure outside this task's file list, so it was not patched.
+
+Recorded in `_MEMORY.md`: `N-066` (the two new local blockers). Ticked `19` §13's matching box
+and `72`'s acceptance list (all backend-scoped items; the `LOG_TO_FILE=false` page-render item
+stays open for `T-078`).
+
+**Next:** `T-078` (`/ops/logs` + `<LogViewer>`), now unblocked. Independent of nothing else
+remaining in this stage.
+
+### 2026-08-25 · T-067 — `/ops/analytics`, the endpoint and the page
+
+Built both halves `71` asks for: `GET /platform/analytics` (new — nothing before this task
+called it) and `/ops/analytics` on top of the route tree `T-066` shipped. `19` §13b was right
+that this had to be its own task — the four decisions below live in the query, not the UI.
+
+Typecheck and lint clean (`tsc -b`, `eslint .`). `audit:vocab` and `audit:drift` clean.
+`npm run test` could not run — same pre-existing broken install `T-066`'s log documents
+(`@rollup/rollup-win32-x64-msvc` missing, `npm install` itself `EISDIR`s on the `@endur/web`
+symlink). Not re-attempted; not worked around. Backend tests for the four decisions and
+INV-011/DEC-035 were written (`platform.test.ts`, six new cases) but are therefore unrun
+locally. The dev server could not be started for the same reason, so the page is unverified
+in a browser beyond typecheck/lint/read-through — same caveat `T-066` closed with.
+
+**The four decisions, and where each one actually lives:**
+1. *A trial is never a customer.* `analytics()` excludes `status: 'trialing'` from the
+   `byTier` query outright; `orgs.trialing` counts it separately.
+2. *Movement is four counts, never one.* `movement[]` carries `new`/`upgraded`/`downgraded`/
+   `churned` per period and nothing else — no field anywhere nets them, and `<GrowthChart>`
+   draws all four lines rather than one growth curve.
+3. *`conversionRate` is `null`, not `0`,* until `converted + expired > 0`. The page renders a
+   dash, never `0%`, for the null case.
+4. *`orgsQuiet30d` must match `70`'s "Quiet" chip exactly.* Extracted the predicate to
+   `packages/shared/src/platform-quiet.ts` (`isQuietOrg`, `N-064`) and pointed both `<OrgRow>`
+   and `analytics()` at the same function, rather than writing the rule a second time.
+
+**Where the numbers come from, confirmed by reading rather than assumed** (`19` §13b's own
+table, verified against the schema before writing the query): `movement.upgraded`/
+`downgraded` read `platform_audit_log`'s `plan.override` rows and rank the tier change —
+`subscriptions` has no history and no `updatedAt` (`schema.prisma:677`), so the audit trail is
+the only record a tier ever moved. `movement.churned` reads `org.suspend` rows the same way.
+`trials.converted` has **no source at all** in the current data model — nothing records a
+trialing-to-active *transition*, only a tier override, which carries no prior status — so it
+is honestly `0` rather than a guessed proxy; decision 3 is what makes that safe to leave zero
+instead of fabricating a number to fill it.
+
+**`<GrowthChart>`'s catalogued shape didn't fit the data that exists, so it changed at build
+time (`N-063`).** `24`'s placeholder drew a per-period tier mix (`{ period, byTier }[]`); no
+such history exists to fill it (same reason `trials.converted` has none — `subscriptions`
+only holds the CURRENT tier). Built it plotting `movement` instead — four lines, same "never
+netted" rule as decision 2 — and corrected the `24` entry to match rather than leaving it
+describe code that was never written. `<StackedBar>` was NOT reused for the tier mix despite
+the plan text mentioning it: `24` §3 documents it as good/neutral/bad and NPS-only, and a
+four-tier mix isn't that shape — used `<BarRow>` instead, once per tier.
+
+**One environment note worth a full memory entry (`N-065`):** `node_modules/@endur/shared`
+inside `src/backend` and `src/frontend` are real directory copies on this machine, not
+symlinks, and they were stale — `tsc -b` at the root kept reporting the new exports as
+missing even though `packages/shared` itself compiled clean. Fixed by copying
+`packages/shared/{src,package.json,tsconfig.json}` over both stale copies (additive, nothing
+deleted). This will recur on the next edit to `packages/shared/src` until `npm install` is
+fixed for real — see `N-065` before assuming a "no exported member" error means the code is
+wrong.
+
+**Files.** `packages/shared/src/platform-quiet.ts` (new — `isQuietOrg`), `dto/platform.ts`
+(`AnalyticsQuery`, `AnalyticsListDto`, `PlatformAnalytics`, copied field-for-field from `71`),
+`src/backend/features/platform/service.ts` (`analytics()`), `router.ts` (`GET /analytics`,
+`platform.analytics.read`, owner only), `test/platform.test.ts` (six new cases).
+`src/frontend/lib/analytics-ops.ts` (new — `useAnalytics`), `pages/platform/Analytics/index.tsx`
+(new), `components/platform/GrowthChart.tsx` (new), `router/index.tsx` (`/ops/analytics`
+mounted, replacing the catch-all fallthrough `T-066` left for it). `<OrgRow>`'s `orgChips()`
+refactored to import `isQuietOrg` rather than restate it. Four new CSS rules
+(`.stroke-movement-*` / `.fill-movement-*`) added to `endur.css`, reusing `<TrendLine>`'s
+`.trend-line*` layout classes rather than inventing a parallel set.
+
+**Not deferred to anything — `T-067` is complete per the plan's file list.** `T-077`/`T-078`
+(the log routes and `/ops/logs`) are next, independent of this task.
+
+---
+
+### 2026-08-26 · T-066 — `/ops`, the Endur admin console
+
+Built the fourth route tree and everything `Mithil/plan.md` calls Step 0, then the estate
+list, one-organisation detail, plan override, suspend and messaging on top of it. No backend
+change — `T-059` already shipped every route this task calls.
+
+Typecheck and lint clean (`tsc -b`, `eslint .`). `audit:vocab` and `audit:drift` clean.
+`npm run test` could not run: the local install is missing the `@rollup/rollup-win32-x64-msvc`
+optional dependency (a known `npm` bug on Windows, unrelated to this change — `package-lock.json`
+was already modified before this session started) and `npm install` itself failed with `EISDIR`
+on the `@endur/web` workspace symlink. Neither failure touches a file this task wrote; typecheck
+and lint both walk the whole repo and passed clean, which is the strongest signal available
+without a working `npm install`. Flagging rather than working around it — a broken local
+install is not something to paper over with `--force` or a lockfile edit made in passing.
+
+**Files.** `lib/ops.ts` (the client — no CSRF token, its own 401 handler, never `lib/api.ts`),
+`lib/opsSession.ts` (boots `/platform/me` on first mount of the tree, not app boot — an
+operator session is the rare case), `lib/estate.ts` (`useEstate`, `useOrgDetail`, modelled on
+`lib/audit.ts`'s cursor/forbidden shape), `lib/opsCapabilities.ts` (`useOpsCan`, mirror of
+`lib/capabilities.ts` — no scopes, since the platform catalogue is two fixed roles and a
+lookup, not the grant engine), `store/opsSlice.ts`, `components/platform/{OrgRow,
+MessageComposer}.tsx`, `pages/platform/Login.tsx`, `pages/platform/Console/{index,
+OrgDetail}.tsx`, and `OpsLayout`/`RequirePlatformAuth`/`OpsBoundary` added to the existing
+`router/{layouts,guards,boundaries}.tsx`.
+
+**The login-route shape needed a small deviation from the plan's literal route table.** The
+plan lists `/ops/login` as a child of `<OpsLayout>` "outside `RequirePlatformAuth`", but
+`OpsLayout` is also where the nav chrome and the sign-out button live — wrapping the whole
+layout in the guard would have made the login page itself unreachable while signed out (the
+guard would redirect `/ops/login` to `/ops/login`). Resolved the way `PublicLayout` already
+resolves the same shape for `/login` and `/start`: `OpsLayout` checks `pathname === '/ops/login'`
+and renders bare chrome, skipping the guard, before the guarded branch runs. `Login.tsx` itself
+does the `RedirectIfSignedIn` half — an authenticated operator navigates onward from inside the
+page rather than a wrapping guard, since the guard sits on the wrong side of the layout for this
+one route to opt out of it.
+
+**`audit:vocab`'s exclusion is wider than Step 0.6 asked for.** The plan says exclude
+`pages/platform/`; `components/platform/` needed the same treatment — `<MessageComposer>`'s
+"Subject" field (an email subject line) matched the banned vocabulary word `Subject` (the org
+capability object). Both directories are Endur's own furniture, reachable only from `/ops`, so
+the same exception applies for the same reason; the script's comment says so.
+
+**Deferred to `T-067`/`T-078` as the plan specifies:** no `analytics` or `logs` routes were
+added to the `/ops` route tree — those pages do not exist yet, and importing them here would
+break the build. The tree's catch-all (`{ path: '*' }`) covers `/ops/analytics` and `/ops/logs`
+until those tasks land.
+
+**Not yet verified in a browser** — the local dev server could not be started because
+`npm install` is broken in this environment (see above). The estate list, org detail, plan
+change, suspend and message flows are unverified beyond typecheck/lint/read-through.
+
+---
+
+### 2026-08-26 · T-059 — the platform backend, and `/ops` gets a door
 
 **459 backend (+19) + 852 frontend = 1,311 tests, all green.** Typecheck, lint,
 `audit:drift`, `audit:vocab` clean. One migration applied locally

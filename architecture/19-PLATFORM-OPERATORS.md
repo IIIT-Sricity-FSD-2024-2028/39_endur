@@ -388,16 +388,17 @@ check people learn to route around.
       for the other
 - [x] **No route carries both `requireCapability` and `requirePlatform`** — `routes.test.ts`,
       added at `T-059`. §9 said "must never", and "must never" without a test is a comment
-- [ ] `/platform/logs/:file` accepts only names matching the log-file pattern and cannot be
-      made to read a file outside `LOG_DIR` — asserted with `../` and with an absolute path
-      · **`T-077`**, which owns the log routes
+- [x] `/platform/logs/:file` accepts only names matching the log-file pattern and cannot be
+      made to read a file outside `LOG_DIR` — asserted with `../`, an absolute path, a
+      URL-encoded traversal and a symlink · **`T-077`**, `platform-logs.test.ts`, "the file
+      name is the whole attack surface"
 
 ## 13b. What T-059 did not build, and why
 
 | Not built | Why, and who owns it |
 |---|---|
 | `GET /platform/analytics` | **`T-067`.** `71`'s four decisions *"are the point of the task"* — what movement means, what a quiet organisation is, counts and never money. Implementing the endpoint here would have decided them in a service file rather than in the doc that argues them |
-| `GET /platform/logs`, `/platform/logs/:file` | **`T-077`**, with `72`'s three-way path guard. The capability exists in the catalogue and holds no route, which the route-enumeration test permits precisely because the reverse — a mounted route with no holder — is the error |
+| `GET /platform/logs`, `/platform/logs/:file` | **BUILT 2026-08-25, `T-077`**, with `72`'s three-way path guard. The reader, guard and parser live at `src/backend/platform/logs/` per `_MEMORY.md`'s MAP; the routes call it through `service.ts` the same way every other platform route calls its logic |
 | Email delivery for `POST /orgs/:id/message` | There is no mail transport in this product and inventing one here would be a feature nobody asked for. **The record is built and it is the half `70` argues for**: *"the next operator can see the conversation"*. Recipients are resolved server-side, the subject and body are stored, and `/platform/audit` is where they are read |
 | A cached `subscriptions.seats` | **`T-057`.** Seats are computed live from `16` §5's formula instead — see `DEC-071` for why reading the never-written column would have been worse than not showing the number |
 | Any `/ops` screen | **`T-066`**, `T-067`, `T-078`. Everything above is reachable today with `curl` and a cookie, which is exactly what "the door exists" means |

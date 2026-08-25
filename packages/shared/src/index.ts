@@ -8,6 +8,9 @@ export * from './capability-labels.js';
 // must never reach TIER_ENTITLEMENTS or the powers grid. Exported beside the org one so
 // that the two being different is visible here, at the package's front door.
 export * from './platform-capabilities.js';
+// `71`'s decision 4 — one predicate, imported by both the estate row chip and the backend
+// analytics count, so "quiet" cannot drift between the two screens that show it.
+export * from './platform-quiet.js';
 export * from './errors.js';
 export * from './labels.js';
 export * from './vocabularies.js';

@@ -38,7 +38,11 @@ const fileName = (prefix: string, day: string, index: number) =>
   index === 0 ? `${prefix}-${day}.log` : `${prefix}-${day}.${index}.log`;
 
 // `app-2026-08-23.log` and `app-2026-08-23.4.log` both belong to that day.
-const filePattern = (prefix: string) =>
+//
+// Exported (72 §"The file name is the whole attack surface") so the platform log reader's
+// allowlist is THIS regex, not a second one that can drift from what the writer actually
+// names files.
+export const filePattern = (prefix: string) =>
   new RegExp(`^${prefix}-(\\d{4}-\\d{2}-\\d{2})(?:\\.(\\d+))?\\.log$`);
 
 export function createRotatingStream(opts: RotatingStreamOptions): RotatingStream {

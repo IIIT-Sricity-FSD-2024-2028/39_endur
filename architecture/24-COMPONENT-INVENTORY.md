@@ -679,7 +679,7 @@ everywhere, not to discover it when they next visit settings.
 
 `noun` comes from `useLabels()`: a hotel is over on *properties*, not on "subjects" (INV-001).
 
-### `<OrgRow>`
+### `<OrgRow>`  ·  **BUILT 2026-08-26 (`T-066`)**
 ```ts
 { org: PlatformOrgSummary;
   onOpen: (id: string) => void;
@@ -689,7 +689,7 @@ One organisation in `70`'s estate list. **`PlatformOrgSummary` carries counts on
 prop type is where INV-011 is enforced for this component, since a row that cannot receive
 response content cannot render it.
 
-### `<MessageComposer>`
+### `<MessageComposer>`  ·  **BUILT 2026-08-26 (`T-066`)**
 ```ts
 { recipients: { name: string; email: string }[];   // resolved SERVER-side
   onSend: (subject: string, body: string) => Promise<void>;
@@ -699,17 +699,29 @@ response content cannot render it.
 carries no address** — the server resolves who holds `org.update` and mails them. An operator
 typing an address is an operator who can typo a customer's plan details to a stranger.
 
-### `<GrowthChart>`
+### `<GrowthChart>`  ·  **BUILT 2026-08-25 (`T-067`), shape changed from the placeholder below**
 ```ts
-{ series: { period: string; byTier: Record<Tier, number> }[];
+{ series: { period: string; new: number; upgraded: number; downgraded: number; churned: number }[];
   granularity: 'month' | 'quarter' }
 ```
-`71` only. Organisations over time, split by tier. **Renamed from `<RevenueChart>` on
-2026-08-23 with DEC-035** — the shape is the same series-over-periods chart, with counts
-instead of amounts and no currency prop, because there is no currency.
+`71` only. **Plots `movement`, not a per-period tier mix.** The placeholder this replaces
+(`{ period, byTier }[]`) assumed a history of what tier each organisation held in a PAST
+period — data the product does not keep: `subscriptions` holds only the CURRENT tier (no
+history, no `updatedAt`, `schema.prisma:677`) and `platform_audit_log`'s `plan.override` rows
+are the only tier-change record there is. Reconstructing "Gold orgs in March" from today's
+audit trail would be re-projecting the present backwards onto a month it does not describe —
+exactly what `71`'s own rule forbids ("historic figures must not move retroactively"). The
+four `movement` counts are what the estate's actual history supports, and plotting those
+keeps decision 2 intact: four lines, never netted into a single growth curve.
 
-Uses the same chart primitives as `<StackedBar>` and `<BarRow>`; it is a third placement of
-that machinery, not a second charting approach.
+**Renamed from `<RevenueChart>` on 2026-08-23 with DEC-035** — counts instead of amounts, no
+currency prop, because there is no currency.
+
+Uses the same inline-SVG-polyline primitives `<TrendLine>` built at `T-082` (`.trend-line*`
+classes, one shared scale, an `aria-hidden` `<svg>` paired with a real `<table>`) — a third
+placement of that machinery, not a second charting approach. `<BarRow>` is used for the
+(four-row, non-time-series) tier mix on the same page — `<StackedBar>` is not: `24` §3
+documents it as good/neutral/bad and NPS-only, and a four-tier mix is not that shape.
 
 ## 6c. Trust, accounts and diagnostics
 
@@ -790,7 +802,7 @@ component that invites a stub. They arrive with `43` or not at all.
 `useLabels()` inside, matching `<UnitTree>`'s `subjectWord` for the same reason: a presentation
 component that reaches for a context is one that cannot be rendered in a test or a preview.
 
-### `<LogViewer>`
+### `<LogViewer>` — BUILT `T-078`
 ```ts
 { files: LogFileMeta[]; selected: string; lines: LogLine[];
   filter: LogFilter; onSelect: (file: string) => void;
@@ -864,10 +876,10 @@ builds a second shell.
 
 ## 9. Acceptance
 
-- [~] Thirty-one components exist with the documented prop types — twenty-six through
+- [x] Thirty-one components exist with the documented prop types — twenty-six through
       2026-08-23 morning, plus the `<AccessNotice>` pattern in §7 (`T-070`). `<InviteLink>`
-      and `<LogViewer>` are still unbuilt; `<ResponseCard>` landed at `T-080` and
-      `<DecisionTrace>` at `T-076`
+      landed at `T-073`; `<ResponseCard>` landed at `T-080`, `<DecisionTrace>` at `T-076`,
+      `<LogViewer>` at `T-078`
 - [ ] No page defines a component that belongs in this list
 - [ ] `<UnitTree>` has exactly one implementation, used in three places
 - [ ] `<WordsEditor>` has exactly one implementation, used by wizard step 4 and by `41`
@@ -891,7 +903,8 @@ builds a second shell.
 - [x] `<TrendLine>` emits the same numbers as a table for a screen reader — `T-082`
 - [x] `<GapBar>` has no `valence` prop and paints no status ramp — `T-084`
 - [x] `<UpgradeCard>` renders no action button while `T-058` does not exist — `T-084`
-- [ ] `<InviteLink>` cannot be dismissed without an explicit action
+- [x] `<InviteLink>` cannot be dismissed without an explicit action — no backdrop click,
+      no Escape (`T-073`)
 - [ ] `<ResponsiveTable>` collapses correctly for all four tables at 390px
 - [ ] No component filters data for permission reasons
 - [ ] Every component is keyboard operable with a visible focus ring

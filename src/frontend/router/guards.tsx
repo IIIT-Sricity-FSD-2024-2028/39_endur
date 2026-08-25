@@ -83,3 +83,19 @@ export function RequireCapability({
   }
   return <>{children ?? <Outlet />}</>;
 }
+
+/**
+ * The `/ops` mirror of `RequireSession`, reading the OPS slice rather than `auth` — the two
+ * must never be confused (`19` §7). `anonymous` goes to `/ops/login`, NEVER `/login` —
+ * sending an operator to the customer sign-in page is the confusion `19` §7 exists to avoid.
+ */
+export function RequirePlatformAuth({ children }: { children?: ReactNode }): JSX.Element {
+  const status = useAppSelector((s) => s.ops.status);
+  const location = useLocation();
+
+  if (status === 'unknown') return <SessionLoading />;
+  if (status === 'anonymous') {
+    return <Navigate to="/ops/login" replace state={{ from: location.pathname + location.search }} />;
+  }
+  return <>{children ?? <Outlet />}</>;
+}

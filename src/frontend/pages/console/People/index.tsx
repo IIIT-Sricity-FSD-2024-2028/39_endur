@@ -12,10 +12,11 @@
 // (INV-005) and is never abbreviated away.
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { CreateAssignmentBody, PersonSummary } from '@endur/shared';
+import type { AccountInvite, CreateAssignmentBody, PersonSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
+import { InviteLink } from '../../../components/feedback/InviteLink.js';
 import { ResponsiveTable, type Column } from '../../../components/data/ResponsiveTable.js';
 import { InlineName } from '../../../components/org/InlineName.js';
 import { Icon } from '../../../components/Icon.js';
@@ -25,9 +26,11 @@ import { ApiError } from '../../../lib/api.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { usePeopleList, useRoles } from '../../../lib/people.js';
-import { pluralise } from '../../../lib/format.js';
+import { inviteAccount } from '../../../lib/accounts.js';
+import { formatRelative, pluralise } from '../../../lib/format.js';
 import { PersonForm, type PersonDraft } from './PersonForm.js';
 import { PositionChip, PositionEditor, type PositionDraft } from './PositionEditor.js';
+import { ImportWizard } from './ImportWizard.js';
 
 export default function People(): JSX.Element {
   const labels = useLabels();
@@ -53,6 +56,10 @@ export default function People(): JSX.Element {
   /** Which row has its two dropdowns open. One at a time — never a modal (34). */
   const [assigning, setAssigning] = useState<string | null>(null);
   const [assignBusy, setAssignBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  /** The one-time credential from `POST /people/:id/account`. Shown once, in `<InviteLink>`. */
+  const [invite, setInvite] = useState<{ person: PersonSummary; data: AccountInvite } | null>(null);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
 
   const filtered = Boolean(q || unitId || roleId);
   const rows = list.data?.data ?? [];
@@ -71,6 +78,17 @@ export default function People(): JSX.Element {
 
   const message = (error: unknown, fallback: string): string =>
     error instanceof ApiError ? error.message : fallback;
+
+  const invitePerson = (person: PersonSummary): void => {
+    setInvitingId(person.id);
+    setRowError(null);
+    void inviteAccount(person.id)
+      .then((data) => setInvite({ person, data }))
+      .catch((error: unknown) => {
+        setRowError({ id: person.id, text: message(error, 'That link could not be created.') });
+      })
+      .finally(() => setInvitingId(null));
+  };
 
   const submit = (draft: PersonDraft): void => {
     setSaving(true);
@@ -215,6 +233,35 @@ export default function People(): JSX.Element {
       render: (row) => row.email ?? <span className="text-meta">—</span>,
     },
     {
+      key: 'account',
+      header: 'Account',
+      // 34 § States, 57 § States. The list only ever offers `Invite` — re-issue and revoke
+      // live on the detail page, where there is room to say what they do (34 § Interactions).
+      render: (row) => {
+        if (row.account.state === 'active') return <span className="tag tag-good">Active</span>;
+        if (row.account.state === 'invited') {
+          return (
+            <span className="tag tag-neutral">
+              Pending — expires {formatRelative(row.account.expiresAt)}
+            </span>
+          );
+        }
+        if (row.account.state === 'disabled') return <span className="tag tag-muted">Disabled</span>;
+        return can('account.create') ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-tiny"
+            disabled={invitingId === row.id}
+            onClick={() => invitePerson(row)}
+          >
+            {invitingId === row.id ? 'Inviting…' : 'Invite'}
+          </button>
+        ) : (
+          <span className="text-meta">No account</span>
+        );
+      },
+    },
+    {
       key: 'actions',
       header: 'Actions',
       render: (row) =>
@@ -250,9 +297,16 @@ export default function People(): JSX.Element {
           // Hidden while the empty state shows its own copy — two identical primary actions
           // on one screen is the reader wondering which is the real one.
           can('person.create') && !(rows.length === 0 && !filtered) ? (
-            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-              <Icon name="add" size={18} /> Add a person
-            </button>
+            <>
+              {can('person.import') && (
+                <button type="button" className="btn btn-secondary" onClick={() => setImporting(true)}>
+                  Import
+                </button>
+              )}
+              <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+                <Icon name="add" size={18} /> Add a person
+              </button>
+            </>
           ) : undefined
         }
       />
@@ -410,6 +464,28 @@ export default function People(): JSX.Element {
             });
           }}
           onCancel={() => setPending(null)}
+        />
+      )}
+
+      {invite && (
+        <InviteLink
+          url={invite.data.url}
+          expiresAt={invite.data.expiresAt}
+          label={invite.data.personName}
+          onClose={() => {
+            setInvite(null);
+            void list.reload();
+          }}
+        />
+      )}
+
+      {importing && (
+        <ImportWizard
+          onClose={() => setImporting(false)}
+          onImported={() => {
+            setImporting(false);
+            void list.reload();
+          }}
         />
       )}
     </>

@@ -84,10 +84,10 @@ const mount = (capabilities: Capability[] = ALL) =>
   );
 
 describe('/app/people/:id', () => {
-  it('shows identity, positions and powers — in that order, payload last', () => {
+  it('shows identity, the account, positions and powers — in that order, payload last', () => {
     mount();
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(['Identity', 'Positions', 'What they can do, and where']);
+    expect(headings).toEqual(['Identity', 'Account', 'Positions', 'What they can do, and where']);
   });
 
   it('PROVES INV-005 on the page — Engineering’s powers are absent from Mechanical', () => {

@@ -9,6 +9,7 @@ import {
   DeleteRoleDto,
   PutGrantsDto,
   ReorderRolesDto,
+  SimulateDto,
   UpdateRoleDto,
 } from '@endur/shared';
 import type {
@@ -16,6 +17,7 @@ import type {
   DeleteRoleBody,
   PutGrantsBody,
   ReorderRolesBody,
+  SimulateBody,
   UpdateRoleBody,
 } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
@@ -33,6 +35,7 @@ import {
   listRoles,
   readMatrix,
   reorderRoles,
+  runSimulation,
   updateRole,
   writeMatrix,
 } from './service.js';
@@ -164,3 +167,18 @@ grantsRouter.put(
 authzRouter.get('/capabilities', authenticate, requireCapability('org.read'), (req, res) => {
   res.json({ data: capabilityCatalogue(nounsOf(req)) });
 });
+
+// 42 — the simulator. Guarded by simulator.run rather than left open: it reveals the org's
+// permission structure (`considered` included), so it is not a default-for-everyone read.
+authzRouter.post(
+  '/simulate',
+  authenticate,
+  validate(SimulateDto),
+  requireCapability('simulator.run'),
+  (req, res, next) => {
+    const { body } = req.data as { body: SimulateBody };
+    void runSimulation(req.ctx.orgId as string, req.ctx.authzVersion ?? 0, body)
+      .then((decision) => res.json({ data: decision }))
+      .catch(next);
+  },
+);

@@ -18,6 +18,31 @@ const ROOTS = [
 ];
 
 /**
+ * `pages/platform/` is EXCLUDED, in the same style as `presets/` and `database/` on the
+ * server side — a directory this check does not walk, with the reason written here rather
+ * than left as a silent gap (`19` §12, `T-066`).
+ *
+ * `/ops` carries the VOCABULARY EXCEPTION: it is Endur's own furniture, not a customer
+ * screen, and it legitimately says "Organizations", "Plan", "Tier" — the words `useLabels()`
+ * exists to replace everywhere else. A check that fired on `<OrgRow>` saying "Organizations"
+ * is a check people learn to route around, and then it stops catching the real thing
+ * (`N-023`'s lesson, repeated at `DEC-055`).
+ */
+const EXCLUDE_DIRS = [
+  'src/frontend/pages/platform',
+  // `<OrgRow>`, `<MessageComposer>` — components built ONLY for `/ops` and mounted nowhere
+  // else. The same exception as the page directory, for the same reason: `70` puts a
+  // message "Subject" field on this surface, and that is an email subject line, not the
+  // vocabulary noun `Subject` — but the check cannot tell those apart, and a component
+  // this narrowly scoped carries the same exemption its page does.
+  'src/frontend/components/platform',
+];
+const isExcluded = (path) => {
+  const normalized = path.split('\\').join('/');
+  return EXCLUDE_DIRS.some((dir) => normalized === dir || normalized.startsWith(`${dir}/`));
+};
+
+/**
  * Pass 3's roots. THE SERVER PRODUCES USER-FACING STRINGS TOO — `error.message` is
  * rendered verbatim by ten console pages — and until T-044 nothing checked them. 22 §6
  * lists three kinds (validation messages, confirmation text, export headers); the CSV
@@ -109,6 +134,7 @@ function* walk(dir) {
   }
   for (const entry of entries) {
     const path = join(dir, entry);
+    if (isExcluded(path)) continue;
     if (statSync(path).isDirectory()) yield* walk(path);
     else if (/\.(ts|tsx)$/.test(path)) yield path;
   }

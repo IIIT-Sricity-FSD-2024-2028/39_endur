@@ -1,7 +1,7 @@
 # 34 — People
 
 Phase: P2 · Milestone: — (cut-list item 7 — seed only if behind) · Related: `57` (accounts)
-Status: **LIST BUILT 2026-08-23 (`T-050`) · DETAIL PAGE BUILT 2026-08-24 (`T-051`)** — accounts are `T-073`, CSV import UI is unbuilt
+Status: **LIST BUILT 2026-08-23 (`T-050`) · DETAIL PAGE BUILT 2026-08-24 (`T-051`) · CSV import + accounts BUILT 2026-08-25 (`T-050`/`T-073`)** — only the two-hat preset buttons remain unbuilt
 Owns: `src/frontend/pages/console/People/**`, `src/frontend/lib/people.ts`
 Design ref: `design_specs/design/04` §4.4, `customization.md` §9 screen 9
 
@@ -190,16 +190,16 @@ or in the backend suite where the guarantee is the API's.
 - [x] **An assignment that would escalate is refused inline and verbatim** — INV-012's
       message names the capability, and replacing it with generic copy would throw away the
       only actionable part (`11` §5b)
-- [ ] CSV import maps columns, previews five rows, and resolves unmatched roles by dropdown —
-      **not built.** The two endpoints exist and are guarded; the wizard is not
+- [x] CSV import maps columns, previews five rows, and resolves unmatched roles by dropdown —
+      built `T-050` 2026-08-25 (`People/ImportWizard.tsx`)
 - [x] A retried import with the same key does not duplicate people (backend, `T-018`)
 - [x] Empty and empty-after-filter show different copy and different actions
 - [ ] Table collapses to cards at 390px — `<ResponsiveTable>` does it; the device check is
       `T-045`
 - [ ] A caller cannot assign a role resolving to a capability they lack at that unit —
       `403 WOULD_ESCALATE`, naming it (INV-012)
-- [ ] The account panel shows all four states, and revoke leaves positions intact — `T-073`.
-      The page it hangs on now exists
+- [x] The account panel shows all four states, and revoke leaves positions intact — built
+      `T-073` 2026-08-25
 - [x] Every noun from `useLabels()` (INV-001) — `audit:vocab` clean, and the page's own tests
       run against nonsense labels
 
