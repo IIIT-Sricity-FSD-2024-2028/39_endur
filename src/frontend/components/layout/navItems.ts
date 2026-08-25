@@ -76,12 +76,20 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     { to: '/app/campaigns', label: labels.campaign.many, icon: 'campaign', group: 'collect',
       needs: 'campaign.read' },
 
-    // P3 — visible, disabled, and honest about it. Showing the roadmap costs an hour and
-    // turns "what's next?" into something an evaluator can see (design_specs/design/02 §7).
-    // Same treatment as Roles and People above; only the phase differs.
+    // Un-disabled by T-082 — the last edit of that task, never a task of its own.
+    //
+    // `analysis.read` AND NO MINIMUM SCOPE. The seeded matrix gives it at `subtree` to the
+    // top two levels and `own_unit` to the third (`50` §1, `D-033`), and a narrow hold here
+    // is a real analysis of a real corpus, not the list-of-one that made People need a
+    // minimum (`DEC-051`). L4 holds it nowhere and does not see the item.
+    //
+    // NOT GATED ON THE TIER, and that is deliberate rather than an omission. A Bronze
+    // organisation's administrators hold the capability and get a 402 with an upgrade card,
+    // which is the demonstration `43` exists for; hiding the item would replace it with an
+    // absence nobody can ask a question about. The client is also the wrong place to decide
+    // an entitlement — it never receives the map (`packages/shared/src/tiers.ts`).
     { to: '/app/analysis', label: 'Analysis', icon: 'results', group: 'understand',
-      disabled: true,
-      soonHint: 'Themes, sentiment and key drivers across every response.' },
+      needs: 'analysis.read' },
     // Un-disabled by T-080 — the last edit of that task, never a task of its own.
     //
     // `response.read` and NOT a minimum scope (DEC-051): unlike People, a narrow hold here

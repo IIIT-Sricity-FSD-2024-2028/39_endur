@@ -3093,3 +3093,195 @@ html:active-view-transition * {
   .response-card-actions { margin-left: auto; }
   .inbox-keys { margin-left: 0; width: 100%; }
 }
+
+/* ── T-082 · the analysis dashboard ──────────────────────────────────────── */
+/* 43, design_specs/design/08 §8.2. Tokens only — no literal colour, size or spacing value
+   (DEC-012), and the three corrections that section requires are made here rather than
+   carried over from the mockup:
+
+     1. the canonical accent, not the mockup's warm `:root` override (CONF-003);
+     2. NEGATIVE SENTIMENT IS THE STATUS RAMP, NEVER THE ACCENT (CONF-004) — blue is the
+        product and cannot also mean "somebody is unhappy". `--color-accent` appears in this
+        whole block only on focus rings and the theme button;
+     3. the theme score bar is the bad -> good gradient, masked at the score.
+
+   Every custom property used here is one that EXISTS. `--status-neutral-500` is the obvious
+   one to reach for and does not exist; a property that resolves to nothing paints nothing,
+   silently, which is `D-030`'s family of bugs. */
+
+.analysis-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.analysis-filters .input { min-height: 34px; padding: 4px 10px; font-size: var(--text-meta); }
+
+/* THE ONE THING ON THIS PAGE THAT IS NEVER OPTIONAL (43 § Data contract). It sits above
+   every number, before any of them, because a 4.6 from 8 responses and a 4.6 from 800 are
+   different facts and presenting them identically is how a dashboard lies. */
+.reliability-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.reliability-text { margin: 0; font-size: var(--text-meta); }
+.confidence-tag { flex-shrink: 0; }
+
+.analysis-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: var(--space-3); margin-bottom: var(--space-3);
+}
+.analysis-card { display: flex; flex-direction: column; gap: var(--space-3); }
+.analysis-card + .analysis-card { margin-top: var(--space-3); }
+.analysis-card-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+}
+.analysis-card-title { margin: 0; margin-right: auto; }
+.analysis-card-lead, .analysis-card-foot { margin: 0; }
+
+.analysis-skeletons { display: flex; flex-direction: column; gap: var(--space-3); }
+.skeleton-card.is-tall { height: 180px; }
+
+/* ── sentiment donut ─────────────────────────────────────────────────────── */
+.donut-row { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+/* The conic gradient itself is inline: its stops are DATA. The hole is here, because a
+   ring's thickness is design and belongs nowhere near a component. */
+.donut {
+  width: 116px; height: 116px; border-radius: 50%; flex-shrink: 0;
+  background: var(--color-neutral-100);
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 55%);
+          mask: radial-gradient(circle, transparent 54%, #000 55%);
+}
+.donut-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.donut-legend li {
+  display: grid; grid-template-columns: 10px 9ch auto auto;
+  align-items: center; gap: var(--space-2);
+  font-size: var(--text-meta);
+}
+.donut-key { width: 10px; height: 10px; border-radius: var(--radius-sm); }
+
+/* ── trend line ──────────────────────────────────────────────────────────── */
+.trend-line { display: flex; flex-direction: column; gap: var(--space-2); }
+/* `preserveAspectRatio="none"` lets it fill any card width; the paths carry
+   `vector-effect="non-scaling-stroke"` so the stroke does not stretch with it. */
+.trend-line-svg { width: 100%; height: 120px; display: block; }
+.trend-path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.stroke-good    { stroke: var(--status-good-500); }
+.stroke-neutral { stroke: var(--color-neutral-400); }
+.stroke-bad     { stroke: var(--status-bad-500); }
+.trend-legend {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-meta);
+}
+.trend-legend li { display: flex; align-items: center; gap: var(--space-1); }
+.trend-key { width: 14px; height: 3px; border-radius: var(--radius-sm); }
+.trend-axis {
+  display: flex; justify-content: space-between;
+  font-size: var(--text-micro);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* ── <TrendChip> ─────────────────────────────────────────────────────────── */
+/* THE ARROW IS THE CUE AND THE COLOUR IS OPTIONAL (21 §8, CONF-004). With no `valence` the
+   chip carries no `.tag-*` class at all, so it inherits body colour: a direction with no
+   judgement attached, which is what a change in mentions is. */
+.trend-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: var(--text-meta); line-height: 1; white-space: nowrap;
+}
+.trend-chip-suffix { font-size: var(--text-micro); }
+
+/* ── themes table ────────────────────────────────────────────────────────── */
+/* A BUTTON, not a clickable row. This is the one table in the product whose point is that
+   you can open a row, and a `<tr>` is not focusable and not announced as actionable. */
+.theme-open {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--color-accent);
+  text-align: left;
+}
+.theme-open:hover { text-decoration: underline; }
+
+.theme-score { display: flex; align-items: center; gap: var(--space-2); }
+/* The gradient runs the FULL width of the track and the remainder is masked off at the
+   score, so the colour at the tip means the same thing on every row. A fill whose own
+   gradient ended at its own width would paint a 20 and a 90 identically at the tip. */
+.score-meter {
+  position: relative; display: inline-block;
+  width: 72px; height: 8px; flex-shrink: 0;
+  border-radius: var(--radius-sm); overflow: hidden;
+  background: linear-gradient(to right, var(--status-bad-500), var(--status-good-500));
+}
+.score-meter-rest {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  background: var(--color-neutral-100);
+}
+.theme-mentions { display: flex; align-items: center; gap: var(--space-2); }
+.theme-mentions-bar {
+  display: inline-block; width: 56px; height: 6px; flex-shrink: 0;
+  border-radius: var(--radius-sm); background: var(--color-neutral-100);
+}
+.theme-mentions-bar > span {
+  display: block; height: 100%; border-radius: var(--radius-sm);
+  background: var(--color-neutral-400);
+}
+
+/* ── key drivers ─────────────────────────────────────────────────────────── */
+.driver-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.driver-column { display: flex; flex-direction: column; gap: var(--space-2); }
+.driver-heading { margin: 0; }
+.driver-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.driver-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 84px 5ch;
+  align-items: center; gap: var(--space-2); font-size: var(--text-meta);
+}
+.driver-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.driver-track {
+  height: 8px; border-radius: var(--radius-sm); background: var(--color-neutral-100);
+  overflow: hidden;
+}
+.driver-fill { display: block; height: 100%; border-radius: var(--radius-sm); }
+.driver-value { text-align: right; }
+
+/* ── the drill-through ───────────────────────────────────────────────────── */
+.analysis-panel { margin-top: var(--space-3); }
+.analysis-panel-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+}
+.analysis-panel-head .analysis-card-title { margin-right: 0; }
+.analysis-panel-close { margin-left: auto; }
+.analysis-panel-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.analysis-comment {
+  padding-top: var(--space-3); border-top: 1px solid var(--color-divider);
+}
+.analysis-comment:first-child { padding-top: 0; border-top: 0; }
+.analysis-comment-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+/* Somebody's own words, set as body text. Quotation marks and italics would style them as
+   a pull-quote, which is a decision about emphasis this page has no business making. */
+.analysis-comment-text { margin: 0; text-wrap: pretty; }
+.analysis-comment-meta { margin: var(--space-1) 0 0; }
+
+/* ── the 402 ─────────────────────────────────────────────────────────────── */
+/* NOT AN ERROR SURFACE. No status ramp, no alert role, no red: the account is fine, the
+   permissions are fine, and the remedy is a plan (43 § States, DEC-011). */
+.analysis-upgrade {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+  max-width: 56ch;
+}
+.analysis-upgrade h3 { margin: 0; }
+.analysis-upgrade p { margin: 0; }
+.analysis-upgrade-icon { color: var(--color-accent); }
+
+@media (max-width: 900px) {
+  .analysis-grid { grid-template-columns: minmax(0, 1fr); }
+  .driver-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .donut-row { justify-content: center; }
+  .analysis-filters .field-inline { width: 100%; }
+  .analysis-filters .input { flex: 1; }
+}

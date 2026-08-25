@@ -5,8 +5,57 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-25  (T-081 BUILT — THE ANALYSIS BACKEND, RULE-BASED. Stage 9's
-                       fourth row. 423 backend (+37) + 807 frontend = 1,230 tests green.
+UPDATED   2026-08-25  (T-082 BUILT — /app/analysis. THE ANALYZE LAYER IS A SCREEN.
+                       Stage 9's fifth row, and Analysis is off the "Soon" list.
+                       423 backend + 837 frontend (+30) = 1,260 tests green.
+                       TWO FAILURES, TWO SCREENS — this is what DEC-011 was for. 403 is
+                       "your account may not": an administrator's problem, nothing to
+                       buy. 402 is "your organisation is below Silver": the account is
+                       fine and the remedy is a tier. Collapsing them would have made a
+                       Bronze customer WITH EVERY PERMISSION IN THE PRODUCT read "you do
+                       not have access" and go asking their administrator to fix a
+                       permission that was never wrong. Both directions asserted.
+                       RELIABILITY IS ON EVERY PANEL, not just the strip. 43 says a 4.6
+                       from 8 responses and a 4.6 from 800 are different facts and that
+                       presenting them identically is the most common way a feedback
+                       dashboard lies. The strip scrolls away and a screenshot of the
+                       themes table does not carry it, so every heading gets the tag.
+                       THE DRILL-THROUGH 403s ON ITS OWN, INSIDE THE PANEL, with the
+                       analysis still on screen — 40's rule for its comments, on the
+                       route that carries the same capability. Somebody who can read the
+                       themes and not the comments is not a bug; they are the split
+                       working.
+                       !! NO CHARTING LIBRARY, AND 24 §10 IS SUPERSEDED RATHER THAN
+                       IGNORED (DEC-064). §10 reserved Recharts "for the P3 analysis
+                       dashboard only" and 43 repeated it — and design_specs/design/08
+                       §8.2 ALREADY DRAWS THIS PAGE as "the conic-gradient donut, the
+                       inline-SVG line chart", with three token swaps as its corrections.
+                       There was nothing to convert. A library to redraw a picture we had
+                       is 24 §1's indirection one layer down, and ~90KB of it. NO
+                       DEPENDENCY WAS ADDED. The svg is aria-hidden and the same numbers
+                       go out as a hidden <table>, which is not optional.
+                       TWO COMPONENTS CATALOGUED, FOUR LEFT PAGE-LOCAL (DEC-065) — 43 §
+                       Components names a line chart and a theme table, so <TrendLine>
+                       and <ThemeTable> went into 24 §3 first and the donut, the driver
+                       rows, the panel and the 402 card did not. 24 forbids a page
+                       acquiring a SHARED CONTRACT nobody agreed, not a div becoming a
+                       row. And <TrendChip> is finally BUILT after two refusals — with
+                       `valence` OPTIONAL, because the arrow is a direction and the
+                       colour is a claim. Its first caller passes none: a theme mentioned
+                       twelve more times is not thereby better or worse.
+                       <BarRow> IS NOT THE DRIVER BAR. It draws a share of a total. A
+                       correlation is signed and lives in -1..+1, so -0.4 and +0.4 would
+                       land in the same place with different colours — colour carrying
+                       the meaning alone, which 21 §8 forbids.
+                       WHAT THE PAGE HONESTLY CANNOT SHOW: the drivers panel is empty on
+                       demo data and says so in words, because demo.ts draws a comment's
+                       tone and its rating as INDEPENDENT THROWS so every correlation
+                       lands in the deadband. And the four demo orgs still cannot open
+                       this page at all — zero analysis.read grants AND no subscription
+                       row, so it 403s and 402s for all four. Nothing was re-seeded;
+                       that is still D-031.
+                       Earlier the same day: T-081 BUILT — THE ANALYSIS BACKEND,
+                       RULE-BASED. Stage 9's fourth row.
                        THE GATE IS THE TYPE. DEC-058 made features/inbox/ hold one
                        content-free table so it COULD NOT query `responses`. Analysis is
                        the same danger one step on — a list of individual comments with
@@ -869,10 +918,12 @@ Full table with `needs` and specs in `55` § Stage 7. Nothing here is M0.
 [x] T-079  A  inbox_state + 5 routes, read THROUGH results/service.ts (58)   BUILT 25 Aug
 [x] T-080  C  /app/inbox + <ResponseCard> + <ScoreBadge>                     BUILT 25 Aug
 [x] T-081  A  analysis backend, RULE-BASED (43, DEC-042)               BUILT 25 Aug
-[ ] T-082  C  /app/analysis                              ← needs T-057 for a real 402
+[x] T-082  C  /app/analysis                                           BUILT 25 Aug
 [ ] T-083  A  improve-loop backend (44)                  ← needs T-057. NOT NEGOTIABLE
 [ ] T-084  B  /app/reflect                               ← needs T-083
 [ ] T-085  B  un-disable the sidebar, one item per page as it lands
+              ← Roles + Inbox done at T-080, ANALYSIS at T-082. Only Reflect is left,
+                and it comes off when T-084 lands. Never a task of its own.
 
 Stage 8 — WHAT EACH TIER SEES.  Owner ask, 24 Aug.  DOCS ONLY so far (55 § Stage 8).
 [x] T-086  A  scope-aware MeResponse.capabilities + subject.read for L4 (13, 50 §1)
@@ -944,7 +995,14 @@ Full tables in `55` § Stage 9.
               is the TYPE (DEC-062). TWO gates: per campaign, and over the filtered
               slice. Drill-through carries response.read as well as analysis.read.
               FOUND D-033: analysis.read was in no row of the seeded matrix.
-[ ] T-082  C  /app/analysis     ← 402-vs-403 is now REAL, T-088 wrote the tier row
+[x] T-082  C  /app/analysis                                           BUILT 25 Aug
+              BUILT 25 Aug. TWO FAILURES, TWO SCREENS (DEC-011): 403 says an
+              administrator, 402 names the tier and what it adds, and neither ever
+              says the other's sentence. Reliability on the strip AND on every
+              panel heading. Drill-through 403s inside the panel. NO CHARTING
+              LIBRARY — DEC-064 supersedes 24 §10; no dependency added. <TrendChip>
+              finally built, uncoloured by default. DEC-065: two components
+              catalogued, four left page-local.
 [ ] T-083  A  improve-loop backend (44)   ← was blocked on D-012; T-088 repaid it
 [ ] T-084  B  /app/reflect
 [ ] T-085  B  un-disable the sidebar — LAST EDIT OF EACH TASK, never its own task
@@ -987,7 +1045,7 @@ withdrawn.** All four are promoted — Stage 9 above.
 |---|---|---|---|
 | **Roles** | `T-052` | ~~nothing — sequenced after M0~~ **nothing. PROMOTED, goes first** | spec is `33`, complete since round 1. The only one with no backend work at all. Repays `D-008` |
 | ~~**Inbox**~~ | ~~`T-079` → `T-080`~~ | **BUILT 25 Aug** | spec is `58`. Reads **through** `features/results/service.ts` so the k-anonymity gate is not forked — and `features/inbox/` cannot reach `responses` at all, which is what makes that true next month as well as today (`DEC-058`) |
-| **Analysis** | ~~`T-081`~~ → `T-082` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | **`T-081` BUILT 25 Aug** — rule-based engine (`DEC-042`), two k-anon gates, drill-through behind `response.read` as well. `T-082`'s screen is next, and it now has both a real `402` path (`T-088`) and, since `D-033`, a capability somebody can actually hold |
+| ~~**Analysis**~~ | ~~`T-081` → `T-082`~~ | **BUILT 25 Aug, both halves** | rule-based engine (`DEC-042`), two k-anon gates, drill-through behind `response.read` as well — and the screen, with a real `402` path (`T-088`) and, since `D-033`, a capability somebody can actually hold. **No dependency was added to draw it** (`DEC-064`) |
 | **Reflect** | `T-083` → `T-084` | ~~`T-088`~~ — **UNBLOCKED 24 Aug** | every capability in the improve loop is Gold, and `D-012` meant no organisation had ever had a subscription row. Built before `T-088`, this surface would have `402`d for **every user in the product**, demo included |
 
 **So the tiers are not a separate missing thing — they are the blocker for half the list.**
@@ -1135,7 +1193,109 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-25 (latest) · T-081 — the analysis backend
+### 2026-08-25 (latest) · T-082 — /app/analysis
+
+Stage 9's fifth row, and the Analyze layer is now a screen. **423 backend + 837 frontend
+(+30) = 1,260 tests, all green.** Typecheck, lint, `audit:drift`, `audit:vocab` clean.
+
+**Two failures, two screens — this is the page `DEC-011` was written for.** A 403 says *your
+account may not*: an administrator's problem, nothing to buy, and the copy never mentions a
+plan. A 402 says *your organisation is below Silver*: it names the tier and what it adds, and
+the account is fine. Collapsing them would have made a Bronze customer **with every
+permission in the product** read *"you do not have access"* and go asking their administrator
+to fix a permission that was never wrong. Both directions are asserted, including that
+neither screen ever says the other's sentence.
+
+**Reliability is on every panel, not just the strip.** `43` is emphatic that a 4.6 from 8
+responses and a 4.6 from 800 are different facts, and that presenting them identically is the
+most common way a feedback dashboard lies. A strip under the header satisfies the letter of
+that and not the point: it scrolls away, and a screenshot of the themes table does not carry
+it. So every panel heading carries the confidence tag as well — and `tag-warn` rather than
+`tag-bad`, because what is thin is the **evidence**, not the feedback.
+
+**The drill-through 403s on its own, inside the panel, with the analysis still on screen.**
+That is `40`'s rule for its comments, applied on the route that carries the same capability.
+Somebody who can read the themes and not the comments behind them is not a bug — they are
+`40`'s split working.
+
+**`DEC-064` — no charting library, and `24` §10 is superseded rather than quietly ignored.**
+§10 reserved Recharts *"for the P3 analysis dashboard only"* and `43` § Components repeated
+it. Then `design_specs/design/08` §8.2 turned out to draw this page as *"the conic-gradient
+donut, the inline-SVG line chart"*, with three token swaps listed as its corrections. **There
+was nothing to convert.** Adding ~90KB and a dependency to redraw a picture we already had is
+`24` §1's indirection one layer down, and a dependency is a decision the owner has reserved
+before (`DEC-036` is the same shape). The cost is stated rather than hidden: two axis labels,
+no tooltip, no zoom — none of which `43` asks for. The `<svg>` is `aria-hidden` and the same
+numbers go out as a visually-hidden `<table>`, which is not optional: a chart with no text
+equivalent is a blank region to a screen reader, and the numbers exist either way.
+
+**`DEC-065` — two components catalogued, four left page-local.** `43` § Components names *a
+line chart and a theme table*, so `<TrendLine>` and `<ThemeTable>` went into `24` §3 before
+any code, and the donut, the driver rows, the drill-through panel and the 402 card did not.
+`24`'s rule is that a page may not invent a **shared contract** nobody agreed; it is not that
+every `<div>` with a class becomes an inventory row, and `58` set that precedent at `T-080`.
+The test is whether a second caller is plausible: a theme table is a shape another page could
+want; a card explaining *this* capability's 402 is not.
+
+**`<TrendChip>` is finally built, after two refusals — and its colour is optional.** It was
+catalogued at `T-003`, borrowed by `46` and refused at `CONF-017`. `43` is the caller it was
+waiting for. The prop that matters is `valence`, and it is **optional, absent meaning
+uncoloured**: the arrow is a *direction*, which is a fact, and a colour is a claim that the
+direction is good or bad, which is the server's to make or nobody's (`CONF-004`). Its first
+caller passes none — a theme mentioned twelve more times this month is not thereby better or
+worse, and `43`'s payload states a valence for the **score** and states none for the delta.
+
+**`<BarRow>` is not the driver bar, and that is the one real design argument on the page.**
+`<BarRow>` draws a share of a total — a quantity that starts at zero and grows. A driver is a
+**correlation**: signed, in -1..+1, with zero in the middle. Rendering it in the component
+built for shares would put -0.4 and +0.4 in the same place with different colours, which is
+colour carrying the meaning on its own. The driver rows diverge from the centre and print the
+value to two decimals.
+
+**A `null` delta renders as absent, never as a zero** (`DEC-061`), and the suppressed branch
+has nothing it could render because the body carried no `themes` key at all — asserted, along
+with the fact that an organisation with **no** responses gets a different screen entirely.
+"Nobody has answered" is not "we are protecting three people", and only the second is a
+promise being kept.
+
+**What the page honestly cannot show, said on the page rather than discovered later.** The
+drivers panel is empty on the seeded demo data and says so in words: `demo.ts` draws a
+comment's tone and its rating as two independent throws, so every correlation lands inside
+the engine's deadband and is correctly reported `neutral`. A neutral entry under *"Key
+drivers"* would present a non-finding as a finding, which is the same failure `43` describes
+for an unfalsifiable theme one panel over.
+
+**And the four demo organisations still cannot open this page** — zero `analysis.read` grants
+(`D-033`) **and** no subscription row (`D-012`), so it 403s *and* 402s for all four.
+`db:seed` skips organisations that already exist; only the destructive `db:reset` repairs
+them, and that is `D-031`. Nothing was re-seeded.
+
+**Sidebar item un-disabled in the same commit**, which is `T-085`'s rule — the tag comes off
+as the page lands, never before, and never as a task of its own. `Sidebar.test.tsx` gained
+the **positive** assertion for Analysis on the day the page shipped rather than a day later,
+which is the whole argument for that half of the rule existing. The `Soon` count is now 1.
+
+**One fixture change worth flagging:** the sidebar's hand-written L1/L2/L3 capability maps
+gained `analysis.read`, and L4 deliberately did not. That is `D-033` surfacing in a test
+fixture — the file was right to omit it while the seeded matrix did, and is only right to
+carry it now that `grant-matrix.ts` does.
+
+**Written:** `DEC-064`, `DEC-065`; `43` (status, route, components, state, acceptance,
+corrections), `24` (`<TrendChip>` built, `<TrendLine>` + `<ThemeTable>` added, §7, §10
+superseded), `20` §2, `55` § Stage 9, MAP.
+
+**What the next session should know.** Stage 9 continues with **`T-083`** (the improve-loop
+backend, `44`) and then `T-084` (`/app/reflect`); `T-085` takes the last "Soon" tag off
+Reflect when that lands. `T-083` will be the first task to meet `routes.test.ts`'s new
+assertion — `reflection.*`, `actionplan.*` and `checkin.*` are in no row of the seeded matrix,
+and the test fails **the day the router is mounted** rather than the day somebody opens the
+page. **Item 3 of the owner's ask is still entirely untouched**: `T-075`/`T-076` (`/app/logs`)
+can start immediately, and the `/ops` tree (`T-059` → `T-066`/`T-067`/`T-077`/`T-078`) after
+it. `D-031` and `D-032` are still owner decisions, and `D-030` is still unrepaid.
+
+---
+
+### 2026-08-25 · T-081 — the analysis backend
 
 Stage 9's fourth row. **423 backend (+37) + 807 frontend = 1,230 tests, all green.**
 Typecheck, lint, `audit:drift`, `audit:vocab` clean.
@@ -1228,10 +1388,11 @@ re-seeded. Verified live, read-only, against all four.
 **Written:** `DEC-061`, `DEC-062`, `DEC-063`, `N-062`, `D-033`; `43` (status, contract,
 engine, acceptance), `13` § Analysis, `50` §1 + its notes, `55` § Stage 9, MAP.
 
-**What the next session should know.** Stage 9 continues with **`T-082`** — `/app/analysis`,
-whose backend is now live and 36 tests deep. Then `T-083`/`T-084` (Reflect), and `T-085` takes
-the "Soon" tags off Analysis and Reflect as each lands. **Item 3 of the owner's ask is still
-entirely untouched**: `T-075`/`T-076` (`/app/logs`) can start immediately, and the `/ops` tree
+**What the next session should know.** *(Written before `T-082`, which landed the same day —
+see the entry above.)* Stage 9 continues with **`T-082`** — `/app/analysis`, whose backend is
+now live and 36 tests deep. Then `T-083`/`T-084` (Reflect), and `T-085` takes the "Soon" tags
+off Analysis and Reflect as each lands. **Item 3 of the owner's ask is still entirely
+untouched**: `T-075`/`T-076` (`/app/logs`) can start immediately, and the `/ops` tree
 (`T-059` → `T-066`/`T-067`/`T-077`/`T-078`) after it.
 
 ---
