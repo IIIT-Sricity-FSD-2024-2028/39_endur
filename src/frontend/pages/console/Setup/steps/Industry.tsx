@@ -95,7 +95,7 @@ export function IndustryStep({
           </div>
         ) : (
           <div className="preset-sidebar-empty">
-            <Icon name="layout" size={32} />
+            <Icon name="structure" size={32} />
             <p>Select an organization type to preview its structure and terminology.</p>
           </div>
         )}
