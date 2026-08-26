@@ -65,7 +65,7 @@ export default function Reflect(): JSX.Element {
   // anybody here typed the address.
   if (!can('reflection.read') || cycles.forbidden) {
     return (
-      <div className="page">
+      <div className="page reflect-page">
         {header}
         <EmptyState
           icon="reflect"
@@ -80,7 +80,7 @@ export default function Reflect(): JSX.Element {
   const upgrade = cycles.upgrade ?? form.upgrade ?? gap.upgrade;
   if (upgrade) {
     return (
-      <div className="page">
+      <div className="page reflect-page">
         {header}
         <UpgradeCard
           requiredTier={upgrade.requiredTier}
@@ -94,11 +94,16 @@ export default function Reflect(): JSX.Element {
 
   if (open) {
     return (
-      <div className="page">
+      <div className="page reflect-page">
         {header}
-        <button type="button" className="btn btn-ghost" onClick={() => select(null)}>
-          <Icon name="disclosure" size={16} /> All cycles
-        </button>
+        {/* A real control, not a word. `btn-ghost` rendered "All cycles" at the same weight
+            as the paragraph above it, so the only way out of a cycle looked like a caption
+            — and the chevron pointed FORWARD, away from where it goes. */}
+        <div className="reflect-back">
+          <button type="button" className="btn btn-secondary btn-back" onClick={() => select(null)}>
+            <Icon name="back" size={16} /> All cycles
+          </button>
+        </div>
         {/* THE ORDER. The form until it is submitted, the gap after — decided by what the
             server returned, never by a flag this page keeps. */}
         {gap.locked ? (
@@ -113,7 +118,7 @@ export default function Reflect(): JSX.Element {
   const rows = cycles.data ?? [];
 
   return (
-    <div className="page">
+    <div className="page reflect-page">
       {header}
       {cycles.loading && rows.length === 0 ? (
         <p className="text-muted">Loading…</p>
@@ -129,17 +134,23 @@ export default function Reflect(): JSX.Element {
           {rows.map((cycle) => {
             const tag = STATUS[cycle.status] ?? STATUS['due'];
             return (
+              // Title and state on one line, the facts about the cycle on the next. Every
+              // part was a sibling of every other before, so a flex row wrapped the tag
+              // and the two meta spans into a centred stack that read as three unrelated
+              // captions under a link.
               <li key={`${cycle.campaignId}:${cycle.subjectId}`} className="card cycle-row">
                 <button type="button" className="cycle-open" onClick={() => select(cycle.campaignId)}>
                   {cycle.campaignName}
                 </button>
                 <span className={tag?.className}>{tag?.label}</span>
-                <span className="text-meta">{cycle.subjectName}</span>
-                {cycle.endsAt && (
-                  <span className="text-meta">
-                    {cycle.closed ? 'closed' : 'ends'} {formatDate(cycle.endsAt)}
-                  </span>
-                )}
+                <p className="cycle-facts text-meta">
+                  <span>{cycle.subjectName}</span>
+                  {cycle.endsAt && (
+                    <span>
+                      {cycle.closed ? 'closed' : 'ends'} {formatDate(cycle.endsAt)}
+                    </span>
+                  )}
+                </p>
               </li>
             );
           })}
@@ -193,8 +204,8 @@ function ReflectionForm({
   };
 
   return (
-    <section className="card reflect-form">
-      <h3>Your own assessment</h3>
+    <section className="card panel reflect-form">
+      <h3 className="panel-title">Your own assessment</h3>
       {/* SAID BEFORE THEY START, not after they submit. The reason the order matters is the
           reason somebody would otherwise resent being made to go first. */}
       <p className="text-muted">
@@ -272,8 +283,8 @@ function GapPanel({
 
   return (
     <>
-      <section className="card reflect-gap">
-        <h3>{view.campaignName}</h3>
+      <section className="card panel reflect-gap">
+        <h3 className="panel-title">{view.campaignName}</h3>
         <p className="text-meta">
           Your assessment, recorded {formatDate(view.reflectedAt)} · {view.responseCount}{' '}
           response{view.responseCount === 1 ? '' : 's'}
@@ -310,8 +321,8 @@ function GapPanel({
         )}
       </section>
 
-      <section className="card reflect-plan">
-        <h3>What you will do about it</h3>
+      <section className="card panel reflect-plan">
+        <h3 className="panel-title">What you will do about it</h3>
         {finalised ? (
           <>
             <p className="text-meta">

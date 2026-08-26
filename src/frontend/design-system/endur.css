@@ -785,28 +785,37 @@
 /* The focused console frame: no sidebar during setup, so the well is wider. */
 .page-focused { max-width: var(--width-builder); }
 
-.wizard { display: flex; flex-direction: column; gap: var(--space-4); }
+/* A reading measure, not the builder's 1100px. The well's width is what sets the
+   distance between Back and Continue, and at 1100px they were far enough apart to
+   read as two unrelated controls rather than as one bar. */
+.wizard {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  width: 100%; max-width: var(--width-reading); margin-inline: auto;
+}
 .wizard-top { display: flex; align-items: center; gap: var(--space-3); }
 .wizard-top .utility { margin-right: auto; }
-.wizard-actions {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
-}
+.wizard-panel { gap: var(--space-6); }
 .wizard-error { margin-bottom: calc(var(--space-2) * -1); }
 
-.step { display: flex; flex-direction: column; gap: var(--space-3); }
+.step { display: flex; flex-direction: column; gap: var(--space-4); }
 .step-title {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(22px, 3.5vw, 27px); margin: 0;
+  font-size: clamp(22px, 3.5vw, 27px); line-height: 1.15; margin: 0;
 }
 .step-lede {
-  margin: -6px 0 0; max-width: 60ch; font-size: 15px;
+  margin: -10px 0 var(--space-2); max-width: 60ch; font-size: 15px; line-height: 1.5;
   color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
 .step-note { max-width: 60ch; }
+/* The step's own body, below the title block. Kept as a named element so a step can
+   put a grid or a tree in it without the title inheriting the layout. */
+.step-body { display: flex; flex-direction: column; gap: var(--space-3); }
 
 /* ── <ProgressRail> — 24 §6 ──────────────────────────────────────────────── */
 
-.rail { display: flex; list-style: none; margin: 0; padding: 0; }
+/* Its own band. With no margin the next heading landed on top of the labels, which is
+   what made both the campaign wizard and setup open on a collision. */
+.rail { display: flex; list-style: none; margin: var(--space-2) 0 var(--space-6); padding: 0; }
 .rail-step {
   position: relative; flex: 1; display: flex; flex-direction: column;
   align-items: center; gap: 6px; min-width: 0;
@@ -920,13 +929,25 @@
 
 /* ── step 2 · roles ─────────────────────────────────────────────────────── */
 
-.role-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.role-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .role-list li.is-dragging { opacity: .4; }
+/* A row is a box, not a tinted band. The border is what tells a reader the name, the
+   rung and the visibility rule on one line belong to each other — a background tint
+   alone left four bands floating in a column with no edges. */
 .role-row {
-  display: flex; align-items: center; gap: var(--space-2);
-  min-height: 52px; padding: 0 var(--space-2);
-  background: var(--color-surface); border-radius: var(--radius-md);
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 54px; padding: 0 var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--dur-fast) var(--ease);
 }
+.role-row:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-divider)); }
+/* The name gets a measure. Left to grow it pushed the visibility rule to the far edge of
+   a 1100px well, and a rule a thousand pixels from the thing it describes is a rule
+   nobody connects to it. */
+.role-row .inline-name { flex: 1 1 auto; max-width: 34ch; }
+.role-row .role-sees { margin-left: auto; }
 .role-grip { opacity: .35; cursor: grab; flex: none; }
 .role-level {
   flex: none; display: grid; place-items: center; width: 24px; height: 24px;
@@ -941,7 +962,7 @@
 
 /* ── <UnitTree> — 24 §4 ─────────────────────────────────────────────────── */
 
-.tree-card { padding: var(--space-2); gap: 2px; }
+.tree-card { padding: var(--space-3); gap: 2px; }
 .unit-tree ul { list-style: none; margin: 0; padding: 0; }
 /* The only hairline in the product, and it earns the exception: a tree without guides
    is unreadable (design_specs/design/03 §3.3). */
@@ -1068,7 +1089,10 @@
 
 /* ── step 4 · words + the live preview ──────────────────────────────────── */
 
-.words-card { gap: var(--space-2); }
+/* Five singular/plural pairs plus a header row. At --space-2 the rows touched and the
+   grid read as one block of inputs rather than five questions. */
+.words-card { gap: var(--space-3); padding: var(--space-4); }
+.word-row-header { padding-bottom: var(--space-1); }
 .word-row {
   display: grid; align-items: center; gap: var(--space-2);
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr);
@@ -1104,7 +1128,7 @@
   display: grid; gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
-.review-card { gap: 6px; }
+.review-card { gap: 6px; padding: var(--space-4); }
 .review-head { display: flex; align-items: center; gap: var(--space-2); }
 .review-head .utility { margin-right: auto; }
 .review-figure {
@@ -1609,13 +1633,10 @@ textarea.q-text-input { min-height: 90px; }
 .when-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .tpick { align-items: flex-start; text-align: left; cursor: pointer; border: 1px solid transparent; }
 .tpick.is-picked { border-color: var(--color-accent); }
-/* The number that moves when a dropdown changes — the visible proof the org graph is real. */
-.audience-count {
-  margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-md);
-  background: var(--color-surface); font-weight: 600;
-}
-.summary-card { display: flex; flex-direction: column; gap: 4px; padding: var(--space-4); margin-top: var(--space-3); }
-.summary-name { margin: 0; font-family: var(--font-heading); font-size: 20px; }
+/* `.audience-count`, `.summary-name` and the summary card's own box moved to the flow
+   grammar at the foot of this file when the campaign steps became panels — one
+   declaration each, rather than a base here and an override there. */
+.summary-card { display: flex; flex-direction: column; gap: 4px; }
 .summary-card p { margin: 0; }
 
 /* ── the share sheet — 06 §6.3. THE DEMO MOMENT ─────────────────────────
@@ -1958,19 +1979,58 @@ textarea.q-text-input { min-height: 90px; }
 /* "A single 900px column of white cards. No sub-navigation — there is not enough here to
    justify it." The words card is wide because five singular/plural pairs and a preview do
    not fit in a narrower one at 390px without wrapping into nonsense. */
+/* ALSO THE PERSON PAGE. `/app/people/:id` renders this exact grammar (T-051), which is
+   why the two look like one product — and why retuning it here retunes both. */
 .settings-page {
-  display: flex; flex-direction: column; gap: var(--space-6);
-  max-width: 900px;
+  display: flex; flex-direction: column; gap: var(--space-12);
+  width: 100%; max-width: var(--width-reading);
 }
 .settings-card { display: flex; flex-direction: column; gap: var(--space-3); }
-.settings-card > .utility { margin: 0; }
-.settings-card > .text-muted { margin: 0; }
+/* The kicker belongs to the card BELOW it, not to the gap above it. It sat --space-3
+   from its own card and --space-6 from the previous one — near enough the same distance
+   that the page read as one undivided column of controls. The section gap is now four
+   times the label gap, so the eye groups before it reads. */
+.settings-card > .utility { margin: 0 0 calc(var(--space-1) * -1); }
+.settings-card > .text-muted { margin: 0; max-width: 62ch; }
 /* Scrolled to by the #words anchor from <VocabularyChips>, so it needs room to clear the
-   sticky top bar rather than landing under it. */
+   top bar rather than landing under it. */
 .settings-card[id] { scroll-margin-top: var(--space-6); }
 
-.settings-card .card { display: flex; flex-direction: column; gap: var(--space-4); }
-.settings-card .card-actions { display: flex; justify-content: flex-end; }
+/* Form density, not tile density — the same --space-6 the wizard panel takes. At the
+   base card's --space-3 the inputs ran within 13px of the border on a 900px card, which
+   is the whole of what read as "clustered". */
+.settings-card > .card {
+  display: flex; flex-direction: column; gap: var(--space-6);
+  padding: var(--space-6);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+/* The card's floor, and the same anatomy as the wizard's `.flow-bar`: a rule to both
+   edges, the action on the right. A save button that just ends the stack looks dropped
+   into the corner rather than placed. */
+.settings-card .card-actions {
+  display: flex; justify-content: flex-end; gap: var(--space-2);
+  margin: var(--space-2) calc(var(--space-6) * -1) calc(var(--space-6) * -1);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-surface) 42%, transparent);
+  border-bottom-left-radius: calc(var(--radius-lg) * 1.15);
+  border-bottom-right-radius: calc(var(--radius-lg) * 1.15);
+}
+
+/* The upload's own hint was a sibling of the drop zone and landed outside its dashed
+   border, so it read as a note about the card rather than about the control. */
+.settings-card .file-upload { display: flex; flex-direction: column; gap: var(--space-2); }
+.settings-card .file-upload .file-drop { padding: var(--space-4); }
+
+@media (max-width: 639px) {
+  .settings-page { gap: var(--space-8); }
+  .settings-card > .card { padding: var(--space-4); gap: var(--space-4); }
+  .settings-card .card-actions {
+    margin-inline: calc(var(--space-4) * -1);
+    margin-bottom: calc(var(--space-4) * -1);
+    padding-inline: var(--space-4);
+  }
+}
 
 .settings-skeleton { gap: var(--space-3); min-height: 120px; }
 
@@ -3736,21 +3796,46 @@ html:active-view-transition * {
    that reads as an accusation guarantees the next reflection is gamed, so `self` and
    `received` are two neutral weights of the same hue rather than good and bad. */
 
-.cycle-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+/* A reading measure for the CONTENT, while the header keeps the well's full width —
+   the same split the settings page uses, so the two pages sit at the same left edge.
+   The cycle list and the gap bars were running all 1240px of it, which put a question
+   and its own two bars a screen's width apart. */
+.reflect-page { display: flex; flex-direction: column; gap: var(--space-4); }
+.reflect-page > *:not(.page-header) { width: 100%; max-width: var(--width-reading); }
+.reflect-back { display: flex; }
+
+.cycle-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+/* Two rows, explicitly. As a wrapping flex row the tag and both meta spans stacked and
+   centred themselves under the title on a wide screen — three captions with no visible
+   relationship to the cycle they describe. */
 .cycle-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  display: grid; align-items: center; gap: var(--space-1) var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: var(--space-4);
+  border-radius: calc(var(--radius-lg) * 1.15);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.cycle-row:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--glass-edge)); }
+.cycle-facts {
+  grid-column: 1 / -1; margin: 0;
+  display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3);
 }
 .cycle-open {
-  background: none; border: 0; padding: 0; cursor: pointer; margin-right: auto;
-  font: inherit; font-weight: 600; color: var(--color-accent); text-align: left;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-lead); line-height: 1.2; letter-spacing: var(--track-heading);
+  color: var(--color-text); text-align: left;
 }
-.cycle-open:hover { text-decoration: underline; }
+.cycle-open:hover { color: var(--color-accent); }
+.cycle-open:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; border-radius: var(--radius-sm); }
 
-.reflect-form, .reflect-gap, .reflect-plan {
-  display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3);
-}
+.reflect-form, .reflect-gap, .reflect-plan { margin-top: var(--space-3); }
 .reflect-form h3, .reflect-gap h3, .reflect-plan h3 { margin: 0; }
 .reflect-form p, .reflect-gap p, .reflect-plan p { margin: 0; }
+/* The gap bars are the content of that panel, so they get the panel's own rhythm rather
+   than the tighter one a paragraph would take. */
+.reflect-gap .gap-row { padding-top: var(--space-4); }
+.reflect-plan h4 { margin: 0; font-size: var(--text-body); }
 
 .gap-row {
   display: flex; flex-direction: column; gap: var(--space-1);
@@ -4456,3 +4541,266 @@ html:active-view-transition * {
 
 .word-header { padding-left: 15px; }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FLOW GRAMMAR — one anatomy for every multi-step and every form screen.
+
+   Written in one pass because it is one decision. Setup, the campaign wizard,
+   settings, person detail and the improve loop had each grown their own
+   spacing: a step was a flat stack on the page ground with one gap between
+   every pair of elements, so a heading, a field and a whole new question were
+   all the same distance apart and nothing grouped. `.wizard-step` had no rule
+   at all.
+
+   Three pieces, and every screen below is built from them:
+
+     .panel          a card at FORM density. `.card` is a tile — --space-3 of
+                     padding is right for a 260px template card and far too
+                     tight for a 900px form, which is what read as "clustered".
+     .panel-section  a sub-block inside a panel, separated from its neighbour
+                     by a hairline rather than by more air. A rule states "new
+                     question" in 1px; whitespace only implies it, and implying
+                     it is what made three questions on one campaign step read
+                     as one long list.
+     .flow-bar       the action bar. Back on the left with a real arrow,
+                     primary on the right, tied together by a rule and bounded
+                     by the panel — so it lands in the same place on every step
+                     of every flow instead of floating two lone buttons a
+                     thousand pixels apart on the page ground.
+
+   Tokens only (DEC-012). Nothing here is sticky: the console's chrome is
+   deliberately in flow, and an action bar that pinned itself would be the one
+   element contradicting that.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* A page inside a page — Logs, Reflect and Analysis wrap their content in a
+   second `.page` — must not pay for the frame twice. The outer one owns the
+   padding; the inner one is only a grouping element. The width cap is left
+   alone so a nested page can still set its own reading measure. */
+.page .page { padding: 0; }
+
+/* ── .panel ──────────────────────────────────────────────────────────────── */
+
+.panel {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-6);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+@media (max-width: 639px) { .panel { padding: var(--space-4); gap: var(--space-3); } }
+
+/* A card inside a panel is a WELL, not a second card. Two lifted white surfaces stacked
+   is the arrangement that made the tree and the words grid read as floating slabs; a
+   recessed one says "this group lives inside that panel" with the same one border. */
+.panel .card {
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  border-color: var(--color-divider);
+  box-shadow: none;
+}
+
+/* ── .panel-section ──────────────────────────────────────────────────────── */
+
+.panel-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.panel-section + .panel-section {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-divider);
+}
+.panel-title {
+  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-sub); line-height: 1.2; letter-spacing: var(--track-heading);
+}
+/* Sits under a title, so it loses the gap the section would otherwise give it. */
+.panel-lede {
+  margin: calc(var(--space-2) * -1) 0 0; max-width: 62ch;
+  font-size: var(--text-small); line-height: 1.5;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+}
+
+/* ── .flow-bar ───────────────────────────────────────────────────────────── */
+
+/* Full-bleed inside its panel: the rule has to reach both edges or it reads as
+   an underline on the last field rather than as the floor of the panel. */
+.flow-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); flex-wrap: wrap;
+  margin: var(--space-2) calc(var(--space-6) * -1) calc(var(--space-6) * -1);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-surface) 42%, transparent);
+  border-bottom-left-radius: calc(var(--radius-lg) * 1.15);
+  border-bottom-right-radius: calc(var(--radius-lg) * 1.15);
+}
+/* Nothing on the left is not the same as nothing at all — the primary stays on
+   the right on step one, or it jumps sides when Back appears on step two. */
+.flow-bar-spacer { flex: 1 1 auto; }
+@media (max-width: 639px) {
+  .flow-bar {
+    margin-inline: calc(var(--space-4) * -1);
+    margin-bottom: calc(var(--space-4) * -1);
+    padding-inline: var(--space-4);
+  }
+  .flow-bar .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* The back button, everywhere. A word on its own is not a control — it has the
+   same weight as the paragraph above it and nothing says it can be pressed. */
+.btn-back { gap: 6px; padding-left: var(--space-3); }
+.btn-back .lucide, .btn-back svg { flex: none; }
+
+/* ── the campaign wizard's steps — T-038 ─────────────────────────────────────
+   `.wizard-step` had no declaration at all, which is why /app/campaigns/new
+   looked the most crowded of the six screens: three separate questions with
+   nothing between them but the browser's default heading margin. */
+.wizard-step { display: flex; flex-direction: column; gap: var(--space-6); }
+
+/* Two picks side by side on a 900px well, not four across 1240px. */
+.wizard-step .tgrid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+/* A pick is a control, so it has to look pressable before it is pressed. */
+.wizard-step .tpick { border-color: var(--color-divider); }
+.wizard-step .tpick:hover { border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-divider)); }
+.wizard-step .tpick.is-picked { border-color: var(--color-accent); background: var(--color-accent-100); }
+
+/* The subject list is a scrolling well inside the panel; it needs its own floor and
+   ceiling or the fade-out at 280px reads as the panel being cut off. */
+.wizard-step .subject-picker { padding: var(--space-3); max-height: 260px; }
+
+/* Choice on the left, the reason for it on the right. They ran together as one line —
+   "Anyone with the link Best for QR codes and posters" — so the label and the rationale
+   read as a single sentence instead of as a heading and its note. */
+.wizard-step .q-option { min-height: 52px; }
+.wizard-step .q-option > .text-meta { margin-left: auto; text-align: right; }
+@media (max-width: 639px) {
+  .wizard-step .q-option { align-items: flex-start; padding-block: var(--space-2); flex-wrap: wrap; }
+  .wizard-step .q-option > .text-meta { margin-left: 0; text-align: left; flex-basis: 100%; }
+}
+
+/* The audience sentence answers the radios above it, so it is attached to them rather
+   than floating as a fourth option. */
+.audience-count {
+  margin: 0; padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  font-size: var(--text-small);
+}
+
+/* The last thing read before an irreversible button, so it stops being a plain card. */
+.summary-card { padding: var(--space-4); border-left: 3px solid var(--color-accent); }
+.summary-name {
+  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-lead);
+}
+
+/* ══ THE FLOW GRAMMAR, PART 2 — roles, subjects, structure ══════════════════
+   Same device as the wizard panels above: one box per idea, `--space-6` of air
+   inside it, and nothing floating loose on the page ground. These three screens
+   were the last that still emitted bare stacks — a filter row, a table and a
+   pager all sitting at the same distance from each other, so nothing grouped.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the list screens: /app/subjects, and every screen sharing the primitives ─ */
+
+/* THE FILTERS ARE A CONTROL SURFACE, NOT CONTENT. Boxed, they stop reading as the
+   first row of the table underneath them. */
+.list-toolbar {
+  /* `.card` in organic.css is a flex COLUMN. Left alone it stands the search box,
+     the filter and the checkbox on top of each other and stretches the input to the
+     height of the stack. The toolbar is a row and has to say so. */
+  flex-direction: row;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+.list-toolbar .list-filter { font-size: var(--text-small); }
+@media (max-width: 639px) {
+  .list-toolbar { padding: var(--space-3); }
+  .list-toolbar .list-search { flex: 1 1 100%; }
+}
+
+/* THE TABLE GETS THE SAME BOX. Row padding goes up one step with it: `--space-2`
+   is tile density and a 1240px row at that height is a wall of text. */
+.table-panel {
+  gap: 0;
+  padding: var(--space-2) var(--space-4) var(--space-2);
+  border-radius: calc(var(--radius-lg) * 1.15);
+  overflow: hidden;
+}
+.table-panel .rtable th { padding: var(--space-3) var(--space-2); }
+.table-panel .rtable td { padding: var(--space-3) var(--space-2); }
+.table-panel .rtable tbody tr:last-child td { border-bottom: 0; }
+/* The empty state is handed straight through by <ResponsiveTable>, so the box has
+   to stop being a table box when there is no table in it. */
+.table-panel:has(.empty-state) { padding: 0; }
+
+/* ── /app/roles — the ladder and the grid ──────────────────────────────────── */
+
+/* Both tab panels are one panel each. The tab strip stays outside them: it chooses
+   WHICH box you are looking at and cannot live inside one of them. */
+.roles-panel { padding: var(--space-6); border-radius: calc(var(--radius-lg) * 1.15); }
+@media (max-width: 639px) { .roles-panel { padding: var(--space-4); } }
+
+.role-ladder, .powers { display: flex; flex-direction: column; gap: var(--space-4); }
+.role-ladder > .panel-title, .powers > .panel-title { margin-bottom: 0; }
+
+/* Margins deleted, not overridden elsewhere: the flex gap above owns the rhythm now,
+   and a margin surviving underneath it is how a 6px gap becomes 24px on one row. */
+.role-ladder-hint { margin: calc(var(--space-2) * -1) 0 0; max-width: 62ch; }
+.role-rows { gap: var(--space-2); margin: 0; }
+.role-ladder > .btn { align-self: flex-start; }
+.role-reassign { margin-top: 0; }
+
+.powers-bar { align-items: center; gap: var(--space-4); margin-bottom: 0; }
+.powers-bar .powers-hint { margin: 0; }
+.powers-error { margin-bottom: 0; }
+
+/* THE LEGEND IS A WELL, not a second card (same rule as `.panel .card` above): it
+   explains the grid rather than standing beside it. */
+.powers-legend {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  gap: var(--space-2) var(--space-6);
+}
+
+/* The copy row is a distinct tool from the grid, so it gets the divider that says so. */
+.powers-copy {
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--color-divider);
+  gap: var(--space-3);
+}
+
+.powers-scroll { border-radius: var(--radius-lg); }
+.powers-corner, .powers-role { padding: var(--space-3); }
+.powers-capability { padding-block: var(--space-2); }
+
+/* ── /app/structure ────────────────────────────────────────────────────────── */
+
+/* One rhythm for the three bands — counts, map, tree — instead of three margins
+   that happened to be set on different elements. */
+.structure-overview { gap: var(--space-4); margin-bottom: var(--space-4); }
+.stat-row { gap: var(--space-4); }
+.shape-chart { padding: var(--space-6); border-radius: calc(var(--radius-lg) * 1.15); }
+.shape-chart-title { margin: 0 0 var(--space-4); }
+@media (max-width: 639px) { .shape-chart { padding: var(--space-4); } }
+
+.structure-map-card {
+  gap: var(--space-4);
+  padding: var(--space-6);
+  margin-bottom: var(--space-4);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+.structure-map-card > .utility { margin: 0; }
+
+.structure { gap: var(--space-4); }
+.structure > .tree-card, .structure .unit-detail {
+  padding: var(--space-4);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+.structure > .tree-card { padding-block: var(--space-3); }
+.unit-detail { gap: var(--space-4); }
+
+@media (max-width: 639px) {
+  .structure-map-card { padding: var(--space-4); }
+}

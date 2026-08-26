@@ -57,6 +57,7 @@ export function RoleLadder({
 
   return (
     <div className="role-ladder">
+      <h2 className="panel-title">The ladder</h2>
       <p className="text-muted role-ladder-hint">
         The order is the ladder. A role’s level is simply where it sits here — moving a row
         renumbers it, and nothing in the product decides anything by comparing two numbers.

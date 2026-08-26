@@ -127,6 +127,7 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
 
   return (
     <div className="powers">
+      <h2 className="panel-title">Who may do what</h2>
       <div className="powers-bar">
         <p className="text-muted powers-hint">
           {editable ? (

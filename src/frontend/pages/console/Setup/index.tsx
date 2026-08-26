@@ -17,6 +17,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { PresetView } from '@endur/shared';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
+import { ProgressRail } from '../../../components/flow/ProgressRail.js';
+import { Icon } from '../../../components/Icon.js';
 import { ApiError } from '../../../lib/api.js';
 import { usePresets, useSetupOrg } from '../../../lib/org.js';
 import { useRefreshSession } from '../../../lib/auth.js';
@@ -174,6 +176,16 @@ export default function Setup(): JSX.Element {
         </button>
       </div>
 
+      {/* The rail was built for this screen (24 §6) and was only ever mounted on the
+          campaign wizard. Without it a step knows it is called "Roles" and nothing else —
+          not how many are left, not that Back is a real option. */}
+      <ProgressRail
+        steps={[...STEPS]}
+        current={step}
+        onStepClick={(index) => index < step && goto(index)}
+      />
+
+      <div className="card panel wizard-panel">
       {step === 0 && (
         <IndustryStep
           presets={presets.data}
@@ -229,15 +241,22 @@ export default function Setup(): JSX.Element {
         </p>
       )}
 
-      <div className="wizard-actions">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={step === 0 || saving}
-          onClick={() => goto(step - 1)}
-        >
-          ← Back
-        </button>
+      {/* The panel's own floor, identical on all five steps. It used to be two loose
+          buttons on the page ground a thousand pixels apart, which is why it read as
+          belonging to no screen in particular. */}
+      <div className="flow-bar">
+        {step === 0 ? (
+          <span className="flow-bar-spacer" />
+        ) : (
+          <button
+            type="button"
+            className="btn btn-secondary btn-back"
+            disabled={saving}
+            onClick={() => goto(step - 1)}
+          >
+            <Icon name="back" size={16} /> Back
+          </button>
+        )}
 
         {last ? (
           <button
@@ -259,6 +278,7 @@ export default function Setup(): JSX.Element {
             Continue
           </button>
         )}
+      </div>
       </div>
 
       {pendingPreset && (

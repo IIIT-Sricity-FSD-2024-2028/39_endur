@@ -1573,7 +1573,40 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-26 (latest) · DEC-077 — the grid you can actually read, and seven lying tags
+### 2026-08-27 (latest) · the flow grammar — boxes and spacing across nine screens
+
+**One owner complaint, repeated nine times: "too clustered, not properly boxes made."** The
+console had a card grammar and the *flow* screens never used it. Setup steps, the campaign
+wizard, reflect, roles, subjects, structure and the two list screens all emitted bare stacks
+against the page ground at a uniform `--space-3`, so a heading, a field and a whole new
+question sat the same distance apart and nothing grouped.
+
+Answered with one shared device rather than nine local patches, appended to `endur.css` as
+**THE FLOW GRAMMAR** (parts 1 and 2):
+
+- `.panel` — a card at `--space-6` with a `--space-4` column rhythm; `.panel-section`,
+  `.panel-title`, `.panel-lede` divide it. `.panel .card` renders as a recessed **well**, not
+  a second card, which is what stops card-in-card stacking.
+- `.flow-bar` — the wizard's Back/Continue pair, made the panel's own floor via negative
+  margins instead of a floating row. Deliberately **not sticky**: the console's chrome is not
+  sticky either, and the bar landing in the same place on every step is what the complaint
+  ("they vary with scrolling") was actually about.
+- `.list-toolbar` / `.table-panel` — the filter row and the table each get a box, and table
+  rows go up one padding step. Note `.card` in `organic.css` is a flex **column**, so any row
+  that also carries `.card` must restate `flex-direction: row`.
+- `.roles-panel` boxes both tab panels on `/app/roles`; the powers legend became a well and
+  the copy row gained the divider that says it is a separate tool.
+- `/app/structure` now has one rhythm across its three bands — counts, map, tree.
+
+`Icon.tsx` gained `back: ArrowLeft` — a genuinely new concept in the closed vocabulary, so
+that a back control is a real button rather than a bare word (a rotated `disclosure` chevron
+would have given one glyph two meanings).
+
+Visual only: no `DEC-` change, no contract touched. Typecheck is unchanged — the four
+pre-existing failures in `roles/service.ts`, `Setup/steps/Industry.tsx` and `Simulator.tsx`
+were there before and are untouched.
+
+### 2026-08-26 · DEC-077 — the grid you can actually read, and seven lying tags
 
 **Two owner items off one screenshot: *"this says Soon still"* and *"this page is still too
 unfriendly to user."* Both were real and neither was about wording.**

@@ -15,6 +15,7 @@ import type {
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { Toggle } from '../../../components/form/Toggle.js';
+import { Icon } from '../../../components/Icon.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useAppSelector } from '../../../store/index.js';
@@ -145,11 +146,14 @@ export default function CampaignNew(): JSX.Element {
         action={<Link className="btn btn-ghost" to="/app/campaigns">Cancel</Link>}
       />
 
+      <div className="wizard">
       <ProgressRail steps={STEPS} current={step} onStepClick={(index) => index < step && setStep(index)} />
 
+      <div className="card panel wizard-panel">
       {step === 0 && (
         <section className="wizard-step">
-          <h3>Which form?</h3>
+          <div className="panel-section">
+          <h3 className="panel-title">Which form?</h3>
           <div className="tgrid">
             {templateRows.map((row) => {
               const time = approxDuration(row.estimatedSeconds);
@@ -174,7 +178,9 @@ export default function CampaignNew(): JSX.Element {
               No forms yet. <Link to="/app/templates">Copy one from the library</Link> first.
             </p>
           )}
+          </div>
 
+          <div className="panel-section">
           <div className="field">
             <label htmlFor="campaign-name">Name this {labels.campaign.one.toLowerCase()}</label>
             <input
@@ -188,6 +194,7 @@ export default function CampaignNew(): JSX.Element {
               Auto-filled from the form. {labels.respondent.many} see this name.
             </p>
           </div>
+          </div>
         </section>
       )}
 
@@ -195,7 +202,8 @@ export default function CampaignNew(): JSX.Element {
         <section className="wizard-step">
           {/* Two genuinely different questions, and this is where the generic model does
               real work: WHAT is reviewed, and WHO may answer. */}
-          <h3>What is being reviewed?</h3>
+          <div className="panel-section">
+          <h3 className="panel-title">What is being reviewed?</h3>
           <div className="card subject-picker">
             {subjectRows.map((subject: SubjectSummary) => (
               <label className="q-option" key={subject.id}>
@@ -226,8 +234,10 @@ export default function CampaignNew(): JSX.Element {
             {pluralise(subjectIds.length, 'selected', 'selected')}. The list only shows what you
             can see — scope comes from the API, not from this page.
           </p>
+          </div>
 
-          <h3>Who can respond?</h3>
+          <div className="panel-section">
+          <h3 className="panel-title">Who can respond?</h3>
           <div className="q-options">
             <label className="q-option">
               <input
@@ -272,6 +282,7 @@ export default function CampaignNew(): JSX.Element {
 
           {/* The visible proof that the org graph is real and not decorative. */}
           <p className="audience-count">{audienceLine}</p>
+          </div>
 
           {/* TWO DIFFERENT QUESTIONS, and 38 exists partly to stop them being folded into
               one. Above: who is EXPECTED to answer — a denominator, enforced nowhere.
@@ -279,7 +290,8 @@ export default function CampaignNew(): JSX.Element {
               can perfectly well be "open to anyone with the link, and we expect the 40
               people in Housekeeping" — that is the commonest shape in the seed, and folding
               the two together would make it unsayable. The heading break is what says so. */}
-          <h3>Who gets in?</h3>
+          <div className="panel-section">
+          <h3 className="panel-title">Who gets in?</h3>
           <div className="q-options">
             <label className="q-option">
               <input
@@ -321,12 +333,14 @@ export default function CampaignNew(): JSX.Element {
               {orgName || 'your organization'} will not be able to answer even with the link.
             </p>
           )}
+          </div>
         </section>
       )}
 
       {step === 2 && (
         <section className="wizard-step">
-          <h3>When?</h3>
+          <div className="panel-section">
+          <h3 className="panel-title">When?</h3>
           <div className="when-row">
             <label className="qe-field">
               <span>Opens</span>
@@ -352,7 +366,9 @@ export default function CampaignNew(): JSX.Element {
             until somebody closes it.
           </p>
           {!ready[2] && <p className="form-error" role="alert">Closes has to be after Opens.</p>}
+          </div>
 
+          <div className="panel-section">
           <Toggle
             checked={anonymous}
             onChange={setAnonymous}
@@ -368,14 +384,23 @@ export default function CampaignNew(): JSX.Element {
           </div>
 
           {error && <p className="form-error" role="alert">{error}</p>}
+          </div>
         </section>
       )}
 
-      <div className="wizard-actions">
-        {step > 0 && (
-          <button type="button" className="btn btn-secondary" onClick={() => setStep(step - 1)}>
-            Back
+      {/* The same bar the setup wizard carries, in the same place, with the same back
+          arrow. Two wizards in one product that end differently are two wizards to learn. */}
+      <div className="flow-bar">
+        {step > 0 ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-back"
+            onClick={() => setStep(step - 1)}
+          >
+            <Icon name="back" size={16} /> Back
           </button>
+        ) : (
+          <span className="flow-bar-spacer" />
         )}
         {step < 2 ? (
           <button
@@ -392,6 +417,8 @@ export default function CampaignNew(): JSX.Element {
             {busy ? 'Launching…' : `Launch ${labels.campaign.one.toLowerCase()}`}
           </button>
         )}
+      </div>
+      </div>
       </div>
 
       {launched && (

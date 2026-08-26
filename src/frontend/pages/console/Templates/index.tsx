@@ -140,7 +140,7 @@ export default function Templates(): JSX.Element {
         }
       />
 
-      <div className="list-controls">
+      <div className="card list-controls list-toolbar">
         <form
           className="list-search"
           onSubmit={(event) => {

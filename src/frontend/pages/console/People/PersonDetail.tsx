@@ -124,7 +124,13 @@ export default function PersonDetail(): JSX.Element {
       <PageHeader
         title={data?.name ?? 'Person'}
         subtitle={data?.email ?? undefined}
-        action={<Link className="btn btn-ghost" to="/app/people">All people</Link>}
+        action={
+          <Link className="btn btn-secondary btn-back" to="/app/people">
+            {/* "people" is a structural product word and never resolves through
+                useLabels() (22 §1) — the org renames its units, not its humans. */}
+            <Icon name="back" size={16} /> All people
+          </Link>
+        }
       />
 
       {person.error && !(person.error instanceof ApiError && person.error.status === 404) && (
