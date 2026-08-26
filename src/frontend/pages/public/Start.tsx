@@ -111,39 +111,32 @@ export default function Start(): JSX.Element {
       : null;
 
   return (
-    <div className="auth">
+    <div className={`auth ${step === 'plan' ? 'is-plan-mode' : ''}`}>
       <div className="auth-main">
-      <div className="card elev-lg auth-card">
-        <h1 className="auth-title">
-          {step === 'details' ? 'Create your organization' : 'Choose a plan'}
-        </h1>
-        <p className="auth-sub">
-          {step === 'details'
-            ? 'Takes about two minutes.'
-            : 'Nothing to pay. Change it any time from settings.'}
-        </p>
-
         <form onSubmit={onFormSubmit} noValidate>
-          {step === 'details' && (
-          <>
-          <div className="field">
-            <label htmlFor="orgName">Organization name</label>
-            <input
-              id="orgName"
-              className="input"
-              name="organization"
-              autoComplete="organization"
-              autoFocus
-              required
-              maxLength={120}
-              value={orgName}
-              onChange={(event) => setOrgName(event.target.value)}
-              aria-describedby={fieldError('orgName') ? 'orgName-error' : undefined}
-            />
-            {fieldError('orgName') && (
-              <p className="field-error" id="orgName-error">{fieldError('orgName')}</p>
-            )}
-          </div>
+          {step === 'details' ? (
+            <div className="card elev-lg auth-card">
+              <h1 className="auth-title">Create your organization</h1>
+              <p className="auth-sub">Takes about two minutes.</p>
+              
+              <div className="field">
+                <label htmlFor="orgName">Organization name</label>
+                <input
+                  id="orgName"
+                  className="input"
+                  name="organization"
+                  autoComplete="organization"
+                  autoFocus
+                  required
+                  maxLength={120}
+                  value={orgName}
+                  onChange={(event) => setOrgName(event.target.value)}
+                  aria-describedby={fieldError('orgName') ? 'orgName-error' : undefined}
+                />
+                {fieldError('orgName') && (
+                  <p className="field-error" id="orgName-error">{fieldError('orgName')}</p>
+                )}
+              </div>
 
           <div className="field">
             <label htmlFor="name">Your name</label>
@@ -219,59 +212,60 @@ export default function Start(): JSX.Element {
               </p>
             )}
           </div>
-          </>
-          )}
-
-          {step === 'plan' && (
-            <PlanPicker
-              plans={SIGNUP_PLAN_OPTIONS}
-              current={tier}
-              mode="signup"
-              onSelect={(chosen) => setTier(chosen as SignupTier)}
-              disabled={busy}
-            />
-          )}
 
           {banner && <p className="form-error" role="alert">{banner}</p>}
 
-          {step === 'details' ? (
-            <button className="btn btn-primary btn-block" type="submit">
-              Continue
-            </button>
+          <button className="btn btn-primary btn-block" type="submit">
+            Continue
+          </button>
+          
+          <p className="auth-alt">
+            Already have an account? <Link className="btn btn-ghost" to="/login">Sign in</Link>
+          </p>
+          </div>
           ) : (
-            <>
-              {/*
-                DISABLED UNTIL A TIER IS CHOSEN, rather than defaulting to one — DEC-048.
-                A pre-selected card would be the product choosing and then attributing the
-                choice to the customer, which is how D-012 looked from the inside for a month.
-              */}
-              <button
-                className="btn btn-primary btn-block"
-                type="submit"
-                disabled={busy || !tier}
-              >
-                {busy && <span className="spinner" aria-hidden="true" />}
-                Continue to setup
-              </button>
-              <button
-                className="btn btn-ghost btn-block"
-                type="button"
+            <div className="auth-plan-wrapper">
+              <div className="auth-plan-header">
+                <h1 className="auth-title">Choose a plan</h1>
+                <p className="auth-sub">Currently every plan is free. Change it any time from settings</p>
+              </div>
+
+              <PlanPicker
+                plans={SIGNUP_PLAN_OPTIONS}
+                current={tier}
+                mode="signup"
+                onSelect={(chosen) => setTier(chosen as SignupTier)}
                 disabled={busy}
-                onClick={() => setStep('details')}
-              >
-                Back
-              </button>
-            </>
+              />
+
+              {banner && <p className="form-error" role="alert">{banner}</p>}
+
+              <div className="auth-plan-actions">
+                <button
+                  className="btn btn-primary btn-block"
+                  type="submit"
+                  disabled={busy || !tier}
+                >
+                  {busy && <span className="spinner" aria-hidden="true" />}
+                  Continue to setup
+                </button>
+                <button
+                  className="btn btn-ghost btn-block"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setStep('details')}
+                >
+                  Back
+                </button>
+              </div>
+            </div>
           )}
         </form>
-
-        <p className="auth-alt">
-          Already have an account? <Link className="btn btn-ghost" to="/login">Sign in</Link>
-        </p>
-      </div>
       </div>
 
-      <AuthAside />
+      {step === 'details' && <AuthAside />}
     </div>
   );
 }
+
+

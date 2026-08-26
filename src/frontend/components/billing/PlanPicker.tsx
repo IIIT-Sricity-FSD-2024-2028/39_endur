@@ -47,7 +47,7 @@ export function PlanPicker({
 }): JSX.Element {
   return (
     <div
-      className="plan-grid"
+      className={`plan-grid${mode === 'signup' ? ' is-signup' : ''}`}
       role={mode === 'signup' ? 'radiogroup' : 'group'}
       aria-label="Plan"
     >
@@ -71,6 +71,17 @@ export function PlanPicker({
             <span className="plan-adds text-meta">{plan.adds}</span>
             {!plan.selectable && (
               <span className="plan-note text-meta">Arranged with us — talk to sales</span>
+            )}
+            
+            {mode === 'signup' && plan.features && plan.features.length > 0 && (
+              <ul className="plan-features">
+                {plan.features.map((feature, idx) => (
+                  <li key={idx} className="plan-feature-item">
+                    <Icon name="check" size={16} />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </>
         );
