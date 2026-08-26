@@ -1,4 +1,4 @@
-// Step 5 — review. 31 § Interactions, design_specs/design/03 §3.4.
+// Step 5 ? review. 31 A  Interactions, design_specs/design/03 A 3.4.
 //
 // Four summary cards, each with a pencil back to its step. The cards state NUMBERS, not
 // reassurance: "5 units, 3 deep" is checkable at a glance, "your structure is ready" is not.
@@ -7,6 +7,7 @@ import { Icon } from '../../../../components/Icon.js';
 import { Toggle } from '../../../../components/form/Toggle.js';
 import { pluralise } from '../../../../lib/format.js';
 import { depthOf, type RoleDraft, type UnitDraft } from '../useWizard.js';
+import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';
 
 function Card({
   kicker,
@@ -61,7 +62,7 @@ export function ReviewStep({
       <div className="review-grid">
         <Card kicker="Roles" step={1} onJump={onJump}>
           <p className="review-figure">{pluralise(roles.length, 'level', 'levels')}</p>
-          <p className="text-meta">{roles.map((role) => role.name).join(' → ')}</p>
+          <p className="text-meta">{roles.map((role) => role.name).join(' + ')}</p>
         </Card>
 
         <Card kicker="Structure" step={2} onJump={onJump}>
@@ -71,7 +72,7 @@ export function ReviewStep({
           <p className="text-meta">{units[0]?.name}</p>
         </Card>
 
-        <Card kicker="Vocabulary" step={3} onJump={onJump}>
+        <Card kicker="Official Terms" step={3} onJump={onJump}>
           <p className="review-figure review-words">
             {[labels.unit.one, labels.subject.one, labels.respondent.one, labels.reviewee.one]
               .join(' · ')}
@@ -93,6 +94,9 @@ export function ReviewStep({
           )}
         </Card>
       </div>
+
+      <DashboardPreview labels={labels} kicker="This is how your dashboard will look" />
     </div>
   );
 }
+

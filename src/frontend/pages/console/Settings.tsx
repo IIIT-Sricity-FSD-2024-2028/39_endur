@@ -20,6 +20,7 @@ import {
 } from '@endur/shared';
 import { PageHeader } from '../../components/layout/PageHeader.js';
 import { WordsEditor } from '../../components/org/WordsEditor.js';
+import { DashboardPreview } from '../../components/org/DashboardPreview.js';
 import { Toast } from '../../components/feedback/Toast.js';
 import { useCan } from '../../lib/capabilities.js';
 import { ApiError } from '../../lib/api.js';
@@ -256,7 +257,7 @@ export default function Settings(): JSX.Element {
         </section>
 
         <section className="settings-card" id="words" aria-labelledby="settings-words">
-          <h3 className="utility" id="settings-words">Words</h3>
+          <h3 className="utility" id="settings-words">Official Terms</h3>
           <p className="text-muted">These appear throughout Endur. Change them any time.</p>
 
           <WordsEditor
@@ -267,6 +268,7 @@ export default function Settings(): JSX.Element {
             onSetMany={setMany}
             onResetPlural={resetPlural}
           />
+          <DashboardPreview labels={draft} />
 
           {blank && <p className="field-error" role="alert">Every word needs a singular and a plural.</p>}
           {wordsError && <p className="field-error" role="alert">{wordsError}</p>}
@@ -290,3 +292,5 @@ export default function Settings(): JSX.Element {
     </>
   );
 }
+
+
