@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { PresetView } from '@endur/shared';
 import { Icon } from '../../../../components/Icon.js';
 
@@ -8,6 +9,10 @@ const PRESET_ICONS: Record<string, string> = {
   company: 'organization',
   custom: 'settings',
 };
+
+/** Industries the vibe system has a colour pair for (`endur.css` "the switch"). Matches
+ *  `AppShell.tsx`'s set — `custom` has no swatch and stays the base blue accent. */
+const VIBE_INDUSTRIES = new Set(['university', 'hotel', 'hospital', 'company']);
 
 export function IndustryStep({
   presets,
@@ -21,6 +26,20 @@ export function IndustryStep({
   onAdvance: () => void;
 }): JSX.Element {
   const selectedPreset = presets.find((p) => p.key === selected);
+
+  // Preview the theme live as the org type is picked — same mechanism Landing.tsx's demo
+  // switcher uses. `AppShell` takes over from `organization.industry` once setup finishes;
+  // this just lets the pick double as a "choose your colour" control before that exists.
+  useEffect(() => {
+    if (selected && VIBE_INDUSTRIES.has(selected)) {
+      document.documentElement.dataset.vibe = selected;
+    } else {
+      delete document.documentElement.dataset.vibe;
+    }
+    return () => {
+      delete document.documentElement.dataset.vibe;
+    };
+  }, [selected]);
 
   return (
     <div className="step step-split">
@@ -52,6 +71,13 @@ export function IndustryStep({
                 <Icon name={PRESET_ICONS[preset.key] || 'organization'} size={24} />
               </div>
               <span className="preset-name">{preset.displayName}</span>
+              {VIBE_INDUSTRIES.has(preset.key) && (
+                <span
+                  className={`preset-swatch preset-swatch-${preset.key}`}
+                  aria-hidden="true"
+                  title="Theme colour for this organization type"
+                />
+              )}
               {selected === preset.key && (
                 <span className="preset-check" aria-hidden="true">
                   <Icon name="check" size={16} />

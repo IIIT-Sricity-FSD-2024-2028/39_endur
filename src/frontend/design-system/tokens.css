@@ -99,7 +99,7 @@
   --glass-edge:   rgba(255, 255, 255, 0.75);
   --glass-sheen:  rgba(255, 255, 255, 0.9);
   --glass-shade:  rgba(23, 35, 46, 0.09);
-  --glass-blur:   blur(22px) saturate(175%);
+  --glass-blur:   blur(16px) saturate(175%);
   --glass-blur-strong: blur(40px) saturate(190%);
 
   /* ── Illustration ramp — DEC-030 ────────────────────────────────────────
@@ -132,21 +132,39 @@
      five-field field from flattening into one even tint. */
   --ambient-4: color-mix(in srgb, var(--color-accent-300) 62%, transparent);
   --ambient-5: color-mix(in srgb, var(--color-accent-600) 24%, transparent);
+
+  /* ── Landing vibes — one seed pair per preset vocabulary ────────────────
+     The landing switcher picks the organisation's WORDS (labels.ts); these
+     pick the organisation's COLOUR. Two raw hexes per industry, light and
+     dark, so the rest of the system can stay derived (endur.css §"the
+     switch") instead of hand-tuning a full ramp per theme. University's pair
+     IS the base accent pair, restated here rather than left implicit: every
+     preset resolving through the same two variables is what lets the switch
+     stay one derived block instead of three industries plus a special case.
+     `custom` has no pair and correctly falls through to the base. */
+  /* Distinct hue per industry, kept light and soft rather than fully saturated (DEC-029
+     "not too AI" — the old versions were dark/heavy enough to wash the whole page; the fix
+     is a lighter tint of the same hue, not collapsing every industry onto one colour). */
+  --vibe-university-1: #3f86e6; --vibe-university-2: #48a99f;
+  --vibe-hotel-1:    #e0a15c; --vibe-hotel-2:    #d97b64;
+  --vibe-hospital-1: #4fae82; --vibe-hospital-2: #5b9dd9;
+  --vibe-company-1:  #7b7fe0; --vibe-company-2:  #4fa8d9;
 }
 
 /* ── Dark — DEC-028 ────────────────────────────────────────────────────────
-   Not an inversion. The ground goes to a deep desaturated navy rather than
-   black, because pure black behind a blurred surface produces grey mud and
-   loses the material entirely. Accents lift one or two steps: #3f86e6 passes
-   on the light ground and fails as running text on the dark one.            */
+   Not an inversion. The ground is a true near-black neutral rather than the
+   navy it used to be — a navy ground reads as "generic AI product blue" once
+   it is under every surface on the page, not just behind the accent. Accents
+   lift one or two steps: #3f86e6 passes on the light ground and fails as
+   running text on the dark one.                                             */
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg:        #0e1621;
-  --color-surface:   #172433;
-  --color-text:      #e4edf7;
-  --color-divider:   color-mix(in srgb, #e4edf7 16%, transparent);
-  --color-card:      #16212f;
+  --color-bg:        #0a0a0b;
+  --color-surface:   #131315;
+  --color-text:      #ededef;
+  --color-divider:   color-mix(in srgb, #ededef 16%, transparent);
+  --color-card:      #18181b;
 
   --color-accent:    #6fabf0;
   --color-accent-100:#132741;  --color-accent-200:#193253;
@@ -162,11 +180,11 @@
   --color-accent-2-700:#a0dbd6; --color-accent-2-800:#c9edea;
   --color-accent-2-900:#e6f7f6;
 
-  --color-neutral-100:#131d29; --color-neutral-200:#1b2836;
-  --color-neutral-300:#243343; --color-neutral-400:#3a4c5e;
-  --color-neutral-500:#5d7186; --color-neutral-600:#8299ae;
-  --color-neutral-700:#a6bacc; --color-neutral-800:#c8d7e4;
-  --color-neutral-900:#e4edf7;
+  --color-neutral-100:#141416; --color-neutral-200:#1c1c1f;
+  --color-neutral-300:#27272a; --color-neutral-400:#3f3f44;
+  --color-neutral-500:#6b6b70; --color-neutral-600:#8f8f95;
+  --color-neutral-700:#b0b0b5; --color-neutral-800:#d4d4d7;
+  --color-neutral-900:#ededef;
 
   /* Shadows on a dark ground do almost nothing; the lift has to come from the
      edge instead, so the sheen is what gets stronger here, not the shadow. */
@@ -174,16 +192,16 @@
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
 
-  --glass-tint:   rgba(30, 44, 62, 0.58);
-  --glass-edge:   rgba(255, 255, 255, 0.13);
-  --glass-sheen:  rgba(255, 255, 255, 0.16);
-  --glass-shade:  rgba(0, 0, 0, 0.35);
+  --glass-tint:   rgba(20, 20, 22, 0.55);
+  --glass-edge:   rgba(255, 255, 255, 0.10);
+  --glass-sheen:  rgba(255, 255, 255, 0.14);
+  --glass-shade:  rgba(0, 0, 0, 0.4);
 
   /* The artwork does not invert — it becomes a night scene. Outlines go pale, the paper
      the shapes are cut from goes dark, and the three fills stay exactly where they were,
      because a rose roof that shifts hue between themes stops being the same drawing. */
   --illus-ink:       #cfe0f0;
-  --illus-paper:     #1b2736;
+  --illus-paper:     #1c1c1f;
   --illus-blue:      #6fabf0;
   --illus-blue-soft: #24486f;
   --illus-teal:      #6ec2ba;
@@ -191,14 +209,22 @@
   --illus-rose:      #ef6f92;
   --illus-amber:     #f5c451;
 
-  --ambient-1: color-mix(in srgb, #3f86e6 26%, transparent);
-  --ambient-2: color-mix(in srgb, #48a99f 17%, transparent);
-  --ambient-3: color-mix(in srgb, #e8577f 6%, transparent);
+  /* Cut hard relative to the old navy version — on a true-black ground the field only
+     needs to be a faint glow behind the glass (DEC-029), not a wash the ground itself
+     shows through. Full-strength blue/teal here is exactly what read as "AI product". */
+  --ambient-1: color-mix(in srgb, #3f86e6 4%, transparent);
+  --ambient-2: color-mix(in srgb, #48a99f 3%, transparent);
+  --ambient-3: color-mix(in srgb, #e8577f 1.5%, transparent);
   /* Dark takes the same five fields but not the same coverage. A dark ground washed edge
      to edge loses the depth that makes the glass edge visible at all, so 4 and 5 stay
      faint — they close the corners without lifting the whole field. */
-  --ambient-4: color-mix(in srgb, #22456f 40%, transparent);
-  --ambient-5: color-mix(in srgb, #6fabf0 9%, transparent);
+  --vibe-university-1: #6fabf0; --vibe-university-2: #6ec2ba;
+  --vibe-hotel-1:    #f0bc7a; --vibe-hotel-2:    #e6997f;
+  --vibe-hospital-1: #6ecb9e; --vibe-hospital-2: #82bce6;
+  --vibe-company-1:  #949ae8; --vibe-company-2:  #79c0ea;
+
+  --ambient-4: color-mix(in srgb, #22456f 7%, transparent);
+  --ambient-5: color-mix(in srgb, #6fabf0 2%, transparent);
 }
 
 /* ── The status ramp — §2b. STRICTLY SEMANTIC ──────────────────────────────

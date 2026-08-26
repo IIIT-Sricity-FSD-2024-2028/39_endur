@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PITCH_KEYS, PRESET_VOCABULARIES } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
-import { Illustration } from '../../components/illustrations/Illustration.js';
+import { Illustration, type IllustrationName } from '../../components/illustrations/Illustration.js';
 
 /** Long enough to read four words, short enough that nobody waits for it. */
 const DWELL_MS = 3500;
@@ -51,6 +51,18 @@ export default function Landing(): JSX.Element {
   }, [engaged]);
 
   const active = PRESET_VOCABULARIES[index] ?? PRESET_VOCABULARIES[0];
+
+  // The ambient background lives outside this component's own DOM subtree (it is a sibling
+  // in PublicLayout, painted behind the nav and the page), so the only shared ancestor the
+  // switcher can reach it through is <html>. Cleared on unmount — the vibe belongs to this
+  // page, not to whatever the visitor opens next.
+  useEffect(() => {
+    document.documentElement.dataset.vibe = active?.key ?? 'university';
+    return () => {
+      delete document.documentElement.dataset.vibe;
+    };
+  }, [active?.key]);
+
   if (!active) return <></>;
 
   const pick = (next: number): void => {
@@ -61,64 +73,76 @@ export default function Landing(): JSX.Element {
   return (
     <div className="landing">
       <section className="landing-hero">
-        <p className="landing-eyebrow utility">Feedback management · performance analysis</p>
+        <div className="landing-hero-row">
+          <div className="landing-hero-copy">
+            <p className="landing-eyebrow utility">Feedback management · performance analysis</p>
 
-        {/*
-          The two nouns are keyed on the vocabulary so React replaces the nodes rather than
-          patching their text. A CSS transition cannot animate a text change on a node it
-          considers unchanged, and without the remount the swap is instantaneous and
-          therefore invisible — which loses the only thing the headline is for.
-        */}
-        <h1 className="landing-title">
-          Ask every{' '}
-          <span className="landing-swap" key={`${active.key}-r`}>
-            {active.labels.respondent.one.toLowerCase()}
-          </span>
-          <br />
-          about every{' '}
-          <span className="landing-swap" key={`${active.key}-s`}>
-            {active.labels.subject.one.toLowerCase()}
-          </span>
-          .
-        </h1>
+            {/*
+              The two nouns are keyed on the vocabulary so React replaces the nodes rather than
+              patching their text. A CSS transition cannot animate a text change on a node it
+              considers unchanged, and without the remount the swap is instantaneous and
+              therefore invisible — which loses the only thing the headline is for.
+            */}
+            <h1 className="landing-title">
+              Ask every{' '}
+              <span className="landing-swap" key={`${active.key}-r`}>
+                {active.labels.respondent.one.toLowerCase()}
+              </span>
+              <br />
+              about every{' '}
+              <span className="landing-swap" key={`${active.key}-s`}>
+                {active.labels.subject.one.toLowerCase()}
+              </span>
+              .
+            </h1>
 
-        <p className="landing-lede">
-          Endur takes the shape of your organization — its structure, its roles, the words it
-          already uses — and collects honest feedback from the people inside it. You describe
-          it once.
-        </p>
+            <p className="landing-lede">
+              Endur takes the shape of your organization — its structure, its roles, the words it
+              already uses — and collects honest feedback from the people inside it. You describe
+              it once.
+            </p>
 
-        <div className="landing-switcher">
-          <p className="utility" id="switch-heading">I run a</p>
-          <div className="seg" role="radiogroup" aria-labelledby="switch-heading">
-            {PRESET_VOCABULARIES.map((entry, position) => (
-              <label className="seg-opt" key={entry.key}>
-                <input
-                  type="radio"
-                  name="vocabulary"
-                  value={entry.key}
-                  checked={position === index}
-                  onChange={() => pick(position)}
-                />
-                {entry.displayName}
-              </label>
-            ))}
+            <div className="landing-switcher">
+              <p className="utility" id="switch-heading">I run a</p>
+              <div className="seg" role="radiogroup" aria-labelledby="switch-heading">
+                {PRESET_VOCABULARIES.map((entry, position) => (
+                  <label className="seg-opt" key={entry.key}>
+                    <input
+                      type="radio"
+                      name="vocabulary"
+                      value={entry.key}
+                      checked={position === index}
+                      onChange={() => pick(position)}
+                    />
+                    {entry.displayName}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="landing-actions">
+              <Link className="btn btn-primary btn-lg" to="/start">
+                Create your organization
+                <Icon name="arrow" size={18} />
+              </Link>
+              <Link className="btn btn-secondary btn-lg" to="/login">Sign in</Link>
+            </div>
+          </div>
+
+          {/* Keyed on the vocabulary, same as the headline swap above — the drawing itself
+              changes to match the organisation type the switcher just picked, not just its
+              words and its ambient colour. */}
+          <div className="landing-hero-scene" aria-hidden="true">
+            {/* `custom` has no drawing of its own — PRESET_VOCABULARIES never contains it, only
+                Industry's type does, so the cast below is safe for every value this switcher
+                can actually produce. */}
+            <Illustration
+              name={`hero-${active.key}` as IllustrationName}
+              className="illus-hero"
+              key={active.key}
+            />
           </div>
         </div>
-
-        <div className="landing-actions">
-          <Link className="btn btn-primary btn-lg" to="/start">
-            Create your organization
-            <Icon name="arrow" size={18} />
-          </Link>
-          <Link className="btn btn-secondary btn-lg" to="/login">Sign in</Link>
-        </div>
-      </section>
-
-      {/* Wide, and given its own band rather than squeezed beside the copy. It is a scene
-          with four things happening in it and it needs the width to be read at all. */}
-      <section className="landing-scene" aria-hidden="true">
-        <Illustration name="hero-organisation" className="illus-hero" />
       </section>
 
       {/*
@@ -196,6 +220,7 @@ export default function Landing(): JSX.Element {
 
         <div className="landing-claim-pair">
           <article className="landing-claim card elev-md">
+            <Illustration name="claim-anonymity" className="landing-claim-illus" />
             {/* EyeOff, not a padlock: the claim is not that the data is locked away, it is
                 that there is nothing there to look at in the first place. */}
             <span className="landing-claim-mark" aria-hidden="true">
@@ -215,6 +240,7 @@ export default function Landing(): JSX.Element {
           </article>
 
           <article className="landing-claim card elev-md">
+            <Illustration name="claim-grants" className="landing-claim-illus" />
             <span className="landing-claim-mark" aria-hidden="true">
               <Icon name="role" size={24} />
             </span>

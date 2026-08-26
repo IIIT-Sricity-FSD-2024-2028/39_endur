@@ -10,6 +10,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { PlatformMeResponse } from '@endur/shared';
+import { Icon } from '../../components/Icon.js';
 import { opsGet, opsPost, OpsError } from '../../lib/ops.js';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { opsSignedIn } from '../../store/opsSlice.js';
@@ -23,6 +24,7 @@ export default function Login(): JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  const [reveal, setReveal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,8 +60,9 @@ export default function Login(): JSX.Element {
 
   return (
     <div className="fullpage">
-      <form className="ops-login card" onSubmit={onSubmit}>
+      <form className="ops-login card elev-md" onSubmit={onSubmit}>
         <h2>Endur operator sign in</h2>
+        <p className="text-muted">Restricted to Endur staff. Every sign-in is audited.</p>
         {error && <p className="field-error" role="alert">{error}</p>}
 
         <label className="field">
@@ -70,20 +73,30 @@ export default function Login(): JSX.Element {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
+            autoFocus
             required
           />
         </label>
 
         <label className="field">
           <span className="field-label">Password</span>
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
+          <div className="input-reveal">
+            <input
+              className="input"
+              type={reveal ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              className="btn btn-icon reveal-toggle"
+              onClick={() => setReveal((shown) => !shown)}
+            >
+              <Icon name={reveal ? 'hide' : 'show'} size={18} label={reveal ? 'Hide password' : 'Show password'} />
+            </button>
+          </div>
         </label>
 
         <label className="field">
@@ -100,7 +113,7 @@ export default function Login(): JSX.Element {
           />
         </label>
 
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting && <span className="spinner" aria-hidden="true" />}
           Sign in
         </button>

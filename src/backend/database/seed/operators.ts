@@ -28,6 +28,18 @@ const OPERATORS = [
     role: 'staff',
     secret: 'KRSXG5CTMVRXEZLUKRSXG5CTMVRXEZLU',
   },
+  {
+    email: 'owner2@endur.test',
+    name: 'Endur Owner Two',
+    role: 'owner',
+    secret: 'MFRGGZDFMZTWQ2LKMFRGGZDFMZTWQ2LK',
+  },
+  {
+    email: 'support2@endur.test',
+    name: 'Endur Support Two',
+    role: 'staff',
+    secret: 'NBSWY3DPO5XXE3DENBSWY3DPO5XXE3DE',
+  },
 ] as const;
 
 export async function seedOperators(prisma: PrismaClient): Promise<void> {

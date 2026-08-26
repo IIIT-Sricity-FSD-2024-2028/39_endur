@@ -207,9 +207,12 @@ paper over.** `design_specs/` is authoritative for visual design (`CLAUDE.md`), 
 colour, type or spacing here would breach `DEC-012` and fail `audit:drift`.
 
 Until a spec exists, this page uses **only** existing tokens and existing component anatomy —
-`<PageHeader>`, `<StatCard>`, `<ResponsiveTable>`, the base `organic.css` classes. It should
-look plainer than the customer console, and that is appropriate: it is an internal tool, and
-the personality of the product belongs on the customer's side of it.
+`<PageHeader>`, `<StatCard>`, `<ResponsiveTable>`, `<AmbientBackground>`, the glass surfaces
+`/app` already carries (`.glass`, `.glass-lit`, `.topbar`/`.nav-public` pattern). **Superseded
+by `DEC-078`:** this page no longer aims to look plainer than the customer console —
+the owner asked for the two to match. What still holds is the reuse constraint: nothing here
+invents a new colour, font or spacing token; every surface this reaches for is one `/app`
+already uses.
 
 ## Out of scope
 

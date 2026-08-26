@@ -1564,6 +1564,29 @@ DEC-077  ACTIVE  2026-08-26  origin:user  task:T-052
            A TASK THAT BUILDS A CAPABILITY MOVES ITS PHASE IN THE SAME COMMIT. `apikey.*` is
            the only true P3 left: no route exists.
   see      33 § "Reading the grid", 11 §3, src/frontend/design-system/endur.css `.powers-*`
+
+DEC-078  ACTIVE  2026-08-27  origin:user  amends:70 § Design note
+  decision `/ops` (estate list, analytics, logs) TAKES THE CONSOLE'S CHROME -- glass nav,
+           `<AmbientBackground>`, the same `.card`/`.stat-row`/`.glass` surfaces `/app`
+           already uses -- and 70's "should look plainer than the customer console" is
+           SUPERSEDED, not silently dropped.
+  why      the owner asked for the ops screens by name, having seen them next to `/app`'s
+           equivalents, and judged plain as merely unfinished rather than intentional.
+  guard    DEC-012 STILL HOLDS. nothing new is invented here: every class this reaches for
+           already exists (`.glass`, `.glass-lit`, `.topbar`, `.nav-public`, `.card`,
+           `.stat-row`, `AmbientBackground`) and is already load-bearing on `/app` and `/`.
+           no new colour, font or spacing token enters the system for this -- reuse only.
+  what     `OpsLayout` (router/layouts.tsx) gains `<AmbientBackground>` and a glass nav in
+           place of the flat `background: var(--color-surface)` bar; `.ops-nav` in
+           endur.css is restyled on the `.topbar`/`.nav-public` pattern; `.org-row` (used
+           but never styled -- zero rules existed) and `.stat-grid` (referenced in
+           Analytics/index.tsx but never defined -- `.stat-row` is the real class) are
+           fixed as part of the same pass, since a class with no rule is not "plain by
+           design", it is a bug this decision's read of the CSS turned up.
+  not      the OWNER-ONLY, INTERNAL-TOOL FACTS themselves are untouched -- no vocabulary
+           chips, no `useLabels()`, "Organizations"/"Plan"/"Tier" stay literal (19 §12).
+           this is a chrome change, not a re-scoping of what the surface is for.
+  see      70 § Design note, DEC-012, 19 §12, src/frontend/router/layouts.tsx
 ```
 
 ---

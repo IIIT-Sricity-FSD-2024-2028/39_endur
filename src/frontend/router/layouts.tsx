@@ -117,10 +117,10 @@ export function ConsoleLayout(): JSX.Element {
 }
 
 /**
- * `/ops`'s own chrome — plain furniture, deliberately (`70` § Design note: it should look
- * plainer than the customer console, and the personality of the product belongs on the
- * customer's side of it). NO `<AmbientBackground>`, NO `<VocabularyChips>`, NO
- * `useLabels()` — this surface says "Organizations", "Plan", "Tier" outright (`19` §12).
+ * `/ops`'s own chrome — took the console's glass and ambient field (`DEC-078`, amending `70`
+ * § Design note's original "plainer than the customer console"). NO `<VocabularyChips>`, NO
+ * `useLabels()` — this surface still says "Organizations", "Plan", "Tier" outright (`19`
+ * §12); that half of the old note was never about visual weight and still stands.
  *
  * `/ops/login` is OUTSIDE the guard, the same way `/login` is outside `RequireSession` — but
  * here it is one path INSIDE this layout rather than a separate top-level tree, because the
@@ -138,6 +138,7 @@ export function OpsLayout(): JSX.Element {
   if (pathname === '/ops/login') {
     return (
       <div className="ops-shell">
+        <AmbientBackground />
         <Outlet />
       </div>
     );
@@ -153,7 +154,10 @@ export function OpsLayout(): JSX.Element {
   return (
     <RequirePlatformAuth>
       <div className="ops-shell">
-        <nav className="nav ops-nav">
+        {/* Same quieter variant `/app` uses — the console is where work happens, and this is
+            too, even though it is a different console (`AppShell`'s reasoning, reused). */}
+        <AmbientBackground />
+        <nav className="nav ops-nav glass glass-lit">
           <Link className="nav-brand" to="/ops">
             <span className="nav-mark" aria-hidden="true" />
             Endur

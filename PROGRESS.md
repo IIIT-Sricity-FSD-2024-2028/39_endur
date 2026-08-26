@@ -5,7 +5,45 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-26  (DEC-077 — THE POWERS GRID IS READABLE WHILE YOU USE IT, AND THE
+UPDATED   2026-08-27  (DEC-078 — /OPS TAKES THE CONSOLE'S CHROME. the owner asked for the
+                       ops screens (estate list, analytics, logs) to look as finished as
+                       /app, having seen them side by side, and judged 70's "plainer than
+                       the customer console" as unfinished rather than intentional —
+                       superseded, in writing, in 70 § Design note and DEC-078, not
+                       silently dropped. DEC-012 still holds: nothing invented, only reuse.
+                       OpsLayout (router/layouts.tsx) gained <AmbientBackground> and a
+                       glass nav on the same .topbar/.nav-public rule /app already carries.
+                       TWO REAL BUGS TURNED UP DOING IT, both pre-existing and unrelated to
+                       the plain-vs-styled question: <OrgRow> (estate list rows) has been
+                       referenced since T-066 with ZERO CSS RULE — every row rendered as a
+                       bare unstyled <button>, which is why the estate list read as
+                       especially basic. Fixed with .org-row in endur.css. Analytics/
+                       index.tsx used className="stat-grid", a class that has never existed
+                       — .stat-row is the real one Home.tsx already uses — so the four
+                       overview cards there rendered as an unstyled stack. Fixed by
+                       renaming the class. Verified live: logged in as owner@endur.test,
+                       confirmed via computed styles on /ops, /ops/analytics, /ops/logs —
+                       glass nav backdrop-filter applied, ambient field present, stat cards
+                       render in a grid, org rows carry padding/radius/hover. No new
+                       console errors from the change (pre-existing 401 session probes and
+                       a pre-existing Logs.tsx setState-in-render warning, both unrelated).
+                       SAME "stat-grid" BUG, A THIRD TIME: OrgDetail.tsx (/ops/orgs/:id) had
+                       it too — fixed to .stat-row, verified live (6 stat cards, grid).
+                       OWNER FLAGGED IT STILL LOOKED BROKEN ON A SCREENSHOT, and two real
+                       layout bugs were in it, both from the SAME ROOT CAUSE as .org-row:
+                       nothing on this page ever gave it room. Every `<section
+                       className="card">` sat bare inside `.page`, which has no gap, so six
+                       sections read as one edge-to-edge block with only a hairline between
+                       them — fixed with a new `.ops-sections` wrapper (same fix
+                       `.settings-page` already does for `/app/settings`, without its 900px
+                       cap). AND `<PlanPicker>` was wrapped in a SECOND `.card` — its own
+                       `.plan-card` already carries background/radius/shadow, the same grid
+                       `Start.tsx` uses BARE — so the four tiers were squeezed into a card
+                       nested inside a card, narrower than every other plan grid on the
+                       product. Unwrapped to `.ops-plan-section` (no `.card`). Verified
+                       live: section gap 26px (was 0), plan cards ~284px wide and no longer
+                       double-bordered, no new console errors.
+                       Earlier: DEC-077 — THE POWERS GRID IS READABLE WHILE YOU USE IT, AND THE
                        "SOON" TAGS WERE LYING. the owner sent a screenshot: TWELVE ROWS OF
                        VALUES WITH NO ROLE NAME ANYWHERE ON SCREEN, cells reading "Their
                        department + belc", and 64 differently-sized dropdowns down the left.
@@ -3905,6 +3943,33 @@ in `_MEMORY.md`; each one supersedes something and says what it supersedes.
 - `tokens.css` is no longer a verbatim copy of any `design_specs` section. `design_specs/`
   is absent from this branch; when it returns, §2 has to be reconciled against the token
   block rather than re-copied over it (`DRIFT-001`).
+
+### 2026-08-26 · Landing hero — one drawing per vocabulary, not one generic drawing
+
+Owner-requested. The 2026-08-22 pass gave the hero a single illustration
+(`hero-organisation.svg`) shared by all four presets, sitting in its own full-width band below
+the copy — disconnected from the switcher that is the whole point of the page.
+
+- **Four drawings, not one.** `hero-university.svg` / `hero-hotel.svg` / `hero-hospital.svg` /
+  `hero-company.svg` replace it, authored in SVGator (same DEC-030 house style: line art,
+  stroke-dashoffset draw-on, hand-converted to inline CSS keyframes afterward — the MCP's own
+  animated-SVG export only emits its JS player, which the illustration system deliberately
+  does not use). Each one's fills are that vocabulary's own `--vibe-*` pair from `tokens.css`
+  (university has none of its own and keeps the base `--illus-*` ramp, per the existing
+  comment there), so the drawing's colour matches the vibe the switcher already puts on the
+  rest of the page, not a shared unrelated palette.
+- **`Landing.tsx`** now keys `<Illustration>` on `` `hero-${active.key}` ``, remounting the
+  same way the headline swap already does, and moves it into a new `.landing-hero-row` grid
+  beside the copy (stacks under 899px) instead of the old full-bleed `.landing-scene` band
+  below it.
+- **Two more, smaller.** `claim-anonymity.svg` / `claim-grants.svg` sit on the "two things most
+  feedback tools get wrong" cards — colour-matched to their own card (rose for anonymity,
+  blue/teal for grants) rather than vocab-flavoured, since that section isn't.
+- `hero-organisation.svg` is deleted; its SVGator project is left in the account, just no
+  longer wired into `Illustration.tsx`'s `SOURCES` map.
+- Gotcha worth keeping: SVGator's `create_project` silently 422s ("Export failed", no detail)
+  on any `rect` whose `properties.shape` omits `radius` entirely — it is documented as
+  optional/animatable, but the export step needs it present, even as `{"x":0,"y":0}`.
 
 ### 2026-08-21 · T-049 — the slug race, and a worse bug found on the way to it
 

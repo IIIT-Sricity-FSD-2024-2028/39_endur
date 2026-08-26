@@ -18,11 +18,24 @@
 //     correct still, not a broken one.
 //
 // `?raw` gives Vite the file as a string at build time; it is not a network request.
-import heroOrganisation from './hero-organisation.svg?raw';
+import heroUniversity from './hero-university.svg?raw';
+import heroHotel from './hero-hotel.svg?raw';
+import heroHospital from './hero-hospital.svg?raw';
+import heroCompany from './hero-company.svg?raw';
+import claimAnonymity from './claim-anonymity.svg?raw';
+import claimGrants from './claim-grants.svg?raw';
 
 const SOURCES = {
-  /** Landing hero: people, the organisation they are in, and the results that come out. */
-  'hero-organisation': heroOrganisation,
+  /** Landing hero, one per preset vocabulary (INV-001) — the drawing follows the org type the
+   *  switcher just picked, the same way the headline and the ambient vibe colour do. */
+  'hero-university': heroUniversity,
+  'hero-hotel': heroHotel,
+  'hero-hospital': heroHospital,
+  'hero-company': heroCompany,
+  /** The two claims further down the landing page. Not vocab-flavoured — colour-matched to
+   *  their own card instead (rose for the anonymity claim, blue/teal for the grants claim). */
+  'claim-anonymity': claimAnonymity,
+  'claim-grants': claimGrants,
 } satisfies Record<string, string>;
 
 export type IllustrationName = keyof typeof SOURCES;

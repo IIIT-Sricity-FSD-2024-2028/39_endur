@@ -179,14 +179,6 @@ export function ShareSheet({
           {/* Selectable, and big. Somebody at the back types this. */}
           <p className="share-url">{display(url)}</p>
 
-          {isUnscannable(url) && (
-            <p className="share-warn" role="alert">
-              This address points at <strong>localhost</strong>, which on a phone means the
-              phone. Nobody can scan this. Set <code>PUBLIC_BASE_URL</code> to an address the
-              room can reach before the demo — see <code>OPEN-002</code>.
-            </p>
-          )}
-
           {failed && (
             <p className="field-error" role="alert">
               Copying was refused by the browser. The address above can be selected by hand.
