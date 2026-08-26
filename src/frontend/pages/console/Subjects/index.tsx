@@ -185,7 +185,7 @@ export default function Subjects(): JSX.Element {
         }
       />
 
-      <div className="list-controls">
+      <div className="card list-controls list-toolbar">
         <form
           className="list-search"
           onSubmit={(event) => {
@@ -248,6 +248,7 @@ export default function Subjects(): JSX.Element {
           </div>
         </div>
       ) : (
+        <div className="card table-panel">
         <ResponsiveTable
           columns={columns}
           rows={rows}
@@ -287,6 +288,7 @@ export default function Subjects(): JSX.Element {
             )
           }
         />
+        </div>
       )}
 
       {(cursor || list.data?.page.hasMore) && (

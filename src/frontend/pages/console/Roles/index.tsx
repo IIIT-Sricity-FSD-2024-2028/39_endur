@@ -76,11 +76,11 @@ export default function Roles(): JSX.Element {
       </div>
 
       {tab === 'roles' ? (
-        <section id="panel-roles" role="tabpanel" aria-labelledby="tab-roles">
+        <section id="panel-roles" role="tabpanel" aria-labelledby="tab-roles" className="card roles-panel">
           <RoleLadder ladder={ladder} editable={canEditRoles} />
         </section>
       ) : (
-        <section id="panel-powers" role="tabpanel" aria-labelledby="tab-powers">
+        <section id="panel-powers" role="tabpanel" aria-labelledby="tab-powers" className="card roles-panel">
           {/* READ-ONLY RATHER THAN ABSENT without `grant.update` (33 § States). Somebody who
               can see the grid and not change it is better served by seeing what the rules
               ARE than by an empty screen that looks broken. */}

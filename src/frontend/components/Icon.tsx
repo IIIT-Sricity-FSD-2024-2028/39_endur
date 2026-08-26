@@ -12,7 +12,7 @@
 // Never emoji. The mockups use them as placeholders; they render differently on the
 // projector machine and read as unfinished. audit-drift greps for them in JSX.
 import {
-  Archive, ArchiveRestore, ArrowRight, BarChart3, Building2, Check, ChevronDown, ChevronRight,
+  Archive, ArchiveRestore, ArrowLeft, ArrowRight, BarChart3, Building2, Check, ChevronDown, ChevronRight,
   Copy, Eye, EyeOff, History, Mail,
   GripVertical, Home,
   Inbox, LayoutTemplate, Maximize2, Monitor as MonitorSmartphone, Moon, Pencil, Play,
@@ -74,6 +74,10 @@ const ICONS = {
   'theme-system': MonitorSmartphone,
   // Landing and empty states.
   arrow: ArrowRight,
+  // The way back out of a flow. NOT `disclosure` rotated: a chevron is the twist on a
+  // tree row and the ">" in a breadcrumb, and giving it a second meaning is how a row
+  // starts looking like it can be collapsed. One icon per concept (rule 2 above).
+  back: ArrowLeft,
   play: Play,
   preview: Maximize2,
   // T-080. The inbox's two toggles. `unread` is the envelope you put a comment BACK into,
