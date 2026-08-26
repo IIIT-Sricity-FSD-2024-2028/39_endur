@@ -18,6 +18,7 @@ import {
   Inbox, LayoutTemplate, Maximize2, Monitor as MonitorSmartphone, Moon, Pencil, Play,
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
+  GraduationCap, Building, HeartPulse,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -41,6 +42,10 @@ const ICONS = {
   delete: Trash2,
   'trend-up': TrendingUp,
   'trend-down': TrendingDown,
+  // Industry Preset Icons
+  university: GraduationCap,
+  hospital: HeartPulse,
+  hotel: Building,
   // Chrome — not in §5's table, because §5 lists concepts in the customer's world. These
   // are Endur's own furniture and cannot be renamed by a preset.
   home: Home,

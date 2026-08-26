@@ -137,7 +137,7 @@
 
 /* ── Top bar — 56px, sticky, chrome, hairline under ───────────────────── */
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+   top: 0; z-index: 20;
   height: 56px; flex: none;
   display: flex; align-items: center; gap: var(--space-3);
   padding-inline: var(--space-4);
@@ -197,7 +197,7 @@
 
 /* ── Sidebar — 232px, chrome, 40px pilled items inset 8px ─────────────── */
 .shell-rail { flex: none; width: 232px; align-self: stretch; background: var(--color-surface); }
-.sidebar { position: sticky; top: 56px; padding: var(--space-3) var(--space-2); }
+.sidebar {  top: 56px; padding: var(--space-3) var(--space-2); }
 .sidebar ul { list-style: none; margin: 0; padding: 0; }
 .sidebar-group + .sidebar-group { margin-top: var(--space-4); }
 .sidebar-heading { margin: 0 0 var(--space-1); padding-inline: var(--space-2); }
@@ -354,7 +354,7 @@
 
 .landing-switcher {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
-  margin-top: var(--space-8);
+  margin-
 }
 .landing-switcher .utility { margin: 0; }
 .landing-switcher .seg {
@@ -365,7 +365,7 @@
 }
 
 .landing-actions {
-  display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8);
+  display: flex; flex-wrap: wrap; gap: var(--space-3); margin-
 }
 /* The one button size above the default, and it exists only for the two page
    actions that are the whole point of their screen. */
@@ -466,7 +466,7 @@
 
 /* ── the two claims ────────────────────────────────────────────────────── */
 .landing-claim-pair {
-  display: grid; gap: var(--space-4); margin-top: var(--space-8);
+  display: grid; gap: var(--space-4); margin-
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 .landing-claim { gap: var(--space-3); padding: var(--space-8); }
@@ -510,7 +510,7 @@
 
 @media (max-width: 639px) {
   .landing { gap: var(--space-16); }
-  .landing-hero { padding-top: var(--space-8); max-width: none; }
+  .landing-hero { padding- max-width: none; }
   .landing-switcher .seg { width: 100%; }
   .landing-switcher .seg-opt { flex: 1 1 0; justify-content: center; padding-inline: 6px; }
   .landing-actions .btn { width: 100%; }
@@ -1440,7 +1440,7 @@ textarea.q-text-input { min-height: 90px; }
 }
 .builder-first:hover { border-color: var(--color-accent); color: var(--color-accent-800); }
 
-.builder-rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: var(--space-2); }
+.builder-rail {  top: 76px; display: flex; flex-direction: column; gap: var(--space-2); }
 .rail-tool {
   width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -1467,7 +1467,7 @@ textarea.q-text-input { min-height: 90px; }
 @media (max-width: 639px) {
   .builder { flex-direction: column; }
   .builder-rail {
-    position: sticky; bottom: 0; top: auto; z-index: 20;
+     bottom: 0; top: auto; z-index: 20;
     flex-direction: row; justify-content: center; width: 100%;
     padding: var(--space-2); background: var(--color-bg);
     border-top: 1px solid var(--color-divider);
@@ -1633,7 +1633,7 @@ textarea.q-text-input { min-height: 90px; }
 /* Sticky, and it counts QUESTIONS rather than scroll: scroll percentage lies
    on a form whose last question is a long text answer (39, rule 3). */
 .rf-progress {
-  position: sticky; top: 0; z-index: 20;
+   top: 0; z-index: 20;
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) 0;
   background: var(--color-bg);
@@ -2256,7 +2256,7 @@ html:active-view-transition * {
 /* The public nav floats rather than sitting flush — it is a pill on the page,
    which is what makes the ambient field visible above and around it. */
 .nav-public {
-  position: sticky; top: var(--space-3); z-index: 20;
+   top: var(--space-3); z-index: 20;
   width: min(1180px, calc(100% - var(--space-6)));
   margin: var(--space-3) auto 0;
   border-radius: 999px;
@@ -2536,7 +2536,7 @@ html:active-view-transition * {
   padding: var(--space-6);
   overflow-y: auto;
 }
-.tpv-figure { margin: 0; position: sticky; top: 0; }
+.tpv-figure { margin: 0;  top: 0; }
 .tp-large { border-radius: var(--radius-md); }
 
 .tpv-detail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
@@ -2907,7 +2907,7 @@ html:active-view-transition * {
    a matrix with its columns stacked has stopped being a matrix. The page body must never
    scroll horizontally; this element does instead. */
 /* IT SCROLLS IN BOTH DIRECTIONS, AND THAT IS WHAT MAKES THE HEADERS STICK. The header row
-   below has been `position: sticky; top: 0` since T-052 and it never once stuck: an element
+   below has been ` top: 0` since T-052 and it never once stuck: an element
    with `overflow-x: auto` and no height is a scroll container that CANNOT scroll vertically,
    so `top: 0` pinned the row to a box that never moves while the PAGE carried it away. With
    64 rows, the reader was choosing between six phrases in a column whose role name had
@@ -2927,7 +2927,7 @@ html:active-view-transition * {
 .powers-corner { width: 100%; }
 
 .powers-corner, .powers-role {
-  position: sticky; top: 0; z-index: 2;
+   top: 0; z-index: 2;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-divider);
   padding: var(--space-2) var(--space-3);
@@ -2963,7 +2963,7 @@ html:active-view-transition * {
 /* THE POWER NAME FOLLOWS YOU SIDEWAYS. Scrolled right to the fifth role, every row label had
    left the screen and the grid became six phrases with nothing to attach them to. */
 .powers-capability {
-  position: sticky; left: 0; z-index: 1;
+   left: 0; z-index: 1;
   background: var(--color-surface);
   padding: var(--space-2) var(--space-3);
   text-align: left; font-weight: 400; white-space: nowrap;
@@ -3714,5 +3714,287 @@ html:active-view-transition * {
   color: var(--color-accent);
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+
+/* Industry Split Layout */
+.step-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-8);
+  align-items: start;
+}
+@media (max-width: 899px) {
+  .step-split { grid-template-columns: 1fr; }
+}
+
+.step-split-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.step-split-aside {
+  display: flex;
+  flex-direction: column;
+  
+  
+}
+
+.preset-grid {
+  display: grid; 
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.preset-card-simple {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-6);
+  min-height: 140px;
+}
+.preset-card-icon {
+  color: var(--color-accent);
+  background: var(--color-accent-100);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-2);
+}
+.preset-card.is-selected .preset-card-icon {
+  background: var(--color-card);
+}
+
+.preset-sidebar {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.preset-sidebar-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--text-h3);
+}
+.preset-sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.preset-sidebar-heading {
+  margin: 0;
+  font-size: var(--text-small);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.preset-org-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+}
+.preset-org-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+.preset-org-arrow {
+  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  margin: 2px 0;
+}
+.preset-org-bubble {
+  background: var(--color-card);
+  border: 1px solid var(--color-divider);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: var(--text-small);
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+.preset-terms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.preset-term {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+}
+.preset-term-label {
+  font-size: var(--text-small);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.preset-term-value {
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.preset-sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  border: 2px dashed var(--color-divider);
+  border-radius: var(--radius-lg);
+}
+
+
+/* Industry Split Layout */
+.step-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-8);
+  align-items: start;
+}
+@media (max-width: 899px) {
+  .step-split { grid-template-columns: 1fr; }
+}
+
+.step-split-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.step-split-aside {
+  display: flex;
+  flex-direction: column;
+  
+  
+}
+
+.preset-grid {
+  display: grid; 
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.preset-card-simple {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-6);
+  min-height: 140px;
+}
+.preset-card-icon {
+  color: var(--color-accent);
+  background: var(--color-accent-100);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-2);
+}
+.preset-card.is-selected .preset-card-icon {
+  background: var(--color-card);
+}
+
+.preset-sidebar {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.preset-sidebar-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--text-h3);
+}
+.preset-sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.preset-sidebar-heading {
+  margin: 0;
+  font-size: var(--text-small);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.preset-org-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+}
+.preset-org-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+.preset-org-arrow {
+  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  margin: 2px 0;
+}
+.preset-org-bubble {
+  background: var(--color-card);
+  border: 1px solid var(--color-divider);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: var(--text-small);
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+.preset-terms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.preset-term {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+}
+.preset-term-label {
+  font-size: var(--text-small);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.preset-term-value {
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.preset-sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  border: 2px dashed var(--color-divider);
+  border-radius: var(--radius-lg);
 }
 
