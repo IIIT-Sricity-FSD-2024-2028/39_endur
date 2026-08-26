@@ -125,14 +125,19 @@ export const CAPABILITY_CATALOGUE = {
   'billing.read': { module: 'Platform', phase: 'P2' },
   'billing.update': { module: 'Platform', phase: 'P2' },
 
-  'reflection.create': { module: 'Improve', phase: 'P3' },
-  'reflection.read': { module: 'Improve', phase: 'P3' },
-  'actionplan.create': { module: 'Improve', phase: 'P3' },
-  'actionplan.read': { module: 'Improve', phase: 'P3' },
-  'checkin.create': { module: 'Improve', phase: 'P3' },
-  'checkin.read': { module: 'Improve', phase: 'P3' },
+  // P2 since 25 Aug, NOT P3. T-083/T-084 built the improve loop and T-081/T-082 built
+  // analysis; the routes are live and entitled, and this map was the one place nobody
+  // updated. `phase` is not a note — the grid greys a P3 row and stamps it "Soon", and
+  // `warnings()` skips P3 when it looks for a power nobody holds, so a stale entry both
+  // lied to the reader and suppressed a real warning about a shipped feature.
+  'reflection.create': { module: 'Improve', phase: 'P2' },
+  'reflection.read': { module: 'Improve', phase: 'P2' },
+  'actionplan.create': { module: 'Improve', phase: 'P2' },
+  'actionplan.read': { module: 'Improve', phase: 'P2' },
+  'checkin.create': { module: 'Improve', phase: 'P2' },
+  'checkin.read': { module: 'Improve', phase: 'P2' },
 
-  'analysis.read': { module: 'Analyze', phase: 'P3' },
+  'analysis.read': { module: 'Analyze', phase: 'P2' },
 } as const satisfies Record<string, Entry>;
 
 export type Capability = keyof typeof CAPABILITY_CATALOGUE;

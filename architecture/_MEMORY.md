@@ -1533,6 +1533,37 @@ DEC-076  ACTIVE  2026-08-26  origin:user  task:T-052
            headers were being laid out by a rule written for a different screen. the table
            row is `.powers-group` now.
   see      33 § Interactions, 33 § "What a cell says", packages/shared/src/scope-labels.ts
+
+DEC-077  ACTIVE  2026-08-26  origin:user  task:T-052
+  decision THE GRID IS READABLE WHILE YOU USE IT, and `phase` is corrected at the source.
+           the header row and the power-name column are PINNED, no cell can truncate its own
+           word, every "Set all…" sits at one width in one place, each role column carries
+           how many powers it holds, and a not-built row stops offering a choice.
+  why      the owner said the screen was still unfriendly and sent a screenshot that showed
+           it: twelve rows of values with NO ROLE NAME ANYWHERE ON SCREEN, cells reading
+           "Their department + belc", and 64 differently-sized dropdowns down the left.
+           DEC-076 fixed the WORDS. none of that was about words.
+  sticky   THE HEADER HAD BEEN `position: sticky; top: 0` SINCE T-052 AND NEVER ONCE STUCK.
+           `.powers-scroll` was `overflow-x: auto` with no height -- which per CSS makes it a
+           scroll container in BOTH axes, so `top: 0` pinned the row to a box that never
+           scrolls while the PAGE carried it away. a max-height fixes it, and the power-name
+           column is sticky left for the same reason on the other axis. a matrix that makes
+           you guess which column you are in is a list of phrases.
+  width    `min-width: 6em` TRUNCATED THE CELLS. no fixed width can be right when the noun in
+           the middle is the tenant's to choose (INV-001), so PowersGrid MEASURES the longest
+           resolved phrase and sets `--cell-ch`. a longer noun widens the column; it never
+           clips. asserted over the nonsense vocabulary.
+  soon     A P3 ROW NO LONGER ACCEPTS A GRANT. it stays readable -- what it will be called and
+           where it sits is what somebody planning a role wants now -- but a control that
+           takes an answer nobody will act on is a worse lie than a greyed one.
+  phase    `phase` IS A BEHAVIOUR, NOT A NOTE, and the catalogue was a day stale: T-081..T-084
+           shipped analysis and the improve loop on 25 Aug and left seven capabilities at P3,
+           so the grid stamped SEVEN LIVE FEATURES "Soon" and `warnings()` -- which skips P3 --
+           never reported that nobody held them. corrected in 11 §3 and in
+           packages/shared/src/capabilities.ts, which is the only place the value is read.
+           A TASK THAT BUILDS A CAPABILITY MOVES ITS PHASE IN THE SAME COMMIT. `apikey.*` is
+           the only true P3 left: no route exists.
+  see      33 § "Reading the grid", 11 §3, src/frontend/design-system/endur.css `.powers-*`
 ```
 
 ---

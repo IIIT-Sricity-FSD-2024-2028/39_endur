@@ -106,6 +106,25 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   const roleName = (id: string): string =>
     state.roles.find((role) => role.id === id)?.name ?? 'that role';
 
+  // THE WIDEST PHRASE THIS ORGANISATION ACTUALLY PRODUCES, in characters. Every cell is at
+  // least this wide, so none of them can truncate — `min-width: 6em` was cutting "Their
+  // department + below" to "Their department + belc", and no fixed width can be right when
+  // the noun in the middle is the tenant's to choose. One number, measured once.
+  const cellCh = Math.max(...GRANT_CHOICES.map((choice) => choiceWord(choice, labels).length));
+
+  // How many powers each role actually holds. The grid already SHOWS this as a darker
+  // column; a number lets two columns be compared without eyeballing them, and it is the
+  // first thing anybody auditing a role wants to know.
+  const grantedBy = new Map<string, number>();
+  for (const role of state.roles) {
+    let held = 0;
+    for (const entry of state.catalogue) {
+      const cell = state.cells.get(cellKey(role.id, entry.key));
+      if (cell && cell.effect === 'allow') held += 1;
+    }
+    grantedBy.set(role.id, held);
+  }
+
   return (
     <div className="powers">
       <div className="powers-bar">
@@ -250,7 +269,7 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
           n roles does not fit a phone and is not meant to — 33 asks for a grid that scrolls,
           not a grid that collapses, because a matrix with its columns stacked is a list. */}
       <div className="powers-scroll">
-        <table className="powers-table">
+        <table className="powers-table" style={{ ['--cell-ch' as string]: cellCh }}>
           <thead>
             <tr>
               <th scope="col" className="powers-corner">Power</th>
@@ -267,6 +286,9 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
                   <span className="powers-role-name">{role.name}</span>
                   <span className="powers-role-level text-muted">
                     {ordinal(role.level)} in the list
+                  </span>
+                  <span className="powers-role-count text-muted">
+                    {grantedBy.get(role.id) ?? 0} of {state.catalogue.length} powers
                   </span>
                 </th>
               ))}
@@ -287,6 +309,8 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
                     >
                       <Icon name="chevron" size={16} className={open ? '' : 'flip-right'} />
                       {moduleName}
+                      {' · '}
+                      {entries.length} power{entries.length === 1 ? '' : 's'}
                     </button>
                   </th>
                 </tr>
@@ -337,24 +361,43 @@ function Row({
     return !cell || cell.effect === 'deny';
   });
 
+  // NOT BUILT YET — there is no route behind it, so no grant on it can do anything. The row
+  // stays READABLE rather than hidden (what it will be called, which module it lands in, is
+  // exactly what somebody planning a role wants to know now), but it stops offering a choice
+  // it cannot honour. A control that accepts an answer nobody will act on is a worse lie
+  // than a greyed one.
+  const soon = entry.phase === 'P3';
+
   return (
-    <tr className={`powers-row${orphan ? ' is-orphan' : ''}`}>
+    <tr className={`powers-row${orphan ? ' is-orphan' : ''}${soon ? ' is-soon' : ''}`}>
       <th scope="row" className="powers-capability">
-        <span className="powers-capability-label">{entry.label}</span>
-        {entry.phase === 'P3' && <span className="tag tag-neutral powers-soon">Soon</span>}
-        {editable && (
-          // WAS A HIDDEN ACTION ON THE ROW LABEL — clicking the words "delete the entire
-          // organisation" granted it to every role at once, with nothing on screen saying so.
-          // Now it is the same dropdown as a cell, visibly labelled, sitting where a "set all
-          // of these at once" control belongs.
-          <ChoicePicker
-            className="powers-all"
-            value={null}
-            placeholder="Set all…"
-            ariaLabel={`Set “${entry.label}” for every role at once`}
-            onChoose={(choice) => grid.fillRow(entry.key, choice)}
-          />
-        )}
+        <span className="powers-capability-inner">
+          <span className="powers-capability-label">
+            {entry.label}
+            {soon && (
+              <span
+                className="tag tag-neutral powers-soon"
+                title={`“${entry.label}” is not built yet. It is listed so you can see what is coming and where it will sit; it cannot be given to anybody until it exists.`}
+              >
+                Soon
+              </span>
+            )}
+          </span>
+          {editable && !soon && (
+            // WAS A HIDDEN ACTION ON THE ROW LABEL — clicking the words "delete the entire
+            // organisation" granted it to every role at once, with nothing on screen saying
+            // so. Now it is the same dropdown as a cell, visibly labelled, and pinned to a
+            // FIXED WIDTH at the right of the label: as a bare select it sized to its own
+            // longest option, so 64 rows produced 64 widths at 64 offsets.
+            <ChoicePicker
+              className="powers-all"
+              value={null}
+              placeholder="Set all…"
+              ariaLabel={`Set “${entry.label}” for every role at once`}
+              onChoose={(choice) => grid.fillRow(entry.key, choice)}
+            />
+          )}
+        </span>
         {rowWarnings.map((warning) => (
           <span key={warning.message} className="powers-warning" role="note">
             {warning.message}
@@ -370,7 +413,7 @@ function Row({
 
         return (
           <td key={role.id} className="powers-cell-wrap">
-            {editable ? (
+            {editable && !soon ? (
               <ChoicePicker
                 className={`powers-cell${choice === 'blocked' ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
                 style={{ ['--weight' as string]: weightOf(choice) }}

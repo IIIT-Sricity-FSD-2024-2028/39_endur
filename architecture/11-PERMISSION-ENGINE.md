@@ -86,13 +86,20 @@ file must agree (`DRIFT-004`).
 | | `audit.read` | The organisation's own activity log, `56`. Reads allows **and denies** (DEC-041) | P2 |
 | **Platform** | `apikey.read` `apikey.create` `apikey.revoke` | Enterprise only | P3 |
 | | `billing.read` `billing.update` | | P2 |
-| **Improve** | `reflection.create` `reflection.read` | | P3 |
-| | `actionplan.create` `actionplan.read` | | P3 |
-| | `checkin.create` `checkin.read` | | P3 |
-| **Analyze** | `analysis.read` | | P3 |
+| **Improve** | `reflection.create` `reflection.read` | Built `T-083`/`T-084`, 25 Aug — **P2 since `DEC-077`** | P2 |
+| | `actionplan.create` `actionplan.read` | | P2 |
+| | `checkin.create` `checkin.read` | | P2 |
+| **Analyze** | `analysis.read` | Built `T-081`/`T-082`, 25 Aug — **P2 since `DEC-077`** | P2 |
 
 Naming rule: `<object>.<verb>`, lowercase, singular object. A page doc may not use a string
 absent from this table — add it here first (`README.md` ground rule 3).
+
+**`Phase` is a behaviour, not a note — `DEC-077`.** `33`'s grid greys a `P3` row and stamps it
+**Soon**, and `warnings()` skips `P3` when it looks for a power nobody holds. So a row left at
+`P3` after its feature ships both tells the reader a live feature does not exist *and*
+suppresses a real warning about it. **A task that builds a capability moves its phase in the
+same commit**, here and in `packages/shared/src/capabilities.ts`, which is the one place the
+value is read from. `apikey.*` is the only genuine `P3` left: it has no route anywhere.
 
 ### What is NOT in this table — platform capabilities
 

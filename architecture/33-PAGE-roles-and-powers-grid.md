@@ -153,6 +153,28 @@ Without `grant.update` a cell is **a chip, not a disabled dropdown** (`§ States
 control reads as *"you are doing this wrong"*; a plain phrase reads as the rule it is, which is
 what somebody who can only read the grid came here for.
 
+### Reading the grid — `DEC-077`
+
+`DEC-076` fixed the words in the cells. It did not make the grid readable *while it is being
+used*, and the owner's screenshot showed the difference: twelve rows of values with **no role
+name anywhere on screen**, cells reading `Their department + belc`, and a column of
+differently-sized dropdowns down the left.
+
+| Rule | Because |
+|---|---|
+| The header row and the **power-name column are pinned** | 64 rows by *n* roles. A value whose column heading has scrolled away, or a phrase whose row label has scrolled sideways, is a phrase attached to nothing. The header carried `position: sticky` from `T-052` and never stuck: `.powers-scroll` was `overflow-x: auto` **with no height**, which is a scroll container in both axes, so `top: 0` pinned the row to a box that never moves while the page carried it away |
+| **No cell may truncate its own phrase.** The width is measured from the longest phrase the tenant's vocabulary actually produces, never a constant | `min-width: 6em` cut `Their department + below` mid-word. No fixed width can be right when the noun in the middle is the tenant's to choose (INV-001), so the number is computed from the resolved words and re-measured when they change |
+| **"Set all…" is one width, in one place, on every row** | As a bare `<select>` it sized to its own longest option, so every row put it at a different offset — a column of noise beside the words the reader came to read |
+| Each role column states **how many of these powers it holds** | The grid already shows this as a darker column; the number is the same fact for a reader comparing two roles rather than eyeballing them, and it is the first thing an audit asks |
+| Each module band states **how many powers it contains** | A collapsed band must say what collapsing it hid |
+| A **`P3` row is readable but not settable** | There is no route behind it, so no grant on it can do anything. It stays listed — what a power will be called and where it will sit is what somebody planning a role wants to know now — but a control that accepts an answer nobody will act on is a worse lie than a greyed one |
+
+**`Phase` is a behaviour, not a note.** This page greys a `P3` row and stamps it **Soon**, and
+`warnings()` skips `P3` when it looks for a power nobody holds. On 26 Aug seven capabilities
+were still `P3` a day after `T-081`–`T-084` shipped them, so this grid told the reader that
+seven live features did not exist *and* stayed silent about a real orphan among them. The rule
+is in `11` §3: **a task that builds a capability moves its phase in the same commit.**
+
 ## Warnings
 
 Rendered as badges **at the site of the problem**, never as a list at the bottom of the page
@@ -227,6 +249,14 @@ proved there.
 - [x] Every cell reads in the tenant's vocabulary — the nonsense-label fixture proves it, so
       a hardcoded "unit" fails the build the same way a hardcoded row label would (INV-001)
 - [x] The six choices are explained once, in a legend above the grid
+- [x] The role names and the power names stay on screen while the grid is scrolled in either
+      direction — the header and the first column are pinned (`DEC-077`)
+- [x] No cell truncates its phrase, in any vocabulary — the width is measured from the
+      longest resolved choice and asserted over the nonsense labels
+- [x] Every role column says how many of these powers it holds, and every module band says
+      how many it contains
+- [x] A capability that is not built yet is listed and explained, and cannot be granted —
+      neither in a cell nor through "Set all…" (`DEC-077`)
 - [x] "Set all…" sets one power for every role from a **visible, labelled** control — it was
       a hidden action on the row label, which rewrote a column when the heading was clicked
 - [x] Column copy fills a role from another in one action, from two dropdowns and a Copy
