@@ -96,6 +96,7 @@ export default function Logs(): JSX.Element {
     <div className="page">
       {header}
 
+      <div className="ops-sections">
       {lines.notFound && (
         <p className="field-error" role="alert">That file has rotated away.</p>
       )}
@@ -168,6 +169,7 @@ export default function Logs(): JSX.Element {
           {lines.loadingMore ? 'Loading…' : 'Load more'}
         </button>
       )}
+      </div>
     </div>
   );
 }

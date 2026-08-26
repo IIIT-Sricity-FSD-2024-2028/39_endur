@@ -343,6 +343,13 @@ export async function seedOrg(
   // 3 · staff. The first is the demo login; the rest populate the org so a people list and
   //     a powers grid have something to show.
   const unitKeys = spec.units.map((unit) => unit.tempId);
+  let adminUserId = '';
+  let adminName = '';
+  // A second person, captured for the reflect loop's check-in — a plan is reviewed by
+  // somebody other than its author, and picking one at seed time is simpler than resolving
+  // "who supervises the admin" from the grant table for a demo that only needs one row.
+  let supervisorUserId = '';
+  const staffUserIds: string[] = [];
   for (let index = 0; index < spec.staff; index += 1) {
     const name = `${rng.pick(FIRST)} ${rng.pick(LAST)}`;
     const email =
@@ -362,6 +369,7 @@ export async function seedOrg(
       data: { orgId, kind: 'person', name, userId: user.id },
       select: { id: true },
     });
+    staffUserIds.push(user.id);
     const roleId = roleIds[Math.min(level, roleIds.length - 1)] as string;
     const unitId = unitIds.get(unitKey) as string;
 
@@ -387,6 +395,8 @@ export async function seedOrg(
     });
 
     if (index === 0) {
+      adminUserId = user.id;
+      adminName = name;
       logins.push({
         org: spec.name,
         email,
@@ -394,7 +404,11 @@ export async function seedOrg(
         role: preset.roles[0]?.name ?? 'Owner',
       });
     }
+    if (index === 1) {
+      supervisorUserId = user.id;
+    }
   }
+  if (!supervisorUserId) supervisorUserId = adminUserId;
 
   // 4 · templates, copied from the preset.
   const templateIds = new Map<string, string>();
@@ -442,8 +456,32 @@ export async function seedOrg(
     quality.set(subject.name, index === 2 ? 0.32 : 0.55 + rng.next() * 0.4);
   }
 
+  // 5b · the admin's own self-review subject, linked by `linkedUserId` — the ONLY thing
+  //      `myCycle()` checks (improve/service.ts). Without a subject like this the demo
+  //      login has no reviewee row anywhere and /app/reflect is permanently empty, on
+  //      every org, regardless of how much else is seeded.
+  const selfSubjectName = `${adminName} — Self Review`;
+  const selfSubject = await prisma.subject.create({
+    data: {
+      orgId,
+      name: selfSubjectName,
+      unitId: unitIds.get('root') as string,
+      type: 'person',
+      linkedUserId: adminUserId,
+    },
+    select: { id: true },
+  });
+
   // 6 · campaigns and their responses.
-  for (const campaign of spec.campaigns) {
+  const campaignRecords: Array<{
+    id: string;
+    name: string;
+    templateId: string;
+    closed: boolean;
+    startsAt: Date;
+    endsAt: Date;
+  }> = [];
+  for (const [campaignIndex, campaign] of spec.campaigns.entries()) {
     const templateId = templateIds.get(campaign.template);
     if (!templateId) continue;
 
@@ -461,11 +499,14 @@ export async function seedOrg(
         publicToken: mintToken(),
         ...(campaign.closed ? { closedAt: endsAt } : {}),
         subjects: {
-          create: [...subjectIds.values()].map((subjectId) => ({ subjectId })),
+          // The self-review subject rides along on every regular campaign, exactly like
+          // any other subject — that is what makes it a cycle rather than a fixture.
+          create: [...subjectIds.values(), selfSubject.id].map((subjectId) => ({ subjectId })),
         },
       },
       select: { id: true },
     });
+    campaignRecords.push({ id: created.id, name: campaign.name, templateId, closed: campaign.closed, startsAt, endsAt });
 
     await seedResponses(prisma, {
       rng,
@@ -479,6 +520,38 @@ export async function seedOrg(
       perSubject: campaign.responsesPerSubject,
       startsAt,
       endsAt,
+    });
+
+    // Only the FIRST campaign gets crowd responses on the self subject too, and enough of
+    // them to clear the k-anon threshold — that is the one cycle whose gap actually
+    // renders. The rest stay reviewee-only, which is what keeps their cycles at "due"
+    // instead of every single one resolving on day one of a fresh database.
+    if (campaignIndex === 0) {
+      await seedResponses(prisma, {
+        rng,
+        industry: spec.industry,
+        campaignId: created.id,
+        templateId,
+        subjects: [{ id: selfSubject.id, quality: 0.72 }],
+        perSubject: 12,
+        startsAt,
+        endsAt,
+      });
+    }
+  }
+
+  // 6b · the self-review reflection, plan, and check-in for that first campaign — so
+  //      /app/reflect opens on a FINISHED loop (44's three steps, all done) rather than
+  //      an evaluator having to run the whole thing live to see what it looks like.
+  const anchor = campaignRecords[0];
+  if (anchor) {
+    await seedSelfReflection(prisma, {
+      orgId,
+      campaignId: anchor.id,
+      templateId: anchor.templateId,
+      subjectId: selfSubject.id,
+      authorUserId: adminUserId,
+      supervisorUserId,
     });
   }
 
@@ -518,7 +591,211 @@ export async function seedOrg(
     });
   }
 
+  // 8 · the activity log. Written directly rather than earned through the middleware,
+  //     because a seed run does not make real requests — but `56`'s reader does not care
+  //     how a row got there, only that it is shaped like one `requireCapability` would have
+  //     written. Without this, "Activity log" is a permanently empty screen on every demo
+  //     org, which is not a state a walkthrough can show anybody anything from.
+  await seedActivityLog(prisma, {
+    orgId,
+    adminUserId,
+    supervisorUserId,
+    unitIds,
+    roleIds,
+    subjectIds,
+    templateIds,
+    campaignRecords,
+    staffUserIds,
+  });
+
   return logins;
+}
+
+/**
+ * The self-reviewee's own reflection, action plan, and one check-in — the whole `44` loop,
+ * finished, on the campaign the reviewee just got real crowd responses on. Answers are
+ * generic rather than random: this is one fixed row an evaluator will open and read, not
+ * three thousand nobody looks at individually (contrast `answerFor`, which is the opposite
+ * case on purpose).
+ */
+async function seedSelfReflection(
+  prisma: PrismaClient,
+  params: {
+    orgId: string;
+    campaignId: string;
+    templateId: string;
+    subjectId: string;
+    authorUserId: string;
+    supervisorUserId: string;
+  },
+): Promise<void> {
+  const questions = await prisma.question.findMany({
+    where: { templateId: params.templateId },
+    orderBy: { position: 'asc' },
+    select: { id: true, kind: true, config: true },
+  });
+  if (questions.length === 0) return;
+
+  const answers = questions.map((question) => {
+    const config = question.config as { max?: number; options?: string[] };
+    switch (question.kind) {
+      case 'rating':
+        return { questionId: question.id, value: { kind: 'rating', n: Math.max(1, (config.max ?? 5) - 1) } };
+      case 'nps':
+        return { questionId: question.id, value: { kind: 'nps', n: 8 } };
+      case 'yesno':
+        return { questionId: question.id, value: { kind: 'yesno', yes: true } };
+      case 'single':
+        return { questionId: question.id, value: { kind: 'single', option: (config.options ?? ['—'])[0] } };
+      case 'multi':
+        return {
+          questionId: question.id,
+          value: { kind: 'multi', options: (config.options ?? ['—']).slice(0, 1) },
+        };
+      default:
+        return {
+          questionId: question.id,
+          value: {
+            kind: 'text',
+            text: 'I think this went well overall, but I could have set clearer priorities earlier on.',
+          },
+        };
+    }
+  });
+
+  const reflection = await prisma.reflection.create({
+    data: {
+      orgId: params.orgId,
+      campaignId: params.campaignId,
+      subjectId: params.subjectId,
+      authorUserId: params.authorUserId,
+      answers,
+      submittedAt: new Date(Date.now() - 6 * DAY),
+    },
+    select: { id: true },
+  });
+
+  const plan = await prisma.actionPlan.create({
+    data: {
+      orgId: params.orgId,
+      reflectionId: reflection.id,
+      items: [
+        { text: 'Set clearer weekly priorities with the team', dueAt: null, status: 'open' },
+        { text: 'Run a monthly retro on what slowed delivery down', dueAt: null, status: 'open' },
+      ],
+      finalisedAt: new Date(Date.now() - 4 * DAY),
+    },
+    select: { id: true },
+  });
+
+  await prisma.checkin.create({
+    data: {
+      orgId: params.orgId,
+      actionPlanId: plan.id,
+      supervisorUserId: params.supervisorUserId,
+      notes: 'Good progress — priorities are visibly clearer in standups now.',
+      heldAt: new Date(Date.now() - 1 * DAY),
+    },
+  });
+}
+
+/**
+ * A believable spread of activity-log rows, spanning the capabilities `56`'s reader
+ * actually filters on (`action`, `targetType`, `outcome`) — including one denial, since a
+ * log that only ever shows allows does not demonstrate the column exists.
+ */
+async function seedActivityLog(
+  prisma: PrismaClient,
+  params: {
+    orgId: string;
+    adminUserId: string;
+    supervisorUserId: string;
+    unitIds: Map<string, string>;
+    roleIds: string[];
+    subjectIds: Map<string, string>;
+    templateIds: Map<string, string>;
+    campaignRecords: Array<{ id: string; name: string; closed: boolean }>;
+    staffUserIds: string[];
+  },
+): Promise<void> {
+  const rootUnitId = params.unitIds.get('root') as string;
+  const someSubjectId = [...params.subjectIds.values()][0] ?? null;
+  const someTemplateId = [...params.templateIds.values()][0] ?? null;
+  const someRoleId = params.roleIds[0] ?? null;
+  const firstCampaign = params.campaignRecords[0] ?? null;
+  const lastCampaign = params.campaignRecords.at(-1) ?? null;
+  const otherPersonId = params.staffUserIds[2] ?? params.staffUserIds[0] ?? null;
+
+  const rows: Array<{
+    actorUserId: string;
+    action: string;
+    targetType: string | null;
+    targetId: string | null;
+    outcome: 'allowed' | 'denied';
+    decidedBy?: Record<string, unknown>;
+    daysAgo: number;
+  }> = [
+    { actorUserId: params.adminUserId, action: 'org.update', targetType: 'unit', targetId: rootUnitId, outcome: 'allowed', daysAgo: 29 },
+    ...(someTemplateId
+      ? [{ actorUserId: params.adminUserId, action: 'template.create', targetType: 'template', targetId: someTemplateId, outcome: 'allowed' as const, daysAgo: 27 }]
+      : []),
+    ...(someRoleId
+      ? [{ actorUserId: params.adminUserId, action: 'role.update', targetType: 'role', targetId: someRoleId, outcome: 'allowed' as const, daysAgo: 24 }]
+      : []),
+    ...(someSubjectId
+      ? [{ actorUserId: params.supervisorUserId, action: 'subject.create', targetType: 'subject', targetId: someSubjectId, outcome: 'allowed' as const, daysAgo: 21 }]
+      : []),
+    ...(otherPersonId
+      ? [{ actorUserId: params.adminUserId, action: 'person.create', targetType: 'person', targetId: otherPersonId, outcome: 'allowed' as const, daysAgo: 20 }]
+      : []),
+    ...(firstCampaign
+      ? [
+          { actorUserId: params.adminUserId, action: 'campaign.create', targetType: 'campaign', targetId: firstCampaign.id, outcome: 'allowed' as const, daysAgo: 18 },
+          { actorUserId: params.adminUserId, action: 'campaign.launch', targetType: 'campaign', targetId: firstCampaign.id, outcome: 'allowed' as const, daysAgo: 18 },
+        ]
+      : []),
+    ...(otherPersonId
+      ? [{
+          actorUserId: params.supervisorUserId,
+          action: 'person.update',
+          targetType: 'person',
+          targetId: otherPersonId,
+          outcome: 'allowed' as const,
+          daysAgo: 12,
+        }]
+      : []),
+    ...(someSubjectId
+      ? [{
+          // The one denial — a scope that legitimately does not reach this subject, not a
+          // bug (44 § the deny-always-beats-allow invariant, DEC- table in `_MEMORY.md`).
+          actorUserId: params.supervisorUserId,
+          action: 'subject.archive',
+          targetType: 'subject',
+          targetId: someSubjectId,
+          outcome: 'denied' as const,
+          decidedBy: { via: 'default', effect: 'deny' },
+          daysAgo: 9,
+        }]
+      : []),
+    ...(lastCampaign && lastCampaign.closed
+      ? [{ actorUserId: params.adminUserId, action: 'campaign.close', targetType: 'campaign', targetId: lastCampaign.id, outcome: 'allowed' as const, daysAgo: 5 }]
+      : []),
+    { actorUserId: params.adminUserId, action: 'org.read', targetType: 'unit', targetId: rootUnitId, outcome: 'allowed', daysAgo: 1 },
+  ];
+
+  await prisma.auditLog.createMany({
+    data: rows.map((row) => ({
+      orgId: params.orgId,
+      actorUserId: row.actorUserId,
+      action: row.action,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      outcome: row.outcome,
+      ...(row.decidedBy ? { decidedBy: row.decidedBy as Prisma.InputJsonValue } : {}),
+      requestId: null,
+      createdAt: new Date(Date.now() - row.daysAgo * DAY),
+    })),
+  });
 }
 
 type ResponsePlan = {

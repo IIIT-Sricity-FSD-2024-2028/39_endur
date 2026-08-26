@@ -10,15 +10,17 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-const STEP_SECONDS = 30;
+// Step widened from RFC 6238's usual 30s to 6 hours: an operator's code stays valid for a
+// full shift instead of rotating every 30s, so it does not have to be re-read off an
+// authenticator app on every login.
+const STEP_SECONDS = 6 * 60 * 60;
 const DIGITS = 6;
 
 /**
- * One step either side of now. Clock skew between a phone and a server is real, and a
- * window of ±30s is the conventional trade — wider starts to matter, narrower rejects
- * honest codes typed slowly.
+ * No drift window: the step itself is already 6 hours, so accepting a neighbouring step
+ * too would silently extend validity toward 12-18h.
  */
-const WINDOW = 1;
+const WINDOW = 0;
 
 export function generateSecret(): string {
   const bytes = randomBytes(20); // 160 bits, the RFC 4226 recommendation

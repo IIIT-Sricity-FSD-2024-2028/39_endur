@@ -16,6 +16,11 @@
   --dur-fast:  120ms;
   --dur-base:  200ms;
   --dur-slow:  320ms;
+  /* One beat between bands of the same screen — the page-enter stagger and the
+     sign-in card/aside pair both step by this, so the whole product has one
+     rhythm rather than two hand-tuned ones. 60ms: under 30ms nobody perceives
+     an order, over 80ms the last band feels late. */
+  --stagger:   60ms;
 
   /* The theme wipe — DEC-028. The feather is duplicated as FEATHER_PX in
      lib/theme.ts, which adds it to the radius so the soft tail clears the
@@ -36,7 +41,34 @@
   *, *::before, *::after {
     animation-duration: .01ms !important;
     transition-duration: .01ms !important;
+    /* Delays too, and it is not redundant: a staggered entrance whose duration
+       collapses but whose delay survives leaves each band invisible for its
+       turn and then popping into place — a worse experience than the motion it
+       was meant to remove. */
+    animation-delay: 0ms !important;
   }
+}
+
+/* ── Global colour smoothing ────────────────────────────────────────────────
+   Org vibe swap (`data-vibe`, endur.css §"the switch") only had a transition
+   on the handful of elements the landing page itself paints — everything else
+   reading `--color-accent`/`--color-2`/etc (sidebar, links, borders, icons,
+   focus rings) snapped, which is what read as laggy against the elements that
+   DID fade. Paint-only properties, never layout ones — cheap sitewide, no
+   reflow. This is deliberately NOT `transition: all`, so a component adding a
+   `transform`/`width`/etc transition of its own is untouched.
+   The theme (light/dark) swap is a separate mechanism (the view-transition
+   wipe below) and stays exempt: `html:active-view-transition *` further down
+   forces `transition: none !important`, which wins over this regardless of
+   source order. */
+*, *::before, *::after {
+  transition: background-color var(--dur-fast) var(--ease),
+              border-color     var(--dur-fast) var(--ease),
+              color            var(--dur-fast) var(--ease),
+              fill             var(--dur-fast) var(--ease),
+              stroke           var(--dur-fast) var(--ease),
+              box-shadow       var(--dur-fast) var(--ease),
+              outline-color    var(--dur-fast) var(--ease);
 }
 
 /* ══ THE ONE OVERRIDE ══════════════════════════════════════════════════════
@@ -95,6 +127,71 @@
 .page-reading { max-width: var(--width-reading); }
 .page-form    { max-width: var(--width-form); }
 @media (max-width: 639px) { .page { padding: var(--space-4); } }
+
+/* ── Page enter ───────────────────────────────────────────────────────────
+   AppShell keys the content wrapper on the pathname, so everything here
+   restarts on each route change rather than firing once on first mount.
+
+   The page arrives as BANDS, not as one block: header, then controls, then
+   the table or grid, each 60ms behind the last. A whole-page fade moves the
+   heading and the table together, which reads as the browser painting a
+   screenshot; banding reads as the page assembling itself, and it is the
+   difference the sign-in screen already demonstrates.
+
+   WHAT DOES NOT STAGGER, and this is the whole reason it stays cheap: only
+   the page's own top-level bands animate — never their contents. A 400-row
+   table is one animated element, exactly as an empty state is. Every page in
+   the console has between two and seven bands, so the layer count is bounded
+   by the layout, not by the data.
+
+   `> .page > *` is the second half of the selector because Logs, Reflect and
+   Analysis wrap their content in a second `.page` div of their own. That
+   nested wrapper is passed over (`animation: none` below) and its children
+   are staggered instead, so those three behave identically to the pages that
+   return a fragment.
+
+   `.dialog-backdrop` is excluded on purpose. Campaigns renders the share
+   sheet as a sibling of its bands, and it is opened by a click — making it
+   wait out a stagger meant for a page load would put a delay on the one
+   interaction that must feel immediate.
+
+   Purpose: preventing a jarring change — route content would otherwise
+   teleport in under a top bar and sidebar that never move.
+
+   opacity + transform only, so no layout or paint work. `both` holds the
+   from-state through the delay, which is what stops a band from flashing in
+   at its final position before its turn.
+
+   prefers-reduced-motion is honoured by the global block at the top of this
+   file (21 §7), which now zeroes delays as well as durations — a collapsed
+   duration alone would leave the bands hidden through their stagger and then
+   pop, which is worse than the animation it was meant to remove. */
+.page-enter > *:not(.dialog-backdrop),
+.page-enter > .page > *:not(.dialog-backdrop) {
+  animation: page-in var(--dur-base) var(--ease) both;
+}
+/* The pass-through wrapper itself is not a band. */
+.page-enter > .page { animation: none; }
+
+:is(.page-enter, .page-enter > .page) > *:not(.dialog-backdrop):nth-child(2) {
+  animation-delay: var(--stagger);
+}
+:is(.page-enter, .page-enter > .page) > *:not(.dialog-backdrop):nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+:is(.page-enter, .page-enter > .page) > *:not(.dialog-backdrop):nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+/* Clamped. Analysis has seven bands; letting the last one wait 360ms would
+   make the page feel slower than it is for the sake of a beat nobody counts. */
+:is(.page-enter, .page-enter > .page) > *:not(.dialog-backdrop):nth-child(n + 5) {
+  animation-delay: calc(var(--stagger) * 4);
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: none; }
+}
 
 /* ── Full-page states — boot, error boundary, 403, 404 ────────────────────
    Used by the router's three error boundaries before any component library
@@ -314,6 +411,18 @@
 
 /* ── hero ──────────────────────────────────────────────────────────────── */
 .landing-hero { padding-top: var(--space-16); }
+/* Copy on one side, the vocab-matched drawing on the other — the illustration used to sit in
+   its own full-width band below the fold, disconnected from the words it was supposed to be
+   illustrating. Beside the headline, the swap reads as one demonstration instead of two. */
+.landing-hero-row {
+  display: grid; grid-template-columns: 1.1fr 1fr;
+  align-items: center; gap: var(--space-12);
+}
+.landing-hero-scene { min-width: 0; }
+@media (max-width: 899px) {
+  .landing-hero-row { grid-template-columns: 1fr; gap: var(--space-8); }
+  .landing-hero-scene { order: -1; max-width: 420px; margin-inline: auto; }
+}
 .landing-eyebrow {
   margin: 0 0 var(--space-4);
   color: var(--color-accent-700);
@@ -354,7 +463,7 @@
 
 .landing-switcher {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
-  margin-
+  margin-top: var(--space-6);
 }
 .landing-switcher .utility { margin: 0; }
 .landing-switcher .seg {
@@ -365,7 +474,7 @@
 }
 
 .landing-actions {
-  display: flex; flex-wrap: wrap; gap: var(--space-3); margin-
+  display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8);
 }
 /* The one button size above the default, and it exists only for the two page
    actions that are the whole point of their screen. */
@@ -380,15 +489,12 @@
 .btn-lg svg { transition: transform var(--dur-base) var(--ease); }
 .btn-lg:hover svg { transform: translateX(3px); }
 
-/* ── the scene ─────────────────────────────────────────────────────────── */
-/* The drawing carries its own margins — sky above the roof, ground below the
-   feet — so the section pulls in on both sides. Left as-is, the artwork's own
-   empty space stacks on top of the page's and the scene floats. */
-.landing-scene {
-  margin-block: calc(var(--space-16) * -1) calc(var(--space-12) * -1);
-}
+/* ── the hero illustration ─────────────────────────────────────────────── */
 .illus, .illus svg { display: block; width: 100%; height: auto; }
-.illus-hero { max-width: 1240px; margin-inline: auto; }
+.illus-hero { max-width: 460px; margin-inline: auto; }
+
+/* ── the two small illustrations on the claim cards ────────────────────── */
+.landing-claim-illus { width: 72px; margin-bottom: var(--space-2); }
 
 /* ── the substitution, laid out ────────────────────────────────────────── */
 .landing-section-title {
@@ -466,7 +572,7 @@
 
 /* ── the two claims ────────────────────────────────────────────────────── */
 .landing-claim-pair {
-  display: grid; gap: var(--space-4); margin-
+  display: grid; gap: var(--space-4); margin-top: var(--space-8);
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 .landing-claim { gap: var(--space-3); padding: var(--space-8); }
@@ -510,7 +616,7 @@
 
 @media (max-width: 639px) {
   .landing { gap: var(--space-16); }
-  .landing-hero { padding- max-width: none; }
+  .landing-hero { padding-top: var(--space-10); max-width: none; }
   .landing-switcher .seg { width: 100%; }
   .landing-switcher .seg-opt { flex: 1 1 0; justify-content: center; padding-inline: 6px; }
   .landing-actions .btn { width: 100%; }
@@ -534,6 +640,16 @@
   align-items: start;
 }
 .auth-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* Sign-in is a rare, first-time-of-the-day screen, so it gets the one place in
+   the product where two things arrive rather than one: the form first, the
+   reassurance beside it a beat later. Two elements, two layers, one beat of
+   --stagger between them — the same beat the console's page bands use.
+
+   Reuses page-in rather than declaring a second identical keyframe; reduced
+   motion is covered by the global rule at the top of this file. */
+.auth-main  { animation: page-in var(--dur-base) var(--ease) both; }
+.auth-aside { animation: page-in var(--dur-base) var(--ease) var(--stagger) both; }
 
 .auth-card {
   gap: var(--space-3);
@@ -1880,6 +1996,9 @@ textarea.q-text-input { min-height: 90px; }
 body {
   font-size: var(--text-body);
   line-height: 1.6;
+  /* No chaining and no rubber-band past the document ends. The bounce is the
+     one place the console still reads as a web page rather than an app. */
+  overscroll-behavior-y: none;
   letter-spacing: var(--track-body);
   /* Inter ships a single-storey `a` and a straight-tailed `l` behind feature
      flags. `cv11` is the one that stops `Il1` collapsing into one shape, which
@@ -1965,12 +2084,20 @@ p { text-wrap: pretty; }
 
 /* Content cards stay near-opaque. White means "this is the thing you are
    working on" (THE ONE OVERRIDE above) and a 60%-transparent data table is
-   both harder to read and a lie about what it is. They are still glass — they
-   blur, they have the edge and the sheen — just at a tint that reads as paper. */
+   both harder to read and a lie about what it is.
+
+   They no longer BLUR, and that is the one deliberate departure from the glass
+   recipe above. A card blurs the rail, which blurs the ambient field: three
+   translucent layers stacked, which is the arrangement Apple's material rules
+   single out as the one that destroys legibility. It is also the arrangement
+   that made the console scroll badly — every card is a backdrop root, so the
+   compositor re-read and re-blurred a region per card per frame and the cost
+   grew with how much was on the page. Translucency belongs to the chrome (the
+   top bar and the rail, which are a fixed pair); content sits on top of it.
+   The edge, the sheen and the shadow are what the eye reads as glass anyway —
+   the tint never carried it, as the .dialog note below already says. */
 .card {
-  background: color-mix(in srgb, var(--color-card) 88%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
+  background: color-mix(in srgb, var(--color-card) 96%, transparent);
   border: 1px solid var(--glass-edge);
   box-shadow: inset 0 1px 0 0 var(--glass-sheen), var(--shadow-sm);
 }
@@ -1993,11 +2120,18 @@ p { text-wrap: pretty; }
   background: color-mix(in srgb, var(--color-neutral-900) 34%, transparent);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
+  /* The share sheet already rises in (share-in, below) but the dim behind it
+     snapped, so the page went dark one frame before the panel existed. Opacity
+     only — the blur is not animated, because animating backdrop-filter forces a
+     full re-blur of everything behind it every frame. Faster than the panel it
+     covers, so the dialog is never the thing you are waiting for. */
+  animation: backdrop-in var(--dur-fast) var(--ease) both;
 }
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+/* Same reasoning as .card — and more pressing, because a filter row carries
+   five or six of these and sits exactly where the eye rests during a scroll. */
 .input {
-  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
   transition: border-color var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               box-shadow var(--dur-fast) var(--ease);
@@ -2012,7 +2146,6 @@ p { text-wrap: pretty; }
    a moving background — so where there is no blur, there is no transparency. */
 @supports not (backdrop-filter: blur(1px)) {
   .glass, .dialog { background: var(--color-surface); }
-  .card, .input   { background: var(--color-card); }
 }
 
 /* A user who has turned transparency down does not want it turned back up by
@@ -2024,7 +2157,8 @@ p { text-wrap: pretty; }
     background: var(--color-surface);
     -webkit-backdrop-filter: none; backdrop-filter: none;
   }
-  .card, .input, .shell-rail {
+  /* .card and .input are opaque enough already and carry no blur to remove. */
+  .shell-rail {
     background: var(--color-card);
     -webkit-backdrop-filter: none; backdrop-filter: none;
   }
@@ -2052,11 +2186,32 @@ p { text-wrap: pretty; }
   position: fixed; inset: 0; z-index: -1;
   overflow: hidden; pointer-events: none;
   background: var(--color-bg);
+  /* Composite the fields as their own group. Without this, each field's blur is flattened
+     against the page one at a time and the overlaps re-quantise; isolated, the five fields
+     resolve together and the dither below lands on the finished field, not on one layer. */
+  isolation: isolate;
 }
+/* The dither. Eight bits of colour cannot express a ramp this wide smoothly — the rings are
+   the display's rounding, not the gradient's shape, so no amount of extra blur removes them.
+   A single frame of fine monochrome noise at a fraction of a step pushes each pixel across
+   the rounding boundary at slightly different points, which is exactly how print and video
+   have hidden banding for decades. Static, one tile, no animation, no repaint cost. */
+.ambient::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: .035;
+}
+/* On the near-black ground `overlay` clips the noise to almost nothing on the dark side and
+   spikes it on the light — `soft-light` keeps the same amplitude either way, which is what a
+   dither has to do to work at all. */
+[data-theme="dark"] .ambient::after { mix-blend-mode: soft-light; opacity: .05; }
 .ambient-field {
   position: absolute;
   border-radius: 50%;
-  will-change: transform;
+  /* No `will-change` here. The field never moves, and the hint pinned five
+     viewport-sized textures in GPU memory for a transform that never came. */
   /* The falloff is painted, not filtered. A solid disc under `filter: blur()` fades over
      the blur radius and no further, which leaves a soft but locatable ring at the edge of
      the circle — three of those on a pale ground read as three blobs, not as a field. A
@@ -2064,6 +2219,11 @@ p { text-wrap: pretty; }
      left for the eye to find; the blur that remains is only there to kill the banding a
      wide gradient shows on an 8-bit display. */
   filter: blur(48px) saturate(118%);
+  /* The landing switcher changes `--ambient-*` on the ROOT (below), and the gradient stops
+     are the same shape on every field — only the colour stop moves — so the browser can
+     interpolate `background` directly. This is the whole reason the swap reads as light
+     changing in the room rather than a hard cut. */
+  transition: background var(--wipe-dur) var(--ease);
 }
 
 /* Every field is anchored past the viewport edge and sized so its own falloff, not its
@@ -2071,31 +2231,175 @@ p { text-wrap: pretty; }
    a shape. Three different periods, none a multiple of another, so the arrangement does
    not visibly repeat — a two-field drift returns to its start in under a minute and the
    eye catches it. */
+/* Each falloff is written as an eased ramp, not one stop to `transparent`. A two-stop
+   radial is LINEAR in alpha, and a linear ramp spread over ~40vmax of a near-black ground
+   quantises to visible concentric rings on an 8-bit display — the "pixelated circle" edge
+   you can trace with a finger. Six stops on a smoothstep curve put most of the alpha change
+   where the field is already bright and almost none out at the tail, so no single 1/255 step
+   is ever wide enough on screen to read as a band. The stops mix off the field's own colour
+   rather than fading to `transparent`, because sRGB interpolation toward `transparent`
+   travels through transparent BLACK and greys the mid-falloff. */
 .ambient-field-1 {
   top: -32vmax; left: -26vmax; width: 96vmax; height: 96vmax;
-  background: radial-gradient(circle at 50% 50%, var(--ambient-1) 0%, transparent 68%);
+  background: radial-gradient(circle at 50% 50%,
+    var(--ambient-1) 0%,
+    color-mix(in srgb, var(--ambient-1) 88%, transparent) 20%,
+    color-mix(in srgb, var(--ambient-1) 64%, transparent) 36%,
+    color-mix(in srgb, var(--ambient-1) 38%, transparent) 50%,
+    color-mix(in srgb, var(--ambient-1) 17%, transparent) 62%,
+    color-mix(in srgb, var(--ambient-1)  5%, transparent) 76%,
+    transparent 92%);
 }
 .ambient-field-2 {
   bottom: -36vmax; right: -24vmax; width: 100vmax; height: 100vmax;
-  background: radial-gradient(circle at 50% 50%, var(--ambient-2) 0%, transparent 66%);
+  background: radial-gradient(circle at 50% 50%,
+    var(--ambient-2) 0%,
+    color-mix(in srgb, var(--ambient-2) 88%, transparent) 19%,
+    color-mix(in srgb, var(--ambient-2) 64%, transparent) 35%,
+    color-mix(in srgb, var(--ambient-2) 38%, transparent) 49%,
+    color-mix(in srgb, var(--ambient-2) 17%, transparent) 61%,
+    color-mix(in srgb, var(--ambient-2)  5%, transparent) 75%,
+    transparent 90%);
 }
 .ambient-field-3 {
   top: 18%; right: 10%; width: 58vmax; height: 58vmax;
-  background: radial-gradient(circle at 50% 50%, var(--ambient-3) 0%, transparent 70%);
+  background: radial-gradient(circle at 50% 50%,
+    var(--ambient-3) 0%,
+    color-mix(in srgb, var(--ambient-3) 88%, transparent) 21%,
+    color-mix(in srgb, var(--ambient-3) 64%, transparent) 37%,
+    color-mix(in srgb, var(--ambient-3) 38%, transparent) 52%,
+    color-mix(in srgb, var(--ambient-3) 17%, transparent) 64%,
+    color-mix(in srgb, var(--ambient-3)  5%, transparent) 78%,
+    transparent 94%);
 }
 .ambient-field-4 {
   bottom: -30vmax; left: -24vmax; width: 88vmax; height: 88vmax;
-  background: radial-gradient(circle at 50% 50%, var(--ambient-4) 0%, transparent 67%);
+  background: radial-gradient(circle at 50% 50%,
+    var(--ambient-4) 0%,
+    color-mix(in srgb, var(--ambient-4) 88%, transparent) 20%,
+    color-mix(in srgb, var(--ambient-4) 64%, transparent) 35%,
+    color-mix(in srgb, var(--ambient-4) 38%, transparent) 50%,
+    color-mix(in srgb, var(--ambient-4) 17%, transparent) 62%,
+    color-mix(in srgb, var(--ambient-4)  5%, transparent) 76%,
+    transparent 91%);
 }
 .ambient-field-5 {
   top: -28vmax; right: -26vmax; width: 80vmax; height: 80vmax;
-  background: radial-gradient(circle at 50% 50%, var(--ambient-5) 0%, transparent 64%);
+  background: radial-gradient(circle at 50% 50%,
+    var(--ambient-5) 0%,
+    color-mix(in srgb, var(--ambient-5) 88%, transparent) 18%,
+    color-mix(in srgb, var(--ambient-5) 64%, transparent) 34%,
+    color-mix(in srgb, var(--ambient-5) 38%, transparent) 48%,
+    color-mix(in srgb, var(--ambient-5) 17%, transparent) 60%,
+    color-mix(in srgb, var(--ambient-5)  5%, transparent) 74%,
+    transparent 88%);
 }
 
 .ambient-hero .ambient-field { filter: blur(56px) saturate(126%); opacity: 1; }
 /* The console sits on this all day, so it comes down — but not to the point where the
    ground shows through again, which was the whole problem. */
 .ambient-default .ambient-field { opacity: .72; }
+/* On a true-black ground the same saturate boost that reads as "lit" on a pale one reads as
+   a solid tinted wash instead — there is no light page colour underneath for it to lift, so
+   it just deepens the field's own hue until the whole viewport is one flat tint. Dark keeps
+   less saturation and a softer blur so the fields stay readable as separate glows. */
+[data-theme="dark"] .ambient-hero .ambient-field { filter: blur(72px) saturate(104%); opacity: .55; }
+[data-theme="dark"] .ambient-default .ambient-field { filter: blur(64px) saturate(108%); }
+
+/* ── The switch — landing vibe follows the "I run a" segment ──────────────
+   `Landing.tsx` writes `data-vibe` onto <html> for as long as it is mounted,
+   keyed to the same preset the noun row already reads (`PRESET_VOCABULARIES`,
+   `packages/shared/src/vocabularies.ts`). Picking "Hotel" does not just swap
+   the words in the headline — it swaps the light the whole page sits in.
+   University's seed pair IS the base accent pair, so its block below is a
+   no-op by value — it exists so all four presets resolve through one shape
+   and nothing has to remember which industry is the special case. Every value
+   below is `color-mix()` off the two seed hexes in tokens.css, never a
+   literal, so this stays a derived block rather than a second copy of the
+   palette. `custom` has no block and keeps the base accent. */
+:root[data-vibe="university"] {
+  --color-accent:      var(--vibe-university-1);
+  --color-accent-700:  color-mix(in srgb, var(--vibe-university-1) 74%, black);
+  --color-accent-2:    var(--vibe-university-2);
+  --color-accent-2-700: color-mix(in srgb, var(--vibe-university-2) 74%, black);
+  --ambient-1: color-mix(in srgb, var(--vibe-university-1) 46%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-university-2) 38%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-university-1) 50%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-university-1) 20%, transparent);
+}
+:root[data-vibe="hotel"] {
+  --color-accent:      var(--vibe-hotel-1);
+  --color-accent-700:  color-mix(in srgb, var(--vibe-hotel-1) 74%, black);
+  --color-accent-2:    var(--vibe-hotel-2);
+  --color-accent-2-700: color-mix(in srgb, var(--vibe-hotel-2) 74%, black);
+  --ambient-1: color-mix(in srgb, var(--vibe-hotel-1) 46%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-hotel-2) 38%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-hotel-1) 50%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-hotel-1) 20%, transparent);
+}
+:root[data-vibe="hospital"] {
+  --color-accent:      var(--vibe-hospital-1);
+  --color-accent-700:  color-mix(in srgb, var(--vibe-hospital-1) 74%, black);
+  --color-accent-2:    var(--vibe-hospital-2);
+  --color-accent-2-700: color-mix(in srgb, var(--vibe-hospital-2) 74%, black);
+  --ambient-1: color-mix(in srgb, var(--vibe-hospital-1) 46%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-hospital-2) 38%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-hospital-1) 50%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-hospital-1) 20%, transparent);
+}
+:root[data-vibe="company"] {
+  --color-accent:      var(--vibe-company-1);
+  --color-accent-700:  color-mix(in srgb, var(--vibe-company-1) 74%, black);
+  --color-accent-2:    var(--vibe-company-2);
+  --color-accent-2-700: color-mix(in srgb, var(--vibe-company-2) 74%, black);
+  --ambient-1: color-mix(in srgb, var(--vibe-company-1) 46%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-company-2) 38%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-company-1) 50%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-company-1) 20%, transparent);
+}
+/* Dark repeats the same three, off the lighter dark-mode seed pair, and wins
+   the cascade over [data-theme="dark"] by being equally specific and later —
+   attribute order in the selector does not matter, source order does. */
+[data-theme="dark"][data-vibe="university"] {
+  --color-accent: var(--vibe-university-1); --color-accent-700: color-mix(in srgb, var(--vibe-university-1) 68%, white);
+  --color-accent-2: var(--vibe-university-2); --color-accent-2-700: color-mix(in srgb, var(--vibe-university-2) 68%, white);
+  --ambient-1: color-mix(in srgb, var(--vibe-university-1) 5%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-university-2) 3%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-university-1) 7%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-university-1) 2%, transparent);
+}
+[data-theme="dark"][data-vibe="hotel"] {
+  --color-accent: var(--vibe-hotel-1); --color-accent-700: color-mix(in srgb, var(--vibe-hotel-1) 68%, white);
+  --color-accent-2: var(--vibe-hotel-2); --color-accent-2-700: color-mix(in srgb, var(--vibe-hotel-2) 68%, white);
+  --ambient-1: color-mix(in srgb, var(--vibe-hotel-1) 5%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-hotel-2) 3%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-hotel-1) 7%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-hotel-1) 2%, transparent);
+}
+[data-theme="dark"][data-vibe="hospital"] {
+  --color-accent: var(--vibe-hospital-1); --color-accent-700: color-mix(in srgb, var(--vibe-hospital-1) 68%, white);
+  --color-accent-2: var(--vibe-hospital-2); --color-accent-2-700: color-mix(in srgb, var(--vibe-hospital-2) 68%, white);
+  --ambient-1: color-mix(in srgb, var(--vibe-hospital-1) 5%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-hospital-2) 3%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-hospital-1) 7%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-hospital-1) 2%, transparent);
+}
+[data-theme="dark"][data-vibe="company"] {
+  --color-accent: var(--vibe-company-1); --color-accent-700: color-mix(in srgb, var(--vibe-company-1) 68%, white);
+  --color-accent-2: var(--vibe-company-2); --color-accent-2-700: color-mix(in srgb, var(--vibe-company-2) 68%, white);
+  --ambient-1: color-mix(in srgb, var(--vibe-company-1) 5%, transparent);
+  --ambient-2: color-mix(in srgb, var(--vibe-company-2) 3%, transparent);
+  --ambient-4: color-mix(in srgb, var(--vibe-company-1) 7%, transparent);
+  --ambient-5: color-mix(in srgb, var(--vibe-company-1) 2%, transparent);
+}
+/* The two page elements that read the accent directly and are not covered by the
+   transition already on `.ambient-field` — the swapping word and the primary button —
+   cross-fade too, so nothing on the page snaps ahead of the light around it. */
+.landing-swap, .landing-swap::after, .landing-dot, .landing-claim-mark,
+.landing-eyebrow, .landing-step-num, .btn-primary, .nav-mark {
+  transition: color var(--wipe-dur) var(--ease), background var(--wipe-dur) var(--ease),
+              border-color var(--wipe-dur) var(--ease);
+}
 
 
 /* ── The appearance control — DEC-028 ──────────────────────────────────────
@@ -2212,13 +2516,43 @@ html:active-view-transition * {
    behind the navigation rather than stopping at the content well's edge. */
 .shell-rail {
   background: color-mix(in srgb, var(--color-surface) 45%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  backdrop-filter: blur(18px) saturate(160%);
+  /* Stretched to the shell's full height, so unlike every other blurred
+     surface this one is on screen for the entire scroll and its sampled
+     region changes every frame. Blur cost climbs faster than the radius, so
+     10px rather than 18 — indistinguishable at this tint, a third of the work. */
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
   border-right: 1px solid var(--glass-edge);
 }
 .sidebar-item {
   font-size: var(--text-small);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
+}
+
+/* ── Press response ───────────────────────────────────────────────────────
+   Feedback belongs on the press, not on the release. Every control here
+   already changed colour, but colour alone arrives with the click handler and
+   whatever it triggers — the press itself read as nothing happening, which is
+   what "laggy" means to a hand more often than a dropped frame does.
+
+   `transform` only, so no layout and no paint, and the global smoothing rule
+   at the top of this file deliberately omits transform — this is the scoped
+   opt-in it leaves room for. 120ms sits inside the 100–160ms band a press is
+   legible in. Reduced motion is handled once, globally, at the top. */
+.btn:active, .sidebar-item:active, .menu-item:active, .tab:active {
+  transform: scale(0.97);
+}
+/* The paint properties are repeated because a class-level `transition` beats
+   the `*` rule above outright — naming only `transform` here would silently
+   drop the colour smoothing these controls already had. */
+.btn, .menu-item, .tab {
+  transition: background-color var(--dur-fast) var(--ease),
+              background        var(--dur-fast) var(--ease),
+              border-color      var(--dur-fast) var(--ease),
+              color             var(--dur-fast) var(--ease),
+              box-shadow        var(--dur-fast) var(--ease),
+              transform         var(--dur-fast) var(--ease);
 }
 /* The active pill gets the sheen too — without it, it is the one opaque object
    in a translucent column and reads as pasted on. */
@@ -3645,6 +3979,95 @@ html:active-view-transition * {
   .log-viewer { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* ── /ops shell — `DEC-078`: took `/app`'s chrome (glass nav + ambient field)
+   rather than the flat surface `70` § Design note originally called for.
+   Nothing new is invented — `.ops-nav` sits on the same `.topbar`/`.nav-public`
+   glass rule the console already carries, and `.ops-shell` gets `<AmbientBackground>`
+   the same way `.shell` does. ─────────────────────────────────────────────── */
+.ops-shell { min-height: 100dvh; display: flex; flex-direction: column; }
+.ops-nav {
+  position: sticky; top: 0; z-index: 20; flex: none;
+  display: flex; align-items: center; gap: var(--space-3);
+  height: 56px; padding-inline: var(--space-4);
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-edge);
+  box-shadow: 0 1px 0 var(--glass-shade);
+}
+.ops-nav .nav-brand { font-size: 16px; }
+.ops-nav a:not(.btn) {
+  font-size: var(--text-small); font-weight: 500; text-decoration: none;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.ops-nav a:not(.btn):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.ops-nav a[aria-current='page'] { background: color-mix(in srgb, var(--color-accent) 15%, transparent); }
+.ops-nav-spacer { flex: 1; }
+.ops-main { flex: 1; padding: var(--space-6) var(--space-4); }
+@media (max-width: 639px) { .ops-main { padding: var(--space-4); } }
+
+/* Estate/analytics filter rows — three or four inputs in a line that wrapped
+   with no gap and no consistent width before this. */
+.ops-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
+.ops-filters .input { min-width: 160px; }
+
+/* Every `<section className="card">` on `/ops/orgs/:id` was stacked bare inside `.page`,
+   edge to edge, with nothing giving them room — `.page` itself has no gap, and nobody had
+   noticed because `.ops-shell`'s flat pre-`DEC-078` background hid it the same way the
+   estate list's flat shell hid `.org-row` having no rule at all. `.settings-page` already
+   solves exactly this on `/app/settings`; this is the same fix, without that class's
+   900px cap, since the estate/plan grids here want the full page width. */
+.ops-sections { display: flex; flex-direction: column; gap: var(--space-6); }
+/* The plan picker's own `.plan-card` already carries background, radius and shadow
+   (`.plan-grid`, same file) — it is a card grid in its own right, the way `Start.tsx`
+   uses it bare. Wrapping it in a SECOND `.card` (as this page did) nested one glass
+   surface inside another and squeezed four tier cards into a narrower box than every
+   other `.plan-grid` on the product gets. This section is deliberately NOT `.card`. */
+.ops-plan-section { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* <OrgRow> — referenced since `70`/`T-066` but never given a rule, so every row in the
+   estate list rendered as a bare unstyled <button>: no card weight, no hover, the tier
+   tag and the meta line stacked with no rhythm. `DEC-078` turned this up while giving
+   the shell around it real chrome — a plain shell was hiding a genuinely unstyled row. */
+.org-row {
+  display: flex; flex-direction: column; gap: 6px;
+  width: 100%; text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.org-row:hover, .org-row:focus-visible {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  border-color: var(--color-divider);
+}
+.org-row-main { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.org-row-name { font-weight: 600; }
+.org-row-tier { text-transform: capitalize; }
+.org-row-meta { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* The sign-in card. Deliberately no `.auth-aside` — just the same card weight and
+   breathing room every other form on the product gets, rather than a bare unstyled
+   form floating in a fullpage grid. */
+.ops-login {
+  width: 100%; max-width: 380px;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  border-radius: calc(var(--radius-lg) * 1.15);
+}
+.ops-login h2 {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: var(--text-h2); letter-spacing: var(--track-heading);
+}
+.ops-login .field-label { font-size: var(--text-small); font-weight: 500; }
+.ops-login .input { min-height: 46px; }
+.ops-login .btn-primary { min-height: 48px; margin-top: var(--space-2); }
+@media (max-width: 479px) { .ops-login { padding: var(--space-6) var(--space-4); } }
+
 /* Wide layout for plan selection */
 .auth.is-plan-mode {
   max-width: 1000px;
@@ -3767,6 +4190,22 @@ html:active-view-transition * {
 .preset-card.is-selected .preset-card-icon {
   background: var(--color-card);
 }
+
+/* The colour this org type gets everywhere once setup finishes (`AppShell.tsx` reads
+   `organization.industry` the same way). Reading `--vibe-*` directly, not `--color-accent`,
+   because the swatch must show every card's colour at once, not just the selected one. */
+.preset-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-top: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+.preset-swatch-university { background: linear-gradient(135deg, var(--vibe-university-1), var(--vibe-university-2)); }
+.preset-swatch-hotel { background: linear-gradient(135deg, var(--vibe-hotel-1), var(--vibe-hotel-2)); }
+.preset-swatch-hospital { background: linear-gradient(135deg, var(--vibe-hospital-1), var(--vibe-hospital-2)); }
+.preset-swatch-company { background: linear-gradient(135deg, var(--vibe-company-1), var(--vibe-company-2)); }
 
 .preset-sidebar {
   background: var(--color-card);
@@ -3908,6 +4347,22 @@ html:active-view-transition * {
 .preset-card.is-selected .preset-card-icon {
   background: var(--color-card);
 }
+
+/* The colour this org type gets everywhere once setup finishes (`AppShell.tsx` reads
+   `organization.industry` the same way). Reading `--vibe-*` directly, not `--color-accent`,
+   because the swatch must show every card's colour at once, not just the selected one. */
+.preset-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-top: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+.preset-swatch-university { background: linear-gradient(135deg, var(--vibe-university-1), var(--vibe-university-2)); }
+.preset-swatch-hotel { background: linear-gradient(135deg, var(--vibe-hotel-1), var(--vibe-hotel-2)); }
+.preset-swatch-hospital { background: linear-gradient(135deg, var(--vibe-hospital-1), var(--vibe-hospital-2)); }
+.preset-swatch-company { background: linear-gradient(135deg, var(--vibe-company-1), var(--vibe-company-2)); }
 
 .preset-sidebar {
   background: var(--color-card);

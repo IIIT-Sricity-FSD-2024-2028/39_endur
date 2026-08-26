@@ -112,7 +112,7 @@ export default function OrgDetail(): JSX.Element {
       {error && <p className="field-error" role="alert">{error}</p>}
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
-      <div className="stat-grid">
+      <div className="stat-row">
         <StatCard kicker="Units" value={org.counts.units} />
         <StatCard kicker="Roles" value={org.counts.roles} />
         <StatCard kicker="People" value={org.counts.people} />
@@ -121,77 +121,83 @@ export default function OrgDetail(): JSX.Element {
         <StatCard kicker="Responses" value={org.counts.responses} />
       </div>
 
-      <section className="card">
-        <h3>Plan</h3>
-        <PlanPicker
-          plans={PLAN_OPTIONS}
-          current={org.tier}
-          mode="override"
-          onSelect={setPendingTier}
-          busyTier={planBusy ? pendingTier : null}
-        />
-      </section>
+      <div className="ops-sections">
+        {/* Not `.card` — `.plan-card` already carries its own background/radius/shadow
+            (same grid `Start.tsx` uses bare), so wrapping it in a second glass card here
+            nested one surface inside another and squeezed the four tiers into a narrower
+            box than every other plan grid on the product. */}
+        <section className="ops-plan-section">
+          <h3>Plan</h3>
+          <PlanPicker
+            plans={PLAN_OPTIONS}
+            current={org.tier}
+            mode="override"
+            onSelect={setPendingTier}
+            busyTier={planBusy ? pendingTier : null}
+          />
+        </section>
 
-      {pendingTier && (
-        <ConfirmDialog
-          title={`Change ${org.name} to ${pendingTier}?`}
-          consequence={`This moves ${org.name} from ${org.tier} to ${pendingTier}. A downgrade retains data — surfaces stop resolving, but nothing is deleted. A downgrade never stops collection: a running campaign keeps running.`}
-          verb="Change plan"
-          onConfirm={confirmPlan}
-          onCancel={() => setPendingTier(null)}
-          confirmDisabled={planBusy}
-        />
-      )}
-
-      <section className="card">
-        <h3>Plan history</h3>
-        {org.planHistory.length === 0 ? (
-          <p className="text-meta">No plan changes recorded.</p>
-        ) : (
-          <ul className="plain-list">
-            {org.planHistory.map((entry) => (
-              <li key={entry.at}>
-                {new Date(entry.at).toLocaleString()} — set to {entry.tier} by {entry.by}
-              </li>
-            ))}
-          </ul>
+        {pendingTier && (
+          <ConfirmDialog
+            title={`Change ${org.name} to ${pendingTier}?`}
+            consequence={`This moves ${org.name} from ${org.tier} to ${pendingTier}. A downgrade retains data — surfaces stop resolving, but nothing is deleted. A downgrade never stops collection: a running campaign keeps running.`}
+            verb="Change plan"
+            onConfirm={confirmPlan}
+            onCancel={() => setPendingTier(null)}
+            confirmDisabled={planBusy}
+          />
         )}
-      </section>
 
-      <section className="card">
-        <h3>Administrators</h3>
-        {org.administrators.length === 0 ? (
-          <p className="text-meta">No administrator on record.</p>
-        ) : (
-          <ul className="plain-list">
-            {org.administrators.map((person) => (
-              <li key={person.id}>{person.name} · {person.email}</li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <section className="card">
+          <h3>Plan history</h3>
+          {org.planHistory.length === 0 ? (
+            <p className="text-meta">No plan changes recorded.</p>
+          ) : (
+            <ul className="plain-list">
+              {org.planHistory.map((entry) => (
+                <li key={entry.at}>
+                  {new Date(entry.at).toLocaleString()} — set to {entry.tier} by {entry.by}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <section className="card">
-        <h3>Message the administrators</h3>
-        <MessageComposer recipients={org.administrators} onSend={sendMessage} sending={messageSending} />
-      </section>
+        <section className="card">
+          <h3>Administrators</h3>
+          {org.administrators.length === 0 ? (
+            <p className="text-meta">No administrator on record.</p>
+          ) : (
+            <ul className="plain-list">
+              {org.administrators.map((person) => (
+                <li key={person.id}>{person.name} · {person.email}</li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <section className="card">
-        <h3>{suspended ? 'Reinstate' : 'Suspend'} this organisation</h3>
-        <p className="text-meta">
-          Suspension cuts staff sign-in and does not stop the respondent surface — a QR code
-          on a wall keeps working.
-        </p>
-        {canSuspend ? (
-          <button type="button" className="btn btn-danger" onClick={() => setSuspendOpen(true)}>
-            {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
-          </button>
-        ) : (
-          <button type="button" className="btn btn-danger" disabled title="Owner only">
-            {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
-          </button>
-        )}
-      </section>
+        <section className="card">
+          <h3>Message the administrators</h3>
+          <MessageComposer recipients={org.administrators} onSend={sendMessage} sending={messageSending} />
+        </section>
+
+        <section className="card">
+          <h3>{suspended ? 'Reinstate' : 'Suspend'} this organisation</h3>
+          <p className="text-meta">
+            Suspension cuts staff sign-in and does not stop the respondent surface — a QR code
+            on a wall keeps working.
+          </p>
+          {canSuspend ? (
+            <button type="button" className="btn btn-danger" onClick={() => setSuspendOpen(true)}>
+              {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
+            </button>
+          ) : (
+            <button type="button" className="btn btn-danger" disabled title="Owner only">
+              {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
+            </button>
+          )}
+        </section>
+      </div>
 
       {/* Reinstating is a plain confirm. Suspending needs the typed-name pattern `32` uses
           for deleting a unit, which `<ConfirmDialog>` has no slot for — so this is the one

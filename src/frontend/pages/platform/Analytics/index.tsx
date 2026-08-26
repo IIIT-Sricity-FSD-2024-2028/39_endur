@@ -110,8 +110,8 @@ export default function Analytics(): JSX.Element {
         {!data ? (
           <p className="text-muted" aria-live="polite">Loading…</p>
         ) : (
-          <>
-            <div className="stat-grid">
+          <div className="ops-sections">
+            <div className="stat-row">
               <StatCard
                 kicker="Organisations"
                 value={data.orgs.joined}
@@ -192,7 +192,7 @@ export default function Analytics(): JSX.Element {
                 {data.totals.responses} responses, counted — never read
               </p>
             </section>
-          </>
+          </div>
         )}
       </div>
     </div>
