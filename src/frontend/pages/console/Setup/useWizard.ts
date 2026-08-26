@@ -34,7 +34,7 @@ export const STEPS = [
   { key: 'industry', label: 'Industry' },
   { key: 'roles', label: 'Roles' },
   { key: 'structure', label: 'Structure' },
-  { key: 'words', label: 'Words' },
+  { key: 'words', label: 'Official Terms' },
   { key: 'review', label: 'Review' },
 ] as const;
 
