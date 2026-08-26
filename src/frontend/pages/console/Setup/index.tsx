@@ -16,7 +16,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { PresetView } from '@endur/shared';
-import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { ApiError } from '../../../lib/api.js';
 import { usePresets, useSetupOrg } from '../../../lib/org.js';
@@ -174,8 +173,6 @@ export default function Setup(): JSX.Element {
           Skip setup →
         </button>
       </div>
-
-      <ProgressRail steps={[...STEPS]} current={step} onStepClick={goto} />
 
       {step === 0 && (
         <IndustryStep
