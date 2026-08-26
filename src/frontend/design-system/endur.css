@@ -2906,12 +2906,20 @@ html:active-view-transition * {
    to — 33 asks for a grid that scrolls sideways, not one that collapses into cards, because
    a matrix with its columns stacked has stopped being a matrix. The page body must never
    scroll horizontally; this element does instead. */
+/* IT SCROLLS IN BOTH DIRECTIONS, AND THAT IS WHAT MAKES THE HEADERS STICK. The header row
+   below has been `position: sticky; top: 0` since T-052 and it never once stuck: an element
+   with `overflow-x: auto` and no height is a scroll container that CANNOT scroll vertically,
+   so `top: 0` pinned the row to a box that never moves while the PAGE carried it away. With
+   64 rows, the reader was choosing between six phrases in a column whose role name had
+   scrolled off the top — which is the one thing a matrix must never make you guess. */
 .powers-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 21rem);
+  min-height: 18rem;
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-md);
 }
-.powers-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.powers-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
 
 /* THE LABEL COLUMN TAKES THE SLACK. Without this the browser hands the leftover width to
    whichever role column it likes, and the first role's cells stretch into metre-wide bars
@@ -2919,15 +2927,21 @@ html:active-view-transition * {
 .powers-corner { width: 100%; }
 
 .powers-corner, .powers-role {
-  position: sticky; top: 0; z-index: 1;
+  position: sticky; top: 0; z-index: 2;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-divider);
   padding: var(--space-2) var(--space-3);
   text-align: left; font-weight: 600;
 }
+/* The corner is sticky in BOTH axes, so it never slides out from under either header. */
+.powers-corner { left: 0; z-index: 4; }
 .powers-role { text-align: center; white-space: nowrap; }
 .powers-role-name { display: block; }
 .powers-role-level { display: block; font-size: 11px; font-weight: 400; }
+/* How many of the powers on this screen the role actually holds. The grid's whole argument
+   is that an over-granted role is a visibly dark column — this is that same fact as a
+   number, for the reader who wants to compare two columns without eyeballing them. */
+.powers-role-count { display: block; font-size: 11px; font-weight: 400; }
 
 /* `.powers-group`, NOT `.powers-module` — T-051's "powers by place" already owns that name
    for a `display: grid` list on the person page, and a global stylesheet does not care that
@@ -2944,20 +2958,36 @@ html:active-view-transition * {
 }
 .powers-group-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
-.powers-row { border-bottom: 1px solid var(--color-divider); }
+.powers-row > * { border-bottom: 1px solid var(--color-divider); }
+
+/* THE POWER NAME FOLLOWS YOU SIDEWAYS. Scrolled right to the fifth role, every row label had
+   left the screen and the grid became six phrases with nothing to attach them to. */
 .powers-capability {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--color-surface);
   padding: var(--space-2) var(--space-3);
   text-align: left; font-weight: 400; white-space: nowrap;
 }
-.powers-capability-label { vertical-align: middle; }
+/* Label left, "Set all…" right, ALWAYS IN THE SAME PLACE. Each row's control used to be a
+   bare select that sized itself to its own longest option, so 64 rows produced 64 different
+   widths starting at 64 different offsets — a column of noise beside the words the reader
+   actually came to read. */
+.powers-capability-inner {
+  display: flex; align-items: center; gap: var(--space-3);
+}
+.powers-capability-label { flex: 1 1 auto; }
 .powers-soon { margin-left: var(--space-2); font-size: 10px; }
+/* A power with no route behind it cannot be granted, so its row does not pretend otherwise
+   (see the `Soon` tag). It stays READABLE rather than hidden: what it will be called and
+   where it will sit is exactly what somebody planning a role wants to know now. */
+.powers-row.is-soon .powers-capability-label { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 
 /* "Set all…" — the row-wide control. It USED TO BE THE ROW LABEL ITSELF: clicking the words
    "delete the entire organisation" granted it to every role at once, with nothing on screen
    saying that would happen. A visible control that says what it does is not a bigger
    interface, it is the same interface admitted to. */
 .powers-all {
-  margin-left: var(--space-3); padding: 2px var(--space-2);
+  flex: 0 0 auto; width: 8.5em; padding: 2px var(--space-2);
   border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
   background: none; color: color-mix(in srgb, var(--color-text) 55%, transparent);
   font: inherit; font-size: 11px; cursor: pointer;
@@ -2983,7 +3013,12 @@ html:active-view-transition * {
    a rule you can change should not look like two different rules. */
 .powers-cell, .powers-chip {
   --weight: 0;
-  display: block; width: 100%; min-width: 6em;
+  /* MEASURED, NOT GUESSED. `min-width: 6em` truncated "Their department + below" to "Their
+     department + belc" — a cell that cannot finish its own word has stopped communicating,
+     and no fixed width can be right when the noun in the middle is the tenant's to choose.
+     PowersGrid sets `--cell-ch` to the longest phrase this organisation actually produces. */
+  display: block; width: 100%;
+  min-width: calc(var(--cell-ch, 10) * 1ch + 2.75rem);
   padding: var(--space-1) var(--space-2);
   border: 0; border-radius: var(--radius-sm);
   font: inherit; font-size: 11px;
@@ -3031,6 +3066,11 @@ html:active-view-transition * {
 @media (max-width: 640px) {
   .powers-bar { flex-direction: column; }
   .powers-capability { white-space: normal; min-width: 14ch; }
+  .powers-capability-inner { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+  .powers-all { width: 100%; }
+  /* A phone has no room for a pinned column AND the cells it labels. */
+  .powers-scroll { max-height: none; }
+  .powers-capability { position: static; }
 }
 
 /* ── T-080 · the response inbox ──────────────────────────────────────────── */
