@@ -27,7 +27,11 @@ const catalogue: CapabilityMeta[] = [
   // The tenant renamed `campaign` to "Plithe", so this is what the server sends back.
   { key: 'campaign.launch', module: 'Campaigns', phase: 'P2', label: 'open plithes for answers' },
   { key: 'campaign.close', module: 'Campaigns', phase: 'P2', label: 'close plithes to further answers' },
-  { key: 'analysis.read', module: 'Analyze', phase: 'P3', label: 'view themes and analysis' },
+  // A GENUINELY UNBUILT POWER. It was `analysis.read` until 26 Aug, which had been marked
+  // P3 in the catalogue for a day after T-081/T-082 shipped it — the grid greyed a live
+  // feature and stamped it "Soon". `apikey.*` has no route anywhere, so it is the honest
+  // fixture for this state.
+  { key: 'apikey.create', module: 'Platform', phase: 'P3', label: 'issue an api key' },
 ];
 
 let grid: GrantCell[];
@@ -393,6 +397,48 @@ describe('the powers grid', () => {
     expect(screen.getByLabelText(/Tutor: cannot open plithes/i).textContent).toBe('No');
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull();
     expect(screen.getByText(/read this grid but not change it/i)).toBeTruthy();
+  });
+
+  it('does not offer a choice on a power that is not built yet', async () => {
+    mount();
+    await openPowers();
+
+    // Readable — what it will be called and where it sits is what somebody planning a role
+    // wants to know now — and NOT settable, because there is no route behind it. A control
+    // that accepts an answer nobody will act on is a worse lie than a greyed one.
+    expect(screen.getByText('issue an api key')).toBeTruthy();
+    expect(screen.getByTitle(/is not built yet/i)).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: /issue an api key/i })).toBeNull();
+    expect(
+      screen.queryByRole('combobox', { name: /Set .issue an api key. for every role/i }),
+    ).toBeNull();
+
+    // A power that IS built keeps both controls, so this is about `phase` and not about
+    // the grid having quietly stopped being editable.
+    expect(cell(/Tutor: cannot open plithes for answers/i)).toBeTruthy();
+  });
+
+  it('counts what each role holds, so two columns can be compared without eyeballing them', async () => {
+    mount();
+    await openPowers();
+
+    // Principal holds grant.update + campaign.launch of the four in the fixture.
+    expect(screen.getByText('2 of 4 powers')).toBeTruthy();
+    // Tutor holds campaign.close only; Learner holds nothing.
+    expect(screen.getAllByText('1 of 4 powers')).toHaveLength(1);
+    expect(screen.getAllByText('0 of 4 powers')).toHaveLength(1);
+  });
+
+  it('sizes every cell to the longest phrase THIS organisation produces', async () => {
+    mount();
+    await openPowers();
+
+    // `min-width: 6em` truncated "Their zblorn + below" mid-word, and no fixed width can be
+    // right when the noun in the middle is the tenant's to choose. The measurement is over
+    // the RESOLVED vocabulary, so a longer noun widens the column instead of clipping it.
+    const table = document.querySelector('.powers-table') as HTMLElement;
+    const longest = 'Their zblorn + below'.length;
+    expect(table.style.getPropertyValue('--cell-ch')).toBe(String(longest));
   });
 
   it('hides the Powers tab entirely without grant.read', async () => {

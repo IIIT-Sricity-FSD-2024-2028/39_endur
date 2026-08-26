@@ -5,7 +5,28 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-26  (D-031 REPAID — THE DEMO DATABASE RECREATED, AND IT WAS WIDER
+UPDATED   2026-08-26  (DEC-077 — THE POWERS GRID IS READABLE WHILE YOU USE IT, AND THE
+                       "SOON" TAGS WERE LYING. the owner sent a screenshot: TWELVE ROWS OF
+                       VALUES WITH NO ROLE NAME ANYWHERE ON SCREEN, cells reading "Their
+                       department + belc", and 64 differently-sized dropdowns down the left.
+                       DEC-076 fixed the WORDS; none of that was about words.
+                       THE HEADER HAD BEEN position:sticky SINCE T-052 AND NEVER ONCE STUCK.
+                       .powers-scroll was overflow-x:auto WITH NO HEIGHT, which per CSS is a
+                       scroll container in BOTH axes — so top:0 pinned the row to a box that
+                       never scrolls while the PAGE carried it away. the power-name column is
+                       pinned on the other axis for the same reason.
+                       min-width:6em TRUNCATED THE CELLS and no constant can be right when
+                       the noun in the middle is the tenant's to choose — the width is now
+                       MEASURED from the longest resolved phrase.
+                       SEVEN CAPABILITIES WERE STILL P3 A DAY AFTER T-081..T-084 SHIPPED
+                       THEM. `phase` is a BEHAVIOUR, not a note: the grid greys a P3 row and
+                       stamps it Soon, and warnings() SKIPS P3 when it hunts for a power
+                       nobody holds — so the screen called seven live features unbuilt AND
+                       stayed silent about a real orphan among them. corrected in 11 §3 and
+                       capabilities.ts. apikey.* is the only true P3 left: no route exists.
+                       A P3 ROW NO LONGER ACCEPTS A GRANT — readable, not settable.
+                       24 tests on the page, 856 frontend, 27 backend roles. green.
+                       Earlier: D-031 REPAID — THE DEMO DATABASE RECREATED, AND IT WAS WIDER
                        THAN FILED. the four demo orgs had 103 grants, ZERO account.* and
                        NO SUBSCRIPTION ROW AT ALL — so it was never only the invite flow,
                        every tier-gated screen was dead too. requireEntitlement fell
@@ -1514,7 +1535,59 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-26 (latest) · D-031 REPAID — the database recreated, and D-037 found underneath it
+### 2026-08-26 (latest) · DEC-077 — the grid you can actually read, and seven lying tags
+
+**Two owner items off one screenshot: *"this says Soon still"* and *"this page is still too
+unfriendly to user."* Both were real and neither was about wording.**
+
+**THE "SOON" TAGS WERE FALSE, AND THE MECHANISM MATTERS MORE THAN THE TAGS.** `Soon` renders
+on `phase === 'P3'`. `T-081`/`T-082` shipped analysis and `T-083`/`T-084` shipped the improve
+loop on **25 Aug**, with live routes behind `requireCapability` *and* `requireEntitlement` —
+and left **seven capabilities at `P3`**. `phase` is not a note. Two things read it:
+
+- the grid greys the row and stamps it **Soon** — so the screen told the reader that seven
+  built, entitled, reachable features do not exist;
+- `warnings()` **skips `P3`** when it looks for a power nobody holds — so the one warning that
+  would have caught this was suppressed *by the same stale field*.
+
+A screen whose entire claim is that it explains the rules was, on those seven rows, doing the
+opposite twice. Corrected in `11` §3 **and** `packages/shared/src/capabilities.ts`, which is
+the only place the value is read. The rule is now written down where it will be looked up:
+**a task that builds a capability moves its phase in the same commit.** `apikey.*` stays `P3`
+— it has no route anywhere, which is the point.
+
+**AND A P3 ROW NO LONGER ACCEPTS A GRANT.** It stays listed and explains itself on hover —
+what a power will be called and which module it lands in is exactly what somebody planning a
+role wants now — but neither the cell nor "Set all…" will take an answer. A control that
+accepts a choice nobody will act on is a worse lie than a greyed one.
+
+**THE HEADER HAD BEEN `position: sticky; top: 0` SINCE `T-052` AND NEVER ONCE STUCK.** The
+screenshot is twelve rows of six-word phrases with **no role name anywhere on screen**.
+`.powers-scroll` was `overflow-x: auto` with no height — which per CSS makes it a scroll
+container in **both** axes, so `top: 0` pinned the header to a box that never scrolls while the
+**page** carried it away. A `max-height` fixes it, and the power-name column is now sticky
+`left` for the identical reason on the other axis. A matrix that makes you guess which column
+you are in has stopped being a matrix.
+
+**`min-width: 6em` WAS TRUNCATING THE CELLS** — `Their department + belc`. No constant can be
+right when the noun in the middle is the tenant's to choose (INV-001), so `PowersGrid` measures
+the longest phrase the resolved vocabulary actually produces and sets `--cell-ch`. A longer
+noun widens the column; it never clips. Asserted over the nonsense labels.
+
+**Three smaller things, all the same complaint.** "Set all…" was a bare `<select>` sizing to
+its own longest option, so 64 rows put it at 64 offsets — one width, one place now. Each role
+column says **how many of these powers it holds**, which is the grid's "over-granted role is a
+dark column" argument as a number for anyone comparing two roles. Each module band says how
+many rows collapsing it hides.
+
+**Checks.** 24 on the page (3 new), 856 frontend, 27 backend roles/powers-grid — green.
+`tsc -b` 4 errors and `audit:vocab` 3 hits, both **the same pre-existing sets** (`D-035`, none
+in a file touched here). `router/routes.test.tsx` ×2 still pre-existing. Lint clean, drift
+clean at 61 docs, `vite build` clean.
+
+**Backend tests were run from `src/backend`, never the repo root — see `D-037`.**
+
+### 2026-08-26 · D-031 REPAID — the database recreated, and D-037 found underneath it
 
 **The owner asked for the demo database to be recreated with a real tier mix and Endur's own
 two accounts. `D-031` is repaid, and measuring it first showed it was wider than it was filed.**
