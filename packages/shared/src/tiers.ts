@@ -58,6 +58,8 @@ export type PlanOption = {
   adds: string;
   /** False for Enterprise: shown for completeness, never selectable. */
   selectable: boolean;
+  /** Marketing bullet points for the plan picker UI */
+  features?: string[];
 };
 
 export const PLAN_OPTIONS: readonly PlanOption[] = [
@@ -67,6 +69,12 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     sells: 'Run campaigns and get results',
     adds: 'The collection engine',
     selectable: true,
+    features: [
+      'Run unlimited campaigns',
+      'The collection engine',
+      'Shared brand assets',
+      'Up to 10,000 responses'
+    ],
   },
   {
     tier: 'silver',
@@ -74,6 +82,13 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     sells: 'See why results moved',
     adds: 'Themes, sentiment, trends, reliability',
     selectable: true,
+    features: [
+      'Everything in Bronze',
+      'See why results moved',
+      'Themes and sentiment analysis',
+      'Trends and reliability reporting',
+      'Up to 50,000 responses'
+    ],
   },
   {
     tier: 'gold',
@@ -81,6 +96,13 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     sells: 'Run the full loop',
     adds: 'Reflection, gap analysis, plans, check-ins',
     selectable: true,
+    features: [
+      'Everything in Silver',
+      'Reflection and gap analysis',
+      'Action plans and check-ins',
+      'Full cycle improvement loop',
+      'Unlimited responses'
+    ],
   },
   {
     tier: 'enterprise',
@@ -88,6 +110,13 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     sells: 'Use output as formal evidence',
     adds: '360°, full audit, appeals, SSO, API access',
     selectable: false,
+    features: [
+      'Everything in Gold',
+      '360° reviews and full audit',
+      'Appeals and HR workflows',
+      'SSO and API access',
+      'Custom response limits'
+    ],
   },
 ];
 

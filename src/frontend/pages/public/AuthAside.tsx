@@ -25,7 +25,7 @@ const POINTS: ReadonlyArray<{ icon: IconName; title: string; body: string }> = [
   },
   {
     icon: 'hide',
-    title: 'Strict k-anonymity',
+    title: 'Strict anonymity',
     body:
       'Anonymity is enforced at the database level. Responses are decoupled from identities, and data is only aggregated when it meets privacy thresholds.',
   },
@@ -51,3 +51,4 @@ export function AuthAside(): JSX.Element {
     </aside>
   );
 }
+

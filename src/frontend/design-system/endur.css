@@ -3644,3 +3644,75 @@ html:active-view-transition * {
 @media (max-width: 900px) {
   .log-viewer { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Wide layout for plan selection */
+.auth.is-plan-mode {
+  max-width: 1000px;
+  grid-template-columns: 1fr;
+}
+.plan-grid.is-signup {
+  grid-template-columns: repeat(3, 1fr);
+}
+.plan-grid.is-signup .plan-card {
+  padding: var(--space-8) var(--space-6);
+  min-height: 320px;
+  gap: var(--space-3);
+}
+.plan-grid.is-signup .plan-name {
+  font-size: var(--text-h3);
+  font-family: var(--font-heading);
+}
+.plan-grid.is-signup .plan-sells {
+  font-size: var(--text-body);
+}
+
+.auth-plan-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-2) 0;
+}
+.auth-plan-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.auth-plan-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+
+/* Features checklist for plan cards */
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-4) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-4);
+  flex-grow: 1;
+}
+
+.plan-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.plan-feature-item svg {
+  color: var(--color-accent);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
