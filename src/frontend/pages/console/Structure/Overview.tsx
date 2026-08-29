@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UnitNode } from '@endur/shared';
 import type { ResolvedLabels } from '@endur/shared';
+import { forestTotals, type Totals } from '../../../lib/unitTotals.js';
 
 /** Counts every unit at each depth, so index 0 is the roots. */
 function perLevel(nodes: UnitNode[], depth = 0, into: number[] = []): number[] {
@@ -21,19 +22,14 @@ function perLevel(nodes: UnitNode[], depth = 0, into: number[] = []): number[] {
   return into;
 }
 
-function totals(nodes: UnitNode[]): { units: number; people: number; subjects: number } {
-  return nodes.reduce(
-    (sum, node) => {
-      const child = totals(node.children);
-      return {
-        units: sum.units + 1 + child.units,
-        people: sum.people + (node.peopleCount ?? 0) + child.people,
-        subjects: sum.subjects + (node.subjectCount ?? 0) + child.subjects,
-      };
-    },
-    { units: 0, people: 0, subjects: 0 },
-  );
-}
+// The band's totals were a second implementation of the same walk until DEC-081 gave the
+// map and the tree the same need. `forestTotals` is now the one — INV-009's rule applied
+// to a function rather than a component, and for the same reason: two of them drift.
+//
+// People and subjects arrive on the response envelope rather than being summed from the
+// roots (DEC-082): a person placed under two roots of a scope-filtered tree is one person,
+// and adding the roots would count them twice in the one number on the page that claims to
+// describe the whole organisation.
 
 /**
  * Counts up to `value` once, on mount.
@@ -92,13 +88,15 @@ function Stat({ label, value }: { label: string; value: number }): JSX.Element {
 
 export function Overview({
   nodes,
+  totals,
   labels,
 }: {
   nodes: UnitNode[];
+  totals: Totals | null;
   labels: ResolvedLabels;
 }): JSX.Element | null {
   const levels = perLevel(nodes);
-  const sums = totals(nodes);
+  const sums = forestTotals(nodes, totals);
   if (sums.units === 0) return null;
 
   const widest = Math.max(...levels, 1);

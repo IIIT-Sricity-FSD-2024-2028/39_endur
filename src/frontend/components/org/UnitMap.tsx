@@ -17,9 +17,16 @@
 // Left-to-right rather than top-down. Organisations are deep and narrow far more often than
 // they are wide, and a top-down chart of a deep one is a column of boxes that runs off the
 // bottom of the screen while the width sits empty.
+//
+// THE NUMBERS ON A NODE COUNT ITS WHOLE BRANCH — DEC-081, and `lib/unitTotals.ts` carries
+// the argument. A map exists to answer "how big is this part of the organisation", and the
+// API's own-count primitive cannot answer it: before this, adding a ward changed the ward
+// and left every box above it untouched. The branch is rolled up server-side (DEC-082),
+// because people have to be counted DISTINCT and this side only ever held scalars to add.
 import { useMemo } from 'react';
-import type { UnitNode } from '@endur/shared';
+import type { Label, UnitNode } from '@endur/shared';
 import { pluralise } from '../../lib/format.js';
+import { branchOf, ownOf, type Totals } from '../../lib/unitTotals.js';
 
 const COLUMN = 224;   // horizontal distance between depths
 const ROW = 56;       // vertical distance between leaves
@@ -33,8 +40,12 @@ type Placed = {
   x: number;
   y: number;
   depth: number;
-  people: number;
-  subjects: number;
+  /** The branch: this unit and everything under it. What the box prints. */
+  total: Totals;
+  /** This unit alone. Never printed — it is what the hover title discloses, so a parent's
+   *  own people are not silently absorbed into a number that looks like theirs. */
+  own: Totals;
+  hasChildren: boolean;
   parent: Placed | null;
 };
 
@@ -54,8 +65,9 @@ function layout(nodes: UnitNode[]): { placed: Placed[]; width: number; height: n
       x: PAD + depth * COLUMN,
       y: 0,
       depth,
-      people: node.peopleCount ?? 0,
-      subjects: node.subjectCount ?? 0,
+      total: branchOf(node),
+      own: ownOf(node),
+      hasChildren: node.children.length > 0,
       parent,
     };
     placed.push(entry);
@@ -87,6 +99,32 @@ function layout(nodes: UnitNode[]): { placed: Placed[]; width: number; height: n
  *  sit half a column out from each end, which keeps every curve the same shape however far
  *  apart the two nodes are — a curve whose bulge scales with distance reads as a different
  *  kind of connection at each depth. */
+/** "3 people", "3 people and 1 Ward". The subject clause is dropped at zero — a trailing
+ *  "and 0 Wards" on most rows is noise, and it is never the thing being asked. */
+function phrase(counts: Totals, subjectWord: Label): string {
+  const people = pluralise(counts.people, 'person', 'people');
+  if (counts.subjects === 0) return people;
+  return `${people} and ${pluralise(counts.subjects, subjectWord.one, subjectWord.many)}`;
+}
+
+/**
+ * The hover and screen-reader text, which is where the branch/own split is disclosed.
+ *
+ * The box has room for one number and the branch total is the one worth having, but a
+ * parent that says "9 people" while three of them are placed on the parent itself owes the
+ * reader that sentence somewhere. A `<title>` costs no layout and, inside a pressable `<g>`,
+ * becomes the button's accessible name — which was previously the two text runs jammed
+ * together ("Surgery3 people · 1 Service").
+ */
+function nodeTitle(node: Placed, subjectWord: Label): string {
+  if (!node.hasChildren) return `${node.name} — ${phrase(node.total, subjectWord)}`;
+
+  const branch = `${node.name} — ${phrase(node.total, subjectWord)}, counting everything inside it`;
+  const differs =
+    node.total.people !== node.own.people || node.total.subjects !== node.own.subjects;
+  return differs ? `${branch}. ${phrase(node.own, subjectWord)} placed here directly.` : `${branch}.`;
+}
+
 function edgePath(from: Placed, to: Placed): string {
   const x1 = from.x + NODE_W;
   const y1 = from.y + NODE_H / 2;
@@ -105,8 +143,15 @@ export function UnitMap({
 }: {
   nodes: UnitNode[];
   selectedId?: string | undefined;
-  /** The organisation's plural word for a subject. Never written here (INV-001). */
-  subjectWord: string;
+  /**
+   * The organisation's word for a subject, BOTH numbers. Never written here (INV-001).
+   *
+   * It was the plural alone until DEC-081, which is how a hospital with one service in a
+   * ward read "1 Services" on every leaf of the map. A count and a plural-only noun cannot
+   * be composed correctly, and the pair is already what `organization.labels` stores —
+   * "Faculty" pluralises to "Faculty", so the singular is not derivable either (`22` §2).
+   */
+  subjectWord: Label;
   /**
    * And its PLURAL word for a unit, for the same reason.
    *
@@ -158,9 +203,9 @@ export function UnitMap({
           // "1" on its own is not a fact. People are always named; the subject count only
           // appears when there is one, because a trailing "· 0" on most rows is noise.
           const meta =
-            node.subjects > 0
-              ? `${pluralise(node.people, 'person', 'people')} · ${node.subjects} ${subjectWord}`
-              : pluralise(node.people, 'person', 'people');
+            node.total.subjects > 0
+              ? `${pluralise(node.total.people, 'person', 'people')} · ${pluralise(node.total.subjects, subjectWord.one, subjectWord.many)}`
+              : pluralise(node.total.people, 'person', 'people');
           return (
             <g
               key={node.id}
@@ -182,6 +227,8 @@ export function UnitMap({
                   }
                 : {})}
             >
+              {/* First child, so it is the accessible name and the hover tooltip both. */}
+              <title>{nodeTitle(node, subjectWord)}</title>
               <rect className="unit-node-box" width={NODE_W} height={NODE_H} rx={12} />
               {/* The depth stripe. Colour is not carrying the meaning on its own — the
                   node's position already states its depth — so this is reinforcement. */}

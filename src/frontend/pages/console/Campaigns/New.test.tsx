@@ -40,10 +40,10 @@ const SUBJECTS: SubjectSummary[] = [
  *  test at the end of step 2. The mock factory reads the binding on each call. */
 let UNITS: UnitNode[] = [{
   id: 'u1', name: 'Engineering', parentId: null, isTemporary: false, endsAt: null,
-  peopleCount: 40, subjectCount: 2,
+  peopleCount: 40, subjectCount: 2, peopleTotal: 55, subjectTotal: 2,
   children: [{
     id: 'u2', name: 'Physics', parentId: 'u1', isTemporary: false, endsAt: null,
-    peopleCount: 15, subjectCount: 0, children: [],
+    peopleCount: 15, subjectCount: 0, peopleTotal: 15, subjectTotal: 0, children: [],
   }],
 }];
 
@@ -250,7 +250,7 @@ describe('step 2 — two different questions', () => {
     const whole = UNITS;
     UNITS = [{
       id: 'u9', name: 'Solo', parentId: null, isTemporary: false, endsAt: null,
-      peopleCount: 1, subjectCount: 0, children: [],
+      peopleCount: 1, subjectCount: 0, peopleTotal: 1, subjectTotal: 0, children: [],
     }];
     try {
       mount();

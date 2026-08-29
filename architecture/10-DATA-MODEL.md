@@ -61,6 +61,16 @@ counter counts (`customization.md` §9 screen 3), it is what a grant is usually 
 and it is what makes INV-005 expressible — *powers are scoped to the unit of the assignment*
 — because the unit is a column on the position, not a lookup through the person.
 
+**One position, many people — and counting the rows is not counting people (`DEC-082`).**
+The slot is shared: `createAssignment` FINDS a `(role, unit)` position before it creates
+one, because two "Tutor at Team A1" nodes would mean two places to attach a position-level
+grant and only one of them would ever be checked. It follows that
+`count(nodes WHERE kind='position' AND unit_id = X)` answers *how many distinct roles are
+present in X*, and never *how many people are in X*. Every people-count in the product read
+it as the second for three revisions. The people question is
+`count(DISTINCT edges.parent_id WHERE type='member')` over those positions, with lapsed
+edges excluded the way `authz/collect.ts` excludes them.
+
 `derived` matters more than it looks. One placement rule — "a Supervisor exists in every
 Department" — generates seven positions and seven edges. They render greyed out, and they
 regenerate when the unit tree changes. Roughly ten declared answers produce two hundred

@@ -92,12 +92,34 @@ half-built organisations behind when someone closes the tab.
 | POST | `/:id/reparent` | `unit.reparent` — cycle-checked |
 | DELETE | `/:id` | `unit.delete` — body states the real impact |
 | GET | `/:id/impact` | `unit.read` — "12 people gain X, 3 lose Y" before a save |
+| GET | `/:id/composition` | `unit.read` — the branch's people broken down by role |
+
+**`/:id/composition` says WHO the count is made of — `DEC-083`.** A total is honest and
+still not usable when the mix is unknown: a hospital reading "30 people" means staff, and
+sixteen of those thirty are Patients. This returns the branch's people grouped by role, in
+ladder order, and is asked for one unit at a time rather than carried on every node of the
+tree — the panel shows one unit, and a per-node breakdown would be roles × units on a page
+load that mostly never reads it. Scope-filtered to the same visible subtree the tree's own
+totals use, so the parts cannot add up to more than the whole they sit under.
+
+**One person can appear under two roles**, and the response says so rather than hiding it:
+`total` is distinct people and the role counts may sum higher. Each role's own count is
+distinct, so somebody who is a Nurse in two wards of the branch is one Nurse.
+
+**Counts on the tree — `DEC-082`.** Each node carries its own `peopleCount`/`subjectCount`
+and its branch `peopleTotal`/`subjectTotal`, and `GET /` puts the whole forest's totals on
+`meta`. All three levels exist because none is derivable from the ones below it: a branch
+is not the sum of its children's counts and the forest is not the sum of its roots, since
+**one person may hold a role in two units**. `people` everywhere means DISTINCT PEOPLE —
+distinct `member` edge parents, lapsed edges excluded — never the number of `position` rows,
+which is a count of role-at-unit slots (`10` §2.1). The rollup runs over the units the
+caller may already see, so it cannot disclose a branch outside their scope (INV-003).
 
 ### Roles and powers — `/api/v1/roles`, `/api/v1/grants`
 
 | Method | Path | C |
 |---|---|---|
-| GET | `/roles` | `role.read` |
+| GET | `/roles` | `role.read` — `peopleCount` is people, not slots (`DEC-082`) |
 | POST | `/roles` | `role.create` |
 | PATCH | `/roles/:id` | `role.update` |
 | POST | `/roles/reorder` | `role.update` — levels are derived from order |

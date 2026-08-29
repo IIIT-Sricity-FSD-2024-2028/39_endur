@@ -30,10 +30,10 @@ const page = (rows: PersonSummary[], over: Partial<Page<PersonSummary>> = {}): P
 const units: UnitNode[] = [
   {
     id: 'u0', name: 'Northfield', parentId: null, isTemporary: false, endsAt: null,
-    peopleCount: 0, subjectCount: 0,
+    peopleCount: 0, subjectCount: 0, peopleTotal: 0, subjectTotal: 0,
     children: [{
       id: 'u1', name: 'Engineering', parentId: 'u0', isTemporary: false, endsAt: null,
-      peopleCount: 0, subjectCount: 0, children: [],
+      peopleCount: 0, subjectCount: 0, peopleTotal: 0, subjectTotal: 0, children: [],
     }],
   },
 ];

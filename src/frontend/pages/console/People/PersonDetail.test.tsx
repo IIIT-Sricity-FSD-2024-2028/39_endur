@@ -47,7 +47,7 @@ const PERSON: PersonDetailView = {
 const units: UnitNode[] = [
   {
     id: 'un1', name: 'Engineering', parentId: null, isTemporary: false, endsAt: null,
-    peopleCount: 0, subjectCount: 0, children: [],
+    peopleCount: 0, subjectCount: 0, peopleTotal: 0, subjectTotal: 0, children: [],
   },
 ];
 const roles: RoleView[] = [{ id: 'r1', name: 'Dean', level: 1, peopleCount: 1, grantCount: 20 }];

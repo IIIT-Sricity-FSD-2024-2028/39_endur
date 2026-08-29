@@ -279,7 +279,7 @@ export default function Earnings(): JSX.Element {
               <h3>Recent payments</h3>
               <ResponsiveTable
                 columns={paymentColumns}
-                rows={data.recent as PaymentRow[]}
+                rows={data.recent}
                 rowKey={(row) => row.id}
                 caption="The most recent payments in this window"
                 empty={<p className="text-muted">Nothing has been paid in this window.</p>}

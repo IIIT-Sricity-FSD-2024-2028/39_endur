@@ -126,9 +126,56 @@ export type UnitNode = {
   parentId: string | null;
   isTemporary: boolean;
   endsAt: string | null;
+  /**
+   * DISTINCT PEOPLE placed on this unit, not the number of positions in it — `DEC-082`.
+   *
+   * A `position` is a role-at-unit SLOT shared by everyone who holds that role there
+   * (`10` §2.1, and `createAssignment` finds one before it creates one). A ward with a
+   * Head, two Nurses and three Patients has three positions and six people, so counting
+   * position rows answered "how many distinct roles are present" under a field named
+   * `peopleCount`, everywhere in the product at once.
+   */
   peopleCount: number;
   subjectCount: number;
+  /**
+   * This unit AND everything under it. What every surface prints (`DEC-081`).
+   *
+   * Server-side, and it has to be: people are counted DISTINCT across the branch, and a
+   * person holding a role in two units of one branch is one person. That cannot be
+   * recovered from per-unit scalars, which is what a client-side sum was adding up.
+   * INV-003 still holds — the rollup runs over the units this caller may see and no
+   * others, so a total never discloses a branch they cannot open.
+   */
+  peopleTotal: number;
+  subjectTotal: number;
   children: UnitNode[];
+};
+
+/**
+ * The forest's own totals, on the `GET /units` envelope.
+ *
+ * Not derivable by summing the roots for the same reason a branch is not derivable by
+ * summing children: one person may be placed under two of them.
+ */
+export type UnitTreeTotals = {
+  people: number;
+  subjects: number;
+  units: number;
+};
+
+/**
+ * Who a unit's people actually are — `DEC-083`.
+ *
+ * `total` is DISTINCT people in the branch, the same figure `peopleTotal` carries. The role
+ * counts may sum HIGHER than it, because one person can hold two roles inside the branch;
+ * each role's own count is distinct, so a Nurse in two wards is one Nurse. Anything reading
+ * this must not present the parts as a partition of the whole.
+ */
+export type UnitComposition = {
+  unitId: string;
+  total: number;
+  /** Ladder order — level 1 first, matching `/app/roles` (`33`). */
+  byRole: Array<{ roleId: string; roleName: string; level: number; count: number }>;
 };
 
 export type UnitImpact = {

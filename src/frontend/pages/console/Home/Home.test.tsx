@@ -28,6 +28,19 @@ vi.mock('../../../lib/home.js', () => ({
   },
 }));
 
+/**
+ * Six days out, always.
+ *
+ * This was the literal `'2026-08-26T23:59:00.000Z'` and it worked until 26 August, when the
+ * assertion below started reading "ended 3 days ago" and failing for no reason anyone had
+ * changed. A fixture pinned to a wall-clock date is a test with an expiry printed on it —
+ * and the one thing this test is about is a RELATIVE phrase.
+ */
+const inSixDays = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
+
+/** Same rule for the comment feed, which renders "3 minutes ago" from these. */
+const hoursAgo = (n: number): string => new Date(Date.now() - n * 60 * 60 * 1000).toISOString();
+
 const FULL: HomeView = {
   stats: {
     window: '30d', responses: 1057, subjectsCovered: 18,
@@ -36,7 +49,7 @@ const FULL: HomeView = {
   activeCampaigns: [
     {
       id: 'c1', name: 'Spring check', subjectCount: 18, responseCount: 612,
-      endsAt: '2026-08-26T23:59:00.000Z',
+      endsAt: inSixDays,
       url: 'https://feedback.example.test/r/K4M9X2PQ', anonymous: true, access: 'public',
     },
     {
@@ -45,8 +58,8 @@ const FULL: HomeView = {
     },
   ],
   recentComments: [
-    { text: 'More worked examples.', subjectName: 'Data Structures', submittedAt: '2026-08-20T10:00:00.000Z' },
-    { text: 'The pace picks up too much.', subjectName: null, submittedAt: '2026-08-20T09:00:00.000Z' },
+    { text: 'More worked examples.', subjectName: 'Data Structures', submittedAt: hoursAgo(2) },
+    { text: 'The pace picks up too much.', subjectName: null, submittedAt: hoursAgo(3) },
   ],
   prompts: [],
   configured: true,

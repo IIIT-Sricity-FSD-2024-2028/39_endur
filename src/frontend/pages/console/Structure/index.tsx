@@ -62,7 +62,8 @@ function withDraft(nodes: UnitNode[], draft: Draft | null, placeholder: string):
   if (!draft) return nodes;
   const row: UnitNode = {
     id: draft.id, name: '', parentId: draft.parentId, isTemporary: false, endsAt: null,
-    peopleCount: 0, subjectCount: 0, children: [], placeholder,
+    peopleCount: 0, subjectCount: 0, peopleTotal: 0, subjectTotal: 0,
+    children: [], placeholder,
   } as UnitNode & { placeholder: string };
 
   if (draft.parentId === null) return [...nodes, row];
@@ -252,7 +253,7 @@ export default function Structure(): JSX.Element {
 
       {/* Derived from `data`, not `tree` — the unnamed draft row is not a unit yet, and
           counting it would make the totals flicker while somebody is still typing. */}
-      {total > 0 && <Overview nodes={data} labels={labels} />}
+      {total > 0 && <Overview nodes={data} totals={units.totals} labels={labels} />}
 
       {total > 0 && (
         <section className="card structure-map-card" aria-labelledby="map-heading">
@@ -260,7 +261,7 @@ export default function Structure(): JSX.Element {
           <UnitMap
             nodes={data}
             selectedId={selectedId ?? undefined}
-            subjectWord={labels.subject.many}
+            subjectWord={labels.subject}
             unitWord={labels.unit.many}
             onSelect={setSelectedId}
           />
@@ -274,7 +275,7 @@ export default function Structure(): JSX.Element {
               nodes={tree}
               mode="edit"
               addLabel={addLabel}
-              subjectWord={labels.subject.many}
+              subjectWord={labels.subject}
               selectedId={selectedId ?? undefined}
               focusId={draft?.id}
               request={request}

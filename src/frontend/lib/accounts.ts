@@ -5,7 +5,7 @@
 // every write for the same reason an account action does — the powers and the account are
 // resolved server-side and there is no client-side way to guess the new state. Callers
 // re-fetch the person themselves after one of these settles.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AccountInvite, ActivateAccountBody, ActivationPreview } from '@endur/shared';
 import { apiDelete, apiGet, apiPost } from './api.js';
 import type { Loadable } from './org.js';

@@ -30,7 +30,7 @@ const detail = (over: Partial<SubjectDetail> = {}): SubjectDetail => ({
 
 const units: UnitNode[] = [{
   id: 'u1', name: 'Engineering', parentId: null, isTemporary: false, endsAt: null,
-  peopleCount: 0, subjectCount: 0, children: [],
+  peopleCount: 0, subjectCount: 0, peopleTotal: 0, subjectTotal: 0, children: [],
 }];
 
 const update = vi.fn();

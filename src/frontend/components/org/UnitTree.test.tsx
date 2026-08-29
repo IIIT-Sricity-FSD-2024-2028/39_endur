@@ -17,6 +17,10 @@ const tree = (over: Partial<UnitTreeNode> = {}): UnitTreeNode[] => [
         id: 'eng',
         name: 'Engineering',
         children: [{ id: 'cs', name: 'Computer Science', children: [] }],
+        // A row prints its BRANCH, and the server sends it (DEC-082). Nothing under
+        // Engineering carries a count in this fixture, so its branch is its own — stated
+        // rather than derived, because deriving it here would test the fixture.
+        peopleTotal: over.peopleCount ?? 0, subjectTotal: over.subjectCount ?? 0,
         ...over,
       },
     ],
@@ -36,7 +40,7 @@ describe('<UnitTree> — counts and badges', () => {
       <UnitTree
         nodes={tree({ peopleCount: 64, subjectCount: 7 })}
         mode="edit"
-        subjectWord="Quaxels"
+        subjectWord={{ one: 'Quaxel', many: 'Quaxels' }}
         onRename={vi.fn()}
       />,
     );
@@ -54,6 +58,53 @@ describe('<UnitTree> — counts and badges', () => {
   it('counts one person in the singular', () => {
     render(<UnitTree nodes={tree({ peopleCount: 1 })} mode="edit" onRename={vi.fn()} />);
     expect(within(rowFor('Engineering')).getByText('1 person')).toBeTruthy();
+  });
+
+  it('counts ONE subject in the singular too — DEC-081', () => {
+    // This row said "1 Quaxels" from T-033 until DEC-081, and a test asserting the plural
+    // form of a count of one is how it survived three revisions unnoticed.
+    render(
+      <UnitTree
+        nodes={tree({ subjectCount: 1 })}
+        mode="edit"
+        subjectWord={{ one: 'Quaxel', many: 'Quaxels' }}
+        onRename={vi.fn()}
+      />,
+    );
+    expect(within(rowFor('Engineering')).getByText('1 Quaxel')).toBeTruthy();
+  });
+
+  it('prints the branch the server counted, not the row’s own share — DEC-081', () => {
+    // The tree sits beside the map on /app/structure. The two showing different numbers for
+    // the same unit would be worse than either rule on its own, so they read one field.
+    //
+    // The walk itself is the server's (DEC-082) and is tested in `test/units.test.ts`;
+    // what this asserts is that the row reads `peopleTotal` and not `peopleCount`, which
+    // is the whole of the component's responsibility here.
+    const nested: UnitTreeNode[] = [
+      {
+        id: 'root',
+        name: 'Northfield',
+        peopleCount: 1,
+        peopleTotal: 65,
+        children: [
+          {
+            id: 'eng',
+            name: 'Engineering',
+            peopleCount: 4,
+            peopleTotal: 64,
+            children: [
+              { id: 'cs', name: 'Computer Science', peopleCount: 60, peopleTotal: 60, children: [] },
+            ],
+          },
+        ],
+      },
+    ];
+    render(<UnitTree nodes={nested} mode="edit" onRename={vi.fn()} />);
+
+    expect(within(rowFor('Engineering')).getByText('64 people')).toBeTruthy();
+    expect(within(rowFor('Northfield')).getByText('65 people')).toBeTruthy();
+    expect(within(rowFor('Computer Science')).getByText('60 people')).toBeTruthy();
   });
 
   it('badges a temporary unit', () => {

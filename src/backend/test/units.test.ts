@@ -4,7 +4,15 @@
 // greyed, and the client never filters for permission reasons. That is the property these
 // tests exist for; the CRUD around it is almost incidental by comparison.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { addStaff, denyPerson, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
+import {
+  addStaff,
+  denyPerson,
+  roleIdByLevel,
+  setUpOrg,
+  unitIdByName,
+  withCsrf,
+  type Session,
+} from './helpers.js';
 import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
 
@@ -78,6 +86,173 @@ describe('GET /units — scope filtering is the API, not the UI', () => {
     const res = await founder.agent.get('/api/v1/units');
     const root = (res.body.data as Array<{ name: string; peopleCount: number }>)[0];
     expect(root?.peopleCount).toBe(1);
+  });
+});
+
+/**
+ * DEC-082. A `position` is a role-at-unit SLOT shared by everyone holding that role there
+ * (`10` §2.1), so `count(kind='position')` answers "how many distinct roles are present"
+ * — and every people-count in the product was reading it as "how many people".
+ *
+ * These tests exist at this level because the rollup moved here from the client under the
+ * same decision: people have to be counted DISTINCT across a branch, which per-unit
+ * scalars cannot express however they are added up.
+ */
+describe('GET /units — what a people count counts, DEC-082', () => {
+  let founder: Session;
+
+  beforeAll(async () => {
+    founder = await setUpOrg();
+  });
+
+  type Row = {
+    id: string;
+    name: string;
+    peopleCount: number;
+    peopleTotal: number;
+    subjectTotal: number;
+    children: Row[];
+  };
+
+  const rows = async (session: Session): Promise<Map<string, Row>> => {
+    const res = await session.agent.get('/api/v1/units');
+    expect(res.status).toBe(200);
+    const into = new Map<string, Row>();
+    const walk = (list: Row[]): void => {
+      for (const row of list) {
+        into.set(row.name, row);
+        walk(row.children);
+      }
+    };
+    walk(res.body.data as Row[]);
+    return into;
+  };
+
+  /** Places a person in a unit, REUSING the role-at-unit slot the way `createAssignment`
+   *  does. `addStaff` makes a fresh position per person and so cannot reach this bug. */
+  const place = async (
+    name: string,
+    unitName: string,
+    over: { validTo?: Date } = {},
+  ): Promise<string> => {
+    const orgId = founder.orgId;
+    const [roleId, unitId] = await Promise.all([
+      roleIdByLevel(orgId, 3),
+      unitIdByName(orgId, unitName),
+    ]);
+    const person = await prisma.node.create({
+      data: { orgId, kind: 'person', name },
+      select: { id: true },
+    });
+    const position =
+      (await prisma.node.findFirst({
+        where: { orgId, kind: 'position', roleId, unitId },
+        select: { id: true },
+      })) ??
+      (await prisma.node.create({
+        data: { orgId, kind: 'position', name: `Tutor — ${unitName}`, roleId, unitId },
+        select: { id: true },
+      }));
+    await prisma.edge.create({
+      data: { orgId, type: 'member', parentId: person.id, childId: position.id, ...over },
+    });
+    clearGrantCache();
+    return person.id;
+  };
+
+  it('counts PEOPLE, not the role slots they share', async () => {
+    await place('Tutor One', 'Team A1');
+    await place('Tutor Two', 'Team A1');
+    await place('Tutor Three', 'Team A1');
+
+    // One "Tutor at Team A1" position node, three people in it. The old count said 1.
+    const slots = await prisma.node.count({
+      where: { orgId: founder.orgId, kind: 'position', unit: { name: 'Team A1' } },
+    });
+    expect(slots).toBe(1);
+    expect((await rows(founder)).get('Team A1')?.peopleCount).toBe(3);
+  });
+
+  it('rolls a branch up to its ancestors, so adding somebody deep moves every row above', async () => {
+    const before = await rows(founder);
+    const rootBefore = before.get('Root')?.peopleTotal ?? 0;
+
+    await place('Tutor Four', 'Team A1');
+
+    const after = await rows(founder);
+    expect(after.get('Team A1')?.peopleTotal).toBe(4);
+    expect(after.get('Section A')?.peopleTotal).toBe(4);
+    expect(after.get('Root')?.peopleTotal).toBe(rootBefore + 1);
+    // The unit's OWN count is untouched by anything below it — it stays the primitive.
+    expect(after.get('Section A')?.peopleCount).toBe(0);
+  });
+
+  it('counts one person once, however many units of the branch they are in', async () => {
+    const orgId = founder.orgId;
+    const before = (await rows(founder)).get('Root')?.peopleTotal ?? 0;
+
+    // The same person, placed a second time in a DIFFERENT unit of the same branch. A
+    // rollup that adds per-unit counts reports them twice; Riverside's demo data has
+    // exactly one such nurse, which is what made a summed total wrong at the root.
+    const personId = await place('Tutor Five', 'Team A1');
+    const [roleId, sectionA] = await Promise.all([
+      roleIdByLevel(orgId, 2),
+      unitIdByName(orgId, 'Section A'),
+    ]);
+    const position = await prisma.node.create({
+      data: { orgId, kind: 'position', name: 'Head — Section A', roleId, unitId: sectionA },
+      select: { id: true },
+    });
+    await prisma.edge.create({
+      data: { orgId, type: 'member', parentId: personId, childId: position.id },
+    });
+    clearGrantCache();
+
+    const after = await rows(founder);
+    expect(after.get('Section A')?.peopleCount).toBe(1);
+    expect(after.get('Team A1')?.peopleTotal).toBe(5);
+    // Five in Team A1 plus the one on Section A, who is one of the five: six, not seven.
+    expect(after.get('Section A')?.peopleTotal).toBe(5);
+    expect(after.get('Root')?.peopleTotal).toBe(before + 1);
+  });
+
+  it('leaves out an assignment that has already expired', async () => {
+    const before = (await rows(founder)).get('Section B')?.peopleTotal ?? 0;
+    await place('Departed Tutor', 'Section B', { validTo: new Date(Date.now() - 60_000) });
+
+    // `valid_to` retains history rather than deleting access (`10` §2.2), and the GRANT
+    // resolver already ignores a lapsed edge. A count that did not would put somebody in a
+    // unit where they hold no powers at all.
+    expect((await rows(founder)).get('Section B')?.peopleTotal).toBe(before);
+  });
+
+  it('puts the forest total on the envelope rather than leaving it to be summed', async () => {
+    const res = await founder.agent.get('/api/v1/units');
+    const distinct = await prisma.edge.findMany({
+      where: { orgId: founder.orgId, type: 'member', child: { kind: 'position' } },
+      select: { parentId: true, validTo: true },
+    });
+    const live = distinct.filter((edge) => !edge.validTo || edge.validTo > new Date());
+    expect(res.body.meta.people).toBe(new Set(live.map((edge) => edge.parentId)).size);
+    expect(res.body.meta.units).toBe(4);
+  });
+
+  it('never totals a unit the caller may not see — INV-003 survives the move', async () => {
+    const head = await addStaff(founder.orgId, {
+      name: 'Scoped Head',
+      level: 2,
+      unitName: 'Section A',
+    });
+
+    const scoped = await rows(head);
+    // Their world starts at Section A, so Root is absent and their total is their own
+    // branch. A total computed over the WHOLE tree would disclose the size of Section B.
+    expect(scoped.has('Root')).toBe(false);
+    expect(scoped.has('Section B')).toBe(false);
+    const whole = await rows(founder);
+    expect(scoped.get('Section A')?.peopleTotal).toBeLessThan(
+      whole.get('Root')?.peopleTotal ?? 0,
+    );
   });
 });
 
@@ -229,6 +404,115 @@ describe('POST /units/:id/reparent', () => {
       newParentId: sectionA,
     });
     expect(res.status).toBe(409);
+  });
+});
+
+/** DEC-083 — the owner's second question: not "is the number right" but "does it mean
+ *  anything", asked of a hospital where sixteen of thirty people are Patients. */
+describe('GET /units/:id/composition', () => {
+  let founder: Session;
+
+  beforeAll(async () => {
+    founder = await setUpOrg();
+  });
+
+  const hold = async (personId: string, unitName: string, level: number): Promise<void> => {
+    const orgId = founder.orgId;
+    const [roleId, unitId] = await Promise.all([
+      roleIdByLevel(orgId, level),
+      unitIdByName(orgId, unitName),
+    ]);
+    const position =
+      (await prisma.node.findFirst({
+        where: { orgId, kind: 'position', roleId, unitId },
+        select: { id: true },
+      })) ??
+      (await prisma.node.create({
+        data: { orgId, kind: 'position', name: `${level} @ ${unitName}`, roleId, unitId },
+        select: { id: true },
+      }));
+    await prisma.edge.create({
+      data: { orgId, type: 'member', parentId: personId, childId: position.id },
+    });
+    clearGrantCache();
+  };
+
+  const person = async (name: string): Promise<string> => {
+    const row = await prisma.node.create({
+      data: { orgId: founder.orgId, kind: 'person', name },
+      select: { id: true },
+    });
+    return row.id;
+  };
+
+  it('breaks the branch down by role, in ladder order', async () => {
+    const root = await unitIdByName(founder.orgId, 'Root');
+    await hold(await person('Learner One'), 'Team A1', 4);
+    await hold(await person('Learner Two'), 'Team A1', 4);
+    await hold(await person('Tutor One'), 'Section A', 3);
+
+    const res = await founder.agent.get(`/api/v1/units/${root}/composition`);
+    expect(res.status).toBe(200);
+    const rows = res.body.data.byRole as Array<{ roleName: string; count: number; level: number }>;
+    // Level ascending, so the panel reads the way /app/roles does rather than by size.
+    expect(rows.map((row) => row.level)).toEqual([...rows.map((row) => row.level)].sort());
+    expect(rows.find((row) => row.roleName === 'Learner')?.count).toBe(2);
+    expect(rows.find((row) => row.roleName === 'Tutor')?.count).toBe(1);
+  });
+
+  it('counts a person once per role however many units they hold it in', async () => {
+    const root = await unitIdByName(founder.orgId, 'Root');
+    const busy = await person('Busy Tutor');
+    await hold(busy, 'Team A1', 3);
+    await hold(busy, 'Section B', 3);
+
+    const res = await founder.agent.get(`/api/v1/units/${root}/composition`);
+    const tutors = (res.body.data.byRole as Array<{ roleName: string; count: number }>).find(
+      (row) => row.roleName === 'Tutor',
+    );
+    // Two positions, one Tutor. The row is distinct within itself.
+    expect(tutors?.count).toBe(2);
+  });
+
+  it('lets the rows exceed the total rather than pretending they partition it', async () => {
+    const root = await unitIdByName(founder.orgId, 'Root');
+    const both = await person('Wears Two Hats');
+    await hold(both, 'Team A1', 3);
+    await hold(both, 'Team A1', 4);
+
+    const res = await founder.agent.get(`/api/v1/units/${root}/composition`);
+    const { total, byRole } = res.body.data as {
+      total: number;
+      byRole: Array<{ count: number }>;
+    };
+    // Somebody holding two roles is honestly in both rows, so the sum may pass the total.
+    // The panel says so out loud; what must never happen is the total being inflated.
+    expect(byRole.reduce((sum, row) => sum + row.count, 0)).toBeGreaterThan(total);
+    const distinct = await prisma.edge.findMany({
+      where: { orgId: founder.orgId, type: 'member', child: { kind: 'position' } },
+      select: { parentId: true },
+    });
+    expect(total).toBe(new Set(distinct.map((edge) => edge.parentId)).size);
+  });
+
+  it('never counts past the caller’s own scope — INV-003', async () => {
+    const head = await addStaff(founder.orgId, {
+      name: 'Composition Head',
+      level: 2,
+      unitName: 'Section A',
+    });
+    const root = await unitIdByName(founder.orgId, 'Root');
+    const sectionA = await unitIdByName(founder.orgId, 'Section A');
+
+    // Root is outside their subtree entirely, so it is a 404 — not a 403, which would
+    // confirm it exists (13 §5).
+    expect((await head.agent.get(`/api/v1/units/${root}/composition`)).status).toBe(404);
+
+    const mine = await head.agent.get(`/api/v1/units/${sectionA}/composition`);
+    const whole = await founder.agent.get(`/api/v1/units/${root}/composition`);
+    // And their own branch's breakdown is smaller than the org's — a composition that
+    // walked the real subtree would leak the size of Section B through its role rows.
+    expect(mine.body.data.total).toBeLessThan(whole.body.data.total);
   });
 });
 

@@ -18,8 +18,11 @@
 // inline refusal message, a placeholder row for "+ then type" — is optional, so the
 // wizard's call site did not change at all.
 import { useEffect, useState } from 'react';
+import type { Label } from '@endur/shared';
 import { Icon } from '../Icon.js';
 import { InlineName } from './InlineName.js';
+import { pluralise } from '../../lib/format.js';
+import { branchOf, type Totals } from '../../lib/unitTotals.js';
 
 export type UnitTreeNode = {
   id: string;
@@ -27,6 +30,11 @@ export type UnitTreeNode = {
   children: UnitTreeNode[];
   peopleCount?: number;
   subjectCount?: number;
+  /** This unit AND everything under it, counted by the server (DEC-082). The row prints
+   *  these; the two `*Count` fields above are the unit's own share and are not shown here.
+   *  Absent on the wizard's draft, which has no counts at all and renders none. */
+  peopleTotal?: number;
+  subjectTotal?: number;
   isTemporary?: boolean;
   /** ISO date. Within 30 days the row says so, because expiry is silent otherwise (10 §9). */
   endsAt?: string | null;
@@ -49,8 +57,13 @@ type Props = {
   selectedId?: string | undefined;
   /** Label for the add-child button, e.g. "Add a Department". Vocabulary, from the caller. */
   addLabel?: string | undefined;
-  /** Plural of the subject noun, e.g. "Courses". Absent means subject counts stay hidden. */
-  subjectWord?: string | undefined;
+  /**
+   * The subject noun, singular AND plural, e.g. `{ one: 'Course', many: 'Courses' }`.
+   * Absent means subject counts stay hidden — better than inventing "Subjects".
+   *
+   * The plural alone until DEC-081, which printed "1 Courses" on every row holding one.
+   */
+  subjectWord?: Label | undefined;
   /** Focus this row's name input on mount — the "+ then type" beat of the demo. */
   focusId?: string | undefined;
   request?: UnitTreeRequest | undefined;
@@ -232,7 +245,10 @@ export function UnitTree(props: Props): JSX.Element {
             </span>
           )}
 
-          <Counts node={node} subjectWord={props.subjectWord} />
+          {/* The branch, straight off the node — the server walked the tree (DEC-082).
+              The wizard's draft carries no counts at all and reads as zeroes, which
+              `<Counts>` renders as nothing, so its call site is unaffected. */}
+          <Counts total={branchOf(node)} subjectWord={props.subjectWord} />
 
           {mode === 'edit' && (
             <span className="unit-actions">
@@ -299,11 +315,17 @@ export function UnitTree(props: Props): JSX.Element {
   );
 }
 
-/** "64 people · 7 Courses". The subject noun is the caller's; "people" is structural. */
-function Counts({ node, subjectWord }: { node: UnitTreeNode; subjectWord?: string | undefined }): JSX.Element | null {
+/**
+ * "64 people · 7 Courses". The subject noun is the caller's; "people" is structural.
+ *
+ * The counts are the ROW'S WHOLE BRANCH, not the unit alone — DEC-081. The map beside this
+ * tree shows the same units, so the two disagreeing about what "Surgery" contains is worse
+ * than either rule on its own.
+ */
+function Counts({ total, subjectWord }: { total: Totals; subjectWord?: Label | undefined }): JSX.Element | null {
   const parts: string[] = [];
-  if (node.peopleCount) parts.push(`${node.peopleCount} ${node.peopleCount === 1 ? 'person' : 'people'}`);
-  if (node.subjectCount && subjectWord) parts.push(`${node.subjectCount} ${subjectWord}`);
+  if (total.people) parts.push(pluralise(total.people, 'person', 'people'));
+  if (total.subjects && subjectWord) parts.push(pluralise(total.subjects, subjectWord.one, subjectWord.many));
   if (parts.length === 0) return null;
   return <span className="text-meta unit-count">{parts.join(' · ')}</span>;
 }

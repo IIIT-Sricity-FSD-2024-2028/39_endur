@@ -1577,7 +1577,7 @@ DEC-078  ACTIVE  2026-08-27  origin:user  amends:70 § Design note
            `.stat-row`, `AmbientBackground`) and is already load-bearing on `/app` and `/`.
            no new colour, font or spacing token enters the system for this -- reuse only.
   what     `OpsLayout` (router/layouts.tsx) gains `<AmbientBackground>` and a glass nav in
-           place of the flat `background: var(--color-surface)` bar; `.ops-nav` in
+           place of the flat opaque-surface bar it had; `.ops-nav` in
            endur.css is restyled on the `.topbar`/`.nav-public` pattern; `.org-row` (used
            but never styled -- zero rules existed) and `.stat-grid` (referenced in
            Analytics/index.tsx but never defined -- `.stat-row` is the real class) are
@@ -1656,6 +1656,144 @@ DEC-080  ACTIVE  2026-08-29  origin:user  supersedes:DEC-035  task:T-058
            OPEN-005's. `payments` is an append-only LEDGER OF CAPTURES, not an accounts
            system.
   see      DEC-035, DEC-034, DEC-048, 16 §2 §4, 19 §4, 49, 71, 13 § Platform
+
+DEC-081  AMENDED-BY-DEC-082  2026-08-29  origin:user  amends:32 § The tree, 24 §4  task:T-033
+  decision A COUNT PRINTED ON A UNIT COUNTS THAT UNIT AND EVERYTHING UNDER IT. the map,
+           the tree row and the overview band all read the branch. the DETAIL PANEL is the
+           one surface that shows both, because it is the one with room to say which is
+           which.
+  why      the owner added a ward under Ward D and nothing above it moved: the leaf said
+           "1 person" and Ward D still said 2, Surgery still said 3. the API's
+           `peopleCount` is a `groupBy` on `unitId` (features/units/service.ts) with no
+           walk in it -- the right PRIMITIVE and the wrong NUMBER TO PRINT. ask anybody how
+           many people are in Surgery and they mean the wards. THE SERVER ALREADY AGREED:
+           `GET /units/:id/impact` answers "delete Engineering" with `peopleAffected: 64`,
+           which is the 4 on Engineering plus the 60 below it, and Structure.test.tsx has
+           carried both numbers side by side since T-033 -- 64 in the impact fixture, 4 in
+           the row assertion -- without anyone reading them together.
+  where    ROLLED UP ON THE CLIENT, AND THAT IS CORRECTNESS, NOT CONVENIENCE. the tree is
+           scope-filtered before it is returned (INV-003, 32 §2), so a total computed over
+           what the reader was SENT counts exactly the units they may see. one computed in
+           SQL would count the ones they may not, and the size of a branch is itself
+           information -- it would tell a level-2 reader how big a subtree is that they are
+           not allowed to open.
+  what     `src/frontend/lib/unitTotals.ts` -- `rollUp()` fills a map in ONE post-order
+           walk rather than offering a per-row function, which on the page whose whole
+           subject is deep trees would have been O(n^2). Overview.tsx's local `totals()`
+           was a second implementation of the same walk and is now a call to `totalOf()`
+           (INV-009's rule, applied to a function). `<UnitMap>` and `<UnitTree>` read the
+           map; `<DetailPanel>` shows "4 here · 60 below" under the branch figure, inside
+           the `<dd>` because `<dl> > <div>` may hold nothing but `<dt>` and `<dd>`.
+  fact     THE SAME PASS FIXED "1 Services". `subjectWord` was the PLURAL ALONE on both
+           components, so every unit holding exactly one printed the plural -- visible on
+           six of the eight boxes in the owner's screenshot. a count and a plural-only noun
+           cannot be composed, and the singular is not derivable: "Faculty" pluralises to
+           "Faculty" (22 §2), which is precisely where a university is watching. the prop
+           is now `Label` -- the `{one, many}` pair `organization.labels` already stores.
+           A TEST ASSERTED THE BUG (`'4 people · 1 Quaxels'`, T-033), which is how it lived
+           through three revisions: a test written from the code cannot catch the code.
+  fact     `<UnitMap>` HAD NO CATALOGUE ENTRY AT ALL. built at T-033 citing "24 §3" and
+           never added to 24, against the ground rule that the catalogue comes first.
+           added under §4 in this pass, with the props it actually has.
+  cost     a parent's OWN people are no longer visible on the map or in the tree. the box
+           holds one number and the branch is the one worth having, so the split moved to
+           the `<title>` (hover text, and the pressable node's accessible name -- which was
+           previously the two text runs jammed together, "Surgery3 people · 1 Service") and
+           to the panel. a reader who wants own-counts only has one click to make.
+  not      the API is UNCHANGED. `peopleCount`/`subjectCount` still mean the unit alone,
+           which is what `<DetailPanel>` and `deleteConsequence()`'s `own` both want. this
+           decision is about what a SCREEN prints, not about what the contract carries.
+  see      32 § The tree, 24 §4, INV-001, INV-003, INV-009, 22 §2,
+           src/frontend/lib/unitTotals.ts, DEC-082
+  amended  DEC-082 keeps the RULE ("a printed count is the branch") and overturns the
+           `where` and `not` rows above: the rollup is the server's, and the API DID have
+           to change, because the primitive it carried was not counting people at all.
+
+DEC-082  ACTIVE  2026-08-29  origin:user  supersedes:DEC-081 § where, § not
+         amends:13 § Structure, 10 §2.1, 32, 33  task:T-016
+  decision A `position` IS A ROLE-AT-UNIT SLOT SHARED BY EVERYONE HOLDING THAT ROLE THERE,
+           so `count(kind='position')` answers "HOW MANY DISTINCT ROLES ARE PRESENT" and
+           never "how many people". every people-count in the product was reading it as the
+           second. they now count DISTINCT PEOPLE -- distinct `member` edge parents, with
+           lapsed edges excluded on the predicate the GRANT resolver already uses.
+  why      the owner's ward panel printed "PEOPLE 3" directly above a list of FIVE NAMES,
+           which is not a rounding error but two different questions answered in one card.
+           Ward C holds a Head, a Nurse slot with two nurses in it and a Patient slot with
+           three: THREE POSITIONS, SIX PEOPLE. the whole hospital read "16 people" -- the
+           number of role slots -- against 30 actual people, and 16 was also the number of
+           patients, so it looked plausible. `10` §2.1 has said the slot is shared since
+           the model was written, and `createAssignment` says so in a comment while it
+           FINDS a position before it creates one; four features read the row count anyway.
+  blast    FOUR SITES, one primitive: `readTree` (map, tree, panel, band), `unitImpact`
+           (`peopleAffected`, which is the number a DELETE CONFIRMATION states before an
+           irreversible action), `listRoles` (`peopleCount` on the ladder), and
+           `Campaigns/New.tsx`'s `countPeople` (the audience a campaign is about to reach).
+           `deleteRole`'s refusal was wrong in BOTH directions -- it read five wards' worth
+           of "Nurse" slots as five people, and it refused to delete a role that exists in
+           some units but nobody holds, naming people who are not there.
+  where    THE ROLLUP MOVES TO THE SERVER, and DEC-081's argument for the client does not
+           survive contact with distinctness. a client holds per-unit scalars and can only
+           ADD them; people do not add -- one nurse holding a post in two wards of a branch
+           is one person in that branch, and Riverside's demo data contains exactly that
+           nurse, so the root read 31 for 30 people. INV-003 IS MET BY THE SAME ARGUMENT ON
+           THE OTHER SIDE: `readTree` has already reduced the units to what this caller may
+           see before the walk runs, so a total still counts exactly the boxes on their
+           screen and still cannot disclose a branch they may not open.
+  what     `UnitNode` gains `peopleTotal`/`subjectTotal` -- the branch -- beside the
+           unchanged own-counts, and `GET /units` gains a `meta` envelope carrying the
+           FOREST totals, because summing the roots has the identical defect summing
+           children had. `lib/unitTotals.ts` keeps only what is exactly derivable from what
+           the reader was sent: the UNIT count. `rollUp()`/`totalOf()` are gone.
+  fact     EXPIRED ASSIGNMENTS ARE NOT COUNTED. `valid_to` retains history rather than
+           deleting access (10 §2.2) and `authz/collect.ts` has always ignored a lapsed
+           edge; the counts did not, so a departed nurse stood in a ward holding no powers
+           in it. the same predicate is now used in both places.
+  cost     one row per live assignment is read where a `groupBy` read one row per unit.
+           at demo scale this is nothing; at 10k people it is 10k rows on a page load, and
+           if that ever matters the fix is a recursive CTE intersected with the visible
+           set, NOT a return to counting slots.
+  not      NOT a decision about whether the lowest tier belongs in the number. the owner
+           asked whether a Patient or a Student should be counted at all and that is
+           OPEN-013 -- open, and theirs. this decision only makes the number mean what its
+           label already claimed.
+  see      DEC-081, DEC-009, INV-003, 10 §2.1, 13 § Structure, 32 § What a count means,
+           33, src/backend/features/units/service.ts, src/backend/test/units.test.ts
+
+DEC-083  ACTIVE  2026-08-29  origin:user  closes:OPEN-013  amends:13 § Structure, 32
+         task:T-033
+  decision THE PANEL SAYS WHAT THE PEOPLE COUNT IS MADE OF. `GET /units/:id/composition`
+           returns the branch's people grouped by role, in ladder order, and the detail
+           panel draws it under the People stat as a bar per role.
+  why      the owner asked whether the lowest tier -- Patient, Student, Guest -- should be
+           counted at all, of a hospital whose root reads 30 people of whom SIXTEEN ARE
+           PATIENTS. the number was correct after DEC-082 and still not usable: an
+           administrator reading "30 people" thinks staff. the honest fix is not to drop a
+           tier from the total -- everyone placed in a ward IS affected when the ward goes,
+           which is what this page's numbers are for -- but to stop making the reader guess
+           the mix.
+  not      NOT (c), which was to stop modelling respondents as positioned people at all.
+           `labels.respondent` already names Patient/Student/Guest as the respondent noun
+           and DEC-009 says respondents are never users, yet the demo seed gives all
+           sixteen patients full `person` nodes WITH ACCOUNTS. that contradiction is real
+           and is NOT resolved here: it is a seed, setup and DEC-009 change, six days from
+           a graded demo, and it would rewrite the org the demo runs on. left as OPEN-014.
+  where    ITS OWN ENDPOINT, not a field on every node. the panel shows ONE unit; a
+           per-node breakdown is roles × units carried on every page load and read almost
+           never. scope-filtered to the same visible subtree the tree's totals use --
+           without that, a level-2 reader's role rows would sum PAST the branch figure
+           printed above them, which both leaks the size of a subtree they cannot open and
+           makes the panel contradict itself. the second is how anyone would notice.
+  fact     THE ROWS MAY SUM HIGHER THAN THE TOTAL, and that is correct: somebody who is
+           both a Nurse and a Head of Department is honestly in both. each row is distinct
+           WITHIN ITSELF, so a Nurse in two wards is one Nurse. the panel says the overage
+           out loud when it happens -- unexplained, it reads as the panel having lost count
+           of its own people.
+  what     bars SCALED TO THE LARGEST ROW, never stacked to fill the width. a stacked bar
+           claims a partition, which this is not, and would silently overflow on exactly
+           the organisation where the claim is false. one role renders NOTHING: it is the
+           stat above restated in a taller shape.
+  see      DEC-082, DEC-009, INV-003, OPEN-014, 13 § Structure, 32 § Who the count is made
+           of, 33, src/frontend/pages/console/Structure/DetailPanel.tsx
 ```
 
 ---

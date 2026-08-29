@@ -102,7 +102,7 @@ describe('create organization — 30 §3.3', () => {
       tier: 'gold',
       // DEC-080. A LABEL for the capture the checkout simulated, not an amount and not a
       // proof — the server prices the tier and writes the ledger row either way.
-      paymentRef: expect.stringMatching(/^endur_/) as unknown as string,
+      paymentRef: expect.stringMatching(/^endur_/) as string,
     });
   });
 

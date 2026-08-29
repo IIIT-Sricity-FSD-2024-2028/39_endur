@@ -87,6 +87,14 @@ Drag to reorder; levels renumber live and the generated "Sees…" text updates p
 rename. The lowest role cannot be deleted. Deleting a role with holders requires a
 reassignment target, and the confirmation states how many people move.
 
+**"How many people hold this role" counts people, not positions — `DEC-082`.** A `position`
+is a role-at-unit slot shared by everyone holding that role there (`10` §2.1), so a `Nurse`
+existing in five wards is five position rows and any number of nurses. Counting the rows was
+wrong in both directions: it read those five slots as five people, and it refused to delete a
+role that exists in some units but **nobody actually holds**, telling the caller to reassign
+people who are not there. A role with no live holders deletes without a reassignment target;
+its empty slots cascade away and no one loses access.
+
 ## Interactions — the powers grid
 
 Rows are capabilities grouped by module and collapsible; columns are roles.
