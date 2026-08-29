@@ -18,6 +18,7 @@
 import { Router } from 'express';
 import {
   AnalyticsListDto,
+  EarningsListDto,
   CreateOperatorDto,
   EstateListDto,
   LogExportDto,
@@ -47,6 +48,7 @@ import { scopedRateLimits } from '../../middleware/rateLimit.js';
 import { UnauthenticatedError } from '../../lib/errors.js';
 import {
   analytics,
+  earnings,
   createOperator,
   estate,
   exportOperatorLogFile,
@@ -168,6 +170,24 @@ platformRouter.get(
   (req, res, next) => {
     const { query } = req.data as { query: Parameters<typeof analytics>[0] };
     void analytics(query).then((data) => res.json({ data })).catch(next);
+  },
+);
+
+/**
+ * `/ops/earnings` — the money. DEC-080, `71` § Revenue.
+ *
+ * OWNER ONLY, behind its OWN capability rather than `platform.analytics.read`. The two were
+ * one capability while DEC-035 stood and there was no revenue to separate; DEC-080 splits
+ * them because the questions separated: support reads adoption to help a customer, and
+ * nobody needs a revenue total to do that.
+ */
+platformRouter.get(
+  '/earnings',
+  validate(EarningsListDto),
+  requirePlatform('platform.revenue.read'),
+  (req, res, next) => {
+    const { query } = req.data as { query: Parameters<typeof earnings>[0] };
+    void earnings(query).then((data) => res.json({ data })).catch(next);
   },
 );
 

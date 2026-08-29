@@ -1,4 +1,4 @@
-// <PlanPicker> — 24 §6b, DEC-048, DEC-035.
+// <PlanPicker> — 24 §6b, DEC-048, DEC-080.
 //
 // `signup` mode is exercised end to end by pages/public/Start.test.tsx, which is where it is
 // actually used. This file covers what that page cannot reach: the ENTERPRISE CARD, which
@@ -12,12 +12,26 @@ import { PLAN_OPTIONS, SIGNUP_PLAN_OPTIONS } from '@endur/shared';
 import { PlanPicker } from './PlanPicker.js';
 
 describe('the picker renders the tiers as data — 16 §2', () => {
-  it('says what each tier sells, without ever saying what it costs', () => {
+  it('says what each tier sells and what it costs', () => {
     render(<PlanPicker plans={PLAN_OPTIONS} current={null} mode="join" onSelect={vi.fn()} />);
     expect(screen.getByText('Bronze — Measure')).toBeTruthy();
     expect(screen.getByText('Run the full loop')).toBeTruthy();
-    // DEC-035, asserted at the one component where a price would go.
+    // DEC-080, asserted at the one component where a price goes.
+    expect(document.body.textContent).toContain('₹99');
+    expect(document.body.textContent).toContain('₹999');
+    // Still no monthly plan and no second currency — neither exists.
     expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month/i);
+  });
+
+  /**
+   * ENTERPRISE PRINTS NO AMOUNT. Its `priceMinor` is 0 and 0 is not a price — `16` §4 prices
+   * it individually, so the card names the conversation rather than quoting a number nobody
+   * honoured. This is the assertion that stops a well-meaning render of `formatMoney(0)`.
+   */
+  it('quotes Enterprise rather than pricing it', () => {
+    render(<PlanPicker plans={PLAN_OPTIONS} current={null} mode="join" onSelect={vi.fn()} />);
+    expect(screen.getByText('Priced with you')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('₹0');
   });
 
   /**

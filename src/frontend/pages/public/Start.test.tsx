@@ -34,19 +34,41 @@ const fill = (email = 'amara@northfield.test') => {
 /** Step 1 → step 2. The button says `Continue`; only the last one says `Continue to setup`. */
 const advance = () => fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-/** Pick a tier on step 2. Matched by role rather than by label text, because the card's
- *  accessible name is its whole contents — name, pitch and what it adds. */
-const pick = (tier: RegExp = /Gold/) =>
-  fireEvent.click(screen.getByRole('radio', { name: tier }));
+/**
+ * One tier's radio, BY VALUE.
+ *
+ * Not by accessible name: a card's name is its whole contents, and the feature bullets say
+ * "Everything in Bronze" on Silver and "Everything in Silver" on Gold, so `{ name: /Silver/ }`
+ * matches two cards. The `value` attribute is the tier and is the only unambiguous handle.
+ */
+const radio = (tier: string): HTMLInputElement =>
+  screen
+    .getAllByRole<HTMLInputElement>('radio')
+    .find((input) => input.value === tier) as HTMLInputElement;
 
-const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Continue to setup' }));
+/** Pick a tier on step 2. */
+const pick = (tier = 'gold') => fireEvent.click(radio(tier));
 
-/** The whole happy path: fill the fields, advance, pick a tier, submit. */
-const register = (email?: string, tier?: RegExp) => {
+/** Step 2 → the checkout. DEC-080: this button opens <PaymentDialog>, it does not POST. */
+const submit = () =>
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
+
+/**
+ * Press Pay, then wait out the dialog's own sequence — a deliberate ~700ms simulated capture
+ * and a ~1500ms success overlay (PaymentDialog.tsx). Real timers rather than fake ones:
+ * `waitFor` and fake timers fight each other, and the whole flow is ~2.2s.
+ */
+const pay = () => fireEvent.click(screen.getByRole('button', { name: /^Pay ₹/ }));
+
+const PAID = { timeout: 4000 };
+
+/** The whole happy path: fill the fields, advance, pick a tier, open the checkout, pay. */
+const register = (email?: string, tier?: string) => {
   fill(email);
   advance();
   pick(tier);
   submit();
+  pay();
 };
 
 // Braces are load-bearing. `mockReset()` returns the mock, and vitest treats a function
@@ -70,7 +92,7 @@ describe('create organization — 30 §3.3', () => {
     registerOrg.mockResolvedValue('/app/setup');
     mount();
     register();
-    await waitFor(() => expect(registerOrg).toHaveBeenCalled());
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled(), PAID);
     expect(registerOrg.mock.calls[0]?.[0]).toEqual({
       orgName: 'Northfield University',
       name: 'Amara Rao',
@@ -78,6 +100,9 @@ describe('create organization — 30 §3.3', () => {
       password: 'a-long-enough-one',
       industry: 'custom',
       tier: 'gold',
+      // DEC-080. A LABEL for the capture the checkout simulated, not an amount and not a
+      // proof — the server prices the tier and writes the ledger row either way.
+      paymentRef: expect.stringMatching(/^endur_/) as unknown as string,
     });
   });
 
@@ -85,7 +110,7 @@ describe('create organization — 30 §3.3', () => {
     registerOrg.mockResolvedValue('/app/setup');
     mount();
     register();
-    await waitFor(() => expect(screen.getByText('WIZARD')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('WIZARD')).toBeTruthy(), PAID);
   });
 
   it('states the real minimum, 10, and states it before the server has to', () => {
@@ -104,7 +129,7 @@ describe('create organization — 30 §3.3', () => {
     mount();
     register();
 
-    await waitFor(() => expect(screen.getByText(/already registered/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/already registered/)).toBeTruthy(), PAID);
     expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
     // Offered a way out, not just a wall.
     expect(screen.getByRole('link', { name: 'Sign in instead' })).toBeTruthy();
@@ -121,7 +146,7 @@ describe('create organization — 30 §3.3', () => {
     );
     mount();
     register();
-    await waitFor(() => expect(screen.getByText('Too short.')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Too short.')).toBeTruthy(), PAID);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -131,7 +156,7 @@ describe('create organization — 30 §3.3', () => {
     );
     mount();
     register();
-    expect((await screen.findByRole('alert')).textContent).toBe('Server exploded.');
+    expect((await screen.findByRole('alert', {}, PAID)).textContent).toBe('Server exploded.');
   });
 });
 
@@ -167,37 +192,74 @@ describe('choose a plan — DEC-048', () => {
     fill();
     advance();
     expect(screen.getAllByRole<HTMLInputElement>('radio').some((radio) => radio.checked)).toBe(false);
-    expect(screen.getByRole('button', { name: 'Continue to setup' }).hasAttribute('disabled')).toBe(true);
-    pick(/Bronze/);
-    expect(screen.getByRole('button', { name: 'Continue to setup' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).hasAttribute('disabled')).toBe(true);
+    pick('bronze');
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('sends the tier that was pressed, not the first one', async () => {
     registerOrg.mockResolvedValue('/app/setup');
     mount();
-    register(undefined, /Silver/);
-    await waitFor(() => expect(registerOrg).toHaveBeenCalled());
+    register(undefined, 'silver');
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled(), PAID);
     expect((registerOrg.mock.calls[0]?.[0] as { tier: string }).tier).toBe('silver');
+    // The checkout's reference rides along as a LABEL (DEC-080) — the server prices the tier.
+    expect((registerOrg.mock.calls[0]?.[0] as { paymentRef?: string }).paymentRef)
+      .toMatch(/^endur_/);
   });
 
-  /** DEC-035, and it is asserted rather than assumed because a price is the sort of thing a
-   *  well-meaning copy edit adds back. */
-  it('shows no prices anywhere', () => {
+  /**
+   * DEC-080 REVERSED DEC-035, so the assertion reverses with it: the prices must be ON the
+   * cards, and the things the product still does not have — a monthly plan, a free trial —
+   * must still be absent. The second half is the half that quietly rots, which is why it is
+   * asserted rather than left to review.
+   */
+  it('prices every tier it offers', () => {
     mount();
     fill();
     advance();
+    expect(document.body.textContent).toContain('₹99');
+    expect(document.body.textContent).toContain('₹499');
+    expect(document.body.textContent).toContain('₹999');
     expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month|free trial|14 days/i);
+  });
+
+  /**
+   * THE CHECKOUT IS A STEP, NOT A COMMIT. Opening it must not POST — registration and the
+   * ledger row are one transaction on the server, and an organisation created before the
+   * reader pressed Pay would be an organisation they never agreed to pay for.
+   */
+  it('opens the checkout without registering anything', () => {
+    mount();
+    fill();
+    advance();
+    pick('gold');
+    submit();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(registerOrg).not.toHaveBeenCalled();
+  });
+
+  it('lets the checkout be cancelled with the tier still chosen', () => {
+    mount();
+    fill();
+    advance();
+    pick('gold');
+    submit();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(radio('gold').checked).toBe(true);
+    expect(registerOrg).not.toHaveBeenCalled();
   });
 
   it('goes back without losing the answers', () => {
     mount();
     fill();
     advance();
-    pick(/Gold/);
+    pick('gold');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.getByLabelText<HTMLInputElement>('Work email').value).toBe('amara@northfield.test');
     advance();
-    expect(screen.getByRole<HTMLInputElement>('radio', { name: /Gold/ }).checked).toBe(true);
+    expect(radio('gold').checked).toBe(true);
   });
 
   /**
@@ -215,11 +277,11 @@ describe('choose a plan — DEC-048', () => {
     );
     mount();
     register();
-    await waitFor(() => expect(screen.getByLabelText('Work email')).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('Work email')).toBeTruthy(), PAID);
     expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
     // The tier survives the trip. Being told your address is taken is not a reason to
     // re-answer a question you already answered.
     advance();
-    expect(screen.getByRole<HTMLInputElement>('radio', { name: /Gold/ }).checked).toBe(true);
+    expect(radio('gold').checked).toBe(true);
   });
 });

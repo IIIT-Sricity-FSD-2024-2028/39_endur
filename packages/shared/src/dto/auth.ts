@@ -55,6 +55,16 @@ export const RegisterBody = Credentials.extend({
   industry: z.enum(['university', 'hotel', 'hospital', 'company', 'custom']).default('custom'),
   /** Bronze, Silver or Gold. Enterprise is operator-assigned and not on the picker (16 §4). */
   tier: z.enum(SIGNUP_TIERS),
+  /**
+   * The reference for the payment the sign-up form simulated before it submitted. DEC-080.
+   *
+   * OPTIONAL, AND A LABEL RATHER THAN A PROOF — the same argument `JoinTierBody` makes. There
+   * is no gateway to verify it against, so requiring it would turn a client-generated string
+   * into something that looks like it gates registration. It does not: the ledger row is
+   * written either way, priced from `PLAN_OPTIONS` server-side, with a server-minted
+   * reference when the client sent none.
+   */
+  paymentRef: z.string().max(64).optional(),
 });
 export type RegisterBody = z.infer<typeof RegisterBody>;
 

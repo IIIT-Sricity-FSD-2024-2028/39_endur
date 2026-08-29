@@ -39,6 +39,10 @@ export const PLATFORM_CAPABILITY_CATALOGUE = {
     roles: OWNER_ONLY,
     note: 'The whole estate at once. Support helps one customer at a time and `platform.org.read` is what that needs (71)',
   },
+  'platform.revenue.read': {
+    roles: OWNER_ONLY,
+    note: 'The MONEY — what the estate has paid, by period and by tier (DEC-080, 71). Deliberately NOT platform.analytics.read: DEC-035 collapsed the two when it deleted pricing, and DEC-080 splits them again because they answer different questions. Support helps one customer at a time and never needs a revenue total; the owner asks about revenue without wanting the adoption page',
+  },
   'platform.usage.read': { roles: BOTH, note: 'Seats, campaign counts, response volume — as NUMBERS' },
   'platform.message.send': { roles: BOTH, note: 'Contact an org’s administrators (70 § Interactions)' },
   'platform.audit.read': { roles: BOTH, note: 'The platform’s own audit trail — ours, not a customer’s' },

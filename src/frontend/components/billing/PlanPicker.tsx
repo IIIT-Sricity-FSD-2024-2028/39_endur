@@ -1,4 +1,4 @@
-// <PlanPicker> — 24 §6b, 49 § Interactions, DEC-048.
+// <PlanPicker> — 24 §6b, 49 § Interactions, DEC-048, DEC-080.
 //
 // ONE COMPONENT, THREE WORLDS. The catalogue specifies two — a customer joining a plan in
 // `49` and an operator overriding one in `70` — and `DEC-048` adds the third: a founder
@@ -12,8 +12,14 @@
 // commits it. In `join` and `override` the organisation already exists and each card carries
 // its own action, because the click IS the write.
 //
-// NO PRICES, in any mode, in any phase — DEC-035. `PlanOption` has no field for one.
-import type { PlanOption, Tier } from '@endur/shared';
+// IT PRINTS A PRICE AND IT DOES NOT TAKE A PAYMENT — DEC-080. `onSelect` still only means
+// "this one", exactly as it did before: the payment dialog is opened by the CALLER. That
+// split is what keeps this component usable in `override` mode, where an operator moves
+// somebody else's plan and must never be shown a Pay button.
+//
+// ENTERPRISE PRINTS NO AMOUNT. Its `priceMinor` is 0 and 0 is not a price — `16` §4 prices
+// it individually, so the card says who to ask instead of quoting a number nobody honoured.
+import { formatMoney, type PlanOption, type Tier } from '@endur/shared';
 import { Icon } from '../Icon.js';
 
 export type PlanPickerMode = 'signup' | 'join' | 'override';
@@ -67,12 +73,26 @@ export function PlanPicker({
               </span>
             )}
             <span className="plan-name">{plan.name}</span>
+
+            {/* THE PRICE, ABOVE THE PITCH AND BELOW THE NAME. It is the second thing read
+                on this screen and the first thing compared across the three cards, so it
+                sits where the eye lands after the tier's name rather than at the bottom
+                where a reader has to hunt back up the column to compare. */}
+            {plan.selectable ? (
+              <span className="plan-price">
+                {formatMoney(plan.priceMinor, plan.currency)}
+                <span className="plan-price-period text-meta"> / year</span>
+              </span>
+            ) : (
+              <span className="plan-price plan-price-quoted text-meta">Priced with you</span>
+            )}
+
             <span className="plan-sells">{plan.sells}</span>
             <span className="plan-adds text-meta">{plan.adds}</span>
             {!plan.selectable && (
               <span className="plan-note text-meta">Arranged with us — talk to sales</span>
             )}
-            
+
             {mode === 'signup' && plan.features && plan.features.length > 0 && (
               <ul className="plan-features">
                 {plan.features.map((feature, idx) => (
@@ -86,12 +106,15 @@ export function PlanPicker({
           </>
         );
 
+        // The tier's own metal (DEC-080). One class, three ramps, and every card carries
+        // one — gold reads as the top of a ladder rather than as the only decorated card.
+        const cardClass =
+          `plan-card is-${plan.tier}` +
+          `${selected ? ' is-selected' : ''}${unavailable ? ' is-unavailable' : ''}`;
+
         if (mode === 'signup') {
           return (
-            <label
-              className={`plan-card${selected ? ' is-selected' : ''}${unavailable ? ' is-unavailable' : ''}`}
-              key={plan.tier}
-            >
+            <label className={cardClass} key={plan.tier}>
               <input
                 type="radio"
                 name="tier"
@@ -106,10 +129,7 @@ export function PlanPicker({
         }
 
         return (
-          <div
-            className={`plan-card${selected ? ' is-selected' : ''}${unavailable ? ' is-unavailable' : ''}`}
-            key={plan.tier}
-          >
+          <div className={cardClass} key={plan.tier}>
             {body}
             <button
               type="button"

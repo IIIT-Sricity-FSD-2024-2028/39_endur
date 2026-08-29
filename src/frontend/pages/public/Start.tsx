@@ -32,6 +32,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
 import { PlanPicker } from '../../components/billing/PlanPicker.js';
+import { PaymentDialog } from '../../components/billing/PaymentDialog.js';
 import { ApiError } from '../../lib/api.js';
 import { useRegister } from '../../lib/auth.js';
 import { AuthAside } from './AuthAside.js';
@@ -51,6 +52,13 @@ export default function Start(): JSX.Element {
   const [password, setPassword] = useState('');
   /** NOTHING IS PRE-SELECTED — DEC-048. There is no default tier to fall back to. */
   const [tier, setTier] = useState<SignupTier | null>(null);
+  /**
+   * The checkout, open or not — DEC-080. It is state on THIS page rather than a step of its
+   * own because the tier is still not committed while it is open: cancelling puts the reader
+   * back on three cards with their choice intact, and a third step would have put a back
+   * button between them and the thing they were mid-decision about.
+   */
+  const [paying, setPaying] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -67,10 +75,15 @@ export default function Start(): JSX.Element {
       setStep('plan');
       return;
     }
-    void submit();
+    // THE PLAN STEP NO LONGER SUBMITS DIRECTLY — DEC-080. It opens the checkout, and the
+    // checkout submits. Registration and the capture are one transaction on the server
+    // (`features/auth/service.ts`), so there is nothing to undo if the reader cancels: the
+    // POST has not happened yet.
+    if (!tier || busy) return;
+    setPaying(true);
   }
 
-  async function submit(): Promise<void> {
+  async function submit(paymentRef?: string): Promise<void> {
     if (busy || !tier) return;
     setBusy(true);
     setError(null);
@@ -83,9 +96,16 @@ export default function Start(): JSX.Element {
         // The wizard's step 1 asks properly, with the contents of each preset visible.
         industry: 'custom',
         tier,
+        // A LABEL, not a proof (DEC-080). The server prices the tier itself and writes the
+        // ledger row either way; this is what lets a human match that row to the dialog.
+        paymentRef,
       });
       navigate(landing, { replace: true });
     } catch (caught) {
+      // The checkout closes first. Leaving a success overlay on screen above an error the
+      // reader cannot reach is the worst of both — and every error this POST returns is
+      // about a FIELD, which is behind the dialog.
+      setPaying(false);
       setError(caught as Error);
       setBusy(false);
       // BACK TO THE FIELDS, because every error this POST can return is about one of them —
@@ -97,6 +117,8 @@ export default function Start(): JSX.Element {
       if (status === 409 || status === 422) setStep('details');
     }
   }
+
+  const chosenPlan = SIGNUP_PLAN_OPTIONS.find((plan) => plan.tier === tier) ?? null;
 
   const apiError = error instanceof ApiError ? error : null;
   const fieldError = (path: string): string | undefined =>
@@ -227,7 +249,7 @@ export default function Start(): JSX.Element {
             <div className="auth-plan-wrapper">
               <div className="auth-plan-header">
                 <h1 className="auth-title">Choose a plan</h1>
-                <p className="auth-sub">Currently every plan is free. Change it any time from settings</p>
+                <p className="auth-sub">One year, billed once. Change plan any time from settings</p>
               </div>
 
               <PlanPicker
@@ -247,7 +269,7 @@ export default function Start(): JSX.Element {
                   disabled={busy || !tier}
                 >
                   {busy && <span className="spinner" aria-hidden="true" />}
-                  Continue to setup
+                  Continue to payment
                 </button>
                 <button
                   className="btn btn-ghost btn-block"
@@ -264,6 +286,15 @@ export default function Start(): JSX.Element {
       </div>
 
       {step === 'details' && <AuthAside />}
+
+      {paying && chosenPlan && (
+        <PaymentDialog
+          plan={chosenPlan}
+          mode="signup"
+          onPaid={(reference) => void submit(reference)}
+          onCancel={() => setPaying(false)}
+        />
+      )}
     </div>
   );
 }

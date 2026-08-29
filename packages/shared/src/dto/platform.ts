@@ -7,7 +7,8 @@
 // slips into a select.
 import { z } from 'zod';
 import { dto, Id, PageQuery, SearchQuery } from './common.js';
-import { TIERS, type Tier } from '../tiers.js';
+import { TIERS, type Currency, type Tier } from '../tiers.js';
+import type { PaymentRecord } from './billing.js';
 import type { PlatformCapability, PlatformRole } from '../platform-capabilities.js';
 
 /**
@@ -36,7 +37,12 @@ export const EstateListDto = dto({ query: EstateQuery });
 export const OrgIdParam = z.object({ id: Id });
 export const PlatformOrgDto = dto({ params: OrgIdParam });
 
-/** DEC-035 — a tier, and no amount anywhere. There is no price in Endur to send. */
+/**
+ * A TIER AND NO AMOUNT, and DEC-080 does not change that. An override is a SUPPORT
+ * action, not a sale: it moves a customer's plan without taking their money, writes no
+ * `payments` row, and therefore never reaches `/ops/earnings`. An operator who could
+ * name an amount here could invent revenue.
+ */
 export const OverridePlan = z.object({
   tier: z.enum(TIERS),
   reason: z.string().max(500).optional(),
@@ -98,6 +104,16 @@ export const AnalyticsQuery = z.object({
 });
 export type AnalyticsQuery = z.infer<typeof AnalyticsQuery>;
 export const AnalyticsListDto = dto({ query: AnalyticsQuery });
+
+/**
+ * `/ops/earnings` reads the SAME window as `/ops/analytics` and deliberately reuses its
+ * shape rather than declaring a parallel one — an owner who narrows the date range on one
+ * page and opens the other should not have to re-narrow it, and two query vocabularies for
+ * one mental model is how the two pages start disagreeing about what "this quarter" means.
+ */
+export const EarningsQuery = AnalyticsQuery;
+export type EarningsQuery = z.infer<typeof EarningsQuery>;
+export const EarningsListDto = dto({ query: EarningsQuery });
 
 export const LogListDto = dto({});
 
@@ -202,9 +218,11 @@ export type PlatformOperator = {
 };
 
 /**
- * `71` § Data contract, copied field for field. There is no `price`, `amount`, or `currency`
- * anywhere in this shape — DEC-035 — and no field that could carry a response, an answer or
- * a respondent identity — INV-011. Every number here is a COUNT.
+ * `71` § Data contract, copied field for field. Every number in this shape is a COUNT, and
+ * that stays true after DEC-080 gave the product prices back: money lives next door in
+ * `PlatformEarnings` and `/ops/earnings`, and mixing the two would make a page that answers
+ * "is this working?" also argue about revenue. No field here could carry a response, an
+ * answer or a respondent identity — INV-011.
  */
 export type PlatformAnalytics = {
   window: { from: string; to: string; granularity: 'month' | 'quarter' };
@@ -237,6 +255,62 @@ export type PlatformAnalytics = {
 
   /** COUNTS ONLY — INV-011. */
   totals: { seats: number; campaigns: number; responses: number };
+};
+
+/**
+ * `/ops/earnings` — the money, which DEC-080 gave the product back. Owner only, behind
+ * `platform.revenue.read`.
+ *
+ * EVERY AMOUNT IS MINOR UNITS (paise) AS AN INTEGER, all the way to the browser. The client
+ * formats with `formatMoney()` and never divides by 100 itself — a float that crosses a
+ * network boundary is a rounding error waiting for a total to be summed downstream of it.
+ *
+ * STILL INV-011: there is no field here that could carry an answer, a comment or a
+ * respondent identity. `payerName` is a STAFF user's name, captured at the moment they
+ * pressed pay — the person who bought the plan, never anybody who answered a form.
+ *
+ * `tierOverTime` COUNTS PURCHASES IN EACH PERIOD, and it is not "how many organisations
+ * were on Gold in March". `subscriptions` holds only the CURRENT tier with no history
+ * (`schema.prisma`, and `<GrowthChart>`'s header records the same limit at length), so the
+ * second question cannot be answered honestly and `71`'s own rule forbids inventing it.
+ * What the ledger genuinely knows is what was bought, and when.
+ */
+export type PlatformEarnings = {
+  window: { from: string; to: string; granularity: 'month' | 'quarter' };
+  currency: Currency;
+
+  totals: {
+    revenueMinor: number;
+    payments: number;
+    /** Distinct organisations that have paid at least once IN THE WINDOW. */
+    orgsPaying: number;
+    /** `null` rather than 0 when nothing was captured — a mean of no payments is not zero. */
+    averageMinor: number | null;
+    /** Every capture ever, ignoring the window — the one lifetime figure on the page. */
+    lifetimeRevenueMinor: number;
+  };
+
+  /** Revenue over time, one row per period in the window — empty periods included as 0. */
+  byPeriod: { period: string; revenueMinor: number; payments: number }[];
+
+  /**
+   * The mix, two ways at once: what each tier has EARNED in the window, and how many
+   * organisations sit on it RIGHT NOW. The pie draws `orgsOnTier`; the legend prints both.
+   */
+  byTier: { tier: Tier; payments: number; revenueMinor: number; orgsOnTier: number }[];
+
+  /** Purchases per tier per period. Not a tier census — see the note above. */
+  tierOverTime: { period: string; bronze: number; silver: number; gold: number }[];
+
+  /** The most recent captures, newest first. */
+  recent: Array<
+    PaymentRecord & { orgId: string; orgName: string }
+  >;
+
+  /** The subset that MOVED a plan — `kind: 'change'` — newest first. */
+  recentChanges: Array<
+    PaymentRecord & { orgId: string; orgName: string }
+  >;
 };
 
 /**

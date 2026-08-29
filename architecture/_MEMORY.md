@@ -368,7 +368,7 @@ DEC-034  SUPERSEDED-BY-DEC-035  2026-08-23  origin:owner
            pricing ever returned. read DEC-035 with it, never instead of it.
   see      19 §8, 49-PAGE-plan-and-billing.md, 16 §8
 
-DEC-035  ACTIVE  2026-08-23  origin:user
+DEC-035  SUPERSEDED-BY-DEC-080  2026-08-23  origin:user
   what     ENDUR HAS NO PRICES. no amounts, no currency, no checkout, no payment
            processor, no invoice, NO plan_prices TABLE. an organisation JOINS a tier:
            one button per tier in 49, POST /billing/tier, subscriptions.tier is written,
@@ -1587,6 +1587,75 @@ DEC-078  ACTIVE  2026-08-27  origin:user  amends:70 § Design note
            chips, no `useLabels()`, "Organizations"/"Plan"/"Tier" stay literal (19 §12).
            this is a chrome change, not a re-scoping of what the surface is for.
   see      70 § Design note, DEC-012, 19 §12, src/frontend/router/layouts.tsx
+
+DEC-079  ACTIVE  2026-08-29  origin:user  amends:49 § Route & access  task:T-058
+  decision THE PLAN PAGE IS A SIDEBAR ITEM AT `/app/plan`, NOT A SETTINGS TAB AT
+           `/app/settings/billing`. 49 § Route & access is SUPERSEDED on the route and on
+           the placement, and on nothing else.
+  why      the owner asked for a "Plan" page in the sidebar showing the current plan with
+           a way to change it. 49's case for a tab -- billing is read monthly, and the
+           sidebar's groups are things people DO -- is still correct about the GROUPS, and
+           that is why the item sits in `system` (beside Settings and the activity log,
+           which are furniture) rather than opening an Organize/Collect/Understand row for
+           one entry. the argument is written into the page header and the nav item, not
+           deleted: if the sidebar ever needs cutting, 49 already says where this goes.
+  what     `/app/plan` (pages/console/Plan/), wrapped in `RequireCapability
+           capability="billing.read"` like Settings and the log; a `Plan` nav item in
+           `system` gated on `billing.read`; `plan` (lucide `Layers`) joins the closed icon
+           vocabulary; `tierRank()` in packages/shared/src/tiers.ts.
+  guard    `tierRank()` DECIDES COPY, NEVER ACCESS -- it picks between "apply silently"
+           (upgrade) and "confirm, and say the data is kept" (downgrade), which is 49
+           § Interactions. the entitlement map still does not ship to the browser and the
+           client still cannot re-decide a 402 (INV-003, DEC-011).
+  not      the SEAT CEILING and `<OverLimitBanner>` are NOT in this: seats are counted and
+           shown, never capped, so there is no over-limit behaviour yet (T-057). the audit
+           row for a join names neither from-tier nor to-tier -- `AuditIntent` carries
+           action/targetType/targetId and audit_log has no metadata column on the org-side
+           write, and widening the shape every feature writes through is T-058's, not a
+           nav item's.
+  see      49, 16 §5, DEC-035, DEC-048, src/backend/features/billing/**
+
+DEC-080  ACTIVE  2026-08-29  origin:user  supersedes:DEC-035  task:T-058
+  decision ENDUR HAS PRICES AGAIN, AND A CHECKOUT. bronze Rs 99, silver Rs 499, gold
+           Rs 999, per YEAR, in INR. the money is SIMULATED end to end: no gateway, no
+           card fields, no webhook, no secret keys. a `payments` table records every
+           capture, and `/ops/earnings` reports it.
+  why      user, 2026-08-29: "currently we have plans but not payment thing". the course
+           project is being demonstrated as a product, and a plan ladder with no price is
+           the one part of the revenue model that reads as unfinished on screen. DEC-035
+           removed pricing because "a course project cannot take money" -- still true,
+           and the answer here is that it does not take money: it records a capture it
+           performed itself and says so in the UI copy.
+  supersed DEC-035 in full on PRICE and CHECKOUT. `PlanOption` now carries `priceMinor`
+           and `currency`. 71 goes back to being a revenue page IN ADDITION to analytics
+           -- `/ops/analytics` is untouched and `/ops/earnings` is a second page beside
+           it. `platform.revenue.read` RETURNS as a capability (owner only); DEC-035 had
+           renamed it to platform.analytics.read, and both now exist and mean different
+           things: analytics is orgs/seats/activity, revenue is money.
+  holds    EVERYTHING DEC-035 KEPT IS STILL KEPT. the entitlement gate (16 §3), the 402,
+           billable_seats (16 §5), the over-limit asymmetry (16 §6). DEC-034's hole stays
+           closed the way DEC-035 closed it: the AUTHORITATIVE tier write is still
+           POST /billing/tier behind `billing.update`, and the payment dialog is a CLIENT
+           step in front of it, never an authorisation step. a client that skips the
+           dialog gets the same tier it would have got before -- there is no money to
+           steal, and pretending otherwise would put an authorisation decision in React
+           (INV-003).
+  money    STORED IN MINOR UNITS AS `Int` (paise). 9900 = Rs 99. never a float, never a
+           decimal column. the AMOUNT IS PRICED SERVER-SIDE from PLAN_OPTIONS on both
+           write paths -- the client sends a tier and a reference and never an amount.
+  what     packages/shared/src/tiers.ts (priceMinor, currency, formatMoney), `payments`
+           table + Payment model, payment rows written inside the EXISTING transactions
+           in features/auth/service.ts (signup) and features/billing/service.ts (change),
+           <PaymentDialog> in components/billing/, `platform.revenue.read`,
+           GET /api/v1/platform/earnings, pages/platform/Earnings/,
+           <RevenueChart> <TierDonut> <TierTrendChart> in components/platform/,
+           the --tier-{bronze,silver,gold}-* ramp in tokens.css.
+  not      NOT a subscription lifecycle. nothing renews, nothing expires, nothing dunns,
+           there are no refunds and no invoices -- `periodEnd` still bills nothing when it
+           passes, exactly as DEC-035 left it, and the unbuilt scheduler is still
+           OPEN-005's. `payments` is an append-only LEDGER OF CAPTURES, not an accounts
+           system.
+  see      DEC-035, DEC-034, DEC-048, 16 §2 §4, 19 §4, 49, 71, 13 § Platform
 ```
 
 ---
@@ -2516,8 +2585,12 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     tables in database/schema.prisma. 10 owns the FILE;
                                     19 owns those two MODELS. (plan_prices was a third
                                     until DEC-035 deleted pricing outright.)
-49-PAGE-plan-and-billing.md      -> src/frontend/pages/console/Billing/**
+49-PAGE-plan-and-billing.md      -> src/frontend/pages/console/Plan/**
                                     src/backend/features/billing/**
+                                    src/frontend/lib/billing.ts
+                                    NOTE the page is `Plan/`, not `Billing/`, and it is a
+                                    SIDEBAR item at /app/plan rather than a settings tab
+                                    -- DEC-079 supersedes 49 § Route & access on that.
 70-PAGE-platform-console.md      -> src/frontend/pages/platform/Console/**
 71-PAGE-platform-analytics.md    -> src/frontend/pages/platform/Analytics/**
                                     NOTE 70+71 are EXEMPT from INV-001 (19 §12) and

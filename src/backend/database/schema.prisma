@@ -120,6 +120,7 @@ model Organization {
   actionPlans     ActionPlan[]
   checkins        Checkin[]
   subscription    Subscription?
+  payments        Payment[]
   platformAudit   PlatformAuditLog[]
 
   @@map("organizations")
@@ -688,6 +689,57 @@ model Subscription {
   status      String   @default("trialing")
 
   @@map("subscriptions")
+}
+
+/// Every capture, as a LEDGER. DEC-080, T-058.
+///
+/// THE MONEY IS SIMULATED AND THIS TABLE SAYS SO BY WHAT IT DOES NOT HAVE: no gateway id,
+/// no payment-method id, no card fingerprint, no webhook payload, no `captured_at` distinct
+/// from `created_at`. There was no third party, so there is nothing a third party would have
+/// told us. `reference` is minted by us and is a LABEL — it matches a row to the dialog the
+/// customer saw, and nothing authorises on it.
+///
+/// APPEND ONLY, and never updated. A capture that was wrong is corrected by a second row,
+/// not by editing the first: the whole point of a ledger is that `/ops/earnings` can add it
+/// up without asking whether a total has moved since yesterday.
+///
+/// IT IS NOT AN ACCOUNTS SYSTEM. Nothing renews, nothing expires, nothing dunns, there are
+/// no refunds and no invoices — `subscriptions.period_end` still bills nothing when it
+/// passes, exactly as DEC-035 left it.
+model Payment {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// CAPTURED AT THE TIME, not joined at read time. The user row may be renamed, disabled
+  /// or gone by the time an owner reads the earnings page, and a receipt that changes its
+  /// mind about who paid is not a receipt. No FK for the same reason.
+  payerName  String @map("payer_name")
+  payerEmail String @map("payer_email")
+
+  /// bronze | silver | gold | enterprise — what was bought.
+  tier String
+  /// What they were on before. NULL on a signup: there was no plan before it.
+  fromTier String? @map("from_tier")
+  /// signup | change. Two write paths, and the earnings page asks a different question of
+  /// each — inferring `change` from a non-null `from_tier` would be inference where a
+  /// column will do.
+  kind String
+
+  /// MINOR UNITS (paise) AS AN INTEGER. 9900 = Rs 99.00. Never NUMERIC, never a float:
+  /// priced server-side from PLAN_OPTIONS on both write paths, so there is one integer to
+  /// carry and nothing to round.
+  amountMinor Int    @map("amount_minor")
+  currency    String @default("INR")
+  status      String @default("succeeded")
+  /// Ours, not a gateway's. Unique so a double-submitted dialog cannot bill twice.
+  reference   String @unique
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([orgId])
+  @@map("payments")
 }
 
 /// The improve loop. 44, T-083.

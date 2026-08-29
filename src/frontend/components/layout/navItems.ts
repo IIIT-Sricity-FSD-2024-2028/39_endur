@@ -130,5 +130,15 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     // (`DEC-051`).
     { to: '/app/logs', label: 'Activity log', icon: 'log', group: 'system',
       needs: 'audit.read' },
+    // `49` PUTS THIS PAGE IN SETTINGS, NOT IN THE SIDEBAR — "billing is looked at monthly,
+    // and a fourth group holding one item is a worse answer than a tab". The owner asked
+    // for a sidebar item, so it is one, and it sits in `system` for the reason that
+    // argument gives: it is not something anybody DOES daily, so it belongs with the
+    // furniture rather than in Organize / Collect / Understand.
+    //
+    // `billing.read`, and NO `minScope`: the seeded matrix grants it at `all` or not at all
+    // (11 §8), so an organisation that has given somebody this capability has given them
+    // the whole page. It is seeded to administrators only, so the item is already rare.
+    { to: '/app/plan', label: 'Plan', icon: 'plan', group: 'system', needs: 'billing.read' },
   ];
 }

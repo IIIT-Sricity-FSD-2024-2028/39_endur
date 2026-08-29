@@ -18,7 +18,7 @@ import {
   Inbox, LayoutTemplate, Maximize2, Monitor as MonitorSmartphone, Moon, Pencil, Play,
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
-  GraduationCap, Building, HeartPulse,
+  GraduationCap, Building, HeartPulse, Layers,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -89,6 +89,10 @@ const ICONS = {
   // the same group: rule 2 above is one icon per concept, and two items in one group
   // sharing a glyph is how a sidebar starts looking like a mistake.
   log: History,
+  // The plan (49). `Layers` and not a card, coin or banknote: there is no money in this
+  // product (DEC-035), and a payment glyph would promise a checkout that does not exist.
+  // What a tier actually is here is a stack — each one carries everything under it.
+  plan: Layers,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

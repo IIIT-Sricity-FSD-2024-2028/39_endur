@@ -612,6 +612,11 @@ only thing that reliably stops "Are you sure?" from reappearing.
 Five components added 2026-08-23 with `49`, `70` and `71`. Four are customer-facing or
 shared; `<GrowthChart>` and `<MessageComposer>` are internal-only.
 
+**Four more added 2026-08-29 with `DEC-080`**, which gave the product prices and a checkout
+back: `<PaymentDialog>` is customer-facing; `<RevenueChart>`, `<TierDonut>` and
+`<TierTrendChart>` are `/ops/earnings` only. All three charts are inline SVG or a
+`conic-gradient` — `DEC-064` still stands and no charting library was added.
+
 ### `<PlanPicker>`  ·  **BUILT 2026-08-24 (`T-088`)**
 ```ts
 { plans: readonly PlanOption[];
@@ -698,6 +703,54 @@ response content cannot render it.
 `70`'s contact-the-administrators action. **`recipients` is display-only and the send call
 carries no address** — the server resolves who holds `org.update` and mails them. An operator
 typing an address is an operator who can typo a customer's plan details to a stranger.
+
+### `<PaymentDialog>`  ·  **BUILT 2026-08-29 (`T-058`, `DEC-080`)**
+```ts
+{ plan: PlanOption;
+  mode: 'signup' | 'change';                     // no organisation yet | one that exists
+  fromTier?: Tier | null;                        // what they are on, for the change sentence
+  onPaid: (reference: string) => void;
+  onCancel: () => void }
+```
+**The checkout `DEC-035` deleted, rebuilt and honest about itself.** No gateway, no card
+field, no secret key: a short deliberate wait, a minted reference, and a green success
+overlay. The copy says so — *"Endur demo checkout · no card details are collected"*.
+
+**It decides nothing.** `onPaid` is what the caller does next, and the server does that thing
+whether or not a reference arrives (`JoinTierBody.paymentRef` is optional and is a label, not
+a proof). Two rails: the amount on the left, `plan.features` on the right, because the reader
+is deciding and the argument for the price has to be beside the price. Two callers — `/start`
+step 2 and `/app/plan` — and `<PlanPicker>` knows about neither: selection still only means
+"this one", which is what keeps the picker usable in `override` mode where an operator must
+never see a Pay button.
+
+### `<RevenueChart>`  ·  **BUILT 2026-08-29 (`T-058`)**
+```ts
+{ series: { period: string; revenueMinor: number; payments: number }[] }
+```
+`/ops/earnings` only. `<TrendLine>`'s primitives a third time (`DEC-064`). **One series, and
+it gets an area** — `<GrowthChart>` refuses one because four filled regions overlapping is
+mud; a single quantity accumulating has nothing to obscure. **The floor is zero, not the
+minimum**: a revenue line scaled from its quietest month makes that month look like nothing
+came in, and the size of a month is the thing being read.
+
+### `<TierDonut>`  ·  **BUILT 2026-08-29 (`T-058`)**
+```ts
+{ slices: { tier: Tier; orgsOnTier: number; revenueMinor: number; payments: number }[] }
+```
+`/ops/earnings` only. The `conic-gradient` + `.donut` mask from `43`'s sentiment ring, in the
+`--tier-*` metals. **The ring is TODAY and the amounts are the WINDOW**, and the card says
+which is which: "Gold: 4" beside "Gold: ₹3,996" otherwise invites reading the second as the
+first times a price, and a tier an organisation has moved off still earned money.
+
+### `<TierTrendChart>`  ·  **BUILT 2026-08-29 (`T-058`)**
+```ts
+{ series: { period: string; bronze: number; silver: number; gold: number }[] }
+```
+`/ops/earnings` only. **Plots PURCHASES per period, not a tier census** — the same limit
+`<GrowthChart>` documents below, for the same reason: nothing records what tier an
+organisation sat on in a past month. Three lines, not four: Enterprise is never purchased
+(`16` §4), so a fourth would be flat at zero forever and read as "nobody wants it".
 
 ### `<GrowthChart>`  ·  **BUILT 2026-08-25 (`T-067`), shape changed from the placeholder below**
 ```ts

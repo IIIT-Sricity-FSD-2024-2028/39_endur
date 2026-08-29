@@ -4804,3 +4804,369 @@ html:active-view-transition * {
 @media (max-width: 639px) {
   .structure-map-card { padding: var(--space-4); }
 }
+
+/* ── /app/plan — 49. The current-plan card and the tier ladder. ─────────────────
+   It reuses `.settings-page` and `.settings-card` wholesale, so this page and Settings
+   are visibly the same kind of screen: a column of labelled cards at reading width. What
+   is new is the ladder, and only the ladder — the picker below it is `.plan-grid`, which
+   `/start` and `/ops/orgs/:id` already render. */
+/* Beats `.settings-card > .card`'s form density: this card is facts, not inputs. */
+.settings-card > .card.plan-current { gap: var(--space-4); }
+.plan-current-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-3); flex-wrap: wrap;
+}
+.plan-current-name {
+  margin: 0 0 2px;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-h3);
+}
+.plan-current-head .text-muted { margin: 0; }
+
+/* The ladder. Four steps, smallest first, with the ones already included filled in — the
+   entitlement model is cumulative, so a filled run reading left to right IS what the
+   organisation has. An `<ol>` because the order carries that meaning; the connector is a
+   pseudo-element so the list stays four items and not seven. */
+.plan-ladder {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  gap: 0; list-style: none; margin: 0; padding: 0;
+}
+.plan-step {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-size: var(--text-micro); text-transform: uppercase;
+  letter-spacing: .06em;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.plan-step::before {
+  content: ''; position: absolute; top: 5px; left: -50%; width: 100%; height: 2px;
+  background: var(--color-divider);
+}
+.plan-step:first-child::before { display: none; }
+.plan-step.is-here::before, .plan-step.is-below::before { background: var(--color-accent); }
+.plan-step-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--color-divider);
+  outline: 3px solid var(--color-card);
+  position: relative; z-index: 1;
+}
+.plan-step.is-below .plan-step-dot { background: var(--color-accent); }
+.plan-step.is-here { color: var(--color-accent-700); font-weight: 600; }
+.plan-step.is-here .plan-step-dot {
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-100);
+}
+.plan-step-name { text-transform: capitalize; }
+
+.plan-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4); margin: 0;
+  padding-top: var(--space-4); border-top: 1px solid var(--color-divider);
+}
+.plan-facts dt { margin: 0 0 2px; }
+.plan-facts dd { margin: 0; line-height: 1.5; }
+.plan-note-seats { margin: 0; max-width: 62ch; line-height: 1.5; }
+
+/* The picker sits directly in the section, like `/ops/orgs/:id` — `.plan-card` already
+   carries its own surface, and nesting one glass card inside another squeezes four tiers
+   into a narrower box than the same grid gets everywhere else (`.ops-plan-section`). */
+.settings-card > .plan-grid { margin-top: var(--space-1); }
+
+@media (max-width: 479px) {
+  /* Four dots across a 320px card puts "enterprise" on two lines under a 40px column. The
+     ladder stacks instead, and the connector runs down the left rather than across. */
+  .plan-ladder { grid-auto-flow: row; gap: var(--space-2); }
+  .plan-step { flex-direction: row; align-items: center; gap: var(--space-2); }
+  .plan-step::before { display: none; }
+}
+
+/* ══ Money — DEC-080 ═══════════════════════════════════════════════════════
+   The price on a plan card, the checkout dialog, and the metals that tie the
+   two to `/ops/earnings`. One section, because the three have to agree: a gold
+   card, a gold pay rail and a gold donut slice are the same claim made three
+   times, and splitting them across the file is how they stop matching.        */
+
+/* ── the price on a plan card ──────────────────────────────────────────────
+   Display size, heading face, and a `text-meta` period hung off it so the two
+   read as one line rather than two facts. `font-variant-numeric: tabular-nums`
+   because the three cards sit side by side and ₹99 / ₹499 / ₹999 must align on
+   the rupee sign, not wander with the digit widths.                          */
+.plan-price {
+  display: flex; align-items: baseline; gap: 4px;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-h3); letter-spacing: var(--track-heading);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.plan-price-period { font-family: var(--font-body); font-weight: 400; letter-spacing: normal; }
+/* Enterprise has no amount and must not look like it is missing one — the sentence
+   replaces the number rather than sitting where a number failed to load. */
+.plan-price-quoted { font-family: var(--font-body); font-size: var(--text-small); }
+.plan-grid.is-signup .plan-price { font-size: var(--text-h2); }
+
+/* ── the metals on a card ──────────────────────────────────────────────────
+   A HAIRLINE AND A WASH, never the type. The tier ramp tints the top edge of
+   every card so the ladder is legible before anything is chosen; selecting one
+   promotes the same hue to the whole border and the check badge. Gold is not
+   given a treatment the other two lack — a single decorated card would read as
+   an ad rather than as the top of a ladder.                                   */
+.plan-card::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 3px;
+  border-radius: calc(var(--radius-lg) * 1.15) calc(var(--radius-lg) * 1.15) 0 0;
+  background: var(--tier-metal, transparent);
+  opacity: .55;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.plan-card.is-bronze { --tier-metal: var(--tier-bronze-500); --tier-wash: var(--tier-bronze-100); }
+.plan-card.is-silver { --tier-metal: var(--tier-silver-500); --tier-wash: var(--tier-silver-100); }
+.plan-card.is-gold   { --tier-metal: var(--tier-gold-500);   --tier-wash: var(--tier-gold-100); }
+.plan-card.is-selected { border-color: var(--tier-metal, var(--color-accent)); }
+.plan-card.is-selected::before { opacity: 1; }
+.plan-card.is-selected .plan-check { background: var(--tier-metal, var(--color-accent)); }
+.plan-card.is-gold.is-selected,
+.plan-card.is-silver.is-selected,
+.plan-card.is-bronze.is-selected {
+  /* The wash sits UNDER the card colour rather than replacing it, so a selected card is
+     still a card and not a coloured slab. 22% is where the tint is legible beside its two
+     unselected neighbours and still passes body text at 4.5:1 in both themes. */
+  background: color-mix(in srgb, var(--tier-wash) 22%, var(--color-card));
+}
+.plan-card:has(input:focus-visible) { outline-color: var(--tier-metal, var(--color-accent)); }
+
+/* Gold, and only gold, gets one extra half-note: a very low-angle sheen across the card.
+   This is the one place the section spends its boldness — everything else here is a
+   hairline. Paint only, no transform, so it costs nothing on scroll. */
+.plan-card.is-gold {
+  background-image:
+    linear-gradient(118deg,
+      color-mix(in srgb, var(--tier-gold-500) 8%, transparent) 0%,
+      transparent 42%);
+}
+
+/* ── <PaymentDialog> ───────────────────────────────────────────────────────
+   Two rails: what it costs on the left, what it buys on the right. The reader
+   is deciding, and the argument for the price has to be beside the price
+   rather than a scroll away from it.                                          */
+.pay-dialog {
+  width: min(720px, 100%);
+  padding: 0; overflow: hidden;
+  position: relative;
+  /* A CHECKOUT MUST NEVER OPEN TALLER THAN THE WINDOW. The value rail carries up to five
+     bullets and the pay rail a display-size figure, which together exceed a laptop's
+     shortest sensible viewport — and a dialog centred in a flex backdrop does not scroll
+     when it overflows, it hangs off both ends with the Pay button unreachable. The panel
+     caps and the CONTENT scrolls; the success overlay is positioned on this box, so it
+     still covers the whole dialog whatever the grid inside is doing. */
+  max-height: 88vh;
+  display: flex; flex-direction: column;
+  /* Rises 8px and settles from .97 — never from `scale(0)`, which is a thing appearing
+     out of nothing. `--dur-base` at `--ease`: a dialog under 300ms. */
+  animation: pay-in var(--dur-base) var(--ease) both;
+}
+@keyframes pay-in {
+  from { opacity: 0; transform: translateY(8px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.pay-grid { display: grid; grid-template-columns: 1fr 1fr; overflow-y: auto; }
+
+.pay-rail {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-8) var(--space-6);
+  background: color-mix(in srgb, var(--tier-wash, var(--color-accent-100)) 30%, var(--color-card));
+  border-right: 1px solid var(--color-divider);
+}
+.pay-dialog.is-bronze { --tier-metal: var(--tier-bronze-500); --tier-wash: var(--tier-bronze-100); }
+.pay-dialog.is-silver { --tier-metal: var(--tier-silver-500); --tier-wash: var(--tier-silver-100); }
+.pay-dialog.is-gold   { --tier-metal: var(--tier-gold-500);   --tier-wash: var(--tier-gold-100); }
+.pay-rail::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--tier-metal, var(--color-accent));
+}
+
+.pay-kicker { text-transform: uppercase; letter-spacing: var(--track-utility); }
+.pay-title {
+  margin: 0;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-sub); letter-spacing: var(--track-heading);
+}
+/* THE ONE BIG NUMBER ON THE SCREEN. Display size, tabular, and the period hung off its
+   baseline — the amount is the whole question this dialog asks. */
+.pay-amount {
+  display: flex; align-items: baseline; gap: 5px; margin: var(--space-2) 0 0;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-display); line-height: 1;
+  letter-spacing: var(--track-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.pay-period { font-family: var(--font-body); font-size: var(--text-small); font-weight: 400; }
+.pay-method { margin: var(--space-1) 0 0; }
+.pay-actions { display: flex; flex-direction: column; gap: var(--space-2); margin-top: auto; padding-top: var(--space-6); }
+.pay-button { min-height: 48px; }
+
+.pay-value {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+}
+.pay-value-title {
+  margin: 0;
+  font-family: var(--font-heading); font-size: var(--text-lead);
+  letter-spacing: var(--track-heading);
+}
+.pay-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.pay-feature {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  font-size: var(--text-small); line-height: 1.4;
+  animation: pay-feature-in var(--dur-base) var(--ease) both;
+}
+.pay-feature svg { color: var(--tier-metal, var(--color-accent)); flex-shrink: 0; margin-top: 2px; }
+@keyframes pay-feature-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.pay-terms { margin: auto 0 0; }
+
+/* ── the success overlay ───────────────────────────────────────────────────
+   The one flourish in the section, spent in one place — a rare-tier moment a
+   person sees once at sign-up. The green field floods from the centre, the
+   tick draws, then the words arrive; nothing overlaps, so each beat is read
+   rather than glimpsed.
+
+   THE ADVANCE IS A TIMER, NOT `animationend` (see PaymentDialog.tsx). Under
+   the global reduced-motion rule these durations collapse to ~0 and the panel
+   simply IS green with a tick on it — still a confirmation, still legible,
+   and the flow still moves on at the same moment.                             */
+.pay-success {
+  position: absolute; inset: 0; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2);
+  /* THE FIELD IS DARKENED FROM THE STATUS TOKEN, not the token itself. White on
+     `--status-good-500` is about 2.8:1 in both themes — under the bar for the sentence on it,
+     and this is the one screen in the product that is nothing BUT a sentence on a colour.
+     Mixed 62% with black it clears 6:1, and it is still recognisably the product green
+     rather than a second one invented here. */
+  background: color-mix(in srgb, var(--status-good-500) 62%, #000);
+  color: #fff;
+  animation: pay-flood var(--dur-slow) cubic-bezier(.34, 1.4, .5, 1) both;
+}
+/* CLIP ONLY, NEVER OPACITY. Fading a green field in over the panel makes the whole thing
+   read as translucent for the length of the animation — the words underneath stay legible
+   through it, which looks like a rendering fault rather than a confirmation. The circle
+   growing IS the reveal, and every frame of it is fully opaque.
+
+   150%, not 75%: a percentage radius is relative to the box, and a circle that stops at
+   three quarters leaves the four corners of a wide dialog uncovered at rest. */
+@keyframes pay-flood {
+  from { clip-path: circle(0% at 50% 50%); }
+  to   { clip-path: circle(150% at 50% 50%); }
+}
+.pay-tick { display: block; width: 76px; height: 76px; }
+.pay-tick svg { width: 100%; height: 100%; display: block; }
+/* THE RESTING STATE IS DRAWN, AND THE ANIMATION RUNS FROM THE HIDDEN ONE — never the other
+   way round. A tick whose visibility depends on an animation REACHING its end state is a
+   confirmation that disappears wherever animations do not run: a throttled background tab,
+   a browser that skips them, a headless pane. The mark is the message; the drawing of it is
+   decoration on top. Same reason  is written this way below.
+
+   45 is a little over the path's own length, so the dash fully clears it. */
+.pay-tick path {
+  fill: none; stroke: #fff; stroke-width: 4;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 45; stroke-dashoffset: 0;
+  animation: pay-tick-draw var(--dur-slow) var(--ease) 180ms backwards;
+}
+@keyframes pay-tick-draw { from { stroke-dashoffset: 45; } }
+.pay-success-word {
+  margin: 0;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-h3); letter-spacing: var(--track-heading);
+  animation: pay-word-in var(--dur-base) var(--ease) 420ms both;
+}
+.pay-success-sub {
+  margin: 0; font-size: var(--text-small); opacity: .88;
+  animation: pay-word-in var(--dur-base) var(--ease) 500ms both;
+}
+@keyframes pay-word-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* One column under the form width: the value rail becomes the thing you scroll to
+   after the price rather than a column squeezed beside it. */
+@media (max-width: 719px) {
+  .pay-grid { grid-template-columns: 1fr; }
+  /* One column is TALL, so the rails give back the space they were spending on air. */
+  .pay-amount { line-height: 1; }
+  .pay-rail { border-right: 0; border-bottom: 1px solid var(--color-divider); }
+  .pay-rail, .pay-value { padding: var(--space-6) var(--space-4); }
+  .pay-amount { font-size: var(--text-h1); }
+}
+
+/* A short window — a laptop with the console open, or a phone in landscape. The panel is
+   already capped at 88vh; this stops the two rails spending that cap on padding. */
+@media (max-height: 620px) {
+  .pay-rail, .pay-value { padding: var(--space-4); }
+  .pay-amount { font-size: var(--text-h2); }
+  .pay-actions { padding-top: var(--space-3); }
+  .pay-features { gap: var(--space-2); }
+}
+
+/* ── /ops/earnings — DEC-080, 71 § Revenue ─────────────────────────────────
+   Reuses `.ops-sections`, `.card`, `.stat-row` and the `.trend-*` family. What
+   is genuinely new is the money figure, the tier metals as chart colour, and
+   the plan-change list.                                                       */
+.earn-total .stat-value { font-variant-numeric: tabular-nums; }
+.earn-figure {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: var(--text-h2); letter-spacing: var(--track-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The metals, as chart ink. Same class pair as `.stroke-movement-*` /
+   `.fill-movement-*`, for the same reason: a `<span>` key needs `background`,
+   an `<svg>` dot needs `fill`, and one class marks both. */
+.stroke-tier-bronze { stroke: var(--tier-bronze-500); }
+.stroke-tier-silver { stroke: var(--tier-silver-500); }
+.stroke-tier-gold   { stroke: var(--tier-gold-500); }
+.stroke-tier-revenue { stroke: var(--status-good-500); }
+.fill-tier-bronze { background: var(--tier-bronze-500); fill: var(--tier-bronze-500); }
+.fill-tier-silver { background: var(--tier-silver-500); fill: var(--tier-silver-500); }
+.fill-tier-gold   { background: var(--tier-gold-500);   fill: var(--tier-gold-500); }
+.fill-tier-enterprise { background: var(--color-neutral-400); fill: var(--color-neutral-400); }
+.fill-tier-revenue { background: var(--status-good-500); fill: var(--status-good-500); }
+
+/* The revenue line gets a fill under it and the four movement lines do not — one series
+   can carry an area without the overlaps turning into mud, and revenue is a QUANTITY
+   accumulating rather than four counts to compare. */
+.revenue-area { fill: color-mix(in srgb, var(--status-good-500) 14%, transparent); stroke: none; }
+/* Drawn once on mount: 620px is comfortably longer than any path this viewBox can hold,
+   so the dash always clears. Purpose is state indication — the figure above it counted
+   up from zero and the line arrives with it. */
+.revenue-path {
+  stroke-dasharray: 620; stroke-dashoffset: 0;
+  animation: revenue-draw var(--wipe-dur) var(--ease) backwards;
+}
+@keyframes revenue-draw { from { stroke-dashoffset: 620; } }
+
+.earn-donut-legend li { grid-template-columns: 10px 10ch auto auto; }
+
+.earn-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.earn-change {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: var(--text-small);
+}
+.earn-change:last-child { border-bottom: 0; }
+.earn-change-move {
+  font-variant-numeric: tabular-nums; font-weight: 600;
+  color: var(--tier-metal, var(--color-text));
+}
+.earn-change.is-bronze { --tier-metal: var(--tier-bronze-800); }
+.earn-change.is-silver { --tier-metal: var(--tier-silver-800); }
+.earn-change.is-gold   { --tier-metal: var(--tier-gold-800); }
+.earn-change-org { font-weight: 600; }
+.earn-change-meta { margin-left: auto; }
+.earn-amount { font-variant-numeric: tabular-nums; }
+.earn-tier { text-transform: capitalize; }

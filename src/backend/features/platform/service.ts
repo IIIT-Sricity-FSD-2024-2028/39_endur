@@ -8,6 +8,7 @@
 import type { Request } from 'express';
 import type {
   AnalyticsQuery,
+  EarningsQuery,
   EstateQuery,
   LogExportQuery,
   LogFileMeta,
@@ -16,6 +17,7 @@ import type {
   LogReadQuery,
   PlatformAnalytics,
   PlatformAuditEntry,
+  PlatformEarnings,
   PlatformOperator,
   PlatformOrgDetail,
   PlatformOrgSummary,
@@ -23,6 +25,7 @@ import type {
   Tier,
 } from '@endur/shared';
 import { TIERS, isQuietOrg } from '@endur/shared';
+import type { PaymentKind } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
 import { writeAudit } from '../../platform/audit.js';
 import { hashPassword } from '../../auth/password.js';
@@ -516,6 +519,174 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
       campaigns: campaignsTotal,
       responses: responsesTotal,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Earnings. `71` § Revenue, DEC-080 — the money, for the owner. `T-058`.
+// ---------------------------------------------------------------------------
+
+/**
+ * A capture, as the earnings page reads one. The row is denormalised at write time
+ * (`payer_name` is captured, never joined), so the only join here is the organisation's
+ * NAME — an id is not something an owner can act on.
+ */
+const PAYMENT_SELECT = {
+  id: true,
+  createdAt: true,
+  orgId: true,
+  tier: true,
+  fromTier: true,
+  kind: true,
+  amountMinor: true,
+  currency: true,
+  payerName: true,
+  reference: true,
+  org: { select: { name: true } },
+} as const;
+
+type PaymentRow = {
+  id: string;
+  createdAt: Date;
+  orgId: string;
+  tier: string;
+  fromTier: string | null;
+  kind: string;
+  amountMinor: number;
+  currency: string;
+  payerName: string;
+  reference: string;
+  org: { name: string } | null;
+};
+
+const paymentView = (row: PaymentRow) => ({
+  id: row.id,
+  at: row.createdAt.toISOString(),
+  orgId: row.orgId,
+  orgName: row.org?.name ?? 'Unknown organisation',
+  tier: row.tier as Tier,
+  fromTier: (row.fromTier as Tier | null) ?? null,
+  kind: row.kind as PaymentKind,
+  amountMinor: row.amountMinor,
+  currency: 'INR' as const,
+  payerName: row.payerName,
+  reference: row.reference,
+});
+
+const RECENT_PAYMENTS = 20;
+const RECENT_CHANGES = 10;
+
+/**
+ * What the estate has paid. `platform.revenue.read`, owner only.
+ *
+ * THE SAME WINDOW AS `analytics()`, down to the twelve-month default, and deliberately so:
+ * an owner reads the two pages one after the other, and two default ranges would make them
+ * disagree about a quarter that has not changed.
+ *
+ * `byPeriod` INCLUDES EMPTY PERIODS AS ZERO, for the reason `periodsBetween` already gives
+ * about movement — a month that vanishes from a revenue line reads as a gap in the data
+ * rather than as a month nobody bought anything.
+ *
+ * `orgsOnTier` IS TODAY AND EVERYTHING ELSE IS THE WINDOW, and the legend on the page says
+ * which is which. They are different questions — "who is on Gold now" against "what did
+ * Gold earn since March" — and folding them into one number would answer neither.
+ *
+ * ONLY `succeeded` ROWS ARE COUNTED. Nothing writes any other status today; the filter is
+ * here so that the day something does, a failed capture does not silently become revenue.
+ */
+export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> {
+  const now = new Date();
+  const to = query.to ?? now;
+  const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
+  const granularity = query.granularity;
+
+  const window = { createdAt: { gte: from, lte: to }, status: 'succeeded' };
+
+  const [inWindow, lifetime, tierRows, recentRows, changeRows] = await Promise.all([
+    db.payment.findMany({
+      where: window,
+      select: { orgId: true, tier: true, amountMinor: true, createdAt: true },
+    }),
+    db.payment.aggregate({ where: { status: 'succeeded' }, _sum: { amountMinor: true } }),
+    // The CURRENT mix. A missing subscription row folds into bronze — the same convention
+    // `stats()` and `analytics()` already use (D-012), and changing it in one place only
+    // would make three pages disagree about the same organisation.
+    db.organization.findMany({ select: { id: true, subscription: { select: { tier: true } } } }),
+    db.payment.findMany({
+      where: window,
+      orderBy: { createdAt: 'desc' },
+      take: RECENT_PAYMENTS,
+      select: PAYMENT_SELECT,
+    }),
+    db.payment.findMany({
+      where: { ...window, kind: 'change' },
+      orderBy: { createdAt: 'desc' },
+      take: RECENT_CHANGES,
+      select: PAYMENT_SELECT,
+    }),
+  ]);
+
+  const revenueMinor = inWindow.reduce((sum, row) => sum + row.amountMinor, 0);
+  const payments = inWindow.length;
+
+  const periods = periodsBetween(from, to, granularity);
+  const periodMap = new Map(periods.map((period) => [period, { revenueMinor: 0, payments: 0 }]));
+  const tierPeriodMap = new Map(
+    periods.map((period) => [period, { bronze: 0, silver: 0, gold: 0 }]),
+  );
+  const byTierMap = new Map<Tier, { payments: number; revenueMinor: number; orgsOnTier: number }>(
+    TIERS.map((tier) => [tier, { payments: 0, revenueMinor: 0, orgsOnTier: 0 }]),
+  );
+  const payingOrgs = new Set<string>();
+
+  for (const row of inWindow) {
+    payingOrgs.add(row.orgId);
+
+    const bucket = periodMap.get(periodKeyOf(row.createdAt, granularity));
+    if (bucket) {
+      bucket.revenueMinor += row.amountMinor;
+      bucket.payments += 1;
+    }
+
+    const tier = row.tier as Tier;
+    const tierBucket = byTierMap.get(tier);
+    if (tierBucket) {
+      tierBucket.payments += 1;
+      tierBucket.revenueMinor += row.amountMinor;
+    }
+
+    // Enterprise is never PURCHASED — it is operator-assigned (16 §4) and `joinTier`
+    // refuses it — so the per-period series carries the three sellable tiers and does not
+    // draw a line that is structurally always zero.
+    const tierSeries = tierPeriodMap.get(periodKeyOf(row.createdAt, granularity));
+    if (tierSeries && (tier === 'bronze' || tier === 'silver' || tier === 'gold')) {
+      tierSeries[tier] += 1;
+    }
+  }
+
+  for (const row of tierRows) {
+    const tier = (row.subscription?.tier ?? 'bronze') as Tier;
+    const entry = byTierMap.get(tier);
+    if (entry) entry.orgsOnTier += 1;
+  }
+
+  return {
+    window: { from: from.toISOString(), to: to.toISOString(), granularity },
+    currency: 'INR',
+    totals: {
+      revenueMinor,
+      payments,
+      orgsPaying: payingOrgs.size,
+      // `null`, never 0 — the same argument decision 3 makes about a conversion rate. A
+      // mean of no payments is not a payment of zero.
+      averageMinor: payments === 0 ? null : Math.round(revenueMinor / payments),
+      lifetimeRevenueMinor: lifetime._sum.amountMinor ?? 0,
+    },
+    byPeriod: periods.map((period) => ({ period, ...periodMap.get(period)! })),
+    byTier: TIERS.map((tier) => ({ tier, ...byTierMap.get(tier)! })),
+    tierOverTime: periods.map((period) => ({ period, ...tierPeriodMap.get(period)! })),
+    recent: recentRows.map((row) => paymentView(row as PaymentRow)),
+    recentChanges: changeRows.map((row) => paymentView(row as PaymentRow)),
   };
 }
 

@@ -167,19 +167,36 @@ the plan.
 | GET | `/api/v1/billing/plans` | `billing.read` | P2 |
 | POST | `/api/v1/billing/tier` | `billing.update` | P2 |
 
-**DEC-035 — there are no prices.** `POST /billing/tier` is a **join**: the caller picks a tier,
-the row is written, and the entitlement gate answers differently from the next request. No
-payment processor, no checkout, no amount, no currency, in any phase. Integrating Stripe would
-demonstrate nothing the middleware chain does not already demonstrate, and it introduces a
-webhook surface with real security requirements for zero marks.
+**DEC-080 — there are prices, and the money is simulated.** Bronze **₹99**, Silver **₹499**,
+Gold **₹999**, per year, in INR. They live in `packages/shared/src/tiers.ts` as `priceMinor`
+(integer **paise** — 9900 is ₹99) because the picker has to print them before anybody has a
+session. Enterprise carries `priceMinor: 0`, which is **not free**: `selectable: false` is what
+every reader keys off and the card quotes a conversation instead of a number.
 
-**This is a stated limitation, not a hidden one:** the entitlement *architecture* is complete
-and enforced, and the seat meter still meters — only money is absent, and deliberately.
+`POST /billing/tier` is **still a join**. `<PaymentDialog>` runs a checkout in the client,
+mints a reference and then calls the same route — so the authoritative write, the capability
+that guards it and the entitlement gate behind it are all exactly what they were. The dialog is
+a step in front of the write, never a condition on it: `paymentRef` is optional, and a request
+without one still joins and still records a capture. Gating a tier on a client-generated string
+would put an authorisation decision in React (`INV-003`).
 
-> This supersedes DEC-034's split of `billing.update`, which existed to keep the tier write out
-> of the org's hands until a checkout completed. There is no checkout. `19` §8 carries the
-> full reasoning and the one protection that remains: `billing.update` is a capability, seeded
-> to administrators only, resolved in middleware, and audited.
+**Every capture is priced server-side** from `PLAN_OPTIONS`, on both write paths (registration
+and plan change), inside the transaction that writes the subscription. There is no field on any
+request for an amount.
+
+**What is still absent, and deliberately:** no payment processor, no webhook surface, no card
+data, no invoices, no refunds, no renewal — `subscriptions.period_end` still bills nothing when
+it passes. `payments` is an append-only ledger of captures, not an accounts system, and the UI
+says "Endur demo checkout · no card details are collected" where a real one would take a card.
+
+> This supersedes **DEC-035** on price and checkout only. DEC-034's hole stays closed the way
+> DEC-035 closed it — `billing.update` is a capability, seeded to administrators only, resolved
+> in middleware, and audited.
+
+> DEC-035's original note, kept because the hole it names is real: DEC-034 split
+> `billing.update` to keep the tier write out of the org's hands until a checkout completed.
+> The checkout that returned at DEC-080 is a **client step**, so it does not revive that split
+> — `19` §8 carries the full reasoning and the protection that remains.
 
 ## 9. Acceptance
 
