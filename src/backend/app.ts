@@ -53,6 +53,7 @@ import { profileRouter } from './features/profile/router.js';
 import { analysisRouter } from './features/analysis/router.js';
 import { checkinsRouter, reflectRouter } from './features/improve/router.js';
 import { auditRouter } from './features/audit/router.js';
+import { billingRouter } from './features/billing/router.js';
 import { inboxRouter } from './features/inbox/router.js';
 import { platformRouter } from './features/platform/router.js';
 import { mount } from './lib/mount.js';
@@ -144,6 +145,10 @@ export function createApp() {
   // T-075. The organisation's OWN log — audit_log, read with audit.read. Endur's log FILES
   // are a different principal, a different store and a different route tree (72, DEC-043).
   mount(app, '/api/v1/audit', auditRouter);
+  // The organisation's OWN plan (49). The operator's side of the same model is under
+  // /platform — a different capability catalogue, a different principal, and it is the
+  // only one that can set SOMEBODY ELSE'S tier (19 §8).
+  mount(app, '/api/v1/billing', billingRouter);
   // T-059. THE FOURTH WORLD (19). A separate account table, a separate cookie, a separate
   // capability catalogue and a separate database seam — mounted here beside the others and
   // sharing nothing with them but the error funnel. It runs NO tenantResolver, NO

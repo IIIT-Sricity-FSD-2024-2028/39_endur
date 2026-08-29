@@ -21,6 +21,7 @@ export * from './analysis.js';
 export * from './improve.js';
 export * from './audit.js';
 export * from './platform.js';
+export * from './billing.js';
 export * from './authz.js';
 
 // Filled as each feature lands:

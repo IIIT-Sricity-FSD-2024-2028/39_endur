@@ -45,6 +45,7 @@ const Logs = lazy(() => import('../pages/console/Logs/index.js'));
 const Profile = lazy(() => import('../pages/console/Profile/index.js'));
 const Simulator = lazy(() => import('../pages/console/Simulator.js'));
 const Settings = lazy(() => import('../pages/console/Settings.js'));
+const Plan = lazy(() => import('../pages/console/Plan/index.js'));
 
 const Fill = lazy(() => import('../pages/respond/Fill.js'));
 const Done = lazy(() => import('../pages/respond/Done.js'));
@@ -57,6 +58,7 @@ const OpsLogin = lazy(() => import('../pages/platform/Login.js'));
 const OpsConsole = lazy(() => import('../pages/platform/Console/index.js'));
 const OpsOrgDetail = lazy(() => import('../pages/platform/Console/OrgDetail.js'));
 const OpsAnalytics = lazy(() => import('../pages/platform/Analytics/index.js'));
+const OpsEarnings = lazy(() => import('../pages/platform/Earnings/index.js'));
 const OpsLogs = lazy(() => import('../pages/platform/Logs/index.js'));
 
 /** One Suspense per route, so a chunk still downloading in the console never blanks the
@@ -139,6 +141,12 @@ export const routes: RouteObject[] = [
       { path: 'profile', element: hold(<Profile />) },
       { path: 'simulator', element: hold(<Simulator />) },
       { path: 'settings', element: hold(<RequireCapability capability="org.read"><Settings /></RequireCapability>) },
+      // WRAPPED, like Settings and the log. `49` § Route & access asks for a full-page 403
+      // on direct navigation, and it can: `billing.read` is seeded `all` (11 §8), so there
+      // is no scoped hold that would make a narrow reader see a half-page. There is no 402
+      // to express either — `billing.*` is in Bronze, and a paywall in front of the upgrade
+      // button is the bug `D-028` recorded.
+      { path: 'plan', element: hold(<RequireCapability capability="billing.read"><Plan /></RequireCapability>) },
       // T-076. WRAPPED, unlike Analysis and Reflect, and for the opposite reason: there is
       // no 402 here — the log is not a tier feature — and `56` § States asks for a
       // full-page 403 on direct navigation. The page renders its own 403 as well, because
@@ -174,6 +182,9 @@ export const routes: RouteObject[] = [
       // same for a scoped capability) — but the page's own request 403s and it renders that,
       // naming `platform.analytics.read`, rather than an empty screen.
       { path: 'analytics', element: hold(<OpsAnalytics />) },
+      // `T-058`, DEC-080. Same posture as `analytics`: no capability gate on the route, the
+      // page's own request 403s and it renders that, naming `platform.revenue.read`.
+      { path: 'earnings', element: hold(<OpsEarnings />) },
       // `T-078`. No capability gate on the route itself — same precedent as `analytics`
       // above — the page's own request 403s and it renders that.
       { path: 'logs', element: hold(<OpsLogs />) },

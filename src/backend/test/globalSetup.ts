@@ -6,6 +6,7 @@
 // would offer to GENERATE a migration from a drifted schema, and a test run is the last
 // place that should be possible.
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
@@ -40,7 +41,16 @@ export default async function setup(): Promise<void> {
   const created = await createIfMissing(url);
   console.log(`[test-db] ${nameOf(url)} ${created ? 'created' : 'already there'}`);
 
-  execFileSync('npx', ['prisma', 'migrate', 'deploy', '--config', path.join(backendRoot, 'prisma.config.ts')], {
+  // PRISMA IS RUN THROUGH `node`, NOT THROUGH `npx` — and that is a portability fix rather
+  // than a preference. On Windows `npx` is a shell script with no extension, so
+  // `execFileSync` finds it and cannot execute it (ENOENT); `npx.cmd` exists but Node 20+
+  // refuses to spawn a `.cmd` without a shell (EINVAL), and `shell: true` would put an
+  // argument list containing an absolute path through cmd's quoting on the one platform
+  // where those paths have spaces in them. Resolving the package's own entry point and
+  // handing it to the interpreter already running has none of those failure modes.
+  const prismaBin = createRequire(import.meta.url).resolve('prisma/build/index.js');
+
+  execFileSync(process.execPath, [prismaBin, 'migrate', 'deploy', '--config', path.join(backendRoot, 'prisma.config.ts')], {
     cwd: backendRoot,
     // The child inherits the OVERRIDE, not the .env value — prisma.config.ts is written to
     // let a real environment variable win, which is what makes this possible at all.

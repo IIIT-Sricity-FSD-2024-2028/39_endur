@@ -165,6 +165,9 @@ export function OpsLayout(): JSX.Element {
           <NavLink to="/ops" end>Estate</NavLink>
           {/* Absent for `staff`, not disabled — `70` § Acceptance. */}
           {can('platform.analytics.read') && <NavLink to="/ops/analytics">Analytics</NavLink>}
+          {/* DEC-080. Its own capability, not analytics' — the two answer different
+              questions and only one of them is about money. */}
+          {can('platform.revenue.read') && <NavLink to="/ops/earnings">Earning</NavLink>}
           {can('platform.logs.read') && <NavLink to="/ops/logs">Logs</NavLink>}
           <span className="ops-nav-spacer" />
           {operator && <span className="text-meta">{operator.name}</span>}

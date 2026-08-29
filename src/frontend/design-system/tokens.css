@@ -27,7 +27,7 @@
   --color-surface:   #dfe9f4;   /* chrome: nav bar, inputs, collapsed rows */
   --color-text:      #17232e;   /* ink */
   --color-divider:   color-mix(in srgb, #17232e 14%, transparent);
-  --color-card:      #ffffff;   /* content cards lift OFF the ground */
+  --color-card:      color-mix(in srgb, var(--color-accent) 4%, #ffffff);   /* content cards lift OFF the ground, tinted toward the org's vibe accent */
 
   /* ── Accent — "the product" ─────────────────────────────── */
   --color-accent:    #3f86e6;
@@ -248,6 +248,34 @@
   --status-good-100:#14332f; --status-good-500:#5cbdb2; --status-good-800:#c9edea;
   --status-warn-100:#332714; --status-warn-500:#e6b055; --status-warn-800:#fbe6c2;
   --status-bad-100: #351c18; --status-bad-500: #e57764; --status-bad-800: #fbd8d1;
+}
+
+/* ── The tier ramp — DEC-080 ───────────────────────────────────────────────
+   Bronze, silver and gold, as COLOUR. Three metals, and the ladder has to read
+   as a ladder at a glance on the plan picker, in the payment dialog, in the
+   earnings donut and on a tier tag — four places that must agree, which is why
+   this is a token and not a hex in a component.
+
+   NOT THE STATUS RAMP AND NOT THE ACCENTS. Gold is not "good" and bronze is
+   not "bad" — the cheapest plan is a perfectly correct choice — so borrowing
+   the semantic ramp would say something about the customer's decision that the
+   product does not mean. Same argument CONF-004 makes about blue.
+
+   -500 is the METAL: borders, chart strokes, donut slices, the check badge.
+   -100 is a wash behind it. -800 is the only one that carries text, and each
+   passes 4.5:1 on --color-card in its own theme. Nothing tints body copy.     */
+:root {
+  --tier-bronze-100:#f6ece3; --tier-bronze-500:#a06a45; --tier-bronze-800:#523320;
+  --tier-silver-100:#eef0f4; --tier-silver-500:#77828f; --tier-silver-800:#39424c;
+  --tier-gold-100:  #fbf1da; --tier-gold-500:  #a87c1f; --tier-gold-800:  #6a4c0c;
+}
+
+/* The metals invert the same way the status ramp does — a gold hairline mixed
+   for a white ground disappears entirely on #0a0a0b. */
+[data-theme="dark"] {
+  --tier-bronze-100:#2c1f16; --tier-bronze-500:#c78d61; --tier-bronze-800:#f0dccc;
+  --tier-silver-100:#20242a; --tier-silver-500:#a3afbd; --tier-silver-800:#e2e7ed;
+  --tier-gold-100:  #2f2612; --tier-gold-500:  #dfb655; --tier-gold-800:  #f7e8c1;
 }
 
 /* ── Faces ────────────────────────────────────────────────────────────────

@@ -5,7 +5,34 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-27  (DEC-078 — /OPS TAKES THE CONSOLE'S CHROME. the owner asked for the
+UPDATED   2026-08-29  (T-058 — PRICES, A CHECKOUT AND /ops/earnings. DEC-080, which
+                       SUPERSEDES DEC-035: bronze Rs 99, silver Rs 499, gold Rs 999 per
+                       year in INR, on the picker and in a payment dialog at both the
+                       sign-up step and /app/plan. THE MONEY IS SIMULATED — no gateway, no
+                       card fields, no keys — and the UI says so where a real one would
+                       take a card. New `payments` table (append-only ledger, amounts as
+                       INTEGER PAISE), written inside the EXISTING transactions in
+                       auth/service.ts and billing/service.ts, PRICED SERVER-SIDE from
+                       PLAN_OPTIONS on both paths — no request carries an amount. New
+                       owner-only capability platform.revenue.read, GET /platform/earnings,
+                       and /ops/earnings: revenue over time, plan mix donut, plans-bought
+                       trend, recent payments, who moved plan. Charts are inline SVG and a
+                       conic gradient — DEC-064 still holds, no library added. New
+                       --tier-{bronze,silver,gold}-* ramp so the three metals mean the same
+                       thing on the picker, in the dialog and in the charts. NOT built: any
+                       renewal, expiry, dunning, refund or invoice — the ledger records
+                       captures and nothing reads period_end.
+                       Earlier: T-058 PART — /app/plan. the owner asked for a "Plan" item in the
+                       sidebar showing the current plan with a way to change it. built as
+                       a nav item in the `system` group, NOT the settings tab 49 asks for;
+                       the doc's argument is recorded in the page, not dropped. new backend
+                       feature src/backend/features/billing/ (GET /billing, /billing/plans,
+                       POST /billing/tier) — the first routes ever to sit behind
+                       billing.read/billing.update. seats are computed from 16 §5, and a
+                       missing subscriptions row is repaired on read (D-012). upgrade
+                       applies silently, downgrade confirms. NOT built: <OverLimitBanner>,
+                       the seat ceiling, the from-tier on the audit row — all T-057/T-058.
+                       Earlier: DEC-078 — /OPS TAKES THE CONSOLE'S CHROME. the owner asked for the
                        ops screens (estate list, analytics, logs) to look as finished as
                        /app, having seen them side by side, and judged 70's "plainer than
                        the customer console" as unfinished rather than intentional —
@@ -1215,8 +1242,25 @@ Opened 23 Aug from a four-item survey. Nothing here is M0: **do not start any of
                 run before this is called done
 [ ] T-055  A  RLS policies                                     ← repays D-001 + D-003
 [x] T-056  X  DECIDE: what an Endur operator IS (OPEN-007)     ← DEC-033. Doc 19 written
-[ ] T-057  A  billing read surface + seat metering (16 §5, §8) ← repays D-012, D-013
-[ ] T-058  B  plan + billing page, JOIN buttons, over-limit banner (49)  ← DEC-035
+[~] T-057  A  billing read surface + seat metering (16 §5, §8) ← repays D-012, D-013
+              ← PART BUILT 29 Aug alongside the /app/plan page. GET /billing (summary +
+                billable_seats computed live from 16 §5, repaired on read when the row is
+                missing), GET /billing/plans, POST /billing/tier. STILL MISSING: the seat
+                LIMIT and everything that depends on it — GET /billing/usage as its own
+                route, <OverLimitBanner>, the 402 on adding a person over the limit
+[~] T-058  B  plan + billing page, JOIN buttons, over-limit banner (49)  ← DEC-080
+              done: /app/plan, prices, <PaymentDialog>, payments ledger, /ops/earnings.
+              left: <OverLimitBanner> + the seat ceiling (needs T-057)
+              ← THE PAGE IS BUILT, 29 Aug, AT /app/plan AND NOT AT /app/settings/billing.
+                49 § Route & access argues for a settings tab; the owner asked for a
+                sidebar item, so it is one — in the `system` group beside Settings and the
+                activity log, and the doc's argument is recorded in the page header rather
+                than deleted. Current-plan card (tier, status, period, seat breakdown, a
+                four-step tier ladder) + <PlanPicker mode="join">. Upgrade applies with no
+                dialog, downgrade confirms and says the data is kept (49 § Interactions).
+                NOT BUILT: <OverLimitBanner> and the seat ceiling (T-057), and the audit
+                row does not name the from-tier — AuditIntent carries no metadata field
+                and widening it belongs with the rest of this task
 [x] T-059  A  platform backend — platform_users, requirePlatform, seam (19)  BUILT 26 Aug
               ← the T-057 dependency was DROPPED, not waited out (DEC-071, closing N-058)
 [x] T-066  B  /ops console — estate, plan override, messaging (70)   BUILT 26 Aug
@@ -1440,21 +1484,26 @@ pricing for now."* That is `DEC-048` and `T-088`: **one step at sign-up, three b
 you press is the one you are on.** It needs none of the billing page, the seat meter or the
 usage breakdown.
 
-**There are no prices because the owner removed them** — `DEC-035`, 23 Aug: *"leave out
-pricing cause this aint an actual product anyway, just add a button to join and directly make
-them join that tier."* No amounts, no currency, no checkout, no processor, no `plan_prices`
-table, and `71` was renamed off revenue onto growth counts. That is settled and is not what is
-missing.
+**Prices came back on 29 Aug — `DEC-080`, which supersedes `DEC-035`.** The owner: *"we
+have plans but not payment thing"*. Bronze ₹99, Silver ₹499, Gold ₹999 per year, on the picker
+and behind a payment dialog. **The money is simulated end to end** — no gateway, no card
+fields, no keys — and the dialog says so on screen. What DEC-035 argued (a course project
+cannot take money) is still true and still honoured: nothing here takes money, it records a
+capture it performed itself.
+
+`71` keeps its analytics page and gains a second one beside it, `/ops/earnings`, behind a
+returning `platform.revenue.read`. The two capabilities now coexist and mean different things:
+analytics is orgs/seats/activity, revenue is money.
 
 **What is missing is the tier machinery itself**, which `DEC-035` explicitly kept:
 
 | Survives `DEC-035` | Built? |
 |---|---|
 | the entitlement gate (`16` §3) and `requireEntitlement`'s `402` | **yes** — middleware exists and is correct |
-| `subscriptions.tier`, `GET /billing`, `/billing/usage`, `/billing/plans`, `POST /billing/tier` | **no** — `T-057`. `billing.read`/`billing.update` have been in the catalogue since `T-003`; the routes have never existed |
-| the seat meter and `billable_seats` (`16` §5) | **no** — `T-057` |
+| `subscriptions.tier`, `GET /billing`, `/billing/plans`, `POST /billing/tier` | **yes, 29 Aug** — `src/backend/features/billing/`. `GET /billing/usage` is still absent: the summary carries the seat breakdown, and a separate usage route only earns its place once there is a limit to measure against |
+| the seat meter and `billable_seats` (`16` §5) | **counted, not capped.** The formula is live in `GET /billing` and shown on `/app/plan`; there is no ceiling and no over-limit behaviour — `T-057` |
 | ~~the 14-day Gold trial (`16` §7)~~ | **RETIRED by `DEC-048`, and the row that was missing is now written.** `D-012` is repaid: `register` writes the `subscriptions` row at the chosen tier, and the seed gives one demo org per tier |
-| `<PlanPicker>` with a **Join** button per tier, `<OverLimitBanner>` | **no** — `T-058` |
+| `<PlanPicker>` with a **Join** button per tier | **yes, 29 Aug** — `/app/plan`. `<OverLimitBanner>` is still `T-058`, and needs the ceiling `T-057` would set |
 
 `D-012` was the one to read first, **and `DEC-048` has now answered it.** The middleware is
 right and was being handed a tier nobody ever set; three documents gave three answers (`16` §7:
@@ -1573,7 +1622,111 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-27 (latest) · the flow grammar — boxes and spacing across nine screens
+### 2026-08-29 (latest) · prices, a simulated checkout, and `/ops/earnings` — `DEC-080`
+
+**The owner asked for the payment half of the plan ladder.** Prices on the three cards, a
+popup that takes the payment with a success animation, gold treated as gold, and an
+owner-only `Earning` page on `/ops` reporting what came in. That reverses `DEC-035`, so it is
+recorded as **`DEC-080`** in `_MEMORY.md` and superseded in `16` §8 rather than diverged from
+silently.
+
+**The money is simulated, and the UI says so.** No gateway, no card fields, no keys, no
+webhook. `<PaymentDialog>` waits ~700ms, mints a reference, and shows a green success overlay;
+the pay rail reads *"Endur demo checkout · no card details are collected"*.
+
+**The decision boundary did not move.** `POST /billing/tier` behind `billing.update` is still
+the authoritative write. `paymentRef` is **optional and is a label, not a proof** — a join
+without one still joins and still records a capture, because gating a tier on a
+client-generated string would be `INV-003` inverted. **Every capture is priced server-side**
+from `PLAN_OPTIONS`, inside the transaction that writes the subscription; no request carries
+an amount, and a test proves a client-supplied one is ignored.
+
+**New:** `payments` table (append-only, `amount_minor` as INTEGER paise, migration
+`20260829120000_payments`); `src/backend/billing/payments.ts` — the ledger's one writer, used
+by both `register()` and `joinTier()`; `platform.revenue.read` (owner only);
+`GET /platform/earnings`; `pages/platform/Earnings/`; `<PaymentDialog>`, `<RevenueChart>`,
+`<TierDonut>`, `<TierTrendChart>`; a `--tier-{bronze,silver,gold}-*` ramp in `tokens.css` so
+the three metals mean the same thing on the picker, in the dialog and in the charts. No
+charting library — `DEC-064` holds; inline SVG and a conic gradient, both with `sr-only`
+tables.
+
+**`tierOverTime` counts PURCHASES, not a tier census.** `subscriptions` has no history, and
+`<GrowthChart>` already records at length why reconstructing "Gold orgs in March" would move
+historic figures retroactively. The page says so in the card's own copy.
+
+**Two robustness fixes came out of verifying it live**, both the same shape and both worth
+keeping: the success tick and the revenue line now have their **drawn** state as the RESTING
+state and animate *from* the hidden one (`backwards`, not `forwards`), and the revenue
+count-up carries a `setTimeout` that lands the true figure. A confirmation mark or a revenue
+total that is only correct if animation frames actually arrive is a wrong number on screen in
+any throttled tab.
+
+**Also fixed, unrelated and pre-existing:** `test/globalSetup.ts` spawned `npx`, which cannot
+be executed by `execFileSync` on Windows (`ENOENT`, then `EINVAL` for `npx.cmd` under Node
+20+) — the whole backend suite died at setup. It now resolves Prisma's own entry point and
+runs it with `process.execPath`.
+
+**Verified:** `tsc -b` clean for everything this session touched; backend `tiers` + new
+`payments` suites 29/29; frontend `Start`, `Plan`, `PlanPicker` all green; the flow driven
+live in the browser — `/app/plan` upgrade → dialog → pay → toast, downgrade → confirm →
+dialog → pay, and `/ops/earnings` as `owner@endur.test` showing ₹3,495 across 5 payments with
+every section populated. Contrast checked in both themes: tier `-800` ≥ 7.5:1 on the card,
+`-500` ≥ 3.6:1, white on the success field ≥ 5.3:1.
+
+**Known failures NOT from this work** (all in files this session did not touch):
+`roles/service.ts`, `Setup/steps/Industry.tsx` and `Simulator.tsx` have `tsc` errors from
+another session's in-flight edits; `platform.test.ts`'s TOTP-window case and
+`platform-logs.test.ts`'s backwards-pagination case fail; the frontend suite has 13
+pre-existing failures, including `router/routes.test.tsx` still asserting **three** worlds
+when `/ops` made four.
+
+**Next:** nothing renews, expires or dunns — `period_end` still bills nothing when it passes,
+and the scheduler that would change that is still `OPEN-005`'s. The seat ceiling and
+`<OverLimitBanner>` are still `T-057`. The audit row for a join still names neither from-tier
+nor to-tier; the ledger now records both, which makes the gap smaller but not closed.
+
+### 2026-08-29 · `/app/plan` — the plan page, and the billing routes under it
+
+**The owner asked for a "Plan" item in the sidebar that shows the current plan and offers
+to change it.** That is `T-058`, whose page had never been built, on top of `T-057`, whose
+routes had never existed — `billing.read` and `billing.update` have sat in the catalogue
+since `T-003` with nothing behind them.
+
+**Backend, new:** `src/backend/features/billing/` — `GET /billing`, `GET /billing/plans`,
+`POST /billing/tier`, mounted at `/api/v1/billing`. Every route is capability-gated, so the
+route-enumeration test needs no allowlist entry. No `requireEntitlement`: `billing.*` is in
+Bronze, so a gate there could only ever pass, and if it could fail it would be a paywall in
+front of the upgrade button (`D-028`). The summary **repairs a missing `subscriptions` row on
+read** — `49` § States says a customer must never open this page and read "unknown", and
+organisations registered before `T-088` still have none (`D-012`). Seats are **computed** from
+`16` §5 rather than read from `subscriptions.seats`, which nothing has ever written.
+
+**Frontend, new:** `/app/plan` (`pages/console/Plan/`), `lib/billing.ts`, a `Plan` nav item in
+the `system` group, `plan` added to the icon vocabulary, and `tierRank()` in
+`packages/shared/src/tiers.ts` — the direction of a change, used for **copy only**: an upgrade
+applies with no dialog, a downgrade confirms and says the data is kept. The page reuses
+`<PlanPicker mode="join">` and `.settings-page`/`.settings-card` wholesale; the only new
+CSS is the tier ladder on the current-plan card.
+
+**Where this disagrees with `49`, on purpose.** The doc puts the page at
+`/app/settings/billing` as a tab and argues billing is not something people DO daily. The
+owner asked for a sidebar item; it is in `system` for exactly the reason that argument gives,
+and the doc's case is written into the page and the nav item rather than dropped.
+
+**Not built, and named as such:** `<OverLimitBanner>`, the seat ceiling and the over-limit
+`402` (all `T-057`), `GET /billing/usage` as its own route, and the from-tier on the audit
+row — `AuditIntent` has three fields and no metadata, and widening the shape every feature
+writes through belongs in `T-058` proper.
+
+**Verified:** 8 new component tests pass (`Plan.test.tsx`), typecheck adds no errors (the 7
+pre-existing ones are unchanged), `audit:vocab` is clean on the new page — the seat and
+campaign nouns resolve through `useLabels()`, and the university demo org reads "18 courses
+that are not a person". Walked live at `localhost:5173/app/plan` signed in as Northfield:
+downgraded Gold → Silver through the dialog, upgraded Silver → Gold with none, and left the
+demo org back on Gold. The backend suite still could not run here — `npx` is not on this
+shell's PATH and there is no local Postgres — so `routes.test.ts` was read, not run.
+
+### 2026-08-27 · the flow grammar — boxes and spacing across nine screens
 
 **One owner complaint, repeated nine times: "too clustered, not properly boxes made."** The
 console had a card grammar and the *flow* screens never used it. Setup steps, the campaign

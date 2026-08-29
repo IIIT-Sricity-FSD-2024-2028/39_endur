@@ -12,6 +12,8 @@ import {
   SIGNUP_PLAN_OPTIONS,
   SIGNUP_TIERS,
   TIERS,
+  formatMoney,
+  priceOf,
   type Capability,
 } from '@endur/shared';
 import { TIER_ENTITLEMENTS, lowestTierFor, tierIncludes } from '../billing/entitlements.js';
@@ -87,12 +89,44 @@ describe('the picker offers three tiers and not four — DEC-048', () => {
     expect(SIGNUP_TIERS).not.toContain('enterprise');
   });
 
-  /** DEC-035. No amount, no currency, in any phase — including in a field nobody reads yet. */
-  it('carries no price anywhere', () => {
+  /**
+   * THE PRICES, ASSERTED — DEC-080, which supersedes DEC-035.
+   *
+   * The picker prints these before anybody has a session and the server prices every ledger
+   * row from the same table, so a typo here is a wrong price quoted to a customer AND a wrong
+   * amount recorded against them. That is a bigger blast radius than the pitch copy this
+   * describe block already guards, and it is worth its own assertion rather than a review.
+   */
+  it('prices the three sellable tiers in paise, ascending', () => {
+    const priced = SIGNUP_PLAN_OPTIONS.map((plan) => [plan.tier, plan.priceMinor]);
+    expect(priced).toEqual([
+      ['bronze', 9900],
+      ['silver', 49900],
+      ['gold', 99900],
+    ]);
     for (const plan of PLAN_OPTIONS) {
-      expect(Object.keys(plan)).toEqual(['tier', 'name', 'sells', 'adds', 'selectable']);
-      expect(`${plan.name} ${plan.sells} ${plan.adds}`).not.toMatch(/[$£€]|\bper month\b|\/mo\b/i);
+      expect(plan.currency).toBe('INR');
+      // Integers, always. A float here is a rounding error in a ledger.
+      expect(Number.isInteger(plan.priceMinor)).toBe(true);
     }
+  });
+
+  /**
+   * Enterprise's 0 IS NOT FREE — `16` §4 prices it individually. `selectable: false` is what
+   * every reader keys off, and the picker prints "Priced with you" rather than an amount, so
+   * nothing may ever render ₹0 out of this row.
+   */
+  it('leaves Enterprise unpriced rather than free', () => {
+    const enterprise = PLAN_OPTIONS.find((plan) => plan.tier === 'enterprise');
+    expect(enterprise?.priceMinor).toBe(0);
+    expect(enterprise?.selectable).toBe(false);
+  });
+
+  /** One formatter, whole rupees while the paise are zero. `49`, `71` and the dialog share it. */
+  it('formats money as whole rupees', () => {
+    expect(formatMoney(9900)).toBe('₹99');
+    expect(formatMoney(99900)).toBe('₹999');
+    expect(priceOf('silver')).toBe(49900);
   });
 });
 
@@ -120,6 +154,50 @@ describe('register writes the subscription — D-012 repaid', () => {
     // No trial on this path. DEC-048, and 16 §7 records that DEC-035 is what killed it.
     expect(subscription?.status).toBe('active');
     expect(subscription?.status).not.toBe('trialing');
+
+    // THE LEDGER ROW — DEC-080 — written in the same transaction, PRICED BY THE SERVER.
+    // The request above sends no amount and there is no field to send one in.
+    const payments = await prisma.payment.findMany({
+      where: { orgId: res.body.organization.id as string },
+    });
+    expect(payments).toHaveLength(1);
+    expect(payments[0]?.kind).toBe('signup');
+    expect(payments[0]?.tier).toBe(tier);
+    expect(payments[0]?.fromTier).toBeNull();
+    expect(payments[0]?.amountMinor).toBe(priceOf(tier));
+    expect(payments[0]?.currency).toBe('INR');
+  });
+
+  /**
+   * A CLIENT-SUPPLIED AMOUNT IS NOT AN AMOUNT. `paymentRef` is the only payment field the
+   * DTO accepts; anything else is stripped by `validate()`, and the row is priced from
+   * `PLAN_OPTIONS` regardless. This asserts the property DEC-080 rests on.
+   */
+  it('prices the capture itself and ignores anything the client says it paid', async () => {
+    const res = await registerWith({ tier: 'gold', amountMinor: 1, priceMinor: 1 });
+    expect(res.status).toBe(201);
+    const payments = await prisma.payment.findMany({
+      where: { orgId: res.body.organization.id as string },
+    });
+    expect(payments[0]?.amountMinor).toBe(99900);
+  });
+
+  /** The reference is carried when sent and minted when not — never null either way. */
+  it('keeps the reference the checkout minted', async () => {
+    // Unique per run — `payments.reference` is unique across the table (that is what stops a
+    // double-submitted dialog billing twice), so a literal would pass once and never again.
+    const reference = `endur_${unique('ref')}`;
+    const res = await registerWith({ tier: 'bronze', paymentRef: reference });
+    const payments = await prisma.payment.findMany({
+      where: { orgId: res.body.organization.id as string },
+    });
+    expect(payments[0]?.reference).toBe(reference);
+
+    const without = await registerWith({ tier: 'bronze' });
+    const minted = await prisma.payment.findMany({
+      where: { orgId: without.body.organization.id as string },
+    });
+    expect(minted[0]?.reference).toMatch(/^endur_/);
   });
 
   /**
@@ -165,6 +243,12 @@ describe('register writes the subscription — D-012 repaid', () => {
       where: { orgId: { in: orgs.map((org) => org.id) } },
     });
     expect(subscriptions).toHaveLength(1);
+    // And no orphan CAPTURE either (DEC-080) — revenue recorded against an organisation
+    // that does not exist is the same bug one table over.
+    const payments = await prisma.payment.findMany({
+      where: { orgId: { in: orgs.map((org) => org.id) } },
+    });
+    expect(payments).toHaveLength(1);
   });
 });
 

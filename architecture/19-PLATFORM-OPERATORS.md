@@ -96,6 +96,7 @@ access.
 | `platform.plan.read` | ✔ | ✔ | What an org is on, and since when |
 | `platform.plan.override` | ✔ | ✔ | Set a tier administratively — a support action, and the reason `billing.update` must not mean this (§8) |
 | `platform.analytics.read` | — | ✔ | **The whole estate at once. Owner only.** Support helps one customer at a time and `platform.org.read` is what that needs (`71` § Route & access) |
+| `platform.revenue.read` | — | ✔ | **The money. Owner only** (`DEC-080`). Deliberately not folded into `platform.analytics.read`: DEC-035 collapsed the two when it deleted pricing, and DEC-080 splits them again because they answer different questions — adoption helps a customer, revenue does not |
 | `platform.usage.read` | ✔ | ✔ | Seats, campaign counts, response volume — as **numbers** |
 | `platform.message.send` | ✔ | ✔ | Contact an org's administrators (`70` §Interactions) |
 | `platform.audit.read` | ✔ | ✔ | The platform's own audit trail |
@@ -340,6 +341,7 @@ route-enumeration test (`12` §7) assert that no `platform.` capability appears 
 | POST | `/platform/orgs/:id/suspend` | `platform.org.suspend` | ✅ |
 | GET | `/platform/stats` | `platform.usage.read` · estate-wide counts, `71` §2 | ✅ |
 | GET | `/platform/analytics` | `platform.analytics.read` · `71` | **`T-067`** |
+| GET | `/platform/earnings` | `platform.revenue.read` · `71` § Revenue | **`T-058`** |
 | POST | `/platform/orgs/:id/message` | `platform.message.send` · `70` §Interactions | ✅ |
 | GET | `/platform/audit` | `platform.audit.read` | ✅ |
 | GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` · `72`. The file list, and one file tailed or filtered | **`T-077`** |

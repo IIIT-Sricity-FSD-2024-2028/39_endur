@@ -330,6 +330,7 @@ restated there rather than here because that document owns the surface.
 | POST | `/platform/orgs/:id/message` | `platform.message.send` | ✅ |
 | GET | `/platform/stats` | `platform.usage.read` | ✅ |
 | GET | `/platform/analytics` | `platform.analytics.read` — **owner only** | `T-067` |
+| GET | `/platform/earnings` | `platform.revenue.read` — **owner only** | `T-058` |
 | GET | `/platform/audit` | `platform.audit.read` | ✅ |
 | GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` | ✅ |
 | GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` | `T-077` |
