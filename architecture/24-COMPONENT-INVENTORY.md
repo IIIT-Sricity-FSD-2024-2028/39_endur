@@ -265,7 +265,7 @@ a `<table>` with no accessible name is one a screen reader announces as nothing 
 ### `<UnitTree>`
 ```ts
 { nodes: UnitTreeNode[]; selectedId?: string; mode: 'browse' | 'edit' | 'select';
-  addLabel?: string; subjectWord?: string; focusId?: string;
+  addLabel?: string; subjectWord?: Label; focusId?: string;
   request?: { id: string; action: 'rename' | 'move'; nonce: number };
   rowMessage?: { id: string; text: string };
   onSelect?: (id: string) => void; onRename?: (id: string, name: string) => void;
@@ -274,7 +274,8 @@ a `<table>` with no accessible name is one a screen reader announces as nothing 
   onReparent?: (id: string, newParentId: string) => void }
 
 type UnitTreeNode = { id: string; name: string; children: UnitTreeNode[];
-                      peopleCount?: number; subjectCount?: number; isTemporary?: boolean;
+                      peopleCount?: number; subjectCount?: number;
+                      peopleTotal?: number; subjectTotal?: number; isTemporary?: boolean;
                       endsAt?: string | null; placeholder?: string }
 ```
 
@@ -287,6 +288,24 @@ yet, and `UnitNode` satisfies it without adaptation.
 — the component must not reach for `useLabels()` itself, because the wizard's draft is not
 the saved org's. `subjectWord` does the same for row counts, and its absence hides them
 rather than inventing "Subjects". `focusId` is what makes `+` then type a two-click beat.
+
+**`subjectWord` is the `Label` PAIR, not the plural — `DEC-081`.** It was `string`, holding
+`labels.subject.many`, so a row with exactly one subject printed "1 Courses". A count and a
+plural-only noun cannot be composed, and the singular is not derivable from the plural —
+"Faculty" pluralises to "Faculty" (`22` §2). The pair is what `organization.labels` stores
+anyway, so the caller passes `labels.subject` rather than picking a half.
+
+**The row prints its WHOLE BRANCH — `DEC-081`, from the server — `DEC-082`.** The node
+carries both: `peopleCount` is the unit's own and `peopleTotal` is the branch, and the row
+reads the second. It matters that this tree sits beside `<UnitMap>` on `/app/structure`
+showing the same units — two views disagreeing about what "Surgery" contains is worse than
+either rule alone — and they agree now by reading one field rather than by running the same
+walk twice.
+
+The component no longer rolls anything up. It cannot: people are counted **distinct**
+across a branch, and somebody holding a role in two units of it is one person, which no sum
+of per-unit scalars can express. Both fields stay optional, so the wizard's draft — which
+has no counts at all — still satisfies the type and renders no counts.
 
 **The five props T-033 added are all optional**, which is why extending beat forking:
 `subjectWord`, `endsAt` and `placeholder` on the node, `rowMessage` (a server refusal shown
@@ -304,6 +323,39 @@ campaign audience picker. Do not fork it (INV-009). The `mode` prop is what make
 component serve all three; a second implementation is how the three drift apart.
 
 Assign it to one person. It is the component most likely to be rewritten three times.
+
+### `<UnitMap>`  ·  **BUILT `T-033`, CATALOGUED 2026-08-29 (`DEC-081`)**
+```ts
+{ nodes: UnitNode[]; selectedId?: string; subjectWord: Label; unitWord: string;
+  onSelect?: (id: string) => void }
+```
+The organisation drawn as the graph it is, read-only, above the editable tree (`32`). Not a
+replacement for `<UnitTree>` and not a second one: a list is the right shape for EDITING the
+graph and the wrong shape for SEEING it — it says what is under what and hides how wide, how
+deep, and how evenly the thing branches. One selected unit, three views of it (map, tree,
+panel).
+
+**Catalogued five days late.** Built at `T-033` citing "24 §3" and never written into any
+section of this file, against the ground rule that a component enters the catalogue before
+it enters the code. Recorded rather than quietly backfilled, because the failure mode is
+the interesting part: nothing caught it — `audit:drift` checks capabilities and design
+values, not components.
+
+Layout is the tidy-tree simplification — x from depth, y assigned to leaves in order, every
+parent at the midpoint of its FIRST and LAST child. The mean would drag a parent toward
+whichever side has more children and the trunk stops reading as a spine. Left-to-right, not
+top-down: organisations are deep and narrow far more often than wide, and a top-down chart
+of a deep one runs off the bottom of the screen with the width sitting empty.
+
+`subjectWord` is the `Label` pair (`DEC-081`) and the numbers are the branch the server
+counted (`DEC-082`) — both argued under `<UnitTree>` above. What is specific to the map is where the split goes: an
+SVG box holds one number, so a parent's own counts live in a `<title>`, which costs no
+layout and doubles as the pressable node's accessible name.
+
+**`role="group"` once `onSelect` is passed, `role="img"` otherwise.** `img` makes the whole
+subtree presentational, so the buttons inside stop existing for a screen reader while
+staying in the tab order — reachable by keyboard, invisible to the thing announcing what
+you reached.
 
 ### `<RoleRow>`
 ```ts

@@ -23,6 +23,7 @@ import {
   deleteUnit,
   readTree,
   reparentUnit,
+  unitComposition,
   unitImpact,
   updateUnit,
 } from './service.js';
@@ -49,7 +50,10 @@ unitsRouter.get(
   (req, res, next) => {
     void Promise.resolve()
       .then(() => readTree(req.ctx.orgId as string, userOf(req), req.ctx.authzVersion ?? 0))
-      .then((tree) => res.json({ data: tree }))
+      // `meta` carries the forest's own totals. Summing the roots on the client would
+      // double-count a person placed under two of them, which is exactly the mistake the
+      // per-branch rollup exists to avoid (DEC-082).
+      .then(({ tree, totals }) => res.json({ data: tree, meta: totals }))
       .catch(next);
   },
 );
@@ -107,6 +111,22 @@ unitsRouter.delete(
     const { body, params } = req.data as { body: DeleteUnitBody; params: { id: string } };
     void deleteUnit(req, req.ctx.orgId as string, params.id, body)
       .then((result) => res.json({ data: result }))
+      .catch(next);
+  },
+);
+
+// What the branch's people ARE, not just how many — DEC-083. Asked for one unit at a time
+// rather than carried on every node of the tree: the panel shows one unit, and a per-node
+// breakdown would be roles × units on a page load that mostly never reads it.
+unitsRouter.get(
+  '/:id/composition',
+  authenticate,
+  validate(UnitIdDto),
+  requireCapability('unit.read', { target: 'unit', from: 'params.id' }),
+  (req, res, next) => {
+    const { params } = req.data as { params: { id: string } };
+    void unitComposition(req.ctx.orgId as string, userOf(req), req.ctx.authzVersion ?? 0, params.id)
+      .then((composition) => res.json({ data: composition }))
       .catch(next);
   },
 );

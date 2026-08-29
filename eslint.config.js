@@ -53,7 +53,13 @@ export default tseslint.config(
 
   {
     languageOptions: {
-      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+      parserOptions: {
+        // The root `vitest.config.ts` (D-037) is owned by no tsconfig — the root one is a
+        // solution file with `files: []` — so it is linted against the default project
+        // rather than left as a parse error.
+        projectService: { allowDefaultProject: ['vitest.config.ts'] },
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',

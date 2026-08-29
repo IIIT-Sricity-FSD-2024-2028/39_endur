@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import type { PresetView } from '@endur/shared';
-import { Icon } from '../../../../components/Icon.js';
+import { Icon, type IconName } from '../../../../components/Icon.js';
 
-const PRESET_ICONS: Record<string, string> = {
+// Typed to the union, not to `string`: `IconName` is the agreed vocabulary (24 §1), and a
+// `Record<string, string>` here is what let a name that does not exist compile.
+const PRESET_ICONS: Record<string, IconName> = {
   university: 'university',
   hotel: 'hotel',
   hospital: 'hospital',
@@ -98,7 +100,7 @@ export function IndustryStep({
               <div className="preset-org-chart">
                 {selectedPreset.roles.map((role, idx) => (
                   <div key={role.name} className="preset-org-node">
-                    {idx > 0 && <Icon name="chevron" size={14} className="preset-org-arrow" />}
+                    {idx > 0 && <Icon name="chevron" size={16} className="preset-org-arrow" />}
                     <div className="preset-org-bubble">{role.name}</div>
                   </div>
                 ))}
@@ -107,21 +109,28 @@ export function IndustryStep({
 
             <div className="preset-sidebar-section">
               <h4 className="preset-sidebar-heading">Terminology</h4>
+              {/* "Unit:" and "Respondent:" until 29 Aug, which broke INV-001 on the one
+                  screen whose entire subject is that the vocabulary is yours to choose.
+                  Those are Endur's INTERNAL names for the two concepts (INV-002) —
+                  nothing in the product says them to a reader, and `<VocabularyChips>`
+                  makes the same point by printing the words alone with no category label
+                  at all. The left side is now a description of the concept; the right
+                  side is the preset's data, which is the only half that was ever right. */}
               <div className="preset-terms">
                 <div className="preset-term">
-                  <span className="preset-term-label">Unit:</span>
-                  <span className="preset-term-value">{selectedPreset.labels['unit']?.one || 'None'}</span>
+                  <span className="preset-term-label">Each part of it is a</span>
+                  <span className="preset-term-value">{selectedPreset.labels['unit']?.one ?? '—'}</span>
                 </div>
                 <div className="preset-term">
-                  <span className="preset-term-label">Respondent:</span>
-                  <span className="preset-term-value">{selectedPreset.labels['respondent']?.one || 'None'}</span>
+                  <span className="preset-term-label">Each person who answers is a</span>
+                  <span className="preset-term-value">{selectedPreset.labels['respondent']?.one ?? '—'}</span>
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="preset-sidebar-empty">
-            <Icon name="structure" size={32} />
+            <Icon name="structure" size={24} />
             <p>Select an organization type to preview its structure and terminology.</p>
           </div>
         )}

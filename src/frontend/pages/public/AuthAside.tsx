@@ -1,9 +1,9 @@
-// The column beside the sign-in and create-organization forms. 30 A  Sign in, A  Create.
+// The column beside the sign-in and create-organization forms. 30 § Sign in, § Create.
 //
 // Three facts, not three selling points. Somebody on `/login` already knows what Endur is;
 // somebody on `/start` is deciding whether the next two minutes are worth spending. Both
-// are served by the same three answers ?" what it costs to set up, what the people answering
-// have to do, and who ends up able to see what ?" so this is one component with one set of
+// are served by the same three answers — what it costs to set up, what the people answering
+// have to do, and who ends up able to see what — so this is one component with one set of
 // copy rather than two that drift.
 //
 // No domain nouns (INV-001): there is no organisation signed in on either screen, so there

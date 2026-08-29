@@ -32,16 +32,41 @@ export async function listRoles(orgId: string): Promise<RoleView[]> {
       id: true,
       name: true,
       level: true,
-      _count: { select: { positionsWithRole: true, grants: true } },
+      _count: { select: { grants: true } },
     },
     orderBy: [{ level: 'asc' }, { name: 'asc' }],
   });
+  if (roles.length === 0) return [];
+
+  // `_count.positionsWithRole` used to answer this, and it counted role-at-unit SLOTS —
+  // DEC-082. "Nurse" existing in five wards read as five people whatever the rosters said,
+  // and Riverside's sixteen patients read as four. The number is load-bearing: the delete
+  // dialog uses it to decide whether a reassignment target is required at all, so a role
+  // held by ten people in one unit could be deleted as though one slot were one person.
+  const assignments = await prisma.edge.findMany({
+    where: {
+      orgId,
+      type: 'member',
+      OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
+      child: { kind: 'position', roleId: { in: roles.map((role) => role.id) } },
+    },
+    select: { parentId: true, child: { select: { roleId: true } } },
+  });
+
+  const holders = new Map<string, Set<string>>();
+  for (const assignment of assignments) {
+    const roleId = assignment.child.roleId;
+    if (!roleId) continue;
+    const held = holders.get(roleId) ?? new Set<string>();
+    held.add(assignment.parentId);
+    holders.set(roleId, held);
+  }
 
   return roles.map((role) => ({
     id: role.id,
     name: role.name,
     level: role.level ?? 0,
-    peopleCount: role._count.positionsWithRole,
+    peopleCount: holders.get(role.id)?.size ?? 0,
     grantCount: role._count.grants,
   }));
 }
@@ -135,7 +160,20 @@ export async function deleteRole(
   body: DeleteRoleBody,
 ): Promise<{ ok: true }> {
   await assertRole(orgId, roleId);
-  const held = await prisma.node.count({ where: { orgId, kind: 'position', roleId } });
+  // DISTINCT PEOPLE, not positions — DEC-082. Counting position rows was wrong in both
+  // directions here: it read five wards' worth of "Nurse" slots as five people, and it
+  // refused to delete a role that EXISTS in some units but nobody actually holds, telling
+  // the caller to reassign people who are not there.
+  const assignments = await prisma.edge.findMany({
+    where: {
+      orgId,
+      type: 'member',
+      OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
+      child: { kind: 'position', roleId },
+    },
+    select: { parentId: true },
+  });
+  const held = new Set(assignments.map((edge) => edge.parentId)).size;
 
   if (held > 0 && !body.reassignTo) {
     // Deleting cascades the positions away, and with them everyone's access. Refusing with

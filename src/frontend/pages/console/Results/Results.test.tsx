@@ -85,7 +85,7 @@ const RESPONSES: Page<ResponseItem> = {
 
 const UNITS: UnitNode[] = [{
   id: 'u1', name: 'Engineering', parentId: null, isTemporary: false, endsAt: null,
-  peopleCount: 40, subjectCount: 2, children: [],
+  peopleCount: 40, subjectCount: 2, peopleTotal: 40, subjectTotal: 2, children: [],
 }];
 
 const reload = vi.fn();

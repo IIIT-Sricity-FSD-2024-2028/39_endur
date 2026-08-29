@@ -7,14 +7,26 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
-import type { Capability, Page, PersonSummary, UnitImpact, UnitNode } from '@endur/shared';
+import type {
+  Capability,
+  Page,
+  PersonSummary,
+  UnitComposition,
+  UnitImpact,
+  UnitNode,
+} from '@endur/shared';
 import { ApiError } from '../../../lib/api.js';
 import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
 import Structure from './index.js';
 
 const unit = (over: Partial<UnitNode> & { id: string; name: string }): UnitNode => ({
   parentId: null, isTemporary: false, endsAt: null,
-  peopleCount: 0, subjectCount: 0, children: [], ...over,
+  peopleCount: 0, subjectCount: 0, children: [],
+  // The branch totals are the SERVER's (DEC-082), so a fixture states them rather than
+  // deriving them — a fixture that rolled them up itself would be testing its own walk.
+  // A leaf's branch is itself, which is the default; the parents below say theirs.
+  peopleTotal: over.peopleCount ?? 0, subjectTotal: over.subjectCount ?? 0,
+  ...over,
 });
 
 /** Northfield › Engineering › Computer Science, with counts on the middle row. */
@@ -22,6 +34,8 @@ const northfield = (): UnitNode[] => [
   unit({
     id: 'root',
     name: 'Northfield',
+    peopleTotal: 64,
+    subjectTotal: 1,
     children: [
       unit({
         id: 'eng',
@@ -29,6 +43,8 @@ const northfield = (): UnitNode[] => [
         parentId: 'root',
         peopleCount: 4,
         subjectCount: 1,
+        peopleTotal: 64,
+        subjectTotal: 1,
         children: [unit({ id: 'cs', name: 'Computer Science', parentId: 'eng', peopleCount: 60 })],
       }),
     ],
@@ -55,11 +71,25 @@ const remove = vi.fn();
 const impact = vi.fn();
 
 let tree: { data: UnitNode[] | null; loading: boolean; error: Error | null };
+/** The role mix behind the People stat — DEC-083. Two Tutors and one Head on Engineering's
+ *  branch, which is a mix; a one-role unit is not one and renders nothing. */
+let mix: UnitComposition | null;
 let people: { data: Page<PersonSummary> | null; loading: boolean; error: Error | null };
 
 vi.mock('../../../lib/units.js', () => ({
-  useUnits: () => ({ ...tree, reload, create, rename, reparent, remove }),
+  useUnits: () => ({
+    ...tree,
+    totals: { people: 64, subjects: 1, units: 3 },
+    reload, create, rename, reparent, remove,
+  }),
   unitImpact: (id: string): Promise<UnitImpact> => impact(id) as Promise<UnitImpact>,
+  // Answers for the unit it names and no other, the way the endpoint does — otherwise
+  // every unit's panel shows Engineering's mix and the numbers collide.
+  useUnitComposition: (id: string | null) => ({
+    data: id && mix?.unitId === id ? mix : null,
+    loading: false,
+    error: null,
+  }),
 }));
 vi.mock('../../../lib/people.js', () => ({
   usePeopleIn: (id: string | null) => (id ? people : { data: null, loading: false, error: null }),
@@ -102,6 +132,14 @@ beforeEach(() => {
   impact.mockResolvedValue(impactOf());
   tree = { data: northfield(), loading: false, error: null };
   people = { data: emptyPeople, loading: false, error: null };
+  mix = {
+    unitId: 'eng',
+    total: 64,
+    byRole: [
+      { roleId: 'r1', roleName: 'Head', level: 1, count: 4 },
+      { roleId: 'r2', roleName: 'Tutor', level: 2, count: 60 },
+    ],
+  };
 });
 
 describe('the tree', () => {
@@ -121,9 +159,13 @@ describe('the tree', () => {
     expect(screen.queryByDisplayValue('Northfield')).toBeNull();
   });
 
-  it('shows counts in the caller vocabulary', () => {
+  it('shows counts in the caller vocabulary, over the whole branch — DEC-081', () => {
+    // 64, not 4: Engineering holds four people and Computer Science under it holds sixty.
+    // The server already reads it that way — the impact fixture below answers "delete
+    // Engineering" with peopleAffected: 64 — so this row was the surface disagreeing.
+    // And ONE Quaxel, not "1 Quaxels", which this assertion used to require.
     mount();
-    expect(within(rowFor('Engineering')).getByText('4 people · 1 Quaxels')).toBeTruthy();
+    expect(within(rowFor('Engineering')).getByText('64 people · 1 Quaxel')).toBeTruthy();
   });
 });
 
@@ -323,6 +365,80 @@ describe('the detail panel', () => {
     expect(within(panel).getByText('People')).toBeTruthy();
   });
 
+  it('is the ONE place the branch and the unit itself are both stated — DEC-081', () => {
+    // The map and the tree print 64 for Engineering because a box has room for one number.
+    // Somebody who clicks through after reading 64 must not then be shown a bare 4 with no
+    // explanation — the two views would simply contradict each other.
+    mount();
+    fireEvent.click(rowFor('Engineering'));
+
+    const panel = screen.getByRole('complementary', { name: 'Engineering details' });
+    expect(within(panel).getByText('64')).toBeTruthy();
+    expect(within(panel).getByText('4 here · 60 below')).toBeTruthy();
+  });
+
+  it('says nothing about a split on a unit that has nothing under it', () => {
+    // A footnote reading "60 here · 0 below" on every leaf is the "· 0" noise DEC-081's own
+    // rule rejects one line above it.
+    mount();
+    fireEvent.click(rowFor('Computer Science'));
+
+    const panel = screen.getByRole('complementary', { name: 'Computer Science details' });
+    expect(within(panel).getByText('60')).toBeTruthy();
+    expect(within(panel).queryByText(/here ·/)).toBeNull();
+  });
+
+  it('says WHO the people are, not only how many — DEC-083', () => {
+    // The owner's complaint about a number that was already correct: a hospital reading
+    // "30 people" means staff, and sixteen of those thirty are Patients. The stat is
+    // honest and unusable until the panel says what it is made of.
+    mount();
+    fireEvent.click(rowFor('Engineering'));
+
+    const panel = screen.getByRole('complementary', { name: 'Engineering details' });
+    // Scoped to the breakdown: "60" is also the stat above it, and a bare getByText would
+    // pass on the number this test is not about.
+    const mixed = panel.querySelector('.unit-mix');
+    expect(mixed?.textContent).toContain('By role');
+    expect(mixed?.textContent).toContain('Head');
+    expect(mixed?.textContent).toContain('4');
+    expect(mixed?.textContent).toContain('Tutor');
+    expect(mixed?.textContent).toContain('60');
+  });
+
+  it('warns when the roles add up past the total, instead of leaving it to be discovered', () => {
+    // Somebody who is both a Nurse and a Head is honestly in both rows, so the column can
+    // exceed the stat above it. Unexplained, the panel looks like it has lost count.
+    mix = {
+      unitId: 'eng',
+      total: 64,
+      byRole: [
+        { roleId: 'r1', roleName: 'Head', level: 1, count: 10 },
+        { roleId: 'r2', roleName: 'Tutor', level: 2, count: 60 },
+      ],
+    };
+    mount();
+    fireEvent.click(rowFor('Engineering'));
+
+    const panel = screen.getByRole('complementary', { name: 'Engineering details' });
+    expect(within(panel).getByText(/add up past 64/)).toBeTruthy();
+  });
+
+  it('does not restate a single role as a “mix”', () => {
+    // One row is the stat above in a taller shape. The breakdown earns its space only when
+    // there is something to compare.
+    mix = {
+      unitId: 'eng',
+      total: 64,
+      byRole: [{ roleId: 'r2', roleName: 'Tutor', level: 2, count: 64 }],
+    };
+    mount();
+    fireEvent.click(rowFor('Engineering'));
+
+    const panel = screen.getByRole('complementary', { name: 'Engineering details' });
+    expect(within(panel).queryByText('By role')).toBeNull();
+  });
+
   it('lists the people the API returned, and offers the rest', () => {
     // The envelope here is the real one from 13 §4. When this fixture said `items` the
     // panel read `undefined` and rendered nothing — and the test still passed (N-029).
@@ -350,7 +466,10 @@ describe('the detail panel', () => {
     // broken product (design_specs/design/02 §7). Restore both links with the page.
     expect(within(panel).getByText('Meera Iyer')).toBeTruthy();
     expect(within(panel).queryByRole('link', { name: 'Meera Iyer' })).toBeNull();
-    expect(within(panel).getByText('Head')).toBeTruthy();
+    // Scoped to the list: "Head" is also a row of the By-role breakdown above it (DEC-083),
+    // and the role beside a NAME is the thing this test is about.
+    const list = panel.querySelector('.unit-people-list');
+    expect(within(list as HTMLElement).getByText('Head')).toBeTruthy();
     expect(within(panel).getByText('4 people here in total.')).toBeTruthy();
   });
 

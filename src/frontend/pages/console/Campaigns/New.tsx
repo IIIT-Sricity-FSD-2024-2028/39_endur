@@ -468,5 +468,12 @@ function find(nodes: UnitNode[], id: string): UnitNode | undefined {
   return undefined;
 }
 
-const countPeople = (node: UnitNode): number =>
-  (node.peopleCount ?? 0) + node.children.reduce((total, child) => total + countPeople(child), 0);
+/**
+ * The audience a unit stands for, straight off the node — DEC-082.
+ *
+ * This was a third rollup, summing `peopleCount` down the tree, and it was wrong twice
+ * over: `peopleCount` counted role SLOTS rather than people, and summing double-counts
+ * anybody holding a post in two units of the branch. Both matter more here than on the
+ * map — this number tells somebody how many people a campaign is about to reach.
+ */
+const countPeople = (node: UnitNode): number => node.peopleTotal ?? 0;

@@ -5,7 +5,9 @@ import type {
   DeleteUnitBody,
   ReparentBody,
   UnitImpact,
+  UnitComposition,
   UnitNode,
+  UnitTreeTotals,
   UpdateUnitBody,
 } from '@endur/shared';
 import type { Request } from 'express';
@@ -28,27 +30,44 @@ export async function readTree(
   orgId: string,
   userId: string,
   authzVersion: number,
-): Promise<UnitNode[]> {
+): Promise<{ tree: UnitNode[]; totals: UnitTreeTotals }> {
   const visibility = await visibleUnits({ orgId, userId, capability: 'unit.read', authzVersion });
-  if (seesNothing(visibility)) return [];
+  if (seesNothing(visibility)) return { tree: [], totals: NO_TOTALS };
 
   const units = await prisma.node.findMany({
     where: { orgId, kind: 'unit', ...whereVisible(visibility) },
     select: { id: true, name: true, isTemporary: true, endsAt: true },
     orderBy: { name: 'asc' },
   });
-  if (units.length === 0) return [];
+  if (units.length === 0) return { tree: [], totals: NO_TOTALS };
 
   const ids = units.map((unit) => unit.id);
-  const [edges, people, subjects] = await Promise.all([
+  const now = new Date();
+  const [edges, assignments, subjects] = await Promise.all([
     prisma.edge.findMany({
       where: { orgId, type: 'contains', childId: { in: ids } },
       select: { parentId: true, childId: true },
     }),
-    prisma.node.groupBy({
-      by: ['unitId'],
-      where: { orgId, kind: 'position', unitId: { in: ids } },
-      _count: true,
+    // ONE ROW PER ASSIGNMENT, not a `groupBy` on positions — DEC-082.
+    //
+    // A position is a role-at-unit slot SHARED by everyone holding that role there
+    // (§2.1 of `10`, and `createAssignment` finds one before it creates one), so counting
+    // position rows counts distinct roles. Riverside's Ward C has a Head, a Nurse slot
+    // with two nurses in it and a Patient slot with three: three positions, six people,
+    // and the panel printed "People 3" above a list of five names.
+    //
+    // Expired assignments are excluded on the same predicate the GRANT resolver uses
+    // (`authz/collect.ts`). `valid_to` retains history rather than deleting access, so a
+    // lapsed nurse is still a row — counting them would put somebody in a ward where they
+    // hold no powers at all.
+    prisma.edge.findMany({
+      where: {
+        orgId,
+        type: 'member',
+        OR: [{ validTo: null }, { validTo: { gt: now } }],
+        child: { kind: 'position', unitId: { in: ids } },
+      },
+      select: { parentId: true, child: { select: { unitId: true } } },
     }),
     prisma.subject.groupBy({
       by: ['unitId'],
@@ -58,8 +77,16 @@ export async function readTree(
   ]);
 
   const parentOf = new Map(edges.map((edge) => [edge.childId, edge.parentId]));
-  const peopleCounts = new Map(people.map((row) => [row.unitId, row._count]));
   const subjectCounts = new Map(subjects.map((row) => [row.unitId, row._count]));
+
+  const peopleIn = new Map<string, Set<string>>();
+  for (const assignment of assignments) {
+    const unitId = assignment.child.unitId;
+    if (!unitId) continue;
+    const held = peopleIn.get(unitId) ?? new Set<string>();
+    held.add(assignment.parentId);
+    peopleIn.set(unitId, held);
+  }
 
   const nodes = new Map<string, UnitNode>(
     units.map((unit) => [
@@ -70,8 +97,11 @@ export async function readTree(
         parentId: parentOf.get(unit.id) ?? null,
         isTemporary: unit.isTemporary,
         endsAt: unit.endsAt?.toISOString() ?? null,
-        peopleCount: peopleCounts.get(unit.id) ?? 0,
+        peopleCount: peopleIn.get(unit.id)?.size ?? 0,
         subjectCount: subjectCounts.get(unit.id) ?? 0,
+        // Filled by the rollup below, once the tree has a shape to walk.
+        peopleTotal: 0,
+        subjectTotal: 0,
         children: [],
       },
     ]),
@@ -86,7 +116,54 @@ export async function readTree(
     if (parent) parent.children.push(node);
     else roots.push(node);
   }
-  return roots;
+
+  return { tree: roots, totals: rollUp(roots, peopleIn) };
+}
+
+const NO_TOTALS: UnitTreeTotals = { people: 0, subjects: 0, units: 0 };
+
+/**
+ * Fills `peopleTotal` and `subjectTotal` on every node, and answers the forest.
+ *
+ * People are unioned rather than added, because a person is one person however many roles
+ * they hold inside the branch. Riverside's demo data has exactly one: a nurse placed in
+ * both Ward F and Medicine, who a summing rollup counted twice at the root. Subjects hang
+ * off one unit each, so they add — but they are carried through the same walk so there is
+ * only ever one traversal to keep correct.
+ *
+ * Post-order, so each node is visited once: a function that re-walked its own subtree per
+ * row would be O(n²) on the page whose entire purpose is deep trees.
+ *
+ * INV-003 SURVIVES THIS MOVE. `readTree` has already reduced `units` to what this caller
+ * may see, so the walk cannot reach a unit they may not — a total here counts exactly the
+ * boxes on their screen, which is the guarantee that made the rollup client-side under
+ * DEC-081 and is now met on the only side that can also count people distinctly.
+ */
+function rollUp(roots: UnitNode[], peopleIn: Map<string, Set<string>>): UnitTreeTotals {
+  const forest = new Set<string>();
+  let subjects = 0;
+  let units = 0;
+
+  /** Returns the branch's distinct people; `units` is accumulated as a side effect so the
+   *  whole forest is measured in this one traversal rather than a second walk per root. */
+  const walk = (node: UnitNode): Set<string> => {
+    const branch = new Set(peopleIn.get(node.id) ?? []);
+    let below = node.subjectCount;
+    units += 1;
+    for (const child of node.children) {
+      for (const personId of walk(child)) branch.add(personId);
+      below += child.subjectTotal;
+    }
+    node.peopleTotal = branch.size;
+    node.subjectTotal = below;
+    return branch;
+  };
+
+  for (const root of roots) {
+    for (const personId of walk(root)) forest.add(personId);
+    subjects += root.subjectTotal;
+  }
+  return { people: forest.size, subjects, units };
 }
 
 export async function createUnit(
@@ -128,6 +205,8 @@ export async function createUnit(
         endsAt: unit.endsAt?.toISOString() ?? null,
         peopleCount: 0,
         subjectCount: 0,
+        peopleTotal: 0,
+        subjectTotal: 0,
         children: [],
       });
       req.ctx.audit.push({ action: 'unit.create', targetType: 'unit', targetId: unit.id });
@@ -171,6 +250,8 @@ export async function updateUnit(
       endsAt: unit.endsAt?.toISOString() ?? null,
       peopleCount: 0,
       subjectCount: 0,
+      peopleTotal: 0,
+      subjectTotal: 0,
       children: [],
     };
   });
@@ -281,8 +362,20 @@ export async function unitImpact(
   const unit = await assertUnitInOrg(req, orgId, unitId);
   const subtree = await unitSubtree(orgId, unitId);
 
-  const [people, subjects, campaigns] = await Promise.all([
-    prisma.node.count({ where: { orgId, kind: 'position', unitId: { in: subtree } } }),
+  const [assignments, subjects, campaigns] = await Promise.all([
+    // Distinct PEOPLE, not positions — DEC-082. This number goes straight into a delete
+    // confirmation ("moves 64 people and 12 courses to School of Engineering"), which is
+    // the one place in the product where a wrong count causes an irreversible action to be
+    // taken on a false premise. It was counting role slots.
+    prisma.edge.findMany({
+      where: {
+        orgId,
+        type: 'member',
+        OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
+        child: { kind: 'position', unitId: { in: subtree } },
+      },
+      select: { parentId: true },
+    }),
     prisma.subject.count({ where: { orgId, unitId: { in: subtree } } }),
     prisma.campaign.count({
       where: { orgId, subjects: { some: { subject: { unitId: { in: subtree } } } } },
@@ -293,7 +386,7 @@ export async function unitImpact(
     unitId,
     unitName: unit.name,
     descendantCount: Math.max(subtree.length - 1, 0),
-    peopleAffected: people,
+    peopleAffected: new Set(assignments.map((edge) => edge.parentId)).size,
     subjectsAffected: subjects,
     campaignsAffected: campaigns,
     gained: [],
@@ -314,6 +407,84 @@ export async function unitImpact(
   impact.lost = await peopleAnchoredAt(orgId, losing);
   impact.gained = await peopleAnchoredAt(orgId, gaining);
   return impact;
+}
+
+/**
+ * Who the count is made of — `DEC-083`.
+ *
+ * The owner's question was not "is 30 right" but "does 30 mean anything", asked of a
+ * hospital where sixteen of the thirty are Patients. A total is honest and still unusable
+ * when the mix is unknown, so the panel breaks it down and this answers that.
+ *
+ * SCOPE-FILTERED to the same visible set the tree's own totals use. If it were not, a
+ * level-2 reader would see role counts summing past the branch figure printed above them —
+ * which both leaks the size of a subtree they cannot open and makes the panel contradict
+ * itself, and the second is how anybody would notice the first.
+ *
+ * ONE PERSON CAN APPEAR TWICE. Someone who is both a Nurse and a Head of Department is in
+ * both rows, so the rows may sum higher than `total`. Each row is distinct within itself —
+ * a Nurse placed in two wards of the branch is one Nurse — and the panel says which number
+ * is the whole.
+ */
+export async function unitComposition(
+  orgId: string,
+  userId: string,
+  authzVersion: number,
+  unitId: string,
+): Promise<UnitComposition> {
+  const [visibility, subtree] = await Promise.all([
+    visibleUnits({ orgId, userId, capability: 'unit.read', authzVersion }),
+    unitSubtree(orgId, unitId),
+  ]);
+  const visible = visibility.all
+    ? subtree
+    : subtree.filter((id) => visibility.unitIds.includes(id));
+  if (visible.length === 0) return { unitId, total: 0, byRole: [] };
+
+  const assignments = await prisma.edge.findMany({
+    where: {
+      orgId,
+      type: 'member',
+      // The same window the GRANT resolver uses, and the same one `readTree` counts on —
+      // a breakdown that included a lapsed nurse would not add up to the stat above it.
+      OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
+      child: { kind: 'position', unitId: { in: visible } },
+    },
+    select: {
+      parentId: true,
+      child: { select: { role: { select: { id: true, name: true, level: true } } } },
+    },
+  });
+
+  const everyone = new Set<string>();
+  const byRole = new Map<string, { name: string; level: number; people: Set<string> }>();
+  for (const assignment of assignments) {
+    everyone.add(assignment.parentId);
+    const role = assignment.child.role;
+    if (!role) continue;
+    const row = byRole.get(role.id) ?? {
+      name: role.name,
+      level: role.level ?? 0,
+      people: new Set<string>(),
+    };
+    row.people.add(assignment.parentId);
+    byRole.set(role.id, row);
+  }
+
+  return {
+    unitId,
+    total: everyone.size,
+    byRole: [...byRole.entries()]
+      .map(([roleId, row]) => ({
+        roleId,
+        roleName: row.name,
+        level: row.level,
+        count: row.people.size,
+      }))
+      // Ladder order, so the panel reads the way `/app/roles` does. Name breaks a tie so
+      // two roles at one level do not reorder between requests.
+      .sort((a, b) => a.level - b.level || a.roleName.localeCompare(b.roleName)),
+  };
 }
 
 /* ---------------------------------------------------------------- helpers */

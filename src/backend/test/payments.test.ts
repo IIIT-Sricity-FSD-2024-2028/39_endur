@@ -15,7 +15,7 @@
 // are written with — the two are one transaction and the assertions belong together.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { priceOf } from '@endur/shared';
+import { priceOf, type PlatformEarnings } from '@endur/shared';
 import { app, registerOrg, unique, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { hashPassword } from '../auth/password.js';
@@ -130,16 +130,18 @@ describe('the earnings page is the owner’s — DEC-080, 19 §4', () => {
     const res = await owner.get('/api/v1/platform/earnings');
     expect(res.status).toBe(200);
 
-    const data = res.body.data;
+    // Typed, not `any`: the assertions below walk into arrays, and an untyped envelope
+    // makes every one of them an unsafe call that asserts nothing about the real shape.
+    const data = res.body.data as PlatformEarnings;
     expect(data.currency).toBe('INR');
     // Integers all the way to the client — a float crossing the wire is a rounding error
     // waiting for somebody downstream to sum it.
     expect(Number.isInteger(data.totals.revenueMinor)).toBe(true);
     expect(data.totals.revenueMinor).toBeGreaterThanOrEqual(priceOf('gold'));
-    expect(data.byTier.map((row: { tier: string }) => row.tier))
+    expect(data.byTier.map((row) => row.tier))
       .toEqual(['bronze', 'silver', 'gold', 'enterprise']);
     // The organisation registered a moment ago is in the window and in the ledger.
-    expect(data.recent.some((row: { orgId: string }) => row.orgId === founder.orgId)).toBe(true);
+    expect(data.recent.some((row) => row.orgId === founder.orgId)).toBe(true);
   });
 
   /**

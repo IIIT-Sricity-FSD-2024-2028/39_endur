@@ -179,6 +179,18 @@ export function ShareSheet({
           {/* Selectable, and big. Somebody at the back types this. */}
           <p className="share-url">{display(url)}</p>
 
+          {/* Deleted by accident in a design pass on 26 Aug and restored here: it was the
+              only thing in the product that says a QR will not scan, and `isUnscannable()`
+              was left sitting there with no caller. `OPEN-002` is still open, so this
+              warning is not decoration — it is the whole mitigation. */}
+          {isUnscannable(url) && (
+            <p className="share-warn" role="alert">
+              This address points at <strong>localhost</strong>, which on a phone means the
+              phone. Nobody can scan this. Set <code>PUBLIC_BASE_URL</code> to an address the
+              room can reach before the demo — see <code>OPEN-002</code>.
+            </p>
+          )}
+
           {failed && (
             <p className="field-error" role="alert">
               Copying was refused by the browser. The address above can be selected by hand.

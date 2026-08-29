@@ -5,7 +5,47 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-29  (T-058 — PRICES, A CHECKOUT AND /ops/earnings. DEC-080, which
+UPDATED   2026-08-29  (DEC-081 — A COUNT ON A UNIT COUNTS THE WHOLE BRANCH, and the
+                       BRANCH SWEEP that came with it. the owner added a ward under Ward D
+                       and NOTHING ABOVE IT MOVED: the leaf said 1 person, Ward D still
+                       said 2, Surgery still said 3. the API's peopleCount is a groupBy on
+                       unitId with no walk in it -- the right PRIMITIVE and the wrong
+                       NUMBER TO PRINT. THE SERVER ALREADY AGREED: /units/:id/impact
+                       answers "delete Engineering" with peopleAffected: 64, and
+                       Structure.test.tsx has carried 64 and 4 side by side since T-033
+                       without anyone reading them together. rolled up ON THE CLIENT and
+                       that is CORRECTNESS: the tree is scope-filtered before it is
+                       returned (INV-003), so a total over what the reader was SENT counts
+                       exactly what they may see -- one computed in SQL would leak the size
+                       of a branch they cannot open. new lib/unitTotals.ts; Overview.tsx's
+                       local totals() was a SECOND implementation of the same walk and is
+                       now a call to it. the DETAIL PANEL is the only surface showing both,
+                       "4 here | 60 below", because it is the only one with room to say
+                       which is which. SAME PASS KILLED "1 Services": subjectWord was the
+                       PLURAL ALONE on both components, and A TEST ASSERTED THE BUG
+                       ('4 people . 1 Quaxels', T-033) -- a test written from the code
+                       cannot catch the code. <UnitMap> HAD NO CATALOGUE ENTRY AT ALL since
+                       T-033; added.
+                       THE BRANCH WAS RED AND IS NOW GREEN WHERE IT CAN BE. lint 9 -> 0,
+                       drift 1 -> 0, vocab 5 -> 3 (D-035's own), tsc 22 -> 4 (D-035's own).
+                       D-037 REPAID AND PROVED -- root vitest.config.ts with both
+                       workspaces as projects; dev database held 4 orgs before a
+                       root-launched backend run and 4 after. THE PAYMENTS MIGRATION HAD
+                       NEVER BEEN APPLIED, so /app/plan's checkout and every panel on
+                       /ops/earnings were dead against the dev database; applied, purely
+                       additive, no data lost. NO postinstall EXISTED, so a fresh clone
+                       could not typecheck -- 15 of the 22 errors were a stale Prisma
+                       client for a model sitting in schema.prisma. THE SHARESHEET
+                       LOCALHOST WARNING HAD BEEN DELETED in a design commit, leaving
+                       isUnscannable() with no caller and OPEN-002 with no mitigation in
+                       the product at all; restored. MOJIBAKE in three files -- comments
+                       re-saved through a non-UTF-8 editor turned every em-dash and section
+                       sign to ?" and A; repaired, no user-visible string affected.
+                       FOUR NEW DEBTS FILED, and D-038/D-039/D-040 ARE DECISIONS, NOT WORK:
+                       the Setup redesign disagrees with six of its own tests, <WordsEditor>
+                       stopped saying which plurals are yours, and OPERATOR MFA QUIETLY
+                       BECAME A 6-HOUR CODE with no DEC and a red test left behind.
+                       Earlier: T-058 — PRICES, A CHECKOUT AND /ops/earnings. DEC-080, which
                        SUPERSEDES DEC-035: bronze Rs 99, silver Rs 499, gold Rs 999 per
                        year in INR, on the picker and in a payment dialog at both the
                        sign-up step and /app/plan. THE MONEY IS SIMULATED — no gateway, no
@@ -1563,6 +1603,10 @@ Blocking or dated. Move to `_MEMORY.md` as a `DEC-` entry once resolved, and tic
 |---|---|---|---|
 | `OPEN-002` | What public URL does the QR encode? `localhost` will not scan from a phone. **Deferred 21 Aug — local for now, by decision.** That unblocks development and unblocks nothing else: the scan-to-respond beat still cannot run until this is answered, so it is deferred rather than resolved | **before `T-045`** | T-038, T-043 |
 | ~~`OPEN-008`~~ | **RESOLVED 23 Aug — `DEC-036`.** File upload **strips metadata, it does not re-encode.** `lib/imageBytes.ts` sniffs the real format from magic bytes, reads dimensions from the header, and removes JPEG APP1/APP13/COM, PNG `eXIf`/`tEXt`/`zTXt`/`iTXt`/`tIME`, and WebP `EXIF`/`XMP ` chunks with the VP8X flag bits that advertise them — without decoding anything, and therefore **without an image library nobody approved**. The privacy property `48` wanted re-encoding for survives: GPS, device ids and author names do not reach disk, asserted by a test that uploads a GPS-tagged JPEG and greps the stored bytes. What is not bought is polyglot neutralisation, and that risk is written into `48` and `DEC-036` rather than left quiet — stored bytes are only ever *served*, with a sniffed `Content-Type`, `nosniff` and `inline`, and respondent uploads stay out of scope, which is where a hostile file would come from. **If an image library is ever approved, `stripMetadata()` is the one function to replace** | ~~before `T-061`~~ — **done** | ~~T-061~~, ~~T-062~~ |
+| `OPEN-011` | **Does operator MFA stay a 6-hour code?** Changed on the branch with no `DEC-` and no amendment to `19` §9, whose argument for building MFA at all is that a stolen operator password exposes **every tenant's** plan data at once. A code valid for a full shift is close to a static secret. Two honest answers: keep it and write the demo-convenience trade into a `DEC-` (then rewrite `platform.test.ts`'s window assertion to the new rule), or revert to 30s and read a live code from `npm run ops:code` at the rehearsal. **What is not an option is leaving it undocumented with its test red** | **before `T-045`** | `D-040` |
+| `OPEN-012` | **Does the Setup wizard keep what its redesign dropped?** The split pane and the preview-on-Review are good; nobody recorded choosing them over the role chain on the card before any click, "Pick the closest one", the step-4 live preview, and `← Back`. Six red tests are the only record that they existed. Answer is either a `DEC-` superseding those parts of `31`, or the affordances come back — **not** a quiet edit of the assertions | before `T-045` | `D-038`, `D-039` |
+| ~~`OPEN-013`~~ | ~~**Should the lowest tier of people be counted on `/app/structure` at all?**~~ **ANSWERED 29 Aug — `DEC-083`, option (b).** Not by dropping a tier from the total: everyone placed in a ward IS affected when the ward goes, which is what this page's numbers are for. By saying what the total is made of — `GET /units/:id/composition`, and a bar per role under the People stat. Riverside's root now reads 30, and under it: Director 1, Head of Department 3, Nurse 10, Patient 16 | done | `DEC-083` |
+| `OPEN-014` | **Should respondents be `person` nodes with accounts at all?** The contradiction `DEC-083` declined to resolve six days from a graded demo. `labels.respondent` names Patient/Student/Guest as the respondent noun and `DEC-009` says respondents are **never users** — yet the demo seed gives all sixteen Riverside patients full `person` nodes **with user accounts and positions**, which is why they appear in a staff count at all. Either `DEC-009` means what it says and the seed is wrong, or respondents-as-people is a real second case `DEC-009` never covered and should be written down. Touches the seed, setup, and the demo org itself | **after M0** | `DEC-083` § not |
 | `OPEN-001` | Phase-3 Redux shape (`23` §4). Recommendation on file: RTK Query + hand-written slices | 15 Oct | nothing before P3 |
 | ~~`OPEN-003`~~ | **RESOLVED 23 Aug — `DEC-042`. Rule-based, no LLM in P1–P3.** Forced early by `CONF-019`: the owner asked for the Analysis page to be completed and it could not be built while its engine was undecided. **The decider was privacy, not cost** — `52` promises respondents anonymity, and shipping their free-text comments to a third party is a disclosure that must be *surfaced* to the customer, and there is no consent mechanism in the product to surface it with. Building one to enable a feature nobody asked for in those terms is the wrong order. Three secondary reasons, each sufficient alone: an API key is a dependency the owner has reserved before (`DEC-036` is the same shape); non-determinism makes `43`'s acceptance list untestable; and a lexicon is *honest about being weak*, which § Reliability already made this page's differentiator. LLM stays available as a per-org opt-in behind one interface — the seam `stripMetadata()` occupies in `48`. `REVISIT:2026-11-01` stands but blocks nothing | ~~1 Nov~~ — **done** | ~~T-081~~ |
 | `OPEN-004` | Third member's lane assignment (`02` §6) | — | scheduling only |
@@ -1579,7 +1623,11 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 | id | What | Why | Repay by |
 |---|---|---|---|
-| `D-037` | **`D-004`'s guard is bypassed by running vitest from the repo root, and that is where the 65 junk orgs came from** | Found 26 Aug while repaying `D-031`. The development database held **65 organisations named `org-n-<epoch>-<random>` and 38 platform users**, all dated **25 Aug** — four days AFTER `T-048` supposedly closed `D-004`. The slug is `test/helpers.ts`'s `unique('n')` verbatim, so the backend suite wrote them. `T-048`'s guard is real and it is not weak — but it lives in `globalSetup`/`setupFiles`, which are declared in **`src/backend/vitest.config.ts`**, and **there is no vitest config at the repo root at all**. So `npx vitest run` from the root loads no config, runs no `setupFiles`, and `lib/config.ts` reads `.env` — pointing a suite that truncates and rewrites at the **development** database, which is the precise failure `test/database.ts`'s own header calls *"losing the demo data an hour before presenting it"*. `npm test` is safe (it delegates per workspace); the ad-hoc root invocation is not, and it is the natural thing to type. **A guard that a shorter command skips is not a guard** — the same sentence `T-090` had to write about a route. Fix is small and structural: a root `vitest.config.ts` with `projects` for both workspaces, so the root command becomes correct rather than dangerous. **Until it exists, run backend tests from `src/backend` and frontend tests from `src/frontend`** | **before `T-045`** — a rehearsal against a re-polluted database is not evidence about the demo |
+| ~~`D-037`~~ | ~~**`D-004`'s guard is bypassed by running vitest from the repo root**~~ | **REPAID 29 Aug.** Root `vitest.config.ts` now declares both workspaces as `projects`, so `npx vitest run` from the repo root runs each under its own config — the backend's `globalSetup`/`setupFiles` included. **Proved, not assumed**: the development database held 4 organisations before a root-launched `test/tiers.test.ts` and 4 after, and the run reported itself as `|@endur/api|` with `env: "test"` in every log line. The frontend project points at `src/frontend/vite.config.ts`, where its jsdom setup already lives — a second copy here is how the two would drift. `eslint.config.js` gained `allowDefaultProject` for the new file, which no tsconfig owns. **The advice to run from `src/backend` is withdrawn — the root command is now the correct one** | ~~before `T-045`~~ — **done** |
+| `D-038` | **The Setup wizard's redesign disagrees with its spec, and six tests are the evidence** | Found 29 Aug reviewing the branch. `Industry.tsx` was rebuilt as a split pane with a preview aside and `Review.tsx` took over the live vocabulary preview. Both are defensible and neither is recorded. Six `Setup.test.tsx` tests name what went: **the role chain and vocabulary pair on the card before any click** (the presenter's ten-second beat, `31` § step 1), **"Pick the closest one"** for an organisation nobody listed, **the step-4 live preview**, and the **`← Back` button**. A red test is not the problem here — the problem is that nobody chose. Either the tests move to the new design with a `DEC-` saying why the old affordances were not worth keeping, or the affordances come back. **Do not silently update the assertions**: three of the four are arguments `31` makes in prose | a decision, then one session either way |
+| `D-039` | **`<WordsEditor>` stopped saying which plurals are yours** | Found 29 Aug. The rebuild dropped the per-row hint that read `auto: Wings` or `your plural`, keeping only the reset button. The override state is now invisible until you notice an icon has appeared, and `Settings.test.tsx` fails on it. The new Singular/Plural header row is a real improvement and the `auto:` half is arguably redundant beside a filled field — but `your plural` was the only thing distinguishing a word the organisation chose from one the deriver guessed, which is the whole point of storing both (`22` §2) | with `D-038`, same decision |
+| `D-040` | **Operator MFA became a 6-hour code, with no `DEC-` and a red test left behind** | Found 29 Aug. `platform/totp.ts` moved `STEP_SECONDS` from 30 to `6 * 60 * 60` and `WINDOW` from 1 to 0. A second factor valid for a full shift is close to a static secret, and `19` §9 argues MFA is the one nicety not deferred **precisely because a stolen operator password exposes every tenant's plan data at once** — that doc was edited in the same window for `platform.revenue.read` and left untouched here. `platform.test.ts`'s window assertion fails consistently, three runs, not flaky. Either it gets a `DEC-` that states the demo-convenience trade out loud and the test is rewritten to the new rule, or it goes back to 30s and the demo reads a live code from `npm run ops:code` | **a decision, and it is a security posture** |
+| `D-041` | **`public.test.ts` flaked once under the root runner** | Found 29 Aug, the first root run after `D-037` was repaid: *"answers the same 404 for unknown, unlaunched, closed and expired tokens"* failed once and passed alone, and passed again on the next full root run. Both projects now start together, so the backend suite shares its one test database at a higher worker count than it ever did alone. **One occurrence is not a diagnosis** — if it returns, the answer is `fileParallelism` or a pool cap on the backend project, not a retry | watch it; act on the second occurrence |
 | `D-035` | **Four `tsc -b` errors on the branch, none of them from a task** | Found 26 Aug during `T-090`. Three in `features/roles/service.ts` and one in `pages/console/Simulator.tsx`, all `exactOptionalPropertyTypes` — an optional property being handed `T | undefined`. **Confirmed pre-existing**: the same four appear on a stashed tree, so they arrived with the `Update codebase` commit rather than with the export. They do not block `npm run dev` (tsx does not typecheck) but they **will fail `npm run build`**, which is what a deploy and a graded checkout run. Each is a one-line `...(x ? { x } : {})` or an explicit `| undefined` on the target type | **before any build-based demo** — small, but it is the kind of thing that is discovered on stage |
 | `D-036` | **`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing** | Found 26 Aug during `T-090` and **verified pre-existing on a stashed tree**. The backwards-pagination test asserts `page1.body.page.nextCursor` is truthy and gets a falsy value, meaning the fixture no longer produces more than one page — most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing rather than the reader being wrong. The reader itself is exercised live (a 775-line export and a 45-line filtered read both came back correct). Fix is to size the fixture past one chunk deliberately, not to relax the assertion | whoever next touches `72`'s reader |
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
@@ -1622,7 +1670,201 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-29 (latest) · prices, a simulated checkout, and `/ops/earnings` — `DEC-080`
+### 2026-08-29 (latest) · `DEC-083` — saying what the count is made of
+
+The owner picked **(b)** from `OPEN-013`: not dropping the lowest tier from the total, but
+disclosing the mix. Everyone placed in a ward is affected when the ward goes, which is what
+this page's numbers are for — the problem was never that Patients were counted, it was that
+"30 people" told an administrator nothing when sixteen of the thirty are Patients.
+
+`GET /units/:id/composition` returns the branch's people by role in ladder order, and the
+detail panel draws a bar per row. Riverside's root, from the live database:
+
+| Director | Head of Department | Nurse | Patient |
+|---|---|---|---|
+| 1 | 3 | 10 | **16** |
+
+**Its own endpoint, not a field on every node.** The panel shows one unit; a per-node
+breakdown is roles × units carried on every page load and read almost never. Scope-filtered
+to the same visible subtree the tree's totals use — without that a level-2 reader's role
+rows would sum *past* the branch figure printed above them, which leaks the size of a
+subtree they cannot open and makes the panel contradict itself.
+
+**The rows may sum higher than the total**, because somebody who is both a Nurse and a Head
+is honestly in both. Each row is distinct within itself. The panel says the overage out loud
+when it happens; unexplained it reads as the panel having lost count. Bars are scaled to the
+largest row and never stacked — a stacked bar claims a partition this is not, and would
+overflow on exactly the org where the claim is false. One role renders nothing.
+
+Four new backend tests and three new panel tests. Two pre-existing panel assertions were
+scoped rather than changed: `Head` and `60` now legitimately appear twice on the panel, in
+the breakdown and in the people list, and a bare `getByText` was passing on the wrong one.
+
+**Checks:** lint 0 · drift clean (61 docs) · vocab 3 (`D-035`'s own) · typecheck 4
+(`D-035`'s own) · tests 11 failed / 1380 passed — the same 11 as the last two sessions.
+
+**Filed, not fixed: `OPEN-014`.** `DEC-009` says respondents are never users, and the seed
+gives all sixteen patients accounts and positions anyway — which is the only reason they are
+in a staff count. That is a seed, setup and `DEC-009` question, and answering it six days
+before a graded demo would rewrite the org the demo runs on.
+
+### 2026-08-29 · `DEC-082` — a position is not a person
+
+**The owner rejected the first fix**: *"nope, i think its make so no sense still… should the
+lowest tier (student/patient, etc) even be counted? idk but the count and no of people
+present and overall everything is still wrong"* — with a screenshot of Ward C reading
+**`PEOPLE 3` above a list of five names**.
+
+They were right, and `DEC-081` had fixed the wrong layer. **A `position` is a role-at-unit
+SLOT shared by everyone holding that role there** — `10` §2.1 has said so since the model
+was written, and `createAssignment` says so in a comment while it FINDS a position before
+creating one. So `count(kind='position')` answers *how many distinct roles are present*.
+Four features read it as *how many people*:
+
+| Site | Was | Is |
+|---|---|---|
+| `readTree` | map, tree, panel, band | distinct `member` parents per unit |
+| `unitImpact` | the number a **delete confirmation** states | distinct people in the subtree |
+| `listRoles` + `deleteRole` | the roles ladder and its refusal | distinct holders |
+| `Campaigns/New.tsx` | **the audience a campaign will reach** | `peopleTotal` |
+
+Riverside read **16 people** for **30**, and 16 was also its number of patients, so it
+looked plausible. Ward C: three positions, six people.
+
+**The rollup moved to the server**, superseding `DEC-081` § where. That decision's INV-003
+argument was right and its location could not deliver it: a client holds per-unit scalars
+and can only ADD them, and people do not add — the demo data contains one nurse placed in
+both Ward F and Medicine, so a summed root read 31 for 30. `readTree` filters to the
+caller's visible units *before* the walk, so INV-003 holds by the same argument on the side
+that can union. `UnitNode` gains `peopleTotal`/`subjectTotal`; `GET /units` gains a `meta`
+envelope for the forest, because summing roots has the identical defect.
+
+**Expired assignments left the counts too.** `valid_to` retains history rather than deleting
+access and `authz/collect.ts` has always ignored a lapsed edge; the counts did not, so a
+departed nurse stood in a ward holding no powers in it.
+
+Six new tests in `test/units.test.ts` — shared slot, branch rollup, the double-placed
+person, the expired edge, the `meta` envelope, and INV-003 under a scoped reader. The
+client-side rollup tests became display tests, since there is no client rollup left to test.
+
+**Checks:** lint 0 · drift clean (61 docs) · vocab 3 (`D-035`'s own) · typecheck 4
+(`D-035`'s own) · tests 11 failed / 1373 passed — the same 11 as the previous session, plus
+six new passing.
+
+**Left open deliberately:** `OPEN-013`, the half of the owner's question that is a design
+decision — whether Patients and Students belong in the number at all. Filed with a
+recommendation, not started; it would rewrite the demo org.
+
+### 2026-08-29 · `DEC-081`, and the branch put back in the green
+
+**Two asks in one session.** The owner added a unit and the numbers above it did not move;
+then, "do the others" — the cleanup block offered after the branch review.
+
+#### The counts — `DEC-081`
+
+Ward F was added under Ward D. Ward F said `1 person`. **Ward D still said 2 and Surgery
+still said 3.** Nothing above the new leaf changed, because nothing above it ever had.
+
+`peopleCount` is a `groupBy` on `unitId` in `features/units/service.ts` and contains no walk
+of the graph. That is the right **primitive** and the wrong **number to print** — ask anybody
+how many people are in Surgery and they mean the wards. And the server had been saying so all
+along: `GET /units/:id/impact` answers *"delete Engineering"* with `peopleAffected: 64`, while
+the row three inches away printed `4`. **`Structure.test.tsx` has carried both numbers since
+`T-033`** — 64 in the impact fixture, 4 in the row assertion — and nobody read them together.
+
+Rolled up **on the client**, and that is correctness rather than convenience: the tree is
+scope-filtered before it is returned (INV-003), so a total over what the reader was *sent*
+counts exactly the units they may see. One computed in SQL would count the ones they may not,
+and the size of a branch is itself information — it would tell a level-2 reader how big a
+subtree is that they are not allowed to open.
+
+- `src/frontend/lib/unitTotals.ts` — `rollUp()` fills a map in **one** post-order walk rather
+  than offering a per-row function, which on the page whose whole subject is deep trees would
+  have been O(n²). `Overview.tsx`'s local `totals()` was a second implementation of the same
+  walk and is now a call to `totalOf()` — INV-009's rule applied to a function.
+- `<UnitMap>` and `<UnitTree>` read the map. **`<DetailPanel>` is the only surface that shows
+  both**, `4 here · 60 below` under the branch figure, because it is the only one with room to
+  say which is which. Inside the `<dd>`: `<dl> > <div>` may hold nothing but `<dt>` and `<dd>`.
+- On the map the split lives in a `<title>` — no layout cost, and inside a pressable `<g>` it
+  becomes the accessible name, which until now was the two text runs jammed together
+  (*"Surgery3 people · 1 Service"*).
+
+**The same pass killed "1 Services".** `subjectWord` was the plural alone on both components,
+so every unit holding exactly one printed the plural — six of the eight boxes in the owner's
+screenshot. The prop is now the `Label` pair `organization.labels` already stores; the
+singular is not derivable ("Faculty" pluralises to "Faculty", `22` §2). **A test asserted the
+bug** — `'4 people · 1 Quaxels'`, written at `T-033` — which is how it survived three
+revisions. A test written *from* the code cannot catch the code.
+
+**`<UnitMap>` had no catalogue entry at all**, built at `T-033` citing "24 §3" and never added
+to `24`, against the ground rule that the catalogue comes first. Added, with the props it
+actually has. Nothing caught it: `audit:drift` checks capabilities and design values, not
+components.
+
+8 new tests. `24`, `32` and `_MEMORY.md` amended first, as the rule requires.
+
+#### The cleanup — the branch was red
+
+It was green on 26 Aug. Five checks and both suites, before → after:
+
+| Check | Was | Now |
+|---|---|---|
+| `npm run lint` | 9 errors | **0** |
+| `npm run audit:drift` | 1 finding | **0**, 61 docs |
+| `npm run audit:vocab` | 5 | **3** — `D-035`'s own, none in a file touched here |
+| `npm run typecheck` | 7 · **22 on a fresh clone** | **4** — `D-035`'s own |
+| frontend tests | 11 fail / 5 files | 9 fail / 3 files, **all decisions or pre-existing** |
+
+- **`D-037` repaid, and proved rather than asserted.** Root `vitest.config.ts` declares both
+  workspaces as `projects`. The development database held **4 organisations before** a
+  root-launched `test/tiers.test.ts` and **4 after**, and the run reported itself as
+  `|@endur/api|` with `env: "test"` on every log line. The advice to run from `src/backend` is
+  withdrawn — the root command is now the correct one.
+- **The payments migration had never been applied.** `20260829120000_payments` was pending, so
+  `/app/plan`'s checkout and every panel on `/ops/earnings` — the flagship of the last commit —
+  were dead against the development database. Applied; purely additive (1 `CREATE TABLE`, 3
+  indexes, no `ALTER`, no `DROP`), 4 orgs before and after.
+- **There was no `postinstall`.** The Prisma client is generated, not committed, so a fresh
+  clone failed `npm run typecheck` with 15 errors about a model sitting in `schema.prisma` —
+  and could not tell them from its own. Root `postinstall` now runs `db:generate`.
+- **The ShareSheet localhost warning had been deleted** in a design commit, leaving
+  `isUnscannable()` with no caller. It was the only thing in the product that says a QR will
+  not scan, and `OPEN-002` is still open — that warning *is* the mitigation. Restored.
+- **A date bomb.** `Home.test.tsx` pinned `endsAt: '2026-08-26'`; on the 29th the card
+  correctly read *"ended 3 days ago"* and a test about a **relative** phrase failed for nothing
+  anyone had changed. Fixtures are now relative to `Date.now()`.
+- **`Industry.tsx` broke INV-001 on the vocabulary screen**, printing `Unit:` and `Respondent:`
+  — Endur's *internal* names (INV-002), which nothing in the product says to a reader;
+  `<VocabularyChips>` makes the point by printing the words with no category label at all. The
+  left side now describes the concept. Same file: `PRESET_ICONS` typed to `IconName` instead of
+  `string`, and two off-scale icon sizes brought onto the closed 16/18/20/24 scale.
+- **Mojibake in three files.** `WordsEditor.tsx`, `AuthAside.tsx` and `Review.tsx` had comments
+  re-saved through a non-UTF-8 editor — every em-dash became `?"` and every `§` became `A`.
+  Repaired. **No user-visible string was affected**, and the sweep found no others.
+- Two committed scratch files (`check.cjs`, `check_icons.js` — the same eight-line "does lucide
+  export this" script, twice) deleted. `_MEMORY.md`'s `DEC-078` entry quoted a CSS value, which
+  is the one thing `audit:drift` check 1 exists to catch; rephrased.
+
+#### What was deliberately NOT done
+
+`D-038`, `D-039`, `D-040` are **decisions, and they are the owner's**:
+
+- the **Setup redesign** disagrees with six of its own tests, and three of the four affordances
+  it dropped are arguments `31` makes in prose. Updating the assertions to match the new design
+  would erase the disagreement rather than resolve it.
+- **`<WordsEditor>`** stopped saying which plurals are the organisation's own.
+- **operator MFA quietly became a 6-hour code** — `STEP_SECONDS` 30 → 21600, `WINDOW` 1 → 0 —
+  with no `DEC-`, `19` §9 untouched, and its test left red. A second factor valid for a full
+  shift is close to a static secret, and `19` §9's argument is blast radius: a stolen operator
+  password exposes every tenant's plan data at once.
+
+`D-036` (`platform-logs`) and the two `routes.test.tsx` failures are unchanged and pre-existing.
+`D-041` filed for a single `public.test.ts` flake under the new root runner — one occurrence,
+did not reproduce, not yet a diagnosis.
+
+Nothing is committed.
+
+### 2026-08-29 · prices, a simulated checkout, and `/ops/earnings` — `DEC-080`
 
 **The owner asked for the payment half of the plan ladder.** Prices on the three cards, a
 popup that takes the payment with a success animation, gold treated as gold, and an
