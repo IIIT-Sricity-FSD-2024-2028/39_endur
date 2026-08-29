@@ -18,6 +18,10 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../db/client.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { isAccepting } from '../campaigns/status.js';
+import {
+  resolveBookable as resolveBookableByToken,
+  type LiveBookable,
+} from '../booking/service.js';
 
 /**
  * One 404 for every reason a token might not work.
@@ -102,4 +106,43 @@ export function campaignOf(req: { campaign?: LiveCampaign }): LiveCampaign {
     throw new Error('resolveCampaign did not run before this handler');
   }
   return req.campaign;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// T-095 — the same shape for a BOOKABLE token, and deliberately the same shape.
+//
+// `/book/:token` has every property `/r/:token` has: no account, a phone, a venue network,
+// and a token that IS the access. So it gets the same middleware order for the same reason —
+// resolve first, gate second — even though there is no membership gate to run after it yet.
+// Writing it as a middleware rather than as a line inside the handler is what keeps that
+// order visible in the router, where somebody adding a gate later will see it.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      /** Set by resolveBookable, read by the three public booking handlers. */
+      bookable?: LiveBookable;
+    }
+  }
+}
+
+/** Unknown, unopened and closed all leave as the SAME 404 — `uniform404`'s argument, and
+ *  the service throws it, so there is one sentence for every reason a link does not work. */
+export const resolveBookable: RequestHandler = (req, _res, next) => {
+  const { params } = req.data as { params: { token: string } };
+  void resolveBookableByToken(params.token)
+    .then((bookable) => {
+      req.bookable = bookable;
+      next();
+    })
+    .catch(next);
+};
+
+/** As `campaignOf`: a missing link is a 500 at the seam, never a crash inside a handler. */
+export function bookableOf(req: { bookable?: LiveBookable }): LiveBookable {
+  if (!req.bookable) throw new Error('resolveBookable did not run before this handler');
+  return req.bookable;
 }

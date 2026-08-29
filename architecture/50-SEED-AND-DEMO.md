@@ -87,6 +87,12 @@ regeneration never silently reverts an administrator's change (`10` §9).
 | `reflection.create` `reflection.read` | **self** | **self** | **self** | — |
 | `actionplan.create` `actionplan.read` | **self** | **self** | **self** | — |
 | `checkin.create` `checkin.read` | subtree | subtree | own_unit | — |
+| `announcement.read` | all | all | all | **all** |
+| `announcement.create` | all | all | — | — |
+| `announcement.publish` `announcement.delete` | all | — | — | — |
+| `booking.read` | all | all | all | — |
+| `booking.create` `booking.update` | all | all | — | — |
+| `booking.delete` `booking.cancel` | all | — | — | — |
 | `simulator.run` | all | subtree | — | — |
 | `audit.read` | all | — | — | — |
 | `billing.read` `billing.update` | all | — | — | — |
@@ -102,7 +108,26 @@ Those two back `/app/profile` (`47`). A default-deny model silently produces an 
 profile page if `self` is forgotten, so the seed must never omit them — and `11` §10 has an
 acceptance test for exactly this.
 
-Notes on four rows that look surprising:
+Notes on five rows that look surprising:
+
+- **`announcement.*` is `all`, and `publish` stops one level short of `create` — `T-094`.**
+  `all` for the reason `template.*` is `all`: an announcement has no unit of its own, its
+  *audience* names one, so a unit scope would mean nobody could read anything. `read` reaches
+  **L4** because everybody is somebody a notice can be sent to, and being sent one is not a
+  permission anybody should have to be given. The gap between `create` (L1–L2) and `publish`
+  (L1) is the entire reason they are separate verbs: drafting is not broadcasting, and out of
+  the box a coordinator writes the notice while an administrator sends it. A single
+  announcement-manage verb would have made that unsayable, exactly as `account.revoke` would
+  have been unsayable folded into `account.create`.
+
+- **`booking.*` is `all`, and `cancel` stops two levels short of `create` — `T-095`.** `all`
+  for the same reason as the row above: a bookable has no unit of its own. `read` reaches
+  **L3** because somebody running a section should see what is booked in it, and the writes
+  stop at L2. `cancel` is L1 alone, and that gap is why it is a separate verb at all: it
+  reaches into a decision somebody else already made. Out of the box a coordinator can add
+  and remove slots, and only an administrator can take back a booking a guest is expecting to
+  be honoured.
+
 
 - **`template.*` is `all`, not `subtree`.** Templates are org-wide artefacts with no unit, so
   a unit scope would mean nobody could read them. Scope is about the org graph; templates are

@@ -122,6 +122,8 @@ model Organization {
   subscription    Subscription?
   payments        Payment[]
   platformAudit   PlatformAuditLog[]
+  announcements   Announcement[]
+  bookables       Bookable[]
 
   @@map("organizations")
 }
@@ -162,6 +164,9 @@ model User {
   inboxState       InboxState[]
   reflections      Reflection[]          @relation("ReflectionAuthor")
   checkinsHeld     Checkin[]             @relation("CheckinSupervisor")
+  announcementsWritten Announcement[]        @relation("AnnouncementCreatedBy")
+  announcementReceipts AnnouncementReceipt[] @relation("AnnouncementRecipient")
+  bookingsMade         Booking[]             @relation("BookingUser")
 
   @@unique([orgId, email])
   @@map("users")
@@ -350,6 +355,7 @@ model Subject {
   campaigns   CampaignSubject[]
   responses   Response[]
   reflections Reflection[]
+  bookables   Bookable[]
 
   @@map("subjects")
 }
@@ -908,4 +914,152 @@ model PlatformAuditLog {
   @@index([createdAt(sort: Desc)])
   @@index([targetOrgId, createdAt(sort: Desc)])
   @@map("platform_audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// Announcements — 13 § Announcements, T-094
+// ---------------------------------------------------------------------------
+
+/// One-way, in-product notices. The SECOND surface built on `AudienceRule` and deliberately
+/// on the same one: "everyone in Housekeeping" must mean the same set here as it does on a
+/// campaign, and two resolvers is how it stops meaning the same thing.
+model Announcement {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  title String
+  /// Plain text. No HTML, so there is no sanitiser to get wrong and no way for one
+  /// coordinator's notice to run script on everybody else's home page.
+  body  String
+
+  /// Reuses AudienceRule verbatim — 'anyone' | 'unit' | 'role'.
+  audienceRule Json @default("{}") @map("audience_rule")
+
+  /// NULL until published. Publishing is irreversible in the same sense a launch is: the
+  /// audience is snapshotted into receipts and the body goes read-only.
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+
+  /// SetNull, not Cascade: when the person who wrote a notice leaves, the notice everybody
+  /// read is still a fact that happened (10 §9).
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  receipts AnnouncementReceipt[]
+
+  @@index([orgId, publishedAt(sort: Desc)])
+  @@map("announcements")
+}
+
+/// WHO HAS READ WHAT. Identified on purpose and with no privacy tension: these are staff
+/// `users` rows, not respondents. INV-006 is about `responses`, and nothing here touches
+/// them — there is no campaignId, no responseId, and no join that could produce one.
+///
+/// **Written at publish time, one row per resolved recipient, `read_at` NULL** — never
+/// lazily on first read. "12 of 40 have read this" needs a denominator, and a row that only
+/// exists once somebody reads cannot supply one.
+model AnnouncementReceipt {
+  announcementId String       @map("announcement_id") @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id") @db.Uuid
+  user           User         @relation("AnnouncementRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  readAt DateTime? @map("read_at") @db.Timestamptz(6)
+
+  @@id([announcementId, userId])
+  @@index([userId, readAt])
+  @@map("announcement_receipts")
+}
+
+
+/// BOOKING — T-095, DEC-090. Three tables, and the third one is a DIFFERENT PRIVACY CONTRACT
+/// from everything else in this schema. Read `Booking`'s comment before touching any of them.
+model Bookable {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  /// Optional. A bookable often IS a subject — a room, a machine, a person — and linking it
+  /// means the console can show what is booked beside that subject's feedback. SetNull, not
+  /// Cascade: archiving a subject must not delete appointments people are expecting.
+  subjectId String?  @map("subject_id") @db.Uuid
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  /// The `/book/:token` link. NULL until opened, and minted by the SAME generator campaigns
+  /// use (`features/campaigns/token.ts` — there is not a second one). Opening is irreversible
+  /// in the sense a launch is: the token, once printed on a card, is out of the product's
+  /// hands, so it is never re-minted and never cleared.
+  publicToken String? @unique @map("public_token")
+
+  /// Closing stops the link, and NOTHING ELSE. The bookings already taken stay, because they
+  /// are appointments somebody is expecting to be honoured.
+  closedAt  DateTime? @map("closed_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  slots Slot[]
+
+  @@index([orgId])
+  @@map("bookables")
+}
+
+model Slot {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookableId String   @map("bookable_id") @db.Uuid
+  bookable   Bookable @relation(fields: [bookableId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt   DateTime @map("ends_at") @db.Timestamptz(6)
+
+  /// How many people fit. THERE IS NO `taken` COLUMN AND THERE MUST NOT BE ONE: remaining is
+  /// derived by counting live bookings, because a stored counter is a second source of truth
+  /// and it drifts the first time somebody cancels.
+  capacity Int @default(1)
+
+  bookings Booking[]
+
+  @@index([bookableId, startsAt])
+  @@map("slots")
+}
+
+/// IDENTIFIED, AND THAT IS THE POINT — DEC-090.
+///
+/// A booking names a person, because a booking that cannot be honoured is not a booking.
+/// This is a DIFFERENT privacy contract from `responses`, which names nobody and never will
+/// (INV-006). The two must never join: there is no responseId here, no bookingId there, no
+/// shared table, and no query in `features/booking/` that reads the responses table — which
+/// is asserted by a test rather than left to review.
+///
+/// Routing bookings through `responses` to reuse the respondent plumbing would be one
+/// migration away from undoing the entire privacy architecture. This table exists so that
+/// nobody is ever tempted.
+model Booking {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slotId String @map("slot_id") @db.Uuid
+  slot   Slot   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  name  String
+  email String
+
+  /// Set when a signed-in member books; NULL for a public booking. SetNull on delete, so a
+  /// departed member's appointment is still a fact that happened (10 §9).
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation("BookingUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Given to the booker so they can cancel WITHOUT AN ACCOUNT. Opaque, 8 characters, the
+  /// same alphabet and the same generator campaigns use (DEC-017). It is the authorisation
+  /// for exactly one row, which is why cancelling with your own token is not
+  /// `booking.cancel` — that verb is for reaching into somebody else's.
+  cancelToken String @unique @map("cancel_token")
+
+  /// Cancelled, never deleted: the slot frees immediately (the count ignores this row) and
+  /// the fact that somebody had booked and withdrew is still history.
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([slotId])
+  @@map("bookings")
 }

@@ -11,6 +11,7 @@
 // nothing else. That is `D-018`'s shape one screen along, and `33` names this screen as the
 // worse of the two: "editing a role's row raises everyone holding it".
 import { beforeAll, describe, expect, it } from 'vitest';
+import { CAPABILITIES } from '@endur/shared';
 import { addStaff, setUpOrg, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
@@ -81,7 +82,10 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
     const res = await founder.agent.get('/api/v1/authz/capabilities');
     const catalogue = res.body.data as Array<{ key: string; label: string }>;
 
-    expect(catalogue).toHaveLength(64);
+    // Against the catalogue itself and not a number typed here: a literal count fails on
+    // the day a module is added, which reports "a capability was added" as "the labels are
+    // wrong". What this test is actually about is the loop below (T-094).
+    expect(catalogue).toHaveLength(CAPABILITIES.length);
     for (const entry of catalogue) {
       // A missing phrase falls back to the raw key, deliberately: a key on screen is obvious
       // where a plausible-looking derivation would ship.

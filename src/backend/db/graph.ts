@@ -1,6 +1,12 @@
 // THE ONLY FILE IN THE APP PERMITTED TO USE $queryRaw (DEC-007), enforced by lint.
 // Prisma cannot express recursive CTEs, and the org graph is nothing but recursion.
 //
+// `lockSlot` AT THE BOTTOM IS NOT A GRAPH QUERY, and it is here for DEC-007's rule rather
+// than its rationale: Prisma has no expression for `SELECT ... FOR UPDATE` either, so the
+// booking feature needed raw SQL and this is the one file allowed to hold it. Keeping the
+// exemption to a single file is the whole point of the rule — a second one would make the
+// lint rule a formality.
+//
 // Each query is wrapped in a typed function so callers never see SQL. Two guards appear
 // in every one of them and neither is optional:
 //
@@ -10,6 +16,7 @@
 //                  possible bug in a multi-tenant app (INV-010).
 //
 // If this file grows past ~8 functions, revisit the ORM choice (DEC-007, REVISIT 2026-10-01).
+import type { Prisma } from '@prisma/client';
 import { prisma } from './client.js';
 
 const MAX_DEPTH = 32;
@@ -102,4 +109,27 @@ export async function wouldCreateCycle(
     )
     SELECT id FROM down WHERE id = ${parentId}::uuid LIMIT 1`;
   return rows.length > 0;
+}
+
+/**
+ * TAKE A ROW LOCK ON ONE SLOT, inside a transaction. `features/booking/service.ts` is the
+ * only caller, and the lock is that feature's entire concurrency mechanism.
+ *
+ * `SELECT ... FOR UPDATE` and not `SELECT ... ` plus a count: without the lock two phones
+ * taking the last place both read `capacity - 1`, both pass the check, and the room is
+ * double-booked. With it, everything after this line is serialised PER SLOT and only per
+ * slot — two different slots never wait on each other.
+ *
+ * It takes a transaction client rather than using `prisma` directly, because a lock outside
+ * a transaction is released the instant the statement returns, which is to say it is not a
+ * lock at all.
+ *
+ * NOT paired with `isolationLevel: 'Serializable'`. That combination was tried and it turns
+ * a legitimate second booking into a `40001` abort: Postgres's SSI treats the count behind
+ * this lock as a predicate read conflicting with the other transaction's insert, even though
+ * the lock has already made the two strictly sequential. The lock and Serializable are
+ * alternatives; taking both refuses a caller who did nothing wrong.
+ */
+export async function lockSlot(tx: Prisma.TransactionClient, slotId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM slots WHERE id = ${slotId}::uuid FOR UPDATE`;
 }

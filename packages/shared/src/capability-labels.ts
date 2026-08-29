@@ -118,6 +118,23 @@ const PHRASES: Record<Capability, string> = {
   'checkin.read': 'read check-ins',
 
   'analysis.read': 'view themes and analysis',
+
+  // T-094. "Everyone" and not "{unit}", because an announcement's audience is the SAME
+  // AudienceRule a campaign uses and can be the whole organisation — naming one shape of it
+  // in the row label would describe the narrow case and mislead about the wide one.
+  'announcement.read': 'read announcements sent to them',
+  'announcement.create': 'write an announcement',
+  'announcement.publish': 'send an announcement to everyone it is addressed to',
+  'announcement.delete': 'delete an announcement',
+
+  // T-095. "Somebody else's" is doing the work in the last row: it is the whole reason
+  // `booking.cancel` is a separate verb, and a grid row that read "cancel a booking" would
+  // let an administrator hand it out thinking it meant their own.
+  'booking.read': 'see bookable things, their slots and who has booked',
+  'booking.create': 'create something people can book',
+  'booking.update': 'edit a bookable thing, its slots and its link',
+  'booking.delete': 'delete a bookable thing',
+  'booking.cancel': "cancel somebody else's booking",
 };
 
 /**

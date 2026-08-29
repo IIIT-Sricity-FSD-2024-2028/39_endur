@@ -101,7 +101,10 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     tier: 'silver',
     name: 'Silver — Understand',
     sells: 'See why results moved',
-    adds: 'Themes, sentiment, trends, reliability',
+    // T-096. ANNOUNCEMENTS ARE NAMED HERE because they are gated here (`16` §3). A tier
+    // that withholds a feature the plan page does not mention is a tier that looks
+    // arbitrary — the customer meets it as a 402 with nothing on this page to explain it.
+    adds: 'Themes, sentiment, trends, reliability, announcements',
     selectable: true,
     priceMinor: 49900,
     currency: 'INR',
@@ -110,6 +113,7 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
       'See why results moved',
       'Themes and sentiment analysis',
       'Trends and reliability reporting',
+      'Announcements with read receipts',
       'Up to 50,000 responses'
     ],
   },
@@ -117,7 +121,8 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     tier: 'gold',
     name: 'Gold — Improve',
     sells: 'Run the full loop',
-    adds: 'Reflection, gap analysis, plans, check-ins',
+    // T-096. Booking joins the Gold line for the reason announcements join Silver.
+    adds: 'Reflection, gap analysis, plans, check-ins, booking',
     selectable: true,
     priceMinor: 99900,
     currency: 'INR',
@@ -125,6 +130,7 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
       'Everything in Silver',
       'Reflection and gap analysis',
       'Action plans and check-ins',
+      'Booking and slot capacity',
       'Full cycle improvement loop',
       'Unlimited responses'
     ],

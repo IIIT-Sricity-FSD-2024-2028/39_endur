@@ -37,8 +37,8 @@ Layer 1 is required for M0; layer 2 lands before P1 closes.
 | Tier | Sells | Adds |
 |---|---|---|
 | **Bronze — Measure** | Run campaigns and get results | The collection engine |
-| **Silver — Understand** | See *why* results moved | Themes, sentiment, trends, reliability |
-| **Gold — Improve** | Run the full loop | Reflection, gap analysis, plans, check-ins |
+| **Silver — Understand** | See *why* results moved | Themes, sentiment, trends, reliability, **announcements** |
+| **Gold — Improve** | Run the full loop | Reflection, gap analysis, plans, check-ins, **booking** |
 | **Enterprise — Decide** | Use output as formal evidence | 360°, full audit, appeals, SSO, **API access** |
 
 Enterprise is priced individually: a base platform plus chosen services.
@@ -54,8 +54,10 @@ export const TIER_ENTITLEMENTS: Record<Tier, readonly Capability[]> = {
     'account.*', 'billing.*',                    // added 2026-08-24 — see below
     'response.read', 'results.read', 'simulator.run',
   ],
-  silver:     [...bronze, 'analysis.read', 'results.export', 'response.export'],
-  gold:       [...silver, 'reflection.*', 'actionplan.*', 'checkin.*'],
+  silver:     [...bronze, 'analysis.read', 'results.export', 'response.export',
+                          'announcement.*'],   // added 2026-08-30, T-094
+  gold:       [...silver, 'reflection.*', 'actionplan.*', 'checkin.*',
+                          'booking.*'],        // added 2026-08-30, T-095
   enterprise: [...gold,   'audit.read', 'apikey.*', 'api.*'],
 };
 ```

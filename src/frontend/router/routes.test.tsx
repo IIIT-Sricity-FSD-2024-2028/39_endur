@@ -26,6 +26,10 @@ describe('the four route trees', () => {
   it.each([
     '/', '/login', '/start', '/activate/:token',
     '/app', '/app/setup', '/app/structure', '/app/roles',
+    // T-093. The console's gallery, and NOT the public `/start` above it — the two are
+    // different screens in different trees and the test names both so a rename cannot
+    // quietly collapse them into one.
+    '/app/start',
     '/app/people', '/app/people/:id',
     '/app/subjects', '/app/subjects/:id',
     '/app/templates', '/app/templates/:id',
@@ -37,11 +41,21 @@ describe('the four route trees', () => {
     // a 403 and a 402 and a route guard knows nothing about entitlements.
     '/app/analysis',
     '/app/reflect',
+    // T-094 and T-096. Same posture as Analysis: no route guard, because the page owns a
+    // 402 as well as a 403 and a guard knows nothing about entitlements.
+    '/app/announcements',
+    // T-095/T-096. Gold, and gated by the page rather than the route for the same reason.
+    '/app/booking', '/app/booking/:id',
     // T-076. WRAPPED in RequireCapability, unlike the two above — there is no 402 on the
     // log, so a route guard can say everything there is to say (56 § States).
     '/app/logs',
     '/app/plan',
     '/r/:token', '/r/:token/done',
+    // T-095. THE RESPONDENT WORLD'S SECOND DOOR, under the same layout and boundary as `/r`
+    // rather than a tree of its own — and at `/book/:token` rather than `/r/book/:token`,
+    // because `/r/:token` already matches one segment and would read "book" as a campaign
+    // token.
+    '/book/:token',
     // The ops world (DEC-033, 19 §4). It was live and untested here, which is how `20` §1
     // went on saying "three worlds" for a fortnight after there were four.
     '/ops/login', '/ops', '/ops/orgs/:id', '/ops/analytics', '/ops/earnings', '/ops/logs',
@@ -83,20 +97,56 @@ describe('containment', () => {
 
   // Counted, not hardcoded. This read `3` until 29 Aug, went red the moment `/ops` became
   // the fourth world (DEC-033), and the number was never the property worth guarding —
-  // EVERY world having its OWN boundary and layout is. Asserting against `worlds.length`
-  // states that directly, so a fifth world must bring its own pair to pass and cannot
-  // break the test merely by existing (`20` §1).
+  // EVERY world having its OWN boundary and layout is.
+  //
+  // IT WENT RED AGAIN AT `T-095`, AND THAT TIME THE TEST WAS WRONG RATHER THAN THE ROUTER.
+  // `/book/:token` is a second ROOT in the respondent world, not a fifth world: it shares
+  // `RespondLayout` and `RespondBoundary` deliberately, because a booking link has every
+  // property that world exists for and duplicating a layout and a boundary to give it its
+  // own root would leave the respondent world with two boundaries to keep in step (20 §2).
+  // A one-root-per-boundary assertion could only be satisfied by making that mistake.
+  //
+  // So the property is stated the way it was always meant: a world IS a layout, and the
+  // PAIRING is what containment depends on. Every layout has exactly one boundary and every
+  // boundary belongs to exactly one layout — so a crash in the console still cannot reach
+  // the respondent flow, and two roots of the same world cannot drift apart.
+  const pairs = worlds.map((route) => ({
+    layout: componentOf(route.element),
+    boundary: componentOf(route.errorElement),
+  }));
+
   it('gives every world its own error boundary', () => {
-    // One shared boundary would let a crash in the console take down the respondent flow.
-    const boundaries = worlds.map((route) => componentOf(route.errorElement));
     expect(worlds.length).toBeGreaterThan(1);
-    expect(boundaries.every(Boolean)).toBe(true);
-    expect(new Set(boundaries).size).toBe(worlds.length);
+    expect(pairs.every((pair) => Boolean(pair.boundary))).toBe(true);
+
+    // No boundary is shared by two DIFFERENT layouts. That is the containment claim: one
+    // shared boundary across worlds would let a crash in the console take down the
+    // respondent flow.
+    const layoutsPerBoundary = new Map<unknown, Set<unknown>>();
+    for (const pair of pairs) {
+      const seen = layoutsPerBoundary.get(pair.boundary) ?? new Set();
+      seen.add(pair.layout);
+      layoutsPerBoundary.set(pair.boundary, seen);
+    }
+    expect([...layoutsPerBoundary.values()].every((layouts) => layouts.size === 1)).toBe(true);
   });
 
   it('gives every world its own layout', () => {
-    const layouts = worlds.map((route) => componentOf(route.element));
-    expect(layouts.every(Boolean)).toBe(true);
-    expect(new Set(layouts).size).toBe(worlds.length);
+    expect(pairs.every((pair) => Boolean(pair.layout))).toBe(true);
+
+    // And the pairing holds the other way: a layout never appears under two boundaries, so
+    // `/r` and `/book` — the respondent world's two roots — are caught by the same one.
+    const boundariesPerLayout = new Map<unknown, Set<unknown>>();
+    for (const pair of pairs) {
+      const seen = boundariesPerLayout.get(pair.layout) ?? new Set();
+      seen.add(pair.boundary);
+      boundariesPerLayout.set(pair.layout, seen);
+    }
+    expect([...boundariesPerLayout.values()].every((set) => set.size === 1)).toBe(true);
+
+    // Four worlds, five roots. Named rather than derived, so a fifth WORLD arriving without
+    // its own pair is a failure somebody has to look at rather than a number that slides.
+    expect(new Set(pairs.map((pair) => pair.layout)).size).toBe(4);
+    expect(worlds.length).toBe(5);
   });
 });

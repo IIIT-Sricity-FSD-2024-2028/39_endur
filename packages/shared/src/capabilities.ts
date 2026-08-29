@@ -27,7 +27,9 @@ export type CapabilityModule =
   | 'Trust'
   | 'Platform'
   | 'Improve'
-  | 'Analyze';
+  | 'Analyze'
+  | 'Announcements'
+  | 'Booking';
 
 type Entry = { module: CapabilityModule; phase: CapabilityPhase; note?: string };
 
@@ -138,6 +140,53 @@ export const CAPABILITY_CATALOGUE = {
   'checkin.read': { module: 'Improve', phase: 'P2' },
 
   'analysis.read': { module: 'Analyze', phase: 'P2' },
+
+  /**
+   * T-094. FOUR VERBS AND THE THIRD ONE IS THE POINT.
+   *
+   * `announcement.publish` is separate from `announcement.create` because drafting and
+   * broadcasting are different acts: an organisation should be able to let a coordinator
+   * write the notice without letting them reach every person in a unit with it. One
+   * `announcement.manage` would make that impossible, the same argument `account.*` makes
+   * for its own three (§57).
+   *
+   * `announcement.read` is the only one seeded to everybody — it is how a person sees what
+   * was sent TO them, so withholding it would make the banner invisible to its audience.
+   */
+  'announcement.read': { module: 'Announcements', phase: 'P2', note: 'what was sent to me' },
+  'announcement.create': { module: 'Announcements', phase: 'P2', note: 'draft' },
+  'announcement.publish': {
+    module: 'Announcements',
+    phase: 'P2',
+    note: 'separate verb: publishing is what reaches people',
+  },
+  'announcement.delete': { module: 'Announcements', phase: 'P2' },
+
+  /**
+   * T-095. FIVE VERBS, AND `cancel` IS THE ONE THAT HAD TO BE ITS OWN.
+   *
+   * The first four are the ordinary CRUD shape over a bookable and its slots. `booking.cancel`
+   * is not: it reaches into a DECISION SOMEBODY ELSE MADE and takes it back. Folding it into
+   * `booking.update` would mean an organisation could not let a receptionist add a slot
+   * without also letting them cancel a guest's appointment, which is the same argument
+   * `announcement.publish` makes against `announcement.create` and `account.revoke` makes
+   * against `account.create` (§57).
+   *
+   * NO CAPABILITY COVERS THE PUBLIC PICKER. A booker holds a link and nothing else — they
+   * have no account, exactly as a respondent has none (DEC-009) — so `/public/bookables/*`
+   * is capability-free for the same reason `/public/campaigns/*` is, and cancelling with
+   * your OWN cancel token is not `booking.cancel`: the token is the authorisation, and it
+   * only ever reaches the one row it was minted for.
+   */
+  'booking.read': { module: 'Booking', phase: 'P2', note: 'bookables, slots and who booked' },
+  'booking.create': { module: 'Booking', phase: 'P2', note: 'a bookable and its slots' },
+  'booking.update': { module: 'Booking', phase: 'P2', note: 'edit, open, close, replace slots' },
+  'booking.delete': { module: 'Booking', phase: 'P2' },
+  'booking.cancel': {
+    module: 'Booking',
+    phase: 'P2',
+    note: "separate verb: it undoes somebody else's booking",
+  },
 } as const satisfies Record<string, Entry>;
 
 export type Capability = keyof typeof CAPABILITY_CATALOGUE;

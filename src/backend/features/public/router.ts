@@ -7,14 +7,21 @@
 // They are listed in `PUBLIC_ROUTES` in the route-enumeration test with that reason spelled
 // out, which is the mechanism that keeps the exception deliberate rather than accidental.
 import { Router } from 'express';
-import { PublicCampaignDto, SubmitResponseDto } from '@endur/shared';
-import type { SubmitResponseBody } from '@endur/shared';
+import {
+  PublicBookDto,
+  PublicBookableDto,
+  PublicCampaignDto,
+  PublicCancelDto,
+  SubmitResponseDto,
+} from '@endur/shared';
+import type { CreateBookingBody, SubmitResponseBody } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
 import { respondentChain } from '../../middleware/chains.js';
 import { scopedRateLimits } from '../../middleware/rateLimit.js';
 import { idempotent } from '../../middleware/idempotency.js';
 import { memberOf, requireMembership } from '../../middleware/requireMembership.js';
-import { campaignOf, resolveCampaign } from './resolve.js';
+import { bookableOf, campaignOf, resolveBookable, resolveCampaign } from './resolve.js';
+import { book, cancelWithToken, readPublicBookable } from '../booking/service.js';
 import { readPublicCampaign, submitResponse } from './service.js';
 
 export const publicRouter: Router = Router();
@@ -65,6 +72,72 @@ publicRouter.post(
     const { body } = req.data as { body: SubmitResponseBody };
     void submitResponse(req, campaignOf(req), body, memberOf(req))
       .then((result) => res.status(201).json({ data: result }))
+      .catch(next);
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// BOOKING — T-095. On THIS router and not on a fourth one, which is the whole decision.
+//
+// A booking link has every property the respondent surface exists for: no account, a phone,
+// a venue network, a token that is the access. Mounting it here inherits the wide CORS, the
+// absent CSRF, the per-IP rate limit and the ONE `PUBLIC_ROUTES` allowlist entry that is
+// already justified in 13 §6 — a separate router would have needed a second exemption, and
+// a second exemption is how the first one stops being deliberate.
+//
+// NOT entitlement-gated, unlike everything in the console half. A guest holding a link did
+// not choose the plan and must not be punished for it — 16 §6 already says exactly this
+// about a suspended organisation's QR code, and a downgrade is the milder case.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+publicRouter.get(
+  '/bookables/:token',
+  validate(PublicBookableDto),
+  resolveBookable,
+  (req, res, next) => {
+    void readPublicBookable(bookableOf(req))
+      .then((data) => res.json({ data }))
+      .catch(next);
+  },
+);
+
+publicRouter.post(
+  '/bookables/:token/bookings',
+  // Per-IP and tight, as the submit route is: this writes to the database with no credential
+  // at all. Same bucket, because it is the same threat and a second one would be a second
+  // number to keep in step.
+  scopedRateLimits.respondentSubmit,
+  validate(PublicBookDto),
+  // Resolve first, gate second — the order is the security property (12 §4.10c). There is no
+  // membership gate here yet; the order is kept anyway so that adding one cannot get it wrong.
+  resolveBookable,
+  // A phone on a flaky network retries by itself, and a duplicate booking takes two places
+  // out of a slot for one person — the same failure a duplicate response is, with a seat
+  // attached (13 §7).
+  idempotent('public.book'),
+  (req, res, next) => {
+    const { body } = req.data as { body: CreateBookingBody };
+    // The user id when a signed-in member happens to be booking, NULL otherwise. It is not
+    // authorisation and nothing reads it as such — the token is the access, exactly as on the
+    // response routes; this only records that the booker had an account.
+    const principal = req.ctx.principal;
+    const userId = principal?.kind === 'user' && principal.id ? principal.id : null;
+    void book(bookableOf(req), body, userId)
+      .then((receipt) => res.status(201).json({ data: receipt }))
+      .catch(next);
+  },
+);
+
+// The booker's own, with no account. The cancel token authorises exactly one row, which is
+// why this is not `booking.cancel` — that verb is for reaching into somebody ELSE's decision.
+publicRouter.post(
+  '/bookings/:cancelToken/cancel',
+  scopedRateLimits.respondentSubmit,
+  validate(PublicCancelDto),
+  (req, res, next) => {
+    const { params } = req.data as { params: { cancelToken: string } };
+    void cancelWithToken(params.cancelToken)
+      .then(() => res.status(204).end())
       .catch(next);
   },
 );

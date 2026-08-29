@@ -129,6 +129,41 @@ export const GRANT_MATRIX: Partial<Record<Capability, Row>> = {
   'checkin.create': S('subtree', 'subtree', 'own_unit'),
   'checkin.read': S('subtree', 'subtree', 'own_unit'),
 
+  // T-094. `all` at every level, for the reason `template.*` is `all`: an announcement has
+  // no unit of its own — its AUDIENCE names one — so a unit scope here would mean nobody
+  // could read anything. Scope is about the org graph, and this row is not in it.
+  //
+  // READ REACHES L4 and the other three do not, which is the whole shape of the feature:
+  // everybody is somebody an announcement can be sent to, and being sent one is not a
+  // permission anybody should have to be given.
+  //
+  // `publish` STOPS ONE LEVEL SHORT OF `create`, and that gap is why the two are separate
+  // verbs at all (11 §3). Drafting is not broadcasting: out of the box a level-2 coordinator
+  // can write a notice and a level-1 administrator is the one who sends it. An
+  // `announcement.manage` would have made that unsayable, exactly as `account.revoke` would
+  // have been unsayable folded into `account.create` (57).
+  'announcement.read': S('all', 'all', 'all', 'all'),
+  'announcement.create': S('all', 'all'),
+  'announcement.publish': S('all'),
+  'announcement.delete': S('all'),
+
+  // T-095. `all` at every level that has a row, for the reason `announcement.*` is `all`: a
+  // bookable has no unit of its own, so a unit scope here would mean nobody could read
+  // anything. Scope is about the org graph and this row is not in it.
+  //
+  // READ REACHES L3 and the writes stop at L2. Somebody running a section should be able to
+  // see what is booked in it; publishing slots is a coordinator's job upward of that.
+  //
+  // `cancel` STOPS ONE LEVEL SHORT OF `update`, and that gap is the whole reason it is a
+  // separate verb (11 §3). Out of the box a level-2 coordinator can add and remove slots and
+  // a level-1 administrator is the one who can take back a booking somebody already made —
+  // exactly the shape `announcement.publish` has one block up, and `account.revoke` in 57.
+  'booking.read': S('all', 'all', 'all'),
+  'booking.create': S('all', 'all'),
+  'booking.update': S('all', 'all'),
+  'booking.delete': S('all'),
+  'booking.cancel': S('all'),
+
   'simulator.run': S('all', 'subtree'),
   'audit.read': S('all'),
   'billing.read': S('all'), 'billing.update': S('all'),

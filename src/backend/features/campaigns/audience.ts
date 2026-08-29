@@ -28,20 +28,11 @@ const MAX = 500;
 export async function countAudience(orgId: string, rule: AudienceRule): Promise<number | null> {
   if (rule.kind === 'anyone') return null;
 
-  const positionWhere =
-    rule.kind === 'role'
-      ? { roleId: rule.roleId }
-      : {
-          unitId: {
-            in: rule.includeSubtree ? await unitSubtree(orgId, rule.unitId) : [rule.unitId],
-          },
-        };
-
   return await prisma.node.count({
     where: {
       orgId,
       kind: 'person',
-      edgesAsParent: { some: { type: 'member', child: positionWhere } },
+      edgesAsParent: { some: { type: 'member', child: await positionFilter(orgId, rule) } },
     },
     take: MAX,
   });
@@ -59,3 +50,61 @@ export const ruleOf = (stored: unknown): AudienceRule => {
   const kind = (stored as { kind?: string } | null)?.kind;
   return kind === 'unit' || kind === 'role' ? (stored as AudienceRule) : { kind: 'anyone' };
 };
+
+/**
+ * The position filter for a rule that resolves to people. ONE implementation, T-094.
+ *
+ * It was written twice before — once in `countAudience` above and once inside
+ * `audiencePreview` — and announcements would have made it three. "Everyone in
+ * Housekeeping" has to mean the same set of people on every surface that says it, and
+ * three copies of a subtree walk is exactly how that stops being true.
+ */
+export async function positionFilter(
+  orgId: string,
+  rule: Extract<AudienceRule, { kind: 'unit' | 'role' }>,
+): Promise<{ roleId: string } | { unitId: { in: string[] } }> {
+  if (rule.kind === 'role') return { roleId: rule.roleId };
+  return {
+    unitId: { in: rule.includeSubtree ? await unitSubtree(orgId, rule.unitId) : [rule.unitId] },
+  };
+}
+
+/**
+ * WHO, by user id — the recipients of an announcement (T-094).
+ *
+ * Deliberately different from `countAudience` in one place: **`anyone` resolves to the whole
+ * organisation here rather than to null.** On a campaign `anyone` means "whoever holds the
+ * link" and there is no roll to count; an announcement has no link and is never read by a
+ * stranger, so the widest audience it can have is every member of staff. Same rule, two
+ * surfaces, and the difference is stated rather than inherited by accident.
+ *
+ * People with no account are skipped, because a receipt is a row against a `users` id and
+ * somebody who cannot sign in cannot read the notice. Disabled accounts are skipped for the
+ * same reason. Both are what makes the read denominator honest.
+ */
+export async function audienceUsers(orgId: string, rule: AudienceRule): Promise<string[]> {
+  if (rule.kind === 'anyone') {
+    const users = await prisma.user.findMany({
+      where: { orgId, disabledAt: null },
+      select: { id: true },
+      take: MAX,
+    });
+    return users.map((user) => user.id);
+  }
+
+  const people = await prisma.node.findMany({
+    where: {
+      orgId,
+      kind: 'person',
+      userId: { not: null },
+      user: { disabledAt: null },
+      edgesAsParent: { some: { type: 'member', child: await positionFilter(orgId, rule) } },
+    },
+    select: { userId: true },
+    take: MAX,
+  });
+
+  // Distinct: one person can hold two positions inside the same subtree, and the receipt
+  // table is keyed on (announcement, user), so a duplicate would be refused anyway.
+  return [...new Set(people.map((person) => person.userId as string))];
+}

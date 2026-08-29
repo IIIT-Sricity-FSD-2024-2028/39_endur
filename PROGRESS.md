@@ -5,7 +5,121 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-29  (TIER 2 -- THE THREE DECISIONS NOBODY WAS MAKING. DEC-084, DEC-085,
+UPDATED   2026-08-30  (T-095 + T-096 -- BOOKING AT GOLD, AND STAGE 10 CLOSED. three
+                       tables, five capabilities, and the only write in the product with
+                       REAL CONTENTION.
+                       THE FEATURE IS THE ROW LOCK: SELECT ... FOR UPDATE on the slot,
+                       THEN the count, then the insert. counting first is the bug -- two
+                       phones both read capacity-1 and the room is double-booked on stage.
+                       the lock lives in db/graph.ts, the one file DEC-007 permits raw SQL.
+                       !! THE N+1-CONCURRENT TEST FOUND A REAL BUG AND IT WAS MINE. the
+                       plan specified isolationLevel 'Serializable' ON TOP of the lock and
+                       I wrote it that way; one of two RIGHTFUL WINNERS came back 40001
+                       instead of 201, because postgres SSI reads the count behind the lock
+                       as a predicate read conflicting with the other insert. it added no
+                       safety and turned a correct booking into a 500. removed -- DEC-092.
+                       the lock and Serializable are ALTERNATIVES, not belt and braces.
+                       the loser gets 409 and NOT 400: well-formed, and lost a race.
+                       DEC-090 A BOOKING IS IDENTIFIED AND A RESPONSE IS NOT, and they must
+                       never join. enforced by a GREP over the whole feature directory with
+                       comments stripped, because the rule has to survive somebody who
+                       never read the header comment.
+                       the PUBLIC payload carries REMAINING and omits capacity and every
+                       name (13 §6). remaining is DERIVED -- a stored counter is a second
+                       source of truth and drifts the first time somebody cancels.
+                       /book/:token is a SECOND ROOT of the respondent world sharing its
+                       layout and boundary, not a fifth world. routes.test.tsx's containment
+                       check was asserting one-root-per-boundary and was RESTATED as the
+                       property it always meant.
+                       D-040's FIRST HALF REPAID because this task depended on it: the
+                       respondent bundle guard compared win32 backslashes against
+                       forward-slash literals, so it reported clean WITHOUT LOOKING.
+                       Book.tsx was going into its entry list; normalised once, all five
+                       assertions now run for real.
+                       T-096 the last two gallery lanes are LIVE, sidebar gains both,
+                       /app/plan and 16 §2 NAME what silver and gold now buy, and the seed
+                       has a nearly-full slot so "1 left" is on screen before anybody books.
+                       backend 540/542, frontend 924/925 -- every failure pre-existing and
+                       documented (D-036, D-042, D-040's second half).
+                       Earlier: T-094 -- ANNOUNCEMENTS AT SILVER, AND THE FIRST RECEIPT TABLE IN
+                       THE PRODUCT. two tables, four capabilities, eight routes, two
+                       screens and a banner on Home.
+                       THE RECEIPTS ARE WRITTEN AT PUBLISH TIME, ONE PER RESOLVED
+                       RECIPIENT, IN THE SAME TRANSACTION THAT STAMPS published_at. that
+                       is the whole feature: "12 of 40 have read this" needs a
+                       DENOMINATOR, and a row created lazily on first read can only ever
+                       count readers.
+                       announcement.publish IS A SEPARATE VERB FROM announcement.create
+                       and the seeded matrix makes the gap real -- L1+L2 draft, L1 alone
+                       sends. drafting is not broadcasting.
+                       THE AUDIENCE IS AudienceRule, resolved by the CAMPAIGNS resolver
+                       (features/campaigns/audience.ts gained audienceUsers + a shared
+                       positionFilter). two resolvers is how "everyone in Housekeeping"
+                       comes to mean two different sets on two screens.
+                       `anyone` MEANS SOMETHING DIFFERENT HERE and it is written down: on
+                       a campaign it is "whoever holds the link" and uncountable; an
+                       announcement has no link, so it is every account in the org.
+                       bronze keeps announcement.read (16 §7 -- a downgrade retains data),
+                       so a bronze org gets 402 on create/publish and 200 on read.
+                       publishing is IRREVERSIBLE and IDEMPOTENT BY STATE as well as by
+                       key: a second publish returns the first result rather than
+                       re-resolving the audience against a graph that has since changed.
+                       delivery is IN-PRODUCT ONLY and the composer says so on screen.
+                       !! FOUND, NOT CAUSED: a quick campaign (poll / suggestion box) is
+                       INVISIBLE ON /app/campaigns to every seeded role -- see D-042. it
+                       is T-091's org-singleton subject having no unit, and the one
+                       remaining red backend test is asserting the correct behaviour.
+                       Earlier: T-092 AND T-093 -- THE SUGGESTION BOX, AND THE GALLERY THAT MAKES
+                       FIVE SURFACES LOOK LIKE ONE PRODUCT.
+                       T-092's backend was already built by T-091 -- the second `purpose`
+                       on the same endpoint -- so the whole task was THE SENTENCE THAT
+                       STOPS IT LOOKING BROKEN. a suggestion box shows NOTHING until
+                       K_ANON_THRESHOLD people have answered, which on stage means the
+                       first two answers land in an empty screen. CampaignSummary now
+                       carries templateCategory and resultsThreshold and the card says
+                       "Answers appear once 5 people have responded. 2 so far." THE
+                       THRESHOLD IS NOT LOWERED FOR THE DEMO, and the number is the
+                       SERVER'S -- a client hardcoding 5 lies the day the config changes.
+                       reading is the EXISTING Inbox, whose campaign filter was already
+                       there. no second reader: that is what INV-006 exists to prevent.
+                       T-093 /app/start. <StartCard> HAS FOUR STATES BECAUSE THERE ARE
+                       FOUR DIFFERENT REASONS A LANE CANNOT BE PRESSED and they are
+                       answered differently -- missing CAPABILITY disables the card WITH
+                       THE REASON, missing ENTITLEMENT keeps it live with a tier chip that
+                       lands on /app/plan (a tier is something you can buy; hiding it
+                       sells nothing), not-built-yet says so and does not navigate.
+                       CAPABILITY FIRST, TIER SECOND -- the chain's own order, DEC-091.
+                       AN UNKNOWN TIER SELLS NOTHING rather than guessing bronze and
+                       offering a gold customer what they already own.
+                       two TemplateSeeds per preset, so the gallery is never empty and a
+                       hotel poll is not a university poll.
+                       !! TWO FRONTEND TESTS ARE RED ON WINDOWS AND WERE BEFORE THIS
+                       WORK -- see D-040. neither is in a file this session touched.
+                       !! THE BACKEND SUITE COULD NOT RUN THIS SESSION: no postgres and no
+                       docker daemon on the machine. typecheck, lint, audit:vocab and
+                       audit:drift are all clean; the new backend assertion in
+                       campaigns.test.ts is UNVERIFIED and must be run before the demo.
+                       Earlier: T-091 -- POLLS, AND THE DECISION NOT TO BUILD ANYTHING. one endpoint
+                       (POST /campaigns/quick), one dialog, and NO new table, kind, column
+                       or capability: DEC-088 extends DEC-010 from questions to products,
+                       so a poll IS a one-question campaign and the category is the only
+                       thing that says so.
+                       DEC-089 THE COMPOSITION IS ONE SERVER TRANSACTION, gated on
+                       campaign.launch -- the strictly most privileged verb in the
+                       sequence, so the endpoint cannot be a way around the launch check.
+                       four client round trips can half-fail and the failure lands on
+                       stage as an orphan template or a campaign with no QR.
+                       DEC-087 "Poll"/"Announcement"/"Booking"/"Slot" ARE STRUCTURAL words
+                       on INV-001's exempt list. audit:vocab passes with NO new exclusion.
+                       !! THE TRAP: subjectIds.min(1) was NOT relaxed for a poll with no
+                       reviewee -- every results screen groups by subject, so quickCreate
+                       finds-or-creates ONE per-org subject with type: 'organisation'.
+                       !! THE SIX NEW BACKEND TESTS WERE NOT RUN. docker daemon down on
+                       this machine AND N-066's globalSetup/npx blocker still stands.
+                       typecheck, lint, audit:vocab and audit:drift are all clean; the two
+                       red frontend tests are pre-existing, confirmed on a stashed tree.
+                       T-092 should run the backend suite before adding to it.
+                       Earlier: TIER 2 -- THE THREE DECISIONS NOBODY WAS MAKING. DEC-084, DEC-085,
                        DEC-086. nine red tests at the start of the session, ONE at the end,
                        and THE FRONTEND SUITE IS FULLY GREEN FOR THE FIRST TIME (890/890).
                        none of the nine was a bug; every one was a deferred decision and
@@ -1564,6 +1678,99 @@ Full tables in `55` § Stage 9.
 rehearsals) is unrun; this stage is 16 tasks — 1 + 8 + 7. The owner has asked twice and the sequence is
 theirs — this line records the trade rather than re-opening it.
 
+### Stage 10 — four demo surfaces on one engine · 29 Aug · **COMPLETE 30 Aug**
+The product showed **one** thing: feedback campaigns. The engine underneath was already
+generic; what was missing was a second and third way to PRESENT it. Plan in `Mithil/plan.md`,
+tables in `55` § 9d, decisions `DEC-087` … `DEC-092`. All six tasks built.
+```
+[x] T-095  B  BOOKING AT GOLD — the row lock, and the one bug the test found
+              ← BUILT 30 Aug. `bookables` + `slots` + `bookings`, five capabilities, ten
+                console routes and three public ones on the EXISTING publicRouter, so the
+                feature inherits the one PUBLIC_ROUTES exemption 13 §6 already justifies.
+                CAPACITY IS A ROW LOCK: SELECT … FOR UPDATE on the slot, THEN the count,
+                then the insert. counting first is the bug — two phones both read
+                capacity-1 and the room is double-booked on stage. the lock lives in
+                db/graph.ts because DEC-007 confines $queryRaw to that file.
+                !! THE N+1 TEST FOUND A REAL BUG AND IT WAS MINE: written with
+                isolationLevel 'Serializable' ON TOP of the lock, one of two rightful
+                winners came back 40001 instead of 201 — postgres SSI treats the count
+                behind the lock as a predicate read conflicting with the other insert.
+                the isolation level added no safety and turned a correct booking into a
+                500. removed; DEC-092 records it. 10/10 booking tests green after.
+                the loser gets 409 and not 400: well-formed, and lost a race.
+                BOOKINGS ARE IDENTIFIED (DEC-090) and never join responses — asserted by
+                a grep over the whole feature directory, comments stripped, so the rule
+                survives somebody who never read the header comment.
+                /book/:token is a SECOND ROOT of the respondent world, sharing its layout
+                and boundary — not a fifth world. routes.test.tsx's containment check was
+                asserting one-root-per-boundary and had to be restated as the property it
+                always meant: every layout has exactly one boundary and vice versa.
+[x] T-096  C  THE LAST TWO LANES GO LIVE — gallery, sidebar, plan page, seed
+              ← BUILT 30 Aug. /app/start's Announcement and Booking cards are real links
+                gated on announcement.create and booking.create, keeping their tier chip.
+                CAPABILITY FIRST, TIER SECOND (DEC-091) and there is now a test for it on
+                an ENTERPRISE org: a reader who may not write is told so rather than sold
+                an upgrade for a verb they would still be refused.
+                sidebar gains both, NEITHER gated on the tier — a bronze administrator
+                reaches the page's own 402 with an upgrade card, which is what 43 exists
+                to demonstrate; the client never receives the entitlement map anyway.
+                /app/plan and 16 §2 now NAME the two features. a tier that withholds
+                something the plan page does not mention looks arbitrary.
+                seed: one published announcement with a receipt per member of staff and a
+                third of them read (nought reads as broken, all reads as fake), and — on
+                gold and above ONLY — a bookable whose middle slot is NEARLY FULL, so
+                "1 left" is on screen before anybody books on stage.
+[x] T-094  B  ANNOUNCEMENTS AT SILVER — receipts written at publish time
+              ← BUILT 30 Aug. `announcements` + `announcement_receipts`, four
+                capabilities, eight routes, /app/announcements + <Composer> +
+                <AnnouncementBanner> on Home. THE DENOMINATOR IS THE POINT: one receipt
+                per resolved recipient, written in the SAME transaction as the
+                published_at stamp, so the read count is a fraction of who it was SENT
+                to rather than a count of who happens to be in the unit today.
+                publish is its own verb and the seeded matrix gives it to L1 alone while
+                L2 may draft — drafting is not broadcasting. audience is AudienceRule
+                through the CAMPAIGNS resolver (audienceUsers), never a second one.
+                bronze keeps announcement.read: 402 on write, 200 on read (16 §7).
+                8/8 new backend tests green, 10/10 new frontend tests green.
+[x] T-092  A  SUGGESTION BOX — the k-anonymity sentence, on the card
+              ← BUILT 30 Aug. no backend work: it is the second `purpose` on T-091's
+                endpoint. CampaignSummary gained templateCategory (DEC-088's discriminator
+                is DATA, so the console has to be told it) and resultsThreshold, and the
+                card explains its own empty state instead of looking broken on stage.
+                READ THROUGH THE EXISTING INBOX, which already filters by campaign — a
+                second path to individual comments is what INV-006 exists to prevent.
+                works on bronze: campaign.* and template.* are all in the bronze line.
+[x] T-093  C  THE START GALLERY — /app/start, five lanes, one product
+              ← BUILT 30 Aug. <StartCard> ready | capability | tier | soon, and the four
+                states are the whole of what the page decides (DEC-091). the two unbuilt
+                lanes are ON the page wearing the tier that will buy them — a customer
+                who cannot see a feature cannot want it — and T-096 turns them into
+                links. sidebar item gated on NOTHING: every level sees it, which is the
+                point of a screen where the whole product is visible at once.
+                two TemplateSeeds per preset (Poll + Suggestion box), one question each.
+[x] T-091  A  POLLS — POST /campaigns/quick, one transaction, no new anything
+              ← BUILT 29 Aug. template + one question + the org subject + campaign +
+                token, composed server-side (DEC-089) and gated on campaign.launch, the
+                strictly most privileged verb in the sequence. NO question kind, NO table,
+                NO column, NO capability (DEC-088) — a poll is a one-question template,
+                exactly as dto/template.ts has said since DEC-010.
+                THE SUBJECT PROBLEM: subjectIds.min(1) was NOT relaxed. quickCreate
+                finds-or-creates ONE per-org subject with type: 'organisation' and reuses
+                it; a campaign with no subject renders as an empty results page.
+                <QuickDialog> + two buttons on /app/campaigns; success lands on the detail
+                page, which already shows the QR (T-089, DEC-086).
+[ ] T-092  A  SUGGESTION BOX — the second `purpose` on the SAME endpoint, so the backend
+              is already built. read through the EXISTING Inbox over the k-anonymity
+              gate, never a second reader. the below-threshold state must be EXPLAINED
+              on screen; the threshold is not lowered for the demo
+[ ] T-093  C  /app/start — the gallery that makes four features look like one product.
+              missing CAPABILITY disables the card with the reason; missing ENTITLEMENT
+              keeps it live with a tier chip to /app/plan. usability only — the server
+              403s and 402s regardless (INV-003)
+[ ] T-094  B  ANNOUNCEMENTS at SILVER (61) — 2 tables, 4 capabilities, receipts written
+              AT PUBLISH so the read count has an honest denominator
+```
+
 ### Why is that item still greyed? — one row per "Soon"
 
 Asked by the owner 24 Aug. **Nothing is on the chopping block; everything below has an id and
@@ -1707,6 +1914,8 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | ~~`D-040`~~ | ~~**Operator MFA became a 6-hour code, with no `DEC-` and a red test left behind**~~ | **REPAID 29 Aug, `DEC-084`.** Back to `STEP_SECONDS = 30` and `WINDOW = 1`. The convenience bought was not re-reading a code at login, and `npm run ops:code -w @endur/api` already buys that in one command — paying for it in posture instead is paying more. **No doc amendment was needed**: `19` §9 already says *"±1 step of clock drift is accepted"*, which the branch had silently broken too, so this restores the doc rather than changing it. `platform.test.ts` 23/23 | ~~a decision, and it is a security posture~~ — **done** |
 | `D-041` | **`public.test.ts` flaked once under the root runner** | Found 29 Aug, the first root run after `D-037` was repaid: *"answers the same 404 for unknown, unlaunched, closed and expired tokens"* failed once and passed alone, and passed again on the next full root run. Both projects now start together, so the backend suite shares its one test database at a higher worker count than it ever did alone. **One occurrence is not a diagnosis** — if it returns, the answer is `fileParallelism` or a pool cap on the backend project, not a retry | watch it; act on the second occurrence |
 | ~~`D-035`~~ | ~~**Four `tsc -b` errors on the branch, none of them from a task**~~ | **REPAID 29 Aug.** All four were `exactOptionalPropertyTypes`, and all four were fixed by CONSTRUCTING THE KEY CONDITIONALLY rather than widening the target type — `...(body.at ? { at: body.at } : {})`, and `subject.unitId ? { kind: 'subject', unitId } : { kind: 'subject' }` twice. That direction is not a style preference: on `Target`, an ABSENT `unitId` is how the resolver says *org-wide*, so `unitId: undefined` and no `unitId` at all mean the same thing to JavaScript and different things to the type. Widening would have made the two indistinguishable everywhere, to fix three lines. **The fourth, in `Simulator.tsx`, was the same shape**: `<DecisionTrace>` documents an absent `considered` as *"this response carried no candidate list"* — a production 403 (`11` §10) — so it is spread in, not passed as `undefined`. **`capability: body.capability as never` is also gone**, and that was the real find: `SimulateBody.capability` was `z.string()` while `ResolveInput.capability` is `Capability`, and the cast bridged them. The DTO now `.refine(isCapability)`, which narrows the inferred type *and* changes behaviour — a misspelt capability is a 422 naming the field, where it used to resolve to a silent `no_grant` that the simulator rendered as *"No rule grants this"*: a real-looking answer to a question the system never understood. The narrowing then found a genuine third error — the page held `capability` as a bare `string`, in a file whose own header says the sentence must never be able to ask an invalid question. It is `Capability | ''` now, so the compiler keeps that rule instead of the comment. **`npm run build` passes** | ~~before any build-based demo~~ — **done** |
+| `D-042` | **A poll or a suggestion box never appears on `/app/campaigns`** | Found 30 Aug during `T-094`, in `T-091`'s work and **not caused by this session**; `campaigns.test.ts` *"carries the category and the k-anonymity threshold on the summary"* is red because the campaign it just created is missing from the list. `quickCreate` anchors every quick campaign to the per-org singleton subject (`type: 'organisation'`), which has **no unit**, and `listCampaigns` scopes a non-`all` reader with `subjects.some.subject.unitId in visibleUnits` — so a row with no unit matches nothing. `campaign.read` is seeded `subtree`/`own_unit` and never `all` (`50` §1), so this hides polls from **every seeded role in every organisation**; the campaign is reachable only by the URL the creator lands on. The test is asserting the correct behaviour and should stay red until the product is fixed. Two candidate fixes, and the choice is an authorisation decision rather than a patch: anchor the singleton subject to the org's ROOT unit (a subtree reader at the top then sees it, an `own_unit` reader below still does not), or teach `listCampaigns` that a subject with no unit belongs to the whole organisation. **Do not relax the visibility filter generally** | before the demo — a poll that vanishes from the list is the demo path |
+| `D-040` | **Two frontend tests fail on Windows, and one of them is a guard that asserts nothing there** | Found 30 Aug during `T-093`; **neither file was touched by that work**. (1) `pages/respond/bundle.test.ts` compares `path.relative()` output against forward-slash literals (`'components/form/QuestionInput.tsx'`), so on win32 every path comparison misses — the INV-008 assertion fails outright and the *"no console code in the respondent bundle"* filter silently matches nothing, which is the worse half: the guard looks green while checking nothing. Fix is to normalise separators once where `reached` is built, never to relax an assertion. (2) `router/boundaries.test.tsx` *"does not mistake a thrown Response for a stale graph"* dies in undici — `RequestInit: Expected signal ("AbortSignal {}") to be an instance of AbortSignal` — a jsdom/undici mismatch inside `createMemoryRouter`, not a product bug | whoever next runs the suite on Windows |
 | `D-036` | **`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing** | Found 26 Aug during `T-090` and **verified pre-existing on a stashed tree**. The backwards-pagination test asserts `page1.body.page.nextCursor` is truthy and gets a falsy value, meaning the fixture no longer produces more than one page — most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing rather than the reader being wrong. The reader itself is exercised live (a 775-line export and a 45-line filtered read both came back correct). Fix is to size the fixture past one chunk deliberately, not to relax the assertion | whoever next touches `72`'s reader |
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
@@ -1748,7 +1957,237 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-29 (latest) · tier 2 — the three decisions nobody was making
+### 2026-08-30 (latest) · `T-095`, `T-096` — booking, and the one bug the test found
+
+**The feature is the row lock.** Everything else about a bookable is ordinary CRUD; what makes
+booking worth building — and what makes it the only surface in the product with real
+contention — is that two phones can want the same last place. `book()` takes
+`SELECT id FROM slots WHERE id = $1 FOR UPDATE` **first**, counts live bookings **second**, and
+inserts **third**, all in one transaction. Counting before locking is the bug: both readers see
+`capacity - 1`, both pass the check, and the room is double-booked in front of the evaluator.
+Locking the slot rather than the table keeps the serialisation to the one row actually
+contended, so two different slots never wait on each other. The loser gets **409** and not 400
+— the request was well formed and lost a race, and telling somebody to fix a form with nothing
+wrong with it sends them looking for a mistake that is not there.
+
+**The N+1-concurrent test found a real bug, and it was mine.** `Mithil/plan.md` specified the
+transaction with `isolationLevel: 'Serializable'` on top of the lock and I wrote it that way,
+on the belt-and-braces argument that it costs nothing. It costs a booking: on a capacity-2 slot
+one of the two rightful winners came back `40001 could not serialize access` instead of `201`.
+Postgres's SSI reads the `count(*)` behind the lock as a predicate read conflicting with the
+other transaction's insert, and aborts one of them — although `FOR UPDATE` had already made the
+two strictly sequential and neither was ever going to overfill anything. The isolation level
+added no safety and converted a correct booking into a 500. The lock and Serializable are
+**alternatives**; taking both turns away a caller who did nothing wrong. Removed, recorded as
+`DEC-092`, and the test that caught it is exactly the test the plan said would be the feature.
+
+**`DEC-090` is enforced by a grep, not by review.** A booking is **identified** — a name and an
+email, because a booking that cannot be honoured is not a booking — and a response names nobody
+and never will (INV-006). The two must never join, and the way that promise dies is not
+somebody deleting it but a future query in `features/booking/` reaching for the responses
+table. `booking.test.ts` reads every file in that directory, strips the comments, and fails on
+the word. A blunt instrument, and the right one: it survives somebody who never read the header
+comment.
+
+**The public payload is smaller than the console's and the omission is the specification.** A
+stranger is told how many places are **left**; never the capacity, and never who took the rest.
+A link that tells somebody who is coming to the clinic on Tuesday is a worse leak than anything
+the campaign payload could make. Remaining is **derived** from live bookings every time — a
+stored counter is a second source of truth and it drifts the first time somebody cancels.
+
+**`/book/:token` is a second root of the respondent world, not a fifth world**, sharing
+`RespondLayout` and `RespondBoundary`. That made `routes.test.tsx`'s containment check red, and
+the test was wrong rather than the router: it asserted one root per boundary, which could only
+be satisfied by duplicating a layout and a boundary the respondent world already has. Restated
+as the property it always meant — every layout has exactly one boundary and every boundary
+belongs to exactly one layout — so a console crash still cannot reach the respondent flow and
+two roots of one world cannot drift apart.
+
+**`D-040`'s first half is repaid, because this task depended on it.** `bundle.test.ts` compared
+`path.relative()` output against forward-slash literals, so on Windows every containment filter
+matched nothing and the guard reported clean without looking. `Book.tsx` was being added to its
+entry list, and a guard that checks nothing is worse than no guard — separators are now
+normalised once where `reached` is built. All five assertions pass for real, `Book.tsx`
+included: React and the router are still the only packages the phone downloads.
+
+**Raw SQL went where `DEC-007` says it goes.** The lock is `lockSlot(tx, slotId)` in
+`db/graph.ts`, the one file permitted `$queryRaw`. Prisma has no expression for `FOR UPDATE`
+either, so the exemption is used for the reason it exists; keeping it to one file is the whole
+point, and a second would make the lint rule a formality.
+
+**`T-096` closed the stage.** The gallery's last two lanes are live links gated on
+`announcement.create` and `booking.create` while keeping their tier chip, and there is now a
+test on an **enterprise** organisation proving the order: a reader who may not write is told
+that, not sold an upgrade for a verb they would still be refused. The sidebar gains both,
+neither gated on the tier — a bronze administrator lands on the page's own 402 with an upgrade
+card, which is what `43` exists to demonstrate. `/app/plan` and `16` §2 now name announcements
+under silver and booking under gold; a tier that withholds something the plan page never
+mentions looks arbitrary. Seed data: a published announcement with one receipt per member of
+staff and a third of them read (nought reads as broken, all of them reads as fake), and — on
+gold and above only — a bookable whose middle slot is **nearly full**, so the *"1 left"* state
+is on screen before anybody books on stage. Seeding a gold feature onto the bronze org would
+have put a row on a screen that answers 402.
+
+**Checks.** `typecheck`, `lint`, `audit:vocab` and `audit:drift` clean. Backend **540/542**:
+the two failures are the pre-existing `D-036` and `D-042`, both documented and neither touched
+here. Frontend **924/925**: the one failure is `D-040`'s second half, the jsdom/undici
+`AbortSignal` mismatch in `boundaries.test.tsx`, which is not a product bug. New this session:
+10 backend booking tests, 8 `<SlotGrid>` tests, and 2 more on the gallery.
+
+**Next.** Stage 10 is complete — all six surfaces (`T-091` … `T-096`) are built. The demo path
+in `Mithil/plan.md` § Verification has **not been walked end to end on a phone**; `T-045` still
+owes that, and `D-042` should be settled before it, because a poll that vanishes from
+`/app/campaigns` is on that path.
+
+### 2026-08-30 · `T-094` — announcements, and the first receipt table
+
+**The feature is the denominator.** Everything else here is ordinary CRUD; what makes an
+announcement worth building is *"12 of 40 have read this"*, and that sentence is only true
+because `announcement_receipts` is written **at publish time, one row per resolved recipient,
+in the same transaction that stamps `published_at`**. A row created lazily on first read can
+count readers and can never supply the 40. Publishing is therefore irreversible in the same
+sense a launch is, and idempotent by **state** as well as by key: a second publish returns the
+first result rather than resolving the audience again against an org graph that has since
+changed — which would silently alter who the notice was sent to.
+
+**`announcement.publish` is a separate verb from `announcement.create`, and the seeded matrix
+is what makes that real.** L1 and L2 may draft; L1 alone may send. Drafting is not
+broadcasting, and one `announcement.manage` would have made the distinction unsayable — the
+same argument `account.revoke` makes against being folded into `account.create` (`57`).
+`announcement.read` is seeded to **every level including L4**: being sent something is not a
+permission anybody should have to be given.
+
+**The audience is `AudienceRule` and the resolver is the campaigns' own.**
+`features/campaigns/audience.ts` gained `audienceUsers()` and a shared `positionFilter()` —
+the unit-subtree walk had been written twice already and announcements would have made it
+three. `anyone` deliberately means something **different** here and it is written in the
+function rather than inherited by accident: on a campaign it is *"whoever holds the link"* and
+has no denominator at all; an announcement has no link and is never read by a stranger, so its
+widest audience is every account in the organisation. People with no sign-in and disabled
+accounts are skipped, which is what keeps the denominator honest.
+
+**Tier.** `announcement.read` is Bronze and the other three are Silver, so a downgraded
+organisation still reads what it was already sent (`16` §7). A bronze org gets **402** on
+create and publish and **200** on read, asserted. `requireEntitlement` sits after
+`requireCapability` on every write, which is the chain's order and not a preference.
+
+**Delivery is in-product only and the composer says so on screen.** There is no mail
+transport in Endur; a composer that implies one is worse than one that admits what it did.
+
+**Found, not caused — `D-042`.** A poll or a suggestion box is invisible on `/app/campaigns`
+for every seeded role: `quickCreate` anchors them to the per-org singleton subject, which has
+no unit, and the list filter scopes on `subjects.some.subject.unitId`. One backend test is red
+and it is asserting the correct behaviour. The fix is an authorisation decision (anchor the
+singleton to the root unit, or teach the list that an unanchored subject is org-wide) and is
+left for whoever picks it up rather than made in passing.
+
+**Three magic numbers in the test suite moved, and each one is the event they were written
+to catch**: the capability catalogue is 68 (`roles.test.ts`), L4's exact grant list gains
+`announcement.read` (`org.test.ts`), and `powers-grid.test.ts` now counts `CAPABILITIES`
+instead of a literal — a hard-coded total there reports *"a module was added"* as *"the labels
+are wrong"*. Three expectations from `T-091`/`T-093`, which shipped without the suite ever
+running, were also corrected: a validation refusal is **422** and not 400, and every preset
+now seeds six starter templates rather than four.
+
+**Checks.** `typecheck`, `lint`, `audit:vocab` and `audit:drift` clean. New backend suite 8/8,
+new frontend suite 10/10. The rest of the backend suite passes except `D-042` above and the
+pre-existing `D-036`; the two pre-existing Windows frontend failures (`D-040`) are unchanged.
+The database was brought up with Docker for this session, so the backend suite ran for the
+first time since `T-090`.
+
+**Next.** `T-095` (booking, gold) is the topmost unblocked task, and `T-096` closes the stage.
+
+### 2026-08-30 · `T-092`, `T-093` — the suggestion box and the start gallery
+
+**`T-092` was one sentence of copy and two DTO fields, and that is the honest size of it.**
+The endpoint, the dialog and the `suggestion` branch all shipped with `T-091`. What was
+missing was the state nobody had looked at: a suggestion box collects anonymously and
+renders **nothing** until `K_ANON_THRESHOLD` responses exist, so the first two answers on
+stage look like a bug. `CampaignSummary` now carries `templateCategory` (DEC-088 made the
+category the discriminator, so the console has to be told it — there is no type column to
+read) and `resultsThreshold`, and the card says *"Answers appear once 5 people have
+responded. 2 so far."* The number comes from the server; the gate stays in SQL; the
+threshold is not lowered for the demo. Reading suggestions is the **existing Inbox**, whose
+campaign filter was already built — a second reader over individual comments is the exact
+thing INV-006 exists to prevent.
+
+**`T-093` is a gallery whose only real content is the gating.** Five lanes: Poll, Suggestion
+box, Feedback, Announcement, Booking. `<StartCard>` has four states because there are four
+different reasons a lane cannot be pressed and they want four different answers — a missing
+**capability** disables the card and says why; a missing **entitlement** keeps it live with a
+tier chip that lands on `/app/plan`; a surface that is not built yet says so and does not
+navigate. Capability first, tier second, matching `requireCapability → requireEntitlement`
+(`DEC-091`). An **unknown** tier sells nothing rather than guessing Bronze and offering a
+Gold customer what they already own. Each of the five presets seeds a `Poll` and a
+`Suggestion box` template, so the gallery is never empty and a hotel's poll is not a
+university's.
+
+**Checks.** `typecheck`, `lint`, `audit:vocab` (156 files, no new exclusion) and
+`audit:drift` are clean. Frontend: 907 passing, **2 failing, both pre-existing and neither
+in a file this session touched** — logged as `D-040`. **The backend suite did not run at
+all**: no Postgres and no Docker daemon on this machine, so the new `campaigns.test.ts`
+assertion about the two summary fields is written and unverified. Run it before the demo.
+
+**Next.** `T-094` (announcements, silver) is the topmost unblocked task. It needs its four
+capabilities in `11` §3 **and** `capabilities.ts` in the same change, or `audit:drift`
+check 2 fails.
+
+### 2026-08-29 · `T-091` — polls, and the decision not to build anything
+
+**One endpoint, one dialog, and nothing underneath.** `POST /campaigns/quick` composes a
+template, one question, the organisation's own subject, a campaign and a public token in a
+single transaction and returns the launched campaign. There is no `polls` table, no seventh
+question kind, no `type` column on `campaigns` and no new capability — `DEC-088` extends
+`DEC-010`'s reasoning from questions to products, and `dto/template.ts` had already written
+the sentence this task obeys: *"a poll is a one-question template; there is no poll entity
+and there never will be."*
+
+**Three decisions recorded before any code** (`DEC-087`, `DEC-088`, `DEC-089`):
+
+- **`DEC-087`** — "Poll", "Suggestion box", "Announcement", "Booking" and "Slot" are
+  **structural** words, on INV-001's exempt list beside Save and Settings. They name Endur's
+  furniture. Every noun *inside* them still resolves through `useLabels()`, and
+  `audit:vocab` passes with **no new exclusion** — they pass on the exempt list, not because
+  a folder was skipped.
+- **`DEC-088`** — a poll and a suggestion box are **campaigns**. What tells them apart is the
+  template's `category` plus `questionCount === 1`. Data, not schema.
+- **`DEC-089`** — quick create is **one server transaction**, gated on `campaign.launch`
+  because that is the strictly most privileged verb in the sequence: whoever may launch may
+  also create, and gating on anything weaker would make this endpoint a way around the launch
+  check. Composed in the browser it would be four round trips that can half-fail, and the
+  failure lands on stage as an orphan template or a campaign with no QR.
+
+**The trap worth writing down: `CreateCampaignBody.subjectIds` requires at least one, and a
+poll has no reviewee.** The tempting fix is to relax the bound. It was not relaxed — every
+results screen groups by subject, so a campaign with none renders as an empty page rather
+than as a poll. `quickCreate()` finds-or-creates **one** per-org subject named after the
+organisation with `type: 'organisation'` (a column that already existed and already
+defaulted) and reuses it for every quick campaign. A test asserts there is still exactly one
+after three of them.
+
+**Frontend.** `<QuickDialog>` (catalogued in `24` §6 before it was written) and two buttons
+on `/app/campaigns`, gated on `campaign.launch` rather than `campaign.create` so the console
+does not offer a button the API is going to refuse. Success navigates to the campaign detail
+page, which already shows the QR code and the public link (`T-089`, `DEC-086`) — that screen
+is the point of the whole surface, and nothing new was built for it.
+
+**Verified:** `npm run typecheck` clean · `npm run lint` clean · `npm run audit:vocab` clean
+(154 files, no new exclusion) · `npm run audit:drift` clean (61 docs, 64 capabilities — the
+count is unchanged, which is the point). Frontend suite run: **the two failures are
+pre-existing and both were confirmed on a stashed tree** — `pages/respond/bundle.test.ts`
+(`D-036`'s neighbour: Node's `relative()` returns backslash paths on Windows, so the
+assertion's forward-slash literal cannot match) and `router/boundaries.test.tsx` "does not
+mistake a thrown Response for a stale graph". **The six new backend tests in
+`campaigns.test.ts` were NOT RUN** — Docker Desktop's daemon is not running on this machine
+(`docker ps` fails at the named pipe), and `N-066`'s second blocker still stands regardless:
+`test/globalSetup.ts` shells `npx` through `execFileSync` with no `shell: true`, which cannot
+work on Windows. Neither is new and neither was introduced here; the new tests are typechecked
+and linted only. **`T-092` should run them before adding to them.**
+
+**Next:** `T-092` is presentation only — the backend for the suggestion box shipped with this
+task as the second `purpose` on the same endpoint.
+
+### 2026-08-29 · tier 2 — the three decisions nobody was making
 
 `DEC-084`, `DEC-085`, `DEC-086`. Nine red tests at the start of this session; **one at the
 end**, and the frontend suite is fully green for the first time. None of the nine was a bug.
