@@ -51,6 +51,16 @@ export function IndustryStep({
           We&rsquo;ll pre-fill roles, structure and vocabulary. You can change all of it in the
           next three steps.
         </p>
+        {/* Restored at DEC-085. `31` § step 1 argues this line in prose and it is the whole
+            answer to the question every unlisted organisation asks first. Without it the
+            five cards read as an exhaustive list and a clinic, a charity or a bus company
+            sees no row for itself — on the one screen whose entire subject is that the
+            model does not care (INV-002). "Custom" alone does not say it: it reads as the
+            hard path, not as the reassurance that the preset is only a starting point. */}
+        <p className="step-lede step-lede-aside">
+          Nothing here exactly? Pick the closest one — every role and every word is yours to
+          change, and none of this is locked in afterwards.
+        </p>
 
         <div className="preset-grid" role="radiogroup" aria-label="Organization type">
           {presets.map((preset) => (

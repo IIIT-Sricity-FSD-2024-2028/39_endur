@@ -62,7 +62,10 @@ export function ReviewStep({
       <div className="review-grid">
         <Card kicker="Roles" step={1} onJump={onJump}>
           <p className="review-figure">{pluralise(roles.length, 'level', 'levels')}</p>
-          <p className="text-meta">{roles.map((role) => role.name).join(' + ')}</p>
+          {/* Arrow, not `+` — DEC-085. These are LEVELS: ordered, each seeing strictly less
+              than the one before, which is the entire content of the "Sees…" column two
+              steps back. `Dean + Head + Tutor` reads as an unordered set and loses it. */}
+          <p className="text-meta">{roles.map((role) => role.name).join(' → ')}</p>
         </Card>
 
         <Card kicker="Structure" step={2} onJump={onJump}>

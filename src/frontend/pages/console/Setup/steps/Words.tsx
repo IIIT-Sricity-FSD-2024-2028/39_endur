@@ -5,6 +5,7 @@
 // the same ones (41 § Interactions, 24 §4). What is left here is the step's framing.
 import type { LabelKey, ResolvedLabels } from '@endur/shared';
 import { WordsEditor } from '../../../../components/org/WordsEditor.js';
+import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';
 
 export function WordsStep({
   labels,
@@ -30,6 +31,13 @@ export function WordsStep({
         onSetMany={onSetMany}
         onResetPlural={onResetPlural}
       />
+      {/* Restored at DEC-085. The redesign moved the preview to Review, where it is also
+          right — but LATER is not the same claim. This step's lede says these words appear
+          throughout Endur, and the preview is the only thing that PROVES it; proving it two
+          steps after the reader has stopped doubting proves nothing. Typing `Studio` and
+          watching a nav say `Studios` is the ten seconds that sells the generic model.
+          The SAME component Review uses, not a second one (INV-009, 24 §4). */}
+      <DashboardPreview labels={labels} />
     </div>
   );
 }

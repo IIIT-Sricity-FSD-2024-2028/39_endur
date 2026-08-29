@@ -10,17 +10,23 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-// Step widened from RFC 6238's usual 30s to 6 hours: an operator's code stays valid for a
-// full shift instead of rotating every 30s, so it does not have to be re-read off an
-// authenticator app on every login.
-const STEP_SECONDS = 6 * 60 * 60;
+/**
+ * RFC 6238's 30 seconds, and it stays 30 seconds — `DEC-084`.
+ *
+ * This was briefly widened to 6 hours so a demo would not have to re-read a code, which is
+ * a real convenience and the wrong place to buy it. A second factor valid for a full shift
+ * is close to a static secret: it survives a shoulder-glance, a screenshot and a scrollback
+ * for the rest of the day, which leaves the password as very nearly the only factor — and
+ * §9's entire argument for building MFA at all is that one stolen operator password exposes
+ * every tenant's plan and revenue data at once. `npm run ops:code -w @endur/api` prints a
+ * live code in one command, so the convenience was already bought somewhere cheaper.
+ */
+const STEP_SECONDS = 30;
 const DIGITS = 6;
 
-/**
- * No drift window: the step itself is already 6 hours, so accepting a neighbouring step
- * too would silently extend validity toward 12-18h.
- */
-const WINDOW = 0;
+/** ±1 step of clock drift, as `19` §9 specifies. One step each way is 30 seconds of slack
+ *  for an unsynchronised laptop clock; it is not a validity extension. */
+const WINDOW = 1;
 
 export function generateSecret(): string {
   const bytes = randomBytes(20); // 160 bits, the RFC 4226 recommendation
@@ -45,7 +51,7 @@ function decodeBase32(secret: string): Buffer {
   return Buffer.from(bytes);
 }
 
-/** The code for one 30-second step. Exported so the ops CLI can print one (see `ops:code`). */
+/** The code for one step. Exported so the ops CLI can print one (see `ops:code`). */
 export function codeAt(secret: string, counter: number): string {
   const message = Buffer.alloc(8);
   message.writeBigUInt64BE(BigInt(counter));

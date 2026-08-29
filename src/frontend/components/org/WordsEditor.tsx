@@ -72,16 +72,34 @@ export function WordsEditor({
                 disabled={readOnly}
                 onChange={(event) => onSetMany(key, event.target.value)}
               />
+              {/* `your plural` — restored at DEC-085 after the redesign dropped it.
+                  22 §2 stores singular and plural separately for exactly one reason: some
+                  organisations' plurals are not the derived ones. `Staff / Staff` and
+                  `Faculty / Faculty` are the cases that matter, and in both the field looks
+                  identical to a field nobody touched. Without this line the override state
+                  is invisible until you notice an icon has appeared — and an override that
+                  reads as an accident is one somebody types over.
+
+                  The `auto: Wings` half is NOT restored: beside a filled field showing
+                  `Wings`, a hint saying `auto: Wings` repeats the field. It is the OVERRIDE
+                  that needs saying, because that is the state the field cannot show. */}
               <span className="text-meta word-hint">
-                {!readOnly && overridden && derived !== labels[key].many && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => onResetPlural(key)}
-                    title={`Reset to ${derived}`}
-                  >
-                    <Icon name="edit" size={16} label={`Reset to the derived plural ${derived}`} />
-                  </button>
+                {overridden && derived !== labels[key].many && (
+                  <>
+                    <span className="word-hint-own">your plural</span>
+                    {/* Shown to a read-only reader too. The hint explains why the plural is
+                        not the obvious one; only the undo is a permission (41 § States). */}
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => onResetPlural(key)}
+                        title={`Reset to ${derived}`}
+                      >
+                        <Icon name="edit" size={16} label={`Reset to the derived plural ${derived}`} />
+                      </button>
+                    )}
+                  </>
                 )}
               </span>
             </span>

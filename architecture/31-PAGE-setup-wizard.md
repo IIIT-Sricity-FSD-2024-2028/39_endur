@@ -93,13 +93,24 @@ to prevent. `T-033` extends the tree; it does not write one (`N-025`).
 
 ## Interactions
 
-**Step 1 · Industry.** Five cards showing the role chain and the vocabulary pair up front, so
-the choice is made without clicking. Selecting enables Continue; double-click selects and
-advances.
+**Step 1 · Industry.** ~~Five cards showing the role chain and the vocabulary pair up front, so
+the choice is made without clicking.~~ **AMENDED 29 Aug by `DEC-085`: a split pane. Five simple
+cards on the left; the role chain and the vocabulary pair move to an aside on the right, for
+the preset currently under consideration.** Selecting enables Continue; double-click selects
+and advances.
+
+The aside shows strictly more than a card could — all four roles as a chart, and both terms in
+full sentences — and none of that fits on a card in a five-card grid. **What it costs is the
+side-by-side beat**: presets are now compared serially, so a presenter who wants *"four
+organisations, four vocabularies, one product"* says the sentence rather than showing it. That
+trade is the whole of `DEC-085` § where, and it is the only one of this doc's step-1 claims
+that did not survive.
 
 When an evaluator names something unlisted — a gym, an NGO, a school district — the copy under
 the grid is the presenter's script: *"Not listed? Pick the closest one — you'll rename
-everything in the next three steps anyway."* A gym is a Company. Say it and move on.
+everything in the next three steps anyway."* A gym is a Company. Say it and move on. **This
+line was dropped in the redesign and restored by `DEC-085`** — without it the five cards read
+as an exhaustive list on the one screen whose entire subject is that the model does not care.
 
 **Step 2 · Roles.** Drag to reorder; levels renumber live. The **"Sees…" column is generated,
 not entered**, and it is the most important thing on the screen: it states the visibility rule
@@ -117,6 +128,11 @@ label uses the vocabulary: "Add a Department" here, "Add a Property" in the hote
 render of the real sidebar and a real sentence, updating on every keystroke. Type "Studio"
 over "Course" and watch the nav change. That is the customization claim proven rather than
 asserted.
+
+**Confirmed 29 Aug by `DEC-085` after the redesign moved it to Review.** It belongs on both,
+and it is the *same* `<DashboardPreview>` in both places (INV-009) — but Review is not a
+substitute for here. This step's lede claims these words appear throughout Endur; proving it
+two steps later, after the reader has stopped doubting, proves nothing.
 
 Plurals auto-derive (`+s`, `y → ies`) with an override, because the hotel org needs
 "Staff / Staff" and deriving it would be wrong exactly where someone is watching (`22` §2).
