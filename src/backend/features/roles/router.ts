@@ -177,7 +177,9 @@ authzRouter.post(
   requireCapability('simulator.run'),
   (req, res, next) => {
     const { body } = req.data as { body: SimulateBody };
-    void runSimulation(req.ctx.orgId as string, req.ctx.authzVersion ?? 0, body)
+    // The tenant's nouns, because the 404s this can raise are sentences an administrator
+    // reads — the same INV-001 rule as the warnings above (`D-008`).
+    void runSimulation(req.ctx.orgId as string, req.ctx.authzVersion ?? 0, body, nounsOf(req))
       .then((decision) => res.json({ data: decision }))
       .catch(next);
   },

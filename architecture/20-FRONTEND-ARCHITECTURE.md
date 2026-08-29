@@ -6,9 +6,9 @@ Decisions: `_MEMORY.md` DEC-003, DEC-013, DEC-014, DEC-015
 
 ---
 
-## 1. The three worlds
+## 1. The four worlds
 
-Endur has three distinct surfaces. They do not share a shell, and confusing them is the
+Endur has four distinct surfaces. They do not share a shell, and confusing them is the
 fastest way to a muddled product.
 
 | World | Who | Auth | Shell |
@@ -16,15 +16,26 @@ fastest way to a muddled product.
 | **Public** | Anyone | None | Marketing nav — brand, two links, one button |
 | **Console** | Staff | Cookie session | Sidebar + top bar |
 | **Respond** | Anyone with a token link | **None, ever** | No chrome at all — just the form |
+| **Ops** | Platform operators | **Separate** cookie, separate login (19 §4) | Operator chrome — never the tenant's |
 
 The respondent world having no account and no navigation is both a simplification and the
 right design: a hotel guest scanning a QR on a table card must never see a login screen
 (DEC-009).
 
-**Architecturally this means three route trees with three layout components**, not one shell
-with conditional rendering. A shell that renders differently for three audiences accumulates
+**Ops was the fourth world from `DEC-033` onward** and this section said three until
+29 Aug. It is listed here rather than treated as a corner of the console because the
+separation is the point: a different cookie, a different login, and an operator who reads
+counts and never content (INV-011). A `/ops` page rendered inside `ConsoleLayout` would put
+a tenant's sidebar around platform data, which is the exact confusion the split prevents.
+
+**Architecturally this means four route trees with four layout components**, not one shell
+with conditional rendering. A shell that renders differently for four audiences accumulates
 conditionals until nobody can say what a respondent actually sees — which is a privacy risk,
 not only a code-quality one.
+
+`router/routes.test.tsx` guards this by counting the trees rather than asserting a literal,
+so a fifth world cannot be added without its own boundary and its own layout — and cannot
+break the test merely by existing.
 
 ## 2. Routes
 
@@ -35,6 +46,7 @@ PUBLIC
   /                          Landing                          [M0 · thin]
   /login                     Sign in                          [M0]
   /start                     Create organization              [M0]
+  /activate/:token           Accept an invitation             [P2]
 
 CONSOLE  (/app, requires session)
   /app                       Organization home                [M0]
@@ -56,6 +68,7 @@ CONSOLE  (/app, requires session)
   /app/profile               My account                       [P2]
   /app/simulator             Permission simulator             [P2]
   /app/settings              Org profile, vocabulary, danger  [P2]
+  /app/plan                  Plan & billing, `billing.read`   [P2]
   /app/logs                  Activity log                     [P2 · built T-076]
   /app/inbox                 Response inbox                   [P2 · built T-080]
 
@@ -70,9 +83,15 @@ RESPOND  (no auth, no shell)
 OPS  (/ops, SEPARATE login, SEPARATE cookie — 19 §4, INV-011)
   /ops/login                 Operator sign in                 [P2]
   /ops                       Estate console                   [P2]
+  /ops/orgs/:id              One tenant — counts, never content [P2]
   /ops/analytics             Tier mix, movement, quiet orgs   [P2]
+  /ops/earnings              Revenue by tier                  [P2]
   /ops/logs                  Log files                        [P2]
 ```
+
+**`/app/plan`, `/activate/:token`, `/ops/orgs/:id` and `/ops/earnings` were live and unmapped
+until 29 Aug** — the same gap this section already records for `/app/logs`. All four are now
+in `routes.test.tsx`, which is what stops the map and the router drifting again.
 
 **`/app/logs` was missing from this map and `56` has owned it since 23 Aug** — the doc's
 § Route & access names the route, the `system` group, the position under Settings and the

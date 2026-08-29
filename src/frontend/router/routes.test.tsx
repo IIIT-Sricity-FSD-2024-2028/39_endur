@@ -22,9 +22,9 @@ function flatten(list: RouteObject[], prefix = ''): string[] {
 
 const paths = new Set(flatten(routes));
 
-describe('the three route trees', () => {
+describe('the four route trees', () => {
   it.each([
-    '/', '/login', '/start',
+    '/', '/login', '/start', '/activate/:token',
     '/app', '/app/setup', '/app/structure', '/app/roles',
     '/app/people', '/app/people/:id',
     '/app/subjects', '/app/subjects/:id',
@@ -40,7 +40,11 @@ describe('the three route trees', () => {
     // T-076. WRAPPED in RequireCapability, unlike the two above — there is no 402 on the
     // log, so a route guard can say everything there is to say (56 § States).
     '/app/logs',
+    '/app/plan',
     '/r/:token', '/r/:token/done',
+    // The ops world (DEC-033, 19 §4). It was live and untested here, which is how `20` §1
+    // went on saying "three worlds" for a fortnight after there were four.
+    '/ops/login', '/ops', '/ops/orgs/:id', '/ops/analytics', '/ops/earnings', '/ops/logs',
   ])('serves %s', (path) => {
     expect(paths.has(path)).toBe(true);
   });
@@ -63,6 +67,9 @@ describe('the three route trees', () => {
     // that a console exists at all.
     expect(paths.has('/*')).toBe(true);
     expect(paths.has('/app/*')).toBe(false);
+    // /ops keeps its OWN catch-all, and that is not the same decision reversed: a stranger
+    // never reaches /ops at all, so a 404 inside it tells them nothing they did not type.
+    expect(paths.has('/ops/*')).toBe(true);
   });
 });
 
@@ -74,17 +81,22 @@ describe('containment', () => {
   const componentOf = (node: ReactNode): unknown =>
     isValidElement(node) ? node.type : undefined;
 
+  // Counted, not hardcoded. This read `3` until 29 Aug, went red the moment `/ops` became
+  // the fourth world (DEC-033), and the number was never the property worth guarding —
+  // EVERY world having its OWN boundary and layout is. Asserting against `worlds.length`
+  // states that directly, so a fifth world must bring its own pair to pass and cannot
+  // break the test merely by existing (`20` §1).
   it('gives every world its own error boundary', () => {
-    // Three boundaries, three DISTINCT components. One shared boundary would let a crash
-    // in the console take down the respondent flow (20 §1).
+    // One shared boundary would let a crash in the console take down the respondent flow.
     const boundaries = worlds.map((route) => componentOf(route.errorElement));
-    expect(boundaries).toHaveLength(3);
+    expect(worlds.length).toBeGreaterThan(1);
     expect(boundaries.every(Boolean)).toBe(true);
-    expect(new Set(boundaries).size).toBe(3);
+    expect(new Set(boundaries).size).toBe(worlds.length);
   });
 
   it('gives every world its own layout', () => {
     const layouts = worlds.map((route) => componentOf(route.element));
-    expect(new Set(layouts).size).toBe(3);
+    expect(layouts.every(Boolean)).toBe(true);
+    expect(new Set(layouts).size).toBe(worlds.length);
   });
 });
