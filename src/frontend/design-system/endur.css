@@ -806,6 +806,9 @@
   margin: -10px 0 var(--space-2); max-width: 60ch; font-size: 15px; line-height: 1.5;
   color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
+/* The second lede on step 1 — "Pick the closest one" (DEC-085). Set back a shade from the
+   first so the two read as instruction then reassurance, rather than one long paragraph. */
+.step-lede-aside { font-size: var(--text-meta); margin-top: calc(var(--space-1) * -1); }
 .step-note { max-width: 60ch; }
 /* The step's own body, below the title block. Kept as a named element so a step can
    put a grid or a tree in it without the title inheriting the layout. */
@@ -1143,6 +1146,9 @@
 .word-plural { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .word-input-plural.is-overridden { border-color: var(--color-accent-300); }
 .word-hint { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+/* `your plural`. Accent-toned to match the overridden field's own border, so the label and
+   the field it describes read as one state rather than two unrelated marks. */
+.word-hint-own { font-size: var(--text-micro); color: var(--color-accent-700); }
 
 /* A miniature, non-interactive render of the real nav. It is the customization claim
    proven rather than asserted, and it updates on every keystroke. */

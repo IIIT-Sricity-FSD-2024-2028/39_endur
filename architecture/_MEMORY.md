@@ -1796,6 +1796,114 @@ DEC-083  ACTIVE  2026-08-29  origin:user  closes:OPEN-013  amends:13 § Structur
            of, 33, src/frontend/pages/console/Structure/DetailPanel.tsx
 ```
 
+```
+DEC-084  ACTIVE  2026-08-29  origin:claude  closes:OPEN-011  confirms:19 §9  task:T-053
+  decision OPERATOR TOTP GOES BACK TO 30 SECONDS, ±1 STEP. the 6-hour step and WINDOW 0
+           that appeared on the branch are reverted. the demo reads a live code from
+           `npm run ops:code -w @endur/api`, which already exists for exactly this.
+  why      a second factor valid for a full shift is close to a static secret. it survives
+           a shoulder-glance, a screenshot and a terminal scrollback for the rest of the
+           day, which leaves the password very nearly the only factor -- and 19 §9's WHOLE
+           argument for building MFA at all, when every other security nicety here is
+           honestly deferred, is that one stolen operator password exposes the plan and
+           revenue data of EVERY TENANT AT ONCE rather than one. a control whose only
+           justification is blast radius cannot be relaxed for convenience without
+           re-arguing the blast radius, and nobody did.
+  not      NOT "keep it and write the trade into a DEC", which was the other honest answer
+           in OPEN-011. it was rejected on price, not on principle: the convenience bought
+           was not re-reading a code at login, and `ops:code` buys that in one command
+           without touching the algorithm. paying for it in posture instead is paying more.
+  where    STEP_SECONDS 30, WINDOW 1, in platform/totp.ts. no doc amendment was needed --
+           19 §9 already says "±1 step of clock drift is accepted", which the branch had
+           silently broken too; this restores the doc rather than changing it.
+  cost     an operator reads a fresh code at each login. that is what TOTP is.
+  evidence platform.test.ts's window assertion had been red on three consecutive runs and
+           passes now; 23/23 green.
+  see      OPEN-011, D-040, 19 §9, INV-011, src/backend/platform/totp.ts,
+           src/backend/database/seed/ops-code.ts
+```
+
+```
+DEC-085  ACTIVE  2026-08-29  origin:claude  closes:OPEN-012  amends:31 § step 1, § step 4
+  decision THE SETUP REDESIGN KEEPS ITS SHAPE AND GIVES BACK WHAT IT DROPPED BY ACCIDENT.
+           the split pane on step 1 and the review-step dashboard preview STAY. restored:
+           "Pick the closest one", step 4's LIVE preview, `your plural` in <WordsEditor>,
+           and the arrow between role names on Review. moved on the record: the role chain
+           and vocabulary pair now appear in step 1's ASIDE rather than on every card.
+  why      six red tests were the only record that four affordances had ever existed, and
+           a red test is not the problem -- NOBODY HAVING CHOSEN is. sorted by asking what
+           each one was FOR, which separated them cleanly:
+             . "Pick the closest one" is COPY, one line, and 31 argues it in prose. without
+               it five cards read as an exhaustive list, and a clinic or a charity sees no
+               row for itself on the ONE SCREEN whose entire subject is that the model does
+               not care (INV-002). "Custom" alone reads as the hard path, not as
+               reassurance. restored.
+             . step 4's LIVE preview is the step's whole claim. the lede says these words
+               appear throughout Endur and the preview is the only thing that PROVES it;
+               proving it on Review, two steps after the reader has stopped doubting,
+               proves nothing. restored with the SAME <DashboardPreview> Review uses --
+               one implementation, two placements (INV-009), not a fork.
+             . `your plural` was the only thing separating a word the organisation CHOSE
+               from one the deriver guessed, which is the whole reason 22 §2 stores singular
+               and plural separately. `Staff / Staff` and `Faculty / Faculty` are the cases
+               that matter and in both the field looks untouched. restored (D-039). the
+               `auto: Wings` half is NOT: beside a filled field reading `Wings` it repeats
+               the field. it is the OVERRIDE that needs saying.
+  not      `← Back` WAS NEVER LOST -- D-038 was wrong about it. the button is present and
+           accessible; the redesign replaced the literal arrow with an <Icon>, and the
+           tests were asserting on decoration. the three assertions now ask for "Back".
+  where    THE ROLE CHAIN ON EVERY CARD IS THE ONE REAL LOSS AND IT IS DELIBERATE. 31 put
+           it there so four organisations were legible SIDE BY SIDE before a click -- the
+           presenter's ten-second beat. the aside shows one preset at a time and shows
+           strictly MORE of it: four roles as a chart plus both terms in full sentences,
+           none of which fits on a card in a five-card grid. THE COST IS THAT PRESETS ARE
+           NOW COMPARED SERIALLY, and a demo that wants the side-by-side beat should say
+           the sentence instead of showing it. the test asserts the PROPERTY -- step 1
+           tells you what a preset would do to your organisation, in your own words, before
+           you commit -- at its new location.
+  rule     A TEST THAT DISAGREES WITH THE CODE IS A DECISION NOBODY MADE, NOT A CHORE. the
+           standing rule that produced this entry: assertions move only with a DEC that
+           says what was traded, never quietly to make a suite green.
+  see      OPEN-012, D-038, D-039, 31 § step 1, 31 § step 4, 22 §2, 41 § Interactions,
+           INV-009, 24 §4, src/frontend/pages/console/Setup/steps/,
+           src/frontend/components/org/WordsEditor.tsx
+```
+
+```
+DEC-086  ACTIVE  2026-08-29  origin:claude  closes:OPEN-002  task:T-043
+  decision THE QR ENCODES THE MACHINE'S LAN ADDRESS. in DEVELOPMENT ONLY, a loopback
+           PUBLIC_BASE_URL is rewritten to the host's LAN IPv4 with the port preserved
+           (`http://localhost:5173` -> `http://192.168.1.14:5173`), and the Vite dev server
+           binds to the LAN (`server.host: true`) so the address in the QR actually answers.
+  why      a QR encoding `localhost` resolves to THE PHONE THAT SCANNED IT, so the
+           scan-to-respond beat -- the demo's opening move -- could not run at all. deferred
+           21 Aug and still deferred eight days later, which is what a decision looks like
+           when nobody has to make it. LAN was picked over a tunnel because it needs no
+           account, no third-party service, no key that expires mid-demo and no network the
+           room may not permit; a phone on the same wifi just reaches it.
+  not      NOT a tunnel (ngrok/cloudflared): a dependency on somebody else's uptime for the
+           first ten seconds of a graded demo. NOT a hand-edited .env: a DHCP lease changes
+           and the QR silently points at another machine. NOT a hardcoded IP in the repo.
+  where    BOTH HALVES OR NEITHER. rewriting the URL without binding the dev server to the
+           LAN produces an address that resolves and refuses the connection -- the same
+           failure one layer down. lib/config.ts does the rewrite and PRINTS IT AT BOOT, so
+           a URL nobody typed is never invisible. production and test are untouched: in
+           production a wrong public URL should be fixed rather than guessed, and in test a
+           machine-dependent URL makes assertions unrepeatable. an explicit non-loopback
+           PUBLIC_BASE_URL always wins.
+  limit    ON WSL2 THIS IS NOT ENOUGH ON ITS OWN and the rehearsal must prove it. the
+           address found inside WSL is the virtual adapter's (172.x), which is behind a NAT
+           and NOT reachable from a phone -- it will look configured and still fail. either
+           run the two dev servers from Windows, or add a `netsh interface portproxy` rule
+           from the Windows host's wifi address to the WSL address. on Linux and macOS the
+           detected address is the real one and nothing further is needed.
+  cost     the LAN address is visible in the QR. it is a private address on a network the
+           scanner is already on, and the token in the URL is the only thing that grants
+           anything (DEC-009).
+  see      OPEN-002, T-043, T-045, D-005, src/backend/lib/config.ts,
+           src/frontend/vite.config.ts, ShareSheet.tsx `isUnscannable()`
+```
+
 ---
 
 ## INV — invariants

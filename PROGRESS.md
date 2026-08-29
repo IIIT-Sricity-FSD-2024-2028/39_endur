@@ -5,7 +5,49 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-29  (THE BRANCH BUILDS. tsc 4 -> 0, npm run build PASSES, tests
+UPDATED   2026-08-29  (TIER 2 -- THE THREE DECISIONS NOBODY WAS MAKING. DEC-084, DEC-085,
+                       DEC-086. nine red tests at the start of the session, ONE at the end,
+                       and THE FRONTEND SUITE IS FULLY GREEN FOR THE FIRST TIME (890/890).
+                       none of the nine was a bug; every one was a deferred decision and
+                       the tests were the only record of it.
+                       DEC-084 OPERATOR TOTP BACK TO 30s, ±1 STEP. a second factor valid
+                       for a full shift is close to a static secret -- it survives a
+                       shoulder-glance, a screenshot and a scrollback all day, leaving the
+                       password very nearly the only factor, and 19 §9's WHOLE argument for
+                       building MFA at all is that one stolen operator password exposes
+                       EVERY TENANT'S plan data at once. keeping it was rejected on PRICE:
+                       the convenience was not re-reading a code, and ops:code buys that in
+                       one command. no doc amendment needed -- 19 §9 already said ±1 step,
+                       which the branch had silently broken too.
+                       DEC-085 SETUP KEEPS ITS SHAPE AND GIVES BACK WHAT IT DROPPED BY
+                       ACCIDENT. sorted by asking what each affordance was FOR. `← Back`
+                       WAS NEVER LOST -- D-038 was wrong; the button is there and the
+                       redesign replaced the literal arrow with an Icon, so three
+                       assertions were matching on DECORATION. restored: "Pick the closest
+                       one" (without it five cards read as an exhaustive list on the one
+                       screen whose subject is that the model does not care), STEP 4's LIVE
+                       PREVIEW (the lede claims these words appear throughout Endur and the
+                       preview is the only thing that proves it -- proving it on Review,
+                       two steps after the reader stopped doubting, proves nothing), and
+                       `your plural` (D-039). THE ROLE CHAIN ON EVERY CARD IS THE ONE REAL
+                       LOSS AND IT IS DELIBERATE: the aside shows strictly more of one
+                       preset, and THE COST IS THAT PRESETS ARE NOW COMPARED SERIALLY. 31
+                       amended.
+                       DEC-086 THE QR ENCODES THE LAN ADDRESS -- OPEN-002 ANSWERED after 8
+                       days deferred. dev only: a loopback PUBLIC_BASE_URL is rewritten to
+                       the host's LAN IPv4, printed at boot, AND VITE BINDS TO THE LAN,
+                       because rewriting the URL without that gives an address that resolves
+                       and refuses the connection. not a tunnel: no account, no third-party
+                       uptime, no key expiring mid-demo.
+                       !! T-045 MUST STILL PROVE IT ON THE DEMO MACHINE. under WSL2 the
+                       address found inside WSL is the VIRTUAL ADAPTER'S, behind a NAT and
+                       NOT reachable from a phone -- it will look configured and still
+                       fail. run the dev servers from Windows, or add a netsh portproxy.
+                       THE ONE REMAINING RED TEST IS D-036, whose fixture drifted below the
+                       64 KB chunk so it asserts nothing. size the fixture, never relax it.
+                       RULE WORTH KEEPING: a test that disagrees with the code is a decision
+                       nobody made, not a chore. assertions move only with a DEC.
+                       Earlier: THE BRANCH BUILDS. tsc 4 -> 0, npm run build PASSES, tests
                        11 failed -> 9. no feature: the owner asked what was open and then
                        for the top of the list, which was that the branch did not build and
                        that two red tests belonged to no debt id.
@@ -1226,7 +1268,7 @@ Status: ` ` not started · `>` in progress · `x` done · `!` blocked · `~` par
 ### Stage 5 — M0 hardening
 ```
 [x] T-042  A  resolve OPEN-005 (campaign status)   ← DEC-016, derived on read
-[ ] T-043  X  resolve OPEN-002 (public URL / QR)   ← decision, do early
+[x] T-043  X  resolve OPEN-002 (public URL / QR)   DEC-086 — LAN address; verify at T-045
 [x] T-044  X  vocabulary nonsense audit            ← 4 leaks, N-048/N-049. 3 now mechanical
 [ ] T-045  X  three demo rehearsals
 [x] T-046  B  settings — the Words card             ← D-010. Was an M0 route behind a stub
@@ -1637,10 +1679,10 @@ Blocking or dated. Move to `_MEMORY.md` as a `DEC-` entry once resolved, and tic
 
 | Ref | Question | Needed by | Blocks |
 |---|---|---|---|
-| `OPEN-002` | What public URL does the QR encode? `localhost` will not scan from a phone. **Deferred 21 Aug — local for now, by decision.** That unblocks development and unblocks nothing else: the scan-to-respond beat still cannot run until this is answered, so it is deferred rather than resolved | **before `T-045`** | T-038, T-043 |
+| ~~`OPEN-002`~~ | ~~What public URL does the QR encode? `localhost` will not scan from a phone~~ | **ANSWERED 29 Aug — the machine's LAN address. `DEC-086`.** In development only, a loopback `PUBLIC_BASE_URL` is rewritten to the host's LAN IPv4 (port preserved, printed at boot) and Vite binds to the LAN so the address answers. Not a tunnel: no account, no third-party uptime, no key expiring mid-demo. **`T-045` must still prove it on the demo machine** — under WSL2 the address found inside WSL is the virtual adapter's and is not reachable from a phone without a `netsh portproxy` rule or running the dev servers from Windows | ~~before `T-045`~~ — **answered, verify at rehearsal** | T-038, T-043 |
 | ~~`OPEN-008`~~ | **RESOLVED 23 Aug — `DEC-036`.** File upload **strips metadata, it does not re-encode.** `lib/imageBytes.ts` sniffs the real format from magic bytes, reads dimensions from the header, and removes JPEG APP1/APP13/COM, PNG `eXIf`/`tEXt`/`zTXt`/`iTXt`/`tIME`, and WebP `EXIF`/`XMP ` chunks with the VP8X flag bits that advertise them — without decoding anything, and therefore **without an image library nobody approved**. The privacy property `48` wanted re-encoding for survives: GPS, device ids and author names do not reach disk, asserted by a test that uploads a GPS-tagged JPEG and greps the stored bytes. What is not bought is polyglot neutralisation, and that risk is written into `48` and `DEC-036` rather than left quiet — stored bytes are only ever *served*, with a sniffed `Content-Type`, `nosniff` and `inline`, and respondent uploads stay out of scope, which is where a hostile file would come from. **If an image library is ever approved, `stripMetadata()` is the one function to replace** | ~~before `T-061`~~ — **done** | ~~T-061~~, ~~T-062~~ |
-| `OPEN-011` | **Does operator MFA stay a 6-hour code?** Changed on the branch with no `DEC-` and no amendment to `19` §9, whose argument for building MFA at all is that a stolen operator password exposes **every tenant's** plan data at once. A code valid for a full shift is close to a static secret. Two honest answers: keep it and write the demo-convenience trade into a `DEC-` (then rewrite `platform.test.ts`'s window assertion to the new rule), or revert to 30s and read a live code from `npm run ops:code` at the rehearsal. **What is not an option is leaving it undocumented with its test red** | **before `T-045`** | `D-040` |
-| `OPEN-012` | **Does the Setup wizard keep what its redesign dropped?** The split pane and the preview-on-Review are good; nobody recorded choosing them over the role chain on the card before any click, "Pick the closest one", the step-4 live preview, and `← Back`. Six red tests are the only record that they existed. Answer is either a `DEC-` superseding those parts of `31`, or the affordances come back — **not** a quiet edit of the assertions | before `T-045` | `D-038`, `D-039` |
+| ~~`OPEN-011`~~ | ~~**Does operator MFA stay a 6-hour code?**~~ | **ANSWERED 29 Aug — no. `DEC-084`.** Reverted to 30s / ±1 step. The other honest answer (keep it, write the trade into a `DEC-`) was rejected on price rather than principle: the convenience was not re-reading a code, and `ops:code` buys that in one command without touching the algorithm | ~~before `T-045`~~ — **done** | ~~`D-040`~~ |
+| ~~`OPEN-012`~~ | ~~**Does the Setup wizard keep what its redesign dropped?**~~ | **ANSWERED 29 Aug — mostly yes, one loss on the record. `DEC-085`.** `← Back` turned out never to have been dropped. *"Pick the closest one"*, step 4's live preview and `your plural` are back; the role chain on every card stays in the aside, with the cost written down. `31` amended | ~~before `T-045`~~ — **done** | ~~`D-038`, `D-039`~~ |
 | ~~`OPEN-013`~~ | ~~**Should the lowest tier of people be counted on `/app/structure` at all?**~~ **ANSWERED 29 Aug — `DEC-083`, option (b).** Not by dropping a tier from the total: everyone placed in a ward IS affected when the ward goes, which is what this page's numbers are for. By saying what the total is made of — `GET /units/:id/composition`, and a bar per role under the People stat. Riverside's root now reads 30, and under it: Director 1, Head of Department 3, Nurse 10, Patient 16 | done | `DEC-083` |
 | `OPEN-014` | **Should respondents be `person` nodes with accounts at all?** The contradiction `DEC-083` declined to resolve six days from a graded demo. `labels.respondent` names Patient/Student/Guest as the respondent noun and `DEC-009` says respondents are **never users** — yet the demo seed gives all sixteen Riverside patients full `person` nodes **with user accounts and positions**, which is why they appear in a staff count at all. Either `DEC-009` means what it says and the seed is wrong, or respondents-as-people is a real second case `DEC-009` never covered and should be written down. Touches the seed, setup, and the demo org itself | **after M0** | `DEC-083` § not |
 | `OPEN-001` | Phase-3 Redux shape (`23` §4). Recommendation on file: RTK Query + hand-written slices | 15 Oct | nothing before P3 |
@@ -1660,9 +1702,9 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | id | What | Why | Repay by |
 |---|---|---|---|
 | ~~`D-037`~~ | ~~**`D-004`'s guard is bypassed by running vitest from the repo root**~~ | **REPAID 29 Aug.** Root `vitest.config.ts` now declares both workspaces as `projects`, so `npx vitest run` from the repo root runs each under its own config — the backend's `globalSetup`/`setupFiles` included. **Proved, not assumed**: the development database held 4 organisations before a root-launched `test/tiers.test.ts` and 4 after, and the run reported itself as `|@endur/api|` with `env: "test"` in every log line. The frontend project points at `src/frontend/vite.config.ts`, where its jsdom setup already lives — a second copy here is how the two would drift. `eslint.config.js` gained `allowDefaultProject` for the new file, which no tsconfig owns. **The advice to run from `src/backend` is withdrawn — the root command is now the correct one** | ~~before `T-045`~~ — **done** |
-| `D-038` | **The Setup wizard's redesign disagrees with its spec, and six tests are the evidence** | Found 29 Aug reviewing the branch. `Industry.tsx` was rebuilt as a split pane with a preview aside and `Review.tsx` took over the live vocabulary preview. Both are defensible and neither is recorded. Six `Setup.test.tsx` tests name what went: **the role chain and vocabulary pair on the card before any click** (the presenter's ten-second beat, `31` § step 1), **"Pick the closest one"** for an organisation nobody listed, **the step-4 live preview**, and the **`← Back` button**. A red test is not the problem here — the problem is that nobody chose. Either the tests move to the new design with a `DEC-` saying why the old affordances were not worth keeping, or the affordances come back. **Do not silently update the assertions**: three of the four are arguments `31` makes in prose | a decision, then one session either way |
-| `D-039` | **`<WordsEditor>` stopped saying which plurals are yours** | Found 29 Aug. The rebuild dropped the per-row hint that read `auto: Wings` or `your plural`, keeping only the reset button. The override state is now invisible until you notice an icon has appeared, and `Settings.test.tsx` fails on it. The new Singular/Plural header row is a real improvement and the `auto:` half is arguably redundant beside a filled field — but `your plural` was the only thing distinguishing a word the organisation chose from one the deriver guessed, which is the whole point of storing both (`22` §2) | with `D-038`, same decision |
-| `D-040` | **Operator MFA became a 6-hour code, with no `DEC-` and a red test left behind** | Found 29 Aug. `platform/totp.ts` moved `STEP_SECONDS` from 30 to `6 * 60 * 60` and `WINDOW` from 1 to 0. A second factor valid for a full shift is close to a static secret, and `19` §9 argues MFA is the one nicety not deferred **precisely because a stolen operator password exposes every tenant's plan data at once** — that doc was edited in the same window for `platform.revenue.read` and left untouched here. `platform.test.ts`'s window assertion fails consistently, three runs, not flaky. Either it gets a `DEC-` that states the demo-convenience trade out loud and the test is rewritten to the new rule, or it goes back to 30s and the demo reads a live code from `npm run ops:code` | **a decision, and it is a security posture** |
+| ~~`D-038`~~ | ~~**The Setup wizard's redesign disagrees with its spec, and six tests are the evidence**~~ | **RESOLVED 29 Aug, `DEC-085`, and the entry was wrong about one of the four.** Sorted by asking what each affordance was *for*. **`← Back` was never lost** — the button is present and accessible, the redesign replaced the literal arrow with an `<Icon>`, and three assertions were matching on decoration. **Restored**: *"Pick the closest one"* (one line of copy, and without it five cards read as an exhaustive list on the one screen whose subject is that the model does not care) and **step 4's live preview** (the step's lede claims these words appear throughout Endur and the preview is the only thing that proves it — the same `<DashboardPreview>` Review uses, not a fork). Review's role list also gets its arrow back: these are ordered levels, and `+` reads as a set. **Moved on the record**: the role chain and vocabulary pair live in step 1's aside rather than on every card. The aside shows strictly more and the cost is real and stated — presets are now compared serially, so a presenter wanting the side-by-side beat says the sentence instead of showing it. `31` § step 1 and § step 4 amended. **Setup.test.tsx 25/25** | ~~a decision, then one session either way~~ — **done** |
+| ~~`D-039`~~ | ~~**`<WordsEditor>` stopped saying which plurals are yours**~~ | **REPAID 29 Aug, `DEC-085`.** `your plural` is back on any row whose plural is not the derived one, shown to a read-only reader too — the hint explains why the plural is unusual; only the undo is a permission. **The `auto: Wings` half is deliberately not restored**: beside a filled field already reading `Wings` it repeats the field, and it is the override that needs saying | ~~with `D-038`~~ — **done** |
+| ~~`D-040`~~ | ~~**Operator MFA became a 6-hour code, with no `DEC-` and a red test left behind**~~ | **REPAID 29 Aug, `DEC-084`.** Back to `STEP_SECONDS = 30` and `WINDOW = 1`. The convenience bought was not re-reading a code at login, and `npm run ops:code -w @endur/api` already buys that in one command — paying for it in posture instead is paying more. **No doc amendment was needed**: `19` §9 already says *"±1 step of clock drift is accepted"*, which the branch had silently broken too, so this restores the doc rather than changing it. `platform.test.ts` 23/23 | ~~a decision, and it is a security posture~~ — **done** |
 | `D-041` | **`public.test.ts` flaked once under the root runner** | Found 29 Aug, the first root run after `D-037` was repaid: *"answers the same 404 for unknown, unlaunched, closed and expired tokens"* failed once and passed alone, and passed again on the next full root run. Both projects now start together, so the backend suite shares its one test database at a higher worker count than it ever did alone. **One occurrence is not a diagnosis** — if it returns, the answer is `fileParallelism` or a pool cap on the backend project, not a retry | watch it; act on the second occurrence |
 | ~~`D-035`~~ | ~~**Four `tsc -b` errors on the branch, none of them from a task**~~ | **REPAID 29 Aug.** All four were `exactOptionalPropertyTypes`, and all four were fixed by CONSTRUCTING THE KEY CONDITIONALLY rather than widening the target type — `...(body.at ? { at: body.at } : {})`, and `subject.unitId ? { kind: 'subject', unitId } : { kind: 'subject' }` twice. That direction is not a style preference: on `Target`, an ABSENT `unitId` is how the resolver says *org-wide*, so `unitId: undefined` and no `unitId` at all mean the same thing to JavaScript and different things to the type. Widening would have made the two indistinguishable everywhere, to fix three lines. **The fourth, in `Simulator.tsx`, was the same shape**: `<DecisionTrace>` documents an absent `considered` as *"this response carried no candidate list"* — a production 403 (`11` §10) — so it is spread in, not passed as `undefined`. **`capability: body.capability as never` is also gone**, and that was the real find: `SimulateBody.capability` was `z.string()` while `ResolveInput.capability` is `Capability`, and the cast bridged them. The DTO now `.refine(isCapability)`, which narrows the inferred type *and* changes behaviour — a misspelt capability is a 422 naming the field, where it used to resolve to a silent `no_grant` that the simulator rendered as *"No rule grants this"*: a real-looking answer to a question the system never understood. The narrowing then found a genuine third error — the page held `capability` as a bare `string`, in a file whose own header says the sentence must never be able to ask an invalid question. It is `Capability | ''` now, so the compiler keeps that rule instead of the comment. **`npm run build` passes** | ~~before any build-based demo~~ — **done** |
 | `D-036` | **`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing** | Found 26 Aug during `T-090` and **verified pre-existing on a stashed tree**. The backwards-pagination test asserts `page1.body.page.nextCursor` is truthy and gets a falsy value, meaning the fixture no longer produces more than one page — most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing rather than the reader being wrong. The reader itself is exercised live (a 775-line export and a 45-line filtered read both came back correct). Fix is to size the fixture past one chunk deliberately, not to relax the assertion | whoever next touches `72`'s reader |
@@ -1706,7 +1748,71 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-29 (latest) · the branch builds — `D-035` and `D-014` closed, and a stale `3`
+### 2026-08-29 (latest) · tier 2 — the three decisions nobody was making
+
+`DEC-084`, `DEC-085`, `DEC-086`. Nine red tests at the start of this session; **one at the
+end**, and the frontend suite is fully green for the first time. None of the nine was a bug.
+Every one was a decision somebody had deferred, and the tests were the only record.
+
+**`DEC-084` — operator TOTP goes back to 30 seconds, ±1 step.** A second factor valid for a
+full shift is close to a static secret: it survives a shoulder-glance, a screenshot and a
+terminal scrollback for the rest of the day, which leaves the password very nearly the only
+factor. `19` §9's whole argument for building MFA at all — when every other security nicety
+here is honestly deferred — is that one stolen operator password exposes **every tenant's**
+plan and revenue data at once. Keeping the 6-hour code was rejected on price, not principle:
+the convenience bought was not re-reading a code at login, and `npm run ops:code` buys that
+in one command. **No doc amendment was needed** — `19` §9 already said "±1 step of clock
+drift is accepted", which the branch had silently broken too.
+
+**`DEC-085` — the Setup wizard keeps its shape and gets back what it dropped by accident.**
+Sorted by asking what each affordance was *for*, which separated four things the debt had
+lumped together:
+
+- **`← Back` was never lost.** `D-038` was wrong about it. The button is present and
+  accessible; the redesign replaced the literal arrow with an `<Icon>` and three assertions
+  were matching on decoration.
+- **"Pick the closest one" is restored.** One line of copy, argued in `31`'s prose. Without
+  it five cards read as an exhaustive list, and a clinic or a charity sees no row for itself
+  on the one screen whose entire subject is that the model does not care.
+- **Step 4's live preview is restored.** The step's lede claims these words appear throughout
+  Endur; the preview is the only thing that proves it, and proving it on Review — two steps
+  after the reader stopped doubting — proves nothing. Same `<DashboardPreview>` Review uses.
+- **`your plural` is restored** (`D-039`). It was the only thing separating a word the
+  organisation chose from one the deriver guessed, which is why `22` §2 stores both.
+  `Staff / Staff` is the case that matters. The `auto: Wings` half is deliberately not back.
+- **The role chain on every card is the one real loss, and it is deliberate.** `31` put it
+  there so four organisations were legible side by side before a click. The aside shows one
+  preset at a time and shows strictly more of it. **The cost is that presets are now compared
+  serially** — a presenter wanting the side-by-side beat says the sentence instead of showing
+  it. `31` § step 1 and § step 4 amended.
+
+**`DEC-086` — the QR encodes the machine's LAN address.** Deferred 21 Aug and still deferred
+eight days later, which is what a decision looks like when nobody has to make it. In
+development only, a loopback `PUBLIC_BASE_URL` is rewritten to the host's LAN IPv4 with the
+port preserved and printed at boot; Vite now binds to the LAN, **because rewriting the URL
+without that produces an address that resolves and refuses the connection** — the same
+failure one layer down. Not a tunnel: no account, no third-party uptime, no key expiring
+mid-demo. Production and test are untouched.
+
+**`T-045` must still prove it on the demo machine.** Under WSL2 the address found inside WSL
+is the virtual adapter's (172.x), behind a NAT and **not reachable from a phone** — it will
+look configured and still fail. Either run the two dev servers from Windows, or add a `netsh
+interface portproxy` rule from the Windows host's wifi address. On Linux and macOS the
+detected address is the real one.
+
+**Checks:** typecheck 0 · lint 0 · drift clean · vocab 0 · `npm run build` passes ·
+tests **1 failed / 1406 passed** (was 9 / 1397). **Frontend 890/890.**
+
+**The one remaining failure is `D-036`** — `platform-logs.test.ts`'s backwards-pagination
+fixture drifted below the 64 KB chunk, so the test asserts nothing rather than the reader
+being wrong. Fix is to size the fixture past one chunk deliberately, never to relax the
+assertion.
+
+**The standing rule this session produced, worth keeping:** a test that disagrees with the
+code is a decision nobody made, not a chore. Assertions move only with a `DEC-` saying what
+was traded — never quietly to make a suite green.
+
+### 2026-08-29 · the branch builds — `D-035` and `D-014` closed, and a stale `3`
 
 Not a feature session. The owner asked for the open issues and then for the top tier of the
 answer, which was: **the branch does not build, and two of its red tests belong to no debt

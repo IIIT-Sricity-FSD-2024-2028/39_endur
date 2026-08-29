@@ -101,10 +101,32 @@ describe('step 1 — industry', () => {
     expect(screen.queryByRole('radiogroup')).toBeNull();
   });
 
-  it('shows the role chain and the vocabulary pair on the card, before any click', () => {
+  // DEC-085 MOVED THIS, and moved it knowingly. `31` § step 1 put the role chain and the
+  // vocabulary pair on EVERY card so four different organisations were legible side by
+  // side before a single click — the presenter's ten-second beat. The split pane shows one
+  // preset at a time and shows strictly MORE of it: all four roles as a chart, plus both
+  // terms in a full sentence, none of which fits on a card in a five-card grid.
+  //
+  // WHAT IS ASSERTED HERE IS THE PROPERTY, NOT THE PLACEMENT: step 1 tells you what a
+  // preset would actually do to your organisation, in this organisation's own words,
+  // BEFORE you commit to it. That was the point of the original and it still holds. The
+  // cost is real and is recorded in DEC-085: you now compare presets serially.
+  it('shows the role chain and the vocabulary pair for the preset under consideration', () => {
     mount();
-    expect(screen.getByText('Dean → Head → Tutor → Learner')).toBeTruthy();
-    expect(screen.getByText('Zblorn · Frimble')).toBeTruthy();
+    pick('University');
+    for (const role of ['Dean', 'Head', 'Tutor', 'Learner']) {
+      expect(screen.getByText(role)).toBeTruthy();
+    }
+    expect(screen.getByText('Zblorn')).toBeTruthy();
+    expect(screen.getByText('Frimble')).toBeTruthy();
+  });
+
+  it('says nothing about roles or words until a preset is under consideration', () => {
+    // The other half of the same decision: the aside is the ONLY place this now lives, so
+    // an empty aside must read as "pick one", never as "this preset has nothing in it".
+    mount();
+    expect(screen.queryByText('Dean')).toBeNull();
+    expect(screen.getByText(/Select an organization type/)).toBeTruthy();
   });
 
   it('carries the presenter\'s script for an organisation nobody listed', () => {
@@ -293,9 +315,9 @@ describe('the whole wizard', () => {
     // Step 5 shows it, and going back shows it still in the field.
     expect(screen.getByText(/Provost → Head → Tutor → Learner/)).toBeTruthy();
 
-    clickButton('← Back');
-    clickButton('← Back');
-    clickButton('← Back');
+    clickButton('Back');
+    clickButton('Back');
+    clickButton('Back');
     expect(screen.getAllByLabelText<HTMLInputElement>('Role name')[0]?.value).toBe('Provost');
   });
 
@@ -351,7 +373,7 @@ describe('the whole wizard', () => {
     const inputs = screen.getAllByLabelText('Role name');
     fireEvent.change(inputs[0]!, { target: { value: 'Provost' } });
     fireEvent.blur(inputs[0]!);
-    clickButton('← Back');
+    clickButton('Back');
 
     pick('Hotel');
     const dialog = screen.getByRole('alertdialog');
@@ -376,7 +398,7 @@ describe('the whole wizard', () => {
     const inputs = screen.getAllByLabelText('Role name');
     fireEvent.change(inputs[0]!, { target: { value: 'Provost' } });
     fireEvent.blur(inputs[0]!);
-    clickButton('← Back');
+    clickButton('Back');
     pick('Hotel');
 
     expect(screen.getByRole('alertdialog')).toBeTruthy();
