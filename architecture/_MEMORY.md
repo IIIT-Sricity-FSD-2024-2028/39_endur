@@ -1904,6 +1904,142 @@ DEC-086  ACTIVE  2026-08-29  origin:claude  closes:OPEN-002  task:T-043
            src/frontend/vite.config.ts, ShareSheet.tsx `isUnscannable()`
 ```
 
+```
+DEC-087  ACTIVE  2026-08-29  origin:claude  confirms:INV-001  task:T-091
+  decision "POLL", "SUGGESTION BOX", "ANNOUNCEMENT", "BOOKING" AND "SLOT" ARE STRUCTURAL
+           PRODUCT WORDS, NOT DOMAIN NOUNS. they stay literal in the UI, in the same class
+           as Save, Settings, Template and Question (INV-001 § exempt).
+  why      INV-001 exists so that a hotel is never shown a university's vocabulary. it does
+           not exist to make every noun configurable. a hotel does not rename "Poll" any
+           more than it renames "Save" -- these words name ENDUR'S OWN FURNITURE, and a
+           label for each would be a setting nobody would ever change and one more thing
+           the vocabulary editor has to explain.
+  where    every noun INSIDE those surfaces still resolves through useLabels(): a booking is
+           for a `subject`, an announcement reaches a `unit`, a poll is a `campaign`. the
+           test is whose word it is -- ours or the organisation's.
+  not      NOT an exemption for the new directories in audit:vocab. the script's exclusion
+           list stays at pages/platform and components/platform; these words pass because
+           they are on INV-001's exempt list, not because their folder is skipped.
+  see      INV-001, DEC-088, 22 §2, scripts/audit-vocab.mjs
+```
+
+```
+DEC-088  ACTIVE  2026-08-29  origin:user  extends:DEC-010  task:T-091, T-092
+  decision A POLL AND A SUGGESTION BOX ARE CAMPAIGNS, NOT ENTITIES. what separates them
+           from a feedback campaign is the TEMPLATE'S `category` ('Poll', 'Suggestion box')
+           plus questionCount === 1. no new question kind, no new table, no new column, and
+           NO `type` COLUMN ON `campaigns`, ever.
+  why      DEC-010 froze the six question kinds and dto/template.ts already states the
+           consequence -- "a poll is a one-question template; there is no poll entity and
+           there never will be". this entry extends that reasoning from QUESTIONS to
+           PRODUCTS: the engine (template -> campaign -> token -> k-anonymised results) is
+           already generic, and what the demo lacked was a second way to PRESENT it, not a
+           second engine underneath it.
+  cost     a poll is told apart from a feedback form by data rather than by schema, so a
+           reader who edits the category loses the distinction. accepted: the distinction is
+           presentational, and the alternative is a discriminator column that every query,
+           every DTO and every screen has to learn.
+  see      DEC-010, DEC-089, packages/shared/src/dto/template.ts, 36
+```
+
+```
+DEC-089  ACTIVE  2026-08-29  origin:claude  task:T-091
+  decision QUICK-CREATE IS ONE SERVER TRANSACTION, NOT FOUR CLIENT CALLS. POST
+           /campaigns/quick composes template -> question -> subject -> campaign -> launch
+           in a single service, guarded by requireCapability('campaign.launch').
+  why      composed in the browser it is four round trips that can half-fail. the failure
+           lands on stage: an orphan template, or a campaign with no token and a QR code
+           that never appears. one transaction either produces a launched campaign or
+           produces nothing.
+  where    the capability is `campaign.launch` -- the STRICTLY MOST PRIVILEGED verb in the
+           sequence -- and not the union of the four. a caller who may launch may also
+           create; the reverse is not true, so gating on the strongest verb is the only
+           gate that cannot be walked around by composing the endpoint out of its parts.
+  not      NOT a relaxation of CreateCampaignBody's `subjectIds.min(1)`. a poll has no
+           reviewee, so quickCreate finds-or-creates a PER-ORG SINGLETON SUBJECT named after
+           the organisation with `type: 'organisation'` and reuses it. a campaign with no
+           subject would break the subject grouping every results screen assumes.
+  see      DEC-088, DEC-016, DEC-017, 13 § Campaigns,
+           src/backend/features/campaigns/service.ts `quickCreate`
+```
+
+```
+DEC-090  ACTIVE  2026-08-30  origin:user  task:T-095  guards:INV-006
+  decision BOOKINGS ARE IDENTIFIED AND LIVE IN THEIR OWN TABLES. RESPONSES ARE ANONYMOUS
+           AND LIVE IN THEIRS. THE TWO MUST NEVER JOIN. a booking carries a name and an
+           email; there is no responseId on a booking, no bookingId on a response, no
+           shared table, and no query in features/booking/ that reads `responses`.
+  why      a booking that cannot be honoured is not a booking, so the booker has to be
+           reachable -- this is the FIRST identified non-staff data in the product. that is
+           a different privacy contract from a response, which names nobody and never will.
+           routing bookings through `responses` to reuse the respondent plumbing would have
+           been one migration away from undoing the whole privacy architecture: INV-006 is
+           kept by that table having no respondent column, and it dies not by somebody
+           deleting the promise but by a second identified table being joinable to it.
+  where    three tables of its own -- bookables, slots, bookings -- and a public token on
+           its own route tree entry (/book/:token) rather than on /r/:token. the public
+           payload carries REMAINING places and omits capacity and every name (13 §6): a
+           link that tells a stranger who is coming on tuesday is a worse leak than
+           anything the campaign payload could make.
+  not      NOT enforced by review. `booking.test.ts` greps every file in features/booking/
+           for the word, comments stripped, so the rule survives somebody who never read
+           the header comment. the header comment says so too, the way inbox/service.ts
+           states its own version.
+  see      INV-006, DEC-009, DEC-017, 13 § Booking, 10 § Bookable/Slot/Booking,
+           src/backend/features/booking/service.ts
+```
+
+```
+DEC-092  ACTIVE  2026-08-30  origin:claude  task:T-095
+  decision THE SLOT ROW LOCK IS THE CAPACITY MECHANISM, AND IT RUNS AT READ COMMITTED --
+           `SELECT id FROM slots WHERE id = $1 FOR UPDATE` first, count second, insert
+           third, all inside one transaction with NO isolationLevel override.
+  why      counting before locking is the bug the feature exists to avoid: two phones
+           taking the last place both read `capacity - 1`, both pass the check, and the
+           room is double-booked in front of the evaluator. locking the SLOT and not the
+           table keeps the serialisation to the one row that is contended -- two different
+           slots never wait on each other.
+  where    the raw SQL lives in db/graph.ts as `lockSlot(tx, slotId)`, because DEC-007
+           confines $queryRaw to that file and prisma has no expression for FOR UPDATE. the
+           exemption stays one file wide; a second would make the lint rule a formality.
+  not      NOT paired with isolationLevel: 'Serializable'. it was written that way on a
+           belt-and-braces argument and THE CONCURRENCY TEST REFUSED IT: on a capacity-2
+           slot one of the two rightful winners came back 40001 `could not serialize
+           access` instead of 201. postgres SSI reads the count(*) behind the lock as a
+           predicate read conflicting with the other transaction's insert, and aborts one
+           of them -- although FOR UPDATE had already made the two strictly sequential and
+           neither was going to overfill anything. the isolation level added no safety and
+           converted a correct booking into a 500. the lock and serializable are
+           ALTERNATIVES; taking both turns away a caller who did nothing wrong.
+  see      DEC-007, 13 § Booking, src/backend/db/graph.ts `lockSlot`,
+           src/backend/test/booking.test.ts "exactly N of N+1"
+```
+
+```
+DEC-091  ACTIVE  2026-08-30  origin:user  task:T-093, T-094, T-095
+  decision THE TIER LADDER GETS A THIRD RUNG THAT GATES A FEATURE RATHER THAN A REPORT.
+           announcements are SILVER, booking is GOLD, and polls and the suggestion box are
+           free at EVERY tier by construction -- they add no capability at all, so there is
+           nothing for an entitlement to gate.
+  why      before this, every paid rung bought ANALYSIS -- a deeper reading of data the
+           customer already had. a rung that buys a WRITE PATH is the first one where the
+           402 is visible to somebody who is not reading a chart, and phase 1 is graded on
+           the middleware chain being visible.
+  where    the console shows a tier the organisation lacks as an ENABLED card with a chip
+           that lands on /app/plan, never as a disabled one: a tier is something you can
+           buy, and hiding it sells nothing. a missing CAPABILITY is the opposite -- the
+           card is disabled with the reason. capability first, tier second, matching the
+           chain's own order (requireCapability then requireEntitlement, app.ts:108-113):
+           403 outranks 402, and telling somebody to buy an upgrade for something they
+           would still be refused is the wrong answer twice.
+  not      NOT the entitlement map moving to the browser. the client compares the LADDER'S
+           ORDER, which is public and advertised on /app/plan; TIER_ENTITLEMENTS stays on
+           the server and requireEntitlement still decides (INV-003). an UNKNOWN tier --
+           loading, or a failed /billing -- sells nothing rather than guessing bronze.
+  see      DEC-048, DEC-080, 16 §2, src/backend/billing/entitlements.ts,
+           src/frontend/pages/console/Start/index.tsx `laneState`
+```
+
 ---
 
 ## INV — invariants
@@ -2013,6 +2149,13 @@ CONF-006  scope breadth. SCOPE.md describes communities, announcements, voting, 
   delivery. BUILD_PLAN_EVAL1.md §4 declares them out.
   RESOLVED -> out for P1/P2. P3 stretch at best. they appear in the sidebar DISABLED with a
   "Soon" tag (design_specs/design/02 §7) and nowhere else. no stub pages.
+  AMENDED 2026-08-30, T-094. ONE QUARTER OF "announcements" CAME IN AT P2 and the rest did
+  not. what was built is a notice with an AudienceRule and a read receipt -- two tables and
+  NO new concept, because the org graph already answers "who is in Housekeeping" and 38's
+  resolver already asks it. what stays out is what this conflict was actually about: NAMED
+  self-maintaining groups (60), multichannel delivery (63), voting, communities. the line
+  the amendment draws is "does it need an idea we do not have yet", not "is it in the
+  Communicate layer". see 61 and DEC-091.
 
 CONF-007  root docs (README.md, definitions.yaml, DomainExpertInteraction.md, SRS.pdf)
   describe the education-only v1 scope.
@@ -2888,6 +3031,47 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     features/results/service.ts, and 40 owns them -- 58 is
                                     the second CALLER, not a second owner (INV-009).
                                     <ScoreBadge> is 24's, built here. CONF-022.
+61-FEATURE-announcements.md      -> src/backend/features/announcements/**  (BUILT T-094)
+                                    src/frontend/pages/console/Announcements/**
+                                    src/frontend/lib/announcements.ts
+                                    packages/shared/src/dto/announcement.ts
+                                    src/frontend/components/org/AnnouncementBanner.tsx (24's)
+                                    NOTE the AUDIENCE resolver is 38/40's, in
+                                    features/campaigns/audience.ts, and 61 is the second
+                                    CALLER and not a second owner -- the same relationship
+                                    58 has with 40's readComments (INV-009). audienceUsers()
+                                    and positionFilter() live there; do NOT write a second
+                                    subtree walk here, or "everyone in Housekeeping" means
+                                    two different sets on two screens.
+                                    NOTE announcement_receipts is IDENTIFIED and that is
+                                    deliberate -- these are staff `users` rows. INV-006 is
+                                    about `responses`, and no query in this feature reads
+                                    that table or holds a column that could join it.
+13-API-CONTRACT.md § Booking      -> src/backend/features/booking/**       (BUILT T-095)
+                                    src/frontend/pages/console/Booking/**
+                                    src/frontend/pages/respond/Book.tsx
+                                    src/frontend/lib/booking.ts
+                                    packages/shared/src/dto/booking.ts
+                                    src/frontend/components/data/SlotGrid.tsx (24's)
+                                    NO FEATURE DOC OF ITS OWN. 13 § Booking is the
+                                    contract, 11 §3 the capabilities, 24 the component,
+                                    50 §1 the seeded grants -- booking arrived through
+                                    Mithil/plan.md rather than through a numbered spec,
+                                    and inventing 64-FEATURE-booking.md after the fact
+                                    would have created a doc nothing else references.
+                                    NOTE the PUBLIC half lives on features/public/router.ts
+                                    and features/public/resolve.ts -- 39's files -- so the
+                                    booking routes inherit the ONE PUBLIC_ROUTES exemption
+                                    13 §6 already justifies. 39 owns them; this feature is
+                                    the second CALLER, not a second owner (INV-009).
+                                    NOTE the TOKEN generator is 38's, in
+                                    features/campaigns/token.ts. do NOT write a second one.
+                                    NOTE the ROW LOCK is in db/graph.ts (`lockSlot`) --
+                                    DEC-007 confines $queryRaw to that file, and DEC-092
+                                    explains why it is not paired with Serializable.
+                                    NOTE `bookings` is IDENTIFIED and that is the POINT
+                                    (DEC-090). it must never join `responses`; a grep test
+                                    in booking.test.ts holds the line.
 72-PAGE-platform-logs.md         -> src/backend/platform/logs/**
                                     src/frontend/pages/platform/Logs/**
                                     NOTE reads lib/logFile.ts's OUTPUT. 18 owns what is

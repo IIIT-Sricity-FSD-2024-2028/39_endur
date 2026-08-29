@@ -90,6 +90,15 @@ file must agree (`DRIFT-004`).
 | | `actionplan.create` `actionplan.read` | | P2 |
 | | `checkin.create` `checkin.read` | | P2 |
 | **Analyze** | `analysis.read` | Built `T-081`/`T-082`, 25 Aug — **P2 since `DEC-077`** | P2 |
+| **Announcements** | `announcement.read` | Built `T-094`. What was sent to me. **Bronze**, so a downgraded organisation still reads what it was already sent (`16` §7) | P2 |
+| | `announcement.create` | Draft. **Silver** | P2 |
+| | `announcement.publish` | **A separate verb, deliberately.** Drafting is not broadcasting, and an organisation should be able to let a coordinator write a notice without letting them reach everybody with it. **Silver** | P2 |
+| | `announcement.delete` | **Silver** | P2 |
+| **Booking** | `booking.read` | Built `T-095`. Bookables, their slots, and who has booked. **Gold** | P2 |
+| | `booking.create` | A bookable and its slots. **Gold** | P2 |
+| | `booking.update` | Edit it, replace its slots, open the public link, close it. **Gold** | P2 |
+| | `booking.delete` | **Gold** | P2 |
+| | `booking.cancel` | **A separate verb, deliberately.** It reaches into a decision somebody else made and takes it back; an organisation should be able to let a receptionist add a slot without letting them cancel a guest's appointment. **Gold** | P2 |
 
 Naming rule: `<object>.<verb>`, lowercase, singular object. A page doc may not use a string
 absent from this table — add it here first (`README.md` ground rule 3).

@@ -24,9 +24,11 @@ import { StatCard } from '../../../components/data/StatCard.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
 import { Icon } from '../../../components/Icon.js';
+import { AnnouncementBanner, unreadFor } from '../../../components/org/AnnouncementBanner.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useHome } from '../../../lib/home.js';
+import { markAnnouncementRead, useAnnouncements } from '../../../lib/announcements.js';
 import { useAppSelector } from '../../../store/index.js';
 import { RANGE_LABEL, promptCopy, statCards } from './cards.js';
 import { CampaignCard } from './CampaignCard.js';
@@ -43,6 +45,17 @@ export default function Home(): JSX.Element {
   const [range, setRange] = useState<StatWindow>('30d');
   const home = useHome(range);
   const [sharing, setSharing] = useState<Campaign | null>(null);
+  /**
+   * T-094. Unread announcements, at the top of the first screen after sign-in — which is
+   * where a notice has to be if it is going to be read at all.
+   *
+   * Fetched only when the reader holds `announcement.read`. It is seeded to every role
+   * (50 §1), so this is about an explicit deny rather than the ordinary case; the hook
+   * treats a 403 as an empty list either way.
+   */
+  const announcements = useAnnouncements(can('announcement.read'));
+  /** Dismissed optimistically: the receipt write is a 204 with nothing to wait for. */
+  const [dismissed, setDismissed] = useState<string[]>([]);
 
   const view = home.data;
   const orgName = org?.name ?? 'Your organisation';
@@ -103,6 +116,19 @@ export default function Home(): JSX.Element {
           Could not refresh just now. These numbers are from the last successful load.
         </p>
       )}
+
+      {/* Above everything, INCLUDING the "nothing assigned to you yet" state — somebody
+          with no campaigns and no comments is exactly the person an announcement is for. */}
+      <AnnouncementBanner
+        items={unreadFor(announcements.rows.filter((row) => !dismissed.includes(row.id)))}
+        onDismiss={(id) => {
+          setDismissed((current) => [...current, id]);
+          // Swallowed: the banner is already gone, and an error toast for a receipt the
+          // reader did not ask to write would report our problem as theirs. It comes back
+          // on the next load if the write really failed.
+          void markAnnouncementRead(id).catch(() => undefined);
+        }}
+      />
 
       {readsNothing ? (
         <EmptyState

@@ -5,11 +5,13 @@ import {
   CampaignIdDto,
   CampaignListDto,
   CreateCampaignDto,
+  QuickCampaignDto,
   UpdateCampaignDto,
 } from '@endur/shared';
 import type {
   CampaignListQuery,
   CreateCampaignBody,
+  QuickCampaignBody,
   UpdateCampaignBody,
 } from '@endur/shared';
 import { validate } from '../../middleware/validate.js';
@@ -23,6 +25,7 @@ import {
   createCampaign,
   launchCampaign,
   listCampaigns,
+  quickCreate,
   readCampaign,
   updateCampaign,
 } from './service.js';
@@ -51,6 +54,33 @@ campaignsRouter.get(
     void Promise.resolve()
       .then(() => listCampaigns(req.ctx.orgId as string, userOf(req), version(req), query))
       .then((page) => res.json(page))
+      .catch(next);
+  },
+);
+
+// A poll or a suggestion box: template, question, campaign and token in ONE transaction
+// (DEC-088, DEC-089).
+//
+// REGISTERED BEFORE `/:id` AND BEFORE `POST /`, because Express matches in order and
+// `quick` would otherwise be read as a campaign id — the same ordering `templatesRouter`
+// applies to `/library`.
+//
+// Gated on `campaign.launch` and not on the union of the four verbs it performs. It is the
+// strictly most privileged one here: whoever may launch may also create, and gating on
+// anything weaker would let this endpoint be a way around the launch check.
+campaignsRouter.post(
+  '/quick',
+  authenticate,
+  validate(QuickCampaignDto),
+  requireCapability('campaign.launch', { target: 'any' }),
+  // Mints a public token, so the same rule as launch: a double-click on stage must not
+  // produce two links (13 §7).
+  idempotent('campaign.quick'),
+  (req, res, next) => {
+    const { body } = req.data as { body: QuickCampaignBody };
+    void Promise.resolve()
+      .then(() => quickCreate(req, req.ctx.orgId as string, userOf(req), body))
+      .then((campaign) => res.status(201).json({ data: campaign }))
       .catch(next);
   },
 );

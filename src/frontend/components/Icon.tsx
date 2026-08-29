@@ -19,6 +19,7 @@ import {
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
   GraduationCap, Building, HeartPulse, Layers,
+  Rocket, Megaphone, CalendarClock,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -93,6 +94,13 @@ const ICONS = {
   // product (DEC-035), and a payment glyph would promise a checkout that does not exist.
   // What a tier actually is here is a stack — each one carries everything under it.
   plan: Layers,
+  // T-093. The start gallery, and the two surfaces it advertises before they exist. One
+  // icon per concept (rule 2): `start` is NOT `add` — the gallery is a place to choose
+  // from, not a button that creates a row — and `announcement` is NOT `unread`, which is
+  // the inbox's envelope-it-again action.
+  start: Rocket,
+  announcement: Megaphone,
+  booking: CalendarClock,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

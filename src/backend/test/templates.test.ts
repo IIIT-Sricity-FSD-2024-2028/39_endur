@@ -31,11 +31,15 @@ describe('templates', () => {
       questionCount: number;
       estimatedSeconds: number;
     }>;
+    // Six since T-093 added a Poll and a Suggestion box seed to every preset, so the start
+    // gallery is never empty and a university's poll is not a hotel's.
     expect(templates.map((template) => template.name).sort()).toEqual([
       'Course feedback',
       'Facilities pulse',
       'Quick pulse',
+      'Room poll',
       'Semester review',
+      'Suggestion box',
     ]);
     // Both derived, never entered by hand. A card showing a hand-typed question count
     // drifts from the form the moment anybody edits it (36).

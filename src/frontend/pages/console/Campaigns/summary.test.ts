@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { CampaignSummary } from '@endur/shared';
 import { summarise, type SummaryInput } from './summary.js';
 import { closeConsequence } from './summary-close.js';
-import { timing } from './index.js';
+import { suppressionNote, timing } from './index.js';
 import { autoName } from './New.js';
 
 const WORD = { one: 'Quaxel', many: 'Quaxels' };
@@ -109,6 +109,7 @@ describe('closeConsequence — the real number, and what is KEPT', () => {
 describe('timing — the line that makes a card feel live', () => {
   const campaign = (over: Partial<CampaignSummary>): CampaignSummary => ({
     id: 'c1', name: 'x', status: 'open', templateId: 't1', templateName: 'f',
+    templateCategory: 'Course feedback', resultsThreshold: 5,
     subjectCount: 1, responseCount: 0, anonymous: true, access: 'public',
     startsAt: null, endsAt: null, closedAt: null, publicToken: null, url: null,
     createdAt: '2026-01-01T00:00:00.000Z', ...over,
@@ -162,5 +163,39 @@ describe('the summary restates BOTH irreversible choices — DEC-037', () => {
   it('keeps both facts, in the order they were chosen', () => {
     expect(summarise(input({ anonymous: false, access: 'organization' })).window)
       .toMatch(/not anonymous · restricted$/);
+  });
+});
+
+describe('suppressionNote — the k-anonymity gate, explained before it looks broken (T-092)', () => {
+  const quick = (over: Partial<CampaignSummary>): CampaignSummary => ({
+    id: 'c1', name: 'x', status: 'open', templateId: 't1', templateName: 'f',
+    templateCategory: 'Suggestion box', resultsThreshold: 5,
+    subjectCount: 1, responseCount: 0, anonymous: true, access: 'public',
+    startsAt: null, endsAt: null, closedAt: null, publicToken: 'K4M9X2PQ',
+    url: 'https://x.test/r/K4M9X2PQ', createdAt: '2026-01-01T00:00:00.000Z', ...over,
+  });
+
+  it('names the threshold and the count while the box is below it', () => {
+    // The demo's second minute: two answers in, nothing on screen, and this is the only
+    // thing standing between that and looking like a bug.
+    expect(suppressionNote(quick({ responseCount: 2 }))).toBe(
+      'Answers appear once 5 people have responded. 2 so far.',
+    );
+  });
+
+  it('uses the number the SERVER sent, never a hardcoded 5', () => {
+    expect(suppressionNote(quick({ responseCount: 2, resultsThreshold: 8 }))).toContain('8 people');
+  });
+
+  it('says nothing once the threshold is reached', () => {
+    expect(suppressionNote(quick({ responseCount: 5 }))).toBeNull();
+  });
+
+  it('says nothing on a feedback round, which explains itself on the Results page', () => {
+    expect(suppressionNote(quick({ templateCategory: 'Course feedback' }))).toBeNull();
+  });
+
+  it('says nothing on a draft, which has collected nothing on purpose', () => {
+    expect(suppressionNote(quick({ status: 'draft', publicToken: null, url: null }))).toBeNull();
   });
 });

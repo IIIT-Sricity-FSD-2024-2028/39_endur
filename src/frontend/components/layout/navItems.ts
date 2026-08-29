@@ -71,10 +71,37 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     { to: '/app/subjects', label: labels.subject.many, icon: 'subject', group: 'organize',
       needs: 'subject.read' },
 
+    // T-093. FIRST in the group and gated on nothing: the gallery is five cards that each
+    // gate themselves, and the one screen where the whole product is visible at once must
+    // not be the one screen somebody has to be told about.
+    { to: '/app/start', label: 'Start', icon: 'start', group: 'collect' },
     { to: '/app/templates', label: 'Templates', icon: 'template', group: 'collect',
       needs: 'template.read' },
     { to: '/app/campaigns', label: labels.campaign.many, icon: 'campaign', group: 'collect',
       needs: 'campaign.read' },
+
+    // T-096, and both items are in `collect` for the reason `/app/start` puts all five lanes
+    // on one screen: they are ways of asking a group for something. An announcement asks for
+    // attention and a bookable asks for a commitment, and neither belongs in Organize (which
+    // is the org graph) or Understand (which is what came back).
+    //
+    // `announcement.read` IS SEEDED TO EVERY LEVEL (`50` §1), so this item appears for
+    // everybody — deliberately. Being sent a notice is not a permission anybody should have
+    // to be given, and the page shows what was sent to the reader whether or not they can
+    // write one. No `minScope`: the matrix grants it at `all` or not at all.
+    { to: '/app/announcements', label: 'Announcements', icon: 'announcement', group: 'collect',
+      needs: 'announcement.read' },
+    // `booking.read`, and NOT GATED ON THE TIER — the same posture Analysis takes one group
+    // down, and for the same two reasons. A Gold-only surface shown to a Bronze organisation
+    // lands on a page with a 402 and an upgrade card, which is the demonstration `43` exists
+    // for; hiding the item would replace that with an absence nobody can ask a question
+    // about. And the client is the wrong place to decide an entitlement at all — it never
+    // receives the map (`packages/shared/src/tiers.ts`).
+    //
+    // No `minScope`: `booking.read` is seeded `all` at L1-L3 and nothing at L4 (`50` §1), so
+    // there is no narrow hold that would open an empty page (`DEC-051`).
+    { to: '/app/booking', label: 'Booking', icon: 'booking', group: 'collect',
+      needs: 'booking.read' },
 
     // Un-disabled by T-082 — the last edit of that task, never a task of its own.
     //

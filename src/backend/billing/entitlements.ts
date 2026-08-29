@@ -44,9 +44,25 @@ const bronze = expand([
   'group.*', 'delegation.*', 'subject.*', 'template.*', 'campaign.*',
   'account.*', 'billing.*',
   'response.read', 'results.read', 'simulator.run',
+  // T-094. READ IS IN BRONZE AND THE REST IS NOT, and the split is the downgrade rule
+  // (16 §7): a downgrade retains data and never deletes, so an organisation that drops to
+  // bronze must still be able to READ the announcements it was already sent. What it loses
+  // is the ability to write and send new ones.
+  'announcement.read',
 ]);
-const silver = [...bronze, ...expand(['analysis.read', 'results.export', 'response.export'])];
-const gold = [...silver, ...expand(['reflection.*', 'actionplan.*', 'checkin.*'])];
+const silver = [
+  ...bronze,
+  ...expand(['analysis.read', 'results.export', 'response.export', 'announcement.*']),
+];
+// T-095. `booking.*` joins GOLD, and unlike `announcement.*` NOTHING of it stays in bronze.
+// The downgrade rule (16 §7) is that data is retained, never deleted — and it is: a
+// downgraded organisation's bookables, slots and bookings all survive, and the PUBLIC picker
+// keeps answering, because a guest holding a link did not choose the plan (16 §6, the same
+// rule that keeps a suspended org's QR code alive). What the staff lose is the console.
+const gold = [
+  ...silver,
+  ...expand(['reflection.*', 'actionplan.*', 'checkin.*', 'booking.*']),
+];
 const enterprise = [...gold, ...expand(['audit.read', 'apikey.*'])];
 
 export const TIER_ENTITLEMENTS: Record<Tier, ReadonlySet<Capability>> = {

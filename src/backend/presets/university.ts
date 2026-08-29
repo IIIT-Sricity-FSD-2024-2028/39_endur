@@ -31,6 +31,26 @@ export const university: Preset = {
     campaign: { one: 'Feedback cycle', many: 'Feedback cycles' },
   },
   templates: [
+    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
+    // empty and each industry's example reads as its own — a hotel poll is not a university
+    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
+    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    {
+      name: 'Room poll',
+      category: 'Poll',
+      description: 'One question, asked of a hall that is already sitting down.',
+      questions: [
+        single('How was the pace of this session?', ['Too slow', 'About right', 'Too fast']),
+      ],
+    },
+    {
+      name: 'Suggestion box',
+      category: 'Suggestion box',
+      description: 'One open question, answered anonymously and read in the Inbox.',
+      questions: [
+        text_('What should we change about how this is taught?', 'One thing'),
+      ],
+    },
     {
       name: 'Course feedback',
       category: 'Teaching',

@@ -591,6 +591,95 @@ export async function seedOrg(
     });
   }
 
+  // 7b · T-096. ONE PUBLISHED ANNOUNCEMENT AND ONE OPEN BOOKABLE, on the orgs whose tier
+  //      actually buys them. A silver org gets the announcement; a gold or enterprise org
+  //      gets both. Seeding a gold feature onto the bronze org would put a row on a screen
+  //      that answers 402 — the demo would show a bookable nobody in that organisation can
+  //      open, which teaches the opposite of what the tier ladder is there to teach.
+  const tierRank = ['bronze', 'silver', 'gold', 'enterprise'].indexOf(spec.tier);
+
+  if (tierRank >= 1) {
+    // Published, with RECEIPTS FOR EVERY MEMBER OF STAFF — written here exactly as
+    // `publishAnnouncement` writes them, because the number that makes the feature worth
+    // looking at is a fraction and a fraction needs a denominator (13 § Announcements).
+    const announcement = await prisma.announcement.create({
+      data: {
+        orgId,
+        title: 'Fire drill on Friday',
+        body: 'Everybody out by the north stair at 11:00. It should take about ten minutes.',
+        audienceRule: { kind: 'anyone' },
+        createdById: adminUserId,
+        publishedAt: new Date(Date.now() - 2 * DAY),
+      },
+      select: { id: true },
+    });
+    await prisma.announcementReceipt.createMany({
+      data: staffUserIds.map((userId, index) => ({
+        announcementId: announcement.id,
+        userId,
+        // A THIRD OF THEM HAVE READ IT. Nought of forty reads as broken and forty of forty
+        // reads as fake; a real fraction is the only one that looks like a working product.
+        // The admin is NOT among them, so their own banner is unread when they sign in and
+        // the feature is visible on Home without navigating to it.
+        readAt: index > 0 && index % 3 === 0 ? new Date(Date.now() - DAY) : null,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  if (tierRank >= 2) {
+    // The bookable, open, with THREE SLOTS AND THE MIDDLE ONE NEARLY FULL. That last part
+    // is the whole reason this is seeded rather than created on stage: "1 left" is the state
+    // the capacity work exists to produce, and waiting for four volunteers to book from the
+    // audience is not a demo, it is a queue.
+    const firstSubjectId = [...subjectIds.values()][0] as string;
+    const bookable = await prisma.bookable.create({
+      data: {
+        orgId,
+        name: 'Consultation slots',
+        description: 'Fifteen minutes each. Pick a time that suits you.',
+        subjectId: firstSubjectId,
+        publicToken: mintToken(),
+      },
+      select: { id: true },
+    });
+
+    const base = new Date();
+    base.setHours(10, 0, 0, 0);
+    base.setTime(base.getTime() + DAY);
+    const slots = await Promise.all(
+      [0, 1, 2].map((index) =>
+        prisma.slot.create({
+          data: {
+            bookableId: bookable.id,
+            startsAt: new Date(base.getTime() + index * 60 * 60 * 1000),
+            endsAt: new Date(base.getTime() + index * 60 * 60 * 1000 + 45 * 60 * 1000),
+            capacity: index === 1 ? 3 : 2,
+          },
+          select: { id: true },
+        }),
+      ),
+    );
+
+    // Two of the middle slot's three places taken, so it renders "1 left" the moment the
+    // page loads. Names and emails are fixtures and identified ON PURPOSE — a booking is a
+    // different privacy contract from a response (DEC-090), and the seed is where that
+    // difference first becomes visible on screen.
+    const takers = [
+      { slot: 1, name: 'Asha Nair', email: 'asha.nair@example.test' },
+      { slot: 1, name: 'Daniel Okafor', email: 'daniel.okafor@example.test' },
+      { slot: 0, name: 'Wei Zhang', email: 'wei.zhang@example.test' },
+    ];
+    await prisma.booking.createMany({
+      data: takers.map((taker) => ({
+        slotId: slots[taker.slot]?.id as string,
+        name: taker.name,
+        email: taker.email,
+        cancelToken: mintToken(),
+      })),
+    });
+  }
+
   // 8 · the activity log. Written directly rather than earned through the middleware,
   //     because a seed run does not make real requests — but `56`'s reader does not care
   //     how a row got there, only that it is shaped like one `requireCapability` would have

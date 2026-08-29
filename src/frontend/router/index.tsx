@@ -23,6 +23,10 @@ const Start = lazy(() => import('../pages/public/Start.js'));
 const Activate = lazy(() => import('../pages/public/Activate.js'));
 
 const Home = lazy(() => import('../pages/console/Home/index.js'));
+// `ConsoleStart`, not `Start` — `/start` in the public tree is the sign-up flow and this
+// is the console's gallery (`T-093`). Two different screens, and the day they share an
+// identifier is the day one of them is imported into the wrong tree.
+const ConsoleStart = lazy(() => import('../pages/console/Start/index.js'));
 const Setup = lazy(() => import('../pages/console/Setup/index.js'));
 const Structure = lazy(() => import('../pages/console/Structure/index.js'));
 const Roles = lazy(() => import('../pages/console/Roles/index.js'));
@@ -39,6 +43,9 @@ const CampaignNew = lazy(() => import('../pages/console/Campaigns/New.js'));
 const CampaignDetail = lazy(() => import('../pages/console/Campaigns/Detail.js'));
 const Results = lazy(() => import('../pages/console/Results/index.js'));
 const Inbox = lazy(() => import('../pages/console/Inbox/index.js'));
+const Announcements = lazy(() => import('../pages/console/Announcements/index.js'));
+const Booking = lazy(() => import('../pages/console/Booking/index.js'));
+const BookingDetail = lazy(() => import('../pages/console/Booking/Detail.js'));
 const Analysis = lazy(() => import('../pages/console/Analysis/index.js'));
 const Reflect = lazy(() => import('../pages/console/Reflect/index.js'));
 const Logs = lazy(() => import('../pages/console/Logs/index.js'));
@@ -48,6 +55,10 @@ const Settings = lazy(() => import('../pages/console/Settings.js'));
 const Plan = lazy(() => import('../pages/console/Plan/index.js'));
 
 const Fill = lazy(() => import('../pages/respond/Fill.js'));
+// `T-095`. IN THE RESPONDENT TREE, not a fifth one: a booking link has every property that
+// tree exists for — no account, a phone, a venue network, a token that is the access — and a
+// fourth world would duplicate a layout and a boundary for nothing (20 §2).
+const Book = lazy(() => import('../pages/respond/Book.js'));
 const Done = lazy(() => import('../pages/respond/Done.js'));
 
 // `19`, `70`. THE FOURTH WORLD — never imported by anything in `/app`, `/` or `/r`, so
@@ -105,6 +116,10 @@ export const routes: RouteObject[] = [
     errorElement: <ConsoleBoundary />,
     children: [
       { index: true, element: hold(<Home />) },
+      // T-093. NO RequireCapability wrapper, and deliberately: the page is five cards that
+      // each gate themselves, and four of the five are readable by anybody. A route-level
+      // gate would need a capability the gallery as a whole does not have.
+      { path: 'start', element: hold(<ConsoleStart />) },
       // The two console routes with a capability gate on the route itself (31 § States,
       // 32 § States). Everywhere else out-of-scope data is simply absent; on these two the
       // page IS the action, so somebody without the capability has nothing to look at and
@@ -128,6 +143,18 @@ export const routes: RouteObject[] = [
       // capability it needs (`response.read`) is one somebody can hold for SOME campaigns
       // and not others, and a route-level gate cannot say that (58 § States).
       { path: 'inbox', element: hold(<Inbox />) },
+      // T-094. No RequireCapability wrapper, and for BOTH of the reasons Analysis gives.
+      // `announcement.read` is seeded to every role, so a route-level gate would refuse
+      // nobody; and the page has a 402 as well as a 403 — writing is Silver — which a guard
+      // that knows nothing about entitlements would answer as "you do not have access".
+      // The page renders its own 403 panel and the composer says what a 402 means.
+      { path: 'announcements', element: hold(<Announcements />) },
+      // T-095. No RequireCapability wrapper, and for the same two reasons Analysis gives:
+      // the page has a 402 as well as a 403 — booking is Gold — and a guard that knows
+      // nothing about entitlements would answer "upgrade to see this" with "you do not have
+      // access". The page renders both states itself and keeps them apart.
+      { path: 'booking', element: hold(<Booking />) },
+      { path: 'booking/:id', element: hold(<BookingDetail />) },
       // No RequireCapability wrapper, and here there are TWO reasons rather than one.
       // The first is the inbox's: `analysis.read` is scoped, so a route-level gate cannot
       // say which campaigns. The second is `43`'s whole point — this page has a 402 as well
@@ -162,6 +189,20 @@ export const routes: RouteObject[] = [
       { path: ':token', element: hold(<Fill />) },
       { path: ':token/done', element: hold(<Done />) },
     ],
+  },
+  // `T-095`. THE SAME LAYOUT AND THE SAME BOUNDARY as `/r`, under a second path rather than
+  // a fourth tree. A booking link is a respondent link in every way that matters — no
+  // account, a phone, a venue network — and duplicating `RespondLayout` and
+  // `RespondBoundary` to give it its own root would buy nothing and give the respondent
+  // world two error boundaries to keep in step (20 §2).
+  //
+  // `/book/:token` and not `/r/book/:token`: `/r/:token` already matches one path segment,
+  // so a nested address would be read as a campaign token called "book".
+  {
+    path: '/book',
+    element: <RespondLayout />,
+    errorElement: <RespondBoundary />,
+    children: [{ path: ':token', element: hold(<Book />) }],
   },
   {
     path: '/ops',

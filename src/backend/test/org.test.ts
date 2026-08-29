@@ -226,11 +226,13 @@ describe('POST /org/setup — one request, one transaction', () => {
       select: { capability: true },
     });
     // L4 is the respondent-level role: org.read so the vocabulary loads, `subject.read` so
-    // the one list they should see is reachable (T-086, closing half of OPEN-009), the two
-    // self rows so their profile opens, and nothing else. This list is deliberately exact —
-    // it is what EVERY organisation gets by default, and a row added here without a reason
-    // should fail rather than pass quietly.
+    // the one list they should see is reachable (T-086, closing half of OPEN-009),
+    // `announcement.read` because being SENT something is not a permission anybody should
+    // have to be given (T-094), the two self rows so their profile opens, and nothing else.
+    // This list is deliberately exact — it is what EVERY organisation gets by default, and a
+    // row added here without a reason should fail rather than pass quietly.
     expect(bottomGrants.map((grant) => grant.capability).sort()).toEqual([
+      'announcement.read',
       'org.read',
       'person.read',
       'person.update',
@@ -269,11 +271,15 @@ describe('POST /org/setup — one request, one transaction', () => {
       orderBy: { name: 'asc' },
     });
 
+    // Six since T-093 added a Poll and a Suggestion box seed to every preset, so the start
+    // gallery is never empty and a university's poll is not a hotel's.
     expect(templates.map((template) => template.name)).toEqual([
       'Course feedback',
       'Facilities pulse',
       'Quick pulse',
+      'Room poll',
       'Semester review',
+      'Suggestion box',
     ]);
     for (const template of templates) {
       expect(template.industry).toBe('university');

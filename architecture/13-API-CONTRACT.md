@@ -287,6 +287,7 @@ reader, it does not replace the check.
 | GET | `/` | `campaign.read` |
 | GET | `/:id` | `campaign.read` |
 | POST | `/` | `campaign.create` |
+| POST | `/quick` | **`campaign.launch`** — one transaction: template + one question + campaign + launch, for a poll or a suggestion box (`DEC-088`, `DEC-089`). Idempotent. Registered **before** `/:id` |
 | PATCH | `/:id` | `campaign.update` — only while `draft` |
 | POST | `/:id/launch` | `campaign.launch` — mints `public_token`. Idempotent |
 | POST | `/:id/close` | `campaign.close` |
@@ -294,6 +295,14 @@ reader, it does not replace the check.
 | GET | `/:id/results` | `results.read` — aggregates, k-anon gated |
 | GET | `/:id/responses` | `response.read` — individual, k-anon gated |
 | GET | `/:id/export` | `results.export` — CSV |
+
+**`CampaignSummary` carries two fields the console cannot work without (`T-092`).**
+`templateCategory` is the template's category verbatim — `'Poll'` and `'Suggestion box'` are
+the *only* thing that tells a quick campaign from a feedback round (`DEC-088`), and there is
+no discriminator column to read instead. `resultsThreshold` is the k-anonymity threshold this
+organisation's results are gated on, sent so a card that shows nothing can say why it shows
+nothing; a client that hardcoded the number would lie the day the config changed, and the
+gate itself stays in SQL (INV-005).
 
 ### Trust — `/api/v1/authz`, `/api/v1/audit`
 
@@ -414,6 +423,87 @@ rather than 403 (`13` §5).
 because a plan has no meaning outside the cycle it belongs to, and a second root would have
 implied it does.
 
+### Announcements — `/api/v1/announcements` · `T-094`
+
+| Method | Path | Capability |
+|---|---|---|
+| GET | `/` | `announcement.read` — what was sent to me, plus my own drafts when I hold `announcement.create` |
+| GET | `/:id` | `announcement.read` — 404 outside the audience, never 403 (§5) |
+| POST | `/` | `announcement.create` · **Silver** — draft |
+| PATCH | `/:id` | `announcement.create` · Silver — **draft only, 409 once published** |
+| POST | `/:id/publish` | `announcement.publish` · **Silver** — resolves the audience, writes one receipt per recipient. Idempotent |
+| DELETE | `/:id` | `announcement.delete` · Silver |
+| POST | `/preview` | `announcement.create` · Silver — the recipient count for an `AudienceRule`, live while the composer's audience changes. No row is written |
+| POST | `/:id/read` | `announcement.read` — marks **my own** receipt, and nobody else's |
+
+**Publish is irreversible in the same sense a launch is.** It snapshots the audience into
+`announcement_receipts`, one row per resolved recipient with `read_at` NULL, in the SAME
+transaction that stamps `published_at`; the body then goes read-only. The receipts are
+written at publish time and NOT lazily on first read, because *"12 of 40 have read this"*
+needs a denominator, and a row created when somebody reads cannot supply one.
+
+**The audience is `AudienceRule`, the campaign's own** — `anyone` | `unit` | `role`, resolved
+by the same code (`features/campaigns/audience.ts`). One resolver, so *"everyone in
+Housekeeping"* cannot come to mean two different sets on two screens. There is no recipient
+field and there must not be one.
+
+**Delivery is in-product only.** There is no mail transport in this product, and the composer
+says so on screen — `70`'s `<MessageComposer>` carries the same limitation for operator
+messages. A composer that implies an email was sent when none was is worse than one that
+says what it did.
+
+`announcement.read` is **Bronze** and the other three are **Silver** (`16` §3). A downgrade
+retains data and never deletes (`16` §7), so a bronze organisation gets **402** on create and
+publish and **200** on read.
+
+### Booking — `/api/v1/bookables` · `T-095`
+
+| Method | Path | Capability |
+|---|---|---|
+| GET | `/bookables` | `booking.read` · **Gold** |
+| GET | `/bookables/:id` | `booking.read` · Gold — the bookable, its slots and their remaining counts |
+| POST | `/bookables` | `booking.create` · Gold |
+| PATCH | `/bookables/:id` | `booking.update` · Gold |
+| PUT | `/bookables/:id/slots` | `booking.update` · Gold — **the whole set at once**, the same shape as `PUT /templates/:id/questions` |
+| POST | `/bookables/:id/open` | `booking.update` · Gold — **mints the public token.** Idempotent, and irreversible in the sense a launch is |
+| POST | `/bookables/:id/close` | `booking.update` · Gold — stops the public link. The bookings already taken stay |
+| DELETE | `/bookables/:id` | `booking.delete` · Gold |
+| GET | `/bookables/:id/bookings` | `booking.read` · Gold — **who booked**, identified |
+| POST | `/bookings/:id/cancel` | `booking.cancel` · **Gold** — somebody else's booking, which is why it is its own verb |
+
+Public — on the **existing** `publicRouter`, so it inherits the wide CORS, the absent CSRF,
+the per-IP rate limit and the `PUBLIC_ROUTES` allowlist entry already justified in §6:
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/public/bookables/:token` | The slots, with **remaining** counts. No org internals — §6 |
+| POST | `/public/bookables/:token/bookings` | Take a slot. Rate limited, idempotent. **409 when it just filled** |
+| POST | `/public/bookings/:cancelToken/cancel` | The booker's own, with no account |
+
+**A booking is IDENTIFIED and a response is not, and the two must never join (`DEC-090`).**
+A booker types a name and an email, because a booking that cannot be honoured is not a
+booking. That is a different privacy contract from `responses`, which names nobody and never
+will (INV-006): there is **no `responseId` on a booking, no `bookingId` on a response, and no
+query in `features/booking/` that reads the responses table** — asserted by a test.
+
+**Capacity is enforced by a row lock, not by a count-then-insert.** The write takes
+`SELECT … FROM slots WHERE id = $1 FOR UPDATE` first, so two phones taking the last place are
+serialised **per slot** and only per slot. The loser gets **409**, not 400: the request was
+well-formed and lost a race, and those are different things to say to a caller. `N+1`
+concurrent bookings on a capacity-`N` slot leave exactly `N` rows, and that assertion is the
+feature.
+
+**Remaining counts are DERIVED, never stored.** A counter is a second source of truth, and it
+drifts the first time a booking is cancelled.
+
+**Resolve first, gate second**, exactly as `resolveCampaign` does: an invalid, unopened or
+closed token 404s before anything else runs, so no route here becomes an existence oracle.
+
+All five capabilities are **Gold** (`16` §3). A bronze or silver organisation gets **402** on
+every write and on the console reads; the public picker is not entitlement-gated, because a
+guest holding a link did not choose the plan and must not be punished for it — the same rule
+`16` §6 already applies to a suspended organisation's QR code.
+
 ### Reserved — P3
 
 Prefixes reserved here; the routes under them are specified in their own docs rather than
@@ -524,12 +614,28 @@ excluded    unit tree, role names, people, other campaigns, other subjects,
 An invalid, unlaunched, closed or expired token returns the same `404` — an existence probe
 must not distinguish "wrong token" from "closed campaign".
 
+`GET /public/bookables/:token` is held to the same rule (`T-095`):
+
+```
+included    bookable name and description, org display name + labels, and for each slot
+            its id, start, end and REMAINING places
+excluded    who has booked, capacity as distinct from remaining, unit tree, subjects,
+            campaigns, any id that is not needed to take a slot
+```
+
+**The names of the people who have already booked are the excluded item that matters**, and
+they are excluded from the public payload even though the console shows them: a link that
+tells a stranger who is coming to the clinic on Tuesday is a worse leak than anything the
+campaign payload could make. An invalid, unopened or closed bookable token returns the same
+`404`, for the reason above.
+
 ---
 
 ## 7. Idempotency
 
-`Idempotency-Key` honoured on `campaign.launch`, `template.clone`, `person.import`, and
-respondent submit (keyed on the invitation token). First response cached 24 h and replayed.
+`Idempotency-Key` honoured on `campaign.launch`, `template.clone`, `person.import`,
+`announcement.publish`, `bookable.open`, public booking, and respondent submit (keyed on the
+invitation token). First response cached 24 h and replayed.
 
 Respondent submit matters most: a phone on a flaky venue network retries, and a duplicate
 response would corrupt the demo's numbers in front of the evaluator.

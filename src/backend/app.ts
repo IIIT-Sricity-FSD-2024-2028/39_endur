@@ -55,6 +55,8 @@ import { checkinsRouter, reflectRouter } from './features/improve/router.js';
 import { auditRouter } from './features/audit/router.js';
 import { billingRouter } from './features/billing/router.js';
 import { inboxRouter } from './features/inbox/router.js';
+import { announcementsRouter } from './features/announcements/router.js';
+import { bookablesRouter, bookingsRouter } from './features/booking/router.js';
 import { platformRouter } from './features/platform/router.js';
 import { mount } from './lib/mount.js';
 
@@ -137,6 +139,16 @@ export function createApp() {
   mount(app, '/api/v1/home', homeRouter);
   mount(app, '/api/v1/profile', profileRouter);
   mount(app, '/api/v1/inbox', inboxRouter);
+  // T-094. The SECOND surface built on `AudienceRule`, and deliberately on the same one:
+  // "everyone in Housekeeping" resolves through features/campaigns/audience.ts here too.
+  mount(app, '/api/v1/announcements', announcementsRouter);
+  // T-095. TWO MOUNTS, because a bookable is the thing an organisation publishes and a
+  // booking is what somebody did with it — and the id in `/bookings/:id/cancel` is a
+  // BOOKING's, which nothing under `/bookables/:id/...` would have suggested. The public
+  // half of this feature is NOT here: it is on `publicRouter`, so it inherits the one
+  // allowlist exemption 13 §6 already justifies rather than needing a second.
+  mount(app, '/api/v1/bookables', bookablesRouter);
+  mount(app, '/api/v1/bookings', bookingsRouter);
   mount(app, '/api/v1/analysis', analysisRouter);
   // T-083. Two routers rather than one: /reflect is the reviewee's own loop and /checkins
   // is the supervisor's side of it, and 44 § Route & access names them separately.

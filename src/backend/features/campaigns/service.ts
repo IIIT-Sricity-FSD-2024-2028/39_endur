@@ -1,5 +1,5 @@
 // Campaigns. 13 § Campaigns, 38, DEC-016, DEC-017.
-import { CampaignAccess } from '@endur/shared';
+import { CampaignAccess, estimateSeconds } from '@endur/shared';
 import type {
   AudiencePreview,
   CampaignDetail,
@@ -7,13 +7,15 @@ import type {
   CampaignSummary,
   CreateCampaignBody,
   LaunchResult,
+  QuestionConfig,
+  QuestionKind,
+  QuickCampaignBody,
   UpdateCampaignBody,
 } from '@endur/shared';
 import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
-import { runInTransaction } from '../../db/tx.js';
-import { unitSubtree } from '../../db/graph.js';
-import { ruleOf } from './audience.js';
+import { runInTransaction, type Tx } from '../../db/tx.js';
+import { positionFilter, ruleOf } from './audience.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
@@ -192,6 +194,125 @@ export async function updateCampaign(
 }
 
 /**
+ * QUICK CREATE — a poll or a suggestion box, launched in ONE transaction (DEC-089).
+ *
+ * Template, question, subject, campaign and token, composed here rather than in the
+ * browser. Composed in the browser it is four round trips that can half-fail, and the
+ * failure lands on stage: an orphan template, or a campaign with no token and a QR code
+ * that never appears. Here it either produces a launched campaign or produces nothing.
+ *
+ * There is no new entity underneath this (DEC-088). A poll IS a campaign over a
+ * one-question template; the category is the only thing that says which kind of thing the
+ * console should call it.
+ */
+export async function quickCreate(
+  req: Request,
+  orgId: string,
+  userId: string,
+  body: QuickCampaignBody,
+): Promise<CampaignDetail> {
+  const poll = body.purpose === 'poll';
+  const config: QuestionConfig = poll
+    ? { kind: 'single', options: body.options as string[], allowOther: false }
+    : { kind: 'text', multiline: true };
+  const kind: QuestionKind = poll ? 'single' : 'text';
+
+  const campaignId = await runInTransaction(req, async (tx) => {
+    const subjectId = await organisationSubject(tx, orgId);
+
+    const template = await tx.template.create({
+      data: {
+        orgId,
+        name: body.name,
+        // DATA, not schema. This string and `questionCount === 1` are the whole of what
+        // tells a poll from a feedback form (DEC-088) — there is no type column and there
+        // is not going to be one.
+        category: poll ? 'Poll' : 'Suggestion box',
+        estimatedSeconds: estimateSeconds([kind]),
+        questions: {
+          create: [{ kind, text: body.name, config: config as never, required: true, position: 0 }],
+        },
+      },
+      select: { id: true },
+    });
+
+    const campaign = await tx.campaign.create({
+      data: {
+        orgId,
+        templateId: template.id,
+        name: body.name,
+        // A link, answerable by anyone holding it, and anonymous. All three are what the
+        // surface is FOR; none of them is a default worth making the presenter choose.
+        audienceRule: { kind: 'anyone' },
+        access: 'public',
+        anonymous: true,
+        ...(body.endsAt ? { endsAt: body.endsAt } : {}),
+        createdById: userId,
+        // The token is minted HERE, by the same generator every other campaign uses
+        // (DEC-017) — there must not be a second one to keep in step.
+        publicToken: mintToken(),
+        subjects: { create: [{ subjectId }] },
+      },
+      select: { id: true },
+    });
+
+    // Two rows, because two things happened, and the second is the irreversible one. An
+    // activity log that shows only `campaign.quick` would hide the launch from the one
+    // screen that exists to make launches visible (56).
+    req.ctx.audit.push({ action: 'template.create', targetType: 'template', targetId: template.id });
+    req.ctx.audit.push({ action: 'campaign.launch', targetType: 'campaign', targetId: campaign.id });
+    return campaign.id;
+  });
+
+  // Read WITHOUT assertVisible, deliberately. The caller just created this row and passed
+  // `campaign.launch` to get here; the singleton subject has no unit, so a scoped reader
+  // would fail the unit check on a campaign they made one line ago. Re-authorising it can
+  // only produce a false negative.
+  const created = await prisma.campaign.findUniqueOrThrow({
+    where: { id: campaignId },
+    select: campaignSelect,
+  });
+  return {
+    ...toSummary(created),
+    audience: ruleOf(created.audienceRule),
+    subjects: created.subjects.map(({ subject }) => ({
+      id: subject.id,
+      name: subject.name,
+      unitName: subject.unit?.name ?? null,
+    })),
+  };
+}
+
+/**
+ * The organisation as a subject of itself — found, or created once and reused.
+ *
+ * A poll has no reviewee, and `CreateCampaignBody.subjectIds` requires at least one. The
+ * temptation is to relax that bound; the reason not to is that every results screen groups
+ * by subject, so a campaign with none renders as an empty page rather than as a poll
+ * (DEC-089). `type: 'organisation'` marks it as furniture rather than as something somebody
+ * added on the Subjects screen.
+ */
+async function organisationSubject(tx: Tx, orgId: string): Promise<string> {
+  const existing = await tx.subject.findFirst({
+    where: { orgId, type: ORGANISATION_SUBJECT, archivedAt: null },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const org = await tx.organization.findUniqueOrThrow({
+    where: { id: orgId },
+    select: { name: true },
+  });
+  const subject = await tx.subject.create({
+    data: { orgId, name: org.name, type: ORGANISATION_SUBJECT },
+    select: { id: true },
+  });
+  return subject.id;
+}
+
+export const ORGANISATION_SUBJECT = 'organisation';
+
+/**
  * Launch. Mints the public token, and is IRREVERSIBLE.
  *
  * Idempotent by key (13 §7), and idempotent by state as well: a campaign that already has
@@ -294,20 +415,12 @@ export async function audiencePreview(
     };
   }
 
-  const positionWhere =
-    rule.kind === 'role'
-      ? { roleId: rule.roleId }
-      : {
-          unitId: {
-            in: rule.includeSubtree ? await unitSubtree(orgId, rule.unitId) : [rule.unitId],
-          },
-        };
-
   const people = await prisma.node.findMany({
     where: {
       orgId,
       kind: 'person',
-      edgesAsParent: { some: { type: 'member', child: positionWhere } },
+      // The SHARED filter (T-094). This block used to be a second copy of countAudience's.
+      edgesAsParent: { some: { type: 'member', child: await positionFilter(orgId, rule) } },
     },
     select: { id: true, name: true },
     take: 500,
@@ -364,7 +477,7 @@ const campaignSelect = {
   closedAt: true,
   publicToken: true,
   createdAt: true,
-  template: { select: { name: true } },
+  template: { select: { name: true, category: true } },
   _count: { select: { responses: true } },
   subjects: {
     select: {
@@ -385,7 +498,7 @@ type CampaignRow = {
   closedAt: Date | null;
   publicToken: string | null;
   createdAt: Date;
-  template: { name: string };
+  template: { name: string; category: string };
   _count: { responses: number };
   subjects: Array<{
     subject: { id: string; name: string; unitId: string | null; unit: { name: string } | null };
@@ -400,8 +513,15 @@ function toSummary(campaign: CampaignRow): CampaignSummary {
     status: statusOf(campaign),
     templateId: campaign.templateId,
     templateName: campaign.template.name,
+    // DEC-088: data, not schema. 'Poll' and 'Suggestion box' are what the console reads to
+    // tell a quick campaign from a feedback round.
+    templateCategory: campaign.template.category,
     subjectCount: campaign.subjects.length,
     responseCount: campaign._count.responses,
+    // The k-anonymity gate the results of this campaign will be held behind (INV-005). Sent
+    // so a card that shows nothing can say WHY it shows nothing; the number stays the
+    // server's, and the gate stays in SQL where it is enforced.
+    resultsThreshold: config.K_ANON_THRESHOLD,
     anonymous: campaign.anonymous,
     // Through the parser rather than a bare cast: the column is TEXT with a CHECK, and a
     // row written outside the API (a seed, a migration) should not be able to put an

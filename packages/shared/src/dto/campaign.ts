@@ -80,6 +80,45 @@ export const UpdateCampaignBody = z.object({
 });
 export type UpdateCampaignBody = z.infer<typeof UpdateCampaignBody>;
 
+/**
+ * QUICK CREATE — a poll or a suggestion box, in one call (DEC-088, DEC-089).
+ *
+ * Not a new entity. A poll is a one-question template pointed at the organisation itself,
+ * launched immediately; the only thing that tells it apart from a feedback campaign is the
+ * template's `category` and the fact that it has one question (DEC-010, DEC-088).
+ *
+ * `name` does double duty as the campaign's name and as the question's text, because for a
+ * one-question campaign they are the same sentence and asking twice would be asking the
+ * presenter to write the same words in two boxes while a room waits.
+ */
+export const QuickCampaignPurpose = z.enum(['poll', 'suggestion']);
+export type QuickCampaignPurpose = z.infer<typeof QuickCampaignPurpose>;
+
+export const QuickCampaignBody = z
+  .object({
+    purpose: QuickCampaignPurpose,
+    name: z.string().min(1).max(120),
+    /**
+     * Poll only. The same 2-10 bound `QuestionConfig`'s `single` kind already enforces —
+     * restated here so the request is refused at the edge with a field path, rather than
+     * deeper in where the error would name a question the caller never sent.
+     */
+    options: z.array(z.string().min(1).max(120)).min(2).max(10).optional(),
+    endsAt: z.coerce.date().optional(),
+  })
+  .refine((body) => body.purpose !== 'poll' || (body.options?.length ?? 0) >= 2, {
+    message: 'A poll needs at least two options.',
+    path: ['options'],
+  })
+  .refine((body) => body.purpose !== 'suggestion' || body.options === undefined, {
+    // Silently dropping them would let a caller believe they had built a poll.
+    message: 'A suggestion box has no options — it is one open question.',
+    path: ['options'],
+  });
+export type QuickCampaignBody = z.infer<typeof QuickCampaignBody>;
+
+export const QuickCampaignDto = dto({ body: QuickCampaignBody });
+
 export const CampaignListQuery = PageQuery.extend({
   status: CampaignStatus.optional(),
 });
@@ -97,8 +136,25 @@ export type CampaignSummary = {
   status: CampaignStatus;
   templateId: string;
   templateName: string;
+  /**
+   * The template's category, verbatim. `'Poll'` and `'Suggestion box'` are the ONLY thing
+   * that tells a quick campaign from a feedback round (DEC-088) — there is no type column
+   * and there is not going to be one — so the console cannot call a poll a poll without
+   * reading it here.
+   */
+  templateCategory: string;
   subjectCount: number;
   responseCount: number;
+  /**
+   * The k-anonymity threshold this organisation's results are gated on, from the server
+   * (INV-005). Carried on the SUMMARY, not only on the results view, because a campaign
+   * that is collecting and shows nothing yet is explained on the card — the screen the
+   * reader is already on — rather than one navigation later (`T-092`).
+   *
+   * Same shape as `ResultsView.threshold`, and for the same reason: the number is the
+   * server's, and a client that hardcoded 5 would lie the day the config changed.
+   */
+  resultsThreshold: number;
   anonymous: boolean;
   /** DEC-037. `public` on every campaign that predates it, which is the honest default. */
   access: CampaignAccess;

@@ -14,6 +14,7 @@ import type {
   CreateCampaignBody,
   LaunchResult,
   Page,
+  QuickCampaignBody,
   UpdateCampaignBody,
 } from '@endur/shared';
 import { apiGet, apiPatch, apiPost } from './api.js';
@@ -192,4 +193,30 @@ export async function launchCampaign(id: string, key: string): Promise<LaunchRes
 export function launchKey(campaignId: string): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   return `launch:${campaignId}:${uuid ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+}
+
+/**
+ * A poll or a suggestion box, created and launched in ONE call (`DEC-088`, `DEC-089`).
+ *
+ * The three-step flow above is right for a feedback round, where the form, the subjects and
+ * the dates are all real decisions. A poll has none of them: it is one question asked of a
+ * room that is already in front of you, so the server composes template, question, subject,
+ * campaign and token in a single transaction and returns the launched campaign.
+ *
+ * Idempotency key for the same reason `launch` carries one — this mints a public token, and
+ * a double-click must not produce two links.
+ */
+export async function quickCreate(body: QuickCampaignBody): Promise<CampaignDetail> {
+  const response = await apiPost<QuickCampaignBody, { data: CampaignDetail }>(
+    '/campaigns/quick',
+    body,
+    { idempotencyKey: quickKey(body.name) },
+  );
+  return response.data;
+}
+
+/** One key per ATTEMPT, stable across retries of that attempt. See `launchKey`. */
+function quickKey(name: string): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return `quick:${name}:${uuid ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }

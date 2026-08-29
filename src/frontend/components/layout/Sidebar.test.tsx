@@ -78,6 +78,13 @@ describe('what each level sees', () => {
     // Activity log is the only item in the sidebar that L1 has and L2 does not besides
     // Settings — which is exactly what the matrix says.
     'audit.read': 'all',
+    // T-096. `announcement.read` is `all` at EVERY level and `booking.read` is `all` at the
+    // top three (`50` §1) — so Announcements appears for L4 as well and Booking does not.
+    // Booking is a GOLD surface and this item is still not gated on the tier: the entitlement
+    // map never reaches the browser, and a Bronze organisation's administrator gets the page's
+    // own 402 with an upgrade card, which is a better answer than an item that is not there.
+    'announcement.read': 'all',
+    'booking.read': 'all',
   } as const;
   const L2 = { ...L1, 'org.update': undefined, 'audit.read': undefined } as const;
   const L3 = {
@@ -86,6 +93,8 @@ describe('what each level sees', () => {
     'campaign.read': 'own_unit', 'response.read': 'own_unit',
     'analysis.read': 'own_unit',
     'reflection.read': 'self',
+    'announcement.read': 'all',
+    'booking.read': 'all',
   } as const;
   // NO `response.read` — the matrix gives level 4 none (50 §1, presets/grant-matrix.ts).
   // So the lowest account does not get an Inbox, which is right: a queue of everybody
@@ -93,6 +102,10 @@ describe('what each level sees', () => {
   const L4 = {
     'org.read': 'all', 'subject.read': 'own_unit',
     'person.read': 'self', 'person.update': 'self',
+    // NO `booking.read` — the matrix stops at L3. `announcement.read` IS here, at `all`, and
+    // it is the only capability in the product seeded to every level without exception:
+    // everybody is somebody a notice can be sent to.
+    'announcement.read': 'all',
   } as const;
 
   /** Every item actually rendered, in order, disabled ones included. */
@@ -110,7 +123,8 @@ describe('what each level sees', () => {
     // together at the top — Settings is not a footer item (design_specs/design/02 §3).
     expect(rendered()).toEqual([
       'Home', 'Settings', 'Activity log', 'Structure', 'Roles', 'People', 'Quaxels',
-      'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
+      'Start', 'Templates', 'Plithes', 'Announcements', 'Booking',
+      'Analysis', 'Inbox', 'Reflect',
     ]);
   });
 
@@ -120,7 +134,8 @@ describe('what each level sees', () => {
     show(L2);
     expect(rendered()).toEqual([
       'Home', 'Structure', 'Roles', 'People', 'Quaxels',
-      'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
+      'Start', 'Templates', 'Plithes', 'Announcements', 'Booking',
+      'Analysis', 'Inbox', 'Reflect',
     ]);
   });
 
@@ -132,7 +147,8 @@ describe('what each level sees', () => {
     expect(rendered()).toContain('People');
     expect(rendered()).toEqual([
       'Home', 'Structure', 'Roles', 'People', 'Quaxels',
-      'Templates', 'Plithes', 'Analysis', 'Inbox', 'Reflect',
+      'Start', 'Templates', 'Plithes', 'Announcements', 'Booking',
+      'Analysis', 'Inbox', 'Reflect',
     ]);
   });
 
@@ -149,7 +165,15 @@ describe('what each level sees', () => {
     // REFLECT LEFT THIS LIST AT T-084, and for the reason `50` §1 gives: L3 is the
     // reviewee, L4 is the respondent-level role, and somebody nobody reviews has nothing to
     // reflect on. The lowest account's sidebar is now Home and one list.
-    expect(rendered()).toEqual(['Home', 'Quaxels']);
+    // START JOINED IT AT T-093 AND IS THE ONE ITEM THAT GOES THE OTHER WAY: it is gated on
+    // NOTHING, because the gallery is five cards that each gate themselves and the lowest
+    // account can still open a poll's link. An item every level sees is what the screen is
+    // for — the whole product, visible from one place.
+    // ANNOUNCEMENTS JOINED THIS LIST AT T-096 and it is the second item that goes the
+    // other way: `announcement.read` is seeded to every level, because being sent a notice
+    // is not a permission anybody should have to be given. Booking did NOT join it — the
+    // matrix stops `booking.read` at L3.
+    expect(rendered()).toEqual(['Home', 'Quaxels', 'Start', 'Announcements']);
   });
 
   it('drops People for an account that can only reach itself — the whole of D-027', () => {

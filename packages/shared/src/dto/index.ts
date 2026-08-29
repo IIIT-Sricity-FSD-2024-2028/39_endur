@@ -19,6 +19,8 @@ export * from './home.js';
 export * from './inbox.js';
 export * from './analysis.js';
 export * from './improve.js';
+export * from './announcement.js';
+export * from './booking.js';
 export * from './audit.js';
 export * from './platform.js';
 export * from './billing.js';

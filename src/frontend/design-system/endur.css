@@ -1292,6 +1292,11 @@
 
 .dialog-wide { width: min(560px, 100%); }
 .subject-form { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* <QuickDialog>'s option rows (T-091). The input takes the row and the remove button sits
+   beside it at a fixed size, so adding a fifth option does not resize the other four. */
+.quick-option { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 6px; }
+.quick-option .input { flex: 1 1 auto; min-width: 0; }
 /* A fieldset's legend needs the same treatment as a field's label, or the unit picker
    looks like it belongs to the field above it. */
 .field > legend {
@@ -1665,12 +1670,31 @@ textarea.q-text-input { min-height: 90px; }
    38, design_specs/design/06. The share sheet is the demo's decisive artifact
    and every rule in its block is a scanning requirement, not a style.      */
 
+/* The start gallery — T-093. Same grid as the campaign list on purpose: five lanes and a
+   list of rounds are both "cards you choose from", and a second grid rhythm on an adjacent
+   screen reads as a second product. */
+.start-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.start-card { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); }
+.start-card-top { display: flex; align-items: center; gap: var(--space-2); }
+.start-card-icon { display: inline-flex; color: var(--color-accent); }
+.start-card-title { margin: 0; font-size: 17px; flex: 1 1 auto; }
+.start-card-tier { text-transform: capitalize; }
+.start-card-body { margin: 0; font-size: 13px; }
+.start-card-time, .start-card-reason { margin: 0; font-size: 12px; }
+.start-card-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin-top: auto; padding-top: var(--space-2); }
+/* A lane the READER may not use, which is a different thing from one the ORGANISATION has
+   not bought — the second keeps full contrast, because it is something they can act on. */
+.start-card.is-blocked { opacity: .72; }
+
 .cgrid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 .ccard { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); }
 .ccard-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .ccard-name { margin: 0; font-size: 17px; }
 .ccard-meta, .ccard-count { margin: 0; font-size: 13px; }
 .ccard-count { font-weight: 600; }
+/* The k-anonymity sentence (`T-092`). Quieter than the count above it — it explains an
+   absence, and an explanation that shouts reads as an error. */
+.ccard-note { margin: 0; font-size: 12px; }
 .ccard-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 /* A draft is a campaign that is not yet anything. 60% opacity, per 06 §6.1. */
 .tag.is-draft { opacity: .6; }
@@ -5217,3 +5241,75 @@ html:active-view-transition * {
 .earn-change-meta { margin-left: auto; }
 .earn-amount { font-variant-numeric: tabular-nums; }
 .earn-tier { text-transform: capitalize; }
+
+/* ── Booking — T-095 ──────────────────────────────────────────────────────────────────
+   The slot grid is the ONE piece of chrome shared by the console editor and the public
+   picker (24 § SlotGrid), so it lives with the design system rather than beside either
+   page: two stylesheets is how "2 left" starts looking urgent on one screen and ordinary
+   on the other. */
+
+.slot-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+.slot { display: flex; flex-direction: column; gap: 4px; }
+.slot-face {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; text-align: left; cursor: pointer;
+  padding: var(--space-3);
+  background: var(--color-card);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  /* 44px is the tap target `26` requires, and this is a phone-first control. */
+  min-height: 44px;
+}
+.slot-day { font-size: var(--text-small); opacity: .7; }
+.slot-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.slot-left { font-size: var(--text-small); }
+/* THREE STATES, VISUALLY DISTINCT, because pressing a full slot is the one interaction
+   that has to fail before it starts. `is-nearly` is called out on its own: one place left
+   is the state a booker has to act on, and the demo exists to show it. */
+.slot.is-nearly .slot-left { font-weight: 600; color: var(--status-warn-800); }
+.slot.is-full .slot-face { opacity: .55; cursor: default; }
+.slot.is-selected .slot-face { border-color: var(--color-accent); border-width: 2px; }
+.slot-remove { align-self: flex-start; }
+
+.slot-editor { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.slot-editor-row {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.slot-editor-row:last-child { border-bottom: 0; }
+.slot-editor-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.field-narrow { max-width: 96px; }
+
+.card-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.booking-new { display: flex; align-items: flex-end; gap: var(--space-2); margin-bottom: var(--space-3); }
+.booking-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  text-decoration: none; color: inherit;
+}
+.booking-row-icon { display: inline-flex; color: var(--color-accent); }
+.booking-row-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; }
+.booking-row-name { font-weight: 600; }
+
+.btn-sm { padding: 4px var(--space-2); font-size: var(--text-small); }
+.danger-zone { border: 1px solid var(--color-divider); }
+
+/* The public picker. Same column and same rhythm as the respondent form next door — it is
+   the same phone, on the same venue network, held by the same person. */
+.rf-book { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); max-width: 560px; margin: 0 auto; }
+.rf-book-head { display: flex; flex-direction: column; gap: 4px; }
+.rf-book-org { margin: 0; font-size: var(--text-small); opacity: .7; }
+.rf-book-title { margin: 0; font-size: 22px; }
+.rf-book-body { margin: 0; }
+.rf-book-heading { margin: var(--space-3) 0 0; font-size: 15px; }
+/* The sentence that says a booking is NOT anonymous (DEC-090). Quiet, but present: the
+   feedback form on the next table card promises the opposite, and a guest has no way to
+   know these are different systems. */
+.rf-book-note { margin: 0; font-size: var(--text-small); opacity: .75; }
+.rf-book-error { margin: 0; font-size: var(--text-small); color: var(--status-bad-800); }
+.rf-book-submit { width: 100%; }

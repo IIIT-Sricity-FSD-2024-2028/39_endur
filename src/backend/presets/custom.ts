@@ -5,7 +5,7 @@
 // start is the enemy (customization.md §8). The generic words here are the same ones
 // DEFAULT_LABELS falls back to, so an org that renames nothing still reads sensibly.
 import type { Preset } from './types.js';
-import { nps, rating, text_, yesno } from './types.js';
+import { nps, rating, single, text_, yesno } from './types.js';
 
 export const custom: Preset = {
   key: 'custom',
@@ -29,6 +29,26 @@ export const custom: Preset = {
     campaign: { one: 'Campaign', many: 'Campaigns' },
   },
   templates: [
+    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
+    // empty and each industry's example reads as its own — a hotel poll is not a university
+    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
+    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    {
+      name: 'Quick poll',
+      category: 'Poll',
+      description: 'One question, a few options, answerable from a phone.',
+      questions: [
+        single('What should we do next?', ['Option one', 'Option two', 'Option three']),
+      ],
+    },
+    {
+      name: 'Suggestion box',
+      category: 'Suggestion box',
+      description: 'One open question, answered anonymously and read in the Inbox.',
+      questions: [
+        text_('What should we change?', 'One thing'),
+      ],
+    },
     {
       name: 'General feedback',
       category: 'General',

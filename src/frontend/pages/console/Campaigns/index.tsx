@@ -4,8 +4,8 @@
 // from this list to a projected QR code must be ONE click, and a menu is a second one plus
 // a hunt.
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import type { CampaignStatus, CampaignSummary } from '@endur/shared';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import type { CampaignStatus, CampaignSummary, QuickCampaignPurpose } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
@@ -15,6 +15,7 @@ import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
 import { formatDate, pluralise } from '../../../lib/format.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
+import { QuickDialog } from './QuickDialog.js';
 
 /** The four values the derivation can produce (DEC-016), plus "everything". */
 const FILTERS: Array<{ key: CampaignStatus | 'all'; label: string }> = [
@@ -32,6 +33,31 @@ export const STATUS_TAG: Record<CampaignStatus, { label: string; className: stri
   draft: { label: 'Draft', className: 'tag tag-neutral is-draft' },
   closed: { label: 'Closed', className: 'tag tag-outline' },
 };
+
+/**
+ * The two categories `POST /campaigns/quick` writes (`DEC-088`). They are DATA — a reader
+ * who edits the category loses the badge and nothing else breaks, which is the cost that
+ * decision accepted in exchange for having no discriminator column.
+ */
+export const QUICK_CATEGORIES = ['Poll', 'Suggestion box'];
+
+/**
+ * The sentence a quick campaign's card owes its owner before anybody asks (`T-092`).
+ *
+ * A suggestion box collects anonymously and shows NOTHING until `resultsThreshold` people
+ * have answered — the k-anonymity gate, enforced in SQL (INV-005) — so the first two
+ * answers on stage land in a screen that looks broken. It is not broken, and the honest fix
+ * is to say the number, never to lower it.
+ *
+ * Only on the quick surfaces: a feedback round is read on the Results page, which says the
+ * same thing itself, and repeating it on every card in the list would be noise.
+ */
+export function suppressionNote(campaign: CampaignSummary): string | null {
+  if (!QUICK_CATEGORIES.includes(campaign.templateCategory)) return null;
+  if (campaign.status === 'draft') return null;
+  if (campaign.responseCount >= campaign.resultsThreshold) return null;
+  return `Answers appear once ${campaign.resultsThreshold} people have responded. ${campaign.responseCount} so far.`;
+}
 
 /** "ends in 6 days" / "starts 1 Sep". The line that makes a card feel live. */
 export function timing(campaign: CampaignSummary, now = Date.now()): string | null {
@@ -60,8 +86,16 @@ export default function Campaigns(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const status = params.get('status') as CampaignStatus | null;
 
+  const navigate = useNavigate();
+
   const list = useCampaignList({ ...(status ? { status } : {}) });
   const [sharing, setSharing] = useState<CampaignSummary | null>(null);
+  /**
+   * The poll and suggestion-box surfaces (`T-091`, `DEC-088`). They live beside the wizard
+   * rather than inside it: the wizard's three steps are the right questions for a feedback
+   * round and the wrong ones for a question asked of a room that is already waiting.
+   */
+  const [quick, setQuick] = useState<QuickCampaignPurpose | null>(null);
 
   const rows = list.data?.data ?? [];
   const total = list.data?.meta.total ?? 0;
@@ -81,12 +115,48 @@ export default function Campaigns(): JSX.Element {
         subtitle={total > 0 ? pluralise(total, labels.campaign.one, labels.campaign.many) : undefined}
         action={
           can('campaign.create') && !(rows.length === 0 && !status) ? (
-            <Link className="btn btn-primary" to="/app/campaigns/new">
-              <Icon name="add" size={18} /> New {labels.campaign.one.toLowerCase()}
-            </Link>
+            <div className="header-actions">
+              {/* Gated on `campaign.launch`, not `campaign.create`: the quick path launches
+                  in the same call, so offering it to somebody who may only draft would be
+                  offering a button the API is going to refuse (DEC-089, INV-003). */}
+              {can('campaign.launch') && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setQuick('poll')}
+                  >
+                    <Icon name="add" size={18} /> Poll
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setQuick('suggestion')}
+                  >
+                    <Icon name="add" size={18} /> Suggestion box
+                  </button>
+                </>
+              )}
+              <Link className="btn btn-primary" to="/app/campaigns/new">
+                <Icon name="add" size={18} /> New {labels.campaign.one.toLowerCase()}
+              </Link>
+            </div>
           ) : undefined
         }
       />
+
+      {quick && (
+        <QuickDialog
+          purpose={quick}
+          onCancel={() => setQuick(null)}
+          // Straight to the detail page, which already shows the QR code and the public
+          // link (`T-089`, `DEC-086`). That screen is the point of the whole surface.
+          onCreated={(campaign) => {
+            setQuick(null);
+            navigate(`/app/campaigns/${campaign.id}`);
+          }}
+        />
+      )}
 
       <div className="segmented" role="radiogroup" aria-label="Status">
         {FILTERS.map((filter) => (
@@ -146,10 +216,17 @@ export default function Campaigns(): JSX.Element {
           {rows.map((campaign) => {
             const tag = STATUS_TAG[campaign.status];
             const when = timing(campaign);
+            const note = suppressionNote(campaign);
+            // Structural product words, literal on purpose (`DEC-087`) — a hotel renames
+            // its departments, never Endur's own furniture.
+            const quick = QUICK_CATEGORIES.includes(campaign.templateCategory)
+              ? campaign.templateCategory
+              : null;
             return (
               <article className="card ccard" key={campaign.id}>
                 <div className="ccard-top">
                   <span className={tag.className}>{tag.label}</span>
+                  {quick && <span className="tag tag-outline">{quick}</span>}
                   {when && <span className="text-meta">{when}</span>}
                 </div>
                 <h4 className="ccard-name">
@@ -162,6 +239,8 @@ export default function Campaigns(): JSX.Element {
                 <p className="ccard-count">
                   {pluralise(campaign.responseCount, 'response', 'responses')}
                 </p>
+                {/* Said here rather than discovered on an empty Results page (`T-092`). */}
+                {note && <p className="ccard-note text-meta">{note}</p>}
                 <div className="ccard-actions">
                   {/* One click from list to projected QR. A draft has no token and no
                       reachable URL, so it has nothing to share yet (38 § States). */}

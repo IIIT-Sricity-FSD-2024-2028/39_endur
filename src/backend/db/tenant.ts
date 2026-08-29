@@ -27,6 +27,7 @@ const TENANT_MODELS = new Set([
   'AuditLog',
   'ApiKey',
   'Subscription',
+  'Announcement',
 ]);
 
 /** Reads that take a `where`. Writes are handled separately — see below. */

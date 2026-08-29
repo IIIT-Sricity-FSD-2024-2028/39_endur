@@ -15,13 +15,18 @@
 // cannot reach the bundle.
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = resolve(HERE, '../..');
 
-const ENTRIES = ['Fill.tsx', 'Done.tsx'].map((file) => resolve(HERE, file));
+// `Book.tsx` JOINED THEM AT T-095, and adding it here is the whole of that task's frontend
+// safety net: `/book/:token` is served to the same phone on the same venue network, so the
+// booking page has to be held to the same rule as the form — no console code, no store, and
+// nothing heavier than React and the router. A guard that walked only two of the three
+// respondent pages would have said nothing about the one most recently written.
+const ENTRIES = ['Fill.tsx', 'Done.tsx', 'Book.tsx'].map((file) => resolve(HERE, file));
 
 /**
  * The app's own entry, walked separately.
@@ -75,8 +80,22 @@ function walk(entries: string[]): { files: Set<string>; packages: Set<string> } 
   return { files, packages };
 }
 
+/**
+ * `path.relative()` RETURNS BACKSLASHES ON WINDOWS, and every literal in this file is
+ * written with forward slashes — so without this line the whole test suite here silently
+ * matched nothing on win32: `startsWith('pages/console/')` was false for every path, the
+ * containment filters came back empty, and the INV-008 assertion failed outright while the
+ * three above it "passed" by checking nothing. `D-040` recorded it on 30 Aug; `T-095` fixed
+ * it, because that task adds `Book.tsx` to `ENTRIES` and a guard that checks nothing is
+ * worse than no guard — it reports that the booking page is clean without looking.
+ *
+ * Normalised ONCE, here, where `reached` is built. Relaxing an assertion instead would have
+ * been the wrong repair in the obvious way.
+ */
+const slashes = (path: string): string => path.split(sep).join('/');
+
 const graph = walk(ENTRIES);
-const reached = [...graph.files].map((file) => relative(FRONTEND, file)).sort();
+const reached = [...graph.files].map((file) => slashes(relative(FRONTEND, file))).sort();
 
 // `lazy(() => import(…))` has no `from`, so the regex above sees only STATIC imports —
 // which is exactly the set that cannot be split out of the entry chunk.
@@ -119,7 +138,7 @@ describe('the respondent world stays its own world', () => {
     // chunk that a phone downloads before it can render a single question.
     // Fixed by making <AppShell> lazy inside `layouts.tsx`; this is the line that holds it.
     const shell = [...entry.files]
-      .map((file) => relative(FRONTEND, file))
+      .map((file) => slashes(relative(FRONTEND, file)))
       .filter((path) => path.startsWith('components/layout/') || path === 'components/Icon.tsx');
     expect(shell).toEqual([]);
     expect([...entry.packages]).not.toContain('lucide-react');

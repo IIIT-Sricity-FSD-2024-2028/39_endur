@@ -30,6 +30,31 @@ export const hotel: Preset = {
     campaign: { one: 'Guest survey', many: 'Guest surveys' },
   },
   templates: [
+    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
+    // empty and each industry's example reads as its own — a hotel poll is not a university
+    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
+    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    {
+      name: 'Lobby poll',
+      category: 'Poll',
+      description: 'One question on a card at the desk, answered on the way past.',
+      questions: [
+        single('What would you like us to add to breakfast?', [
+          'More fruit',
+          'Hot options',
+          'Local dishes',
+          'Nothing — it is good',
+        ]),
+      ],
+    },
+    {
+      name: 'Suggestion box',
+      category: 'Suggestion box',
+      description: 'One open question, answered anonymously and read in the Inbox.',
+      questions: [
+        text_('What would have made your stay better?', 'One thing'),
+      ],
+    },
     {
       name: 'Stay experience',
       category: 'Guest',

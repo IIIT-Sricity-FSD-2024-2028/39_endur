@@ -260,6 +260,37 @@ small screens is how the two versions start disagreeing about which columns exis
 (added T-034) names the table for a screen reader — sighted readers have the page header, and
 a `<table>` with no accessible name is one a screen reader announces as nothing at all.
 
+### `<SlotGrid>`  ·  **BUILT 2026-08-30 (`T-095`)**
+```ts
+{ slots: SlotView[]; selectedId?: string | null;
+  onSelect?: (slotId: string) => void;
+  onRemove?: (slotId: string) => void }
+type SlotView = { id: string; startsAt: string; endsAt: string;
+                  capacity: number; remaining: number }
+```
+
+The one shape that renders slots on **both sides of the product**: the console's editor and
+the public picker. It is one component and not two on purpose — a picker that draws
+availability differently from the editor that produced it is how "2 left" comes to mean two
+different things on two screens.
+
+**`remaining` is the number it prints, and it always arrives from the server.** The public
+payload carries remaining and NOT capacity (`13` §6): a stranger is told how many places are
+left, never how many exist or who has taken them.
+
+Four states per slot and they are visually distinct, because pressing a full slot is the one
+interaction that must fail before it starts: `open` (places left), `nearly` (one left —
+called out, since it is the state the demo exists to show), `full` (no action at all, not a
+disabled button that looks pressable) and `selected`.
+
+`onRemove` is the console's only extra affordance. Its absence is what puts the grid in
+read-only mode, so the respondent bundle carries no editing code at all
+(`pages/respond/bundle.test.ts`).
+
+It never decides anything. The server takes a row lock and answers **409** when a slot filled
+between the render and the press (`13` § Booking), so a grid showing a stale "1 left" refuses
+correctly rather than double-books.
+
 ## 4. Organisation
 
 ### `<UnitTree>`
@@ -472,6 +503,29 @@ and hiding it would hide the explanation.
 The preview is a scaled, `pointer-events: none` render of the real sidebar shape rather than
 a picture of it — a separately-maintained preview eventually lies about what saving will do.
 
+### `<AnnouncementBanner>`  ·  **BUILT 2026-08-30 (`T-094`)**
+```ts
+{ items: AnnouncementSummary[];
+  onDismiss: (id: string) => void }
+```
+
+Unread published announcements for the signed-in reader, at the top of `/app` Home. Dismissing
+one marks the reader's **own** receipt read — `POST /announcements/:id/read` — and nobody
+else's; there is no way from this component to mark somebody else's.
+
+It renders **nothing at all** when `items` is empty, rather than an empty state. This is
+chrome on somebody else's page: a card saying "no announcements" would take permanent space
+on the first screen after sign-in to report the normal case.
+
+It is where the feature is visible **without navigating to it**, which is the whole reason it
+exists as a component rather than as a section of `/app/announcements`.
+
+`unreadFor()` ships beside it and is exported, because the three rules that decide what
+belongs in the banner are worth testing without rendering one: a notice the reader is **not a
+recipient of** (`readByMe === null` — an author who addressed a unit they are not in) never
+appears, a read one never reappears, and the list is capped at two for the reason Home caps
+its prompts at two.
+
 ## 5. Form engine
 
 ### `<QuestionCard>`
@@ -658,6 +712,53 @@ with focus behind it traps nobody.
 
 This is a prop contract enforcing a copy rule, which is deliberate: the type system is the
 only thing that reliably stops "Are you sure?" from reappearing.
+
+### `<QuickDialog>`  ·  **BUILT 2026-08-29 (`T-091`)**
+```ts
+{ purpose: 'poll' | 'suggestion';
+  onCreated: (campaign: CampaignDetail) => void;
+  onCancel: () => void }
+```
+
+The whole of the poll and suggestion-box surface on the client (`DEC-088`). One question, up
+to ten options, an optional close date; `POST /campaigns/quick` composes and launches in one
+transaction (`DEC-089`), and the dialog navigates straight to the campaign detail page, which
+already shows the QR code.
+
+`purpose` changes the fields, not the endpoint: a suggestion box has no options, because it
+is a single multiline `text` question. There is no template picker and no subject picker —
+having to choose either is what made a poll a five-screen job before this existed.
+
+It carries an idempotency key like `<ShareSheet>`'s launch does, for the same reason: the
+request mints a public token, and a double-click on stage must not produce two links.
+
+### `<StartCard>`  ·  **BUILT 2026-08-30 (`T-093`)**
+```ts
+{ title: string; body: string; icon: IconName;
+  estimate: string | null;
+  state: 'ready' | 'capability' | 'tier' | 'soon';
+  reason?: string; tier?: Tier;
+  actionLabel: string;
+  to?: string; onStart?: () => void }
+```
+
+One lane of `/app/start`. It exists because the FOUR reasons a lane cannot be pressed are
+answered differently, and a single disabled state would flatten them into one wrong answer:
+
+| `state` | what it means | how it renders |
+|---|---|---|
+| `ready` | press it | primary button, or a link |
+| `capability` | the READER may not | disabled, **with the reason** |
+| `tier` | the ORGANISATION may not yet | enabled, tier chip, lands on `/app/plan` |
+| `soon` | not built yet (`T-094`, `T-095`) | no action at all |
+
+`tier` deliberately keeps full contrast: a tier is a thing somebody can buy, and greying it
+out tells a Bronze customer they are broken rather than that there is more to have. `soon`
+has no action because a dead link that renders something is worse than one that visibly does
+not navigate (`design_specs/design/02` §7).
+
+All of it is usability. The server 403s on the capability and 402s on the tier whatever this
+renders (INV-003), so a card in the wrong state would still be refused correctly.
 
 ## 6b. Billing and platform
 
