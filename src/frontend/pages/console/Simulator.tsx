@@ -8,7 +8,8 @@
 // `<DecisionTrace>` is EXTENDED here, not forked (`T-076`, INV-009, `24` §6c) — it is the
 // same component `56`'s activity log renders, in the present tense instead of the past.
 import { useMemo, useState } from 'react';
-import type { PersonSummary, SimulateBody, SimulateTarget } from '@endur/shared';
+import type { Capability, PersonSummary, SimulateBody, SimulateTarget } from '@endur/shared';
+import { isCapability } from '@endur/shared';
 import { PageHeader } from '../../components/layout/PageHeader.js';
 import { EmptyState } from '../../components/feedback/EmptyState.js';
 import { DecisionTrace } from '../../components/org/DecisionTrace.js';
@@ -104,7 +105,10 @@ export default function Simulator(): JSX.Element {
   const sim = useSimulator();
 
   const [principal, setPrincipal] = useState<{ userId: string; name: string } | null>(null);
-  const [capability, setCapability] = useState('');
+  // `Capability | ''`, not `string`. The file's own rule is that this sentence cannot ask
+  // an invalid question; since the DTO started validating against the catalogue that rule
+  // is the compiler's to keep rather than a comment's. `''` is the unchosen blank.
+  const [capability, setCapability] = useState<Capability | ''>('');
   const [targetKind, setTargetKind] = useState<TargetKind>('org');
   const [targetUnitId, setTargetUnitId] = useState('');
   const [targetPerson, setTargetPerson] = useState<{ userId: string; name: string } | null>(null);
@@ -160,6 +164,8 @@ export default function Simulator(): JSX.Element {
     catalogue.data?.find((c) => c.key === capability)?.label ?? capability;
 
   const runTest = (): void => {
+    // `ready` already asserts `capability !== ''`, and TypeScript narrows through the
+    // alias — so `capability` is a `Capability` from here down with nothing restated.
     if (!ready || !principal) return;
     let target: SimulateTarget;
     if (targetKind === 'org') target = { kind: 'org' };
@@ -194,7 +200,12 @@ export default function Simulator(): JSX.Element {
             <select
               className="input input-inline"
               value={capability}
-              onChange={(event) => setCapability(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value;
+                // Every option but the placeholder came from the catalogue, so anything
+                // that is not a capability IS the placeholder. Checked rather than cast.
+                setCapability(isCapability(next) ? next : '');
+              }}
               disabled={catalogue.loading}
             >
               <option value="">choose an action</option>
@@ -220,7 +231,7 @@ export default function Simulator(): JSX.Element {
               <option value="unit">a {labels.unit.one.toLowerCase()}</option>
               <option value="person">a person</option>
               <option value="subject">a {labels.subject.one.toLowerCase()}</option>
-              <option value="campaign">a campaign</option>
+              <option value="campaign">a {labels.campaign.one.toLowerCase()}</option>
             </select>
           </span>
 
@@ -328,7 +339,11 @@ export default function Simulator(): JSX.Element {
           <DecisionTrace
             decision={{
               decidedBy: latest.decision.decidedBy ?? null,
-              considered: latest.decision.considered,
+              // Omitted rather than passed as undefined: `<DecisionTrace>` treats an
+              // ABSENT `considered` as "this response carried no candidate list" and
+              // drops the section, which is exactly a production 403 (`11` §10). An
+              // explicit undefined would mean the same at runtime and fail the type.
+              ...(latest.decision.considered ? { considered: latest.decision.considered } : {}),
               tense: 'present',
             }}
           />

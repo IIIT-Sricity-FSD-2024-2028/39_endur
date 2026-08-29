@@ -438,18 +438,29 @@ export async function runSimulation(
   orgId: string,
   authzVersion: number,
   body: SimulateBody,
+  labels: ResolvedLabels,
 ): Promise<Decision> {
   return simulate({
     orgId,
     userId: body.principalUserId,
-    capability: body.capability as never,
-    target: await resolveSimTarget(orgId, body.target),
-    at: body.at,
+    capability: body.capability,
+    target: await resolveSimTarget(orgId, body.target, labels),
+    // Spread rather than passed as `at: body.at`. `ResolveInput.at` is optional and means
+    // "now" when absent; under exactOptionalPropertyTypes an explicit `undefined` is not
+    // the same thing as an absent key, and only the absent key says "now" (`11` §7).
+    ...(body.at ? { at: body.at } : {}),
     authzVersion,
   });
 }
 
-async function resolveSimTarget(orgId: string, target: SimulateBody['target']): Promise<Target> {
+// Takes the tenant's nouns for the same reason `grantWarnings` does (`D-008`, INV-001):
+// these two messages are SENTENCES SHOWN TO AN ADMINISTRATOR, and a hotel operator being
+// told *"that subject does not exist"* is being shown a column name.
+async function resolveSimTarget(
+  orgId: string,
+  target: SimulateBody['target'],
+  labels: ResolvedLabels,
+): Promise<Target> {
   if (target.kind === 'org') return { kind: 'org' };
   if (target.kind === 'unit') return { kind: 'unit', unitId: target.unitId };
   if (target.kind === 'person') return { kind: 'person', userId: target.userId };
@@ -459,17 +470,21 @@ async function resolveSimTarget(orgId: string, target: SimulateBody['target']): 
       where: { id: target.subjectId, orgId },
       select: { unitId: true },
     });
-    if (!subject) throw new NotFoundError('That subject does not exist.');
-    return { kind: 'subject', unitId: subject.unitId ?? undefined };
+    if (!subject) throw new NotFoundError(`That ${labels.subject.one.toLowerCase()} does not exist.`);
+    // An absent `unitId` is how `Target` says ORG-WIDE — a subject hung off the org root
+    // rather than any unit. Setting the key to `undefined` would say the same thing to
+    // JavaScript and a different thing to the type, so the key is omitted instead.
+    return subject.unitId ? { kind: 'subject', unitId: subject.unitId } : { kind: 'subject' };
   }
 
   const campaign = await prisma.campaign.findFirst({
     where: { id: target.campaignId, orgId },
     select: { audienceRule: true },
   });
-  if (!campaign) throw new NotFoundError('That campaign does not exist.');
+  if (!campaign) throw new NotFoundError(`That ${labels.campaign.one.toLowerCase()} does not exist.`);
   const rule = campaign.audienceRule as { unitId?: string } | null;
-  return { kind: 'campaign', unitId: rule?.unitId };
+  // Same rule as above: a campaign whose audience names no unit is org-wide.
+  return rule?.unitId ? { kind: 'campaign', unitId: rule.unitId } : { kind: 'campaign' };
 }
 
 async function assertRole(orgId: string, roleId: string): Promise<void> {

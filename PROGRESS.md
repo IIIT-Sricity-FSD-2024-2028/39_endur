@@ -5,7 +5,43 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-29  (DEC-081 — A COUNT ON A UNIT COUNTS THE WHOLE BRANCH, and the
+UPDATED   2026-08-29  (THE BRANCH BUILDS. tsc 4 -> 0, npm run build PASSES, tests
+                       11 failed -> 9. no feature: the owner asked what was open and then
+                       for the top of the list, which was that the branch did not build and
+                       that two red tests belonged to no debt id.
+                       D-035 CLOSED. all four errors were exactOptionalPropertyTypes and
+                       all four were fixed by CONSTRUCTING THE KEY CONDITIONALLY, never by
+                       widening -- on Target an ABSENT unitId is how the resolver says
+                       ORG-WIDE, so unitId: undefined and no unitId mean the same to JS and
+                       different things to the type. THE REAL FIND WAS UNDERNEATH: the
+                       `as never` on capability was bridging a z.string() DTO to a
+                       Capability input, so A MISSPELT CAPABILITY RESOLVED TO no_grant and
+                       the simulator rendered it as "No rule grants this" -- a real-looking
+                       answer to a question the system never understood. DTO now
+                       .refine(isCapability): 422 instead, AND the narrowing caught the
+                       page holding capability as a bare string in a file whose own header
+                       says the sentence can never ask an invalid question.
+                       D-014 WAS STALE -- /authz/simulate has been mounted all along. what
+                       was missing was ANY TEST, which is exactly why three of D-035's
+                       errors accumulated inside runSimulation with nothing going red. new
+                       test/simulator.test.ts, 7 tests.
+                       THE TWO UNOWNED RED TESTS WERE A LITERAL 3 AGAINST A FOURTH WORLD.
+                       /ops made four at DEC-033; routes.test.tsx now asserts worlds.length,
+                       so a FIFTH world must bring its own boundary and layout to pass and
+                       cannot break the test by existing. 20 §1 said "the three worlds" and
+                       now says four. FOUR LIVE ROUTES WERE IN NEITHER THE MAP NOR THE TEST
+                       -- /app/plan, /activate/:token, /ops/orgs/:id, /ops/earnings.
+                       AUDIT:VOCAB CLEAN FOR THE FIRST TIME, 3 -> 0. all three were INV-001
+                       breaches in these same two files, parked under D-035 and about to be
+                       orphaned by closing it -- the simulator offered "a campaign" between
+                       two labelled options, and resolveSimTarget raised two 404 sentences
+                       an administrator reads. runSimulation takes nounsOf(req) now.
+                       THE REMAINING 9 FAILURES ARE ALL DECISIONS, NOT WORK: D-038 x6,
+                       D-039, D-040, D-036. nothing in the suite is red for a reason
+                       nobody has written down.
+                       NOTE: THE 27 AUG DEMO DATE HAS PASSED and T-045 is still unrun,
+                       while the countdown below still reads "2 days". somebody say which.
+                       Earlier: DEC-081 — A COUNT ON A UNIT COUNTS THE WHOLE BRANCH, and the
                        BRANCH SWEEP that came with it. the owner added a ward under Ward D
                        and NOTHING ABOVE IT MOVED: the leaf said 1 person, Ward D still
                        said 2, Surgery still said 3. the API's peopleCount is a groupBy on
@@ -1628,7 +1664,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-039` | **`<WordsEditor>` stopped saying which plurals are yours** | Found 29 Aug. The rebuild dropped the per-row hint that read `auto: Wings` or `your plural`, keeping only the reset button. The override state is now invisible until you notice an icon has appeared, and `Settings.test.tsx` fails on it. The new Singular/Plural header row is a real improvement and the `auto:` half is arguably redundant beside a filled field — but `your plural` was the only thing distinguishing a word the organisation chose from one the deriver guessed, which is the whole point of storing both (`22` §2) | with `D-038`, same decision |
 | `D-040` | **Operator MFA became a 6-hour code, with no `DEC-` and a red test left behind** | Found 29 Aug. `platform/totp.ts` moved `STEP_SECONDS` from 30 to `6 * 60 * 60` and `WINDOW` from 1 to 0. A second factor valid for a full shift is close to a static secret, and `19` §9 argues MFA is the one nicety not deferred **precisely because a stolen operator password exposes every tenant's plan data at once** — that doc was edited in the same window for `platform.revenue.read` and left untouched here. `platform.test.ts`'s window assertion fails consistently, three runs, not flaky. Either it gets a `DEC-` that states the demo-convenience trade out loud and the test is rewritten to the new rule, or it goes back to 30s and the demo reads a live code from `npm run ops:code` | **a decision, and it is a security posture** |
 | `D-041` | **`public.test.ts` flaked once under the root runner** | Found 29 Aug, the first root run after `D-037` was repaid: *"answers the same 404 for unknown, unlaunched, closed and expired tokens"* failed once and passed alone, and passed again on the next full root run. Both projects now start together, so the backend suite shares its one test database at a higher worker count than it ever did alone. **One occurrence is not a diagnosis** — if it returns, the answer is `fileParallelism` or a pool cap on the backend project, not a retry | watch it; act on the second occurrence |
-| `D-035` | **Four `tsc -b` errors on the branch, none of them from a task** | Found 26 Aug during `T-090`. Three in `features/roles/service.ts` and one in `pages/console/Simulator.tsx`, all `exactOptionalPropertyTypes` — an optional property being handed `T | undefined`. **Confirmed pre-existing**: the same four appear on a stashed tree, so they arrived with the `Update codebase` commit rather than with the export. They do not block `npm run dev` (tsx does not typecheck) but they **will fail `npm run build`**, which is what a deploy and a graded checkout run. Each is a one-line `...(x ? { x } : {})` or an explicit `| undefined` on the target type | **before any build-based demo** — small, but it is the kind of thing that is discovered on stage |
+| ~~`D-035`~~ | ~~**Four `tsc -b` errors on the branch, none of them from a task**~~ | **REPAID 29 Aug.** All four were `exactOptionalPropertyTypes`, and all four were fixed by CONSTRUCTING THE KEY CONDITIONALLY rather than widening the target type — `...(body.at ? { at: body.at } : {})`, and `subject.unitId ? { kind: 'subject', unitId } : { kind: 'subject' }` twice. That direction is not a style preference: on `Target`, an ABSENT `unitId` is how the resolver says *org-wide*, so `unitId: undefined` and no `unitId` at all mean the same thing to JavaScript and different things to the type. Widening would have made the two indistinguishable everywhere, to fix three lines. **The fourth, in `Simulator.tsx`, was the same shape**: `<DecisionTrace>` documents an absent `considered` as *"this response carried no candidate list"* — a production 403 (`11` §10) — so it is spread in, not passed as `undefined`. **`capability: body.capability as never` is also gone**, and that was the real find: `SimulateBody.capability` was `z.string()` while `ResolveInput.capability` is `Capability`, and the cast bridged them. The DTO now `.refine(isCapability)`, which narrows the inferred type *and* changes behaviour — a misspelt capability is a 422 naming the field, where it used to resolve to a silent `no_grant` that the simulator rendered as *"No rule grants this"*: a real-looking answer to a question the system never understood. The narrowing then found a genuine third error — the page held `capability` as a bare `string`, in a file whose own header says the sentence must never be able to ask an invalid question. It is `Capability | ''` now, so the compiler keeps that rule instead of the comment. **`npm run build` passes** | ~~before any build-based demo~~ — **done** |
 | `D-036` | **`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing** | Found 26 Aug during `T-090` and **verified pre-existing on a stashed tree**. The backwards-pagination test asserts `page1.body.page.nextCursor` is truthy and gets a falsy value, meaning the fixture no longer produces more than one page — most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing rather than the reader being wrong. The reader itself is exercised live (a 775-line export and a 45-line filtered read both came back correct). Fix is to size the fixture past one chunk deliberately, not to relax the assertion | whoever next touches `72`'s reader |
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
@@ -1657,7 +1693,7 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | ~~`D-012`~~ | ~~**No organisation has ever had a subscription row, so the trial in `16` §7 has never once happened**~~ | **REPAID 24 Aug, `T-088`, and `DEC-048` is what unblocked it.** The blocker was never the code — it was that there were **three answers and no way to choose between them**: `16` §7 said a new org starts `trialing` on Gold for 14 days, `requireEntitlement`'s own comment called bronze *"the trial default"*, and nothing wrote either, so every org in the product — all four demo orgs included — was silently Bronze and every Silver and Gold surface `402`'d for everyone, forever. `DEC-048` picked a fourth and better answer, which is the owner's: **the tier the founder chose**. `RegisterBody.tier` is required **with no default** (a default would have re-created this bug wearing a nicer coat), the row is written **inside `register`'s transaction** so an org cannot exist without a tier somebody picked, and the seed now gives **one demo org per tier** so the `402` path is demonstrable on a real organisation. Verified live on the running API, both directions on the SAME org: silver → `404` (gate opened), flip to bronze → `402` naming `requiredTier: silver`. The fallback in `requireEntitlement` stays and stays bronze — a missing billing row is our bookkeeping problem, and locking a customer out of a product they are inside is a worse answer to it | done |
 | ~~`D-028`~~ | ~~**Five capabilities were in no tier at all, and `requireEntitlement` had no tests**~~ | **FOUND AND REPAID 24 Aug by `T-088`.** `TIER_ENTITLEMENTS` (`16` §3) is a whitelist, so a capability nobody adds to it is entitled at **no tier including Enterprise**. `account.create`/`reset`/`revoke` arrived with `T-072` yesterday and the map was simply not updated; `billing.read`/`billing.update` had been uncovered since `T-003`. Neither had fired — the account routes are not entitlement-gated and `POST /billing/tier` does not exist — but the `billing` half is the worse one and worth naming: with `billing.update` in no tier, mounting `requireEntitlement` on the tier-change route would `402` every attempt to **leave** the tier you are on. A paywall in front of the upgrade button. Both are now Bronze, which `16` §3's own first assertion requires (the whole permission and identity surface is in every tier — selling privacy as an upgrade would be indefensible). **The durable fix is the test, not the two lines**: `test/tiers.test.ts` asserts every capability in the catalogue appears in at least one tier, and that the tiers **nest** — `lowestTierFor` returns the first tier that includes a capability, which is only the *cheapest* one if they do. That file is also the first test `requireEntitlement` has ever had, mounted since `T-003`; the absence is how `D-012` survived a month | done |
 | `D-013` | **`billable_seats` is specified and not implemented** | `16` §5 defines it — active users, plus non-person subjects, never respondents — and says it is *"recomputed on a schedule and on membership change, cached on `subscriptions.seats`, and shown in settings with a breakdown so a bill is never a surprise"*. `subscriptions.seats` defaults to `0` and is never written by anything. With it absent, `16` §6's over-limit behaviour cannot exist either: there is no count to be over. Neither is M0, and neither should be invented in a hurry — but *"the revenue model is architecture, not a slide"* is `16`'s own opening line, and right now the metering half of it is a slide | with `T-057` |
-| `D-014` | `POST /authz/simulate` is in `13` §Trust and is not mounted | `authz/simulate.ts` exists and exports `simulate()`; `roles/router.ts` mounts only `GET /authz/capabilities`. So the resolver's explain path — the thing `42` renders and `_MEMORY.md` N-005 calls the cheapest trust-builder in the product — has no route to reach it. It is a handler and a DTO, not a design problem: the decision it returns is the same `Decision` `requireCapability` already builds | with `T-053` |
+| ~~`D-014`~~ | ~~`POST /authz/simulate` is in `13` §Trust and is not mounted~~ | **CLOSED 29 Aug — THE ENTRY WAS STALE, and had been for some time.** The route is mounted in `roles/router.ts` behind `validate(SimulateDto)` and `requireCapability('simulator.run')`, and `/app/simulator` has been calling it. It was mounted without this row being closed, which is the small version of the failure the row describes. **What was actually missing was any test at all** — and that is why three of `D-035`'s four type errors accumulated inside `runSimulation` without one check going red. A route nothing exercises is a route nobody notices rotting. `test/simulator.test.ts` now covers it: the decision agrees with the real resolver, an `out_of_scope` block is distinguished from `no_grant`, `considered` comes back with a reason on it, `at` works present and absent, an unknown capability is a 422, a foreign target id is a 404, and a level-3 role gets a 403 | ~~with `T-053`~~ — **done** |
 | `D-015` | The liveness route is `/healthz`; `13` §Unauthenticated utility says `GET /health` | Cosmetic, one line, and listed only because `13` is meant to be the single authority on paths and this is the one place a reader would be told something untrue. `tenantResolver`'s bypass list, `routes.test.ts`'s allowlist and `chain.test.ts` all say `/healthz`, so the code is self-consistent and the doc is the odd one out — but fix whichever, not neither | with `T-057` |
 | ~~`D-016`~~ | ~~**Three different maximum CSV sizes, and the smallest one wins silently**~~ | **REPAID 23 Aug, `T-065`.** One number now: `CSV_MAX_CHARS` (150,000) in `packages/shared`, and it sits **below** the parser's 256 kb on purpose — so anything a person plausibly pastes fails `validate()` with a field error naming the CSV, and the body parser is left as the outer backstop for a body that is malicious rather than merely large. `12` §4.4 rewritten: it claimed a streaming CSV parser with a 5 MB cap that was never written, and now states what is actually true (the import is a string in a JSON body) and names the one real bypass (`48`'s multipart). Asserted by a test that sends an oversized CSV and checks the error is `VALIDATION_FAILED` on `body.csv`, not `PAYLOAD_TOO_LARGE` | done |
 | ~~`D-017`~~ | ~~**`12` §2 draws links 6–8 in a `per-router` box; `app.ts` mounts all three with `app.use()`**~~ | **REPAID 23 Aug, `T-064`.** `middleware/chains.ts` composes links 6–8 into four chains, applied with `router.use()` in twelve routers. `tenantResolver` became a factory in the process and **lost both its path-regex exception lists** — "which routes may have no tenant" and "which routes may use the slug header" are now mount-point decisions, which is a much harder thing to get wrong than a regex kept in step with `app.ts` by hand. Side effect worth having: a mistyped `/api/v1/...` now 404s instead of answering 401 | done |
@@ -1670,7 +1706,69 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-29 (latest) · `DEC-083` — saying what the count is made of
+### 2026-08-29 (latest) · the branch builds — `D-035` and `D-014` closed, and a stale `3`
+
+Not a feature session. The owner asked for the open issues and then for the top tier of the
+answer, which was: **the branch does not build, and two of its red tests belong to no debt
+id.** Both are now false.
+
+**`D-035` — four `tsc -b` errors, `npm run build` failing.** All four were the same
+`exactOptionalPropertyTypes` shape and all four were fixed by constructing the key
+conditionally rather than widening the type. That direction matters here: on `Target`, an
+**absent** `unitId` is how the resolver says *org-wide*, so `unitId: undefined` and no
+`unitId` mean the same thing to JavaScript and different things to the type. Widening would
+have erased that distinction everywhere to fix three lines.
+
+**The real find was underneath it.** `capability: body.capability as never` was bridging a
+`z.string()` DTO to a `Capability` resolver input. The DTO now `.refine(isCapability)`, which
+narrows the inferred type *and* fixes a behaviour: **a misspelt capability used to resolve to
+`no_grant`**, which the simulator rendered as *"No rule grants this"* — a real-looking answer
+to a question the system never understood. It is a 422 naming the field now. The narrowing
+then caught a third bug the cast had been hiding: `/app/simulator` held `capability` as a
+bare `string`, in a file whose own header says the sentence must never be able to ask an
+invalid question. `Capability | ''` now, so the compiler keeps that rule, not the comment.
+
+**`D-014` was stale.** `POST /authz/simulate` has been mounted, behind `validate` and
+`requireCapability('simulator.run')`, and `/app/simulator` has been calling it. It was
+mounted without the row being closed. **What was actually missing was any test at all —
+which is exactly why three of `D-035`'s four errors accumulated inside `runSimulation`
+without one check going red.** `test/simulator.test.ts`, 7 tests: the decision agrees with
+the real resolver, `out_of_scope` is distinguished from `no_grant`, `considered` comes back
+with a reason on it, `at` works present *and* absent, an unknown capability is 422, a foreign
+target id is 404, and a level-3 role gets 403.
+
+**The two unowned red tests were a literal `3` against a fourth world.** `router/routes.test.tsx`
+asserted three route trees; `/ops` made four at `DEC-033`. The number was never the property
+worth guarding — **every world having its own boundary and layout** is — so it asserts
+`worlds.length` now, and a fifth world must bring its own pair to pass rather than breaking
+the test by existing. `20` §1 said *"the three worlds"* and now says four, with the ops row
+in the table.
+
+**Four live routes were in neither the map nor the contract test**: `/app/plan`,
+`/activate/:token`, `/ops/orgs/:id`, `/ops/earnings` — the same gap `20` §2 already records
+for `/app/logs`. All four are in both now, along with the rest of `/ops`.
+
+**`audit:vocab` is clean for the first time — 3 to 0.** All three hits were INV-001
+breaches in these same two files, parked under `D-035` and about to be orphaned by closing
+it: `/app/simulator` offered *"a campaign"* between `a {labels.unit.one}` and
+`a {labels.subject.one}` — one option in a list of five, missed — and `resolveSimTarget`
+raised *"That subject does not exist"* and *"That campaign does not exist"*. Those two are
+404 sentences an administrator reads, so `runSimulation` takes `nounsOf(req)` now, exactly
+as `grantWarnings` beside it does (`D-008`).
+
+**Checks:** typecheck **0** (was 4) · lint 0 · drift clean · **vocab 0 (was 3)** ·
+**`npm run build` passes** · tests **9 failed / 1397 passed** (was 11 / 1380).
+
+**The nine that remain are all decisions, not work** — Setup ×6 (`D-038`), Settings words
+(`D-039`), operator TOTP (`D-040`), log pagination fixture (`D-036`). Nothing in the suite is
+now red for a reason nobody has written down.
+
+**Correction for the next session:** the `DEC-083` entry below says *"six days before a
+graded demo"*. The demo date is **27 Aug and it has passed** — the header block still counts
+down to it and `T-045` (three rehearsals) is still unrun. Somebody should say which of those
+is true before the board is trusted again.
+
+### 2026-08-29 · `DEC-083` — saying what the count is made of
 
 The owner picked **(b)** from `OPEN-013`: not dropping the lowest tier from the total, but
 disclosing the mix. Everyone placed in a ward is affected when the ward goes, which is what
