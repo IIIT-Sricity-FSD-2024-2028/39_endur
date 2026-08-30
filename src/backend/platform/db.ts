@@ -50,8 +50,32 @@ const AGGREGATE_OPERATIONS = new Set(['count', 'aggregate', 'groupBy']);
  * Writes an operator is allowed to make, by model. Everything else is read-only through
  * this client — an operator who could edit a customer's units or people would be an
  * operator who can act inside a tenant, which no capability in `19` §4 means.
+ *
+ * TWO ADDITIONS AT `T-100`/`T-101`, AND BOTH ARE WRITES INTO A TENANT ON PURPOSE — which is
+ * why they are named here rather than worked around at the call site.
+ *
+ * `Notification` — `DEC-101`. `platform.message.send` has always meant "contact this
+ * organisation's administrators"; what it lacked was anywhere to put the message that the
+ * recipient could reach, so it wrote to `platform_audit_log` and reported success. Adding the
+ * model is what makes the capability mean what its name says. THE ROW CARRIES NO CUSTOMER
+ * CONTENT — a subject and a body the OPERATOR typed — so nothing here is a path INTO a
+ * tenant's data; it is a path out of ours into their inbox.
+ *
+ * `EnterpriseRequest` — `DEC-100`. The operator only ever moves `status`, `handled_by` and
+ * `handled_at` on a row the CUSTOMER created. The queue would be unworkable otherwise, and
+ * the alternative — a second table on our side mirroring theirs — is two records of one fact.
+ *
+ * NEITHER WIDENS THE READ SURFACE. `Answer` is still unreachable, `Response` is still
+ * count-only, and neither new model has a relation that could reach either.
  */
-const WRITABLE_MODELS = new Set(['Organization', 'Subscription', 'PlatformAuditLog', 'PlatformUser']);
+const WRITABLE_MODELS = new Set([
+  'Organization',
+  'Subscription',
+  'PlatformAuditLog',
+  'PlatformUser',
+  'Notification',
+  'EnterpriseRequest',
+]);
 const WRITES = new Set(['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany']);
 
 /**

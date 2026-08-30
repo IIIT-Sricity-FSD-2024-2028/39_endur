@@ -117,32 +117,31 @@ export default function Analytics(): JSX.Element {
                 value={data.orgs.joined}
                 context={`${data.orgs.total} total · excludes ${data.orgs.trialing} trialing and ${data.orgs.cancelled} cancelled`}
               />
+              {/* TRIALS STARTED AND CONVERSION RATE ARE GONE — DEC-102. Not moved, not
+                  reworded: removed, because neither could ever move. `DEC-048` made
+                  registration write `status: 'active'`, so nothing is ever trialing, and
+                  `converted` was a hardcoded 0 under a comment saying it had no source. The
+                  honest thing to do with a metric that has no source is not to print it, and
+                  two of six headline cards that cannot change teach a reader to stop
+                  believing the other four. */}
               <StatCard
-                kicker="Trials started"
-                value={data.trials.started}
-                context={`${data.trials.converted} converted · ${data.trials.expired} expired, in this window`}
-              />
-              <StatCard
-                kicker="Conversion rate"
-                // A dash, never `0%` — decision 3: no trial has completed is not a measured zero.
-                value={data.trials.conversionRate === null ? '—' : `${Math.round(data.trials.conversionRate * 100)}%`}
-                context={
-                  data.trials.conversionRate === null
-                    ? 'No trial has completed in this window yet'
-                    : `${data.trials.converted} of ${data.trials.converted + data.trials.expired} completed trials`
-                }
-              />
-              <StatCard
-                kicker="Quiet 30 days"
+                kicker="Gone quiet"
                 value={data.adoption.orgsQuiet30d}
                 context={`of ${data.orgs.total} organisations · no response in the last 30 days`}
               />
             </div>
 
             <section className="card">
-              <h3>Movement</h3>
+              {/* THE ONE SECTION THE DATES GOVERN, AND IT SAYS SO — DEC-103. Every other
+                  figure on this page is a count of the whole estate as of today, so moving
+                  the window left five of six sections unchanged, which is indistinguishable
+                  from a broken control. That was half of the owner's report; the other half
+                  was `D-044`, and it was real — `to` excluded the day it named. */}
+              <h3>Movement · in this window</h3>
               <p className="text-muted">
-                Four counts, never netted — an honest total has no single number.
+                Four counts, never netted — an honest total has no single number. This is the
+                only section the dates above change; everything else on this page is as of
+                today.
               </p>
               <GrowthChart series={data.movement} granularity={data.window.granularity} />
               <ResponsiveTable
@@ -155,17 +154,23 @@ export default function Analytics(): JSX.Element {
             </section>
 
             <section className="card">
-              <h3>Tier mix</h3>
+              {/* AS OF TODAY, AND IT CANNOT BE OTHERWISE — DEC-103. `subscriptions` holds one
+                  row per organisation with NO HISTORY, so "the tier mix on 12 August" is not a
+                  question this database can answer. Saying so is the honest label;
+                  reconstructing it from `payments` is a different feature. */}
+              <h3>Tier mix · as of today</h3>
               <p className="text-muted">
                 {data.byTier.reduce((sum, row) => sum + row.orgs, 0)} organisations · excludes{' '}
                 {data.orgs.trialing} trialing
               </p>
+              {/* NO SEAT COUNT ON THE LABEL — DEC-102. Nothing is billed per seat, so a seat
+                  figure on the revenue owner's page measured something no invoice reads. */}
               {TIERS.map((tier) => {
                 const row = data.byTier.find((entry) => entry.tier === tier);
                 return (
                   <BarRow
                     key={tier}
-                    label={`${TIER_LABEL[tier]} · ${row?.seats ?? 0} seats`}
+                    label={TIER_LABEL[tier] ?? tier}
                     value={row?.orgs ?? 0}
                     total={data.orgs.total}
                     showPercent
@@ -175,7 +180,7 @@ export default function Analytics(): JSX.Element {
             </section>
 
             <section className="card">
-              <h3>Adoption</h3>
+              <h3>Adoption · as of today</h3>
               <p className="text-muted">
                 {data.adoption.orgsWithACampaign} of {data.orgs.total} organisations have a
                 campaign · {data.adoption.orgsWithAResponse} have at least one response
@@ -186,10 +191,13 @@ export default function Analytics(): JSX.Element {
             </section>
 
             <section className="card">
-              <h3>Totals</h3>
+              <h3>Totals · as of today</h3>
+              {/* "— never read" IS GONE. It was INV-011 stated as a boast, and a boast on a
+                  page about numbers reads as a disclaimer somebody felt was needed. The
+                  invariant is enforced by the SHAPE of `PlatformAnalytics`, which has no field
+                  that could carry a response — a sentence here protects nothing. */}
               <p className="text-muted">
-                {data.totals.seats} seats · {data.totals.campaigns} campaigns ·{' '}
-                {data.totals.responses} responses, counted — never read
+                {data.totals.campaigns} campaigns · {data.totals.responses} responses
               </p>
             </section>
           </div>

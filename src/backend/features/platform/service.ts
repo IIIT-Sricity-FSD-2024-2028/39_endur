@@ -9,6 +9,9 @@ import type { Request } from 'express';
 import type {
   AnalyticsQuery,
   EarningsQuery,
+  EnterpriseQueueQuery,
+  EnterpriseRequestRow,
+  EnterpriseStatus,
   EstateQuery,
   LogExportQuery,
   LogFileMeta,
@@ -27,6 +30,7 @@ import type {
 import { TIERS, isQuietOrg } from '@endur/shared';
 import type { PaymentKind } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
+import { newPeriod } from '../../billing/period.js';
 import { writeAudit } from '../../platform/audit.js';
 import { hashPassword } from '../../auth/password.js';
 import { generateSecret, otpauthUrl } from '../../platform/totp.js';
@@ -389,6 +393,23 @@ function periodsBetween(from: Date, to: Date, granularity: 'month' | 'quarter'):
 
 const TIER_RANK = new Map(TIERS.map((tier, index) => [tier, index]));
 
+/**
+ * The last instant of the day a date names — `D-044`, `DEC-103`.
+ *
+ * `<input type="date">` sends `2026-08-12` and `z.coerce.date()` reads it as midnight, so a
+ * range query written `lte: to` excluded the whole of the last day the operator selected, and
+ * a single-day window matched nothing at all. Every windowed query on both platform pages
+ * runs through this.
+ *
+ * 999 MILLISECONDS, NOT `+ 1 DAY` WITH `lt`. Both are correct; this one keeps the comparison
+ * `lte` everywhere, so no caller has to remember which of its two bounds is exclusive.
+ */
+function endOfDay(value: Date): Date {
+  const end = new Date(value.getTime());
+  end.setUTCHours(23, 59, 59, 999);
+  return end;
+}
+
 export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytics> {
   const now = new Date();
   const to = query.to ?? now;
@@ -398,7 +419,29 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
   const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
   const granularity = query.granularity;
 
-  const [organizations, trialing, cancelled, tierRows, movementNew, planOverrides, suspensions] =
+  // `to` IS INCLUSIVE TO THE END OF THE DAY NAMED — D-044.
+  //
+  // `<input type="date">` sends `2026-08-12`; `z.coerce.date()` reads that as
+  // `2026-08-12T00:00:00Z`; every query below is `lte: to`. SO THE WHOLE OF THE LAST DAY
+  // SELECTED WAS EXCLUDED, and a single-day window (`from` === `to`) matched nothing at all —
+  // which is what the owner met as "the date filters are not working".
+  //
+  // The adjustment is here rather than in the DTO because the DTO's job is to say the value
+  // is a date; what a date MEANS at the end of a range is this function's question, and
+  // `/ops/earnings` reads the same shape (`EarningsQuery = AnalyticsQuery`) and needs the
+  // same answer.
+  const windowEnd = endOfDay(to);
+
+  const [
+    organizations,
+    trialing,
+    cancelled,
+    tierRows,
+    movementNew,
+    planChanges,
+    planOverrides,
+    suspensions,
+  ] =
     await Promise.all([
       db.organization.count(),
       db.subscription.count({ where: { status: 'trialing' } }),
@@ -410,33 +453,52 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
         select: { id: true, subscription: { select: { tier: true } } },
       }),
       db.organization.findMany({
-        where: { createdAt: { gte: from, lte: to } },
+        where: { createdAt: { gte: from, lte: windowEnd } },
         select: { createdAt: true },
       }),
+      // MOVEMENT READS `payments` — DEC-102 — AND STILL READS `plan.override` BESIDE IT.
+      //
+      // THE DECISION SAID "RATHER THAN", AND "RATHER THAN" WOULD HAVE LOST A CASE THE SAME
+      // DECISION REQUIRES. `DEC-102`'s argument is that `plan.override` is the OPERATOR'S
+      // action, so the table had only ever counted what operators did while being labelled as
+      // the estate — true, and the remedy is to ADD the customer's own moves rather than to
+      // swap one partial source for another. Its own `not` clause settles it: downgraded
+      // "covers an operator override AND the scheduled expiry", and an override deliberately
+      // writes NO `payments` row (`OverridePlan`'s DTO comment: an operator who could name an
+      // amount could invent revenue). Replacing the source would have made an operator moving
+      // thirty organisations to Gold show as no movement at all.
+      //
+      // THE TWO SOURCES ARE DISJOINT BY CONSTRUCTION, so there is nothing to de-duplicate: a
+      // customer's own move writes a `payments` row and no platform audit row; an operator's
+      // override writes a platform audit row and no `payments` row. That is not a coincidence
+      // to rely on quietly — it is `19` §8's split between a sale and a support action, and if
+      // it ever stops being true this count double-counts, which is why it is written down.
+      db.payment.findMany({
+        where: { createdAt: { gte: from, lte: windowEnd }, status: 'succeeded' },
+        select: { createdAt: true, tier: true, fromTier: true },
+      }),
       db.platformAuditLog.findMany({
-        where: { action: 'plan.override', createdAt: { gte: from, lte: to } },
+        where: { action: 'plan.override', createdAt: { gte: from, lte: windowEnd } },
         select: { createdAt: true, payload: true },
       }),
       db.platformAuditLog.findMany({
-        where: { action: 'org.suspend', createdAt: { gte: from, lte: to } },
+        where: { action: 'org.suspend', createdAt: { gte: from, lte: windowEnd } },
         select: { createdAt: true },
       }),
     ]);
 
   const joined = organizations - trialing - cancelled;
 
-  const seats = await seatsFor(tierRows.map((row) => row.id));
-  const byTierMap = new Map<Tier, { orgs: number; seats: number }>(
-    TIERS.map((tier) => [tier, { orgs: 0, seats: 0 }]),
-  );
+  // NO SEAT COLUMN — DEC-102. `DEC-080` prices per ORGANISATION, `subscriptions.seats` has
+  // never been written (`D-013`), and the live count `16` §5 computes is not billed on. A
+  // seat figure on the revenue owner's page measured something no invoice reads, and the
+  // `seatsFor()` call that produced it was the most expensive query on the page.
+  const byTierMap = new Map<Tier, number>(TIERS.map((tier) => [tier, 0]));
   for (const row of tierRows) {
     const tier = (row.subscription?.tier ?? 'bronze') as Tier;
-    const entry = byTierMap.get(tier);
-    if (!entry) continue;
-    entry.orgs += 1;
-    entry.seats += seats.get(row.id) ?? 0;
+    if (byTierMap.has(tier)) byTierMap.set(tier, byTierMap.get(tier)! + 1);
   }
-  const byTier = TIERS.map((tier) => ({ tier, ...byTierMap.get(tier)! }));
+  const byTier = TIERS.map((tier) => ({ tier, orgs: byTierMap.get(tier)! }));
 
   const periods = periodsBetween(from, to, granularity);
   const movementMap = new Map(
@@ -446,15 +508,35 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
     const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
     if (bucket) bucket.new += 1;
   }
-  for (const row of planOverrides) {
-    const payload = row.payload as { from?: string; to?: string } | null;
-    const fromRank = payload?.from ? TIER_RANK.get(payload.from as Tier) : undefined;
-    const toRank = payload?.to ? TIER_RANK.get(payload.to as Tier) : undefined;
-    if (fromRank === undefined || toRank === undefined || fromRank === toRank) continue;
-    const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
-    if (!bucket) continue;
+  /**
+   * ONE RULE FOR BOTH SOURCES: THE PREVIOUS PLAN AGAINST THE ONE THAT REPLACED IT.
+   *
+   * That is the owner's definition of a downgrade (`DEC-102`) and it is deliberately silent
+   * about WHO caused the move — with `DEC-096` a customer cannot move down at all, so the
+   * downgrades that reach here are an operator override and the scheduled expiry of
+   * `DEC-098`, and a rule that named a cause would have to be extended for each new one.
+   */
+  const countMove = (at: Date, before?: string | null, after?: string | null): void => {
+    // A SIGNUP IS NOT A MOVE. `from_tier` is null on it, and the organisation is already
+    // counted under `new` from its own `created_at` — counting it here as well would put one
+    // organisation in two of four columns decision 2 insists are never netted.
+    const fromRank = before ? TIER_RANK.get(before as Tier) : undefined;
+    const toRank = after ? TIER_RANK.get(after as Tier) : undefined;
+    if (fromRank === undefined || toRank === undefined || fromRank === toRank) return;
+    const bucket = movementMap.get(periodKeyOf(at, granularity));
+    if (!bucket) return;
     if (toRank > fromRank) bucket.upgraded += 1;
     else bucket.downgraded += 1;
+  };
+
+  // The customer's own moves — a join (`DEC-097`) and a scheduled expiry (`DEC-098`).
+  for (const row of planChanges) countMove(row.createdAt, row.fromTier, row.tier);
+
+  // The operator's. Same rule, different table, because an override takes no money and so
+  // writes no ledger row — see the query above.
+  for (const row of planOverrides) {
+    const payload = row.payload as { from?: string; to?: string } | null;
+    countMove(row.createdAt, payload?.from ?? null, payload?.to ?? null);
   }
   for (const row of suspensions) {
     const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
@@ -462,21 +544,18 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
   }
   const movement = periods.map((period) => ({ period, ...movementMap.get(period)! }));
 
-  // Trials. `19` §13b / `Mithil/plan.md`: register never writes `trialing` (DEC-048), so
-  // only a seeded operator-created org can be. `started`/`expired` read the only start/end
-  // dates the model has (`periodStart`/`periodEnd`); `converted` has NO SOURCE — nothing
-  // records a trialing-to-active TRANSITION, only a tier override, which carries no prior
-  // status. Reporting a guessed conversion would be exactly the fabricated confidence
-  // decision 3 exists to refuse, so it stays honestly zero until a real signal exists.
-  const [trialsStarted, trialsExpired] = await Promise.all([
-    db.subscription.count({ where: { status: 'trialing', periodStart: { gte: from, lte: to } } }),
-    db.subscription.count({
-      where: { status: 'trialing', periodEnd: { gte: from, lte: to, lt: now } },
-    }),
-  ]);
-  const trialsConverted = 0;
-  const completed = trialsConverted + trialsExpired;
-  const conversionRate = completed === 0 ? null : trialsConverted / completed;
+  // THE TRIAL COUNTERS ARE GONE — DEC-102, and the argument is that they could never move.
+  //
+  // `DEC-048` made registration write `status: 'active'`, so nothing on the sign-up path is
+  // ever `trialing`; and `converted` was a hardcoded `0` under a comment saying it had no
+  // source, so `conversionRate` was permanently the em-dash. TWO OF THE SIX HEADLINE CARDS
+  // WERE STRUCTURALLY INCAPABLE OF CHANGING, which is what the owner met when they created an
+  // organisation and Trials started did not move.
+  //
+  // The old comment's argument for the honest zero was right about honesty and wrong about
+  // the remedy: the honest thing to do with a metric that has no source is NOT TO PRINT IT.
+  // The DTO fields went with the queries, because a field left behind is a field something
+  // starts computing again.
 
   const [orgsWithACampaign, orgsWithAResponse, allOrgIds] = await Promise.all([
     db.organization.count({ where: { campaigns: { some: {} } } }),
@@ -496,29 +575,21 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
     }
   }
 
-  const allSeats = await seatsFor(allOrgIds.map((row) => row.id));
   const [campaignsTotal, responsesTotal] = await Promise.all([
     db.campaign.count(),
     db.response.count(),
   ]);
 
   return {
+    // `to` GOES BACK OUT AS THE DAY THAT WAS ASKED FOR, not as the 23:59:59 the query used —
+    // the page echoes this into its own date input, and an input that reads back a second
+    // later than what was typed is a control arguing with the person using it.
     window: { from: from.toISOString(), to: to.toISOString(), granularity },
     orgs: { total: organizations, joined, trialing, cancelled },
     byTier,
     movement,
-    trials: {
-      started: trialsStarted,
-      converted: trialsConverted,
-      expired: trialsExpired,
-      conversionRate,
-    },
     adoption: { orgsWithACampaign, orgsWithAResponse, orgsQuiet30d },
-    totals: {
-      seats: [...allSeats.values()].reduce((sum, value) => sum + value, 0),
-      campaigns: campaignsTotal,
-      responses: responsesTotal,
-    },
+    totals: { campaigns: campaignsTotal, responses: responsesTotal },
   };
 }
 
@@ -600,14 +671,26 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
   const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
   const granularity = query.granularity;
 
-  const window = { createdAt: { gte: from, lte: to }, status: 'succeeded' };
+  // `kind: { not: 'expiry' }` — DEC-098. An expiry row records a plan MOVE with no money on
+  // it (Rs 0), and this page is about money: counting it as a payment would leave the average
+  // capture dragged down by events where nothing was captured, and the count answering a
+  // different question from the sum beside it. `/ops/analytics` reads those rows for exactly
+  // the opposite reason — it wants the movement, not the money (DEC-102).
+  const window = {
+    createdAt: { gte: from, lte: to },
+    status: 'succeeded',
+    kind: { not: 'expiry' },
+  };
 
   const [inWindow, lifetime, tierRows, recentRows, changeRows] = await Promise.all([
     db.payment.findMany({
       where: window,
       select: { orgId: true, tier: true, amountMinor: true, createdAt: true },
     }),
-    db.payment.aggregate({ where: { status: 'succeeded' }, _sum: { amountMinor: true } }),
+    db.payment.aggregate({
+      where: { status: 'succeeded', kind: { not: 'expiry' } },
+      _sum: { amountMinor: true },
+    }),
     // The CURRENT mix. A missing subscription row folds into bronze — the same convention
     // `stats()` and `analytics()` already use (D-012), and changing it in one place only
     // would make three pages disagree about the same organisation.
@@ -706,17 +789,21 @@ export async function overridePlan(
   // INV-007, one feature over: the row and the change are one transaction, so there is no
   // plan change without a record of who made it.
   await db.$transaction(async (tx) => {
-    const today = new Date();
     await tx.subscription.upsert({
       where: { orgId },
-      update: { tier, status: 'active' },
+      // `pendingTier: null` for `joinTier`'s reason (DEC-098): an operator who has just been
+      // asked to put an organisation on a tier has settled the question, and a scheduled move
+      // down surviving that would take the plan away weeks later with the support call
+      // already closed. An override is the newest fact about the plan, so it wins.
+      update: { tier, status: 'active', pendingTier: null },
       create: {
         orgId,
         tier,
         status: 'active',
         seats: 0,
-        periodStart: today,
-        periodEnd: new Date(today.getTime() + 365 * DAY),
+        // ONE MONTH, from `billing/period.ts` — DEC-096. The third of four places that each
+        // hardcoded a year, and the one that used a different expression from registration's.
+        ...newPeriod(),
       },
     });
     await writeAudit(tx, req, 'plan.override', orgId, { from, to: tier, ...(reason ? { reason } : {}) });
@@ -748,10 +835,27 @@ export async function setSuspended(
 }
 
 /**
- * 70 § Interactions. Delivery in P2 is the RECORD — there is no mail transport in this
- * product and inventing one here would be a feature nobody asked for. The record is the
- * half that makes it a support tool rather than a mailto link: the next operator can see
- * the conversation, and `/platform/audit` is where they see it.
+ * 70 § Interactions, DEC-101, T-101.
+ *
+ * ~~Delivery in P2 is the RECORD.~~ THE OLD COMMENT'S ARGUMENT WAS HALF RIGHT AND THE MISSING
+ * HALF WAS THE WHOLE FEATURE. It said there is no mail transport in this product and
+ * inventing one would be a feature nobody asked for — true, and `63` is still P3 behind a
+ * provider and `17` (`CONF-006`). But "delivery is the record" is only true if the record is
+ * somewhere the RECIPIENT can reach, and the only row this wrote was to
+ * `platform_audit_log` — THE OPERATOR'S OWN TABLE. The customer's administrators had no route
+ * that read it and no screen that rendered it.
+ *
+ * SO THE OPERATOR WAS SHOWN "Sent to 3 administrators" AND NOBODY HAD BEEN SENT ANYTHING.
+ * That is worse than an unbuilt feature: an unbuilt feature does not report success.
+ *
+ * TWO ROWS NOW, IN ONE TRANSACTION, and they are two different records rather than one
+ * duplicated. The audit row is what the NEXT OPERATOR sees on `/platform/audit` — the
+ * conversation this desk has had with this customer. The `notifications` rows are what the
+ * CUSTOMER sees in `/app/inbox`. The body is copied onto both deliberately (`10` §5): a
+ * shared string that one side could edit is a record of a message that was never sent.
+ *
+ * STILL NO CHANNEL. Nothing leaves the product; the recipient already visits the inbox, and
+ * a row in a table they already open is not `63`'s scope.
  */
 export async function messageAdministrators(
   req: Request,
@@ -768,6 +872,20 @@ export async function messageAdministrators(
   }
 
   await db.$transaction(async (tx) => {
+    // THE CUSTOMER'S COPY — one row per recipient, because read state is the reader's (`58`)
+    // and a shared row cannot be read by one administrator and unread by another.
+    await tx.notification.createMany({
+      data: recipients.map((person) => ({
+        orgId,
+        userId: person.id,
+        kind: 'platform_message',
+        subject,
+        body,
+      })),
+    });
+
+    // The operator's. Same transaction, so `{ sentTo: n }` can never again be returned for a
+    // message that was not written — which is exactly the failure this replaces.
     await writeAudit(tx, req, 'message.send', orgId, {
       subject,
       body,
@@ -1011,3 +1129,120 @@ export async function exportOperatorLogFile(
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// The Enterprise queue — DEC-100, T-100, 70 § The Enterprise queue, 19 §4.
+//
+// A WORK ITEM, NOT A NOTIFICATION. The owner's instruction was *"send a notif on owner admin
+// account"*, and a bell was the wrong shape for it: a bell clears on read, and what has to
+// survive is not "somebody was told" but "somebody has to ring this customer back". Reading
+// this queue changes nothing.
+//
+// OWNER ONLY — `platform.enterprise.read` / `.update`, both `OWNER_ONLY`. Staff see every
+// organisation because support helps one customer at a time; this is a REVENUE queue, and it
+// gets the split `DEC-080` already made between `platform.analytics.read` and
+// `platform.revenue.read`.
+// ---------------------------------------------------------------------------
+
+const ENTERPRISE_SELECT = {
+  id: true,
+  createdAt: true,
+  askedName: true,
+  askedEmail: true,
+  note: true,
+  status: true,
+  handledAt: true,
+  org: { select: { id: true, name: true, subscription: { select: { tier: true } } } },
+} as const;
+
+type EnterpriseRow = {
+  id: string;
+  createdAt: Date;
+  askedName: string;
+  askedEmail: string;
+  note: string | null;
+  status: string;
+  handledAt: Date | null;
+  org: { id: string; name: string; subscription: { tier: string } | null };
+};
+
+const enterpriseView = (row: EnterpriseRow): EnterpriseRequestRow => ({
+  id: row.id,
+  at: row.createdAt.toISOString(),
+  org: {
+    id: row.org.id,
+    name: row.org.name,
+    // A missing subscription row folds into bronze — the same convention `stats()`,
+    // `analytics()` and `earnings()` already use (D-012). Three pages agreeing about one
+    // organisation matters more than a fourth answer here.
+    tier: (row.org.subscription?.tier ?? 'bronze') as Tier,
+  },
+  askedName: row.askedName,
+  askedEmail: row.askedEmail,
+  note: row.note,
+  status: row.status as EnterpriseStatus,
+  handledAt: row.handledAt?.toISOString() ?? null,
+});
+
+export async function readEnterpriseQueue(
+  query: EnterpriseQueueQuery,
+): Promise<EnterpriseRequestRow[]> {
+  const rows = await db.enterpriseRequest.findMany({
+    where: { status: query.status },
+    // OLDEST FIRST, and this is the one list on the platform surface that is not newest-first.
+    // Every other operator screen answers "what just happened"; a work queue answers "who has
+    // been waiting longest", and putting the newest request at the top of it is how the first
+    // customer who asked becomes the last one called.
+    orderBy: { createdAt: 'asc' },
+    select: ENTERPRISE_SELECT,
+  });
+
+  return rows.map(enterpriseView);
+}
+
+/**
+ * Move a request along. `open` -> `contacted` -> `closed`, and back if somebody mis-clicked.
+ *
+ * NO STATE MACHINE. Three values and a free move between them, because the queue is worked by
+ * one person and the cost of a wrong click is another click — a transition table would be
+ * machinery guarding against a mistake that costs nothing.
+ *
+ * MOVING OFF `open` RELEASES THE PARTIAL UNIQUE INDEX, so a customer whose request was closed
+ * can ask again. That is the behaviour we want and it is worth naming: the index says "one
+ * OPEN request per organisation", never "one request ever".
+ */
+export async function updateEnterpriseRequest(
+  req: Request,
+  id: string,
+  status: EnterpriseStatus,
+): Promise<EnterpriseRequestRow> {
+  const existing = await db.enterpriseRequest.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) throw new NotFoundError();
+
+  const operator = req.ctx.principal;
+  await db.$transaction(async (tx) => {
+    await tx.enterpriseRequest.update({
+      where: { id },
+      data: {
+        status,
+        // WHO CLOSED IT AND WHEN, cleared when it comes back to `open` — a handled-by that
+        // survives a reopen names an operator for work that is once again undone.
+        ...(status === 'open'
+          ? { handledBy: null, handledAt: null }
+          : {
+              handledAt: new Date(),
+              ...(operator?.kind === 'platform' ? { handledBy: operator.id } : {}),
+            }),
+      },
+    });
+    await writeAudit(tx, req, 'enterprise.update', null, { requestId: id, status });
+  });
+
+  // THE ROW THAT WAS UPDATED, re-read by its own id. Returning the first row of the new status
+  // instead would hand the caller somebody else's request whenever two are in the same state,
+  // and the page would show the wrong customer's name against the click.
+  const row = await db.enterpriseRequest.findUnique({ where: { id }, select: ENTERPRISE_SELECT });
+  if (!row) throw new NotFoundError();
+  return enterpriseView(row);
+}
+

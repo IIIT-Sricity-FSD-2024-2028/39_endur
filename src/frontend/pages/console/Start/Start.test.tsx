@@ -20,6 +20,7 @@ vi.mock('../../../lib/billing.js', () => ({
           status: 'active',
           periodStart: '2026-08-01T00:00:00.000Z',
           periodEnd: '2026-09-01T00:00:00.000Z',
+          pendingTier: null,
           seats: 4,
           seatBreakdown: { activeUsers: 4, nonPersonSubjects: 0 },
         }

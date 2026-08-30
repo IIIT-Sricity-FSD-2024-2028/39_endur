@@ -794,8 +794,45 @@ already exists and each card carries its own action, because the click **is** th
 sign-up. A pre-selected card is the product choosing and then attributing the choice to the
 customer, which is how `D-012` looked from the inside for a month.
 
-**`PlanOption` carries no price** — DEC-035 removed pricing from the product, so every tier
-renders the same **Join** action. It also carries no `includes[]`: the entitlement map stays on
+**AMENDED 2026-08-31 — `DEC-096`, `DEC-099`.** Three changes, and the middle one is a bug the
+prop table hid:
+
+- **`mode` now decides `selectable`, and it always should have.** The component computes
+  `unavailable = disabled || !plan.selectable` and applies it in **all three modes** — so
+  Enterprise's button is disabled in `override`, which is *the operator assigning a plan*, the
+  one path `DEC-048` routes Enterprise through and the one `19` §4 gives a capability. **The
+  only tier the product calls operator-assigned is unassignable in the only UI that can assign
+  it**, and that is the whole of the "enterprise plan is not working" report. `selectable`
+  means *a customer may not choose this*; an operator is not a customer. Read it as
+  `mode !== 'override' && !plan.selectable`.
+- **In `join`, a card BELOW the current tier is not an action.** The ladder is one-way while a
+  period is running (`DEC-096`), so lower cards render as context — the tier and its price, no
+  button. The rule that refuses a downgrade is the server's (`13` § Billing); this is what
+  stops offering one.
+- **Enterprise's card carries a price and a REQUEST action** (`DEC-099`). `priceMinor` is
+  `499900` and prints like any other; `selectable: false` now means only *not self-serve*, so
+  the card's verb is **Request**, not **Join**, and it opens `<EnterpriseRequestDialog>`.
+  The `Priced with you` branch goes with the sentinel it was protecting.
+
+**BUILT 2026-08-31 (`T-099`, `T-100`), with two amendments to the three bullets above.**
+
+1. **`unavailable` is narrower than `mode !== 'override'`.** It reads
+   `disabled || (mode === 'signup' && !plan.selectable)`, because the Request verb landed in
+   the same pass — a `join` card that has an action does not need to be exempted from being
+   disabled, it needs not to be disabled at all. The operator's case is fixed either way.
+2. **`Arranged with us` stayed, reworded** to *"ask and we will get in touch"*. Deleting it
+   would have left one card whose verb differs from every other card's with nothing on it
+   saying why. It also gained a fourth tier-valued prop, `requestedTier`, so a card with an
+   open request reads **Requested** and is inert — a second ask is a `409`, and a button whose
+   only outcome is an error is not an action.
+
+~~**`PlanOption` carries no price** — DEC-035 removed pricing from the product, so every tier
+renders the same **Join** action.~~ **STALE SINCE `DEC-080` (29 Aug) and corrected here:** the
+prices came back, `PlanOption.priceMinor` carries them in integer paise, and the card prints
+one. Per **month** since `DEC-096`, not per year — the `/ year` suffix is the one place a
+reader learns the period, so it is the one place that must not be left behind.
+
+It carries no `includes[]`: the entitlement map stays on
 the server. `/start` has no session and could not fetch `GET /billing/plans` (it is behind
 `billing.read`), and shipping `TIER_ENTITLEMENTS` to the browser would invite a second
 implementation of the `402` decision — which INV-003's whole posture forbids. What the client
@@ -871,7 +908,15 @@ overlay. The copy says so — *"Endur demo checkout · no card details are colle
 
 **It decides nothing.** `onPaid` is what the caller does next, and the server does that thing
 whether or not a reference arrives (`JoinTierBody.paymentRef` is optional and is a label, not
-a proof). Two rails: the amount on the left, `plan.features` on the right, because the reader
+a proof).
+
+**AMENDED 2026-08-31 — `DEC-097`. In `change` mode the amount is the DIFFERENCE**,
+`priceOf(plan.tier) − priceOf(fromTier)`, and the line says so: *"₹999 Gold − ₹499 already on
+Silver"*. `fromTier` is already a prop and was only feeding a sentence; it now feeds the
+number. **What the dialog prints is not what the ledger records** — `recordPayment` computes
+the same subtraction server-side inside the transaction (`DEC-080` requires this and `DEC-097`
+does not relax it), so a client that renders the wrong figure renders a wrong figure and
+nothing more. Two rails: the amount on the left, `plan.features` on the right, because the reader
 is deciding and the argument for the price has to be beside the price. Two callers — `/start`
 step 2 and `/app/plan` — and `<PlanPicker>` knows about neither: selection still only means
 "this one", which is what keeps the picker usable in `override` mode where an operator must
@@ -920,6 +965,15 @@ exactly what `71`'s own rule forbids ("historic figures must not move retroactiv
 four `movement` counts are what the estate's actual history supports, and plotting those
 keeps decision 2 intact: four lines, never netted into a single growth curve.
 
+**AMENDED 2026-08-31 — `DEC-102`. The props do not change; the SOURCE does.** `upgraded` and
+`downgraded` were counted from `platform_audit_log`'s `plan.override` rows, which are the
+**operator's** actions only — a customer's own upgrade writes `billing.update` to the tenant
+`audit_log`, which that query has never read. So this chart has always plotted what operators
+did while labelled as what the estate did. It reads `payments` now (`from_tier` → `tier`),
+which is written on both paths and is what `/ops/earnings` already sums. The paragraph above
+about there being no tier history is unchanged and is still why a per-period tier mix is not
+plottable.
+
 **Renamed from `<RevenueChart>` on 2026-08-23 with DEC-035** — counts instead of amounts, no
 currency prop, because there is no currency.
 
@@ -928,6 +982,55 @@ classes, one shared scale, an `aria-hidden` `<svg>` paired with a real `<table>`
 placement of that machinery, not a second charting approach. `<BarRow>` is used for the
 (four-row, non-time-series) tier mix on the same page — `<StackedBar>` is not: `24` §3
 documents it as good/neutral/bad and NPS-only, and a four-tier mix is not that shape.
+
+### `<EnterpriseRequestDialog>`  ·  **BUILT 2026-08-31 (`T-100`, `DEC-100`)**
+```ts
+{ orgName: string;
+  onSubmit: (note: string) => Promise<void>;     // POST /billing/enterprise-request
+  onCancel: () => void }
+```
+`/app/plan` only, opened by Enterprise's **Request** card. **One optional free-text note and
+nothing else.** No company-size dropdown, no budget field, no "how did you hear about us" — the
+row exists to make somebody ring this customer back, and every field added is a field that
+delays the click without changing who gets rung. Who asked and which organisation are resolved
+server-side from the session, never posted, for the reason `<MessageComposer>` gives about
+recipients one entry above.
+
+**Its success state is a promise, not a receipt**: *"We'll be in touch"*, with no ticket number
+and no ETA, because nothing in the product can honour either. A second request while one is
+`open` is a 409 that says the first is already with us — not a duplicate row, and not a silent
+success that teaches the customer to click again.
+
+### `<MessageCard>`  ·  **BUILT 2026-08-31 (`T-101`, `DEC-101`)**
+```ts
+{ message: { id: string; subject: string; body: string; sentAt: string; readAt: string | null };
+  onRead: (id: string) => void;
+  onUnread: (id: string) => void }
+```
+`/app/inbox`'s **From Endur** tab. Deliberately the same anatomy as `<ResponseCard>` — an
+unread rail, a timestamp, a body, and read/unread as the only verbs — because the tab reuses
+`58`'s triage mechanic rather than inventing a second one (`INV-009`). **No archive verb**:
+`58` archives a comment because a queue of four hundred needs a floor, and a customer who has
+had three messages from their vendor does not.
+
+**It has no reply.** There is no inbound channel: `70` § Interactions is a one-way support
+tool, `63` (multichannel delivery) is an unwritten P3 placeholder, and a Reply button that
+opens a `mailto:` is a channel invented in a component. The card names the sender as **Endur**
+and stops there.
+
+### `<EnterpriseQueue>`  ·  **BUILT 2026-08-31 (`T-100`, `DEC-100`)**
+```ts
+{ requests: { id: string; orgId: string; orgName: string; askedBy: string;
+              note: string | null; askedAt: string; status: 'open' | 'contacted' | 'closed' }[];
+  onStatus: (id: string, status: 'contacted' | 'closed') => void }
+```
+`/ops` only, **owner only** (`platform.enterprise.read`). Open requests first, oldest first —
+the same sort `70`'s estate list uses and for the same reason: the row that has waited longest
+is the one that needs attention, not the newest one.
+
+**Status is a control, not a read receipt.** Opening the page changes nothing; `contacted` and
+`closed` are things a person asserts. That is the whole argument for a queue over a
+notification (`DEC-100`), and it dies the moment the list marks itself handled.
 
 ## 6c. Trust, accounts and diagnostics
 

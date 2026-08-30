@@ -172,10 +172,24 @@ service as `40`** — never a second path to response content.
 | GET | `/` | `response.read` — `?state=all\|unread\|read\|archived&campaignId&subjectId&cursor` |
 | POST | `/:responseId/read` · `/:responseId/unread` | `response.read` — **per-caller** state, not org state |
 | POST | `/:responseId/archive` · `/:responseId/unarchive` | `response.read` — also per-caller |
+| GET | `/messages` | — · **rows addressed to the caller**, `?state=all\|unread\|read&cursor` |
+| POST | `/messages/:id/read` · `/messages/:id/unread` | — · same argument as above |
 
 Marking your own inbox needs no capability beyond seeing it, which is why there is no
 `inbox.*` module in `11` §3: the state is yours, one row per `(user, response)`, and two
 administrators triaging the same campaign never overwrite each other.
+
+**The two `/messages` rows are `DEC-101` and they carry NO capability at all**, which is the
+same argument one paragraph further than `58` took it. `response.read` scopes which *units'*
+responses a caller may see; it has nothing to say about a message Endur addressed to a named
+administrator, and gating on it would mean an administrator without response scope cannot read
+their own mail. The row names a `user_id`; the row is that user's. **A caller sees exactly the
+rows that name them** — there is no org-wide list, no unread count for anybody else, and no
+`notification.*` module in `11` §3.
+
+Written by `POST /platform/orgs/:id/message` (below) in the same transaction as its audit row.
+Before `DEC-101` that route wrote **only** the operator's own `platform_audit_log` row, so
+`{ sentTo: 3 }` was returned to an operator while nothing had reached the customer at all.
 
 ### Subjects — `/api/v1/subjects`
 
@@ -340,7 +354,15 @@ Tenant routes, session auth, org capabilities. Specified in `49-PAGE-plan-and-bi
 | GET | `/billing` | `billing.read` | Current tier, status, period, price |
 | GET | `/billing/usage` | `billing.read` | `billable_seats` with its breakdown (`16` §5) |
 | GET | `/billing/plans` | `billing.read` | The four tiers and what each unlocks. **No prices** — DEC-035 |
-| POST | `/billing/tier` | `billing.update` | **Joins a tier.** Writes `subscriptions.tier` and applies immediately — DEC-035 |
+| POST | `/billing/tier` | `billing.update` | **Joins a HIGHER tier.** Writes `subscriptions.tier` and applies immediately. **409 on a lower or equal rank** — DEC-096. The capture is the *difference* — DEC-097 |
+| POST | `/billing/downgrade` | `billing.update` | **Schedules** a lower tier for the end of the period. Writes `subscriptions.pending_tier`, captures nothing, changes nothing today — DEC-098. `DELETE` cancels it |
+| POST | `/billing/enterprise-request` | `billing.update` | Asks for Enterprise. Writes an `enterprise_requests` row for the platform owner — DEC-099, DEC-100 |
+
+**`POST /billing/tier` refusing a downgrade is the rule; the missing button is not.** `49`
+removes the affordance from `/app/plan` and this route is what makes that true for anything
+that calls the API directly (`INV-003`). The 409 names the current tier and says the period
+ends before a lower one can start — never "invalid tier", which would be untrue about a tier
+the page is showing the reader.
 
 ### Endur's own platform — `/api/v1/platform`
 
@@ -365,6 +387,8 @@ restated there rather than here because that document owns the surface.
 | GET | `/platform/audit` | `platform.audit.read` | ✅ |
 | GET/POST/PATCH | `/platform/operators` | `platform.operator.manage` | ✅ |
 | GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` | `T-077` |
+| GET | `/platform/enterprise-requests` | `platform.enterprise.read` — **owner only** | `T-100` |
+| PATCH | `/platform/enterprise-requests/:id` | `platform.enterprise.update` — **owner only** | `T-100` |
 
 **INV-011 constrains every payload above:** counts, names, dates and enums only. No route on
 this prefix may return a response body, an answer, a comment or a respondent identity.

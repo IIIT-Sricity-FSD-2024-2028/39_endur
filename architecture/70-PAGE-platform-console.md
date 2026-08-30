@@ -50,6 +50,9 @@ Platform capabilities (`19` §4), never org capabilities. `requirePlatform()`, n
 | Suspend an organisation | `platform.org.suspend` | **owner only** |
 | Message the administrators | `platform.message.send` | staff · owner |
 | See the analytics tab | `platform.analytics.read` | **owner only** — the tab is absent, not disabled, for staff |
+| Suspend / reinstate an organisation | `platform.org.suspend` | **owner only** — the section is **absent** for staff since `DEC-104`, on the same rule as the row above |
+| See the Enterprise request queue | `platform.enterprise.read` | **owner only** (`DEC-100`) |
+| Work a request | `platform.enterprise.update` | **owner only** — a separate verb, so the queue could later be shown to somebody who may not work it |
 
 ## Data contract
 
@@ -147,7 +150,53 @@ sentence, not a reflex click.
 a wall keeps working. Punishing the customer's respondents for the customer's billing problem
 is the same mistake `16` §6 already rules out.
 
-### Messaging the administrators
+**REINSTATING IS NOT SUSPENDING, AND THE GUARD BELONGS TO ONE OF THEM — `D-043`, 30 Aug.
+FIXED 2026-08-31 (`T-103`).**
+Reported as *"Reinstate is not working"*, and it does not: `confirmSuspend()` opens with
+`if (!id || suspendConfirmText !== org.name) return;`, the reinstate path uses a plain
+`<ConfirmDialog>` **with no name field**, so the typed text is `''`, never equals the name, and
+the function **returns silently** — no request, no error, no toast, and the dialog stays open
+looking like it is thinking. One handler serves both verbs and inherited the destructive one's
+guard.
+
+The typed-name confirmation is for **suspension**, which cuts a customer's staff out of their
+own product. Reinstating is the *undo* and takes nothing away; a plain confirm is the whole of
+what it needs.
+
+**And the silent return is its own defect.** The suspend dialog already disables its confirm
+button on the same condition, so on that path the early return is unreachable — it is the
+*only* behaviour on the path with no input to satisfy it. A guard that refuses without saying so
+is exactly how this stayed invisible; the button's `disabled` state is the guard, and the early
+return is a backstop that must never be the thing a user meets.
+
+**Not to be confused with "suspending suspends every organisation"**, reported at the same time.
+That was checked and **not reproduced** — `N-067` records what was checked, so nobody re-reads
+the middleware first. The likeliest reading is this same bug: nothing could be brought back, so
+suspensions accumulated.
+
+### The Enterprise queue  ·  **BUILT 2026-08-31 (`DEC-100`, `T-100`)**
+
+A customer asking for Enterprise from `/app/plan` (`49` § Asking for Enterprise) opens an
+`enterprise_requests` row. **Owner only**, and it appears on `/ops` above the estate list —
+`<EnterpriseQueue>`, open first, oldest first, the same sort the estate list uses and for the
+same reason: the row that has waited longest is the one that needs attention.
+
+**A work item, not a notification.** The reflex answer to *"send a notif on the owner admin
+account"* is a bell, and a bell is wrong here: what has to survive is not *somebody was told*
+but *somebody has to ring this customer back*, and a notice that clears on read loses exactly
+that. `open` → `contacted` → `closed` are things a person asserts; **opening the page changes
+nothing.**
+
+**Not `63-FEATURE-notifications.md`.** That placeholder is outbound multichannel delivery —
+email, SMS, WhatsApp — it is P3, and `CONF-006` put it out of P1/P2 because it needs a provider,
+retry semantics and `17`. **Nothing here needs a channel.** A row in a table the owner already
+visits is not that document's scope, and blocking a two-table feature on an unwritten P3 spec
+would repeat the sequencing mistake `CONF-021` recorded.
+
+Granting the tier is still `platform.plan.override` on the org's own page — the queue tracks the
+conversation, it does not perform the sale.
+
+### Messaging the administrators  ·  **FIXED 2026-08-31 (`DEC-101`, `T-101`)**
 
 The feature the user asked for by name — *"communicates with organisation's admins"*.
 
@@ -163,6 +212,22 @@ bodies are stored and are visible in `platform_audit_log`.
 > **This is a one-way channel in P2.** Replies go to a support address and do not thread back
 > into the product. A full ticketing system is a different product; see § Out of scope.
 
+**IT NEVER REACHED THE CUSTOMER — `DEC-101`, 30 Aug.** As built, `messageAdministrators` writes
+one `platform_audit_log` row and returns `{ sentTo: 3 }`. **`platform_audit_log` is the
+operator's own table.** The customer's administrators have no route that reads it and no screen
+that renders it, and there is no mail transport, so **the operator is shown "Sent to 3
+administrators" while nothing has been sent to anybody.** A confirmation for an action that did
+not happen is worse than an unbuilt feature.
+
+The service's reasoning — that delivery in P2 *is* the record — is right, and incomplete: a
+record is only a delivery if the recipient can reach it. The same transaction now writes one
+`notifications` row per recipient, and those rows surface in the customer's own inbox
+(`58` § From Endur). No channel, no provider, no `17` dependency — one table and a tab.
+
+**Recipients are resolved once and captured on the rows**, not re-resolved at read time, for the
+reason `payments` captures `payer_name`: who held `org.update` when the message was sent is the
+fact, and a grant changing later must not silently move somebody's mail.
+
 ## States
 
 | State | Behaviour |
@@ -171,7 +236,24 @@ bodies are stored and are visible in `platform_audit_log`.
 | Loading | The previous list dims and stays; the operator's context is not thrown away for a spinner (`46`'s range picker set this precedent) |
 | Error | Inline, with the `requestId` visible and copyable — this operator is the one person who can go straight to `error-*.log` (`18` §6) |
 | 401 | Redirect to `/ops/login`. **Never** to `/login` — sending an operator to the customer sign-in page is the confusion `19` §7 is built to avoid |
-| 403 | `staff` reaching an owner-only action sees the reason, not a blank. The revenue tab is absent for them; suspend renders disabled with a tooltip |
+| 403 | `staff` reaching an owner-only action sees the reason, not a blank. **Owner-only affordances are ABSENT for staff — the revenue tab, the analytics tab, the suspend section, and the Enterprise queue.** ~~suspend renders disabled with a tooltip~~ — superseded by `DEC-104` |
+
+**`DEC-104` — the rule this table now follows.** *A capability a role can never hold is absent.
+An action it holds but cannot use right now is disabled, with the reason.* Owner directive:
+*"staff is shown a disabled suspend and reinstate, just don't show it for staff."*
+
+It makes this document agree with itself. § Capabilities already says the analytics tab is
+*absent, not disabled* for staff, and § Acceptance insists that absence is **from the DOM, not
+hidden by CSS**. The suspend button was the one affordance on the surface that disagreed — and a
+permanently-greyed control teaches a support operator to distrust every greyed control they
+meet, including the ones that mean *not right now*.
+
+**The whole `<section>` goes, not just the button.** A card headed *"Suspend this organisation"*
+containing an explanation and nothing actionable is worse than the button was.
+
+**The server does not change.** § Acceptance already asserts the 403 from middleware, and that
+assertion is what makes hiding the control a presentation decision rather than the rule
+(`INV-003`).
 
 ## Acceptance
 
@@ -181,8 +263,23 @@ bodies are stored and are visible in `platform_audit_log`.
 - [x] `staff` sees no revenue tab — **absent from the DOM**, not hidden by CSS (`OpsLayout`
       renders `Analytics`/`Logs` only when `useOpsCan()` says so)
 - [x] `staff` attempting `POST /platform/orgs/:id/suspend` gets 403 from middleware — already
-      true in `requirePlatform('platform.org.suspend')` (`T-059`); the client additionally
-      renders the control disabled with a tooltip rather than hiding it
+      true in `requirePlatform('platform.org.suspend')` (`T-059`). ~~the client additionally
+      renders the control disabled with a tooltip rather than hiding it~~ **— superseded by
+      `DEC-104`; the assertion below replaces it**
+- [x] **`staff` sees no suspend section at all** — the heading, the copy and the button are
+      absent from the DOM, asserted the same way the revenue tab is (`DEC-104`).
+      `OrgDetail.test.tsx`, new at `T-103`
+- [x] **Reinstate sends the request** (`D-043`, fixed 31 Aug). The assertion is that `opsPost`
+      was CALLED, not on anything the screen says afterwards — a silent early return produces
+      no request, no error and no toast, which is indistinguishable from a slow network, and a
+      test written against the visible outcome would have been just as blind as the operator
+- [ ] **Suspending one organisation leaves every other untouched** — asserted across two orgs,
+      because it was reported and disproved by reading rather than by a test (`N-067`)
+- [x] **`POST /platform/orgs/:id/message` writes one `notifications` row per recipient**, in the
+      same transaction as the audit row, and `sentTo` equals the number of rows written — never
+      the number of people found (`DEC-101`). **The test reads the message back through the
+      CUSTOMER'S own session**: asserting the return value, or the audit row, would have passed
+      throughout the bug, because `{ sentTo: 3 }` was true about a row nobody could reach
 - [x] No response, answer or comment text is present in any payload this page consumes —
       `PlatformOrgSummary`/`PlatformOrgDetail` carry no such field (`T-059`'s contract,
       unchanged by this task)

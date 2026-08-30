@@ -20,6 +20,8 @@ import {
   AnalyticsListDto,
   EarningsListDto,
   CreateOperatorDto,
+  EnterpriseQueueDto,
+  EnterpriseUpdateDto,
   EstateListDto,
   LogExportDto,
   LogListDto,
@@ -32,6 +34,8 @@ import {
   SuspendDto,
   UpdateOperatorDto,
   capabilitiesForRole,
+  type EnterpriseQueueQuery,
+  type EnterpriseStatus,
   type LogExportQuery,
   type LogReadQuery,
   type PlatformLoginBody,
@@ -52,6 +56,8 @@ import {
   createOperator,
   estate,
   exportOperatorLogFile,
+  readEnterpriseQueue,
+  updateEnterpriseRequest,
   listOperators,
   listOperatorLogFiles,
   logStoreMeta,
@@ -330,3 +336,41 @@ platformRouter.patch(
     void updateOperator(req, params.id, body).then((data) => res.json({ data })).catch(next);
   },
 );
+
+/**
+ * THE ENTERPRISE QUEUE — DEC-100, T-100, 70 § The Enterprise queue.
+ *
+ * TWO OWNER-ONLY CAPABILITIES, split the way every other pair on this surface is: reading the
+ * queue changes nothing, and working it is the action that has to be attributable. Staff hold
+ * neither — this is a REVENUE queue, and `19` §4's argument is that support helps one customer
+ * at a time while the owner is the one who sells.
+ */
+platformRouter.get(
+  '/enterprise-requests',
+  validate(EnterpriseQueueDto),
+  requirePlatform('platform.enterprise.read'),
+  (req, res, next) => {
+    const { query } = req.data as { query: EnterpriseQueueQuery };
+    void readEnterpriseQueue(query)
+      .then((rows) => res.json({ data: rows }))
+      .catch(next);
+  },
+);
+
+// PATCH, as `13` § platform specifies it: this modifies one field of an existing row
+// rather than creating anything, and the catalogue is the contract.
+platformRouter.patch(
+  '/enterprise-requests/:id',
+  validate(EnterpriseUpdateDto),
+  requirePlatform('platform.enterprise.update'),
+  (req, res, next) => {
+    const { params, body } = req.data as {
+      params: { id: string };
+      body: { status: EnterpriseStatus };
+    };
+    void updateEnterpriseRequest(req, params.id, body.status)
+      .then((row) => res.json({ data: row }))
+      .catch(next);
+  },
+);
+

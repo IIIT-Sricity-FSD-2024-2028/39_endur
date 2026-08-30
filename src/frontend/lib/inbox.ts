@@ -7,7 +7,7 @@
 // `state`, the filters and the cursor live in the URL, so a filtered queue is a link
 // somebody can paste — the same rule as `40`'s filters.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { InboxQuery, InboxResponse, InboxState, Page } from '@endur/shared';
+import type { InboxMessage, InboxQuery, InboxResponse, InboxState, Page } from '@endur/shared';
 import { ApiError, apiGet, apiPost } from './api.js';
 import type { Loadable } from './org.js';
 
@@ -190,3 +190,67 @@ export function useInbox(query: Partial<InboxQuery>, enabled = true): InboxContr
     failures,
   };
 }
+
+// ---------------------------------------------------------------------------
+// From Endur — DEC-101, T-101, 58 § From Endur.
+//
+// A SECOND STREAM, DELIBERATELY SIMPLER THAN THE FIRST. No optimistic mark, no revert, no
+// per-card failure map, no cursor. `useInbox` above carries all of that because it is a queue
+// of four hundred comments that a person works through at speed; this is a handful of messages
+// a year, and the machinery that makes the comment queue feel fast would be machinery guarding
+// against a problem this stream does not have.
+//
+// That is not a shortcut — it is `INV-009` read correctly. What is shared is the MECHANIC the
+// reader sees (a tab, unread counts, click to read); what is not shared is an implementation
+// tuned for a cardinality this stream does not have.
+// ---------------------------------------------------------------------------
+
+export type MessagesController = Loadable<Page<InboxMessage>> & {
+  mark: (id: string, action: 'read' | 'unread') => Promise<void>;
+  reload: () => Promise<void>;
+};
+
+export function useMessages(enabled = true): MessagesController {
+  const [state, setState] = useState<Loadable<Page<InboxMessage>>>({
+    data: null, loading: enabled, error: null,
+  });
+
+  const load = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      const page = await apiGet<Page<InboxMessage>>('/inbox/messages');
+      setState({ data: page, loading: false, error: null });
+    } catch (error) {
+      setState({ data: null, loading: false, error: error as Error });
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const mark = useCallback(async (id: string, action: 'read' | 'unread') => {
+    // Applied locally FIRST, like the comment queue — a message the reader has plainly just
+    // opened should not sit there looking unread while a request flies. Unlike the comment
+    // queue there is no revert on failure: the only consequence of a lost mark is a bold row
+    // that comes back on the next load, and a message that silently un-reads itself mid-read
+    // is the more alarming of the two failures.
+    setState((current) =>
+      current.data
+        ? {
+            ...current,
+            data: {
+              ...current.data,
+              data: current.data.data.map((row) =>
+                row.id === id ? { ...row, read: action === 'read' } : row,
+              ),
+            },
+          }
+        : current,
+    );
+    await apiPost(`/inbox/messages/${id}/${action}`);
+  }, []);
+
+  return { ...state, mark, reload: load };
+}
+

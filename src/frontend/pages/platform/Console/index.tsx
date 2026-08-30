@@ -4,13 +4,15 @@
 // The server paginates on `createdAt` (a cursor cannot paginate on an aggregate of another
 // table — `service.ts:191`), so THE CLIENT SORTS THE PAGE IT WAS GIVEN. Do not "fix" this
 // by changing the cursor; it is a deliberate trade stated in the plan, not a bug.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ResponsiveTable, type Column } from '../../../components/data/ResponsiveTable.js';
 import { OrgRow, orgChips } from '../../../components/platform/OrgRow.js';
-import { useEstate, type EstateFilters } from '../../../lib/estate.js';
+import { useEnterpriseQueue, useEstate, type EstateFilters } from '../../../lib/estate.js';
+import { EnterpriseQueue } from '../../../components/platform/EnterpriseQueue.js';
+import { useOpsCan } from '../../../lib/opsCapabilities.js';
 import type { PlatformOrgSummary } from '@endur/shared';
 
 function readFilters(params: URLSearchParams): EstateFilters {
@@ -27,6 +29,12 @@ export default function Console(): JSX.Element {
   const navigate = useNavigate();
   const filters = readFilters(params);
   const estate = useEstate(filters);
+  const can = useOpsCan();
+  // OWNER ONLY. Staff never see this and never ask for it — `platform.enterprise.read` is a
+  // REVENUE queue, and `19` §4 gives revenue to the owner for the same reason it gives them
+  // `/ops/earnings` (DEC-100).
+  const queue = useEnterpriseQueue(can('platform.enterprise.read'));
+  const [queueBusy, setQueueBusy] = useState<string | null>(null);
 
   // The server's page is by `createdAt`; the screen's promise is last-activity-ascending.
   // Sorted here, on the page in hand — never re-requested for it.
@@ -73,6 +81,19 @@ export default function Console(): JSX.Element {
         title="Organizations"
         subtitle="Every organisation on the platform, as numbers."
         vocabulary={false}
+      />
+
+      {/* ABOVE THE ESTATE LIST, because it is the one thing on this page that is WAITING on
+          somebody. The list below is a reference; this is a to-do. It renders nothing at all
+          when the queue is empty — an always-present empty card is one the reader learns to
+          skip, including on the day it is not empty. */}
+      <EnterpriseQueue
+        rows={queue.rows}
+        busyId={queueBusy}
+        onUpdate={(id, status) => {
+          setQueueBusy(id);
+          void queue.update(id, status).finally(() => setQueueBusy(null));
+        }}
       />
 
       <div className="ops-filters">

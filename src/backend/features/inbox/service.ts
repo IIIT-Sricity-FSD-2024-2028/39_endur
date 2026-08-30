@@ -9,7 +9,12 @@
 // That split is the whole design. `58` and the MAP entry both say it in the same words: a
 // second ungated path to individual comments is what INV-007 exists to prevent, and an
 // inbox is the most tempting place in the product to build one.
-import type { InboxQuery, InboxResponse } from '@endur/shared';
+//
+// SINCE `DEC-101` IT ALSO OWNS `notifications`, and that does not weaken the rule above — it
+// is the clearest possible case of it. A notification carries a `user_id`, a subject and a
+// body typed by an Endur operator. There is no column on it that could reach a `responses`
+// row, so the second stream cannot become the second path this file exists to refuse.
+import type { InboxMessage, InboxMessageQuery, InboxQuery, InboxResponse } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { NotFoundError } from '../../lib/errors.js';
 import type { Paged } from '../../lib/paginate.js';
@@ -139,3 +144,83 @@ async function assertReadable(
     throw new NotFoundError('That response is not in your inbox.');
   }
 }
+
+// ---------------------------------------------------------------------------
+// From Endur — DEC-101, T-101, 58 § From Endur.
+//
+// A SECOND STREAM OVER THE SAME MECHANIC, not a second inbox. `58` already built
+// read/unread and a per-reader state; this reuses it and adds nothing to `11` §3 — the row
+// NAMES A USER, so the reader is the addressee and there is nothing narrower to ask
+// (`DEC-101`, and `58`'s own argument for adding no capability for inbox read state).
+//
+// WHY THE STATE IS A COLUMN HERE AND A JOIN TABLE THERE. `inbox_state` is keyed
+// `(user_id, response_id)` because one response is visible to MANY readers and each has their
+// own queue. A notification is written per recipient already — one row, one reader — so
+// `read_at` sits on the row itself. Two mechanisms for two different cardinalities, not one
+// pattern applied twice.
+// ---------------------------------------------------------------------------
+
+export async function readMessages(
+  orgId: string,
+  userId: string,
+  query: InboxMessageQuery,
+): Promise<Paged<InboxMessage>> {
+  const where = {
+    orgId,
+    // SCOPED TO THE READER, not to the organisation. An administrator must not read a message
+    // addressed to a colleague by name, and `org_id` alone would let them.
+    userId,
+    ...(query.state === 'unread' ? { readAt: null } : {}),
+    ...(query.state === 'read' ? { readAt: { not: null } } : {}),
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      // NEWEST FIRST, and no cursor arithmetic: this stream is a handful of rows a year, not
+      // a queue that grows with every response. `limit + 1` still answers `hasMore` honestly
+      // rather than the page pretending it is complete.
+      orderBy: { createdAt: 'desc' },
+      take: query.limit + 1,
+      select: { id: true, createdAt: true, kind: true, subject: true, body: true, readAt: true },
+    }),
+    prisma.notification.count({ where }),
+  ]);
+
+  const hasMore = rows.length > query.limit;
+  const data = (hasMore ? rows.slice(0, query.limit) : rows).map((row) => ({
+    id: row.id,
+    at: row.createdAt.toISOString(),
+    kind: row.kind,
+    subject: row.subject,
+    body: row.body,
+    read: row.readAt !== null,
+  }));
+
+  return { data, page: { nextCursor: null, hasMore }, meta: { total } };
+}
+
+/**
+ * Mark one message read. Idempotent, and the timestamp is NOT re-stamped on a second call —
+ * "when did they first see this" is the only question this column is ever asked.
+ *
+ * SCOPED BY `userId` IN THE WHERE, not checked after the read. A findUnique-then-compare
+ * leaves a window where the id is enough; `updateMany` with both keys cannot match a row that
+ * is not the caller's, and a count of 0 is the same 404 whether the row is missing or is
+ * somebody else's — one answer, so the response cannot be used to probe for the other.
+ */
+export async function markMessage(
+  orgId: string,
+  userId: string,
+  id: string,
+  action: 'read' | 'unread',
+): Promise<void> {
+  const result = await prisma.notification.updateMany({
+    where: { id, orgId, userId },
+    data: { readAt: action === 'read' ? new Date() : null },
+  });
+  // A count of 0 means no row matched all three keys — missing, or somebody else's. ONE
+  // ANSWER FOR BOTH, so the response cannot be used to probe for the existence of the other.
+  if (result.count === 0) throw new NotFoundError('That message is not in your inbox.');
+}
+

@@ -102,6 +102,8 @@ access.
 | `platform.audit.read` | ✔ | ✔ | The platform's own audit trail |
 | `platform.logs.read` | ✔ | ✔ | **The rotating application log files** (`18` §2) through `72`. Diagnostics, so support needs it as much as the owner does. Safe under INV-011 **because `18` §3 already guarantees no body, no credential and no respondent identity ever reaches a log line** — the viewer inherits that property, it does not create it |
 | `platform.logs.export` | ✔ | ✔ | **A copy of a log file, filtered, as a download** (`72` § Interactions, `DEC-074`). Separate from `platform.logs.read` on purpose: a read is a page on a screen, an export is a file that outlives the session and the retention window, and one capability for both could not be separated later without a migration. Audited as `logs.export` with the file, format, filters and line count |
+| `platform.enterprise.read` | — | ✔ | **The Enterprise request queue. Owner only** (`DEC-100`). A customer asking to be sold to is a revenue event, and it is split from `platform.org.read` for the reason `platform.revenue.read` is split from `platform.analytics.read`: staff see every organisation and never need a pipeline |
+| `platform.enterprise.update` | — | ✔ | Move a request through `open` → `contacted` → `closed`. **A separate verb**, so the queue could later be shown to somebody who may not work it — the same split `platform.logs.read`/`platform.logs.export` makes |
 | `platform.operator.manage` | — | ✔ | Create, disable and re-role operator accounts |
 
 Naming rule matches `11` §3 — `platform.<object>.<verb>` — with the `platform.` prefix as the

@@ -5,7 +5,139 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-30  (D-036 AND D-041 REPAID -- DEC-094, DEC-095. THE SUITE IS GREEN,
+UPDATED   2026-08-31  (STAGE 11 COMPLETE -- ALL NINE TASKS BUILT, T-097 THROUGH T-105.
+                       ROOT RUNNER: 1524/1524 across 115 files. typecheck 0, lint 0, build
+                       passes, drift + vocab clean.
+                       !! DEC-102 HAD TO BE CORRECTED AGAINST ITSELF, and this is the one
+                       thing to read before touching /ops/analytics. it says movement is
+                       read from `payments` "RATHER THAN" from plan.override audit rows.
+                       taken literally that LOSES A CASE THE SAME ENTRY REQUIRES: its own
+                       `not` clause says downgraded covers an operator override, and an
+                       override deliberately writes NO payments row (an operator who could
+                       name an amount could invent revenue). so it reads BOTH -- disjoint
+                       by construction, nothing double-counted, and the disjointness is
+                       written into the query's comment because if it ever stops being
+                       true the count silently doubles.
+                       !! T-101 NEEDED THE PLATFORM WRITE SEAM WIDENED. platform/db.ts
+                       refuses every write into a tenant except by an allowlist;
+                       Notification and EnterpriseRequest join it. THE READ SURFACE IS
+                       UNCHANGED -- Answer unreachable, Response count-only, and neither
+                       new model carries a relation that could reach either. what an
+                       operator writes into a tenant is a subject and a body THEY TYPED.
+                       !! THE ROUTE-ENUMERATION TEST CAUGHT THE TWO NEW INBOX ROUTES and
+                       demanded a written justification rather than a capability. that is
+                       INV-003's guard working: GET /inbox/messages carries NO capability,
+                       because response.read scopes UNITS and would lock a recipient out of
+                       their own mail, and a notification.* module would imply a shared
+                       queue somebody can be excluded from. the row NAMES the reader.
+                       !! OrgDetail.tsx HAD NO TEST AT ALL, which is why reinstate could be
+                       dead. a silent early return produces no request, no error and no
+                       toast -- indistinguishable from a slow network. the new test asserts
+                       THE REQUEST WAS MADE, never what the screen says afterwards.
+                       !! A TEST WAS PINNING A FIGURE THAT COULD NOT MOVE, twice over:
+                       `conversionRate is null` (converted is a hardcoded 0, so the dash
+                       was the only reachable branch) and `priceMinor === 0` on Enterprise.
+                       both passed forever and neither tested a decision.
+                       !! endur.css LOST 150 LINES to a block that appeared TWICE,
+                       byte-identical, 157 lines apart -- .preset-grid declared three times,
+                       the setup step's spacing decided by cascade order. a duplicate that
+                       agrees with itself is invisible until somebody edits one copy.
+                       DESIGN: dark surfaces get an EDGE (DEC-106) -- one block, six
+                       selectors, and `.card` is deliberately absent because the glass card
+                       already carries one in every theme.
+                       NOTE design_specs/design/01 IS GITIGNORED, so its dark column does
+                       not appear in `git status`.
+                       NEXT: T-045 IS STILL UNRUN AND IS STILL THE LARGEST RISK ON THE DAY.
+                       it needs the demo machine and a phone, and DEC-086's WSL2 question
+                       is still open.
+                       Earlier: T-097 BUILT -- THE LADDER IS ONE-WAY AND THE PERIOD IS A MONTH.
+                       DEC-096 + DEC-097. OPEN-015 ANSWERED by the owner: SAME NUMBERS,
+                       BILLED MONTHLY (Rs 99/499/999). a 12x rise, deliberately.
+                       ROOT RUNNER: 1487/1487 across 112 files. typecheck 0, lint 0, build
+                       passes, drift + vocab clean.
+                       THE RULE IS THE SERVER'S: POST /billing/tier answers 409 on a lower
+                       rank AND on an equal one, before anything is written, and the test
+                       CALLS THE ROUTE rather than driving the page -- removing a button is
+                       not a rule (INV-003).
+                       !! THE LEDGER WAS OVERSTATING AND NOBODY HAD ASKED ABOUT IT. an org
+                       walking Bronze->Silver->Gold totalled Rs 1,597 in `payments` for a
+                       customer holding ONE Rs 999 plan. DEC-097 charges the DIFFERENCE and
+                       it now totals Rs 999. the headline assertion is a SUM, not three row
+                       checks, because the sum is what /ops/earnings reads.
+                       !! THE PERIOD WAS HARDCODED IN FOUR PLACES, NOT THREE -- the fourth
+                       is database/seed/demo.ts, found by grepping the COLUMN rather than
+                       the number. AND THEY ALREADY DISAGREED: two used +365*DAY and two
+                       used setFullYear(+1), a day apart in a leap year. nothing read the
+                       difference, which is why it survived -- and DEC-098 is about to make
+                       period_end the date a downgrade fires on. now ONE function,
+                       billing/period.ts, calendar month, CLAMPED (31 Jan -> 28/29 Feb).
+                       !! A TEST WAS ASSERTING THE WRONG THING AND PASSING. Plan.test.tsx's
+                       "CONFIRMS a downgrade" drove a flow that charged a customer a SECOND
+                       time for LESS than they already held. it asserted the dialog's
+                       wording rather than whether the transaction should exist. two more
+                       asserted "per month" appears NOWHERE -- true of a yearly product.
+                       ON THE PAGE: a card below your tier loses its button and gains a
+                       sentence. ABSENT, NOT DISABLED. `override` mode is exempt -- an
+                       operator may still move a plan either way.
+                       CORRECTION TO MY OWN REPORTING: three earlier "full suite" runs said
+                       44 files / 551 tests. that was the BACKEND PROJECT ONLY -- a stale
+                       `cd src/backend` was still in effect. the root run is 112/1487.
+                       NEXT: T-098 and T-099 are unblocked and both depend on this. T-102
+                       and T-103 are independent live bugs, any order.
+                       T-045 IS STILL UNRUN AND IS STILL THE LARGEST RISK ON THE DAY.
+                       Earlier: THE OWNER'S THIRD PASS -- TWELVE REPORTS, NINE TASKS, DOCS ONLY.
+                       (that pass wrote no code; T-097 above is the first of its tasks.)
+                       DEC-096..DEC-106, D-043..D-045, N-067, OPEN-015, 55 § Stage 11.
+                       !! TWO REPORTS WERE MISREAD ON THE WAY IN AND BOTH CORRECTIONS ARE
+                       THE FINDING.
+                       "enterprise plan is not working" is ONE LINE, not a missing feature:
+                       <PlanPicker> applies `unavailable = disabled || !plan.selectable` in
+                       ALL THREE MODES, and `override` is the OPERATOR assigning a plan --
+                       the path DEC-048 routes enterprise through on purpose. THE ONE TIER
+                       THE PRODUCT CALLS OPERATOR-ASSIGNED IS UNASSIGNABLE IN THE ONLY UI
+                       THAT CAN ASSIGN IT.
+                       "suspending suspends every org" was CHECKED AND NOT REPRODUCED --
+                       setSuspended is scoped by params.id, tenantResolver reads facts per
+                       request with no cache, OrgRow renders per row. the likeliest reading
+                       is D-043, reported in the same breath: REINSTATE SILENTLY DOES
+                       NOTHING (one handler guards BOTH verbs on the typed-name check and
+                       the reinstate dialog has no name field, so it RETURNS BEFORE MAKING
+                       ANY REQUEST -- no error, no toast, dialog still open), so nothing
+                       could be brought back and suspensions accumulated. N-067 records
+                       what was checked so nobody re-reads the middleware first.
+                       !! A MESSAGE FROM ENDUR REACHED NOBODY AND THE OPERATOR WAS TOLD
+                       OTHERWISE. messageAdministrators writes ONE platform_audit_log row --
+                       THE OPERATOR'S OWN TABLE -- and returns { sentTo: 3 }. the customer's
+                       admins have no route and no screen. DEC-101 gives them one.
+                       !! TWO OF SIX HEADLINE CARDS ON /ops/analytics COULD NEVER MOVE.
+                       DEC-048 means registration writes 'active', so nothing is ever
+                       trialing; `converted` is a hardcoded 0 under a comment saying it has
+                       no source. the honest thing to do with a metric that has no source is
+                       NOT TO PRINT IT (DEC-102). and movement's upgrade/downgrade counts
+                       read plan.override audit rows -- THE OPERATOR'S ACTION -- so that
+                       table has only ever counted what OPERATORS did while labelled as the
+                       estate. it moves onto `payments`.
+                       !! THE LEDGER OVERSTATES REVENUE, and nobody had noticed: an org that
+                       walks Bronze->Silver->Gold in one period contributes Rs 1,597 for a
+                       customer holding one Rs 999 plan. DEC-097 charges the DIFFERENCE, and
+                       the same journey sums to Rs 999.
+                       THE LADDER IS ONE-WAY (DEC-096) AND THE SERVER IS WHERE THAT IS
+                       DECIDED -- removing the button is not the rule, INV-003.
+                       "downgrade only when exhausted" needs the one thing this product has
+                       not got, something that runs when a date passes. SO NOTHING RUNS:
+                       pending_tier + the first read after period_end, the evaluate-on-read
+                       trick readBilling ALREADY uses for D-012 (DEC-098).
+                       ALSO FOUND, UNASKED: endur.css carries 157 LINES TWICE, verbatim, so
+                       .preset-grid is declared THREE TIMES and the setup step's spacing is
+                       decided by cascade order (D-045). the dark half is a system fault --
+                       design_specs/01 §4's surface table is LIGHT-ONLY and the dark token
+                       block's own comment already says the lift must come from the edge
+                       (DEC-106).
+                       OWED BY THE TEAM: OPEN-015, ONE LINE. monthly prices -- the same
+                       numbers, or the annual figure over twelve? nothing else blocks.
+                       START AT T-097 if that is answered, T-102 or T-103 if not.
+                       T-045 IS STILL UNRUN AND IS STILL THE LARGEST RISK ON THE DAY.
+                       Earlier: D-036 AND D-041 REPAID -- DEC-094, DEC-095. THE SUITE IS GREEN,
                        ALL OF IT, THREE RUNS RUNNING: backend 546/546, frontend 933/933.
                        !! BOTH DEBT ENTRIES HAD THE WRONG DIAGNOSIS WRITTEN DOWN, AND BOTH
                        WOULD HAVE BEEN "FIXED" INTO SOMETHING WORSE.
@@ -1837,6 +1969,110 @@ tables in `55` § 9d, decisions `DEC-087` … `DEC-092`. All six tasks built.
               AT PUBLISH so the read count has an honest denominator
 ```
 
+### Stage 11 — the owner's third pass · 31 Aug · **SPECIFIED, NOT BUILT — docs only**
+
+Twelve reports from one sitting with the running app. **No code was written this session; the
+owner asked for docs.** Nine tasks, `DEC-096`…`DEC-106`, `D-043`…`D-045`, `N-067`, `OPEN-015`.
+Full table in `55` § Stage 11.
+
+**Read this before picking one up.** They are three different kinds of thing wearing one list:
+a **live bug** (`T-102`'s date window, `T-103`'s reinstate, `T-104`), a **product decision**
+where nothing is broken and the owner changed what the product does (`T-097`…`T-101`), and a
+**figure that never had a source** and should not have been printed (`T-102`'s removals).
+
+**Two of the twelve were misread on the way in.** *"Enterprise plan is not working"* is one
+line in `<PlanPicker>` — `unavailable = disabled || !plan.selectable` is applied in **all three
+modes**, so the `override` mode an operator uses has its Enterprise button disabled by a flag
+that means *a customer may not choose this*. **The one tier the product calls operator-assigned
+is unassignable in the only UI that can assign it.** And *"suspending is suspending every org"*
+was **not reproduced** — see `N-067` for what was actually checked, so nobody re-reads the
+middleware first.
+
+```
+[x] T-097  B  ONE-WAY LADDER + A MONTHLY PERIOD (DEC-096, DEC-097)
+              ← BUILT 31 Aug. 409 on a lower rank AND on an equal one, SERVER-SIDE, before
+                anything is written. removing the button is not the rule — /billing/tier is
+                a documented route and INV-003 says the client never decides, so the test
+                calls the ROUTE rather than driving the page.
+                THE UPGRADE CAPTURES THE DIFFERENCE, and the assertion that matters is a
+                SUM: an org walking Bronze→Silver→Gold now totals ₹999 in `payments`, where
+                it used to total ₹1,597 for a customer holding one ₹999 plan.
+                !! THE PERIOD WAS HARDCODED IN FOUR PLACES, NOT THREE. the fourth is
+                database/seed/demo.ts and it was found by grepping the COLUMN, not the
+                number. AND THEY ALREADY DISAGREED — two `+365*DAY`, two `setFullYear(+1)`,
+                a day apart in a leap year. now one function, billing/period.ts.
+                OPEN-015 ANSWERED by the owner: same numbers, billed monthly.
+[x] T-098  B  A SCHEDULED DOWNGRADE, APPLIED ON READ (DEC-098)
+              ← BUILT 31 Aug. readBilling is the ONE applier; requireEntitlement still
+                selects `tier` alone, so the gate and the page cannot reach different
+                answers. THREE WRITES IN ONE TRANSACTION when it fires — the subscription,
+                a payments row of kind 'expiry' at ₹0 (the MOVE, which T-102 counts), and
+                an AUDIT ROW WITH NO ACTOR.
+                the audit row is written DIRECTLY rather than pushed to req.ctx.audit, and
+                that is the part worth reading twice: the intent queue attributes to the
+                CURRENT PRINCIPAL, and this is a date passing, noticed by whoever happened
+                to open the page next. stamping their name on it puts a person's id
+                against a change they did not make, in the one table we offer as evidence.
+                the period ROLLS FORWARD (else the next schedule fires instantly).
+                an upgrade, and an operator override, CLEAR the column — a customer who
+                paid to go up has replaced the intention, not added to it.
+[x] T-099  B  ENTERPRISE STARTS WORKING — one line, plus a price (DEC-099)
+              ← BUILT 31 Aug, and NARROWER than the change order said: `unavailable` reads
+                `disabled || (mode === 'signup' && !plan.selectable)`, because T-100 landed
+                in the same pass and gave the join card a REQUEST verb rather than a
+                disabled one. the operator's case is fixed either way.
+                "Arranged with us" STAYED, reworded — deleting it, as DEC-099 proposed,
+                would have left one card whose verb differs from every other card's with
+                nothing on it saying why.
+                two tests were pinning the sentinel and both could only ever take one
+                branch. the property they defended (nothing renders ₹0) is kept, and is
+                now true because the number is real.
+[x] T-100  B  REQUEST ENTERPRISE → A QUEUE THE OWNER WORKS (DEC-100)   needs T-099
+              ← a WORK ITEM, not a bell: what has to survive is not "somebody was told"
+                but "somebody has to ring this customer back", and a notice that clears on
+                read loses exactly that. two owner-only platform capabilities. explicitly
+                NOT 63, which is outbound multichannel and needs a provider and 17
+[x] T-101  B  THE OPERATOR'S MESSAGE ACTUALLY REACHES THE CUSTOMER (DEC-101)
+              ← !! messageAdministrators writes ONLY platform_audit_log, which is the
+                OPERATOR'S OWN TABLE. the customer's admins have no route and no screen.
+                THE OPERATOR IS TOLD "Sent to 3 administrators" AND NOBODY HAS BEEN SENT
+                ANYTHING. one notifications row per recipient, surfaced as a From Endur
+                tab on /app/inbox — a PLACEMENT of 58's mechanic, not a second one
+[x] T-102  A  /ops/analytics PRINTS ONLY FIGURES WITH A SOURCE (DEC-102, DEC-103)
+              ← BUILT 31 Aug. !! DEC-102 SAID "rather than" AND THAT WOULD HAVE LOST THE
+                OPERATOR'S OWN OVERRIDES — see the header. it reads payments AND
+                plan.override, disjoint by construction. one rule for both: the previous
+                plan against the one that replaced it, silent about who caused the move.
+                endOfDay() is one helper every windowed query on BOTH platform pages runs
+                through, and window.to goes back out as THE DAY THAT WAS ASKED FOR — the
+                page echoes it into its own date input.
+              ← Trials started CANNOT MOVE: DEC-048 means registration writes 'active',
+                and `converted` is a hardcoded 0 under a comment saying it has no source —
+                so conversionRate is permanently the em-dash. TWO OF SIX HEADLINE CARDS
+                WERE STRUCTURALLY INCAPABLE OF CHANGING. seats go (D-013: nothing is
+                billed on them). movement moves onto `payments` — the plan.override source
+                counts ONLY WHAT OPERATORS DID. `to` becomes end-of-day (D-044). the
+                window governs MOVEMENT and the page says so. copy: drop "— never read",
+                rename Quiet 30 days → Gone quiet
+[x] T-103  A  REINSTATE, AND THE STAFF VIEW OF /ops (D-043, DEC-104)
+              ← confirmSuspend() guards BOTH verbs on the typed-name check and the
+                reinstate dialog has no name field, so it RETURNS SILENTLY — no request,
+                no error, dialog still open. the suspend section then goes ABSENT for
+                staff, heading and copy included, which makes 70 agree with its own
+                analytics-tab rule
+[x] T-104  C  `Enter` STOPS LEAVING THE SETUP WIZARD (DEC-105)
+              ← the handler exempts BUTTON and TEXTAREA only. step 3's `+` adds a unit AND
+                FOCUSES ITS NAME INPUT, so the wizard hands you a text field and treats
+                the natural key for finishing the row as the key for leaving the screen
+[x] T-105  C  DARK MODE GETS ITS EDGE BACK, AND endur.css LOSES 157 LINES (DEC-106, D-045)
+              ← design_specs/01 §4's surface table is LIGHT-ONLY, written before dark
+                shipped. the dark token block's own comment says "the lift has to come
+                from the edge instead" and the components never followed. separately,
+                /* Industry Split Layout */ appears TWICE — .preset-grid is declared three
+                times with different minmax() and gap, so the step's spacing is decided by
+                cascade order
+```
+
 ### Why is that item still greyed? — one row per "Soon"
 
 Asked by the owner 24 Aug. **Nothing is on the chopping block; everything below has an id and
@@ -1952,6 +2188,7 @@ Blocking or dated. Move to `_MEMORY.md` as a `DEC-` entry once resolved, and tic
 
 | Ref | Question | Needed by | Blocks |
 |---|---|---|---|
+| ~~`OPEN-015`~~ | **ANSWERED 31 Aug — same numbers, billed monthly. Built in `T-097`.** ~~Monthly prices: the same numbers, or the annual figure divided by twelve?~~ `DEC-096` moves the billing period from a year to a calendar month on your instruction and **leaves the numbers where they are** — Bronze ₹99, Silver ₹499, Gold ₹999, now *per month*. That is a **12× rise** and it is written that way deliberately, not by oversight: ₹99 a **year** for an organisation running unlimited campaigns is not a price anyone would defend in the room, and ₹99 a month is. The other reading gives ₹8.25 / ₹41.58 / ₹83.25, three numbers no customer recognises and that `formatMoney` would print with decimals — which its own comment calls *"an accounting document impersonating a price tag"*. **Nothing else depends on the answer**: the one-way ladder, the difference pricing and the expiry mechanism are identical either way, and every number lives in one table (`PLAN_OPTIONS`) that `tiers.test.ts` already guards. Enterprise is ₹4,999/month by direct instruction and is not in question — note only that it makes Gold→Enterprise a 5× step, which is a sales shape rather than a bug | ~~before `T-097`~~ — **answered** | ~~`T-097`~~, `T-098`, `T-099` |
 | ~~`OPEN-002`~~ | ~~What public URL does the QR encode? `localhost` will not scan from a phone~~ | **ANSWERED 29 Aug — the machine's LAN address. `DEC-086`.** In development only, a loopback `PUBLIC_BASE_URL` is rewritten to the host's LAN IPv4 (port preserved, printed at boot) and Vite binds to the LAN so the address answers. Not a tunnel: no account, no third-party uptime, no key expiring mid-demo. **`T-045` must still prove it on the demo machine** — under WSL2 the address found inside WSL is the virtual adapter's and is not reachable from a phone without a `netsh portproxy` rule or running the dev servers from Windows | ~~before `T-045`~~ — **answered, verify at rehearsal** | T-038, T-043 |
 | ~~`OPEN-008`~~ | **RESOLVED 23 Aug — `DEC-036`.** File upload **strips metadata, it does not re-encode.** `lib/imageBytes.ts` sniffs the real format from magic bytes, reads dimensions from the header, and removes JPEG APP1/APP13/COM, PNG `eXIf`/`tEXt`/`zTXt`/`iTXt`/`tIME`, and WebP `EXIF`/`XMP ` chunks with the VP8X flag bits that advertise them — without decoding anything, and therefore **without an image library nobody approved**. The privacy property `48` wanted re-encoding for survives: GPS, device ids and author names do not reach disk, asserted by a test that uploads a GPS-tagged JPEG and greps the stored bytes. What is not bought is polyglot neutralisation, and that risk is written into `48` and `DEC-036` rather than left quiet — stored bytes are only ever *served*, with a sniffed `Content-Type`, `nosniff` and `inline`, and respondent uploads stay out of scope, which is where a hostile file would come from. **If an image library is ever approved, `stripMetadata()` is the one function to replace** | ~~before `T-061`~~ — **done** | ~~T-061~~, ~~T-062~~ |
 | ~~`OPEN-011`~~ | ~~**Does operator MFA stay a 6-hour code?**~~ | **ANSWERED 29 Aug — no. `DEC-084`.** Reverted to 30s / ±1 step. The other honest answer (keep it, write the trade into a `DEC-`) was rejected on price rather than principle: the convenience was not re-reading a code, and `ops:code` buys that in one command without touching the algorithm | ~~before `T-045`~~ — **done** | ~~`D-040`~~ |
@@ -1974,6 +2211,9 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 
 | id | What | Why | Repay by |
 |---|---|---|---|
+| `D-043` | **Reinstating an organisation silently does nothing, and always has** | Found 31 Aug from the owner's report, by reading. `OrgDetail.tsx`'s `confirmSuspend()` opens `if (!id \|\| suspendConfirmText !== org.name) return;` — the typed-name guard `70` requires for **suspension**. The reinstate path uses a plain `<ConfirmDialog>` **with no name field**, so the typed text is `''`, never equals the organisation name, and the function **returns before making any request**: no error, no toast, the dialog stays open looking like it is working. One handler serves both verbs and inherited the destructive one's guard. **The silent return is the second half of the bug** — the suspend dialog already disables its confirm button on the identical condition, so on that path the early return is unreachable, and it is the *only* behaviour on the path with no input to satisfy it. A guard that refuses without saying so is how this stayed invisible. **Not the same thing as "suspending suspends every org"**, reported in the same breath and **not reproduced** — `N-067` records what was checked so nobody re-reads the middleware first; the likeliest reading is that nothing could be brought back, so suspensions accumulated | `T-103`, `DEC-104` |
+| `D-044` | **`/ops/analytics` excludes the whole of the last day selected** | Found 31 Aug chasing the owner's *"the date filters are not working"* at `?from=2026-08-02&to=2026-08-12`. `<input type="date">` sends `2026-08-12`; `z.coerce.date()` reads that as `2026-08-12T00:00:00Z`; every query is `lte: to`. **A one-day window (`from` = `to`) therefore matches nothing at all.** Cosmetically small and genuinely wrong, and it is the *second* fault behind that report — the first is that the window governs only `movement` and `trials` while four other sections are unfiltered all-time counts, so moving the dates changes almost nothing on screen. That half is `DEC-103`, not debt: it is a decision about what the page claims | `T-102` |
+| `D-045` | **157 lines of `endur.css` are duplicated verbatim, and `.preset-grid` is declared three times** | Found 31 Aug reading for the dark-mode report. `/* Industry Split Layout */` appears at **two** line numbers and the blocks below them differ by one blank line and one trailing rule. So `.preset-grid` exists once at its original definition (`minmax(168px)`, `gap --space-3`) and twice more in the duplicated blocks (`minmax(220px)`, `gap --space-4`), and **what renders is whichever copy the cascade reaches last** — the setup step's column count and spacing are decided by file order rather than by anybody's choice, which is the *"layout and padding are not clear"* half of the owner's report. The dark-mode half is a different fault and is `DEC-106` | `T-105` |
 | ~~`D-037`~~ | ~~**`D-004`'s guard is bypassed by running vitest from the repo root**~~ | **REPAID 29 Aug.** Root `vitest.config.ts` now declares both workspaces as `projects`, so `npx vitest run` from the repo root runs each under its own config — the backend's `globalSetup`/`setupFiles` included. **Proved, not assumed**: the development database held 4 organisations before a root-launched `test/tiers.test.ts` and 4 after, and the run reported itself as `|@endur/api|` with `env: "test"` in every log line. The frontend project points at `src/frontend/vite.config.ts`, where its jsdom setup already lives — a second copy here is how the two would drift. `eslint.config.js` gained `allowDefaultProject` for the new file, which no tsconfig owns. **The advice to run from `src/backend` is withdrawn — the root command is now the correct one** | ~~before `T-045`~~ — **done** |
 | ~~`D-038`~~ | ~~**The Setup wizard's redesign disagrees with its spec, and six tests are the evidence**~~ | **RESOLVED 29 Aug, `DEC-085`, and the entry was wrong about one of the four.** Sorted by asking what each affordance was *for*. **`← Back` was never lost** — the button is present and accessible, the redesign replaced the literal arrow with an `<Icon>`, and three assertions were matching on decoration. **Restored**: *"Pick the closest one"* (one line of copy, and without it five cards read as an exhaustive list on the one screen whose subject is that the model does not care) and **step 4's live preview** (the step's lede claims these words appear throughout Endur and the preview is the only thing that proves it — the same `<DashboardPreview>` Review uses, not a fork). Review's role list also gets its arrow back: these are ordered levels, and `+` reads as a set. **Moved on the record**: the role chain and vocabulary pair live in step 1's aside rather than on every card. The aside shows strictly more and the cost is real and stated — presets are now compared serially, so a presenter wanting the side-by-side beat says the sentence instead of showing it. `31` § step 1 and § step 4 amended. **Setup.test.tsx 25/25** | ~~a decision, then one session either way~~ — **done** |
 | ~~`D-039`~~ | ~~**`<WordsEditor>` stopped saying which plurals are yours**~~ | **REPAID 29 Aug, `DEC-085`.** `your plural` is back on any row whose plural is not the derived one, shown to a read-only reader too — the hint explains why the plural is unusual; only the undo is a permission. **The `auto: Wings` half is deliberately not restored**: beside a filled field already reading `Wings` it repeats the field, and it is the override that needs saying | ~~with `D-038`~~ — **done** |
@@ -2023,7 +2263,290 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-30 (latest) · `D-036` and `D-041` repaid — `DEC-094`, `DEC-095`
+### 2026-08-31 (latest) · `T-098`…`T-105` — the rest of Stage 11, in one pass
+
+**Eight tasks, and the stage is closed.** `1524/1524` across `115` files from the repo root;
+typecheck 0, lint 0, `npm run build` passes, both audits clean.
+
+**`DEC-102` had to be corrected against itself, and that is the finding of the day.** It says
+`/ops/analytics`' movement counts are read from `payments` *rather than* from `plan.override`
+audit rows. Taken literally that **loses a case the same entry requires** — its own `not` clause
+says a downgrade "covers an operator override", and an override deliberately writes no
+`payments` row (`OverridePlan`'s DTO comment: an operator who could name an amount could invent
+revenue). Replacing the source would have made an operator moving thirty organisations to Gold
+show as **no movement at all**. It reads **both**. They are disjoint by construction — a
+customer's move writes a ledger row and no platform audit row, an operator's override the
+reverse — and that disjointness is written into the query's own comment, because if it ever
+stops being true this count silently double-counts.
+
+**`T-101` needed the platform WRITE seam widened**, which is the only part of Stage 11 that
+touches `INV-011`, so it is named rather than quietly done. `platform/db.ts` refuses every write
+into a tenant except by an allowlist; `Notification` and `EnterpriseRequest` join it. **The read
+surface is unchanged** — `Answer` unreachable, `Response` count-only, and neither new model
+carries a relation that could reach either. What an operator writes into a tenant here is a
+subject and a body **they typed**: a path out of our table into their inbox, not into their data.
+
+**`routes.test.ts` caught the two new inbox routes and refused a capability-less route without a
+written reason.** That is `INV-003`'s enumeration doing its job. `GET /inbox/messages` carries
+**no capability**, deliberately: `response.read` scopes which *units'* responses you may see and
+would lock a recipient out of their own mail, and a `notification.*` module would imply a shared
+queue somebody can be excluded from. The row **names the reader**, and the service scopes every
+query by the session's user id.
+
+**`OrgDetail.tsx` had no test at all, which is how reinstate could be dead** (`D-043`). The
+route was tested; the failure was entirely in the page — one handler guarding both verbs on a
+field only one of them has, returning before any request. A silent early return produces no
+request, no error and no toast, which is indistinguishable from a slow network, so the new test
+asserts **the request was made**, never what the screen says afterwards.
+
+**Two more tests were pinning figures that could not move.** `conversionRate is null` passed
+forever because `converted` is a hardcoded `0`, so the dash was the only reachable branch; and
+`priceMinor === 0` on Enterprise, under a comment explaining that `0` was not free. Both were
+correct and neither tested a decision. The property the second defended — nothing renders ₹0 out
+of that field — is kept, and is now true because the number is real rather than because every
+caller remembered to branch first.
+
+**`endur.css` lost 150 lines** to a block that appeared **twice, byte-identical, 157 lines
+apart** (`D-045`) — so `.preset-grid` was declared three times and the setup step's column width
+and gap were settled by cascade order. A duplicate that agrees with itself is invisible until
+somebody edits one of the copies.
+
+**On the pages:** the scheduled downgrade sits **under the current plan**, not on a card —
+`<PlanPicker>`'s rule is that a lower tier carries no action, and a rule with one exception is a
+rule somebody adds a second exception to. Enterprise's card gained a **Request** verb rather
+than losing its disabled one, which made `DEC-099`'s predicted `mode !== 'override'` unnecessary.
+Dark surfaces gained an **edge** (`DEC-106`) in one block of six selectors; `.card` is
+deliberately absent from it, because the glass card already carries one in every theme.
+
+**`design_specs/design/01` is gitignored**, so its dark column does not appear in `git status`.
+
+---
+
+### 2026-08-31 · `T-097` — the ladder goes one-way, and the period becomes a month
+
+**`DEC-096` and `DEC-097`, built.** `OPEN-015` came back from the owner as *"monthly period,
+prices left at ₹99/₹499/₹999"* — the same numbers, billed monthly, which is a 12× rise and is
+what the decision was written expecting. `tiers.test.ts` pins all three against the literals, so
+the next change to them is a change to a test as well as to a table.
+
+**The suite is green from the root: 112 files, 1487 tests.** Typecheck 0, lint 0, build passes,
+drift and vocab clean.
+
+#### The rule is the server's, and the test proves it there
+
+`POST /billing/tier` refuses a lower rank **and an equal one**, with two different messages,
+before anything is written — the lower-rank message names the tier they are on, the date the
+period ends, and says there are no refunds; "already on Silver" is a different situation and a
+reader told the wrong one tries the wrong remedy.
+
+**The test calls the route directly rather than driving `/app/plan`**, and that is the whole
+point of writing it: the page stops *offering* a downgrade, `13` § Billing is a documented route
+anything can call, and a rule the client enforces is a rule that is not enforced (`INV-003`). It
+also asserts that a refusal wrote **nothing** — no tier moved, no capture recorded.
+
+**The equal-rank check earns its own assertion.** `changeCostMinor('gold','gold')` is `0`, so
+without it a double-submitted dialog would grow a free `payments` row per click rather than
+billing twice. The 409 is what stops that, not the price.
+
+#### The number the owner did not ask about
+
+The headline assertion for `DEC-097` is a **sum**, not three row checks: an organisation that
+walks Bronze → Silver → Gold now totals **₹999** in `payments`. It used to total **₹1,597** — for
+a customer holding one ₹999 plan. The ledger overstated, and it overstated most for the
+customers who upgrade most; `/ops/earnings` reads that table directly.
+
+One formula, `changeCostMinor` in `packages/shared/src/tiers.ts`, beside `priceOf` — the
+checkout dialog and `recordPayment` both call it, which is the only reason the two cannot
+disagree about a customer's bill. **What the dialog prints is still not what the ledger
+records**: the server subtracts again inside the transaction, because `DEC-080` requires it.
+
+#### The period was hardcoded in FOUR places, not three, and they already disagreed
+
+The change order said three. The fourth is `database/seed/demo.ts`, and it was found by grepping
+for the **column** rather than for the number — which is the only way to find the copy nobody
+remembered writing.
+
+**And two of the four used a different expression from the other two.** `joinTier`'s repair and
+`overridePlan` used `+ 365 * DAY`; registration and the seed used `setFullYear(+1)`. In a leap
+year a registered organisation got a period **one day longer** than a repaired one. Nothing read
+the difference, which is exactly why it survived — a constant duplicated four ways is not wrong
+until something depends on it, and `DEC-098` is about to make `period_end` the date a scheduled
+downgrade fires on.
+
+It is one function now: `src/backend/billing/period.ts` `newPeriod()`, owned by `16`. A calendar
+month, **clamped** — JavaScript rolls 31 January + 1 month forward to 3 March rather than
+refusing, so an organisation joining on the 31st would silently get three extra days and, after
+`T-098`, a downgrade firing in the wrong month. Computed in UTC, because the columns are
+`@db.Date` and mixing local arithmetic with a date column is how the two old expressions came to
+differ in the first place.
+
+#### On the page
+
+A card **below** the current tier loses its button and gains a sentence — *"Below your plan.
+Moving down happens at the end of a period — there are no refunds part-way through one."*
+**Absent, not disabled**: a permanently-dead control teaches a reader to distrust every greyed
+control they meet, which is `DEC-104`'s argument arriving early. The sentence is load-bearing —
+a card that simply lost its action reads as a rendering fault, which is how somebody "fixes" it
+back.
+
+`override` mode is exempt: an operator may move a plan either way, and reusing one flag for both
+would have made `/ops` quietly one-way too. That has its own test.
+
+The checkout shows its working — *"₹999 Gold − ₹499 already on Silver"* — because an amount that
+is neither of the two prices on the previous screen is exactly the kind of surprise that
+produces a support email.
+
+#### A test that was asserting the wrong thing
+
+`Plan.test.tsx` had *"CONFIRMS a downgrade, says the data is kept, and only then asks for
+money"*. It passed, and it drove a flow that **charged a customer a second time for less than
+they already held**, in a product with no refunds and an append-only ledger. It asserted the
+dialog's wording rather than asking whether the transaction should exist.
+
+Two others were the mirror image: `PlanPicker.test.tsx` and `Plan.test.tsx` both asserted that
+*"per month" appears NOWHERE on the page*. True of a yearly product, and precisely the shape a
+stale test takes when a decision lands and nobody greps for the sentence it invalidates. Both
+now assert the opposite, and that `/ year` is gone.
+
+#### One correction on my own reporting
+
+The first three full-suite runs I did this session reported **44 files, 551 tests** and I read
+that as the whole suite. It was the backend project only — an earlier `cd src/backend` was still
+in effect, so `npx vitest run` picked up that project's config rather than the root's. The root
+run is 112 files and 1487 tests, and that is the number above. **`D-037` made the root command
+the correct one; a stale working directory is how you run the wrong one and believe otherwise.**
+
+#### What the next session should know
+
+`T-098` (the scheduled downgrade, `pending_tier` + evaluate-on-read) and `T-099` (Enterprise's
+one-line fix and its price) are both unblocked and both depend on this. `T-102` and `T-103` are
+independent live bugs and can be taken in any order.
+
+`T-045` is still unrun and is still the largest risk on the day.
+
+### 2026-08-31 · the owner's third pass — twelve reports, nine tasks, **DOCS ONLY**
+
+**No code was written. The owner asked for docs and that is what this is** — twelve reports
+from one sitting with the running app, each traced to a cause in the source and written up as a
+decision, a defect or a task. `DEC-096`…`DEC-106`, `D-043`…`D-045`, `N-067`, `OPEN-015`, `55`
+§ Stage 11, and the § Board block above.
+
+**The reports are three different kinds of thing wearing one list**, and sorting them was most
+of the work:
+
+| Kind | Which | Why it matters |
+|---|---|---|
+| A **live bug** | reinstate, the date window, the wizard's `Enter`, the duplicated CSS | Broken now, reproduction written down |
+| A **product decision** | the plan ladder, Enterprise, the two message surfaces | Nothing is broken; the owner changed what the product does |
+| A **figure with no source** | the trial counters, seats | It was never going to work, and printing it was the mistake |
+
+#### Two reports were misread on the way in, and both corrections are the finding
+
+**"Enterprise plan is not working" is one line, not a missing feature.** `<PlanPicker>` computes
+`unavailable = disabled || !plan.selectable` and applies it in **all three modes**. `override`
+mode is the operator moving somebody else's plan — `DEC-048` routes Enterprise there
+deliberately, `19` §4 has the capability, `70` has the screen — and its Enterprise button is
+disabled by a flag whose whole meaning is *a customer may not choose this*. **The one tier the
+product calls operator-assigned is unassignable in the only UI that can assign it.** The fix is
+`mode !== 'override' && !plan.selectable`. `DEC-099`.
+
+**"Suspending is suspending every org" was checked and NOT reproduced.** `setSuspended` writes
+`where: { id: orgId }` from `params.id`; `tenantResolver`'s refusal reads `factsOf(orgId)` per
+request with no cache and no shared state; `<OrgRow>` renders `org.suspendedAt` per row. There
+is no path in any of the three that could touch a second organisation. **The likeliest reading
+is the bug reported in the same breath**: reinstate silently does nothing, so every organisation
+suspended stayed suspended and the estate accumulated them with no way back — indistinguishable
+from "it suspended everything" from the console list. `N-067` records exactly what was checked
+so the next session does not re-read the middleware first, and names the one observation that
+would settle it.
+
+#### The three findings that were worse than the report
+
+**A message from Endur reached nobody, and the operator was told otherwise.**
+`messageAdministrators` writes one `platform_audit_log` row and returns `{ sentTo: 3 }`. **That
+is the operator's own table.** The customer's administrators have no route that reads it and no
+screen that renders it, and there is no mail transport. So the operator sees *"Sent to 3
+administrators"* while **nothing has been sent to anybody** — a confirmation for an action that
+did not happen, which is worse than an unbuilt feature. The service's reasoning that *delivery
+in P2 is the record* is right and incomplete: a record is a delivery only if the recipient can
+reach it. `DEC-101`, `T-101`.
+
+**Two of six headline cards on `/ops/analytics` could never move.** The owner created an
+organisation, watched *Trials started* stay put, and read the counter as redundant. It is worse:
+`DEC-048` made registration write `status: 'active'`, so nothing but a seeded operator-created
+org is ever `trialing`; and `converted` is a hardcoded `0` under a comment stating it has no
+source, so *Conversion rate* is permanently an em-dash. The service argues honestly for the zero
+and is right about honesty, wrong about the remedy — **the honest thing to do with a metric
+that has no source is not to print it.** `DEC-102`, `T-102`.
+
+**The movement table has only ever counted what operators did.** `upgraded`/`downgraded` come
+from `platform_audit_log` rows with `action: 'plan.override'`. A customer's own upgrade writes
+`billing.update` to the tenant `audit_log`, which that query never reads — so the estate's
+movement chart is labelled as the estate and shows the support desk. It moves onto `payments`,
+which carries `from_tier`, `tier` and `kind`, is written on both paths, and is already what
+`/ops/earnings` sums. One source, or the two pages disagree about the same event.
+
+#### The billing change, and the number nobody had noticed
+
+The owner's first item was four changes in one paragraph. Separated: the ladder is **one-way**
+while a period runs (`DEC-096`), an upgrade captures the **difference** (`DEC-097`), the period
+becomes a **calendar month** (`DEC-096`), and a downgrade is **scheduled for expiry** rather than
+performed (`DEC-098`).
+
+**The difference rule fixes a number that was not in the report.** `/ops/earnings` sums
+`payments`. Today an organisation that walks Bronze → Silver → Gold inside one period
+contributes ₹99 + ₹499 + ₹999 = **₹1,597** to estate revenue for a customer holding one ₹999
+plan. **The ledger overstates, and it overstates most for the customers who upgrade most.**
+Under the difference rule the same journey sums to ₹999.
+
+**"Only when it's exhausted" needs the one thing this product has not got** — something that
+runs when a date passes. `16` §8 says so in as many words, `17` is unwritten and `OPEN-005` says
+nothing owns a scheduler. **So nothing runs**: `pending_tier` plus the first read after
+`period_end`, which is the evaluate-on-read trick `readBilling` already uses to repair a missing
+subscription row (`D-012`), with its argument already written in that function's comment. The
+accepted cost is stated rather than discovered — an organisation nobody opens never transitions,
+which is harmless because a tier is only consulted when somebody asks.
+
+**Removing a button is never the rule.** `/app/plan` stops offering a downgrade and `13`
+§ Billing is what makes that true: `POST /billing/tier` refuses a lower or equal rank with a
+409. A documented route that anything can call, and `INV-003` says the client never decides.
+
+#### And one thing the owner did not ask about
+
+**`endur.css` carries 157 lines twice, verbatim.** `/* Industry Split Layout */` appears at two
+line numbers; the blocks differ by one blank line and one trailing rule. `.preset-grid` is
+therefore declared **three times** across the file with different `minmax()` and different `gap`,
+and what renders is whichever copy the cascade reaches last. That is the *"layout and padding
+are not clear"* half of the dark-mode report, and it is not a dark-mode fault at all. `D-045`.
+
+The dark half **is** a system fault: `design_specs/design/01` §4's surface table gives Content
+*"`#ffffff` + `--shadow-sm/md`"* — light-mode only, written before `DEC-028` shipped dark and
+never revisited. And the dark token block's own comment already says *"shadows on a dark ground
+do almost nothing; the lift has to come from the edge instead"*, over components still carrying
+`border: 2px solid transparent`. **The system knew and the components never followed.**
+`DEC-106`.
+
+#### What the team owes
+
+**`OPEN-015` is the only blocking question and it is one line.** `DEC-096` moves the period to a
+month and leaves the prices at ₹99 / ₹499 / ₹999 — a 12× rise, written deliberately, because
+₹99 a *year* is not a price anyone would defend in the room. If the intent was the annual figure
+divided by twelve, say so before `T-097` is built. Nothing else in Stage 11 depends on it.
+
+#### What the next session should know
+
+Nothing was built and nothing was verified, because there is nothing to verify — **the suite was
+green when this session opened and no file under `src/` was touched.** `git status` should show
+architecture docs, `design_specs/design/01`, and this file.
+
+Start at **`T-097`** if the answer to `OPEN-015` has arrived, **`T-102` or `T-103`** if it has
+not — both are live bugs on the operator surface, neither depends on a price, and `T-103`'s
+reinstate is the one a person would meet in the first minute of using `/ops`.
+
+**`T-045` is still unrun and is still the largest risk on the day.** None of the above changes
+that, and none of it should be done in front of it.
+
+### 2026-08-30 · `D-036` and `D-041` repaid — `DEC-094`, `DEC-095`
 
 **The suite is green, all of it, for the first time: backend 546/546, frontend 933/933, three
 consecutive full runs each.** Two debt entries closed. Both had a diagnosis written down, and

@@ -7,7 +7,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { CAPABILITY_CATALOGUE } from '@endur/shared';
-import { app, setUpOrg, unique, withCsrf, type Session } from './helpers.js';
+import { app, registerOrg, setUpOrg, unique, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { hashPassword } from '../auth/password.js';
 import { platformClient, PlatformSeamViolation } from '../platform/db.js';
@@ -301,14 +301,89 @@ describe('analytics — `71`, `T-067`', () => {
     expect(gold).toBeTruthy();
   });
 
-  it('conversionRate is null until a trial has completed, and never a fabricated number (decision 3)', async () => {
+  /**
+   * THE TRIAL FIGURES ARE GONE FROM THE RESPONSE, NOT JUST FROM THE PAGE — DEC-102.
+   *
+   * This replaces an assertion that `conversionRate` was `null` until a trial completed. That
+   * assertion was correct and it was permanently correct: `DEC-048` made registration write
+   * `status: 'active'`, so nothing on the sign-up path is ever trialing, and `converted` was
+   * a hardcoded `0`. IT WAS A TEST PINNING A FIGURE THAT COULD NOT MOVE.
+   *
+   * The FIELD is asserted absent rather than the card, because a field left on the contract is
+   * a field something starts computing again — and the page would be free to print it.
+   */
+  it('prints no trial figures at all, because nothing can ever write one', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.agent.get('/api/v1/platform/analytics');
     expect(res.status).toBe(200);
-    const { trials } = res.body.data;
-    expect(trials.converted + trials.expired === 0 ? trials.conversionRate : 'measured').toBe(
-      trials.converted + trials.expired === 0 ? null : 'measured',
+    expect(res.body.data).not.toHaveProperty('trials');
+  });
+
+  /**
+   * NO SEATS ANYWHERE ON THIS PAGE — DEC-102. `DEC-080` prices per organisation and
+   * `subscriptions.seats` has never been written (`D-013`), so a seat column on the revenue
+   * owner's page measured something no invoice reads.
+   */
+  it('reports no seat figures — nothing is billed on them', async () => {
+    const owner = await makeOperator('owner');
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    expect(res.body.data.totals).not.toHaveProperty('seats');
+    for (const row of res.body.data.byTier as Array<Record<string, unknown>>) {
+      expect(row).not.toHaveProperty('seats');
+    }
+  });
+
+  /**
+   * `to` INCLUDES THE DAY IT NAMES — D-044, and this is the owner's report about the date
+   * filters. `<input type="date">` sends a bare date, `z.coerce.date()` reads it as midnight,
+   * and every query was `lte: to` — so the whole of the last day selected was excluded and a
+   * SINGLE-DAY WINDOW MATCHED NOTHING AT ALL.
+   *
+   * The single-day case is the assertion, because it is the one that cannot be explained away
+   * as an off-by-one nobody would notice: from = to = today must contain an organisation
+   * created today.
+   */
+  it('includes the whole of the day named by `to`, so a one-day window is not empty', async () => {
+    await setUpOrg();
+    const owner = await makeOperator('owner');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await owner.agent.get(
+      `/api/v1/platform/analytics?from=${today}&to=${today}`,
     );
+    expect(res.status).toBe(200);
+
+    const created = (res.body.data.movement as Array<{ new: number }>)
+      .reduce((sum, row) => sum + row.new, 0);
+    expect(created).toBeGreaterThan(0);
+
+    // The window is echoed back as the DAY that was asked for, not as the 23:59:59 the query
+    // ran with — the page puts this straight back into its own date input.
+    expect((res.body.data.window.to as string).slice(0, 10)).toBe(today);
+  });
+
+  /**
+   * A CUSTOMER'S OWN UPGRADE IS MOVEMENT, AND IT NEVER USED TO BE — DEC-102.
+   *
+   * `movement` read `plan.override` audit rows, which are the OPERATOR'S action; a customer
+   * joining a higher tier writes `billing.update` to the tenant `audit_log` and a row to
+   * `payments`, and the query read neither. So the table was labelled as the estate and
+   * counted only what operators did. This drives the customer's own route, which is the path
+   * that produced nothing before.
+   */
+  it('counts a customer upgrading their own plan, from the payment ledger', async () => {
+    const org = await registerOrg('custom', 'bronze');
+    const owner = await makeOperator('owner');
+
+    const up = await withCsrf(org, 'post', '/api/v1/billing/tier').send({ tier: 'gold' });
+    expect(up.status).toBe(200);
+
+    const res = await owner.agent.get('/api/v1/platform/analytics');
+    expect(res.status).toBe(200);
+    const upgraded = (res.body.data.movement as Array<{ upgraded: number }>)
+      .reduce((sum, row) => sum + row.upgraded, 0);
+    expect(upgraded).toBeGreaterThan(0);
   });
 
   it('movement counts a plan override and a suspension as four separate figures, never netted (decision 2)', async () => {
