@@ -93,96 +93,101 @@ export function QuickDialog({
   return (
     <div className="dialog-backdrop" onMouseDown={() => !busy && onCancel()}>
       <div
-        className="dialog"
+        className="dialog dialog-wide dialog-tall"
         role="dialog"
         aria-modal="true"
         aria-label={copy.title}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 className="dialog-title">{copy.title}</h2>
-        <p className="dialog-body">{copy.help}</p>
+        <header className="dialog-head">
+          <h2 className="dialog-title">{copy.title}</h2>
+          <p className="dialog-body">{copy.help}</p>
+        </header>
 
         <form
-          className="subject-form"
+          className="subject-form dialog-form"
           onSubmit={(event) => {
             event.preventDefault();
             if (!ready || busy) return;
             submit();
           }}
         >
-          <div className="field">
-            <label htmlFor="quick-name">{copy.question}</label>
-            <input
-              id="quick-name"
-              className="input"
-              autoFocus
-              value={name}
-              maxLength={120}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <p className="field-help">
-              Both the question and the name {labels.respondent.many.toLowerCase()} see.
-            </p>
+          {/* Adding a tenth option must not push "Create and share" off the panel. */}
+          <div className="dialog-scroll">
+            <div className="field">
+              <label htmlFor="quick-name">{copy.question}</label>
+              <input
+                id="quick-name"
+                className="input"
+                autoFocus
+                value={name}
+                maxLength={120}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <p className="field-help">
+                Both the question and the name {labels.respondent.many.toLowerCase()} see.
+              </p>
+            </div>
+
+            {purpose === 'poll' && (
+              <fieldset className="field">
+                <legend>Options</legend>
+                {options.map((option, index) => (
+                  // Index as key, deliberately: these rows have no identity until they are
+                  // saved, and nothing here reorders them.
+                  <div className="quick-option" key={index}>
+                    <input
+                      className="input"
+                      value={option}
+                      maxLength={120}
+                      aria-label={`Option ${index + 1}`}
+                      onChange={(event) => setOption(index, event.target.value)}
+                    />
+                    {options.length > 2 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-icon"
+                        aria-label={`Remove option ${index + 1}`}
+                        onClick={() =>
+                          setOptions((current) => current.filter((_, at) => at !== index))
+                        }
+                      >
+                        <Icon name="close" size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {options.length < MAX_OPTIONS && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setOptions((current) => [...current, ''])}
+                  >
+                    <Icon name="add" size={16} /> Add option
+                  </button>
+                )}
+              </fieldset>
+            )}
+
+            <div className="field">
+              <label htmlFor="quick-ends">Close it automatically (optional)</label>
+              <input
+                id="quick-ends"
+                className="input"
+                type="datetime-local"
+                value={endsAt}
+                onChange={(event) => setEndsAt(event.target.value)}
+              />
+              {/* Said BEFORE the button rather than discovered after it: this creates a live,
+                  public link, and both properties are fixed once it exists (10 §4.3). */}
+              <p className="field-help">
+                Anyone with the link can answer, and answers are anonymous. Neither can be
+                changed afterwards.
+              </p>
+            </div>
+
+            {error && <p className="form-error" role="alert">{error}</p>}
           </div>
-
-          {purpose === 'poll' && (
-            <fieldset className="field">
-              <legend>Options</legend>
-              {options.map((option, index) => (
-                // Index as key, deliberately: these rows have no identity until they are
-                // saved, and nothing here reorders them.
-                <div className="quick-option" key={index}>
-                  <input
-                    className="input"
-                    value={option}
-                    maxLength={120}
-                    aria-label={`Option ${index + 1}`}
-                    onChange={(event) => setOption(index, event.target.value)}
-                  />
-                  {options.length > 2 && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-icon"
-                      aria-label={`Remove option ${index + 1}`}
-                      onClick={() =>
-                        setOptions((current) => current.filter((_, at) => at !== index))
-                      }
-                    >
-                      <Icon name="close" size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              {options.length < MAX_OPTIONS && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setOptions((current) => [...current, ''])}
-                >
-                  <Icon name="add" size={16} /> Add option
-                </button>
-              )}
-            </fieldset>
-          )}
-
-          <div className="field">
-            <label htmlFor="quick-ends">Close it automatically (optional)</label>
-            <input
-              id="quick-ends"
-              className="input"
-              type="datetime-local"
-              value={endsAt}
-              onChange={(event) => setEndsAt(event.target.value)}
-            />
-            {/* Said BEFORE the button rather than discovered after it: this creates a live,
-                public link, and both properties are fixed once it exists (10 §4.3). */}
-            <p className="field-help">
-              Anyone with the link can answer, and answers are anonymous. Neither can be
-              changed afterwards.
-            </p>
-          </div>
-
-          {error && <p className="form-error" role="alert">{error}</p>}
 
           <div className="dialog-actions">
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={onCancel}>

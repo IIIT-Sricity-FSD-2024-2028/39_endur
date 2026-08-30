@@ -32,14 +32,17 @@ export function resolveRow(
   maps: NameMaps,
   body: ImportPeopleBody,
   row: ImportRow,
-): { roleId: string | undefined; unitId: string | undefined } {
+): { roleId: string | undefined; unitId: string | undefined; alsoUnitId: string | undefined } {
+  const unit = (name?: string) =>
+    name ? (body.unitMapping[name] ?? maps.unitByName.get(name.toLowerCase())) : undefined;
   return {
     roleId: row.roleName
       ? (body.roleMapping[row.roleName] ?? maps.roleByName.get(row.roleName.toLowerCase()))
       : undefined,
-    unitId: row.unitName
-      ? (body.unitMapping[row.unitName] ?? maps.unitByName.get(row.unitName.toLowerCase()))
-      : undefined,
+    unitId: unit(row.unitName),
+    // Resolved through the SAME mapping as the first unit, so an operator who answered
+    // "did you mean" once in the preview has answered it for both columns.
+    alsoUnitId: unit(row.alsoUnitName),
   };
 }
 
@@ -58,8 +61,12 @@ export async function pairsFromImport(
   const maps = await nameMaps(orgId);
   const out: RoleUnitPair[] = [];
   for (const row of body.rows) {
-    const { roleId, unitId } = resolveRow(maps, body, row);
+    const { roleId, unitId, alsoUnitId } = resolveRow(maps, body, row);
     if (roleId && unitId) out.push({ roleId, unitId });
+    // The second position is bounded exactly like the first. It confers the same role at a
+    // DIFFERENT unit, so an importer who may place that role in Section A and not in
+    // Section B must still be refused for Section B — INV-012 is about where, not how many.
+    if (roleId && alsoUnitId) out.push({ roleId, unitId: alsoUnitId });
   }
   return out;
 }

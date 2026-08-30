@@ -24,6 +24,7 @@ import { runInTransaction } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { clearGrantCache, simulate, type Decision, type Target } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
+import { grantsForLevel } from '../../presets/grant-matrix.js';
 
 export async function listRoles(orgId: string): Promise<RoleView[]> {
   const roles = await prisma.node.findMany({
@@ -356,7 +357,11 @@ export async function grantWarnings(
   labels: ResolvedLabels,
 ): Promise<GrantWarning[]> {
   const [roles, grants] = await Promise.all([
-    prisma.node.findMany({ where: { orgId, kind: 'role' }, select: { id: true, name: true } }),
+    prisma.node.findMany({
+      where: { orgId, kind: 'role' },
+      select: { id: true, name: true, level: true },
+      orderBy: { level: 'asc' },
+    }),
     prisma.grant.findMany({
       where: { orgId, subject: { kind: 'role' } },
       select: { subjectId: true, capability: true, scope: true, effect: true },
@@ -410,8 +415,35 @@ export async function grantWarnings(
     });
   }
 
+  // 4 · the clamped starter row. `GRANT_MATRIX` defines four levels and `org/service.ts`
+  //     gives every role below the fourth the level-4 row, which is deliberately thin — no
+  //     `template.*`, no `campaign.read`, no `booking.*`, no `announcement.create`. That is
+  //     correct for a four-role organisation and silently wrong for a ten-role one: six
+  //     roles come out of the wizard able to do almost nothing, and until D-048 nothing on
+  //     screen said so. It is not an error — the administrator is meant to edit the grid —
+  //     so it is said here, where the grid already reads its warnings, rather than blocked.
+  const clamped = roles.filter((role) => (role.level ?? 0) > MATRIX_LEVELS);
+  const untouched = clamped.filter((role) =>
+    grants.every((grant) => grant.subjectId !== role.id || DERIVED_L4.has(grant.capability)),
+  );
+  for (const role of untouched) {
+    warnings.push({
+      kind: 'thin_starter_row',
+      roleId: role.id,
+      message:
+        `${role.name} starts from the same small set of powers as the fourth role, because ` +
+        'the starter powers only describe four levels. Review this row and give it what ' +
+        'the job needs.',
+    });
+  }
+
   return warnings;
 }
+
+/** How many levels `GRANT_MATRIX` describes. Everything below is clamped to the last one. */
+const MATRIX_LEVELS = 4;
+/** The capabilities that clamped row hands out — a row holding only these was never edited. */
+const DERIVED_L4 = new Set<string>(grantsForLevel(MATRIX_LEVELS).map((grant) => grant.capability));
 
 /**
  * The catalogue, for the grid. Grouped exactly as 11 §3 groups it.

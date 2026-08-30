@@ -2633,6 +2633,69 @@ DEC-091  ACTIVE  2026-08-30  origin:user  task:T-093, T-094, T-095
            src/frontend/pages/console/Start/index.tsx `laneState`
 ```
 
+```
+DEC-107  ACTIVE  2026-08-30  origin:claude  task:D-046, D-047, D-048
+  decision THE GRID'S ESCALATION BOUND ASKS "EVERYWHERE" ONLY OF CELLS THAT CLAIM A UNIT.
+           a cell whose scope is `self` is bounded by whether the saver HOLDS the capability
+           at all -- at `all`, over some units, or over themselves -- and not by whether they
+           hold it in every unit of the organisation.
+  why      D-047. `GRANT_MATRIX` writes `reflection.*` and `actionplan.*` at `self` and at no
+           other scope, so nobody in any organisation holds them at `all`; the bound therefore
+           refused EVERY save of those rows, including the founder's, with
+           `403 WOULD_ESCALATE`. a gold organisation that had paid for the improvement loop
+           could not reach it, and the powers grid -- the documented way to fix exactly this
+           -- was the screen that refused. measured on a ten-role college: `GET /reflect` 403
+           for a professor, with no in-product path to change it.
+           the reading is the one `authz/escalation.ts` has always taken when bounding a
+           POSITION: a `self` grant reaches no unit, so no placement of the role widens it
+           and there is no unit to compare.
+  not      NOT a relaxation of the bound. a capability the saver does not hold AT ALL is still
+           refused, `self` or not -- `seesNothing(reach)` runs first and is untouched. and a
+           capability with even one unit-scoped cell in the same save is bounded the old way,
+           so `self` cannot wrap a wider cell past the guard.
+  see      INV-012, DEC-039, 33 § "The escalation bound",
+           src/backend/middleware/requireNoGrantEscalation.ts,
+           src/backend/test/powers-grid.test.ts "a `self` cell is bounded by holding it"
+```
+
+```
+DEC-108  ACTIVE  2026-08-30  origin:claude  task:N-068
+  decision `/analysis?campaignId=X` ANSWERS 404 WHEN THE CALLER MAY NOT SEE X, and keeps
+           `suppressed: true` for a campaign they may see that sits below the k-anonymity
+           threshold. the two answers are distinct for the reader who owns the campaign and
+           identical for everybody outside it.
+  why      it answered `200 { responseCount: 0 }`, which reports an empty corpus as a fact
+           about a corpus that exists. wrong twice: it tells a stranger the id resolves to
+           something, and it tells the owner of a poll with nine votes that nobody answered.
+           it also hid D-046 for most of a demo run, because the screen that would have shown
+           the missing responses said there were none.
+  where    `assertVisible(..., 'response.read')` at the TOP of `readCorpus`, so it is the same
+           404 and the same wording every other by-id read gives.
+  see      D-046, 43, src/backend/features/results/service.ts `readCorpus`,
+           src/backend/test/quick-results.test.ts
+```
+
+```
+DEC-109  ACTIVE  2026-08-30  origin:claude  task:N-071
+  decision THE CSV IMPORTER READS A SECOND UNIT COLUMN -- `Also in` -- and creates a
+           NON-PRIMARY position at it, with the row's own role.
+  why      an announcement addressed to a unit reaches the people POSITIONED in it, and a
+           college's students are positioned in their department. hostel and mess audiences
+           therefore came out of the importer containing one person, the warden, and the model
+           that supports somebody sitting in two branches at once had no path from the file to
+           that state. adding three students to a hostel by hand took the same announcement
+           from 1 recipient to 4.
+  not      NOT a second ROLE column. a second place with a DIFFERENT role is two rows, or the
+           assignments screen; a column for it would make the common case pay for the rare one.
+           the second position is `isPrimary: false` -- the home unit is what a person-anchored
+           grant anchors to, and two primaries make that a guess.
+  where    the second unit resolves through the SAME `unitMapping` as the first, is bounded by
+           INV-012 exactly like the first (`pairsFromImport` emits both pairs), and a row whose
+           second unit resolves to nothing is SKIPPED and reported rather than half-imported.
+  see      INV-005, INV-012, 34, packages/shared/src/dto/person.ts `ImportRow`,
+           src/backend/features/people/service.ts `commitImport`
+```
+
 ---
 
 ## INV — invariants
@@ -4762,4 +4825,34 @@ N-067  "SUSPENDING SUSPENDS EVERY ORG" — REPORTED 30 Aug, NOT REPRODUCED, AND 
        organisations suspended, and whether `/ops` listed a "Suspended" tag on rows that had
        never been touched. Do not go looking in the middleware again first.
        see D-043, DEC-104.
+
+N-068  A CAMPAIGN THE CALLER MAY NOT SEE ANSWERS 404 ON `/analysis`, NOT `responseCount: 0`.
+       see DEC-108. recorded here too because the OLD answer is what costs time: a session
+       debugging "why is the corpus empty" is reading a permission refusal.
+
+N-069  A RESPONSE RATE OVER 100% IS ARITHMETIC, NOT A BUG, AND THE CARD NOW SAYS SO. a
+       campaign is commonly `access: 'public'` with a UNIT audience (DEC-037) -- the link is
+       answerable by whoever holds it, the denominator counts only the people asked -- so 135%
+       and 150% are both true. the results card stops printing a percentage above the roll and
+       states the two counts; the home card keeps the number and says why. do NOT "fix" this
+       by dropping public campaigns from the rate: nearly every campaign is public and the card
+       would be a dash everywhere. see N-043, N-044, T-040, T-041.
+
+N-070  SIGNING IN TO A SUSPENDED ORGANISATION IS REFUSED AT THE SIGN-IN, after the password is
+       checked. it used to answer 200 and leave the FIRST console call to be the 403, which
+       tells the user nothing at the moment they could act on it. after password verification
+       deliberately: before it, login is an oracle for which organisations exist and in what
+       state (15 §2). same code and sentence as `tenantResolver`, so a session cut mid-use and
+       a sign-in afterwards read alike.
+
+N-071  THE IMPORTER PUTS A PERSON IN A SECOND UNIT, from an `Also in` column. see DEC-109.
+
+N-072  A PENDING MIGRATION AND A STALE PRISMA CLIENT ARE TWO FAULTS AND BOTH NOW SAY SO.
+       `prisma generate` is a `predev` script -- it must run BEFORE `tsx watch` on Windows,
+       where the watcher holds the query-engine DLL open and generate fails on the file lock --
+       and the dev server prints the migrations the database has not applied, read through
+       `db/graph.ts appliedMigrations()` because DEC-007 confines `$queryRaw` to that file.
+       symptom before this: `GET /inbox/messages` answered
+       `500 -- Cannot read properties of undefined (reading 'findMany')` on correct code,
+       because `prisma.notification` did not exist in a client generated before the model did.
 ```

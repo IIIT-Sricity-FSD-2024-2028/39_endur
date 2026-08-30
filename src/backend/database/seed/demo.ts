@@ -12,6 +12,7 @@ import { mintToken } from '../../features/campaigns/token.js';
 import { newPeriod } from '../../billing/period.js';
 import { poolFor, type Tone } from './comments.js';
 import { Rng, skewedNps, skewedRating, skewedTimestamp } from './random.js';
+import { ORGANISATION_SUBJECT } from '../../features/campaigns/visibility.js';
 import type { Tier } from '@endur/shared';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -48,6 +49,12 @@ export type DemoOrg = {
     /** Roughly how many people answer per subject. */
     responsesPerSubject: number;
   }>;
+  /**
+   * T-106. One live poll per org — `campaign.*` is bronze (16 §3 `entitlements.ts`), so
+   * every tier gets this, unlike announcements (silver+) and booking (gold+). A poll IS a
+   * one-question campaign (DEC-088); this seeds the same shape `quickCreate` would.
+   */
+  poll: { question: string; options: string[]; votes: number };
 };
 
 export const DEMO_ORGS: DemoOrg[] = [
@@ -115,6 +122,11 @@ export const DEMO_ORGS: DemoOrg[] = [
         responsesPerSubject: 28,
       },
     ],
+    poll: {
+      question: 'Which time works best for the next open house?',
+      options: ['Weekday morning', 'Weekday evening', 'Saturday'],
+      votes: 46,
+    },
   },
   {
     name: 'The Grand Palace',
@@ -166,6 +178,11 @@ export const DEMO_ORGS: DemoOrg[] = [
         responsesPerSubject: 18,
       },
     ],
+    poll: {
+      question: 'Which amenity should we add next?',
+      options: ['Rooftop bar', 'Late checkout', 'EV charging'],
+      votes: 30,
+    },
   },
   {
     name: 'Riverside Hospital',
@@ -203,6 +220,11 @@ export const DEMO_ORGS: DemoOrg[] = [
         responsesPerSubject: 50,
       },
     ],
+    poll: {
+      question: 'How can we improve the waiting room?',
+      options: ['More seating', 'Better signage', 'Shorter wait times'],
+      votes: 38,
+    },
   },
   {
     name: 'Meridian Consulting',
@@ -249,6 +271,11 @@ export const DEMO_ORGS: DemoOrg[] = [
         responsesPerSubject: 20,
       },
     ],
+    poll: {
+      question: 'What should our next team offsite focus on?',
+      options: ['Skills workshops', 'Team bonding', 'Strategy planning'],
+      votes: 27,
+    },
   },
 ];
 
@@ -588,6 +615,72 @@ export async function seedOrg(
       // Deliberately below the k-anon threshold of 5.
       perSubject: 2,
       startsAt,
+      endsAt: new Date(),
+    });
+  }
+
+  // 7a · T-106. ONE LIVE POLL, on every org regardless of tier — `campaign.*` is bronze
+  //     (`billing/entitlements.ts` §3), so a poll is the one quick-launch surface every
+  //     seeded org can actually use. Built the same way `quickCreate` builds one (DEC-088,
+  //     DEC-089): a one-question single-choice template, anchored to the org's own
+  //     singleton subject, launched with a public token — just written directly since a
+  //     seed run has no `req` to hand `runInTransaction`.
+  {
+    const orgSubject =
+      (await prisma.subject.findFirst({
+        where: { orgId, type: ORGANISATION_SUBJECT, archivedAt: null },
+        select: { id: true },
+      })) ??
+      (await prisma.subject.create({
+        data: { orgId, name: spec.name, type: ORGANISATION_SUBJECT },
+        select: { id: true },
+      }));
+
+    const pollTemplate = await prisma.template.create({
+      data: {
+        orgId,
+        name: spec.poll.question,
+        category: 'Poll',
+        estimatedSeconds: estimateSeconds(['single']),
+        questions: {
+          create: [
+            {
+              kind: 'single',
+              text: spec.poll.question,
+              config: { kind: 'single', options: spec.poll.options, allowOther: false },
+              required: true,
+              position: 0,
+            },
+          ],
+        },
+      },
+      select: { id: true },
+    });
+
+    const pollCampaign = await prisma.campaign.create({
+      data: {
+        orgId,
+        templateId: pollTemplate.id,
+        name: spec.poll.question,
+        audienceRule: { kind: 'anyone' },
+        access: 'public',
+        anonymous: true,
+        startsAt: new Date(Date.now() - 4 * DAY),
+        createdById: adminUserId,
+        publicToken: mintToken(),
+        subjects: { create: [{ subjectId: orgSubject.id }] },
+      },
+      select: { id: true },
+    });
+
+    await seedResponses(prisma, {
+      rng,
+      industry: spec.industry,
+      campaignId: pollCampaign.id,
+      templateId: pollTemplate.id,
+      subjects: [{ id: orgSubject.id, quality: 0.6 }],
+      perSubject: spec.poll.votes,
+      startsAt: new Date(Date.now() - 4 * DAY),
       endsAt: new Date(),
     });
   }

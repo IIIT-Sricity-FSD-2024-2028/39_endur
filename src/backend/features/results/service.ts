@@ -24,9 +24,9 @@ import { NotFoundError } from '../../lib/errors.js';
 import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursorOn, decodeCursor, orderOn, pageOf, type Paged } from '../../lib/paginate.js';
 import { visibleUnits } from '../../authz/index.js';
-import type { Visibility } from '../../authz/visibility.js';
 import { unitSubtree } from '../../db/graph.js';
 import { countAudience, ruleOf } from '../campaigns/audience.js';
+import { campaignInScope } from '../campaigns/visibility.js';
 
 export async function readResults(
   req: Request,
@@ -374,7 +374,7 @@ async function assertVisible(
       templateId: true,
       audienceRule: true,
       org: { select: { labels: true } },
-      subjects: { select: { subject: { select: { id: true, unitId: true } } } },
+      subjects: { select: { subject: { select: { id: true, unitId: true, type: true } } } },
     },
   });
   if (!campaign) throw new NotFoundError(missing);
@@ -383,7 +383,7 @@ async function assertVisible(
   // The SAME predicate the inbox's readableCampaigns uses, from one implementation. 58 §
   // Acceptance asks that the two match for the same caller; sharing the function is how
   // that is true by construction rather than by two people writing the same `some()`.
-  if (canSee(visibility, campaign.subjects)) return campaign;
+  if (campaignInScope(campaign.subjects, visibility)) return campaign;
 
   throw new NotFoundError(missing);
 }
@@ -603,14 +603,14 @@ export async function readableCampaigns(
     where: { orgId, ...(onlyCampaignId ? { id: onlyCampaignId } : {}) },
     select: {
       id: true,
-      subjects: { select: { subject: { select: { unitId: true } } } },
+      subjects: { select: { subject: { select: { unitId: true, type: true } } } },
     },
   });
   if (campaigns.length === 0) return [];
 
   // EXACTLY 40's scope test, from exactly one implementation of it (INV-003).
   const visibility = await visibleUnits({ orgId, userId, capability: 'response.read', authzVersion });
-  const visible = campaigns.filter((campaign) => canSee(visibility, campaign.subjects));
+  const visible = campaigns.filter((campaign) => campaignInScope(campaign.subjects, visibility));
   if (visible.length === 0) return [];
 
   // PER CAMPAIGN, before anything is merged. A groupBy rather than a count each, but the
@@ -626,17 +626,6 @@ export async function readableCampaigns(
       .map((row) => row.campaignId),
   );
   return visible.filter((campaign) => above.has(campaign.id)).map((campaign) => campaign.id);
-}
-
-/** The one scope predicate, shared by assertVisible and readableCampaigns. */
-function canSee(
-  visibility: Visibility,
-  subjects: Array<{ subject: { unitId: string | null } }>,
-): boolean {
-  if (visibility.all) return true;
-  return subjects.some(
-    ({ subject }) => subject.unitId !== null && visibility.unitIds.includes(subject.unitId),
-  );
 }
 
 /* ------------------------------------------- the analysis corpus (43, T-081) */
@@ -672,12 +661,22 @@ export type Corpus = {
 const MAX_CORPUS = 5_000;
 
 export async function readCorpus(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   filter: CorpusFilter,
 ): Promise<Corpus> {
   const threshold = config.K_ANON_THRESHOLD;
+  // ONE named campaign is asked about by id, so it gets the same answer every other
+  // by-id read gives: 404 when the caller may not see it (N-068). Without this, "you
+  // may not read this" arrived as `responseCount: 0`, which reports an empty corpus as
+  // a fact and hid D-042 for a whole demo run. A campaign the caller CAN see but which
+  // sits below the threshold still falls through to the suppressed branch below — the
+  // two answers must stay distinct for the reader and identical for the outsider.
+  if (filter.campaignId) {
+    await assertVisible(req, orgId, userId, authzVersion, filter.campaignId, 'response.read');
+  }
   const campaignIds = await readableCampaigns(orgId, userId, authzVersion, filter.campaignId);
   if (campaignIds.length === 0) {
     return { suppressed: true, responseCount: 0, audienceEstimate: null, threshold };

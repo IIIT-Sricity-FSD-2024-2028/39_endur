@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "//predev": "D-049. The Prisma client is generated, not committed, so pulling a branch that adds a MODEL leaves a client with no delegate for it and the route 500s with `Cannot read properties of undefined`. postinstall covers a fresh install and covered nothing else. This runs BEFORE the watcher starts, which is also the only order that works on Windows: tsx holds the query-engine DLL open and `prisma generate` fails on the file lock while the dev server is running.",
+    "predev": "prisma generate",
     "dev": "tsx watch server.ts",
     "build": "tsc -b",
     "start": "node dist/server.js",

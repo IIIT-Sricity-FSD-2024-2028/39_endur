@@ -340,3 +340,78 @@ describe('the escalation bound on the grid — INV-012', () => {
     expect(after).toBe(before);
   });
 });
+
+/* ------------------------------------------------------------------ D-047 */
+
+describe('a `self` cell is bounded by holding it, not by holding it everywhere — F2', () => {
+  let founder: Session;
+  let roles: Role[];
+
+  beforeAll(async () => {
+    founder = await setUpOrg();
+    roles = await rolesOf(founder);
+  });
+
+  it('lets the founder give a lower role the improvement loop', async () => {
+    // THE FINDING, as the college hit it. `GRANT_MATRIX` writes `reflection.*` and
+    // `actionplan.*` at `self` and at NO other scope, and the guard demanded the saver hold
+    // the capability everywhere in the organisation before handing it out. Nobody can hold
+    // at `all` a capability the matrix only ever writes at `self`, so nobody — including
+    // the founder of a Gold organisation that had paid for the feature — could grant it.
+    // The refusal was `403 WOULD_ESCALATE` on the one screen documented as the way to fix
+    // exactly this.
+    //
+    // A `self` cell is not a claim on any unit: it lets each holder act on THEMSELVES, and
+    // no placement of the role widens that. `authz/escalation.ts` has always read it that
+    // way when bounding a position; this is the same reading on the grid.
+    const learner = roles.find((role) => role.level === 4) as Role;
+    const res = await put(founder, [
+      { roleId: learner.id, capability: 'reflection.create', scope: 'self', effect: 'allow' },
+      { roleId: learner.id, capability: 'reflection.read', scope: 'self', effect: 'allow' },
+    ]);
+    expect(res.status).toBe(200);
+  });
+
+  it('still refuses a `self` cell for a capability the saver does not hold at all', async () => {
+    // The half that must NOT relax. `self` narrows the reach of a power; it does not make
+    // an unheld power free to hand out, or a delegate could give a role every verb in the
+    // catalogue by writing `self` in the box.
+    const tutor = roles.find((role) => role.level === 3) as Role;
+    const delegate = await addStaff(founder.orgId, {
+      name: 'Dev Delegate', level: 2, unitName: 'Section A',
+    });
+    const handover = await put(founder, [
+      { roleId: roles.find((role) => role.level === 2)?.id as string,
+        capability: 'grant.update', scope: 'all', effect: 'allow' },
+    ]);
+    expect(handover.status).toBe(200);
+    clearGrantCache();
+
+    const res = await put(delegate, [
+      { roleId: tutor.id, capability: 'org.delete', scope: 'self', effect: 'allow' },
+    ]);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('WOULD_ESCALATE');
+  });
+});
+
+/* ------------------------------------------------------------------ D-048 */
+
+describe('the grid says when a role started from the clamped starter row — F4', () => {
+  it('warns for the roles below the fourth, and not for the four the matrix describes', async () => {
+    // `GRANT_MATRIX` describes four levels and `org/service.ts` gives everything below the
+    // fourth the level-4 row, which has no `template.*`, no `campaign.read`, no `booking.*`
+    // and no `announcement.create`. A ten-role college therefore comes out of the wizard
+    // with six roles that can do almost nothing, and nothing on screen said so — the demo
+    // run found it one 403 at a time, from the Mess Manager's template upward.
+    const founder = await setUpOrg();
+    const extra = await withCsrf(founder, 'post', '/api/v1/roles').send({ name: 'Warden' });
+    expect(extra.status).toBe(201);
+
+    const res = await founder.agent.get('/api/v1/grants/warnings');
+    expect(res.status).toBe(200);
+    const warnings = res.body.data as Array<{ kind: string; roleId?: string }>;
+    const thin = warnings.filter((warning) => warning.kind === 'thin_starter_row');
+    expect(thin.map((warning) => warning.roleId)).toEqual([extra.body.data.id]);
+  });
+});

@@ -29,6 +29,42 @@ export type SlotGridProps = {
 
 const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 const DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+/* The date block is torn into its three parts so the weekday, the numeral and the month can
+   be sized independently — one 22px numeral is what makes a column of days scannable, and a
+   single formatted string cannot give you that. */
+const DOW = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const DAY_NUM = new Intl.DateTimeFormat(undefined, { day: 'numeric' });
+const MONTH = new Intl.DateTimeFormat(undefined, { month: 'short' });
+
+type SlotDay = { key: string; label: string; start: Date; slots: SlotViewish[] };
+
+/**
+ * Slots, grouped into the days they fall on and sorted within each.
+ *
+ * THE DAY IS THE STRUCTURE, not decoration on top of it. Nine cards each repeating
+ * "Tue, 1 Sept" spend the reader's whole attention on the one thing every card has in
+ * common; grouping states the date once and leaves the times to differ.
+ */
+export function groupByDay(slots: SlotViewish[]): SlotDay[] {
+  const days = new Map<string, SlotDay>();
+  for (const slot of slots) {
+    const start = new Date(slot.startsAt);
+    // Local calendar day. Not the ISO date — a 9pm slot must not land on tomorrow for a
+    // booker standing in the room where it happens.
+    const key = `${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`;
+    const day = days.get(key);
+    if (day) day.slots.push(slot);
+    else days.set(key, { key, label: DAY.format(start), start, slots: [slot] });
+  }
+  return [...days.values()]
+    .sort((a, b) => a.start.getTime() - b.start.getTime())
+    .map((day) => ({
+      ...day,
+      slots: [...day.slots].sort(
+        (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+      ),
+    }));
+}
 
 /**
  * The sentence under a slot, and the three cases are deliberately not one format string.
@@ -48,48 +84,63 @@ export function SlotGrid({ slots, selectedId, onSelect, onRemove }: SlotGridProp
   }
 
   return (
-    <ul className="slot-grid" role="list">
-      {slots.map((slot) => {
-        const full = slot.remaining <= 0;
-        const selected = selectedId === slot.id;
-        const state = full ? 'is-full' : slot.remaining === 1 ? 'is-nearly' : 'is-open';
-        const start = new Date(slot.startsAt);
-        const end = new Date(slot.endsAt);
-        const when = `${DAY.format(start)}, ${TIME.format(start)} to ${TIME.format(end)}`;
+    <div className="slot-cal">
+      {groupByDay(slots).map((day) => (
+        <section className="slot-cal-day" key={day.key}>
+          {/* Not a heading element: this component renders under an <h2> on the console and
+              under a different one on the picker, and a fixed level would be wrong on one of
+              them. The list below carries the date as its accessible name instead. */}
+          <p className="slot-date" aria-hidden="true">
+            <span className="slot-date-dow">{DOW.format(day.start)}</span>
+            <span className="slot-date-num">{DAY_NUM.format(day.start)}</span>
+            <span className="slot-date-mon">{MONTH.format(day.start)}</span>
+          </p>
 
-        return (
-          <li key={slot.id} className={`slot ${state}${selected ? ' is-selected' : ''}`}>
-            <button
-              type="button"
-              className="slot-face"
-              // A full slot has NO action at all rather than a disabled button that still
-              // looks pressable — the same rule <StartCard>'s `soon` state follows.
-              disabled={full || !onSelect}
-              aria-pressed={onSelect ? selected : undefined}
-              // The visible text is a time and a count; a screen reader gets the sentence.
-              aria-label={`${when} — ${remainingLabel(slot.remaining)}`}
-              onClick={onSelect ? () => onSelect(slot.id) : undefined}
-            >
-              <span className="slot-day">{DAY.format(start)}</span>
-              <span className="slot-time">
-                {TIME.format(start)} – {TIME.format(end)}
-              </span>
-              <span className="slot-left">{remainingLabel(slot.remaining)}</span>
-            </button>
+          <ul className="slot-times" role="list" aria-label={day.label}>
+            {day.slots.map((slot) => {
+              const full = slot.remaining <= 0;
+              const selected = selectedId === slot.id;
+              const state = full ? 'is-full' : slot.remaining === 1 ? 'is-nearly' : 'is-open';
+              const start = new Date(slot.startsAt);
+              const end = new Date(slot.endsAt);
+              const when = `${DAY.format(start)}, ${TIME.format(start)} to ${TIME.format(end)}`;
 
-            {onRemove && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm slot-remove"
-                onClick={() => onRemove(slot.id)}
-              >
-                Remove
-                <span className="sr-only"> the slot at {when}</span>
-              </button>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+              return (
+                <li key={slot.id} className={`slot ${state}${selected ? ' is-selected' : ''}`}>
+                  <button
+                    type="button"
+                    className="slot-face"
+                    // A full slot has NO action at all rather than a disabled button that
+                    // still looks pressable — the rule <StartCard>'s `soon` state follows.
+                    disabled={full || !onSelect}
+                    aria-pressed={onSelect ? selected : undefined}
+                    // The visible text is a time and a count; a screen reader gets the
+                    // sentence, including the day the chip no longer repeats.
+                    aria-label={`${when} — ${remainingLabel(slot.remaining)}`}
+                    onClick={onSelect ? () => onSelect(slot.id) : undefined}
+                  >
+                    <span className="slot-time">
+                      {TIME.format(start)} – {TIME.format(end)}
+                    </span>
+                    <span className="slot-left">{remainingLabel(slot.remaining)}</span>
+                  </button>
+
+                  {onRemove && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm slot-remove"
+                      onClick={() => onRemove(slot.id)}
+                    >
+                      Remove
+                      <span className="sr-only"> the slot at {when}</span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }

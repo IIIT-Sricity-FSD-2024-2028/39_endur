@@ -2,9 +2,12 @@
 // so an invalid environment fails before anything binds a port (14 §5).
 import { config } from './lib/config.js';
 import { createApp } from './app.js';
+import { warnOnPendingMigrations } from './db/preflight.js';
 
 const server = createApp().listen(config.PORT, () => {
   process.stdout.write(`endur api listening on :${config.PORT} [${config.NODE_ENV}]\n`);
+  // After the port is bound, so a slow database delays a warning and never the boot.
+  if (config.NODE_ENV !== 'production') void warnOnPendingMigrations();
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

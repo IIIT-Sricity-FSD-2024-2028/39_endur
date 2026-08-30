@@ -78,6 +78,18 @@ function responseRateCard(view: ResultsView): Stat {
       context: 'anyone with the link can respond, so there is no total to measure against',
     };
   }
+  // OVER THE ROLL IS NOT A PERCENTAGE WORTH PRINTING (N-069). `access: 'public'` and a unit
+  // audience is the commonest shape in the product (DEC-037), and it means the numerator
+  // counts everyone holding the link while the denominator counts only the people expected
+  // to answer. 135% is arithmetically true and reads as a broken dashboard, so above the
+  // roll the card states the two counts and says why they do not divide.
+  if (view.responseCount > view.audienceEstimate) {
+    return {
+      kicker: 'Responses',
+      value: `${view.responseCount} of ${view.audienceEstimate} asked`,
+      context: 'more answers than people asked — anyone holding the link can respond',
+    };
+  }
   return {
     kicker: 'Response rate',
     value: `${Math.round(view.responseRate * 100)}%`,

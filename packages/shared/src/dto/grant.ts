@@ -36,7 +36,12 @@ export type PutGrantsBody = z.infer<typeof PutGrantsBody>;
 export const PutGrantsDto = dto({ body: PutGrantsBody });
 
 export type GrantWarning = {
-  kind: 'orphan_capability' | 'nobody_can' | 'self_approval' | 'deny_shadows_allow';
+  kind:
+    | 'orphan_capability'
+    | 'nobody_can'
+    | 'self_approval'
+    | 'deny_shadows_allow'
+    | 'thin_starter_row';
   /** Plain language. The grid renders it next to the row it concerns, not in a console. */
   message: string;
   capability?: string;
