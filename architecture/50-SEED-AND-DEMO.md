@@ -266,7 +266,16 @@ Response generation rules — realistic data is what makes the results screen co
 npm run db:seed            presets + library templates + 4 demo orgs
 npm run db:seed -- --demo  demo orgs only, assumes presets exist
 npm run db:reset           drop → migrate → seed
+npm run ops:code           a live operator TOTP, so MFA is a feature and not an obstacle
+npm run demo:contention    N phones, one slot — the capacity proof, run live (§5, step 10)
 ```
+
+`demo:contention` takes `--n` (default 40), `--capacity` (default 10) and `--keep`. It needs
+the API running. It registers a throwaway organisation at gold, opens one slot through the
+real routes, fires N concurrent public bookings, and **exits non-zero** if anything but
+exactly `capacity` of them wins — it is an assertion that happens to print, not a report. The
+organisation is deleted afterwards unless `--keep`. Development only, like `ops:code`, and it
+refuses to run in production for the same reason.
 
 **`db:reset` must stay fast and reliable — it is the recovery path during a live demo.**
 Target under 30 seconds. Rehearse it.
@@ -293,6 +302,23 @@ backup.
 
 If there is time, step 9: open the **simulator** and let the evaluator ask why someone can or
 cannot do something (`42`). It is the strongest answer available to a permissions question.
+
+Step 10, if **scalability** is being graded — and it is the one claim on the board a green
+test tick does not support, because the room has to take the tick on trust:
+
+```
+npm run demo:contention -- --n 40 --capacity 10
+```
+
+Forty concurrent writers, one slot, ten places. Ten come back `201`, thirty come back `409`,
+the database holds exactly ten rows and the slot reports `remaining 0` — in about a third of a
+second, on the same routes a phone uses. Say the sentence that goes with it: **counting before
+locking passes a sequential test and double-books a live room**; the row lock (`DEC-092`) is
+what makes the number exact. `--capacity 1` is the version to run if there is time for only
+one line — twenty phones, one place, one winner.
+
+This is a *demonstration*, not a benchmark. It prints no throughput figure and should not be
+described as one: the only number being claimed is that the count is exact under contention.
 
 ## 6. Risks
 

@@ -11,6 +11,9 @@ import type { HomeView, StatWindow } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { config } from '../../lib/config.js';
 import { seesNothing, visibleUnits, type Visibility } from '../../authz/index.js';
+// The same predicate the campaigns list uses, not a second copy of it — this file held
+// the second copy until DEC-093, and only one of the two got fixed when D-042 was found.
+import { scopeToCampaigns } from '../campaigns/visibility.js';
 import { whereStatus } from '../campaigns/status.js';
 import { countAudience, ruleOf } from '../campaigns/audience.js';
 import { publicUrlFor } from '../campaigns/token.js';
@@ -331,8 +334,4 @@ async function buildPrompts(
   return prompts.slice(0, 2);
 }
 
-/** A campaign is reachable through its subjects' units — it has no unit of its own. */
-const scopeToCampaigns = (visibility: Visibility) =>
-  visibility.all
-    ? {}
-    : { subjects: { some: { subject: { unitId: { in: visibility.unitIds } } } } };
+

@@ -403,6 +403,73 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
     expect(row?.resultsThreshold).toBe(config.K_ANON_THRESHOLD);
   });
 
+  it('is visible to the LEVEL-3 launcher who created it — D-042, DEC-093', async () => {
+    // The regression, stated as the person it happened to. `campaign.launch` is seeded
+    // `own_unit` at level 3, so a tutor may launch a poll; before DEC-093 the poll they
+    // had just made was missing from their own list, because the organisation subject it
+    // hangs off has no unit and `unitId in visibleUnits` matched nothing.
+    //
+    // This is also the case the narrower fix would NOT have covered: anchoring the
+    // singleton to the org ROOT leaves Section A's tutor outside it, and the bug survives
+    // one level down where nobody is looking for it.
+    const tutor = await addStaff(founder.orgId, {
+      name: 'Tam Tutor',
+      level: 3,
+      unitName: 'Section A',
+    });
+    const created = await withCsrf(tutor, 'post', '/api/v1/campaigns/quick').send({
+      purpose: 'poll',
+      name: 'Which slot suits the team?',
+      options: ['Morning', 'Afternoon'],
+    });
+    expect(created.status).toBe(201);
+
+    const list = await tutor.agent.get('/api/v1/campaigns');
+    const ids = (list.body.data as Array<{ id: string }>).map((row) => row.id);
+    expect(ids).toContain(created.body.data.id);
+
+    // The list and the single-row read are two statements of ONE rule (visibility.ts), and
+    // the failure mode of a rule written twice is that they disagree. Asserted together on
+    // the same campaign so they cannot drift apart quietly.
+    const detail = await tutor.agent.get(`/api/v1/campaigns/${created.body.data.id as string}`);
+    expect(detail.status).toBe(200);
+  });
+
+  it('does NOT relax the unit filter generally — a foreign unit stays invisible', async () => {
+    // The other half of DEC-093, and the half that would make this a leak if it were
+    // wrong. Only the ORGANISATION subject reaches everybody. A campaign anchored to a
+    // real subject in Section A is still absent for a reader in Section B — same list,
+    // same request, same reader who can see the poll above.
+    const sectionA = await unitIdByName(founder.orgId, 'Section A');
+    const subject = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Anchored to Section A',
+      unitId: sectionA,
+    });
+    const templates = await founder.agent.get('/api/v1/templates');
+    const templateId = (templates.body.data as Array<{ id: string; name: string }>).find(
+      (template) => template.name === 'Course feedback',
+    )?.id as string;
+    const anchored = await withCsrf(founder, 'post', '/api/v1/campaigns').send({
+      name: 'Section A only',
+      templateId,
+      subjectIds: [subject.body.data.id],
+      audience: { kind: 'anyone' },
+    });
+    expect(anchored.status).toBe(201);
+
+    const outsider = await addStaff(founder.orgId, {
+      name: 'Bo Outsider',
+      level: 3,
+      unitName: 'Section B',
+    });
+    const list = await outsider.agent.get('/api/v1/campaigns');
+    const ids = (list.body.data as Array<{ id: string }>).map((row) => row.id);
+    expect(ids).not.toContain(anchored.body.data.id);
+    // 404 and not 403 — a 403 confirms it exists to somebody outside its scope (13 §5).
+    const detail = await outsider.agent.get(`/api/v1/campaigns/${anchored.body.data.id as string}`);
+    expect(detail.status).toBe(404);
+  });
+
   it('is refused with 403 for a role that cannot launch', async () => {
     const learner = await addStaff(founder.orgId, {
       name: 'Sam Learner',

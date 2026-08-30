@@ -19,16 +19,14 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "npm run test --workspaces --if-present",
-
     "//postinstall": "The Prisma client is GENERATED, not committed. Without this a fresh clone fails `npm run typecheck` with 15 errors about a model that is right there in schema.prisma, and cannot tell them from its own.",
     "postinstall": "npm run db:generate -w @endur/api",
-
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "npm run db:migrate -w @endur/api",
     "db:seed": "npm run db:seed -w @endur/api",
     "db:reset": "npm run db:reset -w @endur/api",
-
+    "demo:contention": "npm run demo:contention -w @endur/api --",
     "audit:vocab": "node scripts/audit-vocab.mjs",
     "audit:drift": "node scripts/audit-drift.mjs"
   },

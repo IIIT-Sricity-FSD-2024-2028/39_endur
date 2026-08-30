@@ -13,7 +13,8 @@
     "db:generate": "prisma generate",
     "db:seed": "tsx database/seed/index.ts",
     "db:reset": "prisma migrate reset --force",
-    "ops:code": "tsx database/seed/ops-code.ts"
+    "ops:code": "tsx database/seed/ops-code.ts",
+    "demo:contention": "tsx database/seed/contention.ts"
   },
   "dependencies": {
     "@endur/shared": "*",

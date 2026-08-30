@@ -112,11 +112,45 @@ export function resolveTestUrl(
   return url;
 }
 
+/**
+ * D-041 — the pool cap. It is arithmetic worth doing, and it is NOT what fixed the timeouts;
+ * both halves of that sentence are the point.
+ *
+ * Vitest runs one worker per core (16 here) and each worker builds its OWN PrismaClient, whose
+ * default pool is `num_cpus * 2 + 1` — 33 connections. Fifteen workers therefore ask a
+ * `max_connections = 100` postgres for up to 495. That was the standing hypothesis for the
+ * intermittent 5s timeouts, and it was WRONG: with `pool_timeout=3` in place, below vitest's
+ * then-5s test timeout so pool starvation could finally announce itself, the timeouts kept
+ * happening and NOT ONE of them reported "Timed out fetching a connection from the pool". The
+ * cause was the test timeout having no headroom — see `vitest.config.ts`.
+ *
+ * The cap stays anyway, because 495 requested against 100 available is still a ceiling the
+ * suite would eventually walk into. `connection_limit=5` × 15 workers = 75, which fits under
+ * 100 with the developer's own session and a running dev server still connected; five per
+ * worker is ample for a sequential test file plus the interactive transactions the booking
+ * and register paths open — the widest concurrent burst in the suite is three (booking's
+ * N+1 test at capacity 2).
+ *
+ * No `pool_timeout` here on purpose. Prisma's own default is 10s, and now that the test
+ * timeout is 20s rather than 5s that default lands FIRST — so real starvation would name
+ * itself, which is the property that was missing, without a second number to keep in sync.
+ */
+function withPoolCap(url: string): string {
+  const parsed = new URL(url);
+  // `??=` semantics by hand: an explicit TEST_DATABASE_URL that already tunes the pool is the
+  // author saying something, and this is a default, not an override.
+  if (!parsed.searchParams.has('connection_limit')) parsed.searchParams.set('connection_limit', '5');
+  return parsed.toString();
+}
+
 export function testDatabaseUrl(): string {
   const file = loadRepoEnv();
 
   const current = process.env.DATABASE_URL;
   if (!current) throw new Error('DATABASE_URL is not set, so there is nothing to derive a test database from.');
 
-  return resolveTestUrl(current, process.env.TEST_DATABASE_URL, devUrlFromFile(file));
+  // The cap goes on AFTER the guards, never before: rule 2 compares the resolved URL against
+  // the one written in `.env`, and a URL carrying query parameters the file's does not would
+  // never be equal to it — which is a guard that stops firing because of a performance tweak.
+  return withPoolCap(resolveTestUrl(current, process.env.TEST_DATABASE_URL, devUrlFromFile(file)));
 }

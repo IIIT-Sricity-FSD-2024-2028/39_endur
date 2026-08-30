@@ -1990,6 +1990,118 @@ DEC-090  ACTIVE  2026-08-30  origin:user  task:T-095  guards:INV-006
 ```
 
 ```
+DEC-094  ACTIVE  2026-08-30  origin:claude  task:D-036
+  decision A LOG CURSOR IS THE BYTE OFFSET OF A LINE START -- specifically of the OLDEST
+           LINE THE PAGE RETURNED -- and never the offset of the chunk the read stopped in.
+           `hasMore` is computed from that same number, never from how far the scan got.
+  why      D-036, which was filed as "the fixture drifted below the 64 KB chunk so the test
+           is asserting nothing" and was the opposite: the test was asserting the right
+           thing and the READER was losing lines. tailRead set its cursor to the start of
+           the chunk it had just read. the reader walks BACKWARDS, so the next page resumed
+           at that chunk's start and read the chunk BELOW it -- every line the page limit
+           had left unreturned in between was skipped, silently, and the page after that
+           opened on the truncated half of whatever line straddled the boundary.
+           MEASURED, not reasoned: a 1,500-line file at limit 50 returned 150 lines over
+           three pages and lost 1,350 of them. a 220-line file -- SMALLER THAN ONE CHUNK,
+           which is every log file for the first hours of its day -- returned its newest 50
+           and said hasMore false, losing 170.
+           this is the operator's incident tool. a viewer that silently answers "that is all
+           there is" to a file with more in it is worse than one that fails to open.
+  not      NOT "size the fixture past one chunk", which is what the debt entry prescribed
+           and would have produced a GREEN TEST OVER A LIVE BUG -- the sub-chunk case is
+           precisely where `hasMore` was wrong. the rule that a test disagreeing with the
+           code is a decision nobody made still holds; what it does not say is which of the
+           two is wrong, and here it was the code. READ THE DIAGNOSIS, THEN VERIFY IT.
+  not      NOT measured in `String.length`. the cursor is a BYTE offset into a file, so it
+           is built with `Buffer.byteLength` -- a character count walks off the line
+           boundary the first time somebody logs a name with an accent in it, above one
+           chunk only, silently. the fixtures now carry a multi-byte character in every
+           line for that reason.
+  where    src/backend/platform/logs/index.ts `tailRead()`. the test walks a fixture to the
+           END and asserts the pages equal the file, at two sizes (under one chunk, and
+           across several) -- a pagination test that stops after two pages can only ever
+           catch a bug in the first two pages.
+  see      72 § Acceptance, D-036, test/platform-logs.test.ts
+```
+
+```
+DEC-095  ACTIVE  2026-08-30  origin:claude  task:D-041
+  decision AN INTERMITTENT TEST FAILURE IS ANSWERED WITH A MEASUREMENT AND HEADROOM, NEVER
+           WITH `retry`. both vitest projects run a 20s testTimeout and hookTimeout.
+  why      D-041, filed as a flake on one occurrence of public.test.ts. it recurred on every
+           full run afterwards, on a DIFFERENT innocent test each time, each passing alone --
+           which is what "flaky" looks like and was not. the standing hypothesis was
+           connection-pool starvation (16 cores -> ~15 workers, each a PrismaClient whose
+           default pool is num_cpus*2+1 = 33, against max_connections = 100). THAT WAS
+           DISPROVED rather than assumed: with pool_timeout lowered below the test timeout so
+           starvation could announce itself, the timeouts continued and not one reported a
+           pool wait.
+           the real number: these are INTEGRATION tests and the heaviest register two
+           organisations end to end. on an IDLE machine the slowest is 3361ms and four are
+           over 2.5s, against vitest's 5s default -- two thirds of the budget spent before
+           fifteen workers start competing for sixteen cores. the frontend has the same
+           shape for a different reason: <PaymentDialog> runs ~2.2s of REAL-timer capture and
+           success overlay, so Start.test.tsx spends 2.3s per paying test against the same 5s.
+           whichever test is slowest when the machine is busiest loses. that is a lottery,
+           and re-running it finds nothing because there is nothing there.
+  not      NOT `retry: 1`. it would have made the symptom disappear the same evening and
+           hidden every genuine race the suite exists to catch -- including the booking one
+           the N+1-concurrent test found in T-095. a suite that retries cannot report a race.
+  not      NOT `fileParallelism: false`, the other option D-041 named. it would work by
+           making the machine idle, at the cost of a ~60s suite becoming several minutes --
+           paying in the feedback loop for a number that costs nothing to correct.
+  where    src/backend/vitest.config.ts, src/frontend/vite.config.ts (timeouts, with the
+           measurement written beside them); src/backend/test/database.ts caps each worker's
+           pool at 5 -- kept because 495 requested against 100 available is a ceiling the
+           suite would eventually reach, and explicitly NOT credited with the fix.
+           still owed: <PaymentDialog>'s two delays are hardcoded, so the frontend suite
+           spends ~15s of wall clock watching an animation. making them injectable is a
+           change to product code for the tests' benefit and belongs in its own task.
+  see      D-041, D-004, DEC-094
+```
+
+```
+DEC-093  ACTIVE  2026-08-30  origin:claude  task:D-042
+  decision A CAMPAIGN ANCHORED TO THE ORGANISATION SUBJECT IS VISIBLE TO EVERY READER WHO
+           MAY READ CAMPAIGNS AT ALL, and the string that says so is RESERVED from the
+           subjects API. one predicate, in features/campaigns/visibility.ts, used by the
+           list, by the single-row read and by home.
+  why      D-042. a campaign is scoped through its SUBJECTS' units because it has no unit
+           of its own, and DEC-089's per-org singleton subject has no unit either -- so
+           `unitId in visibleUnits` matched nothing and a poll was INVISIBLE on
+           /app/campaigns to every seeded role in every organisation, including the person
+           who had created it one second earlier. the campaign was reachable only from the
+           URL the creator happened to be standing on.
+           the rule is not a relaxation of the unit filter and must not become one. it is a
+           statement about ONE row: the organisation subject is not IN a part of the
+           organisation because it IS the organisation. it is also the only coherent answer
+           on the feature's own terms -- every quick campaign is `access: 'public'` with
+           `audienceRule: anyone` (DEC-089), so the link already answers to whoever holds
+           it and there is nothing there to withhold from a member of staff.
+  not      NOT "anchor the singleton to the org's ROOT unit", which was the first choice
+           and is the narrower one. a subtree reader at the top would then see it -- but
+           `campaign.launch` is seeded `own_unit` at level 3 (50 §1), so a tutor who
+           launches a poll from Section A would still lose it the instant it was created.
+           that is D-042 again, one level down, where nobody is looking for it.
+  not      NOT keyed on a client-settable value. `type` is free text on CreateSubjectBody,
+           so before this entry anybody holding `subject.create` could mint a subject typed
+           'organisation' and widen the audience of their own campaign -- a permission
+           written in a text column. subjects/service.ts now refuses the string with a 422
+           naming `body.type`, which also makes true a comment quickCreate had been making
+           since T-091 ("furniture rather than something somebody added on the Subjects
+           screen").
+  where    src/backend/features/campaigns/visibility.ts holds `scopeToCampaigns()` (the
+           `where` fragment) and `campaignInScope()` (the same rule for a row in hand).
+           BOTH existed before, in two places, saying the same thing in two ways --
+           inlined in listCampaigns and again as home/service.ts's own `scopeToCampaigns`
+           -- and only one of them would have been fixed. INV-009 applies to a predicate
+           exactly as it applies to a component.
+  see      INV-003, INV-009, DEC-089, D-042, 38 § Acceptance, 11 §5,
+           src/backend/test/campaigns.test.ts "is visible to the LEVEL-3 launcher",
+           src/backend/test/subjects.test.ts "refuses the reserved type"
+```
+
+```
 DEC-092  ACTIVE  2026-08-30  origin:claude  task:T-095
   decision THE SLOT ROW LOCK IS THE CAPACITY MECHANISM, AND IT RUNS AT READ COMMITTED --
            `SELECT id FROM slots WHERE id = $1 FOR UPDATE` first, count second, insert
@@ -2823,6 +2935,10 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     was built here but belongs to 24, like every component.
 38-PAGE-campaigns.md             -> src/frontend/pages/console/Campaigns/** lib/campaigns.ts
                                     + src/backend/features/campaigns/**
+                                    features/campaigns/visibility.ts (DEC-093) OWNS the
+                                    "which campaigns may this reader see" predicate.
+                                    home/service.ts imports it — do NOT write a second
+                                    one there, which is exactly how D-042 survived.
                                     T-038 also took components/feedback/ShareSheet.tsx
                                     (owned by 24) — THE DEMO MOMENT, read 38 § The share
                                     sheet before touching it; every rule in that file is a
@@ -2937,6 +3053,11 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     the ONLY two directories where an education noun may
                                     appear, and then only as DATA (INV-002). Both are
                                     exempt in eslint.config.js and in test/seed.test.ts.
+                                    also holds the two DEVELOPMENT-ONLY affordances that
+                                    are not seeds: seed/ops-code.ts (prints a live TOTP,
+                                    DEC-084) and seed/contention.ts (`demo:contention`,
+                                    50 §5) — both refuse to run in production, for the
+                                    same reason and in the same words.
 features/people/powers.ts        -> 34's file, shared with 47's /profile route the way
                                     visibility.ts is shared with 57's account routes.
                                     THE ONE CALLER of resolve() for "what can this person
@@ -3077,6 +3198,10 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     NOTE reads lib/logFile.ts's OUTPUT. 18 owns what is
                                     written; 72 owns who may read it. also EXEMPT from
                                     INV-001 with 70+71.
+                                    NOTE tailRead()'s CURSOR IS A LINE OFFSET (DEC-094),
+                                    never the chunk offset -- the reader walks backwards,
+                                    so a chunk offset skips whatever the page limit left
+                                    behind. do not "simplify" it back.
 
 33-PAGE-roles-and-powers-grid.md -> src/frontend/pages/console/Roles/**
                                     src/frontend/lib/roles.ts
