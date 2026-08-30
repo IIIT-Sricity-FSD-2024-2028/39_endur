@@ -220,6 +220,16 @@ describe('operator actions', () => {
     // next sign-in — and it is the same session that was working a line ago.
     const cut = await org.agent.get('/api/v1/home');
     expect(cut.status).toBe(403);
+    // AND SIGNING IN AGAIN IS REFUSED AT THE SIGN-IN (N-070). Until then login answered
+    // 200 with a working session and the first console call answered 403 — the user was let
+    // in and then told nothing useful at the moment they could act on it. The refusal comes
+    // AFTER the password is checked, so it is never an oracle for which organisations exist.
+    const again = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: org.email, password: org.password });
+    expect(again.status).toBe(403);
+    expect(again.body.error.message).toMatch(/suspended/i);
+
     // And signing in again does not get round it.
     const back = await owner.agent
       .post(`/api/v1/platform/orgs/${org.orgId}/suspend`)

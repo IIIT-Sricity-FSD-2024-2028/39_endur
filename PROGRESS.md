@@ -2071,6 +2071,15 @@ middleware first.
                 /* Industry Split Layout */ appears TWICE — .preset-grid is declared three
                 times with different minmax() and gap, so the step's spacing is decided by
                 cascade order
+[x] T-106  C  A LIVE POLL SEEDED ON EVERY DEMO ORG, REGARDLESS OF TIER
+              ← `campaign.*` is bronze (`billing/entitlements.ts` §3), unlike announcements
+                (silver+) and booking (gold+), so a poll is the one quick-launch surface
+                every seeded org can actually use. `seed/demo.ts` now builds one per org the
+                same way `quickCreate` would — org singleton subject, one-question
+                single-choice template, public token — with a spread of votes on options.
+                Announcements and booking stayed on their existing tier gates on purpose
+                (D-012's one-org-per-tier demo of the 402 wall still needs Riverside on
+                bronze and The Grand Palace on silver to lack the paid ones)
 ```
 
 ### Why is that item still greyed? — one row per "Soon"
@@ -2214,6 +2223,10 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | `D-043` | **Reinstating an organisation silently does nothing, and always has** | Found 31 Aug from the owner's report, by reading. `OrgDetail.tsx`'s `confirmSuspend()` opens `if (!id \|\| suspendConfirmText !== org.name) return;` — the typed-name guard `70` requires for **suspension**. The reinstate path uses a plain `<ConfirmDialog>` **with no name field**, so the typed text is `''`, never equals the organisation name, and the function **returns before making any request**: no error, no toast, the dialog stays open looking like it is working. One handler serves both verbs and inherited the destructive one's guard. **The silent return is the second half of the bug** — the suspend dialog already disables its confirm button on the identical condition, so on that path the early return is unreachable, and it is the *only* behaviour on the path with no input to satisfy it. A guard that refuses without saying so is how this stayed invisible. **Not the same thing as "suspending suspends every org"**, reported in the same breath and **not reproduced** — `N-067` records what was checked so nobody re-reads the middleware first; the likeliest reading is that nothing could be brought back, so suspensions accumulated | `T-103`, `DEC-104` |
 | `D-044` | **`/ops/analytics` excludes the whole of the last day selected** | Found 31 Aug chasing the owner's *"the date filters are not working"* at `?from=2026-08-02&to=2026-08-12`. `<input type="date">` sends `2026-08-12`; `z.coerce.date()` reads that as `2026-08-12T00:00:00Z`; every query is `lte: to`. **A one-day window (`from` = `to`) therefore matches nothing at all.** Cosmetically small and genuinely wrong, and it is the *second* fault behind that report — the first is that the window governs only `movement` and `trials` while four other sections are unfiltered all-time counts, so moving the dates changes almost nothing on screen. That half is `DEC-103`, not debt: it is a decision about what the page claims | `T-102` |
 | `D-045` | **157 lines of `endur.css` are duplicated verbatim, and `.preset-grid` is declared three times** | Found 31 Aug reading for the dark-mode report. `/* Industry Split Layout */` appears at **two** line numbers and the blocks below them differ by one blank line and one trailing rule. So `.preset-grid` exists once at its original definition (`minmax(168px)`, `gap --space-3`) and twice more in the duplicated blocks (`minmax(220px)`, `gap --space-4`), and **what renders is whichever copy the cascade reaches last** — the setup step's column count and spacing are decided by file order rather than by anybody's choice, which is the *"layout and padding are not clear"* half of the owner's report. The dark-mode half is a different fault and is `DEC-106` | `T-105` |
+| `D-046` | **Quick poll and suggestion-box results answered 404 to their own author** — FIXED 30 Aug | `features/results/service.ts` had a private copy of the campaign visibility predicate without `DEC-093`'s organisation-subject clause, and its `select`s did not fetch `subject.type`. Found by the college demo run; it affected every role in every organisation. Now calls `campaignInScope` (INV-009) | fixed, `test/quick-results.test.ts` |
+| `D-047` | **The Gold improvement loop was unreachable and ungrantable** — FIXED 30 Aug | `reflection.*`/`actionplan.*` are seeded at `self` only, and the grid's escalation bound required holding a capability everywhere before granting it, so nobody could grant them. `DEC-107` bounds a `self` cell by holding instead | fixed, `test/powers-grid.test.ts` |
+| `D-048` | **A ten-role organisation leaves six roles clamped to the thin level-4 row, with nothing on screen saying so** — WARNED 30 Aug | The defaults are unchanged and still right for four roles; `GET /grants/warnings` now returns `thin_starter_row` per clamped role. A longer preset ladder for the industries that need one is still open | warning shipped; preset depth open |
+| `D-049` | **`/inbox/messages` answered 500 on a Prisma client generated before the `Notification` model** — FIXED 30 Aug | `predev` now runs `prisma generate`, and the dev server prints unapplied migrations at boot (`N-072`). The Windows ordering matters: the watcher holds the query-engine DLL open | fixed |
 | ~~`D-037`~~ | ~~**`D-004`'s guard is bypassed by running vitest from the repo root**~~ | **REPAID 29 Aug.** Root `vitest.config.ts` now declares both workspaces as `projects`, so `npx vitest run` from the repo root runs each under its own config — the backend's `globalSetup`/`setupFiles` included. **Proved, not assumed**: the development database held 4 organisations before a root-launched `test/tiers.test.ts` and 4 after, and the run reported itself as `|@endur/api|` with `env: "test"` in every log line. The frontend project points at `src/frontend/vite.config.ts`, where its jsdom setup already lives — a second copy here is how the two would drift. `eslint.config.js` gained `allowDefaultProject` for the new file, which no tsconfig owns. **The advice to run from `src/backend` is withdrawn — the root command is now the correct one** | ~~before `T-045`~~ — **done** |
 | ~~`D-038`~~ | ~~**The Setup wizard's redesign disagrees with its spec, and six tests are the evidence**~~ | **RESOLVED 29 Aug, `DEC-085`, and the entry was wrong about one of the four.** Sorted by asking what each affordance was *for*. **`← Back` was never lost** — the button is present and accessible, the redesign replaced the literal arrow with an `<Icon>`, and three assertions were matching on decoration. **Restored**: *"Pick the closest one"* (one line of copy, and without it five cards read as an exhaustive list on the one screen whose subject is that the model does not care) and **step 4's live preview** (the step's lede claims these words appear throughout Endur and the preview is the only thing that proves it — the same `<DashboardPreview>` Review uses, not a fork). Review's role list also gets its arrow back: these are ordered levels, and `+` reads as a set. **Moved on the record**: the role chain and vocabulary pair live in step 1's aside rather than on every card. The aside shows strictly more and the cost is real and stated — presets are now compared serially, so a presenter wanting the side-by-side beat says the sentence instead of showing it. `31` § step 1 and § step 4 amended. **Setup.test.tsx 25/25** | ~~a decision, then one session either way~~ — **done** |
 | ~~`D-039`~~ | ~~**`<WordsEditor>` stopped saying which plurals are yours**~~ | **REPAID 29 Aug, `DEC-085`.** `your plural` is back on any row whose plural is not the derived one, shown to a read-only reader too — the hint explains why the plural is unusual; only the undo is a permission. **The `auto: Wings` half is deliberately not restored**: beside a filled field already reading `Wings` it repeats the field, and it is the override that needs saying | ~~with `D-038`~~ — **done** |
@@ -2263,7 +2276,123 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-31 (latest) · `T-098`…`T-105` — the rest of Stage 11, in one pass
+### 2026-08-31 (latest) · five UI reports — the booking screens and the modal layer
+
+Five screenshots from the owner, and four of the five turned out to be the same class of
+fault: a layout that was written correctly and then never took effect.
+
+**`/app/booking` rendered as three tall boxes of empty space.** `.booking-new` and
+`.booking-row` both set `display: flex; align-items: ...` and neither set
+`flex-direction`, so both inherited `column` from `.card` — `align-items` then centred and
+right-aligned a stack instead of laying out a row. Both now say `row`. The bookable rows
+also gained a tinted icon square, which gives the list a fixed left edge, and a hover lift.
+
+**The modal layer had three structural faults, all shared by every dialog in the console.**
+(1) `.dialog-backdrop` carried **no `z-index` at all**, so the campaigns list's sticky filter
+tabs (z 20) painted straight through an open dialog — that is the third screenshot. It is
+now 120, above the rail. (2) `display: grid; place-items: center` on a fixed box centres the
+panel and then clips whatever does not fit **off the top**, where the title is; the composer
+is taller than a laptop viewport the moment the audience picker opens, so its heading was
+simply gone. Now flex with `margin: auto`, which centres a short dialog and lets a tall one
+scroll. (3) `.input { border-radius: 999px }` is right for a 42px control and turned the
+90px textarea into an oval; `textarea.input` takes the card radius instead.
+
+Added a **`.dialog-tall`** variant — head and actions hold still, only the fields scroll —
+and moved `<Composer>` and `<QuickDialog>` onto it. A form long enough to need scrolling must
+not take its own Save button below the fold with it. The audience picker's rows became a
+two-column grid so the description sits under the label rather than being squeezed into
+two-words-a-line beside it, and both dialogs went to the 560px width.
+
+**`<SlotGrid>` now groups by day** (`24` § SlotGrid updated). Eight cards each repeating
+"Tue, 1 Sept" spend the reader's whole attention on the one thing every card has in common,
+so the day is now the structure: a date block on the left, the times beside it as a chip
+strip on a column grid, and the date stated once. Not a heading element — this renders under
+a different `<h2>` on each side of the product — so each day's list carries the date as its
+accessible name and every chip's `aria-label` still names the whole sentence. Fixes the
+fourth and fifth screenshots at once, which is the point of it being one component. Selection
+moved from `border-width: 2px` to an inset ring, because growing the border moved every other
+chip in the row by a pixel.
+
+Props, states and capabilities all unchanged — presentation only. Typecheck clean, frontend
+suite green, checked in both themes and at 375px.
+
+### 2026-08-31 · `T-106` — a poll on every demo org
+
+Asked to give the demo admins polls, slot booking and announcements with real seed data.
+Checked what each surface actually costs: `campaign.*` (a poll is a one-question campaign,
+DEC-088) is in bronze, so every org can already use it; `announcement.*` write is silver+;
+`booking.*` is gold+ with nothing held back for lower tiers. Asked the owner whether to bump
+every demo org to enterprise so all three surfaces work everywhere, or keep the existing
+one-org-per-tier layout (D-012) and only seed what each org's tier actually unlocks — chose
+the latter. Announcements and booking were already seeded correctly on the orgs whose tier
+buys them (`seed/demo.ts` §7b); the gap was polls, seeded nowhere. Added `DemoOrg.poll` (one
+question, three options, a vote count) and a seeding block that builds it the way
+`quickCreate` does — org singleton subject, one-question single-choice template, public
+token — on all four orgs. `test/seed.test.ts` still green, typecheck clean.
+
+### 2026-08-30 · the demo run's five findings, fixed
+
+**Source and record:** `Mithil/demo_college_run.md`. That report now carries a **section 9**
+written after the fixes — one row per finding with its ledger id and outcome, the two causes
+worth reading in full, the file list, and how the checks were run. The findings themselves are
+left in the present tense, as written, so the document still reads as the run rather than as a
+tidied-up account of it.
+
+**Source:** `Mithil/demo_college_run.md` — a whole college (IIIT Sri City, 34 people, 15 units,
+ten roles) driven end to end through the real API. It changed no code and wrote down 13
+failures collapsing into five issues. All five are now fixed, with a regression test each.
+
+**`D-046` — quick polls and suggestion boxes had unreachable results (blocker).**
+`features/results/service.ts` carried its OWN copy of the campaign visibility predicate,
+missing the organisation-subject clause `DEC-093` exists to provide — and the two `select`s
+feeding it did not fetch `subject.type`, so the clause could not have been evaluated had it
+been there. It bit whenever `visibility.all` is false, which is EVERY role in EVERY
+organisation (no seeded role holds `results.read` or `response.read` at `all`), so a poll with
+nine votes answered `404` on its own results to the founder who created it, and no
+suggestion-box comment ever reached the Inbox. Fixed by deleting the copy and calling
+`campaignInScope` from `features/campaigns/visibility.ts` — INV-009, which is why that file
+exists. New `test/quick-results.test.ts`; verified it fails on the old service.
+
+**`D-047` — the Gold improvement loop could not be granted (blocker).** See `DEC-107`. The
+grid's escalation bound demanded the saver hold a capability EVERYWHERE before handing it out;
+`reflection.*` and `actionplan.*` are seeded at `self` and nowhere else, so nobody could ever
+hold them everywhere and nobody could ever grant them. A `self` cell claims no unit, so it is
+now bounded by holding rather than by reach — the reading `authz/escalation.ts` already took.
+
+**`D-048` — a ten-role organisation left six roles with almost nothing, silently.** The matrix
+describes four levels and everything below the fourth is clamped to the level-4 row, which has
+no `template.*`, no `campaign.read`, no `booking.*` and no `announcement.create`. The defaults
+are unchanged — they are right for a four-role organisation — but `GET /grants/warnings` now
+carries a `thin_starter_row` warning naming each clamped role, so the grid says what the wizard
+did not.
+
+**`D-049` — `/inbox/messages` 500 on a stale Prisma client.** `prisma generate` is now a
+`predev` script (before `tsx watch`, the only order that works on Windows) and the dev server
+prints unapplied migrations at boot. See `N-072`.
+
+**`N-069` — response rates over 100%** now state the two counts instead of a percentage on the
+results card, and explain themselves on the home card. Arithmetic, not a bug: a public link is
+answerable by whoever holds it while the denominator counts the people asked.
+
+Also from the same report: `N-068` `/analysis` on an invisible campaign answers 404 rather than
+`responseCount: 0` (`DEC-108`); `N-070` sign-in to a suspended organisation is refused at the
+sign-in rather than by the first console call; `N-071` the CSV importer takes an `Also in`
+column and creates a second, non-primary position (`DEC-109`) — the thing that made hostel and
+mess audiences one person.
+
+**Not fixed, deliberately:** the dev database still holds ~517 junk organisations from earlier
+harness runs (`N5` in the report) — data, not code; the test-database resolver already refuses
+to write into `DATABASE_URL`. `N1` (an Export CSV button shown to a HoD who lacks
+`results.export`) did not reproduce — the button is already behind `can('results.export')`;
+what the report saw is that `results.export` is seeded to levels 1–2 only, which is the matrix
+working. `N3` is a naming observation about `POST /authz/simulate`, no change.
+
+**Checks:** typecheck 0, lint 0. Backend suites run in batches (`--pool=forks --singleFork`;
+the full parallel run exhausts argon2's memory on this machine and dies with
+`Memory allocation error`, unrelated to these changes). `router/boundaries.test.tsx` fails on
+the frontend before and after these changes — pre-existing, an undici/AbortSignal mismatch.
+
+### 2026-08-31 · `T-098`…`T-105` — the rest of Stage 11, in one pass
 
 **Eight tasks, and the stage is closed.** `1524/1524` across `115` files from the repo root;
 typecheck 0, lint 0, `npm run build` passes, both audits clean.

@@ -102,6 +102,16 @@ function responseRateCard(view: HomeView, labels: ResolvedLabels): Stat {
           : `no ${labels.campaign.one.toLowerCase()} with a fixed audience was collecting then`,
     };
   }
+  // Above the roll the percentage is true and unreadable, for the reason the results card
+  // spells out (N-069): a public link is answered by whoever holds it, and the denominator
+  // counts only the people asked. Same number, and the context says what it means.
+  if (view.stats.responseRate > 1) {
+    return {
+      kicker: 'Response rate',
+      value: `${Math.round(view.stats.responseRate * 100)}%`,
+      context: `more answers than people asked — links can be answered by anyone holding them, ${RANGE_PHRASE[view.stats.window]}`,
+    };
+  }
   return {
     kicker: 'Response rate',
     value: `${Math.round(view.stats.responseRate * 100)}%`,

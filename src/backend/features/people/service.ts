@@ -337,6 +337,11 @@ export async function previewImport(orgId: string, csv: string): Promise<ImportP
   for (const row of rows) {
     if (row.roleName && !roleNames.has(row.roleName.toLowerCase())) unmatchedRoles.add(row.roleName);
     if (row.unitName && !unitNames.has(row.unitName.toLowerCase())) unmatchedUnits.add(row.unitName);
+    // The second unit column goes in the SAME list. It is mapped by the same control in the
+    // preview, so a name that appears in both columns is answered once.
+    if (row.alsoUnitName && !unitNames.has(row.alsoUnitName.toLowerCase())) {
+      unmatchedUnits.add(row.alsoUnitName);
+    }
     if (emails.has(row.email.toLowerCase())) existingEmails.push(row.email);
   }
 
@@ -369,12 +374,12 @@ export async function commitImport(
 
   await runInTransaction(req, async (tx) => {
     for (const row of body.rows) {
-      const { roleId, unitId } = resolveRow(maps, body, row);
+      const { roleId, unitId, alsoUnitId } = resolveRow(maps, body, row);
 
       // A row naming a role or unit nobody resolved is SKIPPED and reported, never
       // silently imported without its position. Somebody who appears in the list with no
       // access looks like a permissions bug rather than an unfinished import.
-      if ((row.roleName && !roleId) || (row.unitName && !unitId)) {
+      if ((row.roleName && !roleId) || (row.unitName && !unitId) || (row.alsoUnitName && !alsoUnitId)) {
         result.skipped.push(row.email);
         continue;
       }
@@ -440,6 +445,45 @@ export async function commitImport(
         });
         result.assigned += 1;
       }
+
+      // THE SECOND PLACE (N-071), and it is `isPrimary: false` — the home unit is where a
+      // person-anchored grant anchors, and a student's home unit is their department, not
+      // their hostel. A second primary would make that ambiguous, which `person-anchor`
+      // refuses to guess at.
+      if (!alsoUnitId || alsoUnitId === unitId) continue;
+
+      const alsoPosition =
+        (await tx.node.findFirst({
+          where: { orgId, kind: 'position', roleId, unitId: alsoUnitId },
+          select: { id: true },
+        })) ??
+        (await tx.node.create({
+          data: {
+            orgId,
+            kind: 'position',
+            name: `${row.roleName ?? 'Position'} — ${row.alsoUnitName ?? ''}`.trim(),
+            roleId,
+            unitId: alsoUnitId,
+          },
+          select: { id: true },
+        }));
+
+      const alsoHeld = await tx.edge.findFirst({
+        where: { orgId, type: 'member', parentId: person.id, childId: alsoPosition.id },
+        select: { id: true },
+      });
+      if (!alsoHeld) {
+        await tx.edge.create({
+          data: {
+            orgId,
+            type: 'member',
+            parentId: person.id,
+            childId: alsoPosition.id,
+            isPrimary: false,
+          },
+        });
+        result.assigned += 1;
+      }
     }
 
     await tx.organization.update({
@@ -470,6 +514,9 @@ function parseCsv(csv: string): { columns: string[]; rows: ImportRow[] } {
   const emailAt = index('email', 'email address', 'e-mail');
   const roleAt = index('role', 'title', 'position');
   const unitAt = index('unit', 'department', 'team', 'ward', 'property');
+  // N-071. The header words a person actually writes for "and they are also here": a
+  // student in a department AND a hostel, a nurse on a ward AND a rota.
+  const alsoAt = index('also in', 'also', 'second unit', 'additional unit', 'other unit');
 
   const rows: ImportRow[] = [];
   for (const line of lines.slice(1)) {
@@ -482,6 +529,7 @@ function parseCsv(csv: string): { columns: string[]; rows: ImportRow[] } {
       email,
       ...(roleAt >= 0 && cells[roleAt]?.trim() ? { roleName: cells[roleAt].trim() } : {}),
       ...(unitAt >= 0 && cells[unitAt]?.trim() ? { unitName: cells[unitAt].trim() } : {}),
+      ...(alsoAt >= 0 && cells[alsoAt]?.trim() ? { alsoUnitName: cells[alsoAt].trim() } : {}),
     });
   }
   return { columns, rows };

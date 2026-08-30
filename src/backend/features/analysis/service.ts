@@ -9,6 +9,7 @@
 // `readCorpus` returns a UNION whose `comments` field exists only on the unsuppressed
 // branch, so the gate here is not a check that could be forgotten — it is the type.
 import type { AnalysisQuery, AnalysisView, ThemeDetail, ThemeSummary } from '@endur/shared';
+import type { Request } from 'express';
 import { NotFoundError } from '../../lib/errors.js';
 import { readCorpus, type Corpus, type CorpusFilter } from '../results/service.js';
 import type { CommentRow } from '../results/service.js';
@@ -21,13 +22,14 @@ const HIGH_AT = 100;
 const THIN_RATE = 0.2;
 
 export async function readAnalysis(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
   query: AnalysisQuery,
 ): Promise<AnalysisView> {
   const window = windowOf(query);
-  const corpus = await readCorpus(orgId, userId, authzVersion, { ...filterOf(query), ...window.now });
+  const corpus = await readCorpus(req, orgId, userId, authzVersion, { ...filterOf(query), ...window.now });
 
   const reliability = reliabilityOf(corpus);
   if (corpus.suppressed) {
@@ -37,7 +39,7 @@ export async function readAnalysis(
   }
 
   const previous = window.previous
-    ? await readCorpus(orgId, userId, authzVersion, { ...filterOf(query), ...window.previous })
+    ? await readCorpus(req, orgId, userId, authzVersion, { ...filterOf(query), ...window.previous })
     : null;
 
   const result = analyse({
@@ -68,6 +70,7 @@ export async function readAnalysis(
  * is currently displaying.
  */
 export async function readTheme(
+  req: Request,
   orgId: string,
   userId: string,
   authzVersion: number,
@@ -77,7 +80,7 @@ export async function readTheme(
   const missing = 'That theme is not in the current analysis.';
 
   const window = windowOf(query);
-  const corpus = await readCorpus(orgId, userId, authzVersion, { ...filterOf(query), ...window.now });
+  const corpus = await readCorpus(req, orgId, userId, authzVersion, { ...filterOf(query), ...window.now });
   // Suppressed and absent produce THE SAME 404. A distinct "below the threshold" message
   // here would confirm that comments exist and are being withheld, which is the one thing
   // the suppression is for (52 §2, and the same reasoning as the inbox's write routes).

@@ -224,7 +224,7 @@ export default function BookingDetail(): JSX.Element {
         </p>
       )}
 
-      <section className="card">
+      <section className="card booking-panel">
         <h2 className="section-title">Times</h2>
         {anyBooked && canUpdate && (
           // Said BEFORE the press. The 409 is the real enforcement; this is so nobody
@@ -306,7 +306,7 @@ export default function BookingDetail(): JSX.Element {
         )}
       </section>
 
-      <section className="card">
+      <section className="card booking-panel">
         <h2 className="section-title">Who has booked</h2>
         {/* THE ONE PLACE IN THIS FEATURE THAT PRINTS NAMES, and it is deliberate: a booking
             is identified because it has to be honoured (DEC-090). The public payload carries
@@ -346,7 +346,7 @@ export default function BookingDetail(): JSX.Element {
       </section>
 
       {canDelete && (
-        <section className="card danger-zone">
+        <section className="card booking-panel danger-zone">
           <h2 className="section-title">Delete</h2>
           <p className="text-meta">
             This removes the times and every booking on them, including the ones people are

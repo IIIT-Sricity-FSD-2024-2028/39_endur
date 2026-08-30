@@ -94,7 +94,7 @@ authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res,
       orderBy: { createdAt: 'asc' },
       take: MAX_LOGIN_CANDIDATES,
       select: { id: true, orgId: true, passwordHash: true, status: true,
-                org: { select: { name: true } } },
+                org: { select: { name: true, suspendedAt: true } } },
     });
 
     // A DUMMY VERIFICATION WHEN THERE ARE NONE, which is the timing half of user
@@ -130,6 +130,22 @@ authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res,
     }
 
     const user = usable[0] as (typeof usable)[number];
+
+    // SAID HERE, WHERE IT IS UNDERSTOOD (N-070). `tenantResolver` refuses a suspended
+    // organisation on every request that carries a session, so before this the sign-in
+    // itself answered 200 and the FIRST console call answered 403 — the user was let in
+    // and then told nothing useful at the moment they could act on it.
+    //
+    // AFTER the password is proved, deliberately: suspension is a fact about a named
+    // organisation, and answering it to an unauthenticated caller would turn login into an
+    // oracle for which organisations exist and what state they are in (15 §2). By this line
+    // the caller has proved they hold the account.
+    //
+    // Same code and same words as the resolver, so a user who is suspended mid-session and
+    // one who signs in afterwards read the same sentence.
+    if (user.org.suspendedAt) {
+      throw new AppError('FORBIDDEN', 'This organization has been suspended. Contact Endur support.');
+    }
 
     // Regenerate BEFORE storing anything: session fixation prevention (15 §2).
     await regenerate(req);

@@ -5158,32 +5158,112 @@ html:active-view-transition * {
    page: two stylesheets is how "2 left" starts looking urgent on one screen and ordinary
    on the other. */
 
-.slot-grid {
+/* ── The slot calendar ───────────────────────────────────────────────────────────────
+   NINE CARDS EACH REPEATING "Tue, 1 Sept" is a list that spends the reader's whole
+   attention on the one thing every entry has in common. So the day is the STRUCTURE and
+   not a line inside a card: stated once, on the left, as a torn-page date block; the
+   times run beside it as a wrapping strip, which is the shape a schedule actually has.
+
+   The chips align on a column grid rather than sizing to their text. A time is a fixed
+   quantity, and a row of chips that jitters by a character is unreadable at a glance —
+   `font-variant-numeric: tabular-nums` finishes the same job inside each one.           */
+
+.slot-cal { display: flex; flex-direction: column; }
+
+.slot-cal-day {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.slot-cal-day:first-child { border-top: 0; padding-top: 0; }
+.slot-cal-day:last-child { padding-bottom: 0; }
+
+/* The one wash of accent in the whole control. It marks WHERE a day begins, which is the
+   only thing on this screen worth colouring — the chips carry state instead. */
+.slot-date {
+  margin: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: var(--space-2) var(--space-1) calc(var(--space-2) + 1px);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+.slot-date-dow {
+  font-size: var(--text-micro); letter-spacing: var(--track-utility);
+  text-transform: uppercase; font-weight: 600;
+  color: var(--color-accent);
+}
+.slot-date-num {
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: 25px; line-height: 1.05; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.slot-date-mon {
+  font-size: var(--text-micro);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+.slot-times {
   list-style: none; margin: 0; padding: 0;
   display: grid; gap: var(--space-2);
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
 }
 .slot { display: flex; flex-direction: column; gap: 4px; }
 .slot-face {
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
   width: 100%; text-align: left; cursor: pointer;
-  padding: var(--space-3);
+  /* 44px is the tap target `26` requires, and this is a phone-first control. */
+  min-height: 54px;
+  padding: var(--space-2) calc(var(--space-3) * 1.1);
   background: var(--color-card);
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-md);
-  /* 44px is the tap target `26` requires, and this is a phone-first control. */
-  min-height: 44px;
+  color: inherit;
+  transition: border-color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
 }
-.slot-day { font-size: var(--text-small); opacity: .7; }
-.slot-time { font-weight: 600; font-variant-numeric: tabular-nums; }
-.slot-left { font-size: var(--text-small); }
+.slot-face:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+.slot-time {
+  font-weight: 600; font-size: var(--text-small);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.slot-left {
+  font-size: var(--text-micro);
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+}
 /* THREE STATES, VISUALLY DISTINCT, because pressing a full slot is the one interaction
    that has to fail before it starts. `is-nearly` is called out on its own: one place left
    is the state a booker has to act on, and the demo exists to show it. */
 .slot.is-nearly .slot-left { font-weight: 600; color: var(--status-warn-800); }
-.slot.is-full .slot-face { opacity: .55; cursor: default; }
-.slot.is-selected .slot-face { border-color: var(--color-accent); border-width: 2px; }
+.slot.is-full .slot-face { opacity: .5; cursor: default; transform: none; }
+.slot.is-full .slot-time { text-decoration: line-through; text-decoration-thickness: 1px; }
+/* An INSET ring rather than a second border pixel: growing the border to 2px moves every
+   other chip in the row by a pixel the moment one is picked. */
+.slot.is-selected .slot-face {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-card));
+}
 .slot-remove { align-self: flex-start; }
+
+/* The date block goes back on top below 520px — 62px of gutter is a third of a phone. */
+@media (max-width: 520px) {
+  .slot-cal-day { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .slot-date {
+    flex-direction: row; align-items: baseline; gap: var(--space-2);
+    justify-content: flex-start; padding-inline: var(--space-3);
+  }
+  .slot-date-num { font-size: var(--text-lead); }
+  .slot-times { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+}
 
 .slot-editor { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .slot-editor-row {
@@ -5196,15 +5276,42 @@ html:active-view-transition * {
 .field-narrow { max-width: 96px; }
 
 .card-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.booking-new { display: flex; align-items: flex-end; gap: var(--space-2); margin-bottom: var(--space-3); }
+
+/* BOTH OF THESE INHERITED `flex-direction: column` FROM `.card` and neither said otherwise,
+   so `align-items` centred and right-aligned a stack instead of laying out a row. That is
+   the whole reason this page rendered as three tall boxes of empty space. */
+.booking-new {
+  flex-direction: row; align-items: flex-end; flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+/* The input takes the row; the button keeps its own width so naming a long room does not
+   shrink it. */
+.booking-new .field { flex: 1 1 260px; margin: 0; }
+.booking-new .btn { flex: none; }
+.booking-new .form-error { flex-basis: 100%; margin: 0; }
+
 .booking-row {
-  display: flex; align-items: center; gap: var(--space-3);
+  flex-direction: row; align-items: center; gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   text-decoration: none; color: inherit;
+  transition: border-color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
 }
-.booking-row-icon { display: inline-flex; color: var(--color-accent); }
-.booking-row-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; }
+.booking-row:hover { border-color: var(--color-accent); transform: translateY(-1px); }
+/* A tinted square, not a bare glyph: it gives the row a fixed left edge, so a list of five
+   bookables reads as a column rather than five differently-indented sentences. */
+.booking-row-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 38px; height: 38px;
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.booking-row-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
 .booking-row-name { font-weight: 600; }
+.booking-row .tag { flex: none; }
 
 .btn-sm { padding: 4px var(--space-2); font-size: var(--text-small); }
 .danger-zone { border: 1px solid var(--color-divider); }
@@ -5350,3 +5457,197 @@ html:active-view-transition * {
 
 .enterprise-actions { display: flex; gap: var(--space-2); flex: none; }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIALOGS — THE MODAL LAYER.  Fixes three faults the composer and the quick
+   campaign dialog shared, all of them structural rather than cosmetic.
+
+   1. `.dialog-backdrop` CARRIED NO z-index AT ALL. Every sticky strip in the
+      console sits at 20 and the rail at 40, so a dialog opened over the
+      campaigns list had the filter tabs painted straight through it. A modal
+      that something else can cover is not a modal.
+   2. IT COULD NOT SCROLL. `display: grid; place-items: center` on a fixed box
+      centres the panel and then clips whatever does not fit — off the TOP,
+      where the title is. The composer is taller than a laptop viewport the
+      moment the audience picker opens, so its heading was simply gone.
+   3. THE PILL RADIUS REACHED THE TEXTAREA. `.input { border-radius: 999px }`
+      is right for a 42px control and turns a 90px one into an oval.
+
+   Flex with `margin: auto` rather than grid centring: it is the one
+   arrangement that centres a short dialog AND lets a tall one scroll from its
+   own first line instead of overflowing past the top edge.                    */
+
+.dialog-backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-6) var(--space-4);
+  /* Above the rail (40), the sticky list headers (20) and the toast strip. */
+  z-index: 120;
+  background: color-mix(in srgb, var(--color-neutral-900) 46%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(0.85);
+  backdrop-filter: blur(14px) saturate(0.85);
+}
+.dialog-backdrop > .dialog { margin: auto; }
+
+.dialog {
+  padding: var(--space-6);
+  gap: var(--space-4);
+  max-height: none;
+  animation: dialog-in var(--dur-base) var(--ease) both;
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog { animation: none; }
+}
+
+.dialog-title { margin: 0; letter-spacing: var(--track-heading); }
+.dialog-body {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-text) 66%, transparent);
+  opacity: 1;
+  max-width: 46ch;
+}
+
+/* ── The tall variant: head and actions hold still, the fields scroll ───────
+   A form long enough to need scrolling should not take its own Save button
+   below the fold with it. The panel caps at the viewport, the middle band is
+   the only thing that moves, and the reader can always see what they are
+   about to press.                                                            */
+.dialog-tall {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(86vh, 820px);
+  overflow: hidden;
+  gap: var(--space-3);
+}
+.dialog-head { flex: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.dialog-form { flex: 1 1 auto; min-height: 0; gap: 0; }
+.dialog-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  /* Room for the focus ring, taken back with a negative margin so the fields
+     still line up with the title above them. */
+  padding: 2px 2px var(--space-4);
+  margin-inline: -2px;
+}
+.dialog-form .dialog-actions {
+  flex: none; margin-top: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+/* ── Controls inside a dialog ──────────────────────────────────────────────
+   The pill is the console's shape for a single-line control. A textarea is a
+   BLOCK of text and takes the card's radius instead — the same corner the
+   panel around it uses. */
+textarea.input {
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-3);
+  line-height: 1.5;
+}
+
+.dialog .field { margin: 0; }
+.dialog .field-help { margin-top: 6px; }
+.dialog .subject-form > .field + .field { margin-top: 0; }
+
+/* The audience picker. The row was a single flex line, so the description was
+   squeezed into whatever was left after the label wrapped — two words a line.
+   A two-column grid gives the label the row and puts the description under
+   it, which is where a description belongs. */
+.dialog .q-options { gap: var(--space-2); }
+.dialog .q-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: 3px;
+  min-height: 0;
+  padding: var(--space-3);
+  font-size: var(--text-small);
+  font-weight: 500;
+  transition: border-color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease);
+}
+.dialog .q-option > .text-meta {
+  grid-column: 2;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+}
+.dialog .q-option:has(input:checked) {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+/* The server's count, and it is the proof the org graph is real — so it reads
+   as a stated fact under the picker rather than one more line of help text. */
+.dialog .audience-count {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  font-size: var(--text-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A poll's options are a numbered set the reader is building, so the rows keep
+   an even rhythm and the remove button never resizes the input beside it. */
+.dialog .quick-option { margin-bottom: var(--space-2); }
+.dialog .quick-option:last-of-type { margin-bottom: 0; }
+.dialog fieldset.field { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+@media (max-width: 520px) {
+  .dialog-backdrop { padding: var(--space-3); align-items: flex-end; }
+  .dialog { padding: var(--space-4); }
+  .dialog-tall { max-height: 92vh; }
+  .dialog-actions { flex-direction: column-reverse; }
+  .dialog-actions .btn { width: 100%; }
+}
+
+
+/* ── The bookable's own screen ─────────────────────────────────────────────
+   Three stacked panels — the times, the roster, the delete. `.card`'s default
+   13px padding is right for a tile in a grid and too tight for a panel that
+   holds a calendar and a table, so these take the wider one and put real air
+   under their headings. */
+.booking-panel {
+  padding: var(--space-6);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.booking-panel .section-title {
+  margin: 0;
+  letter-spacing: var(--track-heading);
+}
+.booking-panel > .text-meta { margin: calc(var(--space-2) * -1) 0 0; }
+.booking-panel .table th:first-child,
+.booking-panel .table td:first-child { padding-left: 0; }
+.booking-panel .table th:last-child,
+.booking-panel .table td:last-child { padding-right: 0; }
+
+/* The editor rows are a form, not a list of cards — one rule between them and
+   a baseline the three controls share. */
+.slot-editor-row { align-items: flex-end; gap: var(--space-3); padding-bottom: var(--space-3); }
+.slot-editor-row .field { flex: 1 1 180px; margin: 0; }
+.slot-editor-row .field-narrow { flex: 0 0 96px; }
+
+/* ── The public picker ─────────────────────────────────────────────────────
+   Same column and rhythm as the respondent form next door, with the two
+   headings given the space they were missing: "Pick a time" and "Your
+   details" are the two halves of this page and have to read as such. */
+.rf-book { gap: var(--space-4); }
+.rf-book-heading {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-lead);
+  letter-spacing: var(--track-heading);
+}
+.rf-book-heading + * { margin-top: calc(var(--space-2) * -1); }
+.rf-book .field { margin: 0; }
+.rf-book-submit { margin-top: var(--space-2); }

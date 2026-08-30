@@ -278,6 +278,14 @@ different things on two screens.
 payload carries remaining and NOT capacity (`13` §6): a stranger is told how many places are
 left, never how many exist or who has taken them.
 
+**It groups by DAY, and the day is structure rather than decoration.** A flat grid of cards
+each repeating "Tue, 1 Sept" spends the reader's whole attention on the one thing every card
+has in common. So each calendar day is one row -- a date block on the left, the times beside
+it as a chip strip on a column grid -- and the date is stated once. The day is not a heading
+element: this renders under an `<h2>` on the console and a different one on the picker, so
+each day's list carries the date as its accessible name instead, and every chip's
+`aria-label` still names the whole day-and-time sentence the chip no longer prints.
+
 Four states per slot and they are visually distinct, because pressing a full slot is the one
 interaction that must fail before it starts: `open` (places left), `nearly` (one left —
 called out, since it is the state the demo exists to show), `full` (no action at all, not a

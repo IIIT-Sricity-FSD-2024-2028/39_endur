@@ -120,6 +120,11 @@ export function ImportWizard({
               {labels.unit.one.toLowerCase()} names are resolved on the next screen — nothing
               is invented.
             </p>
+            <p className="dialog-body">
+              An <strong>Also in</strong> column puts the same person in a second{' '}
+              {labels.unit.one.toLowerCase()} as well — someone who belongs in two places at
+              once, which is what makes both of their audiences reach them.
+            </p>
             <div className="field">
               <label htmlFor="import-file">CSV file</label>
               <input
@@ -224,7 +229,7 @@ function ReviewStep({
       {preview.sample.length > 0 && (
         <table className="import-sample">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>{unitLabel}</th></tr>
+            <tr><th>Name</th><th>Email</th><th>Role</th><th>{unitLabel}</th><th>Also in</th></tr>
           </thead>
           <tbody>
             {preview.sample.map((row) => (
@@ -233,6 +238,7 @@ function ReviewStep({
                 <td>{row.email}</td>
                 <td>{row.roleName ?? '—'}</td>
                 <td>{row.unitName ?? '—'}</td>
+                <td>{row.alsoUnitName ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -336,6 +342,7 @@ function parseCsvRows(csv: string): ImportRow[] {
   const emailAt = index('email', 'email address', 'e-mail');
   const roleAt = index('role', 'title', 'position');
   const unitAt = index('unit', 'department', 'team', 'ward', 'property');
+  const alsoAt = index('also in', 'also', 'second unit', 'additional unit', 'other unit');
 
   const rows: ImportRow[] = [];
   for (const line of lines.slice(1)) {
@@ -348,6 +355,7 @@ function parseCsvRows(csv: string): ImportRow[] {
       email,
       ...(roleAt >= 0 && cells[roleAt]?.trim() ? { roleName: cells[roleAt].trim() } : {}),
       ...(unitAt >= 0 && cells[unitAt]?.trim() ? { unitName: cells[unitAt].trim() } : {}),
+      ...(alsoAt >= 0 && cells[alsoAt]?.trim() ? { alsoUnitName: cells[alsoAt].trim() } : {}),
     });
   }
   return rows;

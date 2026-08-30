@@ -133,3 +133,17 @@ export async function wouldCreateCycle(
 export async function lockSlot(tx: Prisma.TransactionClient, slotId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM slots WHERE id = ${slotId}::uuid FOR UPDATE`;
 }
+
+/**
+ * The migrations this database has finished, by folder name.
+ *
+ * Not a graph query and it lives here anyway, for the reason the file's first line gives:
+ * `_prisma_migrations` is Prisma's own bookkeeping table and has no model, so it can only be
+ * read raw, and DEC-007 says raw reads live in one file where they can be audited together.
+ * `db/preflight.ts` is the only caller.
+ */
+export async function appliedMigrations(): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ migration_name: string }>>`
+    SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL`;
+  return rows.map((row) => row.migration_name);
+}

@@ -89,6 +89,20 @@ async function guard(req: Parameters<RequestHandler>[0]): Promise<void> {
   // over 64 capabilities — and without this the bound would be the slowest thing on the
   // route by two orders of magnitude.
   const capabilities = [...new Set(raising.map((cell) => cell.capability))] as Capability[];
+  // A capability whose every raising cell is `self` makes no unit claim, so "everywhere"
+  // is the wrong bound for it — the same reading `findEscalation` already takes when it
+  // skips `self` grants outright (authz/escalation.ts). A `self` cell says "each holder of
+  // this role may do this TO THEMSELVES", and no placement of that role widens it.
+  //
+  // D-047: without this, the `self`-only rows of the improvement loop — `reflection.*`,
+  // `actionplan.*`, seeded at `self` and never at `all` — were ungrantable by anybody,
+  // including the founder, because nobody can hold at `all` a capability the matrix only
+  // ever writes at `self`. A paid-for Gold feature with no in-product path to it.
+  const selfOnly = new Set(
+    capabilities.filter((capability) =>
+      raising.every((cell) => cell.capability !== capability || cell.scope === 'self'),
+    ),
+  );
   let unitCount: number | null = null;
 
   for (const capability of capabilities) {
@@ -102,6 +116,9 @@ async function guard(req: Parameters<RequestHandler>[0]): Promise<void> {
       );
     }
     if (reach.all) continue;
+    // Held at all, over some units, or over themselves — any of the three is enough to
+    // hand out a power that reaches nobody but its holder.
+    if (selfOnly.has(capability)) continue;
 
     // Counted once per request, and only when some capability is genuinely unit-scoped —
     // an owner never reaches this line.

@@ -292,6 +292,78 @@ describe('CSV import', () => {
     expect(res.body.data.skipped).toEqual(['alan@example.test']);
   });
 
+  /**
+   * N-071 — the second place a person sits, from the file rather than by hand.
+   *
+   * A college's hostel and mess audiences are empty until the students who live there hold
+   * a position in them, and the model has always allowed that. What it did not have was any
+   * path there: the importer read ONE unit column, so the natural first pass produced a
+   * hostel audience of one person — the warden. The demo run fixed three students by hand
+   * and watched the announcement go from 1 recipient to 4.
+   */
+  it('puts a person in a SECOND unit from the "Also in" column', async () => {
+    const founder = await setUpOrg();
+    const csvWithAlso = [
+      'Name,Email,Role,Unit,Also in',
+      'Ada Lovelace,ada-also@example.test,Tutor,Section A,Section B',
+    ].join('\n');
+
+    const preview = await withCsrf(founder, 'post', '/api/v1/people/import/preview').send({
+      csv: csvWithAlso,
+    });
+    expect(preview.status).toBe(200);
+    expect(preview.body.data.sample[0].alsoUnitName).toBe('Section B');
+    // Both units exist, so neither column asks the operator anything.
+    expect(preview.body.data.unmatchedUnits).toEqual([]);
+
+    const res = await withCsrf(founder, 'post', '/api/v1/people/import').send({
+      rows: [
+        {
+          name: 'Ada Lovelace',
+          email: 'ada-also@example.test',
+          roleName: 'Tutor',
+          unitName: 'Section A',
+          alsoUnitName: 'Section B',
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.created).toBe(1);
+    expect(res.body.data.assigned).toBe(2);
+
+    const person = await prisma.node.findFirstOrThrow({
+      where: { orgId: founder.orgId, kind: 'person', user: { email: 'ada-also@example.test' } },
+      select: { id: true },
+    });
+    const edges = await prisma.edge.findMany({
+      where: { orgId: founder.orgId, type: 'member', parentId: person.id },
+      select: { isPrimary: true, child: { select: { unit: { select: { name: true } } } } },
+    });
+    expect(edges).toHaveLength(2);
+    // EXACTLY ONE PRIMARY, and it is the first column. The home unit is where a
+    // person-anchored grant anchors, and a second primary makes that a guess.
+    expect(edges.filter((edge) => edge.isPrimary)).toHaveLength(1);
+    expect(edges.find((edge) => edge.isPrimary)?.child.unit?.name).toBe('Section A');
+    expect(edges.find((edge) => !edge.isPrimary)?.child.unit?.name).toBe('Section B');
+  });
+
+  it('skips a row whose second unit resolves to nothing, rather than half-importing it', async () => {
+    const founder = await setUpOrg();
+    const res = await withCsrf(founder, 'post', '/api/v1/people/import').send({
+      rows: [
+        {
+          name: 'Grace Hopper',
+          email: 'grace-also@example.test',
+          roleName: 'Tutor',
+          unitName: 'Section A',
+          alsoUnitName: 'Nowhere Hall',
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.skipped).toEqual(['grace-also@example.test']);
+  });
+
   it('a repeated import updates rather than duplicating', async () => {
     const founder = await setUpOrg();
     const rows = [

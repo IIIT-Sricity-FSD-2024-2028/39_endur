@@ -41,7 +41,7 @@ analysisRouter.get(
   (req, res, next) => {
     const { query } = req.data as { query: AnalysisQuery };
     void Promise.resolve()
-      .then(() => readAnalysis(req.ctx.orgId as string, userOf(req), version(req), query))
+      .then(() => readAnalysis(req, req.ctx.orgId as string, userOf(req), version(req), query))
       .then((view) => res.json({ data: view }))
       .catch(next);
   },
@@ -69,7 +69,7 @@ analysisRouter.get(
   (req, res, next) => {
     const { params, query } = req.data as { params: { id: string }; query: AnalysisQuery };
     void Promise.resolve()
-      .then(() => readTheme(req.ctx.orgId as string, userOf(req), version(req), params.id, query))
+      .then(() => readTheme(req, req.ctx.orgId as string, userOf(req), version(req), params.id, query))
       .then((detail) => res.json({ data: detail }))
       .catch(next);
   },

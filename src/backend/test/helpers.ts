@@ -25,6 +25,9 @@ export type Session = {
   orgId: string;
   userId: string;
   csrf: string;
+  /** The credentials this session was made with, for the tests that sign in a SECOND time. */
+  email: string;
+  password: string;
 };
 
 export const withCsrf = (session: Session, method: 'post' | 'patch' | 'put' | 'delete', path: string) =>
@@ -44,9 +47,11 @@ export const withCsrf = (session: Session, method: 'post' | 'patch' | 'put' | 'd
  */
 export async function registerOrg(industry = 'custom', tier: SignupTier = 'bronze'): Promise<Session> {
   const agent = request.agent(app);
+  const email = `${unique('founder')}@example.test`;
+  const password = 'a-long-enough-password';
   const res = await agent.post('/api/v1/auth/register').send({
-    email: `${unique('founder')}@example.test`,
-    password: 'a-long-enough-password',
+    email,
+    password,
     name: 'Founder',
     orgName: `Org ${unique('n')}`,
     industry,
@@ -60,6 +65,8 @@ export async function registerOrg(industry = 'custom', tier: SignupTier = 'bronz
     orgId: res.body.organization.id as string,
     userId: me.body.user.id as string,
     csrf: csrf.body.token as string,
+    email,
+    password,
   };
 }
 
@@ -162,7 +169,7 @@ export async function addStaff(
   const login = await agent.post('/api/v1/auth/login').send({ email, password });
   expect(login.status).toBe(200);
   const csrf = await agent.get('/api/v1/auth/csrf');
-  return { agent, orgId, userId: user.id, csrf: csrf.body.token as string };
+  return { agent, orgId, userId: user.id, csrf: csrf.body.token as string, email, password };
 }
 
 /** Give one person an explicit deny. INV-004 says it beats everything, and tests say so too. */

@@ -70,6 +70,21 @@ export const ImportRow = z.object({
   email: z.string().email().max(200),
   roleName: z.string().max(60).optional(),
   unitName: z.string().max(80).optional(),
+  /**
+   * A SECOND place the same person sits, imported as a non-primary position (N-071).
+   *
+   * The model has always allowed one person in two branches of the tree — it is what makes
+   * a student who lives in a hostel reachable by both the department's and the warden's
+   * audiences — and nothing led anybody there: the importer had one unit column, so the
+   * natural first pass at a college produced hostel and mess audiences of one person, the
+   * warden. Written by hand afterwards, the same three students took the hostel
+   * announcement from 1 recipient to 4.
+   *
+   * The role is the row's role. A second unit with a DIFFERENT role is a real thing and it
+   * is not this: it is two rows, or the assignments screen, and inventing a second role
+   * column would make the commonest case pay for the rarest.
+   */
+  alsoUnitName: z.string().max(80).optional(),
 });
 export type ImportRow = z.infer<typeof ImportRow>;
 
