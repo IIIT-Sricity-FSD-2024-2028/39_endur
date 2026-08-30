@@ -18,13 +18,19 @@
 //      point (52 §2).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { InboxState } from '@endur/shared';
+import type { InboxMessage, InboxState } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ResponseCard } from '../../../components/feedback/ResponseCard.js';
+import { MessageCard } from '../../../components/feedback/MessageCard.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
-import { useInbox, type MarkAction } from '../../../lib/inbox.js';
+import {
+  useInbox,
+  useMessages,
+  type MarkAction,
+  type MessagesController,
+} from '../../../lib/inbox.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 
@@ -38,6 +44,21 @@ const TABS: Array<{ id: InboxState; label: string }> = [
 const isState = (value: string | null): value is InboxState =>
   value === 'all' || value === 'unread' || value === 'read' || value === 'archived';
 
+/**
+ * FROM ENDUR — DEC-101, T-101, 58 § From Endur.
+ *
+ * A FIFTH TAB THAT IS NOT A FIFTH FILTER. The four above narrow one stream; this one switches
+ * to a DIFFERENT stream, from a different table, with a different card. It sits in the same
+ * row because that is where a reader looks for "the other thing in my inbox" — but the page
+ * branches on it before the filters, the keyboard queue and the campaign selector, none of
+ * which mean anything about a message from your vendor.
+ *
+ * NOT MERGED INTO THE COMMENT QUEUE. A comment and a message from the company you buy from
+ * are triaged for different reasons, and one interleaved queue would make the message the
+ * thing you scroll past. `DEC-101` is explicit: a tab, with its own count.
+ */
+const MESSAGES_TAB = 'endur';
+
 export default function Inbox(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
@@ -46,6 +67,7 @@ export default function Inbox(): JSX.Element {
   // Everything that shapes the queue lives in the URL, so a filtered queue is a link
   // somebody can paste — the same rule as 40's filters (58 § State).
   const raw = params.get('state');
+  const showingMessages = raw === MESSAGES_TAB;
   const state: InboxState = isState(raw) ? raw : 'unread';
   const campaignId = params.get('campaignId') ?? undefined;
   const subjectId = params.get('subjectId') ?? undefined;
@@ -59,8 +81,17 @@ export default function Inbox(): JSX.Element {
       ...(campaignId ? { campaignId } : {}),
       ...(subjectId ? { subjectId } : {}),
     },
-    can('response.read'),
+    can('response.read') && !showingMessages,
   );
+
+  // NO CAPABILITY GATE. `response.read` scopes which units' responses you may see and has
+  // nothing to say about a message addressed to you by name — gating on it would mean an
+  // administrator with no response scope could be sent a message they could never open
+  // (`DEC-101`). The server scopes every row by the session's user id, which is where that is
+  // decided; this hook only chooses when to ask.
+  const messages = useMessages(showingMessages);
+  const messageRows = messages.data?.data ?? [];
+  const unreadMessages = messageRows.filter((row) => !row.read).length;
   // The filter dropdowns are themselves scope-filtered by their own endpoints, so a
   // filter cannot reach past the scope the queue already applied (INV-003, 40).
   const campaigns = useCampaignList();
@@ -184,8 +215,24 @@ export default function Inbox(): JSX.Element {
             )}
           </button>
         ))}
+        {/* A DIFFERENT STREAM, IN THE SAME ROW — DEC-101. Last, because it is the one people
+            open least; and with its own count, for the reason Unread has one. */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={showingMessages}
+          className={`tab ${showingMessages ? 'is-active' : ''}`}
+          onClick={() => setParam('state', MESSAGES_TAB)}
+        >
+          From Endur
+          {unreadMessages > 0 && <span className="tab-count">{unreadMessages}</span>}
+        </button>
       </nav>
 
+      {/* THE FILTERS BELONG TO THE COMMENT QUEUE AND GO WITH IT. A campaign selector above a
+          message from your vendor is a control that cannot do anything to what is under it,
+          and the keyboard legend is about a queue this tab does not have. */}
+      {!showingMessages && (
       <div className="inbox-filters">
         <label className="field-inline">
           <span className="text-muted">{labels.campaign.one}</span>
@@ -217,7 +264,12 @@ export default function Inbox(): JSX.Element {
           <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>e</kbd> archive · <kbd>u</kbd> unread
         </p>
       </div>
+      )}
 
+      {showingMessages ? (
+        <MessageStream messages={messages} rows={messageRows} />
+      ) : (
+      <>
       {/* Above the list, and the last good page stays visible underneath (58 § States). */}
       {inbox.error && (
         <p className="form-error" role="alert">
@@ -270,6 +322,65 @@ export default function Inbox(): JSX.Element {
           )}
         </div>
       )}
+      </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The From Endur stream. DEC-101, 58 § From Endur.
+ *
+ * ITS EMPTY STATE IS THE GOOD ONE and says so plainly. `<Empty>` below distinguishes three
+ * cases because a comment queue can be empty for three different reasons; there is exactly
+ * one reason this is empty — nobody has written to you — and dressing that as a problem would
+ * be the product apologising for the ordinary case.
+ */
+function MessageStream({
+  messages,
+  rows,
+}: {
+  messages: MessagesController;
+  rows: InboxMessage[];
+}): JSX.Element {
+  if (messages.loading && rows.length === 0) {
+    return (
+      <div className="message-list" aria-busy="true">
+        {[0, 1].map((n) => <div key={n} className="skeleton-card" />)}
+      </div>
+    );
+  }
+
+  if (messages.error) {
+    return (
+      <p className="form-error" role="alert">
+        That did not load. {messages.error.message}
+      </p>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        icon="inbox"
+        title="Nothing from Endur"
+        body="Messages from us about your account land here. There are none."
+      />
+    );
+  }
+
+  return (
+    <div className="message-list">
+      {rows.map((row) => (
+        <MessageCard
+          key={row.id}
+          subject={row.subject}
+          body={row.body}
+          at={row.at}
+          read={row.read}
+          onMark={(action) => void messages.mark(row.id, action)}
+        />
+      ))}
     </div>
   );
 }

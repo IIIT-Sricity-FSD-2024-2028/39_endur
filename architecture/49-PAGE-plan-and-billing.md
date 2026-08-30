@@ -197,23 +197,69 @@ starts answering differently on the next request. No intermediate state, no `pen
 (`OPEN-005`) bought for nothing.
 
 An **upgrade applies with no dialog.** A confirmation before giving someone more is friction
-with no risk behind it. A **downgrade confirms**, because it takes surfaces away, and the
-dialog states in words:
+with no risk behind it. ~~A **downgrade confirms**, because it takes surfaces away.~~
+**AMENDED 2026-08-31 — `DEC-096`. There is no downgrade to confirm.**
 
-| Direction | What the dialog says |
+| Direction | What this page does |
 |---|---|
-| Upgrade | No dialog. Takes effect immediately; the new surfaces unlock now |
-| Downgrade | **Data is retained, not deleted** (`16` §7). Surfaces stop resolving; re-joining the higher tier restores access to the same history |
+| Upgrade | No dialog. `<PaymentDialog>` shows the **difference** (`DEC-097`), then it takes effect immediately and the new surfaces unlock now |
+| Same tier | The card reads **Current plan** and is inert, as it already did |
+| Lower tier | **No action on the card.** It renders as context — the tier and its price, no button. `POST /billing/tier` answers `409` if anything calls it anyway |
+| Lower tier, **scheduled** | A single secondary link under the current plan: *"Move to Bronze when this period ends on 30 September"* → `POST /billing/downgrade`. Nothing is captured and nothing changes today (`DEC-098`) |
 | Either | Collection never stops. Running campaigns keep running (`16` §6) |
 
-The downgrade sentence is the one that matters. Deleting a customer's data on downgrade is how
-a re-upgrade never happens, and a customer who does not know the data survives will not
-downgrade — they will leave.
+**Why the affordance goes rather than gaining a warning.** The old row's sentence — *data is
+retained, not deleted* — is still true and still in `16` §7, and it was never the problem. The
+problem is money: there are no refunds, so a customer who downgrades mid-period pays again for
+less than they already hold and the product keeps both captures (`16` §7a). A dialog that
+explained that accurately would be a dialog talking somebody out of a click the product should
+not offer.
+
+**The scheduled downgrade is the affordance that replaces it**, and it is one line of copy, not
+a second picker. It has a date in it because a promise without one is the thing customers ring
+about, and cancelling it is the same link again.
+
+**BUILT 2026-08-31 (`T-098`), and the placement is the decision worth recording.** The block
+sits under the **current plan**, above the picker, and the lower cards keep no action at all —
+their sentence points up at it. `<PlanPicker>`'s rule is that a tier below the current one
+carries no button (`DEC-096`), and a rule with one exception is a rule somebody adds a second
+exception to. The tier still has to be chosen somewhere, so the block offers one small button
+per sellable tier below the current one — inline in the sentence rather than as a button bar,
+because what is being said is one sentence and the tiers are its ends. It disappears entirely on
+Bronze, and without `billing.update`; the picker beside it stays visible but inert, because
+"what are we on and what would the next one add" is still `billing.read`'s question.
+
+**A downgrade still deletes nothing.** `16` §7 is unchanged; what changed is when it can
+happen.
 
 **A join is audited like any other privileged write** (`12` §4.14): actor, from-tier, to-tier,
 request id. With no invoice and no receipt, `audit_log` is the *only* record that the change
 happened, which makes it more load-bearing here than it is on a route that also produces a
 document.
+
+### Asking for Enterprise  ·  **BUILT 2026-08-31 (`DEC-099`, `DEC-100` — `T-099`, `T-100`)**
+
+Enterprise's card stops being a dead disabled button. It prints **₹4,999 / month** like every
+other card and its verb is **Request** → `<EnterpriseRequestDialog>` → `POST
+/billing/enterprise-request` (`billing.update`).
+
+**A price is not a checkout.** Nothing is captured, no subscription row moves, and the customer
+is not on Enterprise when the dialog closes. What happens is that an `enterprise_requests` row
+opens for Endur's owner, who rings them back — the tier stays operator-assigned through
+`platform.plan.override` exactly as `DEC-048` decided.
+
+- **The success state is a promise, not a receipt.** *"We'll be in touch."* No ticket number, no
+  ETA: nothing in the product can honour either.
+- **A second request while one is `open` is a `409`** that says the first is already with us —
+  never a duplicate row, and never a silent success that teaches the customer to click again.
+- **Who asked is resolved from the session**, never posted, for the same reason
+  `<MessageComposer>` resolves recipients server-side.
+
+### Messages from Endur  ·  **SPECIFIED 2026-08-31 (`DEC-101`) — NOT BUILT**
+
+Not on this page. An operator contacting an organisation (`70` § Interactions) writes to the
+administrators' **inbox** — see `58` § From Endur. It is recorded here only because this is the
+page a customer opens when they want to talk to Endur, and it must not grow a second inbox.
 
 ### Going over the seat limit
 
@@ -265,15 +311,39 @@ The other half of what was asked for — *"can assign leveled roles"* — **exis
 - [ ] A join writes an `audit_log` row naming the from-tier and the to-tier
 - [ ] The entitlement gate answers differently on the **next** request after a join, with no
       restart and no cache to invalidate
-- [ ] No response body, no page and no seed carries a price, an amount or a currency (DEC-035)
+- [ ] ~~No response body, no page and no seed carries a price, an amount or a currency~~
+      **REVERSED by `DEC-080` (29 Aug) and stale here since.** Every selectable tier prints a
+      price, and it is `formatMoney` from `PLAN_OPTIONS` — never a literal in a component
+- [ ] **Every price on the page reads `/ month`, and the period written to `period_end` is one
+      calendar month** — `DEC-096`. Three call sites hardcode 365 days today
+- [x] **`POST /billing/tier` to a LOWER rank returns `409` and the row is unchanged**, and the
+      test calls the route directly rather than through the page — the button's absence is not
+      the rule (`INV-003`)
+- [x] **`POST /billing/tier` to the SAME rank returns `409`** and captures nothing. A
+      double-submitted dialog must not bill twice for standing still
+- [x] **An upgrade captures `priceOf(to) − priceOf(from)`**, computed server-side, in the same
+      transaction as the tier — `DEC-097`. Asserted on the `payments` row, not on the dialog
+- [x] **A scheduled downgrade changes nothing today**: `subscriptions.tier` is unmoved, no
+      `payments` row is written, and the entitlement gate answers exactly as it did
+- [x] **The first read after `period_end` applies a `pending_tier`** and clears the column, and
+      the read that applies it returns the new tier — `DEC-098`
+- [x] **`POST /billing/enterprise-request` writes one `open` row and does not touch
+      `subscriptions`**; a second while one is open is `409`
+- [x] **Enterprise's card prints ₹4,999 and its verb is `Request`, not `Join`** — and no page
+      renders `₹0` for it, the property the old sentinel guard existed to protect
 - [ ] `billable_seats` excludes respondents and does not double-count person-subjects
 - [ ] The breakdown's parts sum to the displayed total
 - [ ] An over-limit org can still collect responses and read results
 - [ ] An over-limit org gets `402` with current and required counts when adding a person
 - [ ] The banner appears on **every** console page, not only this one
 - [ ] A downgrade deletes nothing; a re-upgrade restores access to the same history
-- [ ] Sign-up creates a `Subscription` row — `trialing`, Gold, 14 days (`16` §7)
-- [ ] An expired trial moves to Bronze, never to zero access
+- [ ] ~~Sign-up creates a `Subscription` row — `trialing`, Gold, 14 days~~ **SUPERSEDED by
+      `DEC-048`**: sign-up writes the chosen tier, `status: 'active'`. Nothing has ever written
+      `trialing` on this path, which is what made `/ops/analytics`' trial counters unable to
+      move (`DEC-102`)
+- [ ] ~~An expired trial moves to Bronze, never to zero access~~ — no trial exists to expire.
+      The line that survives is `16` §7's, about **expiry**, and `DEC-098` is what finally makes
+      `period_end` mean something
 - [ ] Response counts appear with an explicit statement that they are not billed
 - [ ] Every user-facing noun on this page resolves through `useLabels()` — this is a customer
       surface and INV-001 applies in full, unlike `70` and `71` (`19` §12)

@@ -14,7 +14,7 @@
 // owner moving between the two pages does not have to re-narrow the range.
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { TIERS, formatMoney, type Tier } from '@endur/shared';
+import { TIERS, formatMoney, type PaymentKind, type Tier } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { StatCard } from '../../../components/data/StatCard.js';
 import { ResponsiveTable, type Column } from '../../../components/data/ResponsiveTable.js';
@@ -40,7 +40,14 @@ type PaymentRow = {
   payerName: string;
   tier: Tier;
   fromTier: Tier | null;
-  kind: 'signup' | 'change';
+  /**
+   * `expiry` is in the union but does not reach this table — `/platform/earnings` excludes it
+   * from the window (`DEC-098`), because a Rs 0 plan move is not a capture and counting it as
+   * one would drag the average payment down with events where no money changed hands. The
+   * type stays honest about the column, and the row below still renders correctly if it ever
+   * arrives.
+   */
+  kind: PaymentKind;
   amountMinor: number;
 };
 
@@ -156,7 +163,8 @@ export default function Earnings(): JSX.Element {
       render: (row) =>
         row.kind === 'signup'
           ? 'New organisation'
-          : `${row.fromTier ? TIER_LABEL[row.fromTier] : 'Unknown'} → ${TIER_LABEL[row.tier]}`,
+          : `${row.fromTier ? TIER_LABEL[row.fromTier] : 'Unknown'} → ${TIER_LABEL[row.tier]}` +
+            (row.kind === 'expiry' ? ' · scheduled' : ''),
     },
     {
       key: 'amount',

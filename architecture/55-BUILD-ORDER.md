@@ -494,6 +494,53 @@ the demo survives stopping anywhere along the line.
 
 ---
 
+## Stage 11 — the owner's third pass · opened 2026-08-31 · **BUILT 2026-08-31**
+
+**Twelve reports from one sitting with the running app, sorted into nine tasks.** They are
+recorded as `DEC-096`…`DEC-106` and `D-043`…`D-045`, and they are not all the same kind of
+thing — which is the first thing to know before picking one up:
+
+| Kind | Which | What it means for you |
+|---|---|---|
+| **A live bug** | `T-103`'s reinstate, `T-102`'s date window, `T-104` | Something is broken now. It has a reproduction written down |
+| **A product decision** | `T-097`, `T-098`, `T-099`, `T-100`, `T-101` | Nothing is broken; the owner changed what the product does |
+| **A figure with no source** | `T-102`'s removals | It was never going to work, and printing it was the mistake |
+
+**Two of the twelve were misread on the way in, and the corrections are the reason to read the
+`DEC-` entries rather than this table.** *"Enterprise plan is not working"* is one line in
+`<PlanPicker>`, not a missing feature (`DEC-099`); *"suspending is suspending every org"* was
+checked and **not reproduced**, and is most likely the reinstate bug wearing a second face
+(`N-067`).
+
+Build order is id order. **ALL NINE ARE BUILT** (31 Aug). Three things this stage produced that
+were not in the change order:
+
+- **`T-097` found the billing period hardcoded in FOUR places, not three**, and two of them
+  already disagreed by a day in a leap year (`+ 365 * DAY` versus `setFullYear(+1)`). Nothing
+  read the difference, which is why it survived — and `DEC-098` was about to make `period_end`
+  the date a downgrade fires on.
+- **`DEC-102` had to be corrected against itself.** It says movement is read from `payments`
+  *rather than* from `plan.override` audit rows; its own `not` clause requires operator
+  overrides to still count, and those deliberately write no `payments` row. It reads **both** —
+  disjoint by construction, so nothing is double-counted. See the `built` note on the entry.
+- **`T-101` needed the platform WRITE seam widened**, which is the only part of Stage 11 that
+  touches `INV-011`. `Notification` and `EnterpriseRequest` join `platform/db.ts`'s allowlist;
+  the read surface is unchanged — `Answer` unreachable, `Response` count-only.
+
+| id | lane | needs | what | spec |
+|---|---|---|---|---|
+| **T-097** ✅ | B | — | **BUILT 2026-08-31. The ladder goes one-way and the period becomes a month.** `POST /billing/tier` refuses a lower or equal rank with a 409 — **server-side, because the missing button is not the rule** (`INV-003`) — and an upgrade captures `priceOf(to) − priceOf(from)` rather than the full new price, which also stops `/ops/earnings` overstating every customer who has ever upgraded. `period_end` moves to one **calendar** month, from **three** separate hardcoded 365-day expressions that must become one constant. `<PlanPicker>` prints `/ month`, and a card below the current tier renders without an action | `16` §7a/§7c/§8, `49`, `DEC-096`, `DEC-097`, ~~`OPEN-015`~~ answered |
+| **T-098** ✅ | B | T-097 | **A scheduled downgrade, applied on read.** `subscriptions.pending_tier` + `POST /billing/downgrade`; nothing is captured and nothing changes today; the **first read after `period_end`** moves the tier and clears the column — the same evaluate-on-read trick `readBilling` already uses to repair a missing row (`D-012`). No scheduler, so no `17` dependency. One line of copy on `/app/plan` with a date in it | `16` §7b, `10` §5, `49`, `DEC-098` |
+| **T-099** ✅ | B | T-097 | **Enterprise starts working, and it is one line plus a price.** `<PlanPicker>` disables `!selectable` in **all three modes**, including `override` — so the one tier `DEC-048` routes through the operator is unassignable in the only UI that can assign it. Read it as `mode !== 'override'`. Then `priceMinor: 499900`, ₹4,999/month, and the `Priced with you` / `Arranged with us` copy goes with the sentinel it was protecting | `16` §2, `24` §6b, `DEC-099` |
+| **T-100** ✅ | B | T-099 | **Request Enterprise → a queue the owner works.** `POST /billing/enterprise-request` (`billing.update`), one `enterprise_requests` row with `open`/`contacted`/`closed`, a partial unique index so a second request is a 409 under two simultaneous clicks, and `<EnterpriseQueue>` on `/ops` behind two new **owner-only** platform capabilities. **A work item, not a bell** — reading it changes nothing. Explicitly **not** `63`, which is outbound multichannel and needs a provider | `49`, `70`, `19` §4, `10` §5, `DEC-100` |
+| **T-101** ✅ | B | — | **The operator's message actually reaches the customer.** `messageAdministrators` writes only a `platform_audit_log` row today — **the operator's own table** — so `{ sentTo: 3 }` is returned while nothing has been sent to anybody. One `notifications` row per recipient in the same transaction, surfaced as a **From Endur** tab on `/app/inbox` reusing `58`'s read/unread mechanic. **No capability**, and no `notification.*` module: the row names a `user_id` | `58`, `70`, `10` §5, `DEC-101` |
+| **T-102** ✅ | A | — | **`/ops/analytics` prints only figures with a source.** Remove Trials started and Conversion rate — `DEC-048` means nothing writes `trialing`, and `converted` is a hardcoded `0`, so **two of six headline cards could never move**. Remove seats (`D-013`: `subscriptions.seats` has never been written and nothing is billed on it). Move `movement`'s upgrade/downgrade counts onto `payments`, because the `plan.override` source counts **only what operators did**. Make `to` inclusive to end-of-day (`D-044`) and label every point-in-time figure *as of today*. Drop `— never read`; rename *Quiet 30 days* → *Gone quiet* | `71`, `DEC-102`, `DEC-103`, `D-044` |
+| **T-103** ✅ | A | — | **Reinstate, and the staff view of `/ops`.** `confirmSuspend()` guards **both** verbs on the typed-name check and the reinstate dialog has no name field, so it returns **silently** — no request, no error (`D-043`). The typed name belongs to suspend alone, and the `disabled` button is the guard; the early return must never be the thing a user meets. Then the suspend **section** goes absent for staff, heading and copy included — `DEC-104`, which makes `70` agree with its own analytics-tab rule | `70`, `D-043`, `DEC-104`, `N-067` |
+| **T-104** ✅ | C | — | **`Enter` stops leaving the setup wizard.** The global handler exempts `BUTTON` and `TEXTAREA` only, so naming a unit on step 3 — into an input the `+` button just focused — advances the step instead of adding a row. Exempt every element that takes text. The two properties it must not cost: `Enter` still advances on steps 1 and 4, and still does nothing behind a confirm dialog | `31`, `DEC-105` |
+| **T-105** ✅ | C | — | **Dark mode gets its edge back, and `endur.css` loses 157 duplicated lines.** `design_specs/design/01` §4's surface table was light-only, written before dark shipped; the dark token block's own comment says *"the lift has to come from the edge instead"* and the components never followed. Add the border under `[data-theme="dark"]`. Separately, `/* Industry Split Layout */` appears **twice**, so `.preset-grid` is declared three times with different `minmax()` and `gap` — the setup step's spacing is currently decided by cascade order (`D-045`) | `31`, `design_specs/design/01` §4, `DEC-106`, `D-045` |
+
+---
+
 ## Rules
 
 1. **Read the spec doc and `_MEMORY.md` before starting a task.** The invariants live in

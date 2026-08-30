@@ -1,0 +1,15 @@
+-- A scheduled downgrade. DEC-098, T-098, 16 §7b, 10 §5.
+--
+-- ONE NULLABLE COLUMN AND NO SECOND TABLE. A downgrade has no lifecycle worth modelling: it
+-- is asked for, and then it either happens or is cancelled. A `scheduled_changes` table would
+-- carry a status, a history and a question about which row wins when there are two — for a
+-- fact that is always singular and always about the row it would point at.
+--
+-- NOT NOT NULL WITH A SENTINEL. NULL is the ordinary state and it is a real absence: nothing
+-- is scheduled. `DEC-099` is deleting a sentinel from `plan_options.price_minor` in the same
+-- change for exactly this reason.
+--
+-- NO CHECK CONSTRAINT THAT IT IS LOWER THAN `tier`. The rule is "lower at the moment it was
+-- asked for", and an upgrade afterwards would make a check fire on a row nobody touched —
+-- `joinTier` clears the column on the way up instead, which is the honest place for it.
+ALTER TABLE "subscriptions" ADD COLUMN "pending_tier" TEXT;

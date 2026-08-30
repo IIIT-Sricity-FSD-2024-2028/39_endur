@@ -236,15 +236,39 @@ export type PlatformAnalytics = {
     cancelled: number;
   };
 
-  /** `trialing` organisations excluded — decision 1. */
-  byTier: { tier: Tier; orgs: number; seats: number }[];
+  /**
+   * `trialing` organisations excluded — decision 1. AS OF TODAY, never windowed — `DEC-103`.
+   * `subscriptions` holds one row per organisation with NO HISTORY, so "the tier mix on
+   * 12 August" is not a question this database can answer, and the page says "as of today"
+   * rather than implying the dates above governed it.
+   *
+   * NO `seats` — `DEC-102`. Nothing is billed per seat (`DEC-080` prices per organisation)
+   * and `subscriptions.seats` has never been written (`D-013`), so a seat column on the
+   * revenue owner's page measured something no invoice reads.
+   */
+  byTier: { tier: Tier; orgs: number }[];
 
-  /** Four counts per period, never netted into one — decision 2. */
+  /**
+   * Four counts per period, never netted into one — decision 2. THE ONLY WINDOWED SECTION ON
+   * THE PAGE (`DEC-103`), which is why the page labels it and labels everything else "as of
+   * today": five of six sections ignoring the date control is indistinguishable from a broken
+   * control.
+   *
+   * `upgraded`/`downgraded` READ `payments`, not `plan.override` audit rows — `DEC-102`. The
+   * old source is the OPERATOR'S action, so the table had only ever counted what operators
+   * did while being labelled as the estate; a customer's own upgrade writes `billing.update`
+   * to the tenant `audit_log`, which the query never read. `payments` carries `from_tier` and
+   * `tier` on both write paths and is what `/ops/earnings` sums — one source for money and
+   * movement, or the two pages disagree about the same event.
+   *
+   * DOWNGRADED MEANS THE PREVIOUS PLAN WAS HIGHER, whoever caused it. With `DEC-096` a
+   * customer cannot move down at all, so the only downgrades are an operator override and the
+   * scheduled expiry of `DEC-098` — which is why that transition writes a `payments` row of
+   * `kind: 'expiry'`.
+   */
   movement: { period: string; new: number; upgraded: number; downgraded: number; churned: number }[];
 
-  /** `conversionRate` is `null`, not `0`, until a trial has completed — decision 3. */
-  trials: { started: number; converted: number; expired: number; conversionRate: number | null };
-
+  /** AS OF TODAY — `DEC-103`. Adoption is a state of the estate, not an event in a window. */
   adoption: {
     orgsWithACampaign: number;
     orgsWithAResponse: number;
@@ -253,8 +277,8 @@ export type PlatformAnalytics = {
     orgsQuiet30d: number;
   };
 
-  /** COUNTS ONLY — INV-011. */
-  totals: { seats: number; campaigns: number; responses: number };
+  /** COUNTS ONLY — INV-011. AS OF TODAY, and no `seats` — `DEC-102`, `DEC-103`. */
+  totals: { campaigns: number; responses: number };
 };
 
 /**
@@ -360,3 +384,40 @@ export type LogLine = {
   err?: { type: string; message: string; stack?: string };
   extra?: Record<string, unknown>;
 };
+
+/**
+ * THE ENTERPRISE QUEUE — `DEC-100`, `T-100`, `70` § The Enterprise queue.
+ *
+ * A WORK ITEM, AND `status` IS THE WHOLE DIFFERENCE from the bell the directive first
+ * suggested. What has to survive is not "somebody was told", it is "somebody has to ring this
+ * customer back" — and a notification that clears on read loses exactly that. READING THE
+ * QUEUE CHANGES NOTHING.
+ *
+ * STILL INV-011. An organisation's name, a person's name and address, a date and one note
+ * they typed. No field here could carry a response, an answer or a respondent identity.
+ */
+export const EnterpriseStatus = z.enum(['open', 'contacted', 'closed']);
+export type EnterpriseStatus = z.infer<typeof EnterpriseStatus>;
+
+export const EnterpriseQueueQuery = z.object({
+  /** Defaults to the only one worth opening the page for. */
+  status: EnterpriseStatus.default('open'),
+});
+export type EnterpriseQueueQuery = z.infer<typeof EnterpriseQueueQuery>;
+export const EnterpriseQueueDto = dto({ query: EnterpriseQueueQuery });
+
+export const EnterpriseUpdate = z.object({ status: EnterpriseStatus });
+export const EnterpriseUpdateDto = dto({ params: OrgIdParam, body: EnterpriseUpdate });
+
+export type EnterpriseRequestRow = {
+  id: string;
+  at: string;
+  org: { id: string; name: string; tier: Tier };
+  /** CAPTURED at the time — the person may have left before anybody rings back. */
+  askedName: string;
+  askedEmail: string;
+  note: string | null;
+  status: EnterpriseStatus;
+  handledAt: string | null;
+};
+

@@ -55,6 +55,15 @@ prop for them (`24` §6c), so nobody can stub them in.
 | Read the queue | `response.read` | `own_unit` · `subtree` · `all` |
 | Mark read / unread / archived | **none beyond the above** | per caller |
 
+**AMENDED 2026-08-31 — `DEC-101`. The From Endur tab is not gated on `response.read` either,
+and nothing new joins `11` §3.** `response.read` scopes which *units'* responses a
+caller may see, and it has nothing to say about a message Endur addressed to a named
+administrator — gating on it would mean an administrator with no response scope cannot read
+their own mail. **The row names a `user_id`; the row is that user's.** A caller sees exactly the
+rows that name them: no org-wide list, and no unread count for anybody else. That is this
+section's own argument carried one step further, and it is why no notification module joins the
+catalogue either.
+
 **No inbox module is added to the capability catalogue** (`11` §3), deliberately. Read state is **the reader's**, not the
 organisation's: one row per `(user, response)` (`10` §5), so two administrators triaging the
 same campaign never mark each other's queue. A capability would imply a shared queue somebody
@@ -164,6 +173,43 @@ it affects only the caller — `<ConfirmDialog>` requires a `consequence` prop (
 action does not have one worth writing.
 
 **Filters:** by campaign and by subject, both scope-filtered by the API.
+
+### From Endur — a fifth tab  ·  **BUILT 2026-08-31 (`DEC-101`, `T-101`)**
+
+Owner report: *"if the owner is sending a message to client the inbox is not updating for it,
+currently inbox is calibrated for feedback only."* **Both halves are correct, and the first half
+is worse than it sounds** — `70` § Messaging the administrators has the diagnosis: the message
+was written to the *operator's* audit table and reached nobody, while the operator was told it
+had reached three people.
+
+The tab renders `<MessageCard>` over `GET /inbox/messages`, and it carries an unread count for
+the same reason *Unread* does.
+
+**Here rather than anywhere else, because this is where the owner looked.** `58` already built
+read/unread over a stream; a second stream is a **placement, not a second implementation**
+(`INV-009`), which is the same argument `<PlanPicker>` makes about its three modes.
+
+**A tab, not a merge into the comment queue.** A comment from a respondent and a message from
+your vendor are triaged for different reasons, and one list would interleave them — the *All*
+tab stays comments-only, and its count does not move when Endur writes.
+
+**No archive verb on this tab.** `58` archives a comment because a queue of four hundred needs a
+floor; a customer who has had three messages from their vendor does not.
+
+**Not gated on `response.read`** — see § Capabilities.
+
+**Built note, and it is where this tab is deliberately *less* than the queue beside it.** No
+optimistic revert, no per-card failure map, no cursor, and no `j`/`k`. `useInbox` carries all of
+that because it is four hundred comments somebody works through at speed; this is a handful of
+rows a year, and the machinery that makes the comment queue feel fast would be machinery
+guarding against a problem this stream does not have. What is shared is the **mechanic a reader
+sees** — a tab, an unread count, click to read — which is what `INV-009` is about. The filters
+and the keyboard legend go with the comment queue and are absent on this tab: a campaign
+selector above a message from your vendor is a control that cannot act on what is under it.
+
+**A mark can be undone.** `POST /inbox/messages/:id/unread` exists alongside `/read`, because a
+read mark that cannot be reversed makes the first click a decision, and *"I will deal with this
+later"* is a real thing to say about a message from the company you buy from.
 
 **Keyboard:** `j`/`k` move, `e` archives, `u` toggles unread. This is a queue, and a queue
 worked with a mouse is a queue nobody works through. Documented on the page rather than hidden,

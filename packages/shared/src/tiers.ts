@@ -28,6 +28,20 @@
 // MONEY IS AN INTEGER IN MINOR UNITS (paise). 9900 is ₹99.00. No floats, no decimal strings,
 // no per-currency special cases: `currency` is `'INR'` on every row, and widening that is a
 // schema conversation rather than a formatting one.
+//
+// THE PRICES ARE PER MONTH — DEC-096, and the numbers did not move when the period did. The
+// owner asked for monthly billing and confirmed the figures stay at ₹99 / ₹499 / ₹999
+// (OPEN-015, answered 31 Aug): ₹99 a YEAR for an organisation running unlimited campaigns is
+// not a price anybody would defend, and ₹99 a month is. Dividing by twelve was the other
+// reading and it gives three numbers no customer recognises, printed with decimals that
+// `formatMoney` below correctly calls an accounting document impersonating a price tag.
+//
+// ALL FOUR TIERS CARRY A PRICE — DEC-099. Enterprise's was `0`, and `0` was a SENTINEL rather
+// than an amount: it meant "ask us", it read as "free" to anything that did not know, and it
+// forced `selectable: false` to be checked before the price could be printed. That special
+// case leaked out of this file as copy — "Priced with you", "Arranged with us". A real number
+// deletes the sentinel, the branch and the copy together, and `selectable` goes back to
+// meaning only what it says: the customer cannot assign this to themselves.
 
 /** Every tier the product has. `subscriptions.tier` is one of these. 16 §2. */
 export const TIERS = ['bronze', 'silver', 'gold', 'enterprise'] as const;
@@ -36,11 +50,12 @@ export type Tier = (typeof TIERS)[number];
 /**
  * The three an organisation may CHOOSE, at sign-up or later from settings.
  *
- * ENTERPRISE IS NOT ON THE LIST, and its absence is `DEC-048`. `16` §4 prices it individually
- * as *"a base platform plus chosen services"* — a sales conversation, not a button. It stays
+ * ENTERPRISE IS NOT ON THE LIST, and its absence is `DEC-048`. It now carries a real price —
+ * ₹4,999 a month, `DEC-099` — and a price is still not a checkout: the tier stays
  * operator-assigned through `platform.plan.override` (`19` §4), a route the spec already has
- * for exactly this. A tier nobody can self-serve is still a real tier: `TIER_ENTITLEMENTS`
- * carries it, `requireEntitlement` honours it, and an operator can set it.
+ * for exactly this, and the customer's own verb is REQUEST rather than Join (`DEC-100`). A
+ * tier nobody can self-serve is still a real tier: `TIER_ENTITLEMENTS` carries it,
+ * `requireEntitlement` honours it, and an operator can set it.
  */
 export const SIGNUP_TIERS = ['bronze', 'silver', 'gold'] as const;
 export type SignupTier = (typeof SIGNUP_TIERS)[number];
@@ -66,14 +81,22 @@ export type PlanOption = {
   sells: string;
   /** What it adds over the tier below. Empty for the lowest — bronze adds nothing to nothing. */
   adds: string;
-  /** False for Enterprise: shown for completeness, never selectable. */
+  /**
+   * False for Enterprise, and since `DEC-099` it means EXACTLY ONE THING: the customer cannot
+   * assign this tier to themselves. Not "it has no price", not "it is not real" — it has both.
+   * The card prints its amount like every other, the customer can request it, and an operator
+   * can set it. Every reader that keys off this flag should be asking about ASSIGNMENT.
+   */
   selectable: boolean;
   /**
-   * MINOR UNITS, for one year. 9900 = ₹99.00. DEC-080.
+   * MINOR UNITS, for ONE CALENDAR MONTH. 9900 = ₹99.00. DEC-080, and the period is DEC-096.
    *
-   * `0` on Enterprise, and that is NOT "free": `selectable: false` is what the picker reads,
-   * and it prints "Arranged with us" where the other three print an amount. Nothing may
-   * render ₹0 out of this field.
+   * EVERY TIER HAS ONE SINCE `DEC-099`. Enterprise used to carry `0` as a sentinel meaning
+   * "ask us", which was never free and was read as free by anything that did not know — so it
+   * forced a special case into every reader and the special case leaked out as copy. It is
+   * ₹4,999 now, it prints, and the branch that guarded the sentinel is deleted WITH it: a
+   * guard left standing after the thing it defended is gone is an invitation to restore the
+   * branch.
    */
   priceMinor: number;
   currency: Currency;
@@ -140,8 +163,13 @@ export const PLAN_OPTIONS: readonly PlanOption[] = [
     name: 'Enterprise — Decide',
     sells: 'Use output as formal evidence',
     adds: '360°, full audit, appeals, SSO, API access',
+    // DEC-099 — the customer cannot assign this to themselves, and that is now ALL this flag
+    // says. `SIGNUP_PLAN_OPTIONS` still filters on it, `joinTier` still refuses it, and the
+    // card's verb is Request.
     selectable: false,
-    priceMinor: 0,
+    // ₹4,999 a month, by owner directive (DEC-099). It was `0`, which was a sentinel and not
+    // a price, and the sentinel cost more than it saved.
+    priceMinor: 499900,
     currency: 'INR',
     features: [
       'Everything in Gold',
@@ -159,11 +187,39 @@ export const SIGNUP_PLAN_OPTIONS: readonly PlanOption[] = PLAN_OPTIONS.filter(
 );
 
 /**
- * What a tier costs. THE SERVER PRICES EVERY PAYMENT THROUGH THIS (DEC-080) — the client
- * sends a tier and a reference, never an amount.
+ * What a tier costs for one month. THE SERVER PRICES EVERY PAYMENT THROUGH THIS (DEC-080) —
+ * the client sends a tier and a reference, never an amount.
  */
 export const priceOf = (tier: Tier): number =>
   PLAN_OPTIONS.find((plan) => plan.tier === tier)?.priceMinor ?? 0;
+
+/**
+ * WHAT A MOVE COSTS — the one formula, in the one place `priceOf` already lives. DEC-097.
+ *
+ * A SIGN-UP (`from === null`) COSTS THE FULL PRICE; there was no plan before it. AN UPGRADE
+ * COSTS THE DIFFERENCE, because the customer has already paid for this period and charging
+ * the full new price bills the overlap twice — the same objection DEC-096 makes about
+ * downgrades, pointed the other way.
+ *
+ * IT ALSO CORRECTS A NUMBER NOBODY HAD NOTICED. `/ops/earnings` sums `payments`. Under the
+ * old rule an organisation that walked Bronze -> Silver -> Gold inside one period contributed
+ * 9900 + 49900 + 99900 = ₹1,597 to estate revenue for a customer holding one ₹999 plan — the
+ * ledger overstated, and it overstated MOST for the customers who upgrade most. This sums to
+ * ₹999.
+ *
+ * NOT PRORATED BY DAYS REMAINING, and that is a decision rather than an omission (DEC-097):
+ * with a one-month period the largest possible overcharge is one month of one step, and
+ * proration buys that back at the cost of a SECOND money formula and a rounding rule in a
+ * module whose opening comment is that there are no floats. Revisit when renewal exists.
+ *
+ * CLAMPED AT ZERO, and the clamp should be unreachable. `POST /billing/tier` refuses a lower
+ * or equal rank before anything is written (DEC-096), so a negative here means a caller got
+ * past that check — and a negative row in an append-only ledger is a REFUND, which is the one
+ * thing this product has never had. Clamping turns a silent accounting lie into a ₹0 row
+ * somebody will ask about.
+ */
+export const changeCostMinor = (from: Tier | null, to: Tier): number =>
+  from === null ? priceOf(to) : Math.max(0, priceOf(to) - priceOf(from));
 
 /**
  * Money, as one string, from one place.

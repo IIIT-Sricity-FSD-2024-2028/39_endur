@@ -4,8 +4,13 @@
 // stale tier is a wrong tier. The page fetches on open and refetches after a join, so what
 // it shows is what the entitlement gate will decide with on the next request.
 import { useCallback, useEffect, useState } from 'react';
-import type { BillingSummary, PlanOption, Tier } from '@endur/shared';
-import { apiGet, apiPost } from './api.js';
+import type {
+  BillingSummary,
+  EnterpriseRequestState,
+  PlanOption,
+  Tier,
+} from '@endur/shared';
+import { apiDelete, apiGet, apiPost } from './api.js';
 import type { Loadable } from './org.js';
 
 export function useBilling(): Loadable<BillingSummary> & { set: (next: BillingSummary) => void } {
@@ -81,3 +86,75 @@ export function useJoinTier(): (tier: Tier, paymentRef?: string) => Promise<Bill
     return response.data;
   }, []);
 }
+
+/**
+ * SCHEDULE A MOVE DOWN, and cancel one. DEC-098, 49 § Interactions.
+ *
+ * Both return the WHOLE summary, like `useJoinTier`, and for the same reason `49` § State
+ * gives: a stale tier is a wrong tier, so the page replaces what it holds rather than patching
+ * one field of it. The pending tier and the period end move together on the server — the read
+ * that answers a cancel may also be the read that fires an overdue downgrade — and a client
+ * that merged one key would show a tier and a date that never coexisted.
+ *
+ * NO `paymentRef` ON EITHER. Nothing is captured at schedule time and nothing at apply time,
+ * so there is no dialog in front of these and no reference to carry.
+ */
+export function useScheduleDowngrade(): (tier: Tier) => Promise<BillingSummary> {
+  return useCallback(async (tier: Tier) => {
+    const response = await apiPost<{ tier: Tier }, { data: BillingSummary }>(
+      '/billing/downgrade',
+      { tier },
+    );
+    return response.data;
+  }, []);
+}
+
+export function useCancelDowngrade(): () => Promise<BillingSummary> {
+  return useCallback(async () => {
+    // No body. There is only ever one pending value, so naming it would let a caller cancel a
+    // downgrade that had already been replaced and be told it worked (13 § Billing).
+    const response = await apiDelete<{ data: BillingSummary }>('/billing/downgrade');
+    return response.data;
+  }, []);
+}
+
+/**
+ * ASKING FOR ENTERPRISE — DEC-100, T-100, 49 § Asking for Enterprise.
+ *
+ * A READ AND A WRITE, and NEITHER touches the plan. The read answers one question — is there
+ * an open request — because that is all the card's verb depends on. The lifecycle beyond that
+ * (contacted, closed) is the OWNER'S, on `/ops`; telling a customer their request had been
+ * "closed" would raise a question the product cannot answer.
+ */
+export function useEnterpriseRequest(): {
+  requestedAt: string | null;
+  request: (note: string) => Promise<void>;
+} {
+  const [requestedAt, setRequestedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void apiGet<{ data: EnterpriseRequestState }>('/billing/enterprise-request')
+      .then((response) => {
+        if (!cancelled) setRequestedAt(response.data.requestedAt);
+      })
+      // SWALLOWED, and that is the right failure. This read decides one word on one button;
+      // an error banner over the plan page because we could not tell whether somebody had
+      // already asked would be the page reporting our problem as theirs.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const request = useCallback(async (note: string) => {
+    const response = await apiPost<
+      { note?: string },
+      { data: EnterpriseRequestState }
+    >('/billing/enterprise-request', note.trim() ? { note: note.trim() } : {});
+    setRequestedAt(response.data.requestedAt);
+  }, []);
+
+  return { requestedAt, request };
+}
+

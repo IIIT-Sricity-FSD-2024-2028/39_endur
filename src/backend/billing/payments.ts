@@ -11,15 +11,25 @@
 // number is posting a number nothing reads, which is what keeps a price from becoming an
 // authorisation input (INV-003).
 //
+// SINCE DEC-097 THE AMOUNT IS THE DIFFERENCE, and the change is entirely inside this module:
+// `fromTier` was already on every call, and it was already being stored — it was simply not
+// being priced against. A signup has `fromTier: null` and still costs the full price, because
+// there was no plan before it. That is `changeCostMinor`'s whole shape.
+//
 // IT TAKES A `Tx`, NEVER `prisma`. Both callers already own a transaction that writes the
 // subscription row, and a capture recorded outside it could survive a rolled-back signup —
 // revenue for an organisation that does not exist.
 import { randomBytes } from 'node:crypto';
-import { priceOf, type Tier } from '@endur/shared';
+import { changeCostMinor, type Tier } from '@endur/shared';
 import type { Tx } from '../db/tx.js';
 
-/** `signup` is written by registration; `change` by `POST /billing/tier`. */
-export type PaymentKind = 'signup' | 'change';
+/**
+ * `signup` is written by registration; `change` by `POST /billing/tier`; `expiry` by the
+ * scheduled downgrade firing on read (`DEC-098`) — which is the one kind that captures NO
+ * money and is written anyway, because `payments` is the only table that records a plan MOVE
+ * with a from and a to on it. Shared with the client as `@endur/shared`'s `PaymentKind`.
+ */
+export type PaymentKind = 'signup' | 'change' | 'expiry';
 
 /**
  * A reference, minted by us.
@@ -36,7 +46,8 @@ export const paymentReference = (): string => `endur_${randomBytes(9).toString('
  *
  * `fromTier` is `null` on a signup because there was no plan before it — that is a real
  * absence and not an unknown, and the earnings page reads `kind` rather than inferring the
- * difference from this column.
+ * difference from this column. Since DEC-097 it is also an INPUT TO THE PRICE, so passing it
+ * wrongly no longer just mislabels a row: it bills the wrong amount.
  */
 export async function recordPayment(
   tx: Tx,
@@ -59,8 +70,10 @@ export async function recordPayment(
       kind: input.kind,
       payerName: input.payerName,
       payerEmail: input.payerEmail,
-      // PRICED SERVER-SIDE. The one line this module exists for.
-      amountMinor: priceOf(input.tier),
+      // PRICED SERVER-SIDE. The one line this module exists for — and since DEC-097 it
+      // prices the MOVE rather than the destination, which is also what stops
+      // `/ops/earnings` overstating every customer who has ever upgraded.
+      amountMinor: changeCostMinor(input.fromTier ?? null, input.tier),
       currency: 'INR',
       status: 'succeeded',
       reference: input.reference?.trim() || paymentReference(),

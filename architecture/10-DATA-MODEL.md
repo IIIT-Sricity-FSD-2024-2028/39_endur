@@ -460,6 +460,52 @@ CREATE TABLE audit_log (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Endur -> customer messages. DEC-101, spec 58 § From Endur, 70 § Messaging.
+-- ONE ROW PER RECIPIENT, not one per message: the read state is the reader's, exactly as
+-- inbox_state is (58 § Capabilities), and a shared row would mean one administrator
+-- marking the org's mail read for everybody.
+--
+-- WHY IT EXISTS AT ALL: messageAdministrators() wrote only platform_audit_log, which is the
+-- OPERATOR'S table -- so the customer's administrators had no route and no screen, and the
+-- operator was told "sent to 3 administrators" while nothing had been sent. DEC-101.
+CREATE TABLE notifications (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL,          -- 'platform_message' today. The column is here so the
+                                      -- second kind is a value, not a migration.
+  subject     TEXT NOT NULL,
+  body        TEXT NOT NULL,          -- CAPTURED, never joined back to the audit row. The
+                                      -- audit payload is the operator's record; this is the
+                                      -- customer's copy, and they must not diverge silently.
+  read_at     TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX ON notifications (user_id, read_at);
+
+-- A customer asking to be sold Enterprise. DEC-100, spec 49 + 70 § The Enterprise queue.
+--
+-- A WORK ITEM, NOT A NOTIFICATION, and `status` is the whole difference: what has to survive
+-- is not "somebody was told" but "somebody has to ring this customer back". Reading the queue
+-- changes nothing.
+--
+-- ONE OPEN ROW PER ORG, enforced in the database rather than in the handler -- a second
+-- request while one is open is a 409, and a partial unique index is what makes that true
+-- under two simultaneous clicks.
+CREATE TABLE enterprise_requests (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  asked_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+  asked_name    TEXT NOT NULL,        -- captured, for the reason payments.payer_name is
+  asked_email   TEXT NOT NULL,
+  note          TEXT,                 -- the one optional field on the dialog
+  status        TEXT NOT NULL DEFAULT 'open',   -- 'open' | 'contacted' | 'closed'
+  handled_by    UUID REFERENCES platform_users(id),
+  handled_at    TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX ON enterprise_requests (org_id) WHERE status = 'open';
+
 -- Account provisioning. DEC-038, spec 57.
 -- NOT called `invitations` -- that name is taken, means campaign tokens, and two tables
 -- called invitations in one schema is a mistake somebody makes at 2am.
@@ -507,11 +553,33 @@ CREATE TABLE subscriptions (
   org_id       UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
   tier         TEXT NOT NULL DEFAULT 'bronze',   -- bronze|silver|gold|enterprise
   seats        INT  NOT NULL DEFAULT 0,          -- reviewees + staff. never respondents.
+                                                 -- NEVER WRITTEN by anything (D-013), which
+                                                 -- is why /ops/analytics stops reporting it
+                                                 -- (DEC-102) and both live seat counts are
+                                                 -- computed from 16 §5 instead.
   period_start DATE NOT NULL,
-  period_end   DATE NOT NULL,
-  status       TEXT NOT NULL DEFAULT 'trialing'
+  period_end   DATE NOT NULL,                    -- ONE CALENDAR MONTH since DEC-096, was 365
+                                                 -- days in three separate hardcoded places.
+  pending_tier TEXT,                             -- DEC-098. A DOWNGRADE THE CUSTOMER ASKED
+                                                 -- FOR, applied by the first read after
+                                                 -- period_end and cleared. NEVER consulted by
+                                                 -- requireEntitlement: the tier the customer
+                                                 -- reads and the tier the gate decides with
+                                                 -- stay the same column (49 § Interactions).
+  status       TEXT NOT NULL DEFAULT 'trialing'  -- and NOTHING WRITES 'trialing' on the
+                                                 -- sign-up path since DEC-048, which is what
+                                                 -- made /ops/analytics' trial counters unable
+                                                 -- to move (DEC-102).
 );
 ```
+
+**`pending_tier` is evaluate-on-read, and that is a deliberate choice over a scheduler.**
+`17-BACKGROUND-JOBS.md` is unwritten and `OPEN-005` says nothing owns a cron; `readBilling`
+already repairs a missing subscription row on read (`D-012`) and its comment carries the
+argument — the write happens on the read so the entitlement gate and the page agree from the
+next request onward. The accepted cost is stated rather than discovered: **an organisation
+nobody opens never transitions**, which is harmless because a tier is only ever consulted when
+somebody asks.
 
 `audit_log.decided_by` stores the decision trace from the resolver. It is what turns "access
 denied" from an assertion into evidence, and it is what the simulator replays (`42`).

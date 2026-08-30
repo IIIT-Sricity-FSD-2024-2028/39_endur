@@ -143,6 +143,50 @@ seeds starter templates and lands on `/app` with a one-time banner and a primary
 
 **Keyboard:** `Enter` advances. `Esc` never closes the wizard — too destructive.
 
+**AMENDED 2026-08-31 — `DEC-105` (built 31 Aug, `T-104`). `Enter` advances only from outside a text field.** Owner
+report on `?step=structure`: *"clicking enter goes to next page when I am just trying to form
+the team."*
+
+The global handler skips `BUTTON` and `TEXTAREA` and **nothing else**, so an `INPUT` falls
+through to *advance the step* — and steps 2 and 3 are built around typing into inputs. Step 3 is
+the sharp case: `+` adds a child unit **and focuses its name input immediately**, so the wizard
+hands the user a text field and then treats the natural key for finishing that row as the key
+for leaving the screen. The work is not lost — the draft is in state — but the user is now a
+step away from the thing they were building and has to find their way back.
+
+**The handler's own comment already had the rule and applied it to one tag:** *"from anywhere
+that is not a button (which has its own meaning for Enter)."* **A text input has its own meaning
+for `Enter` too.** The test is *does this element take text* — `INPUT` (bar the button-like
+types), `TEXTAREA`, and anything `contenteditable` — not a tag list to extend one bug at a time.
+
+Advancing on `Enter` stays right on steps 1 and 4, where there is nothing to type, and the
+existing assertion that `Enter` must not advance the step **behind a confirm dialog** is
+untouched.
+
+**Inside a text field, `Enter` belongs to the field** — on steps 2 and 3 that means *commit this
+row and give me another*, which is what the user was reaching for.
+
+### Dark mode — the cards have no edge  ·  `DEC-106` (built 31 Aug, `T-105`)
+
+Owner report: *"in dark mode I can't see the cards, the card layout and padding are not clear
+and hard on the eyes."* **It is a system fault, not a Setup fault**, and Setup is simply the
+screen that is nothing but cards.
+
+`design_specs/design/01` §4 defines Content surfaces as a white fill plus a resting shadow — a
+**light-mode-only table**, written before `DEC-028` shipped dark and never revisited. On dark
+the page and the card sit one step apart, at the edge of visibility on a laptop panel, and
+`.preset-card`'s border is transparent. **The values themselves live in `design_specs/design/01`
+§4 and are deliberately not restated here** (`DEC-012`). **The theme block already says so in
+its own comment** — *"shadows on a dark ground do almost nothing; the lift has to come from the
+edge instead"* — and the components never followed. Elevation is carried by an edge on dark.
+
+**The padding half is a separate and simpler fault: `D-045`.** `endur.css` carries the setup
+step's layout block **twice, 157 lines duplicated verbatim** (`/* Industry Split Layout */`
+appears at two line numbers), so `.preset-grid` is declared **three times** across the file with
+different `minmax()` and different `gap`, and `.preset-card`'s padding is overridden by
+`.preset-card-simple` in the duplicated blocks. What renders is whichever copy the cascade
+reaches last, which is not a layout anybody chose.
+
 ## States
 
 | State | Behaviour |
@@ -154,6 +198,14 @@ seeds starter templates and lands on `/app` with a one-time banner and a primary
 | Partial | Not possible — the commit is atomic |
 
 ## Acceptance
+
+- [ ] **`Enter` inside a text input does not change the step** — asserted on step 3 with the
+      focus `+` leaves behind, which is the exact sequence reported (`DEC-105`)
+- [ ] **`Enter` still advances from steps 1 and 4**, and still does nothing behind a confirm
+      dialog — the two properties the fix must not cost
+- [ ] **Every card on this page has a visible edge in dark mode**, not a shadow (`DEC-106`)
+- [ ] **`.preset-grid` is declared once** — the duplicated block is gone and the step's spacing
+      no longer depends on cascade order (`D-045`)
 
 - [ ] Industry → Finish completes in **under 100 seconds** with a stopwatch. If over, cut a
       field, not a step

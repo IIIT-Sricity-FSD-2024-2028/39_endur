@@ -4,7 +4,8 @@
 //
 //   1 · A plan change writes exactly ONE capture, priced by the SERVER, with the real
 //       from-tier on it. The client sends a tier and a label; it cannot send an amount, and
-//       if it could, nothing would read it.
+//       if it could, nothing would read it. SINCE DEC-097 the amount is the DIFFERENCE, and
+//       `from_tier` stopped being a label on the row and became an input to its price.
 //   2 · `paymentRef` IS NOT AN AUTHORISATION INPUT. A join with no reference still joins and
 //       still records a capture — because a gate on a client-generated string would be
 //       INV-003 inverted, and there is no gateway to verify one against.
@@ -15,7 +16,7 @@
 // are written with — the two are one transaction and the assertions belong together.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { priceOf, type PlatformEarnings } from '@endur/shared';
+import { changeCostMinor, priceOf, type PlatformEarnings } from '@endur/shared';
 import { app, registerOrg, unique, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { hashPassword } from '../auth/password.js';
@@ -68,7 +69,12 @@ describe('a plan change writes one capture — DEC-080', () => {
     expect(change?.kind).toBe('change');
     expect(change?.tier).toBe('gold');
     expect(change?.fromTier).toBe('bronze');
-    expect(change?.amountMinor).toBe(priceOf('gold'));
+    // THE DIFFERENCE, NOT THE DESTINATION — DEC-097. ₹999 − ₹99 = ₹900. Asserted against the
+    // shared formula AND against the literal, because a test that only calls
+    // `changeCostMinor` would agree with a broken `changeCostMinor`.
+    expect(change?.amountMinor).toBe(changeCostMinor('bronze', 'gold'));
+    expect(change?.amountMinor).toBe(priceOf('gold') - priceOf('bronze'));
+    expect(change?.amountMinor).toBe(90000);
     expect(change?.reference).toBe(reference);
     // WHO PAID, captured rather than joined — the row has to still read correctly after the
     // user is renamed or removed.
@@ -86,7 +92,62 @@ describe('a plan change writes one capture — DEC-080', () => {
     expect(res.status).toBe(200);
 
     const payments = await paymentsOf(founder.orgId);
-    expect(payments[1]?.amountMinor).toBe(priceOf('silver'));
+    expect(payments[1]?.amountMinor).toBe(changeCostMinor('bronze', 'silver'));
+  });
+
+  /**
+   * THE LEDGER STOPS OVERSTATING — DEC-097, and this is the assertion the decision exists
+   * for. Under the old rule an organisation that walked Bronze → Silver → Gold contributed
+   * ₹99 + ₹499 + ₹999 = ₹1,597 to `/ops/earnings` for a customer holding ONE ₹999 plan. It
+   * now sums to exactly what the estate holds, and the property is stated as a SUM rather
+   * than as three row assertions because the sum is what the earnings page reads.
+   */
+  it('sums to the plan they end on, however many steps they took to get there', async () => {
+    const founder = await registerOrg('custom', 'bronze');
+    expect((await join(founder, { tier: 'silver' })).status).toBe(200);
+    expect((await join(founder, { tier: 'gold' })).status).toBe(200);
+
+    const payments = await paymentsOf(founder.orgId);
+    expect(payments).toHaveLength(3);
+    expect(payments.reduce((sum, row) => sum + row.amountMinor, 0)).toBe(priceOf('gold'));
+  });
+
+  /**
+   * THE LADDER IS ONE-WAY, AND THE SERVER IS WHERE THAT IS DECIDED — DEC-096.
+   *
+   * This calls the route DIRECTLY rather than driving `/app/plan`, and that is the whole
+   * point: the page stops OFFERING a downgrade, and `13` § Billing is a documented route
+   * anything can call. A rule the client enforces is a rule that is not enforced (INV-003).
+   */
+  it('refuses a move DOWN, writes nothing, and says why', async () => {
+    const founder = await registerOrg('custom', 'gold');
+    const res = await join(founder, { tier: 'silver' });
+
+    expect(res.status).toBe(409);
+    // The message names where they are and what to do instead — "invalid tier" would be
+    // untrue about a tier the page is showing them.
+    expect(res.body.error.message).toMatch(/only move up/i);
+    expect(res.body.error.message).toMatch(/no refunds/i);
+
+    // NOTHING WAS WRITTEN. A refusal that had already moved the tier or captured money would
+    // be worse than allowing the move.
+    const after = await prisma.subscription.findUnique({ where: { orgId: founder.orgId } });
+    expect(after?.tier).toBe('gold');
+    expect(await paymentsOf(founder.orgId)).toHaveLength(1);
+  });
+
+  /**
+   * STANDING STILL IS NOT A PURCHASE. A double-submitted dialog, or a customer pressing the
+   * card they are already on, must not capture a second time — and `changeCostMinor` would
+   * price it at ₹0, so without this check the ledger would grow a free row per click.
+   */
+  it('refuses a move to the tier they are already on', async () => {
+    const founder = await registerOrg('custom', 'silver');
+    const res = await join(founder, { tier: 'silver' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toMatch(/already on/i);
+    expect(await paymentsOf(founder.orgId)).toHaveLength(1);
   });
 
   /**

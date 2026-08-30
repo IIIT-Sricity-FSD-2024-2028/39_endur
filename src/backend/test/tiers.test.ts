@@ -12,11 +12,13 @@ import {
   SIGNUP_PLAN_OPTIONS,
   SIGNUP_TIERS,
   TIERS,
+  changeCostMinor,
   formatMoney,
   priceOf,
   type Capability,
 } from '@endur/shared';
 import { TIER_ENTITLEMENTS, lowestTierFor, tierIncludes } from '../billing/entitlements.js';
+import { periodEndFrom } from '../billing/period.js';
 import { app, registerOrg, unique, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
@@ -112,14 +114,25 @@ describe('the picker offers three tiers and not four — DEC-048', () => {
   });
 
   /**
-   * Enterprise's 0 IS NOT FREE — `16` §4 prices it individually. `selectable: false` is what
-   * every reader keys off, and the picker prints "Priced with you" rather than an amount, so
-   * nothing may ever render ₹0 out of this row.
+   * ENTERPRISE HAS A PRICE AND STILL CANNOT BE ASSIGNED — `DEC-099`.
+   *
+   * This assertion used to read `priceMinor === 0` under a comment explaining that 0 was not
+   * free. It was true and it was the problem: a sentinel that every reader had to be told
+   * about is a sentinel that leaks, and it leaked as copy — "Priced with you", "Arranged with
+   * us". The two facts are now independent, which is the point of the change, so they are
+   * asserted as two facts.
+   *
+   * ₹0 MUST STILL NEVER RENDER OUT OF THIS ROW, and that property survives the sentinel it
+   * used to be about: nothing prints ₹0 because the number is 499900, rather than because
+   * every caller remembered to branch first.
    */
-  it('leaves Enterprise unpriced rather than free', () => {
+  it('prices Enterprise and still refuses to let a customer assign it', () => {
     const enterprise = PLAN_OPTIONS.find((plan) => plan.tier === 'enterprise');
-    expect(enterprise?.priceMinor).toBe(0);
+    expect(enterprise?.priceMinor).toBe(499900);
+    expect(formatMoney(enterprise?.priceMinor ?? 0)).toBe('₹4,999');
+    // A price is not a checkout. `selectable` now says ONE thing and this is it.
     expect(enterprise?.selectable).toBe(false);
+    expect(SIGNUP_PLAN_OPTIONS.some((plan) => plan.tier === 'enterprise')).toBe(false);
   });
 
   /** One formatter, whole rupees while the paise are zero. `49`, `71` and the dialog share it. */
@@ -127,6 +140,40 @@ describe('the picker offers three tiers and not four — DEC-048', () => {
     expect(formatMoney(9900)).toBe('₹99');
     expect(formatMoney(99900)).toBe('₹999');
     expect(priceOf('silver')).toBe(49900);
+  });
+
+  /**
+   * WHAT A MOVE COSTS — DEC-097. One formula, and both the checkout dialog and the ledger
+   * writer call it, which is the only reason the two cannot disagree about a customer's bill.
+   */
+  it('prices an upgrade as the difference and a signup at full price', () => {
+    expect(changeCostMinor(null, 'gold')).toBe(priceOf('gold'));
+    expect(changeCostMinor('bronze', 'gold')).toBe(90000);
+    expect(changeCostMinor('silver', 'gold')).toBe(50000);
+    // Standing still costs nothing — which is exactly why `joinTier` refuses it with a 409
+    // rather than writing a free row per click.
+    expect(changeCostMinor('gold', 'gold')).toBe(0);
+    // CLAMPED, AND THE CLAMP SHOULD BE UNREACHABLE. A negative row in an append-only ledger
+    // is a refund, and this product has never had one; the route refuses the move first.
+    expect(changeCostMinor('gold', 'bronze')).toBe(0);
+  });
+
+  /**
+   * THE PERIOD, AS ARITHMETIC — DEC-096. It is one calendar month and it CLAMPS, because
+   * JavaScript rolls 31 January + 1 month forward to 3 March rather than refusing. Nothing
+   * reads `period_end` today; `DEC-098` is about to make it the date a scheduled downgrade
+   * fires on, and an off-by-three-days there is a customer on the wrong plan.
+   */
+  it('runs a period for one calendar month, clamped to the last day', () => {
+    const on = (iso: string) => periodEndFrom(new Date(iso)).toISOString().slice(0, 10);
+    expect(on('2026-08-31T00:00:00.000Z')).toBe('2026-09-30');
+    expect(on('2026-01-31T00:00:00.000Z')).toBe('2026-02-28');
+    // A leap year takes the 29th, not the 28th — the clamp finds the end of the month, it
+    // does not subtract a fixed number of days.
+    expect(on('2028-01-31T00:00:00.000Z')).toBe('2028-02-29');
+    // An ordinary date is untouched, and December rolls the year.
+    expect(on('2026-03-15T00:00:00.000Z')).toBe('2026-04-15');
+    expect(on('2026-12-15T00:00:00.000Z')).toBe('2027-01-15');
   });
 });
 
@@ -154,6 +201,15 @@ describe('register writes the subscription — D-012 repaid', () => {
     // No trial on this path. DEC-048, and 16 §7 records that DEC-035 is what killed it.
     expect(subscription?.status).toBe('active');
     expect(subscription?.status).not.toBe('trialing');
+
+    // ONE CALENDAR MONTH — DEC-096, and asserted HERE because registration is one of four
+    // places that used to decide the period length for itself. Between 28 and 31 days rather
+    // than an exact figure: the length of a month depends on which month you are in, and a
+    // test that pinned 30 would go red every February for a correct implementation.
+    const days =
+      (subscription!.periodEnd.getTime() - subscription!.periodStart.getTime()) / 86_400_000;
+    expect(days).toBeGreaterThanOrEqual(28);
+    expect(days).toBeLessThanOrEqual(31);
 
     // THE LEDGER ROW — DEC-080 — written in the same transaction, PRICED BY THE SERVER.
     // The request above sends no amount and there is no field to send one in.

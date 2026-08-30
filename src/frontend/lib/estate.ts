@@ -6,8 +6,14 @@
 // gets a page — every estate capability here is `BOTH` — but the shape is kept for the same
 // reason `lib/audit.ts` keeps it: a 403 is not "there is nothing").
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Page, PlatformOrgDetail, PlatformOrgSummary } from '@endur/shared';
-import { OpsError, opsGet } from './ops.js';
+import type {
+  EnterpriseRequestRow,
+  EnterpriseStatus,
+  Page,
+  PlatformOrgDetail,
+  PlatformOrgSummary,
+} from '@endur/shared';
+import { OpsError, opsGet, opsPatch } from './ops.js';
 
 export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
 
@@ -140,3 +146,55 @@ export function useOrgDetail(id: string | undefined): Loadable<PlatformOrgDetail
 
   return { ...state, forbidden, reload: load };
 }
+
+/**
+ * THE ENTERPRISE QUEUE — DEC-100, T-100, 70 § The Enterprise queue.
+ *
+ * NOT ASKED FOR WITHOUT THE CAPABILITY. `platform.enterprise.read` is owner-only, and a
+ * request nobody may answer is a request not worth making — the rule `/ops` already applies
+ * to the analytics tab.
+ *
+ * NOT PAGINATED. If this queue ever needs a second page, Endur has a sales problem it would
+ * rather have; a cursor here would be machinery for a list that is empty most weeks.
+ */
+export function useEnterpriseQueue(enabled: boolean): {
+  rows: EnterpriseRequestRow[];
+  loading: boolean;
+  update: (id: string, status: EnterpriseStatus) => Promise<void>;
+} {
+  const [rows, setRows] = useState<EnterpriseRequestRow[]>([]);
+  const [loading, setLoading] = useState(enabled);
+
+  useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    void opsGet<{ data: EnterpriseRequestRow[] }>('/enterprise-requests?status=open')
+      .then((response) => {
+        if (!cancelled) setRows(response.data);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  const update = useCallback(async (id: string, status: EnterpriseStatus) => {
+    await opsPatch<{ status: EnterpriseStatus }, { data: EnterpriseRequestRow }>(
+      `/enterprise-requests/${id}`,
+      { status },
+    );
+    // DROPPED FROM THE LIST, not re-rendered with a new label. This list is the OPEN queue;
+    // a row that has been contacted or closed is not open, and leaving it visible with a
+    // changed chip would make "what is left to do" a thing the operator has to read for.
+    setRows((current) => current.filter((row) => row.id !== id));
+  }, []);
+
+  return { rows, loading, update };
+}
+

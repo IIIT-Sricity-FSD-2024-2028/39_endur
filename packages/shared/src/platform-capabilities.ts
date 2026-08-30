@@ -54,6 +54,14 @@ export const PLATFORM_CAPABILITY_CATALOGUE = {
     roles: BOTH,
     note: 'A filtered COPY of a log file, downloaded (72 § Interactions, DEC-074). Separate from platform.logs.read on purpose: a read is a page on a screen, an export is a file that outlives the session and the retention window',
   },
+  'platform.enterprise.read': {
+    roles: OWNER_ONLY,
+    note: 'The queue of customers asking to be sold Enterprise (DEC-100, 70). OWNER ONLY by direct instruction, and for platform.revenue.read’s reason: staff see every organisation because support helps one customer at a time, and this is a REVENUE queue rather than a support one — the same split DEC-080 already made',
+  },
+  'platform.enterprise.update': {
+    roles: OWNER_ONLY,
+    note: 'Move a request to contacted or closed. Separate from the read for the reason every other pair here is: reading the queue changes nothing, and working it is the action that must be attributable',
+  },
   'platform.operator.manage': { roles: OWNER_ONLY, note: 'Create, disable and re-role operator accounts' },
 } as const satisfies Record<string, Entry>;
 

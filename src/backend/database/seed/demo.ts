@@ -9,6 +9,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, presetFor, type Level } from '../../presets/index.js';
 import { mintToken } from '../../features/campaigns/token.js';
+import { newPeriod } from '../../billing/period.js';
 import { poolFor, type Tone } from './comments.js';
 import { Rng, skewedNps, skewedRating, skewedTimestamp } from './random.js';
 import type { Tier } from '@endur/shared';
@@ -290,13 +291,13 @@ export async function seedOrg(
 
   // The subscription, written for the same reason `register` writes one (DEC-048): an org
   // without a row falls through requireEntitlement's bronze backstop, and a demo org silently
-  // on the wrong tier is a demo that proves the opposite of what it claims. A year from today,
-  // billing nothing — see auth/service.ts for why the period is honest but inert.
-  const periodStart = new Date();
-  const periodEnd = new Date(periodStart);
-  periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+  // on the wrong tier is a demo that proves the opposite of what it claims. ONE MONTH from
+  // today (DEC-096), billing nothing — see auth/service.ts for why the period is honest but
+  // inert. This was the FOURTH copy of the period length and the one the change order missed;
+  // it is here because a seeded org whose period disagrees with a registered org's is a demo
+  // that lies about the product.
   await prisma.subscription.create({
-    data: { orgId, tier: spec.tier, status: 'active', periodStart, periodEnd },
+    data: { orgId, tier: spec.tier, status: 'active', ...newPeriod() },
   });
 
   // 1 · units and the contains edges.

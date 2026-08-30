@@ -46,6 +46,37 @@ function canContinue(state: WizardState, step: number): boolean {
   return true;
 }
 
+/**
+ * Does this element take text? `DEC-105`, `31` § Interactions.
+ *
+ * THE EXEMPTION LIST USED TO BE `['BUTTON', 'TEXTAREA']` AND `INPUT` FELL THROUGH IT, so
+ * naming a unit on step 3 advanced the wizard instead of finishing the row — and step 3's `+`
+ * button ADDS A CHILD AND FOCUSES ITS NAME INPUT IMMEDIATELY, so the screen handed the user a
+ * text field and then treated the natural key for "done with this one" as the key for leaving.
+ * Step 2 has the same shape.
+ *
+ * The old handler's own comment already knew the rule and applied it to one tag: a button
+ * *"has its own meaning for Enter"*. So does a text field.
+ *
+ * IT ASKS A QUESTION RATHER THAN LISTING TAGS. `contenteditable` is here for the same reason —
+ * a list of tag names is a list somebody has to remember to extend, and this one was already
+ * one element short. The button-like `<input>` types are excluded because Enter on them is
+ * the button's meaning again, not the field's, and the wizard should still advance.
+ */
+const NON_TEXT_INPUTS = new Set([
+  'button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file', 'image',
+]);
+
+function takesText(element: HTMLElement | null): boolean {
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  if (element.tagName === 'BUTTON' || element.tagName === 'TEXTAREA') return true;
+  if (element.tagName !== 'INPUT') return false;
+  // `type` defaults to "text" when the attribute is absent, which is how most of the wizard's
+  // fields are written — reading `.type` rather than the attribute gets that for free.
+  return !NON_TEXT_INPUTS.has((element as HTMLInputElement).type);
+}
+
 export default function Setup(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -71,7 +102,8 @@ export default function Setup(): JSX.Element {
   );
 
   // Esc NEVER closes the wizard — far too destructive when everything is unsaved. Enter
-  // advances, from anywhere that is not a button (which has its own meaning for Enter).
+  // advances, from anywhere that is not a button and not a text field (both have their own
+  // meaning for Enter).
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter') return;
@@ -80,7 +112,7 @@ export default function Setup(): JSX.Element {
       // longer the one it was asking about.
       if (pendingPreset) return;
       const target = event.target as HTMLElement | null;
-      if (target && ['BUTTON', 'TEXTAREA'].includes(target.tagName)) return;
+      if (takesText(target)) return;
       if (step < STEPS.length - 1 && canContinue(state, step)) goto(step + 1);
     };
     window.addEventListener('keydown', onKey);

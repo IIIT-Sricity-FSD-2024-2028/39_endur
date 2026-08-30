@@ -1990,6 +1990,487 @@ DEC-090  ACTIVE  2026-08-30  origin:user  task:T-095  guards:INV-006
 ```
 
 ```
+DEC-096  ACTIVE  2026-08-31  origin:U  task:T-097  BUILT 2026-08-31
+  decision THE TIER LADDER IS ONE-WAY WHILE A PERIOD IS RUNNING. `POST /billing/tier` accepts
+           a tier of STRICTLY HIGHER rank than the row's current tier and refuses everything
+           else -- 409 on a lower rank, 409 on the same rank. THE BILLING PERIOD IS ONE
+           CALENDAR MONTH, not 365 days.
+  why      owner directive, 30 Aug: *"if a guy is on GOLD should he pay for the silver plan??
+           ... dont allow switching to lower plans because we are not giving refunds. we can
+           only go up."* the product takes money at the moment of the join and has no refund
+           path -- `payments` is append-only, there are no invoices and nothing renews (16
+           §8). a customer who moves Gold -> Silver mid-period therefore PAYS AGAIN for less
+           than they already hold, and the product keeps both captures. that is not a policy
+           to confirm with a dialog; it is a transaction that should not exist.
+           A MONTH, because the period is about to start meaning something (DEC-098 applies a
+           scheduled downgrade when it ends) and a year-long period makes that mechanism
+           unobservable -- nobody demonstrates a feature with a 365-day fuse. calendar month,
+           clamped (31 Jan -> 28/29 Feb), never 30 days: a customer renews on the date they
+           joined, and a 30-day period walks backwards through the calendar.
+  not      NOT "remove the button". the owner asked for the affordance to go from `/app/plan`
+           and from the operator's side, and that is half the change -- the OTHER half is the
+           only one that is load-bearing. INV-003: authorisation is never decided in the
+           frontend. a UI that stops offering a downgrade while `joinTier` still performs one
+           is a rule written in React, and `POST /billing/tier` is a documented route (13
+           § Billing) that anything can call.
+  not      NOT a price change. the numbers stay Bronze 9900 / Silver 49900 / Gold 99900 and
+           are now PER MONTH rather than per year. OPEN-015 ANSWERED 31 Aug -- the owner
+           confirmed the same numbers, billed monthly. a 12x rise, deliberately.
+  measured THE PERIOD LENGTH WAS HARDCODED IN FOUR PLACES, NOT THREE. this entry said three,
+           counted from the doc; the fourth is `database/seed/demo.ts` and it was found by
+           grepping for the COLUMN rather than for the number, which is the only way to find
+           the copy nobody remembered writing.
+           AND THEY ALREADY DISAGREED. two used `+ 365 * DAY`, two used `setFullYear(+1)`, so
+           in a leap year a registered organisation got a period one day longer than a
+           repaired one. nothing read the difference, which is exactly why it survived -- a
+           constant duplicated four ways is not wrong until something starts depending on it,
+           and DEC-098 is about to make `period_end` the date a downgrade fires on.
+           it is now ONE function, `src/backend/billing/period.ts` `newPeriod()`.
+  where    packages/shared/src/tiers.ts (`priceMinor` doc comment says "for one year" and is
+           now wrong in the one place a reader looks); billing/service.ts `joinTier` +
+           `readBilling`'s D-012 repair (365 * DAY); platform/service.ts `overridePlan` (365 *
+           DAY again, a THIRD copy of the period length -- one constant, one place);
+           <PlanPicker>'s "/ year"; 16 §7, 16 §8, 49 § Interactions.
+  see      DEC-097, DEC-098, DEC-080, DEC-035, OPEN-015, 16 §7
+```
+
+```
+DEC-097  ACTIVE  2026-08-31  origin:U  task:T-097  BUILT 2026-08-31
+  decision AN UPGRADE IS PRICED AS THE DIFFERENCE. the capture is
+           `priceOf(to) - priceOf(from)`, computed server-side inside the same transaction
+           that writes the tier, and `period_end` DOES NOT MOVE. the `payments` row keeps
+           `kind: 'change'`, `from_tier` and `tier`, and `amount_minor` is now the step rather
+           than the destination.
+  why      owner directive: *"if it fits within the duration ... difference in the cost will
+           be charged."* the customer has already paid for this period; charging the full new
+           price bills the overlap twice, which is the same objection DEC-096 makes about
+           downgrades pointed the other way.
+           AND IT FIXES A NUMBER NOBODY HAD NOTICED. `/ops/earnings` sums `payments`. today an
+           org that walked Bronze -> Silver -> Gold in one month contributes 9900 + 49900 +
+           99900 = Rs 1,597 to the estate's revenue for a customer holding one Rs 999 plan.
+           the ledger OVERSTATES, and it overstates most for the customers who upgrade most.
+           the difference rule makes the ledger sum to what the estate actually holds.
+  not      NOT prorated by days remaining. that was the alternative and it is rejected on
+           this reasoning, not overlooked: with a one-month period (DEC-096) the largest
+           possible overcharge is one month of one step, and proration buys that back at the
+           cost of a SECOND money formula and a rounding rule in a system that has exactly
+           one (`priceOf`, integer paise, no floats -- tiers.ts's opening comment). revisit
+           when renewal exists; nothing renews today (16 §8) and until it does, "the rest of
+           the period" is a quantity nothing else in the product reads.
+  not      NOT computed in the client. `<PaymentDialog>` may PRINT the difference -- it has
+           `summary.tier` and the catalogue -- and the amount it prints is not the amount
+           recorded. DEC-080 already requires server-side pricing on both write paths; this
+           keeps that property while changing the formula.
+  where    billing/service.ts `joinTier` -> `recordPayment`; 16 §8; 49 § Interactions;
+           <PaymentDialog>'s summary line.
+  see      DEC-096, DEC-080, T-097
+```
+
+```
+DEC-098  BUILT   2026-08-31  origin:U  task:T-098
+  decision A DOWNGRADE IS SCHEDULED, NOT PERFORMED, AND IT IS APPLIED ON READ. the customer
+           writes `subscriptions.pending_tier`; nothing is charged and nothing changes; the
+           FIRST request after `period_end` passes moves the row and clears the column.
+  why      owner directive: *"the plan can be downgraded but only when its exhausted."* which
+           needs the one thing this product does not have -- something that runs when a date
+           passes. `16` §8 says it in as many words: *"`subscriptions.period_end` still bills
+           nothing when it passes."* `17-BACKGROUND-JOBS.md` is unwritten and `OPEN-005` says
+           nothing owns a scheduler.
+           EVALUATE-ON-READ IS ALREADY THE PATTERN IN THIS EXACT FILE. `readBilling` repairs a
+           missing subscription row on read (D-012) and its comment gives the argument: the
+           write happens there so that *"the entitlement gate and this page agree from the
+           next request onward instead of the page inventing a default the gate has never
+           heard of."* a pending tier is the same shape -- a state the row implies, made real
+           by the first reader.
+           the known cost, stated rather than discovered: an organisation nobody opens never
+           transitions. that is acceptable because a tier is only consulted when somebody
+           asks; an org with no requests has nothing being gated.
+  not      NOT a cron job, and NOT a `pending`/`effective_from` pair on the read path. `49`
+           § Interactions is explicit that the tier the customer reads and the tier the gate
+           decides with are THE SAME ROW, with no cache and no future-dated value. this keeps
+           that: `pending_tier` is never consulted by `requireEntitlement`, only by the write
+           that retires it.
+  not      NOT a refund. a scheduled downgrade captures nothing at schedule time and nothing
+           at apply time. it writes a `payments` row of `kind: 'expiry'` with
+           `amount_minor: 0` -- see DEC-102 for why that row has to exist.
+  built    2026-08-31, T-098. `readBilling` is the ONE applier and nothing else reads the
+           column -- `requireEntitlement` still selects `tier` alone, so the gate and the page
+           cannot reach different answers.
+           THREE WRITES IN ONE TRANSACTION when it fires, each a different kind of record: the
+           subscription (the state), a `payments` row of `kind: 'expiry'` at Rs 0 (the MOVE,
+           which DEC-102 counts), and an audit row WITH NO ACTOR.
+           THE AUDIT ROW IS WRITTEN DIRECTLY RATHER THAN PUSHED TO `req.ctx.audit`, and that
+           is the part worth reading twice. the intent queue is flushed by `db/tx.ts`, which
+           attributes the row to the CURRENT PRINCIPAL -- and this transition is not an action
+           anybody took, it is a date passing, noticed by whoever happened to open the page
+           next. stamping their name on it would put a person's id against a change they did
+           not make, in the one table the product offers as evidence (`56`).
+           THE PERIOD ROLLS FORWARD on apply. leaving `period_end` in the past would leave the
+           row permanently expired, so the next schedule would fire the instant it was asked
+           for. nothing is billed for the new period and nothing ever has been -- `16` §8 has
+           always said `period_end` bills nothing when it passes, and this does not change it.
+           AN UPGRADE CLEARS `pending_tier`, and so does an operator override. a customer who
+           scheduled Silver -> Bronze and then PAID for Gold has replaced the intention rather
+           than added to it; leaving the column set would drop them to the tier they abandoned
+           at the end of the period they just bought, silently, weeks later.
+           `/ops/earnings` EXCLUDES `kind: 'expiry'` from its window -- a Rs 0 plan move is not
+           a capture, and counting it as one would drag the average payment down with events
+           where no money changed hands. /ops/analytics reads the same rows for the opposite
+           reason: it wants the movement, not the money.
+           THE AFFORDANCE IS UNDER THE CURRENT PLAN AND NOT ON A CARD, per `49`. <PlanPicker>'s
+           rule is that a tier below the current one carries NO action (DEC-096), and a rule
+           with one exception is a rule somebody adds a second exception to -- so the card's
+           sentence points at the block above instead.
+  where    schema.prisma `Subscription` (+ `pending_tier String?`); billing/service.ts
+           `readBilling`; 10 §, 16 §7, 49 § Interactions.
+  see      DEC-096, DEC-102, D-012, OPEN-005
+```
+
+```
+DEC-099  BUILT   2026-08-31  origin:U  task:T-099
+  decision `selectable: false` MEANS "THE CUSTOMER CANNOT ASSIGN THIS TO THEMSELVES" AND
+           NOTHING ELSE. Enterprise carries a real price -- Rs 4,999 per month,
+           `priceMinor: 499900` -- and three things follow: the card PRINTS it, the customer
+           can REQUEST it, and an operator can SET it.
+  why      two owner reports, one cause. *"enterprise plan is not working"* and *"remove
+           priced for you and charge 4999."*
+           THE OPERATOR'S SIDE IS A ONE-LINE BUG AND IT IS THE WHOLE OF THE FIRST REPORT.
+           <PlanPicker> computes `unavailable = disabled || !plan.selectable` and applies it
+           in ALL THREE MODES. `override` mode is the operator moving somebody else's plan --
+           `DEC-048` routes Enterprise there deliberately, `19` §4 has the capability, `70`
+           § Interactions has the screen -- and its Enterprise button is disabled by a flag
+           that means "a customer may not choose this". THE ONE TIER THE PRODUCT SAYS IS
+           OPERATOR-ASSIGNED IS UNASSIGNABLE IN THE ONLY UI THAT CAN ASSIGN IT. the fix is
+           `mode !== 'override' && !plan.selectable`.
+           THE PRICE. `priceMinor: 0` was never free -- tiers.ts says so at length -- but it
+           forced every reader into a special case, and the special case leaked as copy:
+           "Priced with you", "Arranged with us -- talk to sales". a real number deletes the
+           branch AND the copy.
+  not      NOT `selectable: true`. Enterprise stays off the sign-up picker and off the join
+           path. a price is not a checkout: the card's action is REQUEST, which writes a work
+           item (DEC-100) rather than a subscription. `SIGNUP_TIERS` is unchanged.
+  not      NOT "nothing may render Rs 0 out of this field" any more -- that guard in tiers.ts
+           existed to protect a sentinel and the sentinel is gone. delete it with the
+           sentinel or the next reader restores the branch it was defending.
+  built    2026-08-31, T-099. `unavailable` now reads `disabled || (mode === 'signup' &&
+           !plan.selectable)` -- narrower than the `mode !== 'override'` this entry predicted,
+           because T-100 landed in the same pass and gave the `join` card a REQUEST verb
+           rather than a disabled one. the operator's case is fixed either way.
+           THE `.plan-note` LINE SURVIVED, reworded. this entry lists it with the copy to
+           delete, and deleting it would have left a card whose verb is different from every
+           other card's with nothing on it explaining why. "Priced with you" went, because
+           there is a price; "arranged with us" stayed, because the tier still is.
+           TWO TESTS ASSERTED THE SENTINEL AND BOTH WERE PINNING A FIGURE THAT COULD NOT MOVE:
+           `priceMinor === 0` under a comment explaining that 0 was not free, and a picker test
+           demanding the string "Priced with you". the PROPERTY they defended -- nothing renders
+           Rs 0 out of that field -- is kept, and is now true because the number is real rather
+           than because every caller remembered to branch first.
+  where    packages/shared/src/tiers.ts (`priceMinor`, `sells`/`adds` unchanged, the
+           `selectable: false` doc comment); <PlanPicker> `unavailable`, the "Priced with you"
+           branch and the `.plan-note` line; 16 §4, 16 §8, 49 § Interactions, 70.
+  see      DEC-100, DEC-048, DEC-080, T-099
+```
+
+```
+DEC-100  BUILT   2026-08-31  origin:U  task:T-100
+  decision AN ENTERPRISE REQUEST IS A WORK ITEM, NOT A NOTIFICATION. `POST
+           /billing/enterprise-request` (`billing.update`) writes an `enterprise_requests` row
+           with a status -- `open` | `contacted` | `closed` -- and `/ops` shows the open ones
+           to the OWNER. reading it does not clear it.
+  why      owner directive: *"allow request for enterprise from customer's end and it should
+           send a notif on owner admin account."* the reflex is a bell. a bell is wrong here:
+           the thing that has to survive is not "somebody was told", it is "somebody has to
+           ring this customer back", and a notification that clears on read loses exactly
+           that. `19` §4's operator model is already a support desk -- this is the first row
+           on it that has a lifecycle.
+           OWNER-ONLY, per the directive. `platform.enterprise.read` and
+           `platform.enterprise.update` join the catalogue in `19` §4 rather than reusing
+           `platform.org.read`, because staff see every organisation and this is a revenue
+           queue -- the same split DEC-080 already made between `platform.analytics.read` and
+           `platform.revenue.read`, for the same reason.
+  not      NOT `63-FEATURE-notifications.md`. that document is outbound multichannel delivery
+           -- email, SMS, WhatsApp -- it is P3, and `CONF-006` put it out of P1/P2 because it
+           needs a provider, retry semantics and `17`. NOTHING HERE NEEDS A CHANNEL. a row in
+           a table the owner already visits is not the placeholder's scope, and blocking a
+           two-table feature on an unwritten P3 document would be the sequencing mistake
+           `CONF-021` recorded.
+  not      NOT a free-text sales lead form. the row carries who asked, which org, when, and
+           an optional note. the conversation happens off-product, which is what "arranged
+           with us" always meant.
+  built    2026-08-31, T-100. the partial unique index is the rule and the handler only turns
+           `P2002` into a sentence -- THE TEST FIRES THE TWO REQUESTS IN PARALLEL, because a
+           read-then-write check passes a sequential test and loses to two simultaneous clicks,
+           which is the exact failure that leaves the owner ringing one customer twice.
+           MOVING OFF `open` RELEASES THE INDEX, so a customer whose request was closed can ask
+           again. the index says "one OPEN request per organisation", never "one request ever",
+           and the test asserts the second ask succeeds after a close.
+           THE QUEUE IS OLDEST-FIRST -- the only list on the platform surface that is not
+           newest-first. every other operator screen answers "what just happened"; a work queue
+           answers "who has been waiting longest", and newest-first is how the first customer
+           who asked becomes the last one called.
+           the customer's own read answers ONE field (`requestedAt`). the lifecycle beyond that
+           is the owner's: telling a customer their request had been "closed" would raise a
+           question the product cannot answer.
+  where    schema.prisma `EnterpriseRequest`; 13 § Billing + § platform; 19 §4; 70; 49.
+  see      DEC-099, DEC-101, CONF-006, T-100
+```
+
+```
+DEC-101  BUILT   2026-08-31  origin:U  task:T-101
+  decision A MESSAGE FROM ENDUR REACHES THE CUSTOMER, AND IT LANDS IN `/app/inbox` AS A
+           SECOND STREAM. `messageAdministrators` writes one `notifications` row per
+           recipient in the same transaction as its audit row. the inbox grows a
+           **From Endur** tab beside the comment queue, reusing the read/unread mechanic.
+  why      owner report: *"if the owner is sending a message to client the inbox is not
+           updating for it, currently inbox is calibrated for feedback only."* BOTH HALVES
+           ARE CORRECT AND THE FIRST HALF IS WORSE THAN IT SOUNDS. `messageAdministrators`
+           writes a `platform_audit_log` row and returns `{ sentTo: n }` -- and
+           `platform_audit_log` IS THE OPERATOR'S OWN TABLE. the customer's administrators
+           have no route that reads it and no screen that renders it. THE OPERATOR IS SHOWN
+           "Sent to 3 administrators" AND NOBODY HAS BEEN SENT ANYTHING. the service comment
+           argues, correctly, that there is no mail transport and inventing one is out of
+           scope -- but "delivery is the record" is only true if the record is somewhere the
+           recipient can reach.
+           IN THE INBOX, BECAUSE THAT IS WHERE THE OWNER LOOKED. `58` built read/unread/
+           archived over one stream; a second stream is a placement, not a second
+           implementation (INV-009).
+  not      NOT merged into the comment stream. a comment and a message from your vendor are
+           triaged for different reasons and one queue would interleave them. a TAB, with its
+           own count.
+  not      NOT gated on `response.read`. that capability scopes which UNITS' responses you may
+           see and has nothing to say about a message addressed to you by name. the tab is
+           visible when a row names you, which is `58`'s own argument for adding no capability
+           for inbox read state -- the state is the reader's. NO `notification.*` MODULE GOES
+           IN `11` §3.
+  not      NOT a bell in the console header. rejected: one kind of notice does not justify a
+           new chrome affordance, and the inbox already has the mechanic. promote it when a
+           second SOURCE of notice exists, not a second message.
+  built    2026-08-31, T-101. two rows in ONE transaction, so `{ sentTo: n }` can never again
+           be returned for a message that was not written.
+           THE PLATFORM WRITE SEAM HAD TO BE WIDENED, and it is named here because it is the
+           only part of this that touches INV-011. `platform/db.ts` refuses every write into a
+           customer's tenant except by an allowlist; `Notification` and `EnterpriseRequest`
+           join it. NEITHER WIDENS THE READ SURFACE -- `Answer` is still unreachable,
+           `Response` is still count-only, and neither new model carries a relation that could
+           reach either. what an operator writes into a tenant here is a subject and a body
+           THEY TYPED: a path out of our table into their inbox, not into their data.
+           THE TEST DRIVES THE CUSTOMER'S OWN GET WITH THE CUSTOMER'S OWN SESSION. asserting
+           the return value, or the audit row, would have passed throughout the bug --
+           `{ sentTo: 3 }` was TRUE about a row nobody could read.
+           `POST /inbox/messages/:id/unread` exists too, per `13` § Inbox: a read mark that
+           cannot be undone makes the first click a decision.
+  where    schema.prisma `Notification`; platform/service.ts `messageAdministrators`;
+           13 § Inbox (`GET /inbox/messages`, `POST /inbox/messages/:id/read`); 58; 70.
+  see      DEC-100, INV-009, 58 § Capabilities, T-101
+```
+
+```
+DEC-102  BUILT   2026-08-31  origin:U  task:T-102
+  decision `/ops/analytics` PRINTS ONLY FIGURES WITH A SOURCE. the Trials started and
+           Conversion rate cards are REMOVED, seats are removed from the tier mix and the
+           totals, and `movement.upgraded`/`downgraded` are read from `payments`
+           (`from_tier` -> `tier`) rather than from `plan.override` audit rows.
+  why      the owner created an organisation and Trials started did not move, and read that
+           as the counter being redundant. IT IS WORSE THAN REDUNDANT -- IT CANNOT MOVE.
+           `DEC-048` made registration write `status: 'active'`, so nothing but a seeded
+           operator-created org is ever `trialing`; and `trialsConverted` is a hardcoded `0`
+           with a comment saying it has no source, so `conversionRate` is permanently the
+           em-dash. TWO OF THE SIX HEADLINE CARDS ARE STRUCTURALLY INCAPABLE OF CHANGING.
+           the service comment's argument for the honest zero is right about honesty and
+           wrong about the remedy: the honest thing to do with a metric that has no source is
+           not to print it. the DTO fields go too -- a field left behind is a field something
+           starts computing again.
+           SEATS, because nothing is billed on them. `16` §5 specifies `billable_seats` and
+           `D-013` records that `subscriptions.seats` has never been written; pricing is flat
+           per organisation (DEC-080). a seat column on the revenue owner's page measures
+           something no invoice reads.
+           MOVEMENT, because the current source is wrong in a way the page does not admit:
+           `plan.override` is the OPERATOR'S action, so the movement table has only ever
+           counted what operators did -- a customer's own upgrade writes `billing.update` to
+           the tenant `audit_log`, which this query never reads. `payments` already carries
+           `from_tier`, `tier` and `kind`, is written on both paths, and is what
+           `/ops/earnings` sums. one source for money and movement, or the two pages
+           disagree about the same event.
+  not      NOT netted into one number. `71` decision 2 stands -- four counts, never netted.
+           the change is where they come from.
+  not      NOT "downgraded means the operator moved them down". with DEC-096 the customer can
+           no longer move down at all, so the honest definition is the owner's: THE PREVIOUS
+           PLAN WAS HIGHER THAN THE ONE NOW IN FORCE. that covers an operator override AND
+           the scheduled expiry of DEC-098 -- which is why the expiry transition has to write
+           a `payments` row of `kind: 'expiry'`, `amount_minor: 0`. a zero-amount row in a
+           money ledger is the objection; the alternative is a second table describing the
+           same event, and INV-009 loses that trade.
+  built    2026-08-31, T-102 -- WITH ONE CORRECTION, AND THIS ENTRY IS WHAT MADE IT NECESSARY.
+           the decision above says movement is read from `payments` "RATHER THAN" from
+           `plan.override` audit rows. TAKEN LITERALLY THAT LOSES A CASE THIS SAME ENTRY
+           REQUIRES: the `not` clause says downgraded "covers an operator override AND the
+           scheduled expiry", and an operator override deliberately writes NO `payments` row
+           (`OverridePlan`'s DTO comment -- an operator who could name an amount could invent
+           revenue). replacing the source would have made an operator moving thirty
+           organisations to Gold show as no movement at all.
+           SO IT READS BOTH, and the argument the decision actually makes is the one served:
+           the fault was that `plan.override` was the ONLY source, and the remedy is to ADD
+           the customer's own moves rather than to swap one partial source for another.
+           THE TWO ARE DISJOINT BY CONSTRUCTION, so there is nothing to de-duplicate -- a
+           customer's move writes a `payments` row and no platform audit row; an operator's
+           override writes a platform audit row and no `payments` row. that is `19` §8's split
+           between a sale and a support action, and it is written into the query's own comment
+           because if it ever stops being true this count silently double-counts.
+           ONE RULE FOR BOTH SOURCES, in one function: the previous plan against the one that
+           replaced it, deliberately silent about who caused the move.
+           a SIGNUP is skipped -- `from_tier` is null on it and the org is already counted
+           under `new` from its own `created_at`, so counting it here would put one
+           organisation in two of the four columns decision 2 insists are never netted.
+  where    features/platform/service.ts `analytics()`; packages/shared/src/dto/platform.ts
+           `PlatformAnalytics` (drop `trials`, drop `byTier[].seats` and `totals.seats`);
+           pages/platform/Analytics/index.tsx; 71.
+  see      DEC-103, DEC-096, DEC-048, D-013, D-044, 71
+```
+
+```
+DEC-103  BUILT   2026-08-31  origin:U  task:T-102
+  decision THE ANALYTICS WINDOW GOVERNS MOVEMENT AND SAYS SO. every other figure on
+           `/ops/analytics` is AS OF NOW and is labelled as such. `to` is inclusive to the
+           END of the day named.
+  why      the owner reported the date filters not working at
+           `?from=2026-08-02&to=2026-08-12`. two separate faults, and only one is cosmetic.
+           (1) THE WINDOW GOVERNS ALMOST NOTHING. `orgs`, `byTier`, `adoption` and `totals`
+           are unfiltered counts of the whole estate for all time; only `movement` and
+           `trials` read `from`/`to`. move the dates and five of the six sections do not
+           change, which is indistinguishable from a broken control. with `trials` gone
+           (DEC-102), MOVEMENT IS THE ONLY WINDOWED SECTION LEFT and the page must say so.
+           (2) `to` LOSES A DAY. the `<input type="date">` sends `2026-08-12`, which
+           `z.coerce.date()` reads as `2026-08-12T00:00:00Z`, and every query is `lte: to` --
+           SO THE WHOLE OF THE LAST DAY SELECTED IS EXCLUDED, and a single-day window
+           (`from` = `to`) matches nothing at all. D-044.
+  not      NOT "window the tier mix too". it cannot be windowed and that is a schema fact, not
+           an omission: `subscriptions` holds ONE ROW PER ORG WITH NO HISTORY, so "the tier
+           mix as of 12 August" is not a question this database can answer. saying "as of
+           today" is the honest label; reconstructing it from `payments` is a different
+           feature and belongs with the one that needs it.
+  built    2026-08-31, T-102. `endOfDay()` is one helper in `features/platform/service.ts` and
+           every windowed query on both platform pages runs through it -- 999ms rather than
+           `+1 day` with `lt`, so every bound in the file stays `lte` and no reader has to
+           remember which of two is exclusive.
+           `window.to` GOES BACK OUT AS THE DAY THAT WAS ASKED FOR, not the 23:59:59 the query
+           ran with: the page echoes it into its own `<input type="date">`, and an input that
+           reads back a second later than what was typed is a control arguing with the person
+           using it.
+           THE TEST IS THE SINGLE-DAY WINDOW (`from` === `to` === today), because that is the
+           case that cannot be explained away as an off-by-one nobody would notice -- it
+           matched NOTHING before.
+           the page headers now read "Movement · in this window" and "· as of today" on the
+           other three.
+  where    features/platform/service.ts `analytics()` (end-of-day on `to`); 71 § State,
+           71 § Interactions; pages/platform/Analytics/index.tsx section headers.
+  see      DEC-102, D-044, 71
+```
+
+```
+DEC-104  BUILT   2026-08-31  origin:U  task:T-103
+  decision ON `/ops`, AN ACTION A ROLE CAN NEVER HOLD IS ABSENT. an action it holds but
+           cannot use right now is disabled. capability-absent -> gone, including the heading
+           and the explanatory copy around it; state-blocked -> greyed with the reason.
+  why      owner directive: *"staff is shown a disbled suspend and reinstate just dont show it
+           for staff."* `70` § States currently SPECIFIES the opposite -- *"suspend renders
+           disabled with a tooltip"* -- and that line is what this supersedes.
+           IT MAKES `70` AGREE WITH ITSELF. the same document already says the analytics tab
+           is *"absent, not disabled, for staff"* and its acceptance list insists that absence
+           is **from the DOM, not hidden by CSS**. the suspend button was the one affordance
+           on the surface that disagreed, and a permanently-greyed button teaches a support
+           operator to distrust every greyed control they meet.
+           the whole `<section>` goes, not just the button. a card headed "Suspend this
+           organisation" containing an explanation and nothing actionable is worse than the
+           button was.
+  not      NOT a change to the server. `70` § Acceptance already asserts that staff calling
+           `POST /platform/orgs/:id/suspend` gets a 403 from middleware, and that assertion is
+           what makes hiding the control a presentation decision rather than the rule
+           (INV-003). the 403 stays and stays tested.
+  built    2026-08-31, T-103, together with D-043 -- the two were one report and the fix is in
+           one file.
+           THE PAGE HAD NO TEST AT ALL, which is why reinstate could be dead. the backend route
+           was tested (the 403 and the write); the failure was entirely in the page, and a
+           silent early return is the hardest kind of bug to see from the inside -- no request,
+           no error, no toast, the dialog still open. it looks exactly like a slow network.
+           `OrgDetail.test.tsx` is new and asserts the REQUEST WAS MADE, not what the screen
+           says afterwards.
+  where    pages/platform/Console/OrgDetail.tsx (the `canSuspend` ternary and its section);
+           70 § States row 403, 70 § Acceptance.
+  see      D-043, INV-003, 70
+```
+
+```
+DEC-105  BUILT   2026-08-31  origin:U  task:T-104
+  decision THE SETUP WIZARD'S GLOBAL ENTER HANDLER EXEMPTS EVERY TEXT-ENTRY ELEMENT, NOT JUST
+           `TEXTAREA`. inside a text field, Enter belongs to the field.
+  why      owner report on `?step=structure`: *"clicking enter goes to next page when I am
+           just trying to form the team."* the handler skips `BUTTON` and `TEXTAREA` and
+           nothing else, so `INPUT` falls through to "advance the step" -- and step 3 is built
+           around typing into inputs: `+` adds a child unit AND FOCUSES ITS NAME INPUT
+           IMMEDIATELY, so the wizard hands the user a text field and then treats the natural
+           key for finishing a row as the key for leaving the screen. step 2 (roles) has the
+           same shape.
+           THE HANDLER'S OWN COMMENT ALREADY KNEW THE RULE and applied it to one tag:
+           *"from anywhere that is not a button (which has its own meaning for Enter)."* a
+           text input has its own meaning for Enter too.
+  not      NOT "remove the global Enter handler". advancing on Enter is right on steps 1 and 4,
+           where there is nothing to type, and the existing test that Enter must not advance
+           the step BEHIND a confirm dialog stays exactly as it is.
+  not      NOT a tag list to extend forever. the test is "does this element take text" --
+           `INPUT` (bar the button-like types), `TEXTAREA`, and anything `contenteditable`.
+  built    2026-08-31, T-104. the exemption is a FUNCTION asking "does this take text" rather
+           than a longer tag list -- `contenteditable`, then `BUTTON`/`TEXTAREA`, then `INPUT`
+           minus the button-like types, read off `.type` so an attribute-less field defaults to
+           text for free. a list of tag names is a list somebody has to remember to extend, and
+           this one was already one element short.
+           THE TEST DISPATCHES FROM THE INPUT, not from `document.body`. the whole bug was
+           about which element the key came from, so a body-sourced event would have passed
+           against the broken handler too. the second test pins the `not` clause: Enter still
+           advances from outside a text field.
+  where    pages/console/Setup/index.tsx `onKey`; 31 § Interactions.
+  see      31, T-104
+```
+
+```
+DEC-106  BUILT   2026-08-31  origin:claude  task:T-105
+  decision ELEVATION IS CARRIED BY AN EDGE ON DARK, NOT BY A SHADOW. every content surface
+           whose only separation from the page is a resting shadow gains a visible divider
+           border under the dark theme. THE VALUES ARE design_specs/design/01 §4's AND ARE
+           NOT RESTATED HERE (DEC-012).
+  why      owner report: *"in dark mode I cant see the cards, the card layout and padding are
+           not clear and hard on the eyes."* it is a system fault, not a Setup fault, and both
+           halves of the design system already contain the proof.
+           design_specs/design/01 §4 defines three surface levels and gives Content a white
+           fill plus a resting shadow -- A LIGHT-MODE-ONLY TABLE, written before `DEC-028`
+           shipped dark, and never revisited. on dark the ground and the card sit one step
+           apart, at the edge of visibility on a laptop panel.
+           AND THE DARK THEME BLOCK SAYS THIS IN ITS OWN COMMENT -- *"shadows on a dark
+           ground do almost nothing; the lift has to come from the edge instead"* -- then
+           leaves `.preset-card` with a transparent border. the system knew and the
+           components did not follow.
+  not      NOT "lighten the card fill". the near-black ground is a considered choice
+           (DEC-028) and raising the card until a shadow reads would flatten the ramp the rest
+           of the palette is built on.
+  built    2026-08-31, T-105. ONE BLOCK under `[data-theme="dark"]`, not a patch on the screen
+           that was reported -- `.stat-card`, `.unit-detail`, `.preview-frame` and
+           `.preset-sidebar` take a border; `.preset-card` and `.plan-card` take a COLOUR on
+           the 2px border they already reserve for their selected state, guarded by
+           `:not(.is-selected)` so the accent edge still wins where it should. adding a border
+           to those two would have moved their content 2px on dark only.
+           `.card` IS ABSENT FROM THE LIST and that is correct: the glass card already carries
+           `1px solid var(--glass-edge)` in every theme. what the list holds is the set that
+           leaned on the shadow alone.
+           D-045 WENT WITH IT: 150 lines of `endur.css` deleted. the `/* Industry Split Layout
+           */` block appeared TWICE, byte-identical, 157 lines apart -- so `.preset-grid` was
+           declared three times and the setup step's column width and gap were settled by
+           cascade order. a duplicate that agrees with itself is invisible until somebody edits
+           one of the copies.
+  where    design_specs/design/01 §4 (a dark column on the surface table); tokens.css;
+           endur.css `.preset-card` and every sibling that leans on a resting shadow alone.
+  see      DEC-028, D-045, 31, design_specs/design/01 §4
+```
+
+```
 DEC-094  ACTIVE  2026-08-30  origin:claude  task:D-036
   decision A LOG CURSOR IS THE BYTE OFFSET OF A LINE START -- specifically of the OLDEST
            LINE THE PAGE RETURNED -- and never the offset of the chunk the read stopped in.
@@ -2621,6 +3102,29 @@ CONF-013  RESOLVED 2026-08-24 BY DEC-049 -- PER-TENANT, and login verifies the p
 
 
 ```
+OPEN-015  RESOLVED-BY:U  2026-08-31  (was: REVISIT:2026-09-05, blocks:T-097)
+  MONTHLY PRICES: the same numbers, or the annual figure divided by twelve?
+  DEC-096 moves the billing period from a year to a calendar month on the owner's
+  instruction ("change from yearly charges to monthly") and leaves the numbers where they
+  are -- Bronze Rs 99, Silver Rs 499, Gold Rs 999, now PER MONTH. That is a 12x rise and it
+  is written that way DELIBERATELY, not by oversight: Rs 99 a YEAR for an org running
+  unlimited campaigns is not a price anyone would defend at the demo, and Rs 99 a month is.
+  The alternative reading -- 825 / 4158 / 8325 paise -- gives three prices no customer would
+  recognise and that `formatMoney` would print with decimals, which the function's own
+  comment calls "an accounting document impersonating a price tag".
+  ONE LINE FROM THE OWNER SETTLES IT. Nothing else in DEC-096/097/098 depends on the answer:
+  the ladder direction, the difference pricing and the expiry mechanism are the same either
+  way, and the numbers live in ONE table (`PLAN_OPTIONS`) that the tier test already guards.
+  Enterprise is Rs 4,999 per month by direct instruction (DEC-099) and is not in question --
+  note that it makes Gold-to-Enterprise a 5x step, which is a sales shape, not a bug.
+
+  ANSWERED 2026-08-31 BY THE OWNER: *"Monthly period, prices left at Rs 99/499/999 sounds
+  good."* THE NUMBERS DO NOT MOVE; the period does. Built in T-097. `tiers.test.ts` pins all
+  three against the literals, so the next change to them is a change to a test as well as to
+  a table -- which is the point.
+
+
+```
 OPEN-001  REVISIT:2026-10-15  blocks:nothing-before-P3
   P3 redux shape. user: "i dont know about redux rn".
   recommendation on file: RTK Query for server state + hand-written slices for
@@ -2905,6 +3409,10 @@ _MEMORY.md                       -> architecture/_MEMORY.md
 30..45 page docs                 -> src/frontend/pages/<world>/<Page>/**
                                     + src/backend/features/<feature>/**
 31-PAGE-setup-wizard.md          -> src/frontend/pages/console/Setup/** lib/org.ts
+                                    NOTE the global Enter handler exempts BUTTON and
+                                    TEXTAREA only, so INPUT advances the step while you
+                                    are naming a unit (DEC-105). the test is "does this
+                                    element take text", not a tag list.
                                     the wizard owns its own state (useWizard.ts) and it
                                     is NOT in redux — 23 §2, one route's transient state.
                                     it also drove components/org/**, components/flow/**,
@@ -3101,10 +3609,30 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     NOTE the page is `Plan/`, not `Billing/`, and it is a
                                     SIDEBAR item at /app/plan rather than a settings tab
                                     -- DEC-079 supersedes 49 § Route & access on that.
+                                    NOTE THE PERIOD LENGTH WAS HARDCODED IN FOUR PLACES
+                                    (billing/service.ts joinTier + readBilling's D-012
+                                    repair, platform/service.ts overridePlan, AND
+                                    database/seed/demo.ts -- the fourth was missed by the
+                                    change order and found by grepping the COLUMN).
+                                    CLOSED 31 Aug: one function, newPeriod() in
+                                    src/backend/billing/period.ts, owned by 16. do not
+                                    inline a duration beside a subscription write.
+                                    NOTE THE LADDER IS ONE-WAY AND THE SERVER IS WHERE
+                                    THAT IS DECIDED (DEC-096). removing the button is
+                                    not the rule -- INV-003.
 70-PAGE-platform-console.md      -> src/frontend/pages/platform/Console/**
+                                    src/frontend/components/platform/EnterpriseQueue.tsx
+                                    NOTE OrgDetail.tsx's confirmSuspend() guards BOTH
+                                    verbs on the typed-name check, so REINSTATE RETURNS
+                                    SILENTLY and always has (D-043). the typed name
+                                    belongs to suspend alone.
 71-PAGE-platform-analytics.md    -> src/frontend/pages/platform/Analytics/**
                                     NOTE 70+71 are EXEMPT from INV-001 (19 §12) and
                                     audit-vocab.mjs must exclude pages/platform/.
+                                    NOTE movement's upgraded/downgraded READ `payments`,
+                                    not plan.override audit rows (DEC-102) -- the audit
+                                    source counts only what OPERATORS did. do not
+                                    "simplify" it back to the audit table.
 
 --- added 2026-08-23 with the four-ask pass (DEC-037..DEC-043, CONF-019) ---
 
@@ -3140,8 +3668,13 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
 58-PAGE-inbox.md                 -> src/backend/features/inbox/**   (BUILT T-079)
                                     src/frontend/pages/console/Inbox/** (BUILT T-080)
                                     src/frontend/components/feedback/ResponseCard.tsx
+                                    src/frontend/components/feedback/MessageCard.tsx
                                     src/frontend/lib/inbox.ts
                                     packages/shared/src/dto/inbox.ts
+                                    NOTE the From Endur tab (DEC-101) reads a DIFFERENT
+                                    table and carries NO capability -- do not fold it
+                                    behind response.read to match the other four tabs.
+                                    the WRITER is platform/service.ts, owned by 70.
                                     NOTE reads THROUGH features/results/service.ts and must
                                     not query responses itself -- the k-anon gate lives
                                     there and a second path around it is the whole risk.
@@ -4214,4 +4747,19 @@ N-066  TWO SEPARATE, NEWLY-DISCOVERED LOCAL BLOCKERS, both found 25 Aug running 
        blocked `npm install` itself; this one is downstream of a working install. `T-077`'s new
        tests (`platform-logs.test.ts`) are typechecked and linted clean but were not run.
        see N-018, N-065, `test/globalSetup.ts:32`.
+
+N-067  "SUSPENDING SUSPENDS EVERY ORG" — REPORTED 30 Aug, NOT REPRODUCED, AND HERE IS WHAT
+       WAS ACTUALLY CHECKED so the next session does not re-check it. `setSuspended` writes
+       `where: { id: orgId }` from `params.id` on `POST /platform/orgs/:id/suspend`; the
+       refusal in `tenantResolver` reads `factsOf(orgId)` per request with NO CACHE and no
+       shared state; `<OrgRow>` renders `org.suspendedAt` per row. There is no path in any of
+       the three that could touch a second organisation.
+       THE LIKELY EXPLANATION IS D-043, reported in the same breath. Reinstate silently does
+       nothing, so every organisation the operator suspended STAYED suspended and the estate
+       accumulated them one at a time with no way back. That is indistinguishable from
+       "it suspended everything" from the console list, and it is one bug, not two.
+       TO SETTLE IT, one observation is needed and nothing else: which screen showed which
+       organisations suspended, and whether `/ops` listed a "Suspended" tag on rows that had
+       never been touched. Do not go looking in the middleware again first.
+       see D-043, DEC-104.
 ```

@@ -408,6 +408,44 @@ describe('the whole wizard', () => {
     expect(screen.queryByText('Sees everything')).toBeNull();
   });
 
+  /**
+   * ENTER INSIDE A TEXT FIELD BELONGS TO THE FIELD — `DEC-105`, and this is the owner's
+   * report: *"clicking enter goes to next page when I am just trying to form the team."*
+   *
+   * The handler exempted `BUTTON` and `TEXTAREA` and nothing else, so `INPUT` fell through to
+   * "advance the step" — on the two steps built entirely around typing into inputs. Step 3's
+   * `+` ADDS A CHILD UNIT AND FOCUSES ITS NAME INPUT, so the wizard handed the user a text
+   * field and then read the natural key for finishing a row as the key for leaving the screen.
+   *
+   * The event is dispatched FROM THE INPUT, not from `document.body`, because the whole bug
+   * was about which element the key came from — a `body`-sourced event would pass against the
+   * broken handler too.
+   */
+  it('does not advance the step when Enter is pressed inside a text field', () => {
+    mount();
+    pick('University');
+    continueOn();
+    const input = screen.getAllByLabelText('Role name')[0] as HTMLElement;
+    expect(screen.getByText('Sees everything')).toBeTruthy();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // Still on the roles step. `Sees everything` is step 2's copy and it is gone on step 3.
+    expect(screen.getByText('Sees everything')).toBeTruthy();
+  });
+
+  /**
+   * AND ENTER STILL ADVANCES WHERE THERE IS NOTHING TO TYPE — `DEC-105`'s `not` clause. The
+   * fix that would have been easiest is deleting the handler; step 1 is a radio grid, and the
+   * key that means "yes, that one" is the one this test presses.
+   */
+  it('still advances on Enter from outside a text field', () => {
+    mount();
+    pick('University');
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(screen.getByText('Sees everything')).toBeTruthy();
+  });
+
   it('switches silently when there is nothing to lose', () => {
     mount();
     pick('University');

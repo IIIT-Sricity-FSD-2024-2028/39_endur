@@ -12,8 +12,16 @@
 //
 // TWO CALLERS, ONE COMPONENT: `/start`'s plan step, where the organisation does not exist
 // yet, and `/app/plan`, where it does. `mode` changes one sentence — what is being bought
-// versus what it is being changed FROM — and nothing else, which is the same argument
-// <PlanPicker> makes about its own three modes.
+// versus what it is being changed FROM — and, since DEC-097, THE AMOUNT.
+//
+// IN `change` MODE THE PRICE IS THE DIFFERENCE. The customer has already paid for this
+// period; charging the full new price bills the overlap twice. `fromTier` was already a prop
+// and was only feeding a sentence — it feeds the number now, through `changeCostMinor`, which
+// is the SAME function `recordPayment` prices the ledger row with.
+//
+// WHAT THIS DIALOG PRINTS IS NOT WHAT THE LEDGER RECORDS, and that is deliberate rather than
+// sloppy: the server subtracts again, server-side, inside the transaction that writes the tier
+// (DEC-080). A client that renders the wrong figure renders a wrong figure and nothing more.
 //
 // MOTION. Rare-tier interaction: a person sees this once at sign-up and rarely again, which
 // is the tier where a delight budget is allowed to exist at all. The panel rises 8px and
@@ -23,7 +31,7 @@
 // top), and the advance to `onPaid` is a TIMER rather than an `animationend`, so a reader
 // whose animations are collapsed to nothing still gets moved on.
 import { useEffect, useRef, useState } from 'react';
-import { formatMoney, type PlanOption, type Tier } from '@endur/shared';
+import { changeCostMinor, formatMoney, type PlanOption, type Tier } from '@endur/shared';
 import { Icon } from '../Icon.js';
 
 /** The simulated capture, and then the overlay. Both are deliberate, both are visible. */
@@ -93,7 +101,13 @@ export function PaymentDialog({
     );
   }
 
-  const amount = formatMoney(plan.priceMinor, plan.currency);
+  // DEC-097. `fromTier` is null at sign-up, and `changeCostMinor` answers the full price for
+  // that case — the branch lives in the formula rather than here, so the client and the server
+  // cannot come to different conclusions about what a signup costs.
+  const chargeMinor = changeCostMinor(mode === 'change' ? fromTier : null, plan.tier);
+  const amount = formatMoney(chargeMinor, plan.currency);
+  const fullAmount = formatMoney(plan.priceMinor, plan.currency);
+  const isDifference = chargeMinor !== plan.priceMinor;
   const features = plan.features ?? [];
 
   return (
@@ -121,8 +135,21 @@ export function PaymentDialog({
 
             <p className="pay-amount">
               {amount}
-              <span className="pay-period text-meta"> / year</span>
+              <span className="pay-period text-meta"> / month</span>
             </p>
+
+            {/* THE SUBTRACTION, SHOWN. An amount that is neither of the two prices on the
+                previous screen is the kind of surprise that produces a support email, so the
+                arithmetic is on the page rather than in a tooltip. */}
+            {isDifference && fromTier && (
+              <p className="pay-difference text-meta">
+                {fullAmount} {TIER_LABEL[plan.tier]} − {formatMoney(
+                  plan.priceMinor - chargeMinor,
+                  plan.currency,
+                )}{' '}
+                already on {TIER_LABEL[fromTier]}
+              </p>
+            )}
 
             <p className="pay-method text-meta">
               Endur demo checkout · no card details are collected
@@ -167,7 +194,8 @@ export function PaymentDialog({
               ))}
             </ul>
             <p className="pay-terms text-meta">
-              Change plan any time from Plan in the sidebar. One year, billed once.
+              Move up any time from Plan in the sidebar. One month, billed once. Moving down
+              happens at the end of a period — there are no refunds part-way through one.
             </p>
           </div>
         </div>

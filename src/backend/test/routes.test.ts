@@ -62,6 +62,30 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
       '/me is gated by requirePlatformAuth rather than by a capability (19 §11)',
   },
   {
+    // T-101, DEC-101. NOT UNAUTHENTICATED — `authenticate` runs and this 401s without a
+    // session. It is uncapability-GATED, which is what this list enumerates.
+    //
+    // NOT `response.read`. That capability scopes which UNITS' responses you may see, and it
+    // has nothing to say about a message addressed to you BY NAME. Gating on it would mean an
+    // administrator with no response scope could be sent a message they could never open —
+    // and the operator would still be told it was delivered, which is the exact failure
+    // `DEC-101` exists to fix.
+    //
+    // AND NOT A NEW `notification.*` MODULE. A capability implies a shared queue somebody can
+    // be excluded from; this queue is one reader's, because THE ROW NAMES THEM. `58` makes the
+    // same argument about inbox read state — the state is the reader's, so there is nothing
+    // narrower than "held" to ask for. What authorises the call is the session, and the
+    // service scopes every query by `userId` from it rather than from anything in the request
+    // (INV-010's shape), so there is no id a caller could send to reach a colleague's mail.
+    pattern: /^\/api\/v1\/inbox\/messages(\/:id\/(read|unread))?$/,
+    why:
+      'a message from Endur is addressed to ONE user by name (DEC-101, 58 § From Endur). ' +
+      'No capability expresses "this row is yours": response.read scopes units and would ' +
+      'lock a recipient out of their own mail, and a notification.* module would imply a ' +
+      'shared queue somebody can be excluded from. The service scopes by the session\'s ' +
+      'user id, so the route can only ever reach the caller\'s own rows.',
+  },
+  {
     pattern: /^\/api\/v1\/files\/:id$/,
     why:
       'serving a logo or an avatar (48). The unguessable id IS the credential: these render ' +

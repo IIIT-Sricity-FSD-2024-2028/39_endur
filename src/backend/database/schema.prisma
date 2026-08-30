@@ -124,6 +124,8 @@ model Organization {
   platformAudit   PlatformAuditLog[]
   announcements   Announcement[]
   bookables       Bookable[]
+  notifications      Notification[]
+  enterpriseRequests EnterpriseRequest[]
 
   @@map("organizations")
 }
@@ -167,6 +169,8 @@ model User {
   announcementsWritten Announcement[]        @relation("AnnouncementCreatedBy")
   announcementReceipts AnnouncementReceipt[] @relation("AnnouncementRecipient")
   bookingsMade         Booking[]             @relation("BookingUser")
+  notifications        Notification[]
+  enterpriseRequests   EnterpriseRequest[]
 
   @@unique([orgId, email])
   @@map("users")
@@ -662,6 +666,89 @@ model AuditLog {
   @@map("audit_log")
 }
 
+/// A message from Endur to one of a customer's administrators. DEC-101, T-101, 58, 10 §5.
+///
+/// THE OPERATOR'S MESSAGE USED TO REACH NOBODY AND THE OPERATOR WAS TOLD OTHERWISE.
+/// `messageAdministrators` wrote one `platform_audit_log` row — THE OPERATOR'S OWN TABLE —
+/// and returned `{ sentTo: 3 }`. The customer's administrators had no route that read it and
+/// no screen that rendered it. This is the row they can actually reach.
+///
+/// NOT `63-FEATURE-NOTIFICATIONS`. That document is outbound multichannel delivery — email,
+/// SMS, a provider, retries, `17` — and is P3. Nothing here needs a channel: the recipient
+/// already visits `/app/inbox`, and a row in a table they already open is not that document's
+/// scope (CONF-006).
+///
+/// NO CAPABILITY GUARDS IT, and that is `58`'s own argument about inbox read state: the row
+/// NAMES A USER, so the reader is the addressee and there is nothing narrower to ask. No
+/// `notification.*` module goes in `11` §3.
+model Notification {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// WHO IT IS FOR. One row per recipient, not one row with a list — read state is the
+  /// reader's (`58`), and a shared row cannot be read by one administrator and unread by
+  /// another.
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// `platform_message` today. The column exists so the second kind is a VALUE rather than a
+  /// migration — and so the inbox tab can filter without learning a second table.
+  kind String
+
+  subject String
+  /// CAPTURED, never joined back to the audit row. The audit payload is the OPERATOR'S record
+  /// of what they sent; this is the CUSTOMER'S copy of what they were sent, and the two must
+  /// not be able to diverge silently behind one shared string.
+  body String
+
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// A customer asking to be SOLD Enterprise. DEC-100, T-100, 49, 70.
+///
+/// A WORK ITEM, NOT A NOTIFICATION, and `status` is the whole difference. The owner's
+/// instruction was *"send a notif on owner admin account"*, and the reflex is a bell — but a
+/// bell clears on read, and what has to survive is not "somebody was told", it is "somebody
+/// has to ring this customer back". `19` §4's operator model is already a support desk; this
+/// is the first row on it with a lifecycle.
+///
+/// NOT A FREE-TEXT SALES LEAD FORM. Who asked, which organisation, when, and one optional
+/// note. The conversation happens off-product, which is what "arranged with us" always meant.
+model EnterpriseRequest {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// The user row may be removed before anyone rings back, so the name and address are
+  /// CAPTURED beside it — `payments.payer_name`'s argument, on a row with a longer life.
+  askedBy    String? @map("asked_by") @db.Uuid
+  asker      User?   @relation(fields: [askedBy], references: [id], onDelete: SetNull)
+  askedName  String  @map("asked_name")
+  askedEmail String  @map("asked_email")
+
+  note String?
+
+  /// open | contacted | closed. Reading the queue changes none of them.
+  status String @default("open")
+
+  handledBy String?       @map("handled_by") @db.Uuid
+  handler   PlatformUser? @relation(fields: [handledBy], references: [id])
+  handledAt DateTime?     @map("handled_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  /// ONE OPEN ROW PER ORGANISATION, enforced by a PARTIAL UNIQUE INDEX in the migration
+  /// rather than by a check in the handler — a handler-side check loses to two simultaneous
+  /// clicks, and Prisma cannot express `WHERE status = 'open'` here. See the migration.
+  @@index([status, createdAt])
+  @@map("enterprise_requests")
+}
+
 model ApiKey {
   id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orgId String       @map("org_id") @db.Uuid
@@ -692,7 +779,24 @@ model Subscription {
 
   periodStart DateTime @map("period_start") @db.Date
   periodEnd   DateTime @map("period_end") @db.Date
-  status      String   @default("trialing")
+
+  /// A DOWNGRADE THE CUSTOMER ASKED FOR AND HAS NOT HAD YET. DEC-098, 16 §7b.
+  ///
+  /// NULL means nothing is scheduled, which is the ordinary case. When it is set, the tier
+  /// above is still the one in force and still the one `requireEntitlement` decides with —
+  /// this column is read by exactly one writer, the one that retires it, and by nothing else.
+  /// `49` § Interactions requires that the tier the customer reads and the tier the gate
+  /// decides with are the same column, so a future-dated value must never become a second
+  /// answer to "what plan are they on".
+  ///
+  /// APPLIED ON READ, not by a scheduler. `17-BACKGROUND-JOBS.md` is unwritten and `OPEN-005`
+  /// says nothing owns a cron; the first request after `period_end` passes moves `tier` and
+  /// clears this. The accepted cost is stated rather than discovered: an organisation nobody
+  /// opens never transitions, which is harmless because a tier is only ever consulted when
+  /// somebody asks.
+  pendingTier String? @map("pending_tier")
+
+  status String @default("trialing")
 
   @@map("subscriptions")
 }
@@ -863,6 +967,7 @@ model PlatformUser {
 
   sessions   PlatformSession[]
   auditLog   PlatformAuditLog[]
+  enterpriseRequestsHandled EnterpriseRequest[]
 
   @@map("platform_users")
 }

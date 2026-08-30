@@ -9,6 +9,7 @@ import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, presetFor } from '../../presets/index.js';
 import { ConflictError } from '../../lib/errors.js';
 import { recordPayment } from '../../billing/payments.js';
+import { newPeriod } from '../../billing/period.js';
 import type { RegisterBody } from '@endur/shared';
 
 /**
@@ -113,18 +114,21 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
     // deleted: expiring one needs a scheduler OPEN-005 still says nobody owns, and a
     // countdown nothing enforces is a promise the product cannot keep.
     //
-    // THE PERIOD IS A YEAR, AND THE YEAR IS NOW WHAT WAS PAID FOR. `periodStart`/`periodEnd`
-    // are NOT NULL in the schema (10, `subscriptions`) and a subscription genuinely has a
-    // period. Nothing still happens when it ends — there is no renewal and no dunning
-    // (DEC-080 § not) — but the dates are no longer decorative: they are the span the
-    // capture below covers, and the plan picker prices "/ year" against them. `seats` stays
-    // at its default 0 because D-013's meter does not exist yet, and a number nothing
-    // recomputes is worse than a zero that is obviously unbuilt.
-    const periodStart = new Date();
-    const periodEnd = new Date(periodStart);
-    periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    // THE PERIOD IS A MONTH, AND THE MONTH IS WHAT WAS PAID FOR — DEC-096, and it was a year
+    // until 31 Aug. `periodStart`/`periodEnd` are NOT NULL in the schema (10, `subscriptions`)
+    // and a subscription genuinely has a period. Nothing still happens when it ends — there is
+    // no renewal and no dunning (DEC-080 § not) — but the dates are no longer decorative: they
+    // are the span the capture below covers, the plan picker prices "/ month" against them,
+    // and DEC-098 is about to make `period_end` the date a scheduled downgrade fires on.
+    //
+    // THE LENGTH COMES FROM `billing/period.ts` AND NOWHERE ELSE. It used to be
+    // `setFullYear(+1)` here and `+ 365 * DAY` in two other services, which already disagreed
+    // by a day in a leap year — nothing read the difference, which is exactly why it survived.
+    //
+    // `seats` stays at its default 0 because D-013's meter does not exist yet, and a number
+    // nothing recomputes is worse than a zero that is obviously unbuilt.
     await tx.subscription.create({
-      data: { orgId: org.id, tier: input.tier, status: 'active', periodStart, periodEnd },
+      data: { orgId: org.id, tier: input.tier, status: 'active', ...newPeriod() },
     });
 
     // THE CAPTURE, IN THE SAME TRANSACTION as the subscription it pays for — DEC-080, and

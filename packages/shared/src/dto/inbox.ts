@@ -60,3 +60,40 @@ export type InboxResponse = {
   read: boolean;
   archived: boolean;
 };
+
+/**
+ * A MESSAGE FROM ENDUR — `DEC-101`, `T-101`, `58` § From Endur.
+ *
+ * A SECOND STREAM, NOT A SECOND INBOX. `58` built read/unread/archived over one queue and
+ * this reuses the mechanic; what it does not do is merge into it. A comment from a respondent
+ * and a message from your vendor are triaged for different reasons and one queue would
+ * interleave them — so it is a TAB, with its own count.
+ *
+ * NOTHING HERE IS A RESPONSE. This stream is why the inbox's own file comment about carrying
+ * no respondent attribute stays true of BOTH tabs: a notification names a `user_id` and a
+ * subject line, and there is no column on it that could reach a `responses` row.
+ */
+export type InboxMessage = {
+  id: string;
+  at: string;
+  /** `platform_message` today. A value rather than a second type — `10` §5. */
+  kind: string;
+  subject: string;
+  body: string;
+  read: boolean;
+};
+
+/**
+ * `state` is the SAME enum, minus `archived`. A message from your vendor has no archive
+ * because there is nothing to clear it out of the way OF — the stream is a handful of rows a
+ * year, not a queue that grows with every response. Passing `archived` is a 400 rather than an
+ * empty list, because an empty list would look like the archive working.
+ */
+export const InboxMessageQuery = PageQuery.extend({
+  state: z.enum(['all', 'unread', 'read']).default('all'),
+});
+export type InboxMessageQuery = z.infer<typeof InboxMessageQuery>;
+
+export const InboxMessageListDto = dto({ query: InboxMessageQuery });
+export const InboxMessageMarkDto = dto({ params: z.object({ id: Id }) });
+

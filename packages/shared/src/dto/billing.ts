@@ -32,6 +32,17 @@ export type BillingSummary = {
   status: BillingStatus;
   periodStart: string;
   periodEnd: string;
+  /**
+   * A DOWNGRADE ASKED FOR AND NOT YET HAD — `DEC-098`. `null` is the ordinary case.
+   *
+   * IT IS NOT A SECOND ANSWER TO "WHAT PLAN ARE THEY ON". `tier` above is in force, is what
+   * the entitlement gate decides with, and stays that way until the period ends; this is the
+   * date-stamped intention beside it. The page prints one sentence from it and offers to
+   * cancel; nothing else in either app may branch on it, which is `49` § Interactions'
+   * requirement that the tier the customer reads and the tier the gate decides with are the
+   * same column.
+   */
+  pendingTier: Tier | null;
   seats: number;
   /** What the meter counts, in its parts. `16` §5: a plan's size must never be a surprise. */
   seatBreakdown: { activeUsers: number; nonPersonSubjects: number };
@@ -40,12 +51,23 @@ export type BillingSummary = {
 /**
  * A CAPTURE, as the ledger records it. DEC-080.
  *
- * `kind` separates the two write paths — `signup` is written by registration, `change` by
+ * `kind` separates the write paths — `signup` is written by registration, `change` by
  * `POST /billing/tier` — because the earnings page has to answer two different questions
  * ("what did we take?" and "who is moving?") and inferring the second from a null
  * `fromTier` would be inference where a column will do.
+ *
+ * `expiry` IS A THIRD KIND AND IT IS NOT A CAPTURE — `DEC-098`. It is written when a scheduled
+ * downgrade fires, with `amountMinor: 0`, and it exists so a plan MOVE that took no money is
+ * still legible in the one table that records plan moves. `/ops/analytics` counts downgrades
+ * from here (`DEC-102`) precisely because the old source counted only what OPERATORS did.
+ *
+ * A ZERO-AMOUNT ROW IN A LEDGER IS UNUSUAL AND IS THE POINT. The alternative is a tier that
+ * changed with no record anywhere of when or why — an append-only ledger with a hole in it is
+ * worse than one with a ₹0 line somebody asks about. `/ops/earnings` excludes this kind from
+ * its window for the opposite reason: counting it as a payment would drag the average down
+ * with events where no money moved.
  */
-export type PaymentKind = 'signup' | 'change';
+export type PaymentKind = 'signup' | 'change' | 'expiry';
 
 export type PaymentRecord = {
   id: string;
@@ -81,3 +103,53 @@ export const JoinTierBody = z.object({
 export type JoinTierBody = z.infer<typeof JoinTierBody>;
 
 export const JoinTierDto = dto({ body: JoinTierBody });
+
+/**
+ * SCHEDULING A MOVE DOWN — `DEC-098`, `16` §7b.
+ *
+ * The tier, and nothing else. No date: the only date this can fire on is the one already on
+ * the row, and letting a client name one would be a second answer to when the period ends.
+ *
+ * `enterprise` IS IN THE SCHEMA HERE TOO, for `JoinTierBody`'s reason: the service refuses it
+ * with a sentence about how Enterprise is arranged, and a schema rejection would say "not a
+ * valid tier" about a tier the page is printing a price for. It is also, always, a move UP —
+ * so the rank check refuses it before the Enterprise check is ever reached.
+ *
+ * THERE IS NO BODY ON THE CANCEL. `DELETE /billing/downgrade` clears whatever is scheduled;
+ * naming the tier would invite a caller to cancel a downgrade that had already been replaced
+ * by a different one and be told it succeeded.
+ */
+export const ScheduleDowngradeBody = z.object({
+  tier: z.enum(TIERS),
+});
+export type ScheduleDowngradeBody = z.infer<typeof ScheduleDowngradeBody>;
+
+export const ScheduleDowngradeDto = dto({ body: ScheduleDowngradeBody });
+
+/**
+ * ASKING TO BE SOLD ENTERPRISE — `DEC-100`, `T-100`, `49` § Asking for Enterprise.
+ *
+ * THE TIER IS NOT A FIELD. There is exactly one tier a customer can ask for — the one they
+ * cannot assign themselves — so naming it would be a parameter with one legal value, and the
+ * first thing a reader would wonder is what happens when they send a different one.
+ *
+ * NOR IS WHO IS ASKING. `asked_by`, `asked_name` and `asked_email` come from the session, the
+ * same way `payments.payer_name` does (INV-010: identity never arrives in a body).
+ *
+ * A NOTE, AND NOTHING ELSE. `DEC-100` is explicit that this is not a sales lead form: the row
+ * carries who asked, which organisation, when, and one optional sentence. The conversation
+ * happens off-product, which is what "arranged with us" has always meant.
+ */
+export const EnterpriseRequestBody = z.object({
+  note: z.string().max(1000).optional(),
+});
+export type EnterpriseRequestBody = z.infer<typeof EnterpriseRequestBody>;
+
+export const EnterpriseRequestDto = dto({ body: EnterpriseRequestBody });
+
+/** What the customer's own page reads back — enough for one sentence, and no more. */
+export type EnterpriseRequestState = {
+  /** `null` when nothing is open. The card's verb depends on this and on nothing else. */
+  requestedAt: string | null;
+};
+

@@ -64,8 +64,24 @@ export default function OrgDetail(): JSX.Element {
       .finally(() => setPlanBusy(false));
   };
 
+  /**
+   * SUSPEND AND REINSTATE, AND ONE OF THEM WAS DEAD — `D-043`.
+   *
+   * This guard used to read `if (!id || suspendConfirmText !== org.name) return;`, unqualified,
+   * for BOTH verbs. The reinstate dialog is a plain `<ConfirmDialog>` with no name field, so
+   * `suspendConfirmText` was always `''` — the handler RETURNED BEFORE MAKING ANY REQUEST. No
+   * call, no error, no toast, the dialog left open. Reinstate had never worked, which is also
+   * the likeliest reading of the second report in the same breath: nothing could be brought
+   * back, so suspensions accumulated and looked like suspending everything (`N-067`).
+   *
+   * THE TYPED NAME BELONGS TO SUSPEND, AND THE DISABLED BUTTON IS THE GUARD. An early return
+   * must never be the thing a user meets: it is indistinguishable from a broken app, because
+   * it IS one. The check stays, scoped to the direction that has a field to check, so the
+   * handler cannot be driven past the button by anything else.
+   */
   const confirmSuspend = (): void => {
-    if (!id || suspendConfirmText !== org.name) return;
+    if (!id) return;
+    if (!suspended && suspendConfirmText !== org.name) return;
     setSuspendBusy(true);
     setError(null);
     void opsPost(`/orgs/${id}/suspend`, { suspended: !suspended })
@@ -181,22 +197,30 @@ export default function OrgDetail(): JSX.Element {
           <MessageComposer recipients={org.administrators} onSend={sendMessage} sending={messageSending} />
         </section>
 
-        <section className="card">
-          <h3>{suspended ? 'Reinstate' : 'Suspend'} this organisation</h3>
-          <p className="text-meta">
-            Suspension cuts staff sign-in and does not stop the respondent surface — a QR code
-            on a wall keeps working.
-          </p>
-          {canSuspend ? (
+        {/* ABSENT FOR STAFF, NOT DISABLED — `DEC-104`, and the whole SECTION goes: heading,
+            explanation and button. A card headed "Suspend this organisation" that explains
+            what suspension does and then offers nothing actionable is worse than the greyed
+            button was. `70` already says the analytics tab is "absent, not disabled, for
+            staff" and insists that absence is from the DOM rather than hidden by CSS; this
+            was the one affordance on the surface that disagreed with that rule, and a
+            permanently-dead control teaches a support operator to distrust every greyed
+            control they meet.
+            NOT A CHANGE TO THE SERVER. `POST /platform/orgs/:id/suspend` still answers 403 to
+            staff from middleware and `70` § Acceptance still asserts it — which is exactly
+            what makes removing the control a presentation decision rather than the rule
+            (INV-003). */}
+        {canSuspend && (
+          <section className="card">
+            <h3>{suspended ? 'Reinstate' : 'Suspend'} this organisation</h3>
+            <p className="text-meta">
+              Suspension cuts staff sign-in and does not stop the respondent surface — a QR code
+              on a wall keeps working.
+            </p>
             <button type="button" className="btn btn-danger" onClick={() => setSuspendOpen(true)}>
               {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
             </button>
-          ) : (
-            <button type="button" className="btn btn-danger" disabled title="Owner only">
-              {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
-            </button>
-          )}
-        </section>
+          </section>
+        )}
       </div>
 
       {/* Reinstating is a plain confirm. Suspending needs the typed-name pattern `32` uses

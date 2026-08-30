@@ -85,7 +85,7 @@ file must agree (`DRIFT-004`).
 | **Trust** | `simulator.run` | "why was this allowed?" | P2 |
 | | `audit.read` | The organisation's own activity log, `56`. Reads allows **and denies** (DEC-041) | P2 |
 | **Platform** | `apikey.read` `apikey.create` `apikey.revoke` | Enterprise only | P3 |
-| | `billing.read` `billing.update` | | P2 |
+| | `billing.read` `billing.update` | `billing.update` now covers three verbs, not one: join a higher tier, schedule a downgrade, request Enterprise. **Asking for a plan is a plan action** — a fourth capability would be a fourth thing to seed, to grant and to get wrong, for three routes with one audience (`DEC-096`, `DEC-098`, `DEC-100`) | P2 |
 | **Improve** | `reflection.create` `reflection.read` | Built `T-083`/`T-084`, 25 Aug — **P2 since `DEC-077`** | P2 |
 | | `actionplan.create` `actionplan.read` | | P2 |
 | | `checkin.create` `checkin.read` | | P2 |

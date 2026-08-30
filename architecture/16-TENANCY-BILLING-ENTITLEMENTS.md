@@ -41,7 +41,24 @@ Layer 1 is required for M0; layer 2 lands before P1 closes.
 | **Gold — Improve** | Run the full loop | Reflection, gap analysis, plans, check-ins, **booking** |
 | **Enterprise — Decide** | Use output as formal evidence | 360°, full audit, appeals, SSO, **API access** |
 
-Enterprise is priced individually: a base platform plus chosen services.
+~~Enterprise is priced individually: a base platform plus chosen services.~~
+**SUPERSEDED 2026-08-31 by `DEC-099`, and BUILT the same day (`T-099`). Enterprise is ₹4,999
+per month, and it prints.** Owner
+directive. "Priced individually" was true as a sales posture and false as a product decision:
+it forced `priceMinor: 0` as a sentinel, a `selectable: false` special case in every reader,
+and two strings of apology copy on the card. A number deletes all three.
+
+**A price is not a checkout.** Enterprise stays off `SIGNUP_TIERS` and off the join path;
+`selectable: false` survives and now means exactly one thing — *the customer cannot assign this
+to themselves*. The card's verb is **Request** (`DEC-100`), and an operator can still set the
+tier directly (`19` §4), which is the path `DEC-048` chose and `DEC-099` found broken.
+
+**Built note.** `<PlanPicker>`'s `unavailable` ended up narrower than `DEC-099` predicted —
+`disabled || (mode === 'signup' && !plan.selectable)` rather than `mode !== 'override'` —
+because `T-100` landed in the same pass and gave the `join` card a **Request** verb instead of a
+disabled one. The operator's case is fixed either way. The `Arranged with us` line **stayed**,
+reworded: deleting it, as `DEC-099` proposed, would have left a card whose verb differs from
+every other card's with nothing on it saying why.
 
 ## 3. The entitlement map
 
@@ -157,8 +174,75 @@ the plan.
   larger than the change that prompted this.
 - On downgrade, data is **retained, not deleted** — the surfaces just stop resolving. A
   re-upgrade restores access to history. Deleting a customer's data on downgrade is how you
-  lose a re-upgrade.
+  lose a re-upgrade. **Unchanged and load-bearing** — everything below narrows *when* a
+  downgrade happens, never what it destroys, which is nothing.
 - Expiry moves the org to Bronze, never to zero access.
+
+### 7a. The ladder is one-way while a period is running — `DEC-096`, 2026-08-31
+
+**Owner directive, and the argument is the refund policy.** The product captures at the moment
+of the join, `payments` is append-only, there are no invoices and no refunds (§8). So a
+customer moving Gold → Silver mid-period **pays a second time for less than they already
+hold**, and the product keeps both captures. That is not a consequence to warn about in a
+confirm dialog; it is a transaction that should not exist.
+
+| Move | What happens |
+|---|---|
+| To a **higher** tier | Applies immediately. The capture is the **difference** — `DEC-097` |
+| To the **same** tier | `409`. Already there |
+| To a **lower** tier | `409` on the spot. It can be **scheduled** for the end of the period instead — `DEC-098` |
+
+**`POST /billing/tier` is where this is decided, not `/app/plan`.** The affordance is removed
+from the customer's page and from the operator's picker, and neither is the rule: `13`
+§ Billing is a documented route and `INV-003` says the client never decides. A UI that stops
+offering a downgrade while the service still performs one has moved a policy into React.
+
+### 7b. A downgrade is scheduled and applied on read — `DEC-098`
+
+**BUILT 2026-08-31 (`T-098`).** `readBilling` is the one applier; `requireEntitlement` still
+selects `tier` alone. When it fires it writes three things in one transaction — the
+subscription, a `payments` row of `kind: 'expiry'` at ₹0, and an audit row **with no actor**,
+because a date passing is not an action anybody took and the person who happened to open the
+page did not perform it. The period rolls forward; nothing is billed for the new one, and
+nothing ever has been.
+
+*"The plan can be downgraded but only when it's exhausted."* Which needs the one thing this
+product does not have: something that runs when a date passes. §8 says it plainly —
+`subscriptions.period_end` bills nothing when it passes — `17-BACKGROUND-JOBS.md` is unwritten
+and `OPEN-005` says nothing owns a scheduler.
+
+**So nothing runs.** The customer writes `subscriptions.pending_tier`; the row is otherwise
+untouched and nothing is captured. **The first request after `period_end` passes** moves the
+tier and clears the column. That is the trick `readBilling` already uses to repair a missing
+subscription row (`D-012`), and its own comment carries the argument: the write happens on the
+read so that the entitlement gate and the page agree from the next request onward.
+
+`pending_tier` is **never consulted by `requireEntitlement`** — only by the write that retires
+it. `49` § Interactions requires that the tier the customer reads and the tier the gate decides
+with are the same row, with no cache and no future-dated value, and this keeps that true.
+
+**Known and accepted:** an organisation nobody opens never transitions. A tier is only ever
+consulted when somebody asks, so an org with no requests has nothing being gated.
+
+### 7c. The period is one calendar month — `DEC-096`
+
+**BUILT 2026-08-31 (`T-097`).** Calendar month with clamping (31 Jan → 28/29 Feb), never 30
+days: a customer renews on the date they joined, and a 30-day period walks backwards through
+the calendar. One function — `src/backend/billing/period.ts` `newPeriod()`.
+
+**It was 365 days in FOUR places, not the three this section named.** `joinTier`'s repair,
+`readBilling`'s `D-012` repair, `overridePlan`, **and `database/seed/demo.ts`** — the fourth was
+found by grepping for the *column* rather than for the number, which is the only way to find the
+copy nobody remembered writing.
+
+**And they already disagreed.** Two used `+ 365 * DAY` and two used `setFullYear(+1)`, so in a
+leap year a registered organisation got a period one day longer than a repaired one. Nothing
+read the difference, which is exactly why it survived: a constant duplicated four ways is not
+wrong until something starts depending on it, and `DEC-098` is about to make `period_end` the
+date a downgrade fires on.
+
+A year-long period would also make §7b unobservable. Nobody demonstrates a feature with a
+365-day fuse.
 
 ## 8. Endpoints
 
@@ -168,12 +252,22 @@ the plan.
 | GET | `/api/v1/billing/usage` | `billing.read` | P2 |
 | GET | `/api/v1/billing/plans` | `billing.read` | P2 |
 | POST | `/api/v1/billing/tier` | `billing.update` | P2 |
+| POST · DELETE | `/api/v1/billing/downgrade` | `billing.update` | P2 — `DEC-098` |
+| GET · POST | `/api/v1/billing/enterprise-request` | `billing.read` · `billing.update` | P2 — `DEC-100` |
 
 **DEC-080 — there are prices, and the money is simulated.** Bronze **₹99**, Silver **₹499**,
-Gold **₹999**, per year, in INR. They live in `packages/shared/src/tiers.ts` as `priceMinor`
+Gold **₹999**, ~~per year~~ **per month since `DEC-096`**, in INR — plus Enterprise at
+**₹4,999** per month (`DEC-099`, built 31 Aug), which used to be a sentinel `0`. **The numbers themselves did
+not change when the period did, which is a 12× rise and is deliberate** — `OPEN-015`, **answered
+by the owner 31 Aug**: *"Monthly period, prices left at ₹99/₹499/₹999 sounds good."*
+`tiers.test.ts` pins all four against the literals, so the next change to them is a change to a
+test as well as to a table. They live in `packages/shared/src/tiers.ts` as `priceMinor`
 (integer **paise** — 9900 is ₹99) because the picker has to print them before anybody has a
-session. Enterprise carries `priceMinor: 0`, which is **not free**: `selectable: false` is what
-every reader keys off and the card quotes a conversation instead of a number.
+session. ~~Enterprise carries `priceMinor: 0`, which is **not free**.~~ **The sentinel is gone
+(`DEC-099`)** — it was never free, it read as free to anything that did not know, and it forced
+a `selectable` check in front of every price render. That special case leaked out of the data as
+copy. `selectable: false` now means one thing and one thing only: the customer cannot assign this
+tier to themselves.
 
 `POST /billing/tier` is **still a join**. `<PaymentDialog>` runs a checkout in the client,
 mints a reference and then calls the same route — so the authoritative write, the capability
@@ -186,9 +280,28 @@ would put an authorisation decision in React (`INV-003`).
 and plan change), inside the transaction that writes the subscription. There is no field on any
 request for an amount.
 
+**An upgrade captures the DIFFERENCE — `DEC-097`, 2026-08-31.** `priceOf(to) − priceOf(from)`,
+and `period_end` does not move. The customer has already paid for this period; charging the
+full new price bills the overlap twice, which is §7a's objection to downgrades pointed the
+other way.
+
+**It also corrects a number nobody had noticed.** `/ops/earnings` sums `payments`. Today an org
+that walked Bronze → Silver → Gold inside one period contributes ₹99 + ₹499 + ₹999 = **₹1,597**
+to estate revenue for a customer holding one ₹999 plan — the ledger **overstates, and it
+overstates most for the customers who upgrade most**. Under the difference rule the same
+journey sums to ₹999, which is what the estate actually holds.
+
+*Not prorated by days remaining.* Rejected on reasoning, not overlooked: with a one-month period
+the largest possible overcharge is one month of one step, and proration buys that back at the
+cost of a **second money formula and a rounding rule** in a system that has exactly one
+(`priceOf`, integer paise, no floats). Revisit when renewal exists — nothing renews today, and
+until it does, "the rest of the period" is a quantity nothing else in the product reads.
+
 **What is still absent, and deliberately:** no payment processor, no webhook surface, no card
 data, no invoices, no refunds, no renewal — `subscriptions.period_end` still bills nothing when
-it passes. `payments` is an append-only ledger of captures, not an accounts system, and the UI
+it passes, and `DEC-098` does not change that. What it does now is **fire a scheduled
+downgrade** the first time somebody reads the row after it, and start a new period so the row is
+not left permanently expired. `payments` is an append-only ledger of captures, not an accounts system, and the UI
 says "Endur demo checkout · no card details are collected" where a real one would take a card.
 
 > This supersedes **DEC-035** on price and checkout only. DEC-034's hole stays closed the way
