@@ -5,7 +5,73 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-30  (T-095 + T-096 -- BOOKING AT GOLD, AND STAGE 10 CLOSED. three
+UPDATED   2026-08-30  (D-036 AND D-041 REPAID -- DEC-094, DEC-095. THE SUITE IS GREEN,
+                       ALL OF IT, THREE RUNS RUNNING: backend 546/546, frontend 933/933.
+                       !! BOTH DEBT ENTRIES HAD THE WRONG DIAGNOSIS WRITTEN DOWN, AND BOTH
+                       WOULD HAVE BEEN "FIXED" INTO SOMETHING WORSE.
+                       D-036 said the log-pagination fixture had shrunk below the 64 KB
+                       chunk so the test asserted nothing, and prescribed sizing it up.
+                       THAT WOULD HAVE BEEN A GREEN TEST OVER A LIVE BUG. the test was
+                       right and the READER was losing lines: tailRead's cursor was the
+                       CHUNK offset, and the reader walks BACKWARDS, so the next page
+                       resumed at that chunk's start and read the chunk BELOW it -- every
+                       line the page limit left unreturned in between was skipped, and the
+                       page after that opened on half a line. MEASURED: a 1,500-line file
+                       at limit 50 returned 150 lines and LOST 1,350. a 220-line file --
+                       under one chunk, i.e. every log file for the first hours of its day
+                       -- returned 50 and said hasMore false, LOSING 170. this is the
+                       operator's incident tool.
+                       THE CURSOR IS NOW A LINE OFFSET (DEC-094), in Buffer.byteLength and
+                       never String.length, and the test WALKS TO THE END at two sizes.
+                       D-041 said "flake, watch it". it recurred every full run on a
+                       DIFFERENT innocent test, each passing alone. the pool hypothesis
+                       (~15 workers x 33 connections vs max_connections 100) was DISPROVED
+                       rather than assumed -- pool_timeout was dropped below the test
+                       timeout so starvation could speak, and NOT ONE timeout was a pool
+                       wait. the real number: the slowest test is 3361ms on an IDLE machine
+                       against vitest's 5s default. a lottery, not a bug.
+                       BOTH PROJECTS NOW RUN A 20s TIMEOUT with the measurement beside it
+                       (DEC-095). NOT retry:1 -- that hides every race the suite exists to
+                       catch, including the booking one T-095 found.
+                       ALSO FOUND: booking.test.ts's DEC-090 grep guard resolved its
+                       directory from process.cwd(), so it THREW from the repo root -- the
+                       command D-037 made the correct one. resolved from the test file now.
+                       a rule that only holds from one working directory is not a rule.
+                       ROOT RUNNER: 1479/1479 across 112 files, three runs.
+                       STILL OWED: <PaymentDialog>'s two delays are hardcoded, so the
+                       frontend suite spends ~15s watching an animation.
+                       Earlier: D-042 REPAID + THE CONTENTION DEMO -- DEC-093.
+                       A POLL WAS INVISIBLE ON /app/campaigns TO EVERY SEEDED ROLE,
+                       INCLUDING THE PERSON WHO MADE IT ONE SECOND EARLIER. a campaign is
+                       scoped through its SUBJECTS' units and DEC-089's org singleton
+                       subject has no unit, so the filter matched nothing.
+                       THE RULE NOW SAYS WHAT THE ROW MEANS rather than loosening the
+                       filter: anchored to the ORGANISATION subject = the whole
+                       organisation, visible to anyone who may read campaigns at all.
+                       every quick campaign is access:public + audience:anyone, so the
+                       link already answers to whoever holds it.
+                       !! THE ROOT-UNIT CANDIDATE WAS REJECTED ON EVIDENCE. campaign.launch
+                       is seeded own_unit at LEVEL 3, so a tutor launching from Section A
+                       would still lose the poll instantly -- the same bug one level down.
+                       !! `type` WAS CLIENT-SETTABLE and the new rule reads it. anybody with
+                       subject.create could have widened their own campaign's audience -- a
+                       permission written in a text column. 'organisation' is now RESERVED,
+                       422 on body.type.
+                       !! THE PREDICATE WAS ALREADY WRITTEN TWICE -- listCampaigns inline
+                       and home/service.ts's own scopeToCampaigns. fixing one would have
+                       left Home wrong and silent. both import campaigns/visibility.ts now.
+                       npm run demo:contention -- 40 phones, one slot, capacity 10. an
+                       ASSERTION THAT HAPPENS TO PRINT: 10 x 201, 30 x 409, 10 rows in the
+                       database, remaining 0, ~300ms, non-zero exit if the count is not
+                       exact. 50 SS5 carries it as demo step 10. a demonstration, NOT a
+                       benchmark -- no throughput figure is claimed.
+                       AFTER PULLING 5fd6a953: `npm install && npm run db:migrate`. the
+                       prisma client is generated not committed, and two migrations were
+                       unapplied -- 15 phantom typecheck errors and a 500 saying
+                       public.bookables does not exist.
+                       backend 544/545, frontend 933/933. (D-036 was the one red then; it
+                       is closed above, and it was a REAL BUG, not a fixture.)
+                       Earlier: T-095 + T-096 -- BOOKING AT GOLD, AND STAGE 10 CLOSED. three
                        tables, five capabilities, and the only write in the product with
                        REAL CONTENTION.
                        THE FEATURE IS THE ROW LOCK: SELECT ... FOR UPDATE on the slot,
@@ -1912,11 +1978,11 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 | ~~`D-038`~~ | ~~**The Setup wizard's redesign disagrees with its spec, and six tests are the evidence**~~ | **RESOLVED 29 Aug, `DEC-085`, and the entry was wrong about one of the four.** Sorted by asking what each affordance was *for*. **`← Back` was never lost** — the button is present and accessible, the redesign replaced the literal arrow with an `<Icon>`, and three assertions were matching on decoration. **Restored**: *"Pick the closest one"* (one line of copy, and without it five cards read as an exhaustive list on the one screen whose subject is that the model does not care) and **step 4's live preview** (the step's lede claims these words appear throughout Endur and the preview is the only thing that proves it — the same `<DashboardPreview>` Review uses, not a fork). Review's role list also gets its arrow back: these are ordered levels, and `+` reads as a set. **Moved on the record**: the role chain and vocabulary pair live in step 1's aside rather than on every card. The aside shows strictly more and the cost is real and stated — presets are now compared serially, so a presenter wanting the side-by-side beat says the sentence instead of showing it. `31` § step 1 and § step 4 amended. **Setup.test.tsx 25/25** | ~~a decision, then one session either way~~ — **done** |
 | ~~`D-039`~~ | ~~**`<WordsEditor>` stopped saying which plurals are yours**~~ | **REPAID 29 Aug, `DEC-085`.** `your plural` is back on any row whose plural is not the derived one, shown to a read-only reader too — the hint explains why the plural is unusual; only the undo is a permission. **The `auto: Wings` half is deliberately not restored**: beside a filled field already reading `Wings` it repeats the field, and it is the override that needs saying | ~~with `D-038`~~ — **done** |
 | ~~`D-040`~~ | ~~**Operator MFA became a 6-hour code, with no `DEC-` and a red test left behind**~~ | **REPAID 29 Aug, `DEC-084`.** Back to `STEP_SECONDS = 30` and `WINDOW = 1`. The convenience bought was not re-reading a code at login, and `npm run ops:code -w @endur/api` already buys that in one command — paying for it in posture instead is paying more. **No doc amendment was needed**: `19` §9 already says *"±1 step of clock drift is accepted"*, which the branch had silently broken too, so this restores the doc rather than changing it. `platform.test.ts` 23/23 | ~~a decision, and it is a security posture~~ — **done** |
-| `D-041` | **`public.test.ts` flaked once under the root runner** | Found 29 Aug, the first root run after `D-037` was repaid: *"answers the same 404 for unknown, unlaunched, closed and expired tokens"* failed once and passed alone, and passed again on the next full root run. Both projects now start together, so the backend suite shares its one test database at a higher worker count than it ever did alone. **One occurrence is not a diagnosis** — if it returns, the answer is `fileParallelism` or a pool cap on the backend project, not a retry | watch it; act on the second occurrence |
+| ~~`D-041`~~ | ~~**`public.test.ts` flaked once under the root runner**~~ | **REPAID 30 Aug — `DEC-095`, and it was never a flake.** The entry said *"one occurrence is not a diagnosis"* and was right; the second occurrence came, and the third, on a **different innocent test every full run**, each passing alone. **The standing hypothesis was disproved, not assumed:** ~15 workers × a 33-connection default Prisma pool against `max_connections = 100` looked damning, so `pool_timeout` was dropped below the test timeout to let starvation announce itself — the timeouts continued and **not one** reported a pool wait. The real number is that these are integration tests and the heaviest register two organisations end to end: **on an idle machine the slowest is 3361ms and four are over 2.5s**, against vitest's **5s** default. Two thirds of the budget spent before fifteen workers compete for sixteen cores; whichever test is slowest when the machine is busiest loses. The frontend had the same shape for its own reason — `<PaymentDialog>`'s ~2.2s of **real-timer** capture and success overlay against the same 5s. **Both projects now run a 20s `testTimeout`/`hookTimeout` with the measurement written beside them.** Not `retry: 1` — it would have hidden every genuine race the suite exists to catch, including the booking one `T-095` found. Not `fileParallelism: false` — that works by making the machine idle and turns a 60s suite into minutes. **Backend 546/546 and frontend 933/933, three consecutive full runs each** | ~~watch it~~ — **done** |
 | ~~`D-035`~~ | ~~**Four `tsc -b` errors on the branch, none of them from a task**~~ | **REPAID 29 Aug.** All four were `exactOptionalPropertyTypes`, and all four were fixed by CONSTRUCTING THE KEY CONDITIONALLY rather than widening the target type — `...(body.at ? { at: body.at } : {})`, and `subject.unitId ? { kind: 'subject', unitId } : { kind: 'subject' }` twice. That direction is not a style preference: on `Target`, an ABSENT `unitId` is how the resolver says *org-wide*, so `unitId: undefined` and no `unitId` at all mean the same thing to JavaScript and different things to the type. Widening would have made the two indistinguishable everywhere, to fix three lines. **The fourth, in `Simulator.tsx`, was the same shape**: `<DecisionTrace>` documents an absent `considered` as *"this response carried no candidate list"* — a production 403 (`11` §10) — so it is spread in, not passed as `undefined`. **`capability: body.capability as never` is also gone**, and that was the real find: `SimulateBody.capability` was `z.string()` while `ResolveInput.capability` is `Capability`, and the cast bridged them. The DTO now `.refine(isCapability)`, which narrows the inferred type *and* changes behaviour — a misspelt capability is a 422 naming the field, where it used to resolve to a silent `no_grant` that the simulator rendered as *"No rule grants this"*: a real-looking answer to a question the system never understood. The narrowing then found a genuine third error — the page held `capability` as a bare `string`, in a file whose own header says the sentence must never be able to ask an invalid question. It is `Capability | ''` now, so the compiler keeps that rule instead of the comment. **`npm run build` passes** | ~~before any build-based demo~~ — **done** |
-| `D-042` | **A poll or a suggestion box never appears on `/app/campaigns`** | Found 30 Aug during `T-094`, in `T-091`'s work and **not caused by this session**; `campaigns.test.ts` *"carries the category and the k-anonymity threshold on the summary"* is red because the campaign it just created is missing from the list. `quickCreate` anchors every quick campaign to the per-org singleton subject (`type: 'organisation'`), which has **no unit**, and `listCampaigns` scopes a non-`all` reader with `subjects.some.subject.unitId in visibleUnits` — so a row with no unit matches nothing. `campaign.read` is seeded `subtree`/`own_unit` and never `all` (`50` §1), so this hides polls from **every seeded role in every organisation**; the campaign is reachable only by the URL the creator lands on. The test is asserting the correct behaviour and should stay red until the product is fixed. Two candidate fixes, and the choice is an authorisation decision rather than a patch: anchor the singleton subject to the org's ROOT unit (a subtree reader at the top then sees it, an `own_unit` reader below still does not), or teach `listCampaigns` that a subject with no unit belongs to the whole organisation. **Do not relax the visibility filter generally** | before the demo — a poll that vanishes from the list is the demo path |
+| ~~`D-042`~~ | ~~**A poll or a suggestion box never appears on `/app/campaigns`**~~ | **REPAID 30 Aug — `DEC-093`.** The rule now says what the unattached row MEANS rather than loosening the filter: a campaign anchored to the organisation subject belongs to the whole organisation and is visible to anyone who may read campaigns at all. Every quick campaign is `access: public` with `audience: anyone`, so the link already answers to whoever holds it — there was nothing there to withhold. **The root-unit candidate was rejected on evidence**, not taste: `campaign.launch` is seeded `own_unit` at level 3, so a tutor launching a poll from Section A would still have lost it the instant it was created — the same bug one level down. The `organisation` type is now **reserved** (`POST /subjects` → 422 on `body.type`), because a client-settable value deciding visibility is a client-settable permission. The predicate was written **twice** — inlined in `listCampaigns` and again as `home/service.ts`'s own `scopeToCampaigns` — so only one of the two would have been fixed; both now import `features/campaigns/visibility.ts`. Three new tests: the level-3 launcher sees their own poll, a foreign unit still does not see a unit-anchored campaign (404, not 403), and the reserved type is refused. Original diagnosis: Found 30 Aug during `T-094`, in `T-091`'s work and **not caused by this session**; `campaigns.test.ts` *"carries the category and the k-anonymity threshold on the summary"* is red because the campaign it just created is missing from the list. `quickCreate` anchors every quick campaign to the per-org singleton subject (`type: 'organisation'`), which has **no unit**, and `listCampaigns` scopes a non-`all` reader with `subjects.some.subject.unitId in visibleUnits` — so a row with no unit matches nothing. `campaign.read` is seeded `subtree`/`own_unit` and never `all` (`50` §1), so this hides polls from **every seeded role in every organisation**; the campaign is reachable only by the URL the creator lands on. The test is asserting the correct behaviour and should stay red until the product is fixed. Two candidate fixes, and the choice is an authorisation decision rather than a patch: anchor the singleton subject to the org's ROOT unit (a subtree reader at the top then sees it, an `own_unit` reader below still does not), or teach `listCampaigns` that a subject with no unit belongs to the whole organisation. **Do not relax the visibility filter generally** | ~~before the demo~~ — **done** |
 | `D-040` | **Two frontend tests fail on Windows, and one of them is a guard that asserts nothing there** | Found 30 Aug during `T-093`; **neither file was touched by that work**. (1) `pages/respond/bundle.test.ts` compares `path.relative()` output against forward-slash literals (`'components/form/QuestionInput.tsx'`), so on win32 every path comparison misses — the INV-008 assertion fails outright and the *"no console code in the respondent bundle"* filter silently matches nothing, which is the worse half: the guard looks green while checking nothing. Fix is to normalise separators once where `reached` is built, never to relax an assertion. (2) `router/boundaries.test.tsx` *"does not mistake a thrown Response for a stale graph"* dies in undici — `RequestInit: Expected signal ("AbortSignal {}") to be an instance of AbortSignal` — a jsdom/undici mismatch inside `createMemoryRouter`, not a product bug | whoever next runs the suite on Windows |
-| `D-036` | **`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing** | Found 26 Aug during `T-090` and **verified pre-existing on a stashed tree**. The backwards-pagination test asserts `page1.body.page.nextCursor` is truthy and gets a falsy value, meaning the fixture no longer produces more than one page — most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing rather than the reader being wrong. The reader itself is exercised live (a 775-line export and a 45-line filtered read both came back correct). Fix is to size the fixture past one chunk deliberately, not to relax the assertion | whoever next touches `72`'s reader |
+| ~~`D-036`~~ | ~~**`platform-logs.test.ts` "a bounded page from the end" fails, and has been failing**~~ | **REPAID 30 Aug — `DEC-094`, and the filed diagnosis was wrong in the direction that matters.** It read *"most likely the fixture size drifted below the 64 KB chunk, in which case the test is asserting nothing"*, and prescribed sizing the fixture up. **That would have produced a green test over a live bug.** The test was asserting the right thing and the reader was losing lines: `tailRead` set its cursor to the start of the **chunk** it had just read, and the reader walks **backwards**, so the next page resumed at that chunk's start and read the chunk *below* it — every line the page limit left unreturned in between was skipped, and the page after that opened on the truncated half of whatever line straddled the boundary. **Measured, not reasoned:** a 1,500-line file at limit 50 returned **150 lines and lost 1,350**; a 220-line file — smaller than one chunk, which is every log file for the first hours of its day — returned its newest 50 and said `hasMore: false`, **losing 170**. The cursor is now the byte offset of the **oldest line the page returned**, measured in `Buffer.byteLength` (a character count walks off the boundary the first time somebody logs an accented name). The test walks a fixture to the **end** at both sizes and asserts the pages equal the file — a pagination test that stops after two pages can only catch a bug in the first two pages. `platform-logs.test.ts` **15/15** | ~~whoever next touches `72`'s reader~~ — **done** |
 | `D-001` | RLS policies not written (`10` §8 layer 2) | **Raised in severity by T-006.** Layer 1 cannot scope `findUnique`/`update`/`delete` by-id calls; RLS is what actually closes that. Until then, by-id handlers must check `orgId` themselves | before P1 closes |
 | `D-003` | Every by-id read checks `orgId` by hand | Stage 2 repeats that check in eleven services (`assertVisible`, `assertOwned`, `assertUnitInOrg`). Each one is correct; one forgotten call is a cross-tenant read. RLS (`D-001`) is what makes it structural rather than remembered | with `D-001` |
 | ~~`D-004`~~ | **REPAID 21 Aug by `T-048`.** `vitest.config.ts` gained a `globalSetup` (create `endur_test` if absent, then `prisma migrate deploy`) and a `setupFiles` that points each worker's `DATABASE_URL` at it **before `lib/config.ts` reads `.env`** — which works because `process.loadEnvFile()` does not overwrite an already-set variable. `TEST_DATABASE_URL` is optional; absent, it derives by appending `_test`. Two guards in `test/database.ts` refuse to run rather than trust the config: the name must end in `_test`, and it must not be the `DATABASE_URL` written in `.env`. `test/test-database.test.ts` asserts both by their failure. **The leak is closed; the puddle is not mopped** — `endur` still holds 2,880 organisations, and `npm run db:reset` is yours to run because it also drops anything you made by hand | ~~before `T-045`~~ — **done** |
@@ -1957,7 +2023,187 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-30 (latest) · `T-095`, `T-096` — booking, and the one bug the test found
+### 2026-08-30 (latest) · `D-036` and `D-041` repaid — `DEC-094`, `DEC-095`
+
+**The suite is green, all of it, for the first time: backend 546/546, frontend 933/933, three
+consecutive full runs each.** Two debt entries closed. Both had a diagnosis written down, and
+**both diagnoses were wrong in the direction that would have made things worse.**
+
+#### `D-036` — the log reader was losing lines, and the entry said it was the fixture
+
+The filed diagnosis: *"most likely the fixture size drifted below the 64 KB chunk, in which
+case the test is asserting nothing rather than the reader being wrong."* Prescription: size the
+fixture up. **That would have produced a green test over a live bug**, which is the one outcome
+worse than the red test that had been sitting there since 26 Aug.
+
+The test was asserting the right thing. `tailRead` set its cursor to the start of the **chunk**
+it had just read — the header comment even explained why that was safe, *"a chunk this call only
+partially used is simply re-read from the same offset next time"*. It is not re-read. **The
+reader walks backwards.** Resuming at the chunk's start reads the chunk *below* it, so every
+line the page limit left unreturned in that chunk is skipped, and the page after that opens on
+the truncated half of whatever line straddled the boundary.
+
+Measured before touching anything, by paging a real fixture to the end:
+
+| fixture | limit | returned | lost |
+|---|---|---|---|
+| 1,500 lines / 186 KB | 50 | 150 over three pages | **1,350** |
+| 220 lines / 27 KB (under one chunk) | 50 | 50, `hasMore: false` | **170** |
+
+The sub-chunk row is the one that matters, and it is the case the debt entry proposed to
+delete: one read takes the scan to offset 0 while the limit is still capping the page, so
+`hasMore = position > 0` answers *"that is all of them"* to a file with 170 more. **A file
+under 64 KB is not an edge case — it is every log file for the first hours of its day**, and
+this is the tool an operator opens during an incident.
+
+The cursor is now the byte offset of the **oldest line the page returned**, built with
+`Buffer.byteLength` and never `String.length` — a character count walks off the line boundary
+the first time somebody logs an accented name, above one chunk only, silently. `DEC-094`.
+
+**The test now walks to the end** and asserts the pages *equal the file*, at two sizes — under
+one chunk and across several — because the two sizes broke differently and one fixture proves
+half of it. A pagination test that stops after two pages can only ever catch a bug in the first
+two pages. Every fixture line carries a multi-byte character. `platform-logs.test.ts` **15/15**.
+
+`72` § Acceptance carried `[x]` against *"asserts the two pages are contiguous with no gap or
+repeat"* the whole time. The fix restores the doc rather than changing it, as `D-040` did.
+
+#### `D-041` — not a flake, and the pool hypothesis was mine and was wrong
+
+The entry said *"one occurrence is not a diagnosis — if it returns, the answer is
+`fileParallelism` or a pool cap, not a retry."* It returned, on **a different innocent test
+every full run**, each passing alone. That is what flakiness looks like and it was not.
+
+The standing hypothesis was connection-pool starvation: 16 cores → ~15 workers, each a
+PrismaClient whose default pool is `num_cpus*2+1` = 33, against `max_connections = 100`. The
+arithmetic is genuinely bad. **It was still disproved rather than assumed** — `pool_timeout` was
+dropped below the test timeout so starvation could announce itself by name, and the timeouts
+carried on with **not one** of them reporting a pool wait.
+
+The real number took one command: these are integration tests and the heaviest register two
+organisations end to end. **On an idle machine the slowest single test is 3361ms and four are
+over 2.5s**, against vitest's **5s** default — two thirds of the budget spent before fifteen
+workers start competing for sixteen cores. Whichever test is slowest when the machine is
+busiest loses. A lottery, not a bug, which is exactly why four rounds of re-running found
+nothing.
+
+The frontend has the same shape for its own reason: `<PaymentDialog>` runs a deliberate ~700ms
+simulated capture and ~1500ms success overlay on **real** timers (fake ones fight `waitFor`), so
+every paying test in `Start.test.tsx` costs ~2.3s against the same 5s. It failed once in a full
+run here and passed 16/16 alone, twice.
+
+**Both projects now run a 20s `testTimeout`/`hookTimeout`, with the measurement written beside
+them** so the next person changing it knows what it is buying. `DEC-095`.
+
+- **Not `retry: 1`.** It would have made the symptom disappear the same evening and hidden every
+  genuine race the suite exists to catch — including the booking one the N+1-concurrent test
+  found in `T-095`. A suite that retries cannot report a race.
+- **Not `fileParallelism: false`**, the other option the entry named: it works by making the
+  machine idle, turning a ~60s suite into several minutes — paying in the feedback loop for a
+  number that costs nothing to correct.
+- The **pool cap stays** (`connection_limit=5`, 75 of 100 across 15 workers) because 495
+  requested against 100 available is a ceiling the suite would eventually reach — and it is
+  explicitly **not** credited with the fix, in the comment as well as here.
+
+**Still owed, and small:** `<PaymentDialog>`'s two delays are hardcoded, so the frontend suite
+spends ~15s of wall clock watching an animation. Making them injectable is a change to product
+code for the tests' benefit and belongs in its own task, not smuggled into a debt repayment.
+
+#### Found on the way out: a structural guard that only held from one directory
+
+Running the whole thing from the repo root — which `D-037` established as *the correct
+command* — turned `booking.test.ts`'s `DEC-090` grep red in 8ms. It resolved
+`features/booking/` from **`process.cwd()`**, so from `src/backend` the path was right and from
+the root `readdirSync` threw. `D-037`'s own lesson, still being made by a guard written after
+it: **a rule that only holds from one working directory is not a rule**, and a structural check
+is the last place that should depend on how it was launched. Now resolved from the test file's
+own location. Nothing else in the suite reads `process.cwd()`.
+
+**Checks:** typecheck 0, lint 0, `npm run build` passes, `audit:drift` clean (61 docs, 73
+capabilities), `audit:vocab` clean. **The root runner — `npx vitest run`, both projects
+together — is 1479/1479 across 112 files, three consecutive runs.** Backend alone 546/546 ×3,
+frontend alone 933/933 ×3.
+
+**Next session:** `T-045` is now the only thing left on the board that can still go wrong on the
+day, and it is the largest risk — three rehearsals, the 390px checks, and the WSL2 question
+`DEC-086` left open (the LAN address found inside WSL is the virtual adapter's and is not
+reachable from a phone without a `netsh portproxy` rule or running the dev servers from
+Windows). It needs the demo machine and a phone, so it is the owner's to run.
+
+### 2026-08-30 · `D-042` repaid, and the contention demo — `DEC-093`
+
+Two things, asked for together: fix the bug that was going to break the demo, and make the
+scalability claim something the room can watch rather than take on trust.
+
+**First, a caveat that costs ten minutes if you hit it cold.** After pulling `5fd6a953` the
+branch does not typecheck — 15 errors saying `Property 'booking' does not exist on
+PrismaClient`, about models that are visibly right there in `schema.prisma`. The client is
+generated, not committed, and the `postinstall` hook that regenerates it only runs on `npm
+install`. Two pending migrations were unapplied on the dev database too, which shows up as a
+500 saying `public.bookables does not exist`. `npm install && npm run db:migrate` fixes both.
+
+**`D-042` — `DEC-093`.** The debt entry laid out two candidate fixes and called the choice an
+authorisation decision rather than a patch, which was right. It picked neither, and the
+evidence picks the wider one: `campaign.launch` is seeded `own_unit` at level 3, so anchoring
+the singleton subject to the org's ROOT unit leaves a tutor who launches a poll from Section A
+unable to see it one second later — D-042 again, one level down, where nobody is looking. So
+the rule instead says what the unattached row *means*: a campaign anchored to the organisation
+subject belongs to the whole organisation. That is also the only coherent answer on the
+feature's own terms — every quick campaign is `access: public` with `audience: anyone`, so the
+link already answers to whoever holds it and there is nothing to withhold from staff.
+
+Two things came out of it that were not in the entry:
+
+- **The `organisation` type was client-settable.** `type` is free text on
+  `CreateSubjectBody`, and the new rule reads it — so anybody holding `subject.create` could
+  have minted a subject that widened the audience of their own campaign. A permission written
+  in a text column. It is now reserved: 422 naming `body.type`. This also makes true a comment
+  `quickCreate` has been making since `T-091` about the row being furniture rather than
+  something somebody added on the Subjects screen.
+- **The predicate was already written twice** — inlined in `listCampaigns`, and again as
+  `home/service.ts`'s own `scopeToCampaigns`. Fixing D-042 in one place would have left Home
+  wrong, silently, and nothing would have caught it. Both now import
+  `features/campaigns/visibility.ts`. INV-009 applies to a predicate exactly as it applies to
+  a component, and the MAP row for `38` now says so.
+
+Three tests: the level-3 launcher finds their own poll (list **and** detail, so the two
+statements of the rule cannot drift apart), a Section B reader still cannot see a Section A
+campaign and gets 404 rather than 403, and the reserved type is refused without a row being
+written.
+
+**`npm run demo:contention` — the scalability proof, made watchable.** `booking.test.ts`
+already proves capacity holds under concurrency, but a green tick is a claim the evaluator has
+to take on trust, and *scalable* is the one item on the board that a screenshot does not
+support. The script registers a throwaway gold org, opens one slot through the real routes,
+fires N concurrent public bookings over HTTP, and prints what happened:
+
+```
+  CONTENTION — 40 phones, one slot, capacity 10
+  201 booked                     10   ✓ exactly capacity
+  409 slot full                  30   ✓ everyone else
+  anything else                   0   ✓ none
+  rows in the database           10   ✓ agrees with the API
+  slot reports remaining          0   ✓ full
+  all answered in               301ms
+```
+
+It is an **assertion that happens to print** — non-zero exit if anything but exactly
+`capacity` wins — and it is a demonstration, not a benchmark: no throughput figure, because
+the only number being claimed is that the count is exact under contention. `50` §4 and §5
+carry it as demo step 10, with the sentence to say over it (counting before locking passes a
+sequential test and double-books a live room) and the `--capacity 1` variant for when there is
+time for one line only. Setup goes through the API deliberately: a script that reached into
+Prisma to open the slot would be demonstrating a path nobody uses.
+
+**Checks.** typecheck 0, lint 0, drift clean (61 docs, 73 capabilities), vocab clean, backend
+**544/545**, frontend **933/933**. The one remaining red is `D-036`, pre-existing and
+documented.
+
+**Next session:** `T-045` is still unrun and is now the largest risk on the board — three
+rehearsals, the 390px checks, a QR scan on two phones, and the WSL2 question `DEC-086` left
+open. Nothing was committed.
+
+### 2026-08-30 · `T-095`, `T-096` — booking, and the one bug the test found
 
 **The feature is the row lock.** Everything else about a bookable is ordinary CRUD; what makes
 booking worth building — and what makes it the only surface in the product with real

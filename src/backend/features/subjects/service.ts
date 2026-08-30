@@ -8,13 +8,15 @@ import type {
   UpdateSubjectBody,
 } from '@endur/shared';
 import type { Request } from 'express';
+import { z } from 'zod';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
-import { ConflictError, NotFoundError } from '../../lib/errors.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 import { seesNothing, visibleUnits } from '../../authz/index.js';
 import { statusOf } from '../campaigns/status.js';
+import { ORGANISATION_SUBJECT } from '../campaigns/visibility.js';
 
 export async function listSubjects(
   orgId: string,
@@ -110,6 +112,26 @@ export async function createSubject(
     select: { id: true },
   });
   if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
+
+  // RESERVED (DEC-093). `type` is otherwise free text the client chooses, and this one
+  // value decides who can see a campaign — the organisation subject is the row a quick
+  // campaign hangs off, and campaigns/visibility.ts reads the string to know it. Left
+  // settable, anybody holding `subject.create` could mint a subject that made their own
+  // campaign visible org-wide, which is a permission written in a text column.
+  //
+  // 422 rather than a silent rewrite to 'general': a request that asked for something it
+  // may not have should be told so, not quietly given something else.
+  if (body.type === ORGANISATION_SUBJECT) {
+    throw new ValidationError(
+      new z.ZodError([
+        {
+          code: z.ZodIssueCode.custom,
+          path: ['body', 'type'],
+          message: `'${ORGANISATION_SUBJECT}' is reserved`,
+        },
+      ]),
+    );
+  }
 
   if (body.linkedUserId) {
     const user = await prisma.user.findFirst({

@@ -132,9 +132,22 @@ function matchesFilters(line: LogLine, raw: string, filters: LogFilters): boolea
 
 /**
  * Reads one page from the end of `fullPath`, backwards, applying `filters` server-side as it
- * goes. `cursor`, when present, is the exact byte offset the previous page stopped at — so a
- * chunk this call only partially used is simply re-read from the same offset next time,
- * rather than needing to remember where inside a chunk it left off.
+ * goes.
+ *
+ * `cursor` IS THE BYTE OFFSET OF A LINE START — specifically, of the OLDEST LINE THE PREVIOUS
+ * PAGE RETURNED — and D-036 is the whole reason that sentence has to be this exact. It used
+ * to be the offset of the CHUNK the previous page stopped in, on the reasoning that a
+ * partly-used chunk would simply be re-read from the same offset next time. It is not
+ * re-read: the reader walks BACKWARDS, so resuming at the chunk's start reads the chunk
+ * BELOW it and every line the page limit left unreturned in between is skipped, silently.
+ * Measured on a 1,500-line file at limit 50: three pages returned 150 lines and lost 1,350,
+ * and every page after the first opened on the truncated half of whatever line straddled the
+ * boundary. A chunk offset is not a line offset, and only one of the two can be a cursor.
+ *
+ * `hasMore` therefore reads off the same number, not off `position`. A file SMALLER THAN ONE
+ * CHUNK made that difference visible: one read takes `position` to 0 while the limit is still
+ * capping the page, so the reader answered "50 lines, that is all of them" to a 220-line
+ * file. That is not an edge case — it is every log file for the first hours of its day.
  */
 function tailRead(
   fullPath: string,
@@ -158,6 +171,10 @@ function tailRead(
     let leftover = '';
     let bytesRead = 0;
     const matched: LogLine[] = [];
+    // Byte offset of the oldest line RETURNED, which is what the next cursor is made of.
+    // Null until something matches — a filter that matches nothing in the window has no line
+    // to resume from, and the scan boundary below answers for that case instead.
+    let oldestReturned: number | null = null;
 
     while (position > 0 && matched.length < limit && bytesRead < MAX_BYTES_PER_CALL) {
       const readSize = Math.min(CHUNK_BYTES, position);
@@ -172,22 +189,52 @@ function tailRead(
       leftover = rows.shift() ?? ''; // still possibly incomplete unless start === 0
       position = start;
 
+      // Where each complete line STARTS in the file. `leftover` begins at `position`, so the
+      // first complete line begins one byte past the newline that ends it. Measured in BYTES
+      // (`Buffer.byteLength`, never `.length`) — a cursor built from character counts walks
+      // off a line boundary the first time somebody logs a name with an accent in it.
+      const offsets: number[] = [];
+      let at = position + Buffer.byteLength(leftover, 'utf8') + 1;
+      for (const row of rows) {
+        offsets.push(at);
+        at += Buffer.byteLength(row, 'utf8') + 1;
+      }
+
       for (let i = rows.length - 1; i >= 0 && matched.length < limit; i -= 1) {
         const raw = rows[i];
         if (!raw || raw.length === 0) continue;
         const parsed = parseLogLine(raw, fallbackDate);
-        if (matchesFilters(parsed, raw, filters)) matched.push(parsed);
+        if (matchesFilters(parsed, raw, filters)) {
+          matched.push(parsed);
+          oldestReturned = offsets[i] ?? 0;
+        }
       }
     }
 
     if (position === 0 && leftover.length > 0 && matched.length < limit) {
       const parsed = parseLogLine(leftover, fallbackDate);
-      if (matchesFilters(parsed, leftover, filters)) matched.push(parsed);
+      if (matchesFilters(parsed, leftover, filters)) {
+        matched.push(parsed);
+        oldestReturned = 0; // the file's first line, and there is nothing below it
+      }
       leftover = '';
     }
 
-    const hasMore = position > 0;
-    return { data: matched, page: { nextCursor: hasMore ? encodeCursor(position) : null, hasMore } };
+    // Everything at or above this offset has been ANSWERED FOR — either returned, or read and
+    // rejected by a filter. Two ways to arrive here and they resume from different places:
+    // a full page stops at the oldest line it returned, while a window exhausted without
+    // filling the page (the MAX_BYTES_PER_CALL ceiling, or a filter matching little) has
+    // considered every complete line it read and resumes at the oldest of those. Both are
+    // LINE starts, which is the property the cursor needs and `position` never had.
+    const boundary =
+      matched.length >= limit && oldestReturned !== null
+        ? oldestReturned
+        : position === 0
+          ? 0
+          : position + Buffer.byteLength(leftover, 'utf8') + 1;
+
+    const hasMore = boundary > 0;
+    return { data: matched, page: { nextCursor: hasMore ? encodeCursor(boundary) : null, hasMore } };
   } finally {
     fs.closeSync(fd);
   }

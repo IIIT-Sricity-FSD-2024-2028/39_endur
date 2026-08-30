@@ -209,8 +209,15 @@ lossless export and `csv` is the one you can hand to somebody who will open it i
 - [x] A large file renders its most recent page without reading the whole file — the reader
       walks backwards in 64 KB chunks and stops at the page limit (`src/backend/platform/logs/index.ts`'s
       `tailRead`); the test exercises the same algorithm at a size the suite can afford
-      (~220 lines) rather than an actual 10 MB fixture, and asserts the two pages are
-      contiguous with no gap or repeat
+      rather than an actual 10 MB fixture
+- [x] **Paging to the end yields the file** — every line, exactly once, newest first, with no
+      gap and no repeat. Asserted at **two sizes**: one **under** a single 64 KB chunk and one
+      **spanning several**, because the two sizes broke differently and one fixture proves half
+      of it (`DEC-094`, `D-036`). The cursor is the byte offset of the **oldest line the page
+      returned** — never of the chunk the read stopped in, which is the bug this row exists to
+      keep out: the reader walks backwards, so a chunk offset resumes below everything the page
+      limit left unreturned. Measured before the fix: a 1,500-line file at limit 50 returned 150
+      lines and lost 1,350; a 220-line file returned 50 and reported no more
 - [x] `requestId` filtering returns every line of one request across both streams — reads
       every rotation of both `app-*`/`error-*` files for that line's date in full rather than
       paginating (documented as a deliberate exception to "never slurped": the files are

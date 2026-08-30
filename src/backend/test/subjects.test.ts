@@ -202,4 +202,26 @@ describe('subjects', () => {
     // Section B is outside their subtree entirely, so they cannot even see it: 404.
     expect(res.status).toBe(404);
   });
+
+  it("refuses the reserved type 'organisation' — DEC-093", async () => {
+    // `type` is free text the client picks, and ONE value of it decides visibility: a
+    // campaign anchored to the organisation subject is visible to every reader who may
+    // read campaigns at all. Left settable, `subject.create` would be enough to widen the
+    // audience of your own campaign — a permission written in a text column.
+    const res = await withCsrf(founder, 'post', '/api/v1/subjects').send({
+      name: 'Not the organisation',
+      unitId: sectionA,
+      type: 'organisation',
+    });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_FAILED');
+    // Named under the field that caused it, so the form can point at it (13 § Errors).
+    expect(res.body.error.details.fields[0].path).toBe('body.type');
+    // And nothing was written under a different type instead — refused, not rewritten.
+    expect(
+      await prisma.subject.count({ where: { orgId: founder.orgId, name: 'Not the organisation' } }),
+    ).toBe(0);
+  });
+
 });

@@ -95,6 +95,33 @@ second submission; the absence of a third column is what keeps the answer anonym
 `<AccessNotice>` (`24` §7) says which of the two promises the respondent is being given. A
 narrower promise the product can keep beats a broader one it cannot.
 
+### Which campaigns a reader sees — and the one row that is not in a unit
+
+A campaign has **no unit of its own**. It is reachable through its subjects' units, which is
+the honest reading of the model: a campaign is a template pointed at some subjects, and the
+subjects are what live in the org graph.
+
+That reading has exactly one hole, and `D-042` fell down it. A quick campaign — a poll or a
+suggestion box — hangs off the per-organisation singleton subject (`DEC-089`), which is in no
+unit, so `unit_id in visible_units` matched nothing and the poll was **invisible to every
+seeded role in every organisation**, including the person who had created it a second earlier.
+
+`DEC-093` closes it by saying what that row *means* rather than by loosening the filter: a
+campaign anchored to the organisation subject belongs to the whole organisation and is visible
+to anyone who may read campaigns at all. Every quick campaign is `access: public` with
+`audience_rule: anyone`, so the link already answers to whoever holds it — there is nothing
+there to withhold from a member of staff. Nothing else changes: a campaign over a real subject
+in Section A is still absent for a reader in Section B, and the read still 404s rather than
+403s.
+
+The `organisation` subject type is **reserved** — `POST /subjects` refuses it with a 422 on
+`body.type`. It is otherwise free text the client chooses, and a client-settable value that
+decides visibility is a client-settable permission.
+
+The predicate lives in `features/campaigns/visibility.ts` and is used by the list, by the
+single-row read, and by Home. It was written twice before `DEC-093`, which is how only one of
+the two would have been fixed.
+
 **Launch mints `public_token` and is irreversible.** It is idempotent by key (`13` §7) — a
 double-click on stage must not create two links, because the QR already on screen would then
 point at the wrong one.
@@ -277,6 +304,12 @@ is what INV-007 exists to prevent, so that one is refused rather than merely def
       inside the transaction, so a duplicate aborts before a response row exists; the test
       asserts the response count did not move
 - [x] `campaign_participants` cannot be joined to `responses` — asserted against the schema
+- [x] A quick campaign appears on `/app/campaigns` for the person who launched it, including
+      a level-3 launcher whose `campaign.launch` is seeded `own_unit` (`DEC-093`) — the case
+      the narrower root-unit fix would have left broken one level down
+- [x] The unit filter is **not** relaxed generally: a campaign over a unit-anchored subject
+      stays absent for a reader in another unit, and its detail read returns 404
+- [x] `POST /subjects` refuses `type: 'organisation'` with 422 naming `body.type`
 - [x] A campaign cannot be edited once open; the attempt returns 409 (T-021)
 - [x] The share sheet is reachable again from the campaign card, and from the detail page
 - [~] `PUBLIC_BASE_URL` is verified non-localhost before the demo — the product now checks

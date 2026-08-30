@@ -23,6 +23,7 @@ import { seesNothing, visibleUnits } from '../../authz/index.js';
 import { config } from '../../lib/config.js';
 import { statusOf, whereStatus } from './status.js';
 import { mintToken, publicUrlFor } from './token.js';
+import { campaignInScope, ORGANISATION_SUBJECT, scopeToCampaigns } from './visibility.js';
 
 /**
  * Campaigns are scoped through their SUBJECTS' units — a campaign has no unit of its own.
@@ -42,9 +43,9 @@ export async function listCampaigns(
 
   const where = {
     orgId,
-    ...(visibility.all
-      ? {}
-      : { subjects: { some: { subject: { unitId: { in: visibility.unitIds } } } } }),
+    // DEC-093. The rule lives in visibility.ts because home/service.ts asks the same
+    // question, and a predicate written twice is a predicate fixed once.
+    ...scopeToCampaigns(visibility),
     // Filtering by a DERIVED status means restating the derivation in SQL. The alternative
     // — read every row and discard most of them — is worse, and status.ts keeps the two
     // statements next to each other so they are read together (DEC-016).
@@ -310,7 +311,7 @@ async function organisationSubject(tx: Tx, orgId: string): Promise<string> {
   return subject.id;
 }
 
-export const ORGANISATION_SUBJECT = 'organisation';
+export { ORGANISATION_SUBJECT } from './visibility.js';
 
 /**
  * Launch. Mints the public token, and is IRREVERSIBLE.
@@ -453,12 +454,7 @@ async function assertVisible(
   if (!campaign) throw new NotFoundError(missing);
 
   const visibility = await visibleUnits({ orgId, userId, capability, authzVersion });
-  if (visibility.all) return campaign;
-
-  const units = campaign.subjects
-    .map(({ subject }) => subject.unitId)
-    .filter((unitId): unitId is string => Boolean(unitId));
-  if (units.some((unitId) => visibility.unitIds.includes(unitId))) return campaign;
+  if (campaignInScope(campaign.subjects, visibility)) return campaign;
 
   // 404, not 403: a 403 would confirm the campaign exists to somebody outside its scope
   // and leak which parts of the organisation are collecting feedback (13 §5).
@@ -481,7 +477,11 @@ const campaignSelect = {
   _count: { select: { responses: true } },
   subjects: {
     select: {
-      subject: { select: { id: true, name: true, unitId: true, unit: { select: { name: true } } } },
+      // `type` is selected for the visibility rule, not for the DTO — an organisation
+      // subject is the one that belongs to no unit on purpose (DEC-093).
+      subject: {
+        select: { id: true, name: true, unitId: true, type: true, unit: { select: { name: true } } },
+      },
     },
   },
 };
@@ -501,7 +501,13 @@ type CampaignRow = {
   template: { name: string; category: string };
   _count: { responses: number };
   subjects: Array<{
-    subject: { id: string; name: string; unitId: string | null; unit: { name: string } | null };
+    subject: {
+      id: string;
+      name: string;
+      unitId: string | null;
+      type: string;
+      unit: { name: string } | null;
+    };
   }>;
 };
 

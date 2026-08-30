@@ -158,36 +158,59 @@ describe('reading a file', () => {
     expect(statuses).toEqual([200, 403]); // one from app-*.log, one from error-*.log
   });
 
-  it('a bounded page from the end, paginated backwards, with no gap or duplicate', async () => {
-    const owner = await makeOperator('owner');
-    const bulkDate = '2021-06-16';
-    const bulkFile = `app-${bulkDate}.log`;
-    const bulkPath = path.join(logDir, bulkFile);
-    // Representative of "a large file returns its most recent page without reading the
-    // whole file" at a size the test suite can afford — the algorithm exercised is the
-    // same backward, chunked read regardless of how many chunks a real 10 MB file takes.
-    const total = 220;
-    const rows: string[] = [];
-    for (let i = 0; i < total; i += 1) {
-      rows.push(line({ msg: `line-${i}`, method: 'GET', path: '/x', status: 200 }));
-    }
-    fs.writeFileSync(bulkPath, `${rows.join('\n')}\n`);
-    try {
-      const page1 = await owner.agent.get(`/api/v1/platform/logs/${bulkFile}?limit=50`);
-      expect(page1.body.data).toHaveLength(50);
-      expect(page1.body.data[0].msg).toBe(`line-${total - 1}`); // newest first
-      expect(page1.body.page.hasMore).toBe(true);
-      expect(page1.body.page.nextCursor).toBeTruthy();
+  // D-036, and the assertion is deliberately the WHOLE file rather than the first two pages.
+  // The old version stopped after page 2 and was red for four days against a diagnosis that
+  // said the fixture had shrunk below the 64 KB chunk so it was "asserting nothing". It was
+  // asserting the right thing: the reader lost 170 of these 220 lines and said hasMore false.
+  // A pagination test that walks two pages can only ever catch a bug in the first two pages —
+  // the property is that paging to the end yields the file, so that is what is written here.
+  //
+  // Both sizes are on purpose. UNDER one chunk is where `hasMore` was wrong (one read takes
+  // the scan to offset 0 while the limit is still capping the page), and OVER one chunk is
+  // where the cursor was wrong (it named the chunk start, so every line the limit left
+  // unreturned in that chunk was skipped). One fixture would have proved half of it.
+  for (const [label, total, bulkDate] of [
+    ['smaller than one 64 KB chunk', 220, '2021-06-16'],
+    ['spanning several chunks', 900, '2021-06-18'],
+  ] as const) {
+    it(`pages backwards to the end of a file ${label}, with no gap or duplicate`, async () => {
+      const owner = await makeOperator('owner');
+      const bulkFile = `app-${bulkDate}.log`;
+      const bulkPath = path.join(logDir, bulkFile);
+      const rows: string[] = [];
+      for (let i = 0; i < total; i += 1) {
+        // A multi-byte character in every line: the cursor is a BYTE offset, and a reader
+        // measuring it in string length walks off a line boundary the first time somebody
+        // logs an accented name. Silent, and only above one chunk.
+        rows.push(line({ msg: `line-${i}`, method: 'GET', path: '/x', status: 200, note: 'café ✓' }));
+      }
+      fs.writeFileSync(bulkPath, `${rows.join('\n')}\n`);
+      try {
+        const seen: string[] = [];
+        let cursor: string | undefined;
+        let pages = 0;
+        for (;;) {
+          const query = cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`;
+          const res = await owner.agent.get(`/api/v1/platform/logs/${bulkFile}?limit=50${query}`);
+          expect(res.status).toBe(200);
+          const data = res.body.data as LogLineBody[];
+          seen.push(...data.map((l) => String((l as { msg?: string }).msg)));
+          pages += 1;
+          expect(pages).toBeLessThan(total); // a cursor that stops advancing must fail, not hang
+          if (!res.body.page.hasMore) break;
+          expect(res.body.page.nextCursor).toBeTruthy();
+          cursor = res.body.page.nextCursor as string;
+        }
 
-      const page2 = await owner.agent.get(
-        `/api/v1/platform/logs/${bulkFile}?limit=50&cursor=${encodeURIComponent(page1.body.page.nextCursor)}`,
-      );
-      expect(page2.body.data).toHaveLength(50);
-      expect(page2.body.data[0].msg).toBe(`line-${total - 51}`); // continues, no gap or repeat
-    } finally {
-      fs.unlinkSync(bulkPath);
-    }
-  });
+        // Newest first, every line exactly once, in order — which is the same statement as
+        // "no gap and no duplicate", said once instead of three times.
+        const expected = Array.from({ length: total }, (_, i) => `line-${total - 1 - i}`);
+        expect(seen).toEqual(expected);
+      } finally {
+        fs.unlinkSync(bulkPath);
+      }
+    });
+  }
 
   it('no route here can write, delete or rotate a file', async () => {
     const owner = await makeOperator('owner');

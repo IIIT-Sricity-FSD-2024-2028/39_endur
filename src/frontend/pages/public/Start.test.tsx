@@ -60,7 +60,11 @@ const submit = () =>
  */
 const pay = () => fireEvent.click(screen.getByRole('button', { name: /^Pay ₹/ }));
 
-const PAID = { timeout: 4000 };
+// ~2.2s of that sequence is real wall clock, and 4000 left only 1.7s of slack — which a
+// jsdom run across 68 files in parallel eats. D-041: raised with the project's test timeout,
+// and still well under it so a dialog that never resolves fails HERE, naming the wait, rather
+// than as an anonymous test timeout.
+const PAID = { timeout: 12_000 };
 
 /** The whole happy path: fill the fields, advance, pick a tier, open the checkout, pay. */
 const register = (email?: string, tier?: string) => {

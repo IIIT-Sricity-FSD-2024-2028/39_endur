@@ -11,7 +11,8 @@
 //   · the public payload names NOBODY who has booked
 //   · DEC-090 holds structurally: nothing in features/booking/ reads `responses`
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { prisma } from '../db/client.js';
@@ -272,7 +273,12 @@ describe('booking', () => {
  */
 describe('bookings and responses never meet — DEC-090', () => {
   it('has no query in features/booking/ that touches the responses table', () => {
-    const dir = join(process.cwd(), 'features', 'booking');
+    // Resolved from THIS FILE, never from `process.cwd()` — D-037's lesson, and this guard
+    // was still making the mistake. Run from `src/backend` the old path was right; run from
+    // the repo root, which D-037 made the correct command, `readdirSync` threw and the guard
+    // reported on nothing. A rule that only holds from one working directory is not a rule,
+    // and a structural guard is the last place that should depend on how it was launched.
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'features', 'booking');
     const files = readdirSync(dir).filter((name) => name.endsWith('.ts'));
     expect(files.length).toBeGreaterThan(0);
 
