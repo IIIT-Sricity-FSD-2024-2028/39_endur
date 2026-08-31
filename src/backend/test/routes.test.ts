@@ -10,9 +10,7 @@
 // allowlist. It is to add the guard.
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
-import { CAPABILITY_TAG } from '../middleware/requireCapability.js';
-import { PLATFORM_TAG } from '../middleware/requirePlatform.js';
-import { mountedRouters } from '../lib/mount.js';
+import { enumerateRoutes } from '../lib/routeTable.js';
 import { grantsForLevel } from '../presets/grant-matrix.js';
 
 /**
@@ -108,6 +106,26 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
       'user id, so the route can only ever reach the caller\'s own rows.',
   },
   {
+    // T-110, DEC-115. THE API DOCUMENT AND ITS VIEWER, and they are unguarded on purpose.
+    //
+    // The document describes the SHAPE of the API — paths, schemas, which capability each route
+    // needs — and carries no customer data, no organisation names and no secrets. Every fact in
+    // it is already derivable by reading the client bundle. A session gate would keep out the one
+    // audience that most needs it (somebody integrating, somebody evaluating, somebody new to the
+    // codebase) in exchange for hiding nothing.
+    //
+    // What actually scopes it is the MOUNT: `app.ts` does not mount this router in production, so
+    // there the path answers the same 404 as any other unknown URL rather than a 403 that would
+    // confirm it would have been there. A capability could not have expressed that, because in
+    // production there is no route for one to sit on.
+    pattern: /^\/api\/v1\/docs(\/|\/openapi\.json)?$/,
+    why:
+      'the OpenAPI document and its viewer (DEC-115, 13 §12). It describes the shape of the API ' +
+      'and contains no tenant data — every fact in it is already derivable from the client ' +
+      'bundle. It is scoped by NOT BEING MOUNTED in production rather than by a capability, so ' +
+      'a production deployment 404s it like any unknown URL.',
+  },
+  {
     pattern: /^\/api\/v1\/files\/:id$/,
     why:
       'serving a logo or an avatar (48). The unguessable id IS the credential: these render ' +
@@ -117,53 +135,14 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
   },
 ];
 
-type Route = {
-  method: string;
-  path: string;
-  guarded: boolean;
-  capabilities: string[];
-  /** T-059. The FOURTH guard's tag, collected separately — see the two tests below. */
-  platform: string[];
-};
-
 /**
- * Walks the app's own stack plus every mounted router, using the prefixes recorded by
- * `mount()` rather than Express internals.
+ * THE WALKER MOVED TO `lib/routeTable.ts` AT `T-110`, and this test now imports it.
+ *
+ * It was defined here for as long as this was the only thing that needed it. The OpenAPI
+ * document needs to walk the same stack (`DEC-115`), and two walkers would be able to disagree
+ * about which routes exist WITHOUT EITHER FAILING — the spec would describe a route this test
+ * never checked, or miss one it did, and nothing would say so. One walker, two readers.
  */
-function enumerateRoutes(app: ReturnType<typeof createApp>): Route[] {
-  const routes: Route[] = [];
-  const appStack = (app as unknown as { router?: { stack: unknown[] } }).router?.stack ?? [];
-
-  const collect = (layers: unknown[], prefix: string): void => {
-    for (const raw of layers) {
-      const route = (raw as { route?: { path: string; methods: Record<string, boolean>; stack: { handle: unknown }[] } }).route;
-      if (!route) continue;
-      const tagged = (tag: symbol) =>
-        route.stack.flatMap((entry) =>
-          typeof entry.handle === 'function' && tag in entry.handle
-            ? [(entry.handle as unknown as Record<symbol, string>)[tag] as string]
-            : [],
-        );
-      const capabilities = tagged(CAPABILITY_TAG);
-      const platform = tagged(PLATFORM_TAG);
-      for (const method of Object.keys(route.methods)) {
-        routes.push({
-          method: method.toUpperCase(),
-          path: prefix + route.path,
-          guarded: capabilities.length > 0 || platform.length > 0,
-          capabilities,
-          platform,
-        });
-      }
-    }
-  };
-
-  collect(appStack, '');
-  for (const [router, prefix] of mountedRouters()) {
-    collect((router as unknown as { stack: unknown[] }).stack, prefix);
-  }
-  return routes;
-}
 
 const isPublic = (path: string) => PUBLIC_ROUTES.find((entry) => entry.pattern.test(path));
 

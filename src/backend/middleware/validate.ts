@@ -12,9 +12,19 @@ import type { RequestHandler } from 'express';
 import type { z } from 'zod';
 import { ValidationError } from '../lib/errors.js';
 
-export const validate =
-  (schema: z.ZodType<unknown>): RequestHandler =>
-  (req, _res, next) => {
+/**
+ * The DTO, hung on the middleware so the route table can find it. `DEC-115`.
+ *
+ * Exactly the trick `CAPABILITY_TAG` already plays one link along, and for the same reason:
+ * the alternative is a second list of "which schema belongs to which route", maintained by
+ * hand, which is a list that goes stale the first time somebody adds a route in a hurry. A tag
+ * on the function is a fact the router stack already carries — so the OpenAPI document
+ * describes the schema the request is ACTUALLY parsed against, and cannot describe any other.
+ */
+export const DTO_TAG = Symbol.for('endur.dto');
+
+export const validate = (schema: z.ZodType<unknown>): RequestHandler => {
+  const handler: RequestHandler = (req, _res, next) => {
     // Express types req.body as `any`. Narrowing it to `unknown` here is not ceremony:
     // this middleware exists precisely because that value is untrusted, and `any` would
     // let it flow onward unchecked.
@@ -26,3 +36,5 @@ export const validate =
     req.data = result.data;
     next();
   };
+  return Object.assign(handler, { [DTO_TAG]: schema });
+};
