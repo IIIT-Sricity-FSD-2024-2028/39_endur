@@ -1,14 +1,9 @@
-// The Prisma singleton. Everything that touches the database goes through this instance.
-//
-// IMPORTANT: services never call this client directly with a bare `findMany()`. Every
-// request-scoped read goes through the tenant-bound wrapper (T-006, 10 §8) which injects
-// `where: { orgId }`, because org_id comes from tenantResolver and NEVER from a request
-// body — a body-supplied orgId is an attack, not an input (INV-010).
+// The one Prisma client for the whole app.
+// Request code does not use it directly - it uses ctx.db, which adds the orgId filter for you.
 import { PrismaClient } from '@prisma/client';
 import { config, isDev } from '../lib/config.js';
 
-// tsx watch re-imports this module on every save; without the global the dev server
-// leaks a connection pool per reload until Postgres refuses new connections.
+// Kept on globalThis so the dev watcher does not leak a new connection pool on every save.
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export const prisma =

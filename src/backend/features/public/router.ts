@@ -1,11 +1,6 @@
-// The respondent routes. 13 §6, 39.
-//
-// The only two routes in the product with no capability check. Access IS the token — a
-// respondent has no account, no session and no cookie that identifies them (DEC-009), so
-// there is nothing for requireCapability to decide.
-//
-// They are listed in `PUBLIC_ROUTES` in the route-enumeration test with that reason spelled
-// out, which is the mechanism that keeps the exception deliberate rather than accidental.
+// The respondent routes: what a phone reaches after scanning a QR code.
+// The only routes with no capability check, because the token IS the access - a respondent has no account,
+// no session and no cookie. The route test lists them with that reason, so the exception stays deliberate.
 import { Router } from 'express';
 import {
   PublicBookDto,
@@ -26,24 +21,14 @@ import { readPublicCampaign, submitResponse } from './service.js';
 
 export const publicRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2), and a DIFFERENT set from every other router.
-//
-// publicCors is wide and without credentials: a QR scan has to work from any network, off
-// any phone, with no cookie attached — which is exactly why this is a different CORS
-// policy from the console's and why it is mounted here rather than globally.
-//
-// The tenant is optional (an invalid token must 404 like a closed campaign, not 401 —
-// 13 §6) and there is NO csrfProtection, because these routes carry no ambient authority
-// for a forged request to borrow. See middleware/chains.ts.
+// A different chain from every other router: wide CORS with no credentials, so a scan works from any network,
+// an optional organisation, and no CSRF, because there is no cookie here for a forged request to borrow.
 publicRouter.use(respondentChain);
 
-// RESOLVE FIRST, GATE SECOND, AND THE ORDER IS THE SECURITY PROPERTY (12 §4.10c).
-//
-// resolveCampaign 404s an invalid, unlaunched, not-yet-open, closed or expired token
-// exactly as this route always has, so requireMembership is reachable ONLY with a working
-// token. Its 401 therefore discloses nothing the token in the caller's hand did not.
-// Swapping these two lines turns a restricted campaign into an existence oracle — probe a
-// token, and a 401 instead of a 404 tells you the campaign is real.
+// Resolve first, gate second - and the ORDER is the security property.
+// The resolver 404s an unknown, unlaunched, closed or expired token, so the membership gate is only
+// reachable with a working token. Swapping the two would let a probe tell a real campaign from a fake one.
+// The form a respondent sees.
 publicRouter.get(
   '/campaigns/:token',
   validate(PublicCampaignDto),
@@ -54,19 +39,17 @@ publicRouter.get(
   },
 );
 
+// Submitting answers.
 publicRouter.post(
   '/campaigns/:token/responses',
-  // Per-IP, and tight. This route writes to the database with no credential at all.
+  // Per IP, and tight: this route writes to the database with no credential at all.
   scopedRateLimits.respondentSubmit,
   validate(SubmitResponseDto),
-  // Same order, same reason. The gate also runs BEFORE idempotency: a refused request
-  // should not consume a key, and a caller who is turned away and then signs in must not
-  // be replayed their own 401.
+  // Same order, same reason. It also runs before idempotency, so a refused request does not consume a key.
   resolveCampaign,
   requireMembership,
-  // The idempotency case that matters most (13 §7): a phone on a flaky venue network
-  // retries by itself, and a duplicate response corrupts the demo's numbers in front of
-  // the evaluator.
+  // The idempotency case that matters most: a phone on a weak network retries by itself, and a duplicate
+  // response would corrupt the numbers during the demo.
   idempotent('public.submit'),
   (req, res, next) => {
     const { body } = req.data as { body: SubmitResponseBody };
@@ -76,20 +59,11 @@ publicRouter.post(
   },
 );
 
-// ─────────────────────────────────────────────────────────────────────────────────────────
-// BOOKING — T-095. On THIS router and not on a fourth one, which is the whole decision.
-//
-// A booking link has every property the respondent surface exists for: no account, a phone,
-// a venue network, a token that is the access. Mounting it here inherits the wide CORS, the
-// absent CSRF, the per-IP rate limit and the ONE `PUBLIC_ROUTES` allowlist entry that is
-// already justified in 13 §6 — a separate router would have needed a second exemption, and
-// a second exemption is how the first one stops being deliberate.
-//
-// NOT entitlement-gated, unlike everything in the console half. A guest holding a link did
-// not choose the plan and must not be punished for it — 16 §6 already says exactly this
-// about a suspended organisation's QR code, and a downgrade is the milder case.
-// ─────────────────────────────────────────────────────────────────────────────────────────
+// Booking, on THIS router rather than a fourth one: a booking link has every property the respondent
+// surface exists for, and mounting it here inherits the one already-justified public exemption.
+// Not plan-gated either: a guest holding a link did not choose the organisation's plan.
 
+// The public booking page for a bookable's open slots.
 publicRouter.get(
   '/bookables/:token',
   validate(PublicBookableDto),
@@ -101,25 +75,20 @@ publicRouter.get(
   },
 );
 
+// Making a booking.
 publicRouter.post(
   '/bookables/:token/bookings',
-  // Per-IP and tight, as the submit route is: this writes to the database with no credential
-  // at all. Same bucket, because it is the same threat and a second one would be a second
-  // number to keep in step.
+  // Per IP and tight, like submit: this writes with no credential. The same bucket, because it is the same threat.
   scopedRateLimits.respondentSubmit,
   validate(PublicBookDto),
-  // Resolve first, gate second — the order is the security property (12 §4.10c). There is no
-  // membership gate here yet; the order is kept anyway so that adding one cannot get it wrong.
+  // Resolve first, gate second. There is no membership gate here yet; the order is kept so adding one is safe.
   resolveBookable,
-  // A phone on a flaky network retries by itself, and a duplicate booking takes two places
-  // out of a slot for one person — the same failure a duplicate response is, with a seat
-  // attached (13 §7).
+  // A retry on a weak network must not take two places out of a slot for one person.
   idempotent('public.book'),
   (req, res, next) => {
     const { body } = req.data as { body: CreateBookingBody };
-    // The user id when a signed-in member happens to be booking, NULL otherwise. It is not
-    // authorisation and nothing reads it as such — the token is the access, exactly as on the
-    // response routes; this only records that the booker had an account.
+    // The account id when a signed-in member happens to be booking, otherwise null. It is not authorisation:
+    // the token is the access, and this only records that the booker had an account.
     const principal = req.ctx.principal;
     const userId = principal?.kind === 'user' && principal.id ? principal.id : null;
     void book(bookableOf(req), body, userId)
@@ -128,8 +97,8 @@ publicRouter.post(
   },
 );
 
-// The booker's own, with no account. The cancel token authorises exactly one row, which is
-// why this is not `booking.cancel` — that verb is for reaching into somebody ELSE's decision.
+// The booker's own cancellation. The cancel token authorises exactly one row, which is why this is not
+// the booking.cancel capability - that verb is for reaching into somebody else's booking.
 publicRouter.post(
   '/bookings/:cancelToken/cancel',
   scopedRateLimits.respondentSubmit,

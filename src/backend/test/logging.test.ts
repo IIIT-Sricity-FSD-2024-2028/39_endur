@@ -1,9 +1,7 @@
-// 18 — logs and error information on disk. T-063.
-//
-// The evaluation criterion is "logs and error information should be stored in files at
-// regular intervals", so these tests are about the FILES: that they appear, that they
-// rotate on both axes, that old ones go, that the split between app and error holds, and
-// that a broken log directory cannot take the application down.
+// Logs and error information on disk.
+// These tests are about the FILES: that they appear, that they rotate by day and by size, that old
+// ones are removed, that the split between the app log and the error log holds, and that a broken
+// log directory cannot take the application down.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -67,7 +65,7 @@ describe('rotating log file', () => {
     const foreign = 'notes.txt';
     for (const name of [old, recent, foreign]) fs.writeFileSync(path.join(dir, name), 'x');
 
-    // Retention runs at open, which is the cheapest honest moment for a daily scan.
+    // Old files are removed when a file is opened, which is the cheapest honest moment for a daily scan.
     createRotatingStream({ dir, prefix: 'app', maxBytes: 1024, retentionDays: 14 }).close();
 
     expect(fs.existsSync(path.join(dir, old))).toBe(false);
@@ -86,7 +84,7 @@ describe('rotating log file', () => {
   });
 
   it('fails OFF rather than throwing when the directory cannot be used', () => {
-    // A file where the directory should be: mkdir fails, and so would every write.
+    // A file where the directory should be: creating it fails, and so would every write.
     const blocked = path.join(dir, 'blocked');
     fs.writeFileSync(blocked, 'not a directory');
 
@@ -102,7 +100,7 @@ describe('rotating log file', () => {
 });
 
 describe('the two streams', () => {
-  /** The real wiring from logger.ts, pointed at a temp directory. */
+  // The real wiring from logger.ts, pointed at a temp directory.
   const build = () =>
     pino(
       loggerOptions,
@@ -132,7 +130,7 @@ describe('the two streams', () => {
     expect(app).toContain('req=r2');
     expect(app).toContain('req=r3');
 
-    // The point of a second file: no 200s in it.
+    // The point of a second file: no successful requests in it.
     expect(err).not.toContain('req=r1');
     expect(err).toContain('req=r2');
     expect(err).toContain('req=r3');
@@ -159,7 +157,7 @@ describe('the two streams', () => {
       'request',
     );
 
-    // 18 §2 — the pipeline's rendering is unchanged; only the file's reader is a person.
+    // The pipeline's own rendering is unchanged; only the file's reader is a person.
     expect(out[0]).toContain('"requestId":"r9"');
 
     const line = read(`app-${today}.log`).trim();
@@ -178,7 +176,7 @@ describe('the two streams', () => {
     const app = read(`app-${today}.log`);
     expect(app).not.toContain('hunter2');
     expect(app).not.toContain('argon2id');
-    // `remove: true`, so the key is ABSENT rather than present-and-starred (18 §3).
+    // Removed outright, so the key is ABSENT rather than present and starred out.
     expect(app).not.toContain('password');
   });
 

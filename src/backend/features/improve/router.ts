@@ -1,7 +1,6 @@
-// The improve loop. 44, T-083. Gold-entitled, every route.
-//
-// Order is `requireCapability` then `requireEntitlement`, always — 403 outranks 402, so
-// nobody is invited to buy something they still would not be allowed to open (DEC-011).
+// The improve loop: reflect, see the gap, write a plan, and check in on it.
+// Every route is Gold-only, and the capability check always runs before the plan check,
+// so nobody is invited to buy something they still could not open.
 import { Router } from 'express';
 import {
   CheckinCreateDto,
@@ -53,6 +52,7 @@ const send = <T>(res: { json: (b: unknown) => unknown }, next: (e?: unknown) => 
   void Promise.resolve().then(work).then((data) => res.json({ data })).catch(next);
 };
 
+// The cycles this person is a reviewee in, and where each one stands.
 reflectRouter.get(
   '/',
   authenticate,
@@ -62,6 +62,7 @@ reflectRouter.get(
   (req, res, next) => send(res, next, () => readCycles(org(req), userOf(req))),
 );
 
+// The self-assessment form for one cycle: the campaign's own questions.
 reflectRouter.get(
   '/:campaignId',
   authenticate,
@@ -74,6 +75,7 @@ reflectRouter.get(
   },
 );
 
+// Records the person's own assessment. Once only.
 reflectRouter.post(
   '/:campaignId',
   authenticate,
@@ -88,9 +90,8 @@ reflectRouter.post(
   },
 );
 
-// THE ORDERING CONSTRAINT'S ROUTE. 404 until the reflection exists — see service.ts. There
-// is no sibling route that returns the received scores without the self ones, and that
-// absence is the enforcement (44 § Purpose).
+// The gap route 404s until the reflection exists. There is deliberately no route that returns the
+// received scores on their own, and that absence IS the enforcement.
 reflectRouter.get(
   '/:campaignId/gap',
   authenticate,
@@ -103,6 +104,7 @@ reflectRouter.get(
   },
 );
 
+// Writes or updates the action plan for a cycle.
 reflectRouter.post(
   '/:campaignId/plan',
   authenticate,
@@ -117,6 +119,7 @@ reflectRouter.post(
   },
 );
 
+// Marks a plan as final.
 reflectRouter.post(
   '/plans/:id/finalise',
   authenticate,
@@ -129,6 +132,7 @@ reflectRouter.post(
   },
 );
 
+// A supervisor records a check-in against somebody's plan.
 checkinsRouter.post(
   '/',
   authenticate,
@@ -141,6 +145,7 @@ checkinsRouter.post(
   },
 );
 
+// Edits or finalises a check-in.
 checkinsRouter.patch(
   '/:id',
   authenticate,

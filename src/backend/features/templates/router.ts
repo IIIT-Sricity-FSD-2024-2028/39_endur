@@ -1,4 +1,4 @@
-// Template routes. 13 § Templates and forms, 36, 37.
+// Template routes: the reusable question sets a campaign is built from.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import {
@@ -32,16 +32,12 @@ import {
 
 export const templatesRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 templatesRouter.use(tenantChain);
 
-// Registered before /:id so "library" is never read as a template id.
-//
-// Guarded by `template.read` rather than added to the route-enumeration allowlist
-// (DEC-018). 13 §3 lists it as auth-optional, but no M0 screen reaches it without a
-// session — the wizard and the library browser are both inside the console — and every
-// allowlist entry is a route no guard protects forever.
+// Registered before /:id, so "library" is never read as a template id.
+// Guarded by template.read rather than left open: every unguarded route is one no permission protects.
+// The shared library of starter templates.
 templatesRouter.get(
   '/library',
   authenticate,
@@ -55,6 +51,7 @@ templatesRouter.get(
   },
 );
 
+// This organisation's own templates.
 templatesRouter.get(
   '/',
   authenticate,
@@ -68,6 +65,7 @@ templatesRouter.get(
   },
 );
 
+// One template, with its questions.
 templatesRouter.get(
   '/:id',
   authenticate,
@@ -81,6 +79,7 @@ templatesRouter.get(
   },
 );
 
+// Creates an empty template.
 templatesRouter.post(
   '/',
   authenticate,
@@ -94,14 +93,14 @@ templatesRouter.post(
   },
 );
 
+// Copies a template into this organisation so it can be edited.
 templatesRouter.post(
   '/:id/clone',
   authenticate,
   validate(CloneTemplateDto),
   requireCapability('template.clone'),
-  // A double-clicked clone must produce ONE template (36 § Acceptance). Clone lands the
-  // user straight in the builder, so a second copy appearing behind them is invisible
-  // until it is confusing.
+  // A double-clicked clone must produce ONE template: cloning drops the user into the builder,
+  // so a second copy behind them is invisible until it becomes confusing.
   idempotent('template.clone'),
   (req, res, next) => {
     const { body, params } = req.data as { body: { name?: string }; params: { id: string } };
@@ -111,6 +110,7 @@ templatesRouter.post(
   },
 );
 
+// Renames a template or edits its description.
 templatesRouter.patch(
   '/:id',
   authenticate,
@@ -124,8 +124,7 @@ templatesRouter.patch(
   },
 );
 
-// Bulk, and the whole set. The builder autosaves a document, not a stream of field edits,
-// and reordering is one operation on an array rather than N position updates (37).
+// Saves the whole question set at once: the builder autosaves a document, and reordering is one array, not N updates.
 templatesRouter.put(
   '/:id/questions',
   authenticate,
@@ -139,6 +138,7 @@ templatesRouter.put(
   },
 );
 
+// Deletes a template.
 templatesRouter.delete(
   '/:id',
   authenticate,

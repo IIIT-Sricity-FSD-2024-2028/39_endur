@@ -1,9 +1,6 @@
-// T-088 — the tier is chosen at sign-up and it is the tier the org is on. DEC-048, 16, 49.
-//
-// This file did not exist before T-088, which is worth saying plainly: `requireEntitlement`
-// has been mounted since T-003 and had NO TESTS AT ALL. That is how D-012 survived a month —
-// every organisation silently bronze, every silver and gold surface 402ing for everyone, and
-// nothing anywhere asserting that a tier a customer chose is the tier they get.
+// The tier is chosen at sign-up, and it is the tier the organisation is on.
+// This file did not exist before: the entitlement gate had been mounted for a long time with NO tests
+// at all, which is how every organisation stayed silently on the free tier for a month.
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import {
@@ -24,32 +21,18 @@ import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
 
 describe('the entitlement map covers the catalogue — 16 §3', () => {
-  /**
-   * THE TEST THAT WOULD HAVE CAUGHT BOTH BUGS T-088 FOUND.
-   *
-   * `account.*` (added by T-072) and `billing.*` (added by T-003) were in no tier whatsoever,
-   * so `lowestTierFor` returned `undefined` for them and `requireEntitlement` would have
-   * refused them at every tier including Enterprise. Neither had fired yet — the account
-   * routes are not entitlement-gated and `POST /billing/tier` does not exist — but
-   * `billing.update` uncovered means a paywall in front of the upgrade button, which is the
-   * one place a 402 can never be correct.
-   *
-   * A capability in no tier is always a bug, never a decision: the point of the map is that
-   * SOMEBODY can use each thing. If a future capability is genuinely operator-only it belongs
-   * in `19`'s platform catalogue, which this table does not describe.
-   */
+  // The test that would have caught both bugs found here: two whole modules were in NO tier, so the gate
+  // would have refused them at every tier including the highest - and an uncovered billing capability
+  // means a paywall in front of the upgrade button.
+  // A capability in no tier is always a bug, never a decision.
   it('leaves no capability in no tier at all', () => {
     const covered = new Set<Capability>(TIERS.flatMap((tier) => [...TIER_ENTITLEMENTS[tier]]));
     const orphans = CAPABILITIES.filter((capability) => !covered.has(capability));
     expect(orphans).toEqual([]);
   });
 
-  /**
-   * `lowestTierFor` returns the FIRST tier in `TIERS` order that includes the capability, and
-   * that is only the cheapest tier if the tiers nest. A silver-only capability that bronze
-   * also held would make the 402's `requiredTier` a lie — it would name a tier the caller is
-   * already above.
-   */
+  // The cheapest tier only means anything if the tiers nest: a capability held by a lower tier but
+  // reported as needing a higher one would make the 402's advice a lie.
   it('nests: every tier includes everything the tier below it does', () => {
     for (let index = 1; index < TIERS.length; index += 1) {
       const lower = TIER_ENTITLEMENTS[TIERS[index - 1]!];
@@ -80,25 +63,16 @@ describe('the picker offers three tiers and not four — DEC-048', () => {
     expect(PLAN_OPTIONS.map((plan) => plan.tier)).toEqual([...TIERS]);
   });
 
-  /**
-   * Enterprise is priced individually (`16` §4) — a sales conversation, not a button. It is
-   * still a REAL tier: the entitlement map carries it and an operator can set it through
-   * `platform.plan.override` (`19` §4). What it is not is self-serve.
-   */
+  // Enterprise is priced individually - a conversation, not a button - but it is still a real tier that
+  // an operator can assign.
   it('shows Enterprise and refuses to let anyone choose it', () => {
     expect(PLAN_OPTIONS.find((plan) => plan.tier === 'enterprise')?.selectable).toBe(false);
     expect(SIGNUP_PLAN_OPTIONS.map((plan) => plan.tier)).toEqual([...SIGNUP_TIERS]);
     expect(SIGNUP_TIERS).not.toContain('enterprise');
   });
 
-  /**
-   * THE PRICES, ASSERTED — DEC-080, which supersedes DEC-035.
-   *
-   * The picker prints these before anybody has a session and the server prices every ledger
-   * row from the same table, so a typo here is a wrong price quoted to a customer AND a wrong
-   * amount recorded against them. That is a bigger blast radius than the pitch copy this
-   * describe block already guards, and it is worth its own assertion rather than a review.
-   */
+  // The prices, asserted: the picker prints these before anybody has a session and the server prices
+  // every ledger row from the same table, so a typo is both a wrong quote and a wrong charge.
   it('prices the three sellable tiers in paise, ascending', () => {
     const priced = SIGNUP_PLAN_OPTIONS.map((plan) => [plan.tier, plan.priceMinor]);
     expect(priced).toEqual([
@@ -108,68 +82,50 @@ describe('the picker offers three tiers and not four — DEC-048', () => {
     ]);
     for (const plan of PLAN_OPTIONS) {
       expect(plan.currency).toBe('INR');
-      // Integers, always. A float here is a rounding error in a ledger.
+      // Whole numbers always: a decimal here is a rounding error in a ledger.
       expect(Number.isInteger(plan.priceMinor)).toBe(true);
     }
   });
 
-  /**
-   * ENTERPRISE HAS A PRICE AND STILL CANNOT BE ASSIGNED — `DEC-099`.
-   *
-   * This assertion used to read `priceMinor === 0` under a comment explaining that 0 was not
-   * free. It was true and it was the problem: a sentinel that every reader had to be told
-   * about is a sentinel that leaks, and it leaked as copy — "Priced with you", "Arranged with
-   * us". The two facts are now independent, which is the point of the change, so they are
-   * asserted as two facts.
-   *
-   * ₹0 MUST STILL NEVER RENDER OUT OF THIS ROW, and that property survives the sentinel it
-   * used to be about: nothing prints ₹0 because the number is 499900, rather than because
-   * every caller remembered to branch first.
-   */
+  // Enterprise has a price and still cannot be chosen by a customer.
+  // This used to assert a price of zero under a comment explaining that zero did not mean free - a
+  // sentinel every reader had to be told about, which leaked into the copy. Now they are two facts.
   it('prices Enterprise and still refuses to let a customer assign it', () => {
     const enterprise = PLAN_OPTIONS.find((plan) => plan.tier === 'enterprise');
     expect(enterprise?.priceMinor).toBe(499900);
     expect(formatMoney(enterprise?.priceMinor ?? 0)).toBe('₹4,999');
-    // A price is not a checkout. `selectable` now says ONE thing and this is it.
+    // A price is not a checkout.
     expect(enterprise?.selectable).toBe(false);
     expect(SIGNUP_PLAN_OPTIONS.some((plan) => plan.tier === 'enterprise')).toBe(false);
   });
 
-  /** One formatter, whole rupees while the paise are zero. `49`, `71` and the dialog share it. */
+  // One formatter, whole rupees while the paise are zero, shared by the plan page, the dialog and the
+  // earnings page.
   it('formats money as whole rupees', () => {
     expect(formatMoney(9900)).toBe('₹99');
     expect(formatMoney(99900)).toBe('₹999');
     expect(priceOf('silver')).toBe(49900);
   });
 
-  /**
-   * WHAT A MOVE COSTS — DEC-097. One formula, and both the checkout dialog and the ledger
-   * writer call it, which is the only reason the two cannot disagree about a customer's bill.
-   */
+  // What a move costs: one formula, called by both the checkout dialog and the ledger writer, which is
+  // the only reason the two cannot disagree about a customer's bill.
   it('prices an upgrade as the difference and a signup at full price', () => {
     expect(changeCostMinor(null, 'gold')).toBe(priceOf('gold'));
     expect(changeCostMinor('bronze', 'gold')).toBe(90000);
     expect(changeCostMinor('silver', 'gold')).toBe(50000);
-    // Standing still costs nothing — which is exactly why `joinTier` refuses it with a 409
-    // rather than writing a free row per click.
+    // Standing still costs nothing, which is why the join route refuses it rather than writing a free row.
     expect(changeCostMinor('gold', 'gold')).toBe(0);
-    // CLAMPED, AND THE CLAMP SHOULD BE UNREACHABLE. A negative row in an append-only ledger
-    // is a refund, and this product has never had one; the route refuses the move first.
+    // Clamped, and the clamp should be unreachable: a negative row in an append-only ledger is a refund.
     expect(changeCostMinor('gold', 'bronze')).toBe(0);
   });
 
-  /**
-   * THE PERIOD, AS ARITHMETIC — DEC-096. It is one calendar month and it CLAMPS, because
-   * JavaScript rolls 31 January + 1 month forward to 3 March rather than refusing. Nothing
-   * reads `period_end` today; `DEC-098` is about to make it the date a scheduled downgrade
-   * fires on, and an off-by-three-days there is a customer on the wrong plan.
-   */
+  // The period, as arithmetic: one calendar month, and it CLAMPS, because adding a month to 31 January
+  // would otherwise roll forward into March.
   it('runs a period for one calendar month, clamped to the last day', () => {
     const on = (iso: string) => periodEndFrom(new Date(iso)).toISOString().slice(0, 10);
     expect(on('2026-08-31T00:00:00.000Z')).toBe('2026-09-30');
     expect(on('2026-01-31T00:00:00.000Z')).toBe('2026-02-28');
-    // A leap year takes the 29th, not the 28th — the clamp finds the end of the month, it
-    // does not subtract a fixed number of days.
+    // A leap year takes the 29th: the clamp finds the end of the month rather than subtracting fixed days.
     expect(on('2028-01-31T00:00:00.000Z')).toBe('2028-02-29');
     // An ordinary date is untouched, and December rolls the year.
     expect(on('2026-03-15T00:00:00.000Z')).toBe('2026-04-15');
@@ -198,21 +154,19 @@ describe('register writes the subscription — D-012 repaid', () => {
       where: { orgId: res.body.organization.id as string },
     });
     expect(subscription?.tier).toBe(tier);
-    // No trial on this path. DEC-048, and 16 §7 records that DEC-035 is what killed it.
+    // No trial on this path.
     expect(subscription?.status).toBe('active');
     expect(subscription?.status).not.toBe('trialing');
 
-    // ONE CALENDAR MONTH — DEC-096, and asserted HERE because registration is one of four
-    // places that used to decide the period length for itself. Between 28 and 31 days rather
-    // than an exact figure: the length of a month depends on which month you are in, and a
-    // test that pinned 30 would go red every February for a correct implementation.
+    // One calendar month, asserted here because registration is one of the places that used to decide
+    // the period length for itself. A range rather than an exact figure, because months differ in length.
     const days =
       (subscription!.periodEnd.getTime() - subscription!.periodStart.getTime()) / 86_400_000;
     expect(days).toBeGreaterThanOrEqual(28);
     expect(days).toBeLessThanOrEqual(31);
 
-    // THE LEDGER ROW — DEC-080 — written in the same transaction, PRICED BY THE SERVER.
-    // The request above sends no amount and there is no field to send one in.
+    // The ledger row, written in the same transaction and priced by the SERVER: the request sends no
+    // amount and there is no field to send one in.
     const payments = await prisma.payment.findMany({
       where: { orgId: res.body.organization.id as string },
     });
@@ -224,11 +178,8 @@ describe('register writes the subscription — D-012 repaid', () => {
     expect(payments[0]?.currency).toBe('INR');
   });
 
-  /**
-   * A CLIENT-SUPPLIED AMOUNT IS NOT AN AMOUNT. `paymentRef` is the only payment field the
-   * DTO accepts; anything else is stripped by `validate()`, and the row is priced from
-   * `PLAN_OPTIONS` regardless. This asserts the property DEC-080 rests on.
-   */
+  // A client-supplied amount is not an amount: anything but the reference is stripped by validation,
+  // and the row is priced from the plan catalogue regardless.
   it('prices the capture itself and ignores anything the client says it paid', async () => {
     const res = await registerWith({ tier: 'gold', amountMinor: 1, priceMinor: 1 });
     expect(res.status).toBe(201);
@@ -238,10 +189,10 @@ describe('register writes the subscription — D-012 repaid', () => {
     expect(payments[0]?.amountMinor).toBe(99900);
   });
 
-  /** The reference is carried when sent and minted when not — never null either way. */
+  // The reference is carried when sent and minted when not - never null either way.
   it('keeps the reference the checkout minted', async () => {
-    // Unique per run — `payments.reference` is unique across the table (that is what stops a
-    // double-submitted dialog billing twice), so a literal would pass once and never again.
+    // Unique per run, because the reference column is unique across the table - which is what stops a
+    // double-submitted dialog billing twice.
     const reference = `endur_${unique('ref')}`;
     const res = await registerWith({ tier: 'bronze', paymentRef: reference });
     const payments = await prisma.payment.findMany({
@@ -256,10 +207,8 @@ describe('register writes the subscription — D-012 repaid', () => {
     expect(minted[0]?.reference).toMatch(/^endur_/);
   });
 
-  /**
-   * NO DEFAULT, and the 422 is the point. A `.default()` on the DTO would have re-created
-   * D-012 exactly — every organisation on one tier, chosen by nobody, looking deliberate.
-   */
+  // No default, and the 422 is the point: a default would have re-created the bug where every
+  // organisation sat on one tier chosen by nobody, looking deliberate.
   it('refuses a registration that names no tier', async () => {
     const res = await registerWith({ tier: undefined });
     expect(res.status).toBe(422);
@@ -276,21 +225,16 @@ describe('register writes the subscription — D-012 repaid', () => {
     expect((await registerWith({ tier: 'platinum' })).status).toBe(422);
   });
 
-  /**
-   * The row is written INSIDE register's transaction, so a registration that fails leaves no
-   * subscription behind — the same property register-rollback.test.ts proves for the org. A
-   * subscription with no organisation would be a billing record for a customer who does not
-   * exist, which is worse than none.
-   */
+  // The row is written INSIDE registration's transaction, so a failed registration leaves no subscription
+  // behind: a billing record for a customer who does not exist is worse than none.
   it('leaves no orphan subscription when the registration fails', async () => {
-    // Scoped by NAME rather than by a global count, because vitest runs these files in
-    // parallel — a count of every subscription in the database is a count of what the other
-    // workers happened to be doing.
+    // Scoped by NAME rather than a global count, because the suite runs in parallel and other workers
+    // are creating organisations at the same time.
     const email = `${unique('dup')}@example.test`;
     const orgName = `Orphan ${unique('n')}`;
     expect((await registerWith({ tier: 'gold', email, orgName })).status).toBe(201);
-    // Same address, so the user insert conflicts and the whole transaction rolls back —
-    // after the organisation row and the subscription row have both been written inside it.
+    // The same address, so the user insert conflicts and the whole transaction rolls back - after the
+    // organisation and subscription rows have both been written inside it.
     expect((await registerWith({ tier: 'gold', email, orgName })).status).toBe(409);
 
     const orgs = await prisma.organization.findMany({ where: { name: orgName }, select: { id: true } });
@@ -299,8 +243,8 @@ describe('register writes the subscription — D-012 repaid', () => {
       where: { orgId: { in: orgs.map((org) => org.id) } },
     });
     expect(subscriptions).toHaveLength(1);
-    // And no orphan CAPTURE either (DEC-080) — revenue recorded against an organisation
-    // that does not exist is the same bug one table over.
+    // And no orphan capture either: revenue recorded against an organisation that does not exist is the
+    // same bug one table over.
     const payments = await prisma.payment.findMany({
       where: { orgId: { in: orgs.map((org) => org.id) } },
     });
@@ -309,13 +253,9 @@ describe('register writes the subscription — D-012 repaid', () => {
 });
 
 describe('the gate answers with the tier that was chosen — DEC-011, 16 §4', () => {
-  /**
-   * `GET /campaigns/:id/export` is the one entitlement-gated route that is actually reachable
-   * today, so it is where the 402 is proven. The campaign id is a real uuid that does not
-   * exist: the entitlement check runs in MIDDLEWARE, before the handler ever looks the
-   * campaign up, so a 402 here is the gate speaking and a 404 is the gate having let the
-   * request through. That is exactly the distinction being asserted.
-   */
+  // The export route is the one plan-gated route reachable today, so it is where the 402 is proven.
+  // The campaign id is a real uuid that does not exist: the gate runs in MIDDLEWARE, before the handler
+  // looks anything up, so a 402 here is the gate speaking and a 404 would mean it let the request past.
   const NOWHERE = '00000000-0000-0000-0000-0000000000ee';
   const exportOf = (session: Session) =>
     session.agent.get(`/api/v1/campaigns/${NOWHERE}/export`);
@@ -341,13 +281,9 @@ describe('the gate answers with the tier that was chosen — DEC-011, 16 §4', (
     expect((await exportOf(founder)).status).toBe(404);
   });
 
-  /**
-   * 403 OUTRANKS 402 — `16` §4's ordering rule, and the only test of it anywhere.
-   *
-   * Never tell somebody to buy an upgrade for something they would not be allowed to use
-   * after buying it. It is a bad experience, and for a competitor probing the API it leaks
-   * which features an organisation has not bought from an unauthenticated-adjacent position.
-   */
+  // 403 outranks 402, and this is the only test of that ordering anywhere.
+  // Never tell somebody to buy an upgrade for something they would not be allowed to use after buying it -
+  // besides the bad experience, it tells a prober which features an organisation has not bought.
   it('answers 403 before 402 for a caller who may not export at any price', async () => {
     const founder = await registerOrg('custom', 'bronze');
     await prisma.grant.updateMany({

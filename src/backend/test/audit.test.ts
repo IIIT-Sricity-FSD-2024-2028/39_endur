@@ -1,18 +1,8 @@
-// T-075 — the activity log's read surface. 56 § Acceptance.
-//
-// Short on purpose. `audit_log` has been written since T-013 and this is its first reader,
-// so what has to be asserted is not that rows exist but that reading them keeps three
-// promises the writer already makes:
-//
-//   1. NO `ip`, FOR ANY PRINCIPAL (DEC-040, rule 2 of 56 § Anonymity). The writer NULLs it
-//      where it matters; the read surface must not carry it where it does not.
-//   2. A `response.submit` ROW NAMES NOBODY. It is deliberately the least informative row
-//      in the table, and that is INV-006 surviving contact with a feature that wanted it.
-//   3. THE LIST IS SCOPE-FILTERED BY THE API (INV-003), over the TARGET rather than the
-//      actor — an owner acting on your department is your business.
-//
-// Plus DEC-041, which is the reason anybody opens the page: refusals are recorded and
-// filterable on their own.
+// The activity log's read surface.
+// Short on purpose: the rows have been written for a long time, so what needs asserting is that
+// READING them keeps three promises - no IP address for any principal, a response submission names
+// nobody, and the list is scope-filtered over the TARGET rather than the actor.
+// Plus the reason anybody opens the page: refusals are recorded and can be filtered on their own.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { addStaff, app, roleIdByLevel, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
@@ -47,7 +37,7 @@ describe('GET /audit — the organisation reads its own record', () => {
     unitBId = await unitIdByName(founder.orgId, 'Section B');
     sectionA = await addStaff(founder.orgId, { name: 'Head A', level: 2, unitName: 'Section A' });
 
-    // Two units renamed, one in each section. These are the rows the scope test divides.
+    // Two units renamed, one in each section: these are the rows the scope test divides.
     await withCsrf(founder, 'patch', `/api/v1/units/${unitAId}`).send({ name: 'Section A' });
     await withCsrf(founder, 'patch', `/api/v1/units/${unitBId}`).send({ name: 'Section B' });
   });
@@ -59,17 +49,15 @@ describe('GET /audit — the organisation reads its own record', () => {
     expect(row?.outcome).toBe('allowed');
     expect(row?.actor?.id).toBe(founder.userId);
     expect(row?.target?.name).toBe('Section A');
-    // INV-007. This is the whole reason the table is worth reading: not "it was allowed"
-    // but WHICH GRANT allowed it, which is the same trace the simulator replays (42).
+    // Not just "it was allowed" but WHICH grant allowed it, which is the same trace the simulator replays.
     expect(row?.decidedBy?.via).toBeTruthy();
   });
 
   it('carries no `ip` on any row, for any principal — DEC-040 rule 2', async () => {
     const { data } = await log(founder, '?limit=100');
     expect(data.length).toBeGreaterThan(0);
-    // Belt to the writer's brace. `ip` IS written for a staff mutation and stays on the
-    // row for forensics (10 §5); a field that reaches a screen is a field that reaches a
-    // screenshot, so it must not be in the body at all.
+    // The IP IS written for a staff mutation and stays on the row for forensics, but it must not reach
+    // the body: a field that reaches a screen reaches a screenshot.
     for (const row of data) expect(row).not.toHaveProperty('ip');
   });
 
@@ -108,12 +96,11 @@ describe('GET /audit — the organisation reads its own record', () => {
     const { data } = await log(founder, '?action=response.submit');
     const row = data.find((entry) => entry.target?.id === campaignId);
     expect(row).toBeDefined();
-    // The action, the campaign, the time — and nothing else. 56 § Anonymity rule 3.
+    // The action, the campaign, the time - and nothing else.
     expect(row?.actor).toBeNull();
     expect(row).not.toHaveProperty('ip');
 
-    // And the column itself is NULL, not merely omitted from the body. A reader-side
-    // filter protects one screen; this is the writer keeping the promise (DEC-045).
+    // And the column itself is NULL, not merely left out of the body: the writer keeps the promise.
     const stored = await prisma.auditLog.findFirstOrThrow({
       where: { orgId: founder.orgId, action: 'response.submit' },
       select: { ip: true, actorUserId: true },
@@ -123,8 +110,7 @@ describe('GET /audit — the organisation reads its own record', () => {
   });
 
   it('records refusals of mutating capabilities, and they filter alone — DEC-041', async () => {
-    // `role.create` is L1 and nothing else (50 §1), so a section head asking for it is a
-    // refusal somebody would want to see: an attempt to create a role in this org.
+    // Creating a role is a top-level power, so a section head asking for it is a refusal worth seeing.
     const refused = await withCsrf(sectionA, 'post', '/api/v1/roles').send({
       name: 'Invented role',
       level: 2,
@@ -133,8 +119,7 @@ describe('GET /audit — the organisation reads its own record', () => {
 
     const { data } = await log(founder, '?outcome=denied');
     expect(data.length).toBeGreaterThan(0);
-    // The toggle is the reason the page is a security screen and not only a business
-    // record, so `denied` has to mean denied and nothing else.
+    // The refusal filter is what makes this a security screen and not only a business record.
     expect(data.every((row) => row.outcome === 'denied')).toBe(true);
     const row = data.find((entry) => entry.action === 'role.create');
     expect(row?.actor?.id).toBe(sectionA.userId);
@@ -149,8 +134,7 @@ describe('GET /audit — the organisation reads its own record', () => {
     const now = await prisma.auditLog.count({
       where: { orgId: founder.orgId, outcome: 'denied', action: 'audit.read' },
     });
-    // Thousands a day would produce a table nobody reads, which is the same reasoning that
-    // keeps a 403 at `warn` rather than `error` in 18 §4.
+    // Thousands a day would produce a table nobody reads.
     expect(now).toBe(before);
   });
 
@@ -168,9 +152,8 @@ describe('GET /audit — the organisation reads its own record', () => {
 
     const mine = await log(sectionA, '?limit=100&action=unit.update');
     expect(mine.data.some((row) => row.target?.id === unitAId)).toBe(true);
-    // Absent, not greyed. The founder renamed Section B and that is not this person's
-    // business — and the FOUNDER did it, which is exactly the case 56 settles: the filter
-    // is over the target, so an owner acting on your department IS your business.
+    // Absent, not greyed out. The founder renamed the other section and that is not this person's business -
+    // and the filter is over the target, so an owner acting on YOUR department is.
     expect(mine.data.some((row) => row.target?.id === unitBId)).toBe(false);
 
     const everything = await log(founder, '?limit=100&action=unit.update');
@@ -183,16 +166,14 @@ describe('GET /audit — the organisation reads its own record', () => {
       parentId: unitAId,
     });
     expect(created.status).toBe(201);
-    // `POST /units` answers with the whole tree rather than the new node (32 § Data
-    // contract), so the id comes from the same place the tree got it.
+    // Creating a unit answers with the whole tree rather than the new node, so the id comes from there.
     const unitId = await unitIdByName(founder.orgId, 'Doomed unit');
     const removed = await withCsrf(founder, 'delete', `/api/v1/units/${unitId}`).send({});
     expect(removed.status).toBe(200);
 
     const { data } = await log(founder, '?limit=100&action=unit.create');
     const row = data.find((entry) => entry.target?.id === unitId);
-    // A record that quietly drops the rows whose subjects are gone is a record that can be
-    // edited by deleting things (56 § States).
+    // A record that quietly drops rows whose subjects are gone is a record that can be edited by deleting things.
     expect(row).toBeDefined();
     expect(row?.target?.name).toBeNull();
   });

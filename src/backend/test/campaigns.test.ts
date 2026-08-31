@@ -1,8 +1,6 @@
-// T-021 — campaigns, and the decision that removed a whole failure mode. 13, 38, DEC-016.
-//
-// Status is derived on read, so the tests that matter are the ones that move the CLOCK
-// rather than the ones that move a column: a campaign is open because the dates say so,
-// and nothing has to run for that to be true.
+// Campaigns, and the decision that removed a whole failure mode: status is worked out from the dates
+// on every read, so the tests that matter move the CLOCK rather than a column - a campaign is open
+// because the dates say so, and nothing has to run for that to be true.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { addStaff, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
@@ -10,11 +8,8 @@ import { config } from '../lib/config.js';
 import { statusOf, whereStatus } from '../features/campaigns/status.js';
 import type * as TokenModule from '../features/campaigns/token.js';
 
-/**
- * The forced failure the atomicity test needs, and the only honest way to get one: the
- * token is minted in the middle of the transaction, after the template row exists. Wrapping
- * the real generator rather than replacing it keeps every other test on the real one.
- */
+// A forced failure for the atomicity test, and the only honest way to get one: the token is minted
+// in the middle of the transaction. Wrapping the real generator keeps every other test on the real one.
 let failMint = false;
 vi.mock('../features/campaigns/token.js', async (importOriginal) => {
   const actual = await importOriginal<typeof TokenModule>();
@@ -29,10 +24,8 @@ vi.mock('../features/campaigns/token.js', async (importOriginal) => {
 
 const HOUR = 60 * 60 * 1000;
 
-/**
- * Tokens are globally unique, and this database is not reset between runs, so a literal
- * like 'OPEN2345' passes once and then collides forever. Minted per call instead.
- */
+// Tokens are globally unique and this database is not reset between runs, so a literal token would
+// pass once and collide forever. Minted per call instead.
 let tokenCounter = 0;
 const someToken = () => {
   tokenCounter += 1;
@@ -78,8 +71,7 @@ describe('status is derived from the dates, never stored — DEC-016', () => {
   });
 
   it('lets an explicit close win over a window that has not ended', () => {
-    // Somebody pressing Close means it now. A scheduled end date still in the future must
-    // not reopen the campaign behind them.
+    // Pressing Close means now: a scheduled end date still in the future must not reopen the campaign.
     expect(
       statusOf(
         {
@@ -117,9 +109,8 @@ describe('status is derived from the dates, never stored — DEC-016', () => {
       make('closed', { publicToken: someToken(), closedAt: new Date() }),
     ]);
 
-    // whereStatus() restates the derivation in Prisma's vocabulary, which is the one
-    // duplication this design costs. Comparing the two directly is what stops them
-    // drifting apart quietly.
+    // The status filter restates the same rule as a database query, which is the one duplication this
+    // design costs - comparing the two directly is what stops them drifting apart.
     for (const status of ['draft', 'scheduled', 'open', 'closed'] as const) {
       const matched = await prisma.campaign.findMany({
         where: { orgId: founder.orgId, ...whereStatus(status) },
@@ -154,7 +145,7 @@ describe('campaign lifecycle', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('draft');
-    // A draft has no token and no `/r/` URL. Nothing to scan, nothing to leak (38).
+    // A draft has no token and no public URL: nothing to scan, nothing to leak.
     expect(res.body.data.publicToken).toBeNull();
     expect(res.body.data.url).toBeNull();
     campaignId = res.body.data.id as string;
@@ -165,7 +156,7 @@ describe('campaign lifecycle', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('open');
-    // No 0, O, 1, I or L: this gets read aloud in a room during the demo.
+    // No 0, O, 1, I or L, because this gets read aloud in a room.
     expect(res.body.data.publicToken).toMatch(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/);
     expect(res.body.data.url).toMatch(/\/r\/[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/);
   });
@@ -174,8 +165,8 @@ describe('campaign lifecycle', () => {
     const first = await founder.agent.get(`/api/v1/campaigns/${campaignId}`);
     const again = await withCsrf(founder, 'post', `/api/v1/campaigns/${campaignId}/launch`).send({});
 
-    // Idempotent by STATE, not only by key. A double-click on stage must not mint a second
-    // token, because the QR already on the screen would then point at the wrong campaign.
+    // Idempotent by STATE, not only by key: a double-click must not mint a second token, because the QR
+    // already on screen would then point at the wrong campaign.
     expect(again.body.data.publicToken).toBe(first.body.data.publicToken);
   });
 
@@ -210,8 +201,7 @@ describe('campaign lifecycle', () => {
       `/api/v1/campaigns/${created.body.data.id}/launch`,
     ).send({});
 
-    // The token exists, so it has left draft; the clock says it has not started. No
-    // scheduler ever has to notice — which is the whole of DEC-016.
+    // The token exists, so it has left draft; the clock says it has not started. No scheduler ever notices.
     expect(launched.body.data.status).toBe('scheduled');
   });
 
@@ -238,8 +228,8 @@ describe('campaign lifecycle', () => {
       subjectIds: [subjectId],
       audience: { kind: 'anyone' },
     });
-    // A campaign pointing at a library template would hang every org's responses off the
-    // same question rows. Clone first (36).
+    // A campaign pointing at a library template would hang every organisation's responses off the same
+    // question rows. Clone it first.
     expect(shared.status).toBe(409);
   });
 });
@@ -259,9 +249,8 @@ describe('anonymity is immutable once a token is minted — INV-006', () => {
     const id = created.body.data.id as string;
     await withCsrf(founder, 'post', `/api/v1/campaigns/${id}/launch`).send({});
 
-    // Straight at the database, bypassing every service check. The trigger is the point:
-    // respondents were promised anonymity at submission time, and the service layer is not
-    // the only writer — seeds and imports write here too (10 §4.3).
+    // Straight at the database, past every service check: the trigger is the point, because seeds and
+    // imports write here too.
     await expect(
       prisma.campaign.update({ where: { id }, data: { anonymous: false } }),
     ).rejects.toThrow(/immutable/i);
@@ -287,13 +276,9 @@ describe('GET /campaigns/:id/audience', () => {
   });
 });
 
-/**
- * Quick create — T-091, DEC-088, DEC-089.
- *
- * The point of these is that a poll adds NOTHING underneath. Every assertion below reads a
- * table that already existed: a template with one question, a campaign with a token. If one
- * of them ever needs a `polls` table to pass, DEC-088 has been broken.
- */
+// Quick create.
+// The point of these is that a poll adds NOTHING underneath: every assertion reads a table that already
+// existed - a template with one question, and a campaign with a token.
 describe('POST /campaigns/quick — a poll and a suggestion box on the same engine', () => {
   let founder: Session;
 
@@ -309,8 +294,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
     });
 
     expect(res.status).toBe(201);
-    // Launched by the same call. A draft here would mean walking to a second screen with a
-    // room waiting, which is the whole reason this endpoint exists.
+    // Launched by the same call: a draft here would mean walking to a second screen with a room waiting.
     expect(res.body.data.status).toBe('open');
     expect(res.body.data.publicToken).toMatch(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/);
     expect(res.body.data.url).toMatch(/\/r\/[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/);
@@ -321,7 +305,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       where: { id: res.body.data.templateId as string },
       select: { category: true, questions: { select: { kind: true, config: true, required: true } } },
     });
-    // The category IS the distinction (DEC-088). No type column, no seventh kind.
+    // The category IS the distinction. No type column, no seventh question kind.
     expect(template.category).toBe('Poll');
     expect(template.questions).toHaveLength(1);
     expect(template.questions[0]?.kind).toBe('single');
@@ -354,8 +338,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       purpose: 'poll',
       name: 'Nothing to pick',
     });
-    // 422 VALIDATION_FAILED — the refusal is the DTO's refinement, in `validate()`, before
-    // a handler runs (12 §4.9).
+    // The refusal comes from the schema, before any handler runs.
     expect(noOptions.status).toBe(422);
 
     // Dropping them silently would let the caller believe they had built a poll.
@@ -378,8 +361,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       where: { orgId: founder.orgId, type: 'organisation' },
       select: { id: true },
     });
-    // Three quick campaigns by now. A subject each would fill the Subjects screen with
-    // rows nobody created.
+    // Three quick campaigns by now: a subject each would fill the Subjects screen with rows nobody created.
     expect(subjects).toHaveLength(1);
   });
 
@@ -389,9 +371,8 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       name: 'What should we fix first?',
     });
     expect(created.status).toBe(201);
-    // The console tells a suggestion box from a feedback round by the CATEGORY (DEC-088),
-    // and explains its own empty results with the THRESHOLD (INV-005). Both come from the
-    // server: a client that hardcoded either would lie the day the config changed.
+    // The console tells a suggestion box from a feedback round by the CATEGORY, and explains an empty
+    // results page with the THRESHOLD. Both come from the server, so a hardcoded client would lie.
     expect(created.body.data.templateCategory).toBe('Suggestion box');
     expect(created.body.data.resultsThreshold).toBe(config.K_ANON_THRESHOLD);
 
@@ -404,14 +385,9 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
   });
 
   it('is visible to the LEVEL-3 launcher who created it — D-042, DEC-093', async () => {
-    // The regression, stated as the person it happened to. `campaign.launch` is seeded
-    // `own_unit` at level 3, so a tutor may launch a poll; before DEC-093 the poll they
-    // had just made was missing from their own list, because the organisation subject it
-    // hangs off has no unit and `unitId in visibleUnits` matched nothing.
-    //
-    // This is also the case the narrower fix would NOT have covered: anchoring the
-    // singleton to the org ROOT leaves Section A's tutor outside it, and the bug survives
-    // one level down where nobody is looking for it.
+    // The regression, stated as the person it happened to: a tutor may launch a poll, and before the fix
+    // the poll they had just made was missing from their own list, because the organisation subject it
+    // hangs off has no unit. The narrower fix would have left this same bug one level down.
     const tutor = await addStaff(founder.orgId, {
       name: 'Tam Tutor',
       level: 3,
@@ -428,18 +404,15 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
     const ids = (list.body.data as Array<{ id: string }>).map((row) => row.id);
     expect(ids).toContain(created.body.data.id);
 
-    // The list and the single-row read are two statements of ONE rule (visibility.ts), and
-    // the failure mode of a rule written twice is that they disagree. Asserted together on
-    // the same campaign so they cannot drift apart quietly.
+    // The list and the single-row read are two statements of ONE rule, asserted together on the same
+    // campaign so they cannot drift apart.
     const detail = await tutor.agent.get(`/api/v1/campaigns/${created.body.data.id as string}`);
     expect(detail.status).toBe(200);
   });
 
   it('does NOT relax the unit filter generally — a foreign unit stays invisible', async () => {
-    // The other half of DEC-093, and the half that would make this a leak if it were
-    // wrong. Only the ORGANISATION subject reaches everybody. A campaign anchored to a
-    // real subject in Section A is still absent for a reader in Section B — same list,
-    // same request, same reader who can see the poll above.
+    // The other half, and the half that would be a leak if it were wrong: only the ORGANISATION subject
+    // reaches everybody. A campaign on a real subject in another section is still absent.
     const sectionA = await unitIdByName(founder.orgId, 'Section A');
     const subject = await withCsrf(founder, 'post', '/api/v1/subjects').send({
       name: 'Anchored to Section A',
@@ -465,7 +438,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
     const list = await outsider.agent.get('/api/v1/campaigns');
     const ids = (list.body.data as Array<{ id: string }>).map((row) => row.id);
     expect(ids).not.toContain(anchored.body.data.id);
-    // 404 and not 403 — a 403 confirms it exists to somebody outside its scope (13 §5).
+    // 404 and not 403: a 403 confirms it exists to somebody outside its scope.
     const detail = await outsider.agent.get(`/api/v1/campaigns/${anchored.body.data.id as string}`);
     expect(detail.status).toBe(404);
   });
@@ -481,8 +454,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       name: 'Should not exist',
       options: ['a', 'b'],
     });
-    // The gate is `campaign.launch` — the strictly most privileged verb in the sequence —
-    // so this endpoint cannot be a way around the launch check (DEC-089).
+    // Gated on the strongest verb in the sequence, so this endpoint cannot be a way around the launch check.
     expect(res.status).toBe(403);
   });
 
@@ -500,8 +472,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       failMint = false;
     }
 
-    // One transaction, so a failure at the token leaves nothing — not an orphan template on
-    // stage, which is what four client round trips would have left (DEC-089).
+    // One transaction, so a failure at the token leaves nothing - not an orphan template on stage.
     const orphans = await prisma.template.count({ where: { orgId: founder.orgId, name } });
     expect(orphans).toBe(0);
   });

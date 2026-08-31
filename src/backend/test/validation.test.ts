@@ -1,14 +1,9 @@
-// T-107 — a name is a name, and the server is where that is decided. DEC-110.
-//
-// THE OWNER TYPED DIGITS INTO EVERY FIELD ON `/start`, PRESSED CONTINUE, CHOSE A PLAN, RAN THE
-// CHECKOUT, AND ONLY THEN MET A 422. Registration and the capture are one transaction
-// (`features/auth/service.ts`), so nothing was created and nothing was charged — but the reader
-// had no way to know that, and the product had walked them through a payment screen to reject
-// them.
-//
-// THE PAGE NOW CHECKS BEFORE IT ADVANCES, AND THAT IS NOT THE RULE (INV-003). These tests call
-// the ROUTE, because `min(1).max(n)` was written out twenty-odd times across the DTOs and every
-// copy accepted `"12345"` and `"   "` — the client was not the only thing letting it through.
+// A name is a name, and the SERVER is where that is decided.
+// The owner typed digits into every field on the sign-up page, chose a plan, ran the checkout, and only
+// then met a validation error - nothing was created and nothing was charged, but the product had walked
+// them through a payment screen in order to reject them.
+// These tests call the ROUTE, because the old hand-written length checks were repeated across the DTOs
+// and every copy accepted digits and blank space.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { nameField, textField } from '@endur/shared';
@@ -19,9 +14,8 @@ const register = (body: Record<string, unknown>) =>
     email: `${unique('founder')}@example.test`,
     password: 'a-long-enough-password',
     name: 'Founder',
-    // UNIQUE, because `register` mints a SLUG from it and a fixed name means the second
-    // successful registration in this file collides with the first for `409 slug taken` —
-    // which reads as "the DTO refused it" and is nothing of the kind.
+    // Unique, because registration mints a slug from the name and a fixed name would collide with the
+    // earlier registration in this file - which reads as "the schema refused it" and is nothing of the kind.
     orgName: unique('Northfield'),
     industry: 'custom',
     tier: 'bronze',
@@ -39,16 +33,13 @@ describe('nameField — the one definition, DEC-110', () => {
   it('refuses whitespace, because the trim runs first', () => {
     expect(nameField(120).safeParse('   ').success).toBe(false);
     expect(nameField(120).safeParse('\t\n').success).toBe(false);
-    // And it NORMALISES what is stored — a trailing space on a role name is a role the CSV
-    // importer will never match against the one somebody typed.
+    // And it NORMALISES what is stored: a trailing space on a role name is a role the CSV importer will
+    // never match against the one somebody typed.
     expect(nameField(120).parse('  Sanjay Iyer  ')).toBe('Sanjay Iyer');
   });
 
-  /**
-   * EVERY ALPHABET, not `[A-Za-z]`. The product is generic across organisation types
-   * (INV-002) and has no business being English-only about people's names — `\p{L}` with the
-   * `u` flag is what makes that true rather than aspirational.
-   */
+  // Every alphabet, not just the English one: the product is generic across organisation types and has
+  // no business being English-only about people's names.
   it('accepts names in any script, and names with punctuation in them', () => {
     for (const name of ['देवनागरी', '中文名', 'Кириллица', 'தமிழ்', "O'Brien", 'Ram-Kumar', 'Nguyễn', '3M Ltd']) {
       expect(nameField(120).safeParse(name), name).toMatchObject({ success: true });
@@ -60,11 +51,8 @@ describe('nameField — the one definition, DEC-110', () => {
     expect(nameField(60).safeParse('a'.repeat(60)).success).toBe(true);
   });
 
-  /**
-   * FREE TEXT IS NOT A NAME. A note reading `+91 98765 43210` is a useful note, and the
-   * argument that makes `nameField` right says nothing about a box whose whole purpose is that
-   * the writer decides what goes in it. It still trims and still bounds.
-   */
+  // Free text is not a name: a note reading "+91 98765 43210" is a useful note, and the argument for
+  // the name rule says nothing about a box whose purpose is that the writer decides what goes in it.
   it('lets free text be anything, bounded and trimmed', () => {
     expect(textField(100).safeParse('+91 98765 43210').success).toBe(true);
     expect(textField(100).parse('  spaced  ')).toBe('spaced');
@@ -96,8 +84,8 @@ describe('registration refuses what the picker used to accept — DEC-110', () =
     });
     expect(res.status).toBe(422);
 
-    // THE REFUSAL IS BEFORE THE TRANSACTION, so there is no half-made organisation and no
-    // ledger row. This is the assertion that says the payment screen was never the problem.
+    // The refusal is BEFORE the transaction, so there is no half-made organisation and no ledger row:
+    // this is the assertion that says the payment screen was never the problem.
     const { prisma } = await import('../db/client.js');
     expect(await prisma.user.count({ where: { email } })).toBe(0);
   });
@@ -107,15 +95,15 @@ describe('registration refuses what the picker used to accept — DEC-110', () =
     expect(res.status).toBe(201);
   });
 
-  /** The trim reaches the DATABASE, not just the check. */
+  // The trim reaches the DATABASE, not just the check.
   it('stores the trimmed name', async () => {
     const email = `${unique('trim')}@example.test`;
     const res = await request(app).post('/api/v1/auth/register').send({
       email,
       password: 'a-long-enough-password',
       name: '  Anitha Rao  ',
-      // Padded AND unique — the padding is what this test is about, the uniqueness is what
-      // stops it colliding with the registration above on the slug they would otherwise share.
+      // Padded AND unique: the padding is what this test is about, the uniqueness stops it colliding with
+      // the registration above on the slug they would otherwise share.
       orgName: `  ${unique('Northfield')}  `,
       industry: 'custom',
       tier: 'bronze',
@@ -129,10 +117,8 @@ describe('registration refuses what the picker used to accept — DEC-110', () =
 });
 
 describe('the same rule reaches the rest of the product — DEC-110', () => {
-  /**
-   * `nameField` REPLACED TWENTY-ODD HAND-WRITTEN COPIES, so this asserts a route far from
-   * registration to show the rule travelled rather than being bolted onto one form.
-   */
+  // The shared name rule replaced twenty-odd hand-written copies, so this asserts a route far from
+  // registration, to show the rule travelled rather than being bolted onto one form.
   it('refuses a digits-only person and a digits-only subject', async () => {
     const org = await setUpOrg();
 

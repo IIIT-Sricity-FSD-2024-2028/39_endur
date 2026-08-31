@@ -1,18 +1,6 @@
-// THE CONTENTION DEMO — N phones, one slot, and the row lock that decides.
-//
-// 50 §5, DEC-092, T-095. `booking.test.ts` already PROVES capacity holds under concurrency;
-// this exists so it can be SHOWN. A passing test is a claim the room has to take on trust,
-// and "scalable" is the one claim on the board that a screenshot of a green tick does not
-// support. Twenty seconds of forty concurrent writers against one capacity-10 slot does.
-//
-// It is a demonstration, not a benchmark. It is not measuring throughput and prints no
-// requests-per-second: the number that matters is that EXACTLY `capacity` of them won, and
-// that the database agrees. Everything else on screen is there to make that number credible.
-//
-// Runs entirely through HTTP against the real server, because the lock is not the only
-// thing under test here — the whole chain is. Setup goes through the API for the same
-// reason: a script that reached into Prisma to open the slot would be demonstrating a path
-// nobody uses.
+// The contention demo: many phones, one slot, and the row lock that decides who gets in.
+// The test already proves capacity holds under load; this exists so it can be SHOWN on a projector.
+// It runs entirely over HTTP against the real server, so the whole chain is exercised, not just the lock.
 import { prisma } from '../../db/client.js';
 import { config, isProd } from '../../lib/config.js';
 
@@ -21,7 +9,7 @@ type Json = Record<string, unknown>;
 const HOUR = 60 * 60 * 1000;
 const at = (hoursFromNow: number): string => new Date(Date.now() + hoursFromNow * HOUR).toISOString();
 
-/** `--n 40` / `--capacity 10` / `--keep`. Defaults are the ones that read well on a projector. */
+// --n 40 / --capacity 10 / --keep. The defaults are the numbers that read well on a projector.
 function flags(): { n: number; capacity: number; keep: boolean } {
   const argv = process.argv.slice(2);
   const value = (name: string, fallback: number): number => {
@@ -36,11 +24,7 @@ function flags(): { n: number; capacity: number; keep: boolean } {
   return { n: value('n', 40), capacity: value('capacity', 10), keep: argv.includes('--keep') };
 }
 
-/**
- * A cookie jar in eight lines, because the alternative is a dependency for one header.
- * Sessions are cookie-based (DEC-004) and CSRF is double-submit, so both have to survive
- * between calls or every write comes back 403 and the demo looks like a permission bug.
- */
+// A tiny cookie jar, because the session is a cookie and CSRF is double-submit, so both must survive between calls.
 class Client {
   private cookies = new Map<string, string>();
   private csrf = '';
@@ -68,7 +52,7 @@ class Client {
     return { status: res.status, json };
   }
 
-  /** Every write needs the token, and it is re-read after sign-in because the session rotates. */
+  // Every write needs the CSRF token, re-read after sign-in because the session rotates.
   async refreshCsrf(): Promise<void> {
     const res = await this.call('GET', '/api/v1/auth/csrf');
     this.csrf = String((res.json as { token?: string }).token ?? '');
@@ -86,8 +70,7 @@ function expect(ok: boolean, what: string, detail?: unknown): void {
 }
 
 async function main(): Promise<void> {
-  // Same reasoning as `ops:code`: this writes freely and registers organisations. It is a
-  // development affordance and says so rather than trusting nobody will run it elsewhere.
+  // A development script: it registers organisations and writes freely, so it refuses to run elsewhere.
   if (isProd) throw new Error('demo:contention registers throwaway organisations and never runs in production.');
 
   const { n, capacity, keep } = flags();
@@ -102,11 +85,10 @@ async function main(): Promise<void> {
   console.log(`\n  CONTENTION — ${n} phones, one slot, capacity ${capacity}`);
   console.log(`  ${'server'.padEnd(10)} ${base}`);
 
-  /* ---- setup, through the API a person would use ------------------------- */
+  // Setup, done through the same API a person would use.
 
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  // Gold, because booking is a gold entitlement (16 §2) — and registering at gold rather
-  // than writing a subscription row is the point: the tier gate is part of what is shown.
+  // Registers at gold, because booking is a gold feature - the tier gate is part of what is shown.
   const registered = await client.call('POST', '/api/v1/auth/register', {
     email: `contention-${stamp}@example.test`,
     password: 'a-long-enough-password',
@@ -135,7 +117,7 @@ async function main(): Promise<void> {
   expect(opened.status === 200, 'could not open the bookable', opened.json);
   const token = String(data(opened)['publicToken']);
 
-  // Read it the way a phone does — no session, no CSRF, just the token off the QR code.
+  // Read the way a phone does: no session, no CSRF, just the token from the QR code.
   const publicRead = await fetch(`${base}/api/v1/public/bookables/${token}`);
   const publicBody = (await publicRead.json()) as { data: { slots: Array<{ id: string; remaining: number }> } };
   const slot = publicBody.data.slots[0];
@@ -146,12 +128,9 @@ async function main(): Promise<void> {
   console.log(`  ${'link'.padEnd(10)} ${config.PUBLIC_BASE_URL}/book/${token}`);
   console.log(`\n  firing ${n} concurrent POSTs …\n`);
 
-  /* ---- the burst --------------------------------------------------------- */
+  // The burst.
 
-  // Built first and fired second. Constructing the requests inside Promise.all would stagger
-  // them by however long the construction takes, and a staggered burst is a sequential test
-  // wearing a costume — it passes against a count-then-insert, which is the bug this exists
-  // to rule out.
+  // Built first and fired second: building inside Promise.all would stagger the requests and prove nothing.
   const started = Date.now();
   const attempts = Array.from({ length: n }, (_unused, index) => async (): Promise<{ status: number; ms: number }> => {
     const began = Date.now();
@@ -169,7 +148,7 @@ async function main(): Promise<void> {
   const results = await Promise.all(attempts.map((run) => run()));
   const elapsed = Date.now() - started;
 
-  /* ---- what happened ----------------------------------------------------- */
+  // What happened.
 
   const won = results.filter((r) => r.status === 201);
   const lost = results.filter((r) => r.status === 409);
@@ -180,13 +159,11 @@ async function main(): Promise<void> {
     console.log(`  ${label.padEnd(28)} ${String(value).padStart(4)}   ${note}`);
 
   row('201 booked', won.length, won.length === capacity ? '✓ exactly capacity' : '✗ NOT capacity');
-  // 409 and not 400: the request was well-formed and lost a race. Telling the loser to fix
-  // their form sends them looking for a mistake that is not there (DEC-092).
+  // 409, not 400: the request was fine and simply lost the race.
   row('409 slot full', lost.length, lost.length === n - capacity ? '✓ everyone else' : '✗');
   row('anything else', other.length, other.length === 0 ? '✓ none' : `✗ ${JSON.stringify(other)}`);
 
-  // The half a status code cannot prove. Two writers both answering 201 off a stale count
-  // would look identical above and be wrong here.
+  // The half a status code cannot prove - ask the database how many bookings really exist.
   const rows = await prisma.booking.count({ where: { slotId, cancelledAt: null } });
   const after = await fetch(`${base}/api/v1/public/bookables/${token}`);
   const afterBody = (await after.json()) as { data: { slots: Array<{ remaining: number }> } };
@@ -210,7 +187,7 @@ async function main(): Promise<void> {
     console.log(`  --keep: organisation ${orgId} left in place.\n`);
     return;
   }
-  // Throwaway means throwaway. Cascades through the bookable, the slot and the bookings.
+  // Throwaway means throwaway: this removes the bookable, its slots and its bookings.
   await prisma.organization.delete({ where: { id: orgId } });
 }
 

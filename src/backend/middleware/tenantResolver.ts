@@ -1,17 +1,10 @@
-// Link 6. Resolves orgId, then attaches the tenant-bound database client.
-//
-// > **orgId is NEVER read from a request body or query parameter.**
-// > A body-supplied tenant is an attack, not an input. (INV-010)
-//
-// It runs BEFORE authenticate because an API key resolves the tenant *and* the principal,
-// and the tenant-bound client must exist before any lookup can happen (12 §5).
+// Link 6. Works out which organisation the request belongs to, then attaches a database client locked to it.
+// The organisation is never read from a body or query string - only from credentials the caller could not forge.
 import type { Request, RequestHandler } from 'express';
 import { resolveLabels, type LabelSet, type ResolvedLabels } from '@endur/shared';
 import { AppError } from '../lib/errors.js';
 import { tenantClient, type TenantClient } from '../db/tenant.js';
-// ONE definition of token -> hash, shared with the activation service. A second sha256
-// here would be a second mapping, and a disagreement would show up as a link that
-// resolves no tenant rather than as an error anybody could see.
+// One shared token-to-hash function with the activation service, so both agree what a token maps to.
 import { hashInviteToken } from '../auth/inviteToken.js';
 import { prisma } from '../db/client.js';
 
@@ -25,65 +18,24 @@ declare global {
 }
 
 export type TenantResolverOptions = {
-  /**
-   * Fail closed when no organisation can be resolved. True on every tenant router; false
-   * on auth (signing in has no tenant yet) and on the respondent surface.
-   *
-   * The respondent surface is false for a specific reason. A VALID token resolves its
-   * campaign's org and never reaches the decision; an INVALID one resolves nothing, and
-   * 401ing here would answer differently from the 404 a closed campaign produces at the
-   * handler. That difference is an existence oracle: try a token, and the status code
-   * tells you whether that campaign exists (13 §6). Falling through lets one uniform 404
-   * answer every case.
-   */
+  // Refuse when no organisation can be found. True on console routers, false on auth and respondent routes.
   required: boolean;
-  /**
-   * Allow `X-Org-Slug` to name the tenant. ONLY on routes where the caller holds no
-   * credential — otherwise a header could widen the access of someone who already has one.
-   *
-   * This used to be a path regex (`TENANTLESS`) tested inside the resolver. It is an
-   * option now because the resolver became router-level (T-064, D-017): the router that
-   * mounts it knows whether its routes are credential-free, and a mount point is a much
-   * harder thing to get wrong than a regex that has to be kept in step with app.ts.
-   */
+  // Allow the X-Org-Slug header to name the organisation. Only where the caller holds no credential yet.
   allowSlugHeader?: boolean;
 };
 
-/**
- * Link 6, as a factory. Router-level: each router mounts the variant its routes need
- * (12 §2's per-router box, made true by T-064).
- */
+// Builds the middleware. Each router mounts the variant its own routes need.
 export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
   return (req, _res, next) => {
-    // Idempotent. `resultsRouter` and `campaignsRouter` share the `/campaigns` prefix, so
-    // a results request runs both chains; resolving twice would double the tenant read for
-    // no benefit.
+    // Idempotent: two routers share the /campaigns prefix, and resolving twice would read the tenant twice.
     if (req.ctx.orgId) return next();
 
     void resolve(req, opts)
       .then(async ({ orgId, via }) => {
         if (orgId) {
           const tenant = await factsOf(orgId);
-          // T-059, 19 §6. SUSPENSION CUTS THE STAFF SESSION AND NOTHING ELSE, and this is
-          // the one line in the codebase that can express that distinction — because it is
-          // the only place that knows HOW the tenant was resolved.
-          //
-          // A suspended organisation's campaigns keep running and its QR codes keep
-          // answering: a respondent token (strategy 3) resolves the same org through the
-          // same middleware and is deliberately not refused here. Punishing the customer's
-          // respondents for the customer's billing problem is the mistake `16` §6 already
-          // rules out, and `70` says so again in words.
-          //
-          // Checking here rather than at login is what makes a suspension take effect on
-          // the next REQUEST rather than at the next sign-in — the same property permissions
-          // get from being resolved per request instead of read from a session claim.
-          //
-          // DEC-114 CARVES ONE EXCEPTION, and it is the only one: a SUPPORT session gets in.
-          // A suspension is a commercial state, not a quarantine — and the moment a customer
-          // most needs somebody from Endur inside their console is the moment they have been
-          // cut off from it. Refusing the operator here would mean the one organisation
-          // nobody can help is the one that has a problem. The customer's own staff are still
-          // refused, which is what a suspension is for.
+          // A suspended organisation is cut off from its own staff, but its campaigns and QR codes keep answering,
+          // and an Endur support session may still come in to help.
           if (via === 'session' && tenant.suspendedAt && !isSupport(req)) {
             return next(
               new AppError('FORBIDDEN', 'This organization has been suspended. Contact Endur support.'),
@@ -102,38 +54,18 @@ export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
   };
 }
 
-/**
- * DEC-114. The session's own flag, read WITHOUT a database round trip.
- *
- * It is safe to trust for this one decision even though `authenticate` deliberately does not
- * trust it for authorisation, and the difference is what the two decisions are about. Here it
- * decides only whether to let the REQUEST CONTINUE past a suspension; a forged flag on an
- * ordinary session buys nothing, because the next link resolves no support row, attaches no
- * principal, and every console route then 401s. There is no state in which this flag alone
- * lets somebody see anything.
- */
+// Reads the support flag straight off the session, with no database call. Safe here, because it only decides
+// whether the request may continue past a suspension; on its own it grants nothing.
 const isSupport = (req: Request): boolean =>
   (req as { session?: { support?: boolean } }).session?.support === true;
 
-/**
- * The two tenant facts every later link needs, in ONE read.
- *
- * `authzVersion` is what makes the grant cache safe: without it the cache key is a
- * constant, and a revoked permission keeps working until the TTL expires.
- *
- * `labels` rides along because this query was already happening (T-044). 22 §6 puts the
- * label set here so the server's own user-facing strings — validation messages,
- * confirmation text, export headers — go through the same vocabulary the UI does. Adding
- * a column to a read that runs anyway is the difference between doing it and deciding it
- * costs a query per request.
- */
+// The tenant facts every later link needs, in one read: permission version, labels and suspension.
 async function factsOf(
   orgId: string,
 ): Promise<{ authzVersion: number; labels: ResolvedLabels; suspendedAt: Date | null }> {
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    // `suspendedAt` rides along for the same reason `labels` did (T-044): this query was
-    // already happening, so the check costs nothing per request.
+    // suspendedAt rides along in a query that was happening anyway, so the check costs nothing.
     select: { settings: true, labels: true, suspendedAt: true },
   });
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
@@ -144,24 +76,13 @@ async function factsOf(
   };
 }
 
-/** Which strategy answered. `via` is what lets a suspension cut staff without cutting
- *  respondents — see the check in the factory above. */
+// Which strategy answered. 'via' is what lets a suspension stop staff without stopping respondents.
 type Resolved = { orgId?: string | undefined; via?: 'activation' | 'session' | 'token' | 'slug' };
 
-/** Strict priority. Each source is a credential the caller could not have forged. */
+// Strict order of strategies. Each source is a credential the caller could not have forged.
 async function resolve(req: Request, opts: TenantResolverOptions): Promise<Resolved> {
-  // 0 · ACTIVATION TOKEN — /api/v1/auth/activate/:token (57). THE ONE STRATEGY THAT
-  //     OUTRANKS A SESSION, and it needs the argument spelled out because "strict priority"
-  //     is otherwise the whole rule.
-  //
-  //     Every other strategy answers "who is calling". This route is different: the person
-  //     following an activation link HAS NO ACCOUNT — that is the entire situation — so any
-  //     session in the browser belongs to somebody else, quite possibly in a different
-  //     organisation. Letting it win would file org B's activation under org A's audit log.
-  //     The token is in the PATH, is unforgeable, and is what the request is ABOUT.
-  //
-  //     An unknown token resolves no tenant and becomes the same uniform dead end the
-  //     handler produces anyway — never a hint that the token was nearly right.
+  // 0. Activation token in the URL. It beats a session, because somebody following an invite link has no
+  //    account yet, so any session in that browser belongs to a different person.
   const activation = /^\/api\/v1\/auth\/activate\/([0-9A-Za-z]{43})(?:$|[/?])/.exec(
     req.originalUrl.split('?')[0] ?? '',
   )?.[1];
@@ -173,18 +94,11 @@ async function resolve(req: Request, opts: TenantResolverOptions): Promise<Resol
     return { orgId: invite?.orgId, via: 'activation' };
   }
 
-  // 1 · API key  — T-007 attaches the parsed key; its org_id wins.
-  // 2 · Session  — the signed-in user's orgId, set by express-session (T-007).
+  // 1. API key (arrives later) and 2. the signed-in session's organisation.
   const session = (req as { session?: { orgId?: string } }).session;
   if (session?.orgId) return { orgId: session.orgId, via: 'session' };
 
-  // 3 · Respondent token — the campaign's org. The token is in the PATH, never a body.
-  // The FULL prefix, including /campaigns/. The earlier pattern matched the segment after
-  // /api/v1/public/ and so captured the literal word "campaigns" as the token, resolving no
-  // tenant at all — invisible until the first public route existed (N-017).
-  // Matched against the ORIGINAL url, not req.path: router-level middleware sees a path
-  // relative to its mount point, so `/api/v1/public/campaigns/<token>` arrives here as
-  // `/campaigns/<token>` and the full-prefix pattern would never match (T-064).
+  // 3. Respondent token in the URL. Matched against the original URL, since router middleware sees a trimmed path.
   const token = /^\/(?:r\/|api\/v1\/public\/campaigns\/)([A-Za-z0-9_-]{6,128})/.exec(
     req.originalUrl.split('?')[0] ?? '',
   )?.[1];
@@ -193,13 +107,11 @@ async function resolve(req: Request, opts: TenantResolverOptions): Promise<Resol
       where: { publicToken: token },
       select: { orgId: true },
     });
-    // A bad token resolves to nothing here and becomes a uniform 404 later (13 §6) —
-    // never a "wrong organisation" hint that would confirm the token's shape.
+    // A bad token resolves nothing and becomes a uniform 404 later, never a hint about the token.
     return { orgId: campaign?.orgId, via: 'token' };
   }
 
-  // 4 · Slug header — ONLY where the router said so, so it can never widen the access of
-  //     a caller who already has a credential.
+  // 4. The X-Org-Slug header, only where the router allowed it.
   if (opts.allowSlugHeader) {
     const slug = req.get('x-org-slug');
     if (slug) {

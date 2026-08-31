@@ -1,5 +1,4 @@
-// argon2id. Chosen over bcrypt because it is memory-hard: a GPU farm gets far less
-// advantage per rupee, which is the entire threat model for a leaked password table.
+// Password hashing with argon2id, which is memory-hard, so a stolen password table is slow to crack.
 import argon2 from 'argon2';
 
 const OPTIONS = {
@@ -9,11 +8,12 @@ const OPTIONS = {
   parallelism: 1,
 } as const;
 
+// Turns a plain password into the hash we store in the database.
 export const hashPassword = (plain: string): Promise<string> => argon2.hash(plain, OPTIONS);
 
+// Checks a plain password against the stored hash and returns true only if they match.
 export async function verifyPassword(hash: string | null, plain: string): Promise<boolean> {
-  // An unactivated invite has no hash. Still spend the time: returning instantly would
-  // tell an attacker which addresses exist, which is the timing half of user enumeration.
+  // No hash means the invite was never activated. Hash anyway, so timing cannot reveal who exists.
   if (!hash) {
     await argon2.hash(plain, OPTIONS);
     return false;

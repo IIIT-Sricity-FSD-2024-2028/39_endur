@@ -1,4 +1,4 @@
-// People and assignment routes. 13 § People, 34.
+// People and assignment routes.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import { imageUpload } from '../../middleware/upload.js';
@@ -43,8 +43,7 @@ import {
 
 export const peopleRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 peopleRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
@@ -53,6 +52,7 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
   return principal.id;
 };
 
+// The people list, already filtered to what the caller may see.
 peopleRouter.get(
   '/',
   authenticate,
@@ -69,7 +69,8 @@ peopleRouter.get(
   },
 );
 
-// Registered before /:id, or "import" and "import/preview" are read as person ids.
+// Registered before /:id, or "import" would be read as a person id.
+// Reads a CSV and reports what it found, without writing anything.
 peopleRouter.post(
   '/import/preview',
   authenticate,
@@ -83,21 +84,18 @@ peopleRouter.post(
   },
 );
 
+// Commits an import: creates or updates people and gives them their positions.
 peopleRouter.post(
   '/import',
   authenticate,
   validate(ImportPeopleDto),
   requireCapability('person.import', { target: 'any' }),
-  // THE IMPORT CREATES POSITIONS TOO, so it carries the same bound — and it is the more
-  // dangerous half of D-018, because it is bulk. Without this line the guard on
-  // /:id/assignments above is bypassable in a single call by naming the Owner role in a
-  // one-row CSV. The pairs come from the same resolution the service uses (positions.ts),
-  // so the guard cannot check one role and the handler create another.
+  // The import creates positions too, so it carries the same escalation bound - and this is the
+  // bulk half of it: without this, a one-row CSV naming the Owner role would bypass the guard below.
   requireNoEscalation((req) =>
     pairsFromImport(req.ctx.orgId as string, (req.data as { body: ImportPeopleBody }).body),
   ),
-  // A retried import must not duplicate people (13 §7). The service is idempotent by email
-  // as well; this layer means the retry does not even re-run.
+  // A retried import must not create people twice. The service is idempotent by email as well.
   idempotent('people.import'),
   (req, res, next) => {
     const { body } = req.data as { body: ImportPeopleBody };
@@ -107,13 +105,13 @@ peopleRouter.post(
   },
 );
 
+// One person, with their positions and what those positions let them do.
 peopleRouter.get(
   '/:id',
   authenticate,
   validate(PersonIdDto),
-  // `any` plus a row-level check inside readPerson(). A person is not anchored to a unit
-  // in the request — their positions are — so the scope question can only be answered
-  // after the row is read, and answering it there keeps INV-003 mechanical.
+  // 'any' plus a row-level check inside readPerson(): a person is not anchored to a unit in the request,
+  // their positions are, so the scope question can only be answered once the row has been read.
   requireCapability('person.read', { target: 'any' }),
   (req, res, next) => {
     const { params } = req.data as { params: { id: string } };
@@ -126,12 +124,12 @@ peopleRouter.get(
   },
 );
 
+// Creates a person, and an invited account when an email is given.
 peopleRouter.post(
   '/',
   authenticate,
   validate(CreatePersonDto),
-  // Creating a person grants nobody anything: a person with no position has no access at
-  // all. The permission weight is in the assignment call, which IS unit-targeted.
+  // Creating a person grants nothing: someone with no position has no access. The weight is in the assignment call.
   requireCapability('person.create', { target: 'any' }),
   (req, res, next) => {
     const { body } = req.data as { body: CreatePersonBody };
@@ -141,6 +139,7 @@ peopleRouter.post(
   },
 );
 
+// Renames a person or changes their email.
 peopleRouter.patch(
   '/:id',
   authenticate,
@@ -154,6 +153,7 @@ peopleRouter.patch(
   },
 );
 
+// Removes a person from the organisation.
 peopleRouter.delete(
   '/:id',
   authenticate,
@@ -167,19 +167,14 @@ peopleRouter.delete(
   },
 );
 
-// Its own endpoint, its own capability, its own audit row. Granting somebody a position IS
-// a permission change, and it has to look like one in the log (34, 14 §8).
+// Its own route, capability and audit row, because giving somebody a position IS a permission change.
 peopleRouter.post(
   '/:id/assignments',
   authenticate,
   validate(CreateAssignmentDto),
-  // The target is the UNIT the position sits in: giving someone a role at Section A is an
-  // act on Section A, and that is what the caller's scope has to cover (INV-005).
+  // The target is the UNIT: giving someone a role at Section A is an act on Section A.
   requireCapability('assignment.create', { target: 'unit', from: 'body.unitId' }),
-  // Link 10b, INV-012. The line above answers "may you assign AT Section A". It does not
-  // answer "may you assign THE OWNER ROLE", and before 2026-08-23 nothing did — a caller
-  // holding only `assignment.create` could hand out a role more powerful than their own
-  // and hold the organisation an hour later (D-018, 11 §5b). It only ever refuses.
+  // Link 10b: the check above asks "may you assign at Section A", this one asks "may you hand out THIS role".
   requireNoEscalation({ role: 'body.roleId', unit: 'body.unitId' }),
   (req, res, next) => {
     const { body, params } = req.data as {
@@ -192,6 +187,7 @@ peopleRouter.post(
   },
 );
 
+// Removes one assignment, which takes the powers that came with it.
 peopleRouter.delete(
   '/:id/assignments/:edgeId',
   authenticate,
@@ -205,16 +201,12 @@ peopleRouter.delete(
   },
 );
 
-/**
- * Somebody else's avatar (48). The same write as `/profile/avatar`, asked as a different
- * question: `target: 'person'` builds the target from the id in the path, so a caller whose
- * `person.update` is scoped to their own unit cannot reach somebody in another one — where
- * the profile route's `target: 'self'` has no id for anyone to point anywhere.
- *
- * `imageUpload` sits in link 9's slot, before requireCapability, exactly as validate does.
- */
+// Somebody else's avatar. The same write as the profile route, asked as a different question:
+// the target is built from the id in the path, so a caller scoped to one unit cannot reach another.
+// imageUpload does this route's validation, so it runs before the permission check.
 const uploadAvatar = imageUpload({ field: 'file', maxBytes: config.UPLOAD_MAX_MB * 1024 * 1024 });
 
+// Uploads an avatar for somebody else.
 peopleRouter.post(
   '/:id/avatar',
   authenticate,
@@ -229,6 +221,7 @@ peopleRouter.post(
   },
 );
 
+// Removes somebody else's avatar.
 peopleRouter.delete(
   '/:id/avatar',
   authenticate,

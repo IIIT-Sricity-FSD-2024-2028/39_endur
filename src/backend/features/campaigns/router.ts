@@ -1,4 +1,4 @@
-// Campaign routes. 13 § Campaigns, 38.
+// Campaign routes: create, launch, close and share a round of feedback.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import {
@@ -32,8 +32,7 @@ import {
 
 export const campaignsRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 campaignsRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
@@ -44,6 +43,7 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
 
 const version = (req: { ctx: { authzVersion?: number } }) => req.ctx.authzVersion ?? 0;
 
+// The campaign list, filtered to what the caller may see.
 campaignsRouter.get(
   '/',
   authenticate,
@@ -58,23 +58,15 @@ campaignsRouter.get(
   },
 );
 
-// A poll or a suggestion box: template, question, campaign and token in ONE transaction
-// (DEC-088, DEC-089).
-//
-// REGISTERED BEFORE `/:id` AND BEFORE `POST /`, because Express matches in order and
-// `quick` would otherwise be read as a campaign id — the same ordering `templatesRouter`
-// applies to `/library`.
-//
-// Gated on `campaign.launch` and not on the union of the four verbs it performs. It is the
-// strictly most privileged one here: whoever may launch may also create, and gating on
-// anything weaker would let this endpoint be a way around the launch check.
+// Quick create - a poll or suggestion box: template, question, campaign and public token in ONE transaction.
+// Registered before /:id, or Express would read "quick" as a campaign id.
+// Gated on campaign.launch, the strongest of the four things it does, so it cannot become a way around that check.
 campaignsRouter.post(
   '/quick',
   authenticate,
   validate(QuickCampaignDto),
   requireCapability('campaign.launch', { target: 'any' }),
-  // Mints a public token, so the same rule as launch: a double-click on stage must not
-  // produce two links (13 §7).
+  // It mints a public link, so the same rule as launch: a double-click must not produce two links.
   idempotent('campaign.quick'),
   (req, res, next) => {
     const { body } = req.data as { body: QuickCampaignBody };
@@ -85,6 +77,7 @@ campaignsRouter.post(
   },
 );
 
+// One campaign, with its subjects and counts.
 campaignsRouter.get(
   '/:id',
   authenticate,
@@ -99,6 +92,7 @@ campaignsRouter.get(
   },
 );
 
+// Creates a draft campaign.
 campaignsRouter.post(
   '/',
   authenticate,
@@ -113,6 +107,7 @@ campaignsRouter.post(
   },
 );
 
+// Edits a draft: its name, window, audience or subjects.
 campaignsRouter.patch(
   '/:id',
   authenticate,
@@ -129,9 +124,8 @@ campaignsRouter.patch(
   },
 );
 
-// The highest-stakes button in the product. Idempotent by key AND by state: a double-click
-// on stage must not mint a second token, because the QR already on screen would then point
-// at the wrong campaign (38, 13 §7).
+// The highest-stakes button in the product. Idempotent by key and by state: a double-click must not mint
+// a second token, because the QR code already on screen would then point at the wrong campaign.
 campaignsRouter.post(
   '/:id/launch',
   authenticate,
@@ -147,6 +141,7 @@ campaignsRouter.post(
   },
 );
 
+// Closes a campaign, so it stops accepting answers.
 campaignsRouter.post(
   '/:id/close',
   authenticate,
@@ -161,6 +156,7 @@ campaignsRouter.post(
   },
 );
 
+// The share sheet: the public link and QR code for a launched campaign.
 campaignsRouter.get(
   '/:id/audience',
   authenticate,

@@ -1,9 +1,6 @@
-// T-018 — people, positions and CSV import. 13 § People, 34.
-//
-// The assertion that matters most here is the one about two hats. A person holding
-// Section Head at Section A and Tutor at Section B must show senior powers on A and only
-// junior powers on B — INV-005 in one screen, and the single most important behavioural
-// detail in the model.
+// People, positions and the CSV import.
+// The assertion that matters most is the one about two hats: somebody senior in one unit and junior
+// in another must show senior powers only where the senior position sits.
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   addStaff,
@@ -46,12 +43,12 @@ describe('GET /people', () => {
 
     expect(res.status).toBe(200);
     const names = (res.body.data as Array<{ name: string }>).map((person) => person.name);
-    // Section A and below, plus themselves. B Head is ABSENT, not greyed (INV-003).
+    // Their own section and below, plus themselves. The other section's head is ABSENT, not greyed out.
     expect(names).toContain('A Head');
     expect(names).toContain('A1 Tutor');
     expect(names).not.toContain('B Head');
-    // meta.total counts what the CALLER may see, not what exists (13 §4). A total that
-    // counted everything would leak the size of the organisation.
+    // The total counts what the CALLER may see, not what exists: counting everything would leak the size
+    // of the organisation.
     expect(res.body.meta.total).toBe(names.length);
   });
 
@@ -66,8 +63,8 @@ describe('GET /people', () => {
     );
     const firstIds = (first.body.data as Array<{ id: string }>).map((p) => p.id);
     const secondIds = (second.body.data as Array<{ id: string }>).map((p) => p.id);
-    // No overlap. That is the whole reason for a cursor: an offset on a growing table
-    // returns duplicates and skips rows while somebody else is inserting (13 §4).
+    // No overlap, which is the whole reason for a cursor: offset paging duplicates and skips rows while
+    // somebody else is inserting.
     expect(secondIds.filter((id) => firstIds.includes(id))).toEqual([]);
   });
 
@@ -83,7 +80,7 @@ describe('POST /people', () => {
     const res = await withCsrf(founder, 'post', '/api/v1/people').send({
       name: 'New Person',
       email: `new-${Date.now()}@example.test`,
-      // Ignored: no create-person DTO accepts a role, level or capability (14 §8).
+      // Ignored: no create-person request accepts a role, a level or a capability.
       roleId: await roleIdByLevel(founder.orgId, 1),
     });
 
@@ -94,26 +91,21 @@ describe('POST /people', () => {
       where: { orgId: founder.orgId, name: 'New Person' },
       select: { passwordHash: true, status: true },
     });
-    // An account nobody has activated must not be sign-in-able, and `invited` is the
-    // column that says so — a fact about the HASH, asserted where the hash is.
+    // An account nobody has activated must not be able to sign in, and the missing password hash is the
+    // fact that says so.
     expect(user.passwordHash).toBeNull();
     expect(user.status).toBe('invited');
 
-    // AND IT DOES NOT TRAVEL. This line used to read `expect(res.body.data.status).toBe(
-    // 'invited')`, which is how the phantom tag on /app/people passed review: the response
-    // carried a raw database state and the list printed it beside the name, so every person
-    // an administrator added was labelled "invited" in the same row that still offered them
-    // the Invite button. `account` is the derived answer and the only one on the wire.
+    // And the raw state does not travel. This line used to assert the database column, which is how a
+    // phantom "invited" tag passed review: the list printed it beside every person an administrator added,
+    // in the same row that still offered them the Invite button.
     expect(res.body.data.status).toBeUndefined();
     expect(res.body.data.account).toEqual({ state: 'none' });
   });
 
-  // D-026 — THE DEADLOCK, as a test. Found while building T-072, and it was live in
-  // shipped code: `POST /people` creates a person and no position (14 §8 requires that),
-  // so the person it returned had no unit, matched no unit-scoped caller, and disappeared.
-  // The founder of a brand-new organisation could create somebody and then not see them,
-  // open them, or give them a position — every route that could do so had first to see
-  // them. Before the fix this was 201, then a list that did not contain them and a 404.
+  // The deadlock, as a test. Creating a person makes no position, so the person had no unit, matched no
+  // unit-scoped caller, and disappeared: the founder could create somebody and then not see them, open
+  // them, or give them a position, because every route that could do so had first to see them.
   it('can still see somebody it just created, who has no position yet', async () => {
     const founder = await setUpOrg();
     const created = await withCsrf(founder, 'post', '/api/v1/people').send({
@@ -122,15 +114,15 @@ describe('POST /people', () => {
     });
     expect(created.status).toBe(201);
     const id = created.body.data.id as string;
-    // The founder holds `person.read: subtree` at the root — NOT `all`. That is the
-    // ordinary shape, and it is the shape the hole was invisible in.
+    // The founder holds the read at subtree scope, not everywhere - the ordinary shape, and the shape the
+    // hole was invisible in.
     const list = await founder.agent.get('/api/v1/people');
     expect((list.body.data as Array<{ id: string }>).map((row) => row.id)).toContain(id);
     expect(await founder.agent.get(`/api/v1/people/${id}`)).toMatchObject({ status: 200 });
   });
 
-  // The other half of the same rule: unanchored is not a back door into other people. A
-  // person WITH a position outside the caller's reach is still invisible.
+  // The other half of the same rule: having no position is not a back door. A person WITH a position
+  // outside the caller's reach is still invisible.
   it('does not make somebody in another section visible along with them', async () => {
     const founder = await setUpOrg();
     const head = await addStaff(founder.orgId, { name: 'Head', level: 2, unitName: 'Section A' });
@@ -191,8 +183,7 @@ describe('POST /people/:id/assignments — the two-hat case', () => {
     const can = (place: typeof atA, capability: string) =>
       place?.capabilities.some((entry) => entry.capability === capability) ?? false;
 
-    // The senior hat applies at Section A and nowhere else. A senior hat somewhere does
-    // not become senior powers everywhere — this is the line the whole model turns on.
+    // The senior hat applies in its own section and nowhere else: this is the line the whole model turns on.
     expect(can(atA, 'person.create')).toBe(true);
     expect(can(atB, 'person.create')).toBe(false);
     expect(can(atB, 'results.read')).toBe(true);
@@ -218,8 +209,8 @@ describe('POST /people/:id/assignments — the two-hat case', () => {
       select: { decidedBy: true },
     });
     expect(after.length).toBe(before + 1);
-    // INV-007: the row records WHICH GRANT decided it. Without that, "access denied" is an
-    // assertion rather than evidence.
+    // The audit row records WHICH grant decided it: without that, "access denied" is an assertion rather
+    // than evidence.
     expect(after.at(-1)?.decidedBy).not.toBeNull();
   });
 
@@ -239,24 +230,10 @@ describe('POST /people/:id/assignments — the two-hat case', () => {
     expect((await withCsrf(founder, 'post', path).send(body)).status).toBe(409);
   });
 
-  /**
-   * 13 §5, BOTH HALVES OF IT, on the one route where the split was getting decided by an
-   * accident rather than by the rule.
-   *
-   * `requireCapability`'s `invisible()` asks "can the caller see the target at all" using
-   * `<module>.read` — `unit.read` for `unit.update`, `subject.read` for `subject.create`.
-   * There is no `assignment.read`: the catalogue has `assignment.create` and
-   * `assignment.delete` and nothing else, because an assignment is never read on its own,
-   * it is read as part of the person who holds it. So the visibility question was asked
-   * with a capability NOBODY HOLDS, every caller saw nothing, and every out-of-scope
-   * assignment answered 404 — including at a unit sitting in plain sight in the caller's
-   * own tree, which they had just picked out of a unit menu.
-   *
-   * A Section Head is the exact shape: `unit.read: subtree` reaches Team A1, while
-   * `assignment.create: own_unit` stops at Section A. They can see the place and may not
-   * act there, which is 13 §5's definition of a 403 — "actionable, it tells you whom to
-   * ask" — and "Not found." for a unit on their own screen is the opposite of actionable.
-   */
+  // Both halves of the 404-versus-403 rule, on the route where the split was being decided by accident.
+  // The visibility check used to derive a read capability from the acting one, and there is no
+  // "assignment.read" in the catalogue - so it asked with a capability nobody holds, and every
+  // out-of-scope assignment answered 404, including at a unit the caller had just picked from a menu.
   it('says 403 when the caller can SEE the unit but may not assign there — 13 §5', async () => {
     const founder = await setUpOrg();
     const head = await addStaff(founder.orgId, {
@@ -269,9 +246,8 @@ describe('POST /people/:id/assignments — the two-hat case', () => {
       email: `scoped-${Date.now()}@example.test`,
     });
 
-    // Team A1 is INSIDE Section A, so `unit.read: subtree` reaches it and the head can read
-    // the unit directly. Asserted, because the whole point of the case is that the unit is
-    // visible — if this ever stops being true the test below is testing nothing.
+    // The inner unit IS visible to this caller, asserted on purpose: if that ever stops being true, the
+    // test below is testing nothing.
     const teamA1 = await unitIdByName(founder.orgId, 'Team A1');
     expect((await head.agent.get(`/api/v1/units/${teamA1}/composition`)).status).toBe(200);
 
@@ -286,7 +262,7 @@ describe('POST /people/:id/assignments — the two-hat case', () => {
     expect(res.body.error.details.reason).toBe('out_of_scope');
   });
 
-  /** The other half, unchanged: a unit they cannot see must not be confirmed to exist. */
+  // The other half, unchanged: a unit they cannot see must not be confirmed to exist.
   it('still says 404 for a unit outside the caller\'s reach entirely — 13 §5', async () => {
     const founder = await setUpOrg();
     const head = await addStaff(founder.orgId, {
@@ -326,20 +302,15 @@ describe('CSV import', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.columns).toEqual(['Name', 'Email', 'Role', 'Unit']);
     expect(res.body.data.rowCount).toBe(3);
-    // A quoted field with an embedded comma is what real exports contain.
+    // A quoted field with a comma inside is what real exports contain.
     expect(res.body.data.sample[1].name).toBe('Grace Hopper, PhD');
-    // "Professor" is not a role in this organisation. The import must not invent it — the
-    // capability catalogue and the org structure are things people map onto (11 §3).
+    // That role does not exist in this organisation, and the import must not invent it.
     expect(res.body.data.unmatchedRoles).toEqual(['Professor']);
   });
 
-  /**
-   * D-016 / T-065. The import is a string inside a JSON body, so two caps could reject it:
-   * CSV_MAX_CHARS in validate(), and express.json's 256 kb in the body parser. The DTO's cap
-   * is the SMALLER one, so an oversized CSV must come back as a field error naming the CSV —
-   * never as PAYLOAD_TOO_LARGE, which is what a caller used to get between 256 kb and the
-   * old 1 MB cap and which says nothing about what to fix.
-   */
+  // The CSV arrives as a string inside a JSON body, so two caps could reject it: the schema's own limit
+  // and the body parser's. The schema's is the SMALLER one, so an oversized file comes back as a field
+  // error naming the CSV rather than as an unhelpful payload-too-large.
   it('rejects an oversized CSV with a FIELD error, not a payload error — D-016', async () => {
     const founder = await setUpOrg();
     const row = 'Ada Lovelace,ada@example.test,Tutor,Section A\n';
@@ -367,20 +338,12 @@ describe('CSV import', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.created).toBe(1);
     expect(res.body.data.assigned).toBe(1);
-    // Reported, not silently imported without a position: somebody who appears in the list
-    // with no access looks like a permissions bug rather than an unfinished import.
+    // Reported, not silently imported without a position: somebody in the list with no access looks like
+    // a permissions bug rather than an unfinished import.
     expect(res.body.data.skipped).toEqual(['alan@example.test']);
   });
 
-  /**
-   * N-071 — the second place a person sits, from the file rather than by hand.
-   *
-   * A college's hostel and mess audiences are empty until the students who live there hold
-   * a position in them, and the model has always allowed that. What it did not have was any
-   * path there: the importer read ONE unit column, so the natural first pass produced a
-   * hostel audience of one person — the warden. The demo run fixed three students by hand
-   * and watched the announcement go from 1 recipient to 4.
-   */
+  // The second place a person sits, taken from the file rather than added by hand.
   it('puts a person in a SECOND unit from the "Also in" column', async () => {
     const founder = await setUpOrg();
     const csvWithAlso = [

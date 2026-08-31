@@ -1,4 +1,4 @@
-// Subjects. 13 § Subjects, 35, 10 §9.
+// Subjects: the people or things feedback is collected about.
 import type {
   CreateSubjectBody,
   SubjectCycle,
@@ -18,6 +18,7 @@ import { seesNothing, visibleUnits } from '../../authz/index.js';
 import { statusOf } from '../campaigns/status.js';
 import { ORGANISATION_SUBJECT } from '../campaigns/visibility.js';
 
+// The subject list, filtered to what the caller may see.
 export async function listSubjects(
   orgId: string,
   userId: string,
@@ -50,16 +51,8 @@ export async function listSubjects(
   return pageOf(rows, query.limit, total, toSummary);
 }
 
-/**
- * The summary plus its history. 35 § Interactions.
- *
- * The history is what "did anything actually change?" looks like in miniature, and it is
- * worth having now even though the Improve loop is P3 — a subject with three cycles and a
- * falling response count is a story an evaluator can read off the screen.
- *
- * Two queries, never one per row: the campaigns, then one grouped count across all of
- * them. A subject with twelve cycles must not cost thirteen round trips.
- */
+// One subject plus its history of cycles - the miniature version of "did anything actually change?".
+// Two queries only: the campaigns, then one grouped count across all of them, so twelve cycles is not thirteen trips.
 export async function readSubject(
   orgId: string,
   userId: string,
@@ -74,8 +67,7 @@ export async function readSubject(
       id: true, name: true, publicToken: true,
       closedAt: true, startsAt: true, endsAt: true, createdAt: true,
     },
-    // Oldest first: a trend reads left to right, and `startsAt` is null for a draft, so
-    // `createdAt` is the tiebreak that keeps unlaunched cycles in a sensible place.
+    // Oldest first, because a trend reads left to right. createdAt breaks the tie for drafts, which have no start date.
     orderBy: [{ startsAt: 'asc' }, { createdAt: 'asc' }],
   });
 
@@ -91,7 +83,7 @@ export async function readSubject(
   const cycles: SubjectCycle[] = campaigns.map((campaign) => ({
     campaignId: campaign.id,
     campaignName: campaign.name,
-    // The one place status is computed, asked for here rather than reimplemented (DEC-016).
+    // Status is worked out in one place and asked for here, never re-implemented.
     status: statusOf(campaign),
     startsAt: campaign.startsAt?.toISOString() ?? null,
     endsAt: campaign.endsAt?.toISOString() ?? null,
@@ -102,6 +94,7 @@ export async function readSubject(
   return { ...toSummary(subject), cycles };
 }
 
+// Creates a subject in a unit, optionally linked to a person's account.
 export async function createSubject(
   req: Request,
   orgId: string,
@@ -113,14 +106,9 @@ export async function createSubject(
   });
   if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
 
-  // RESERVED (DEC-093). `type` is otherwise free text the client chooses, and this one
-  // value decides who can see a campaign — the organisation subject is the row a quick
-  // campaign hangs off, and campaigns/visibility.ts reads the string to know it. Left
-  // settable, anybody holding `subject.create` could mint a subject that made their own
-  // campaign visible org-wide, which is a permission written in a text column.
-  //
-  // 422 rather than a silent rewrite to 'general': a request that asked for something it
-  // may not have should be told so, not quietly given something else.
+  // The organisation-wide subject type is reserved. Anyone could otherwise mint a subject that made
+  // their own campaign visible to the whole organisation - a permission written in a text column.
+  // It answers 422 rather than quietly substituting another type.
   if (body.type === ORGANISATION_SUBJECT) {
     throw new ValidationError(
       new z.ZodError([
@@ -157,6 +145,7 @@ export async function createSubject(
   });
 }
 
+// Renames a subject or moves it to another unit.
 export async function updateSubject(
   req: Request,
   orgId: string,
@@ -190,14 +179,9 @@ export async function updateSubject(
   });
 }
 
-/**
- * Archive, never delete.
- *
- * A subject with responses attached must survive for the history to mean anything (10 §9).
- * An archived subject drops out of new campaign audiences and still appears in the results
- * of past ones — which is the behaviour somebody looking at last year's numbers expects,
- * and the behaviour a hard delete makes impossible.
- */
+// Archive, never delete.
+// An archived subject drops out of new audiences and still appears in past results, which is what
+// somebody looking at last year's numbers expects.
 export async function archiveSubject(
   req: Request,
   orgId: string,
@@ -219,13 +203,9 @@ export async function archiveSubject(
   });
 }
 
-/* ---------------------------------------------------------------- helpers */
+// Helpers.
 
-/**
- * A subject IS anchored to a unit, so the scope question can be answered directly — unlike
- * a person, whose units come from their positions. 404 rather than 403 for a subject
- * outside the caller's scope: a 403 would confirm it exists (13 §5).
- */
+// A subject is anchored to a unit, so its scope can be checked directly. 404, not 403, so a stranger cannot confirm it exists.
 async function assertVisible(
   orgId: string,
   userId: string,
@@ -255,7 +235,7 @@ const subjectSelect = {
   createdAt: true,
   unit: { select: { name: true } },
   linkedUser: { select: { name: true } },
-  // Counted in the SAME query, so an 18-row list stays one request (35).
+  // Counted in the same query, so an 18-row list is still one request.
   _count: { select: { responses: true } },
   campaigns: {
     select: {
@@ -293,10 +273,10 @@ type SubjectRow = {
   responses: Array<{ submittedAt: Date }>;
 };
 
+// Turns a subject row into the summary shape the client reads.
 function toSummary(subject: SubjectRow): SubjectSummary {
   const now = Date.now();
-  // Status is derived, here as everywhere (DEC-016). "Active" is the same five lines the
-  // campaign feature uses, asked of the dates rather than of a stored column.
+  // Status is derived from the dates, here as everywhere, rather than read from a stored column.
   const activeCampaigns = subject.campaigns.filter(({ campaign }) => {
     if (campaign.closedAt) return false;
     if (!campaign.publicToken) return false;

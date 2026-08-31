@@ -1,4 +1,4 @@
-// Storing and serving uploaded images. 48.
+// Storing and serving uploaded images.
 import { NotFoundError } from '../../lib/errors.js';
 import { storage } from '../../lib/storage.js';
 import { prisma } from '../../db/client.js';
@@ -16,12 +16,8 @@ export type FileView = {
 
 export type FileKind = 'logo' | 'avatar';
 
-/**
- * Row and bytes are written INSIDE the caller's transaction (`db/tx.ts`), and the disk
- * write happens before the commit on purpose: if the disk fails, the transaction rolls
- * back and nothing ever referenced a file that is not there. The reverse order leaves an
- * orphan on disk that nothing will ever ask about again.
- */
+// The row and the bytes are written inside the caller's transaction, with the disk write first:
+// if the disk fails, the transaction rolls back and nothing ever pointed at a missing file.
 export async function storeUpload(
   tx: Tx,
   orgId: string,
@@ -33,7 +29,7 @@ export async function storeUpload(
     data: {
       orgId,
       kind,
-      // The stored type, which is the sniffed one — never the type the client claimed.
+      // The type sniffed from the bytes, never the type the client claimed.
       mime: file.facts.mime,
       bytes: file.bytes.length,
       width: file.facts.width,
@@ -55,35 +51,22 @@ export async function storeUpload(
   };
 }
 
-/**
- * Detach and delete — the row goes, and so do the bytes.
- *
- * A replaced avatar is not kept. An image nobody references is a copy of somebody's face
- * that nothing will ever ask about again; keeping it would be a quiet privacy debt with no
- * feature behind it.
- */
+// Detach and delete: the row goes and so do the bytes. A replaced avatar is not kept, because an
+// unreferenced image is a copy of somebody's face that nothing will ever ask for again.
 export async function discardFile(tx: Tx, orgId: string, fileId: string): Promise<void> {
-  // Scoped by orgId as well as id: `tx` is the RAW client, not the tenant-stamped one, so
-  // the scope has to be written here (10 §8, and the reason RLS is still owed as layer 2).
+  // Scoped by organisation as well as id, because this uses the raw client rather than the tenant-bound one.
   const row = await tx.file.findFirst({ where: { id: fileId, orgId }, select: { id: true, mime: true } });
   if (!row) return;
   await tx.file.delete({ where: { id: row.id } });
   await storage.remove(orgId, row.id, extOf(row.mime));
 }
 
+// The public URL for a stored file.
 export const urlFor = (fileId: string): string => `/api/v1/files/${fileId}`;
 
-/**
- * Serving. NO session and NO tenant, and therefore the raw client rather than `req.db` —
- * the one place in the application that reads a tenant table without a tenant, which is
- * worth saying out loud. INV-010 forbids taking an orgId from a REQUEST; here the row
- * supplies its own and the caller never names one.
- *
- * What makes it safe is that the id IS the credential: the id is a random uuid, the only
- * two kinds of file that exist are logos and avatars, and both are shown to everyone who
- * can see the page they sit on — including a respondent with no account at all, which is
- * exactly why this cannot sit behind the console's chain.
- */
+// Serving: no session and no organisation, so it uses the raw client - the one place a tenant table is
+// read without a tenant. What makes it safe is that the id IS the credential: it is a random uuid, and
+// the only files that exist are logos and avatars, shown to everyone who can see the page they sit on.
 export async function readFile(fileId: string): Promise<{ bytes: Buffer; mime: string }> {
   const row = await prisma.file.findUnique({
     where: { id: fileId },
@@ -96,5 +79,6 @@ export async function readFile(fileId: string): Promise<{ bytes: Buffer; mime: s
   return { bytes, mime: row.mime };
 }
 
+// The file extension for a stored image type.
 const extOf = (mime: string): string =>
   mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';

@@ -1,4 +1,4 @@
-// Campaigns. 13 § Campaigns, 38, DEC-016, DEC-017.
+// Campaigns: a template pointed at some subjects, for a window of time.
 import { CampaignAccess, estimateSeconds } from '@endur/shared';
 import type {
   AudiencePreview,
@@ -25,11 +25,7 @@ import { statusOf, whereStatus } from './status.js';
 import { mintToken, publicUrlFor } from './token.js';
 import { campaignInScope, ORGANISATION_SUBJECT, scopeToCampaigns } from './visibility.js';
 
-/**
- * Campaigns are scoped through their SUBJECTS' units — a campaign has no unit of its own.
- * That is the honest reading of the model: a campaign is a template pointed at some
- * subjects, and the subjects are what live in the org graph.
- */
+// Campaigns are scoped through their SUBJECTS' units, because a campaign has no unit of its own.
 export async function listCampaigns(
   orgId: string,
   userId: string,
@@ -43,12 +39,9 @@ export async function listCampaigns(
 
   const where = {
     orgId,
-    // DEC-093. The rule lives in visibility.ts because home/service.ts asks the same
-    // question, and a predicate written twice is a predicate fixed once.
+    // The rule lives in visibility.ts, because the home screen asks the same question.
     ...scopeToCampaigns(visibility),
-    // Filtering by a DERIVED status means restating the derivation in SQL. The alternative
-    // — read every row and discard most of them — is worse, and status.ts keeps the two
-    // statements next to each other so they are read together (DEC-016).
+    // Filtering on a derived status means writing the same rule as a database filter; status.ts keeps the two together.
     ...(query.status ? whereStatus(query.status) : {}),
   };
 
@@ -65,6 +58,7 @@ export async function listCampaigns(
   return pageOf(rows, query.limit, total, toSummary);
 }
 
+// One campaign, with its template, subjects and counts.
 export async function readCampaign(
   req: Request,
   orgId: string,
@@ -75,9 +69,7 @@ export async function readCampaign(
   const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.read');
   return {
     ...toSummary(campaign),
-    // Through ruleOf, not a bare cast: the column is JSONB and holds `{}` on rows that
-    // predate the discriminated union. A client switching on `audience.kind` renders
-    // nothing at all for those.
+    // Read through ruleOf, not a bare cast, so an older row holding {} still renders.
     audience: ruleOf(campaign.audienceRule),
     subjects: campaign.subjects.map(({ subject }) => ({
       id: subject.id,
@@ -87,6 +79,7 @@ export async function readCampaign(
   };
 }
 
+// Creates a draft campaign over a template and some subjects.
 export async function createCampaign(
   req: Request,
   orgId: string,
@@ -99,13 +92,11 @@ export async function createCampaign(
   });
   if (!template) throw new NotFoundError('That template does not exist.');
   if (template._count.questions === 0) {
-    // A campaign with no questions collects nothing and cannot be told apart from a broken
-    // link by the person who scans it.
+    // A campaign with no questions collects nothing and looks like a broken link to whoever scans it.
     throw new ConflictError('That template has no questions yet.');
   }
   if (template.orgId === null) {
-    // Library templates are shared; a campaign pointing at one would make every org's
-    // responses hang off the same question rows. Clone first (36).
+    // Library templates are shared, so a campaign must point at this org's own copy. Clone it first.
     throw new ConflictError('Clone that template into your organisation before using it.');
   }
 
@@ -125,8 +116,7 @@ export async function createCampaign(
         name: body.name,
         audienceRule: body.audience,
         anonymous: body.anonymous,
-        // Two axes, written together. `audienceRule` is the denominator the response-rate
-        // card divides by; `access` is the gate the public route enforces (38, DEC-037).
+        // Two different things: audienceRule is the denominator for the response rate, access is the gate the public route enforces.
         access: body.access,
         ...(body.startsAt ? { startsAt: body.startsAt } : {}),
         ...(body.endsAt ? { endsAt: body.endsAt } : {}),
@@ -146,6 +136,7 @@ export async function createCampaign(
   return readCampaign(req, orgId, userId, 0, created);
 }
 
+// Edits a draft campaign.
 export async function updateCampaign(
   req: Request,
   orgId: string,
@@ -156,8 +147,7 @@ export async function updateCampaign(
 ): Promise<CampaignDetail> {
   const campaign = await assertVisible(req, orgId, userId, authzVersion, campaignId, 'campaign.update');
 
-  // Draft only (13 §3). Once responses can arrive, changing the audience or the subjects
-  // would make the numbers already collected mean something different.
+  // Draft only: once answers can arrive, changing the audience or subjects would change what the numbers mean.
   if (statusOf(campaign) !== 'draft') {
     throw new ConflictError(
       `That ${nounsOf(req).campaign.one.toLowerCase()} has launched. It can be closed, but not edited.`,
@@ -173,8 +163,7 @@ export async function updateCampaign(
         ...(body.startsAt !== undefined ? { startsAt: body.startsAt } : {}),
         ...(body.endsAt !== undefined ? { endsAt: body.endsAt } : {}),
         ...(body.anonymous !== undefined ? { anonymous: body.anonymous } : {}),
-        // Draft only, like everything else here — the status check above already refused a
-        // launched campaign, and the trigger refuses this column even if it had not.
+        // Draft only as well, and the database refuses this column on a launched campaign anyway.
         ...(body.access !== undefined ? { access: body.access } : {}),
       },
     });
@@ -194,18 +183,10 @@ export async function updateCampaign(
   return readCampaign(req, orgId, userId, authzVersion, campaignId);
 }
 
-/**
- * QUICK CREATE — a poll or a suggestion box, launched in ONE transaction (DEC-089).
- *
- * Template, question, subject, campaign and token, composed here rather than in the
- * browser. Composed in the browser it is four round trips that can half-fail, and the
- * failure lands on stage: an orphan template, or a campaign with no token and a QR code
- * that never appears. Here it either produces a launched campaign or produces nothing.
- *
- * There is no new entity underneath this (DEC-088). A poll IS a campaign over a
- * one-question template; the category is the only thing that says which kind of thing the
- * console should call it.
- */
+// Quick create: a poll or a suggestion box, launched in ONE transaction.
+// Template, question, subject, campaign and token together, because doing it in four browser calls
+// can half-fail on stage and leave a campaign with no QR code. There is no new entity underneath:
+// a poll IS a campaign over a one-question template.
 export async function quickCreate(
   req: Request,
   orgId: string,
@@ -225,9 +206,7 @@ export async function quickCreate(
       data: {
         orgId,
         name: body.name,
-        // DATA, not schema. This string and `questionCount === 1` are the whole of what
-        // tells a poll from a feedback form (DEC-088) — there is no type column and there
-        // is not going to be one.
+        // Data, not schema: this category and "one question" are the whole of what tells a poll from a feedback form.
         category: poll ? 'Poll' : 'Suggestion box',
         estimatedSeconds: estimateSeconds([kind]),
         questions: {
@@ -242,33 +221,27 @@ export async function quickCreate(
         orgId,
         templateId: template.id,
         name: body.name,
-        // A link, answerable by anyone holding it, and anonymous. All three are what the
-        // surface is FOR; none of them is a default worth making the presenter choose.
+        // A link, answerable by anyone holding it, and anonymous - all three are what this surface is for.
         audienceRule: { kind: 'anyone' },
         access: 'public',
         anonymous: true,
         ...(body.endsAt ? { endsAt: body.endsAt } : {}),
         createdById: userId,
-        // The token is minted HERE, by the same generator every other campaign uses
-        // (DEC-017) — there must not be a second one to keep in step.
+        // The token is minted by the same generator every other campaign uses, so there is no second one to keep in step.
         publicToken: mintToken(),
         subjects: { create: [{ subjectId }] },
       },
       select: { id: true },
     });
 
-    // Two rows, because two things happened, and the second is the irreversible one. An
-    // activity log that shows only `campaign.quick` would hide the launch from the one
-    // screen that exists to make launches visible (56).
+    // Two audit rows, because two things happened, and the launch is the irreversible one.
     req.ctx.audit.push({ action: 'template.create', targetType: 'template', targetId: template.id });
     req.ctx.audit.push({ action: 'campaign.launch', targetType: 'campaign', targetId: campaign.id });
     return campaign.id;
   });
 
-  // Read WITHOUT assertVisible, deliberately. The caller just created this row and passed
-  // `campaign.launch` to get here; the singleton subject has no unit, so a scoped reader
-  // would fail the unit check on a campaign they made one line ago. Re-authorising it can
-  // only produce a false negative.
+  // Read without the visibility check on purpose: the caller made this row a line ago, and the organisation
+  // subject has no unit, so re-checking could only produce a false negative.
   const created = await prisma.campaign.findUniqueOrThrow({
     where: { id: campaignId },
     select: campaignSelect,
@@ -284,15 +257,8 @@ export async function quickCreate(
   };
 }
 
-/**
- * The organisation as a subject of itself — found, or created once and reused.
- *
- * A poll has no reviewee, and `CreateCampaignBody.subjectIds` requires at least one. The
- * temptation is to relax that bound; the reason not to is that every results screen groups
- * by subject, so a campaign with none renders as an empty page rather than as a poll
- * (DEC-089). `type: 'organisation'` marks it as furniture rather than as something somebody
- * added on the Subjects screen.
- */
+// The organisation as a subject of itself, found or created once and then reused.
+// A poll has no reviewee, and every results screen groups by subject, so a campaign with none renders empty.
 async function organisationSubject(tx: Tx, orgId: string): Promise<string> {
   const existing = await tx.subject.findFirst({
     where: { orgId, type: ORGANISATION_SUBJECT, archivedAt: null },
@@ -313,13 +279,8 @@ async function organisationSubject(tx: Tx, orgId: string): Promise<string> {
 
 export { ORGANISATION_SUBJECT } from './visibility.js';
 
-/**
- * Launch. Mints the public token, and is IRREVERSIBLE.
- *
- * Idempotent by key (13 §7), and idempotent by state as well: a campaign that already has
- * a token returns the same one. A double-click on stage must not mint a second token,
- * because the QR code already on the screen would then point at the wrong campaign.
- */
+// Launch: mints the public token, and cannot be undone.
+// Idempotent by key and by state, so a double-click returns the same token rather than minting a second one.
 export async function launchCampaign(
   req: Request,
   orgId: string,
@@ -354,12 +315,12 @@ export async function launchCampaign(
   return {
     publicToken: token,
     url: publicUrlFor(config.PUBLIC_BASE_URL, token),
-    // Derived, so a campaign launched with a future start date correctly comes back
-    // `scheduled` rather than `open` (DEC-016).
+    // Derived, so a campaign launched with a future start date comes back as scheduled rather than open.
     status: statusOf({ ...campaign, publicToken: token }),
   };
 }
 
+// Closes a campaign, so it stops accepting answers.
 export async function closeCampaign(
   req: Request,
   orgId: string,
@@ -373,7 +334,7 @@ export async function closeCampaign(
   if (!campaign.publicToken) throw new ConflictError(`That ${noun} has not launched yet.`);
 
   await runInTransaction(req, async (tx) => {
-    // The ONE stored transition. Everything else about status is read off the dates.
+    // The one stored transition. Everything else about status is read off the dates.
     await tx.campaign.update({ where: { id: campaignId }, data: { closedAt: new Date() } });
     req.ctx.audit.push({
       action: 'campaign.close',
@@ -385,13 +346,9 @@ export async function closeCampaign(
   return readCampaign(req, orgId, userId, authzVersion, campaignId);
 }
 
-/**
- * How many people this campaign is actually for, resolved against the org graph.
- *
- * `anyone` has no countable audience — a link is a link — so it reports the number of
- * subjects instead of pretending to a headcount it cannot know. Saying "0" there would
- * read as a broken audience rather than an open one.
- */
+// How many people this campaign is for, resolved against the org graph.
+// 'anyone' has no countable audience, so this screen shows the subject count instead - "0" beside an open
+// audience would read as a broken rule rather than an unbounded one.
 export async function audiencePreview(
   req: Request,
   orgId: string,
@@ -403,10 +360,7 @@ export async function audiencePreview(
   const rule = ruleOf(campaign.audienceRule);
 
   if (rule.kind === 'anyone') {
-    // countAudience() returns null here, correctly — a link has no roll. THIS screen still
-    // needs a number, because "0" beside an open audience reads as a broken rule rather
-    // than an unbounded one, so the substitution stays and stays visible. 40's response
-    // RATE does not get the same courtesy; see countAudience.
+    // The response-rate card does NOT make this substitution; only this preview does, and it is visible here.
     return {
       estimatedCount: campaign.subjects.length,
       sample: campaign.subjects.slice(0, 5).map(({ subject }) => ({
@@ -420,7 +374,7 @@ export async function audiencePreview(
     where: {
       orgId,
       kind: 'person',
-      // The SHARED filter (T-094). This block used to be a second copy of countAudience's.
+      // The shared filter, so this and the count above cannot drift apart.
       edgesAsParent: { some: { type: 'member', child: await positionFilter(orgId, rule) } },
     },
     select: { id: true, name: true },
@@ -433,7 +387,7 @@ export async function audiencePreview(
   };
 }
 
-/* ---------------------------------------------------------------- helpers */
+// Helpers.
 
 async function assertVisible(
   req: Request,
@@ -443,9 +397,7 @@ async function assertVisible(
   campaignId: string,
   capability: 'campaign.read' | 'campaign.update' | 'campaign.launch' | 'campaign.close',
 ): Promise<CampaignRow> {
-  // Both throws below say the SAME thing, deliberately (13 §5) — and both say it in the
-  // org's own noun (22 §6). Uniform and vocabulary-aware are not in tension: what must not
-  // vary between the two branches is the answer, not the language it is written in.
+  // Both refusals below say the same sentence, in the organisation's own noun.
   const missing = `That ${nounsOf(req).campaign.one.toLowerCase()} does not exist.`;
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, orgId },
@@ -456,8 +408,7 @@ async function assertVisible(
   const visibility = await visibleUnits({ orgId, userId, capability, authzVersion });
   if (campaignInScope(campaign.subjects, visibility)) return campaign;
 
-  // 404, not 403: a 403 would confirm the campaign exists to somebody outside its scope
-  // and leak which parts of the organisation are collecting feedback (13 §5).
+  // 404, not 403: a 403 would confirm the campaign exists to somebody outside its scope.
   throw new NotFoundError(missing);
 }
 
@@ -477,8 +428,7 @@ const campaignSelect = {
   _count: { select: { responses: true } },
   subjects: {
     select: {
-      // `type` is selected for the visibility rule, not for the DTO — an organisation
-      // subject is the one that belongs to no unit on purpose (DEC-093).
+      // The subject's type is selected for the visibility rule, not for the response body.
       subject: {
         select: { id: true, name: true, unitId: true, type: true, unit: { select: { name: true } } },
       },
@@ -511,33 +461,29 @@ type CampaignRow = {
   }>;
 };
 
+// Turns a campaign row into the summary shape the client reads.
 function toSummary(campaign: CampaignRow): CampaignSummary {
   return {
     id: campaign.id,
     name: campaign.name,
-    // Derived on every read (DEC-016). There is no column to be stale.
+    // Derived on every read, so there is no column that can go stale.
     status: statusOf(campaign),
     templateId: campaign.templateId,
     templateName: campaign.template.name,
-    // DEC-088: data, not schema. 'Poll' and 'Suggestion box' are what the console reads to
-    // tell a quick campaign from a feedback round.
+    // Data, not schema: the category is what the console reads to tell a quick campaign from a feedback round.
     templateCategory: campaign.template.category,
     subjectCount: campaign.subjects.length,
     responseCount: campaign._count.responses,
-    // The k-anonymity gate the results of this campaign will be held behind (INV-005). Sent
-    // so a card that shows nothing can say WHY it shows nothing; the number stays the
-    // server's, and the gate stays in SQL where it is enforced.
+    // The anonymity threshold these results will be held behind, sent so a card can say WHY it shows nothing.
     resultsThreshold: config.K_ANON_THRESHOLD,
     anonymous: campaign.anonymous,
-    // Through the parser rather than a bare cast: the column is TEXT with a CHECK, and a
-    // row written outside the API (a seed, a migration) should not be able to put an
-    // unknown mode in front of a client switching on it.
+    // Parsed rather than cast, so a row written by a seed or a migration cannot put an unknown mode in front of the client.
     access: CampaignAccess.catch('public').parse(campaign.access),
     startsAt: campaign.startsAt?.toISOString() ?? null,
     endsAt: campaign.endsAt?.toISOString() ?? null,
     closedAt: campaign.closedAt?.toISOString() ?? null,
     publicToken: campaign.publicToken,
-    // A draft has no token and therefore no reachable URL (38 § Acceptance).
+    // A draft has no token, and therefore no URL anybody could open.
     url: campaign.publicToken
       ? publicUrlFor(config.PUBLIC_BASE_URL, campaign.publicToken)
       : null,

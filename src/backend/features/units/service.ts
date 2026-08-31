@@ -1,4 +1,4 @@
-// Units — the org graph's structural half. 13 § Structure, 32, 10 §6.
+// Units: the structural half of the org graph.
 import { expandUnitNames } from '@endur/shared';
 import type {
   CreateUnitBody,
@@ -19,13 +19,8 @@ import { counted, nounsOf } from '../../lib/vocabulary.js';
 import { seesNothing, visibleUnits, type Visibility } from '../../authz/index.js';
 import { bumpVersion } from '../org/service.js';
 
-/**
- * The tree, scope-filtered by the API (INV-003).
- *
- * A level-2 role sees their own subtree rooted at their own unit — not the whole
- * organisation with the rest greyed out. Out-of-scope units are ABSENT, and the client
- * never filters for permission reasons.
- */
+// The tree, already filtered to what the caller may see.
+// A unit outside their scope is ABSENT from the response, not greyed out, so the client never filters for permission.
 export async function readTree(
   orgId: string,
   userId: string,
@@ -48,18 +43,9 @@ export async function readTree(
       where: { orgId, type: 'contains', childId: { in: ids } },
       select: { parentId: true, childId: true },
     }),
-    // ONE ROW PER ASSIGNMENT, not a `groupBy` on positions — DEC-082.
-    //
-    // A position is a role-at-unit slot SHARED by everyone holding that role there
-    // (§2.1 of `10`, and `createAssignment` finds one before it creates one), so counting
-    // position rows counts distinct roles. Riverside's Ward C has a Head, a Nurse slot
-    // with two nurses in it and a Patient slot with three: three positions, six people,
-    // and the panel printed "People 3" above a list of five names.
-    //
-    // Expired assignments are excluded on the same predicate the GRANT resolver uses
-    // (`authz/collect.ts`). `valid_to` retains history rather than deleting access, so a
-    // lapsed nurse is still a row — counting them would put somebody in a ward where they
-    // hold no powers at all.
+    // One row per ASSIGNMENT, not per position: a position is a slot shared by everyone holding that role there,
+    // so counting positions would count roles instead of people. Expired assignments are left out, using the
+    // same date window the permission resolver uses.
     prisma.edge.findMany({
       where: {
         orgId,
@@ -99,7 +85,7 @@ export async function readTree(
         endsAt: unit.endsAt?.toISOString() ?? null,
         peopleCount: peopleIn.get(unit.id)?.size ?? 0,
         subjectCount: subjectCounts.get(unit.id) ?? 0,
-        // Filled by the rollup below, once the tree has a shape to walk.
+        // Filled in by the rollup below, once the tree has a shape to walk.
         peopleTotal: 0,
         subjectTotal: 0,
         children: [],
@@ -107,9 +93,7 @@ export async function readTree(
     ]),
   );
 
-  // A unit whose parent is not visible becomes a root of the returned tree. That is the
-  // point of scope filtering: the caller's world starts at their own unit, and the units
-  // above it do not exist as far as this response is concerned.
+  // A unit whose parent is not visible becomes a root here: the caller's world starts at their own unit.
   const roots: UnitNode[] = [];
   for (const node of nodes.values()) {
     const parent = node.parentId ? nodes.get(node.parentId) : undefined;
@@ -122,30 +106,15 @@ export async function readTree(
 
 const NO_TOTALS: UnitTreeTotals = { people: 0, subjects: 0, units: 0 };
 
-/**
- * Fills `peopleTotal` and `subjectTotal` on every node, and answers the forest.
- *
- * People are unioned rather than added, because a person is one person however many roles
- * they hold inside the branch. Riverside's demo data has exactly one: a nurse placed in
- * both Ward F and Medicine, who a summing rollup counted twice at the root. Subjects hang
- * off one unit each, so they add — but they are carried through the same walk so there is
- * only ever one traversal to keep correct.
- *
- * Post-order, so each node is visited once: a function that re-walked its own subtree per
- * row would be O(n²) on the page whose entire purpose is deep trees.
- *
- * INV-003 SURVIVES THIS MOVE. `readTree` has already reduced `units` to what this caller
- * may see, so the walk cannot reach a unit they may not — a total here counts exactly the
- * boxes on their screen, which is the guarantee that made the rollup client-side under
- * DEC-081 and is now met on the only side that can also count people distinctly.
- */
+// Fills in peopleTotal and subjectTotal on every node, and returns the forest.
+// People are unioned, not added, because one person holding two roles in a branch is still one person.
+// One post-order walk, so each node is visited once even on a deep tree.
 function rollUp(roots: UnitNode[], peopleIn: Map<string, Set<string>>): UnitTreeTotals {
   const forest = new Set<string>();
   let subjects = 0;
   let units = 0;
 
-  /** Returns the branch's distinct people; `units` is accumulated as a side effect so the
-   *  whole forest is measured in this one traversal rather than a second walk per root. */
+  // Returns the branch's distinct people; the forest is measured in this same single traversal.
   const walk = (node: UnitNode): Set<string> => {
     const branch = new Set(peopleIn.get(node.id) ?? []);
     let below = node.subjectCount;
@@ -166,6 +135,7 @@ function rollUp(roots: UnitNode[], peopleIn: Map<string, Set<string>>): UnitTree
   return { people: forest.size, subjects, units };
 }
 
+// Creates one unit, or a numbered range of siblings, inside a parent.
 export async function createUnit(
   req: Request,
   orgId: string,
@@ -174,9 +144,8 @@ export async function createUnit(
 ): Promise<UnitNode[]> {
   if (body.parentId) await assertUnitInOrg(req, orgId, body.parentId);
 
-  // `Floor 1..8` — one request, one transaction, eight siblings. The grammar and the cap
-  // live in the shared DTO so the client's preview and this loop cannot disagree, and so
-  // the cap is enforced where it cannot be skipped (32).
+  // "Floor 1..8" makes eight siblings in one request. The grammar and the cap live in the shared DTO,
+  // so the client's preview and this loop cannot disagree.
   const names = expandUnitNames(body.name, body.repeat);
 
   return runInTransaction(req, async (tx) => {
@@ -212,8 +181,7 @@ export async function createUnit(
       req.ctx.audit.push({ action: 'unit.create', targetType: 'unit', targetId: unit.id });
     }
 
-    // A new unit changes what `subtree` scopes reach, so every cached decision for this
-    // tenant has to stop being trusted (11 §7).
+    // A new unit changes what a subtree scope reaches, so cached permission decisions must be dropped.
     await tx.organization.update({
       where: { id: orgId },
       data: { settings: (await bumpVersion(tx, orgId)) as never },
@@ -223,6 +191,7 @@ export async function createUnit(
   });
 }
 
+// Renames a unit, or changes its temporary end date.
 export async function updateUnit(
   req: Request,
   orgId: string,
@@ -257,10 +226,7 @@ export async function updateUnit(
   });
 }
 
-/**
- * Reparenting is a separate capability from renaming for a reason worth remembering:
- * renaming a department is cosmetic, moving it changes the scope of everyone inside it.
- */
+// Moving a unit is its own capability: renaming is cosmetic, moving changes the scope of everyone inside it.
 export async function reparentUnit(
   req: Request,
   orgId: string,
@@ -270,9 +236,7 @@ export async function reparentUnit(
   await assertUnitInOrg(req, orgId, unitId);
   if (body.newParentId) {
     await assertUnitInOrg(req, orgId, body.newParentId);
-    // The client also prevents the obvious drags, but the server is the authority. A cycle
-    // here does not merely produce wrong answers — it is what the recursive queries' depth
-    // guard exists to survive (10 §6).
+    // The client blocks the obvious drags, but the server is the authority: a loop here would hang the recursive queries.
     const inItself = `That move would put the ${nounsOf(req).unit.one.toLowerCase()} inside itself.`;
     if (await wouldCreateCycle(orgId, 'primary', body.newParentId, unitId)) {
       throw new ConflictError(inItself);
@@ -298,6 +262,7 @@ export async function reparentUnit(
   });
 }
 
+// Deletes a unit. Refuses while it still has children, and detaches its subjects rather than deleting them.
 export async function deleteUnit(
   req: Request,
   orgId: string,
@@ -309,11 +274,8 @@ export async function deleteUnit(
 
   const unitNoun = nounsOf(req).unit;
   if (children.length > 0 && !body.reassignChildrenTo) {
-    // Deleting silently orphans everything below, and the cascade would take the positions
-    // with it. Refusing with a number is the honest answer; the dialog states it (32).
-    //
-    // `counted` takes the stored plural rather than two strings, because this line used to
-    // append an "s" — and "Faculty" pluralises to "Faculty" (22 §5, §8).
+    // Deleting would orphan everything below, so it is refused with a number the dialog can show.
+    // counted() uses the organisation's stored plural, because not every word just adds an s.
     throw new ConflictError(
       `That ${unitNoun.one.toLowerCase()} has ${counted(children.length, unitNoun).toLowerCase()} inside it. Say where they should go first.`,
     );
@@ -335,9 +297,7 @@ export async function deleteUnit(
         data: { parentId: body.reassignChildrenTo },
       });
     }
-    // Subjects survive their unit. A subject with responses attached must stay for the
-    // history to mean anything (10 §9); the schema sets unit_id to NULL rather than
-    // cascading, and this is where that becomes visible.
+    // Subjects outlive their unit: their unit id is set to null rather than deleting the history.
     await tx.node.delete({ where: { id: unitId } });
     await tx.organization.update({
       where: { id: orgId },
@@ -348,11 +308,7 @@ export async function deleteUnit(
   });
 }
 
-/**
- * What actually happens if this unit moves or goes. The delete dialog is not actionable
- * until this has answered, because a confirmation that says "are you sure?" without saying
- * what changes is a confirmation nobody reads (32).
- */
+// What would actually happen if this unit moved or went. The delete dialog waits for this before it lets you confirm.
 export async function unitImpact(
   req: Request,
   orgId: string,
@@ -363,10 +319,7 @@ export async function unitImpact(
   const subtree = await unitSubtree(orgId, unitId);
 
   const [assignments, subjects, campaigns] = await Promise.all([
-    // Distinct PEOPLE, not positions — DEC-082. This number goes straight into a delete
-    // confirmation ("moves 64 people and 12 courses to School of Engineering"), which is
-    // the one place in the product where a wrong count causes an irreversible action to be
-    // taken on a false premise. It was counting role slots.
+    // Distinct PEOPLE, not positions: this number goes straight into a confirmation for an irreversible action.
     prisma.edge.findMany({
       where: {
         orgId,
@@ -395,8 +348,7 @@ export async function unitImpact(
 
   if (!newParentId) return impact;
 
-  // A move changes who can reach this subtree: everyone anchored above the OLD parent
-  // loses it unless they are also above the new one, and the reverse for the new side.
+  // A move changes who can reach this subtree: anyone anchored above the old parent loses it, and vice versa.
   const [oldAncestors, newAncestors] = await Promise.all([
     ancestorsAbove(orgId, unitId),
     unitAncestors(orgId, newParentId),
@@ -409,23 +361,9 @@ export async function unitImpact(
   return impact;
 }
 
-/**
- * Who the count is made of — `DEC-083`.
- *
- * The owner's question was not "is 30 right" but "does 30 mean anything", asked of a
- * hospital where sixteen of the thirty are Patients. A total is honest and still unusable
- * when the mix is unknown, so the panel breaks it down and this answers that.
- *
- * SCOPE-FILTERED to the same visible set the tree's own totals use. If it were not, a
- * level-2 reader would see role counts summing past the branch figure printed above them —
- * which both leaks the size of a subtree they cannot open and makes the panel contradict
- * itself, and the second is how anybody would notice the first.
- *
- * ONE PERSON CAN APPEAR TWICE. Someone who is both a Nurse and a Head of Department is in
- * both rows, so the rows may sum higher than `total`. Each row is distinct within itself —
- * a Nurse placed in two wards of the branch is one Nurse — and the panel says which number
- * is the whole.
- */
+// What the count is made of: how many of the people in a branch hold each role.
+// Filtered to the same visible set the tree totals use. One person can appear in two rows, so the rows may
+// sum higher than the total, and the panel says which number is the whole.
 export async function unitComposition(
   orgId: string,
   userId: string,
@@ -445,8 +383,7 @@ export async function unitComposition(
     where: {
       orgId,
       type: 'member',
-      // The same window the GRANT resolver uses, and the same one `readTree` counts on —
-      // a breakdown that included a lapsed nurse would not add up to the stat above it.
+      // The same date window the resolver and the tree counts use, so the breakdown adds up to the figure above it.
       OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
       child: { kind: 'position', unitId: { in: visible } },
     },
@@ -489,14 +426,9 @@ export async function unitComposition(
 
 /* ---------------------------------------------------------------- helpers */
 
-/**
- * INV-010's honest limit, applied by hand. The tenant-bound client cannot scope a by-id
- * `where` — Prisma will not accept a non-unique field there — so every by-id handler
- * checks `orgId` itself until RLS lands (D-001, 10 §8).
- *
- * The failure is 404 rather than 403 on purpose: a 403 would confirm the unit exists to
- * somebody who cannot see it, which leaks structure (13 §5).
- */
+// Checks a unit really belongs to this organisation.
+// The tenant-bound client cannot add its filter to a by-id lookup, so every by-id handler checks by hand.
+// It answers 404 rather than 403, because a 403 would confirm the unit exists to somebody who cannot see it.
 async function assertUnitInOrg(
   req: Request,
   orgId: string,
@@ -506,9 +438,7 @@ async function assertUnitInOrg(
     where: { id: unitId, orgId, kind: 'unit' },
     select: { id: true, name: true },
   });
-  // The ORG'S noun, not the word "unit" (22 §6). This message reaches a reader: 32's page
-  // renders `error.message` inline, and a hotel being told about a "unit" is INV-001 broken
-  // by the API rather than by a component.
+  // In the organisation's OWN noun, because this message is rendered straight onto the page.
   if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
   return unit;
 }

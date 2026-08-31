@@ -1,11 +1,6 @@
-// Results, and the gate that makes the anonymity promise real. 13, 40, 52 §2.
-//
-// The aggregation is the easy half. The half that matters is the k-anonymity gate: with
-// three responses in a small department, an average plus one comment identifies the author,
-// and an administrator who wants to find a critic will find them.
-//
-// Suppression is the promise being kept when it is inconvenient, which is the only time a
-// privacy promise means anything.
+// Results, and the anonymity gate that makes the promise real.
+// The aggregation is the easy half. The gate is the half that matters: with three responses in a small
+// team, an average plus one comment identifies the author.
 import { resolveLabels } from '@endur/shared';
 import type {
   LabelSet,
@@ -28,6 +23,7 @@ import { unitSubtree } from '../../db/graph.js';
 import { countAudience, ruleOf } from '../campaigns/audience.js';
 import { campaignInScope } from '../campaigns/visibility.js';
 
+// The aggregated results for one campaign, or a suppressed reply when there are too few responses.
 export async function readResults(
   req: Request,
   orgId: string,
@@ -46,12 +42,8 @@ export async function readResults(
 
   const [responseCount, audienceEstimate, latest] = await Promise.all([
     prisma.response.count({ where: responseWhere }),
-    // FROM THE AUDIENCE RULE, not from the subject count. Until T-040 this was
-    // `campaign.subjects.length`, which made the response rate responses-per-SUBJECT and
-    // rendered it as a percentage: every seeded demo campaign showed a rate between 1750%
-    // and 4675%, on the screen the evaluator opens straight after scanning.
-    // `anyone` has no denominator at all and now says so by returning null (40's DTO has
-    // typed both fields `| null` since revision one, anticipating exactly this).
+    // The denominator comes from the AUDIENCE RULE, not the subject count - otherwise the response rate
+    // becomes responses-per-subject and reads as 1750%. An open link has no denominator and says so with null.
     countAudience(orgId, ruleOf(campaign.audienceRule)),
     prisma.response.findFirst({
       where: responseWhere,
@@ -62,9 +54,8 @@ export async function readResults(
 
   const threshold = config.K_ANON_THRESHOLD;
 
-  // THE GATE. Below the threshold the body carries no per-question data at all — not
-  // zeroed, not rounded, absent. A client cannot render what it was never sent, which is
-  // the difference between a privacy guarantee and a UI convention (52 §2).
+  // THE GATE. Below the threshold the reply carries no per-question data at all - not zeroed, absent.
+  // A client cannot render what it was never sent.
   if (responseCount < threshold) {
     return {
       responseCount,
@@ -101,11 +92,7 @@ export async function readResults(
   };
 }
 
-/**
- * Individual comments. A SEPARATE capability from the aggregates, deliberately: seeing
- * that the average is 4.3 and reading what one person wrote are different levels of
- * access, and a head of department may reasonably have the first without the second (40).
- */
+// The individual comments, behind a separate capability from the aggregates on purpose.
 export async function readResponses(
   req: Request,
   orgId: string,
@@ -118,8 +105,7 @@ export async function readResponses(
 
   const total = await prisma.response.count({ where: { campaignId } });
   if (total < config.K_ANON_THRESHOLD) {
-    // The same gate, on the surface where it matters most. Free-text answers are the most
-    // identifying data in the product — people write in their own voice.
+    // The same gate, on the surface where it matters most: people write free text in their own voice.
     return {
       data: [],
       page: { nextCursor: null, hasMore: false },
@@ -130,8 +116,7 @@ export async function readResponses(
 
   const where = { campaignId };
   const rows = await prisma.response.findMany({
-    // A response has no created_at: for a submission those would be the same instant, and
-    // a second column would be a second thing to get wrong (10 §4.4).
+    // A response has no created_at: for a submission that would be the same instant as submitted_at.
     where: { ...where, ...afterCursorOn('submittedAt', query.cursor) },
     take: query.limit + 1,
     orderBy: orderOn('submittedAt'),
@@ -170,7 +155,7 @@ export async function readResponses(
   return { ...page, suppressed: false };
 }
 
-/** CSV, gated exactly as the aggregates are — an export is a results page you can email. */
+// The CSV export, gated exactly as the aggregates are: an export is a results page you can email.
 export async function exportResults(
   req: Request,
   orgId: string,
@@ -203,9 +188,7 @@ export async function exportResults(
     },
   });
 
-  // THE ORG'S OWN NOUN, not the word "Subject" (22 §6, 40 § Acceptance). A CSV whose header
-  // column says "Course" for a hotel is exactly the leak the manual vocabulary audit exists
-  // for, and it is the one nobody thinks to check — audit-vocab only scans the frontend.
+  // The organisation's own noun in the header, never the literal word "Subject".
   const labels = resolveLabels(campaign.org.labels as LabelSet);
   const header = [
     'Submitted at',
@@ -220,8 +203,7 @@ export async function exportResults(
       [
         response.submittedAt.toISOString(),
         response.subject?.name ?? '',
-        // No respondent column exists to export, which is the point (INV-006). A CSV that
-        // could name people would undo the schema-level guarantee at the last step.
+        // There is no respondent column to export, which is the point: the CSV cannot undo the schema's guarantee.
         ...questions.map((question) => renderAnswer(byQuestion.get(question.id))),
       ]
         .map(csvCell)
@@ -232,7 +214,7 @@ export async function exportResults(
   return { filename: `${slug(campaign.name)}-results.csv`, csv: `${lines.join('\n')}\n` };
 }
 
-/* ------------------------------------------------------------ aggregation */
+// Aggregation.
 
 type QuestionRow = { id: string; kind: string; text: string; config: unknown };
 
@@ -254,9 +236,7 @@ async function summarise(
   const config_ = question.config as QuestionConfig;
 
   if (question.kind === 'rating') {
-    // Aggregated on numeric_value, not by extracting (value->>'n')::numeric on every row.
-    // That column is written alongside `value` at submit time precisely so this stays one
-    // indexed aggregate (10 §4.4, 40 § Acceptance).
+    // Aggregated on the stored numeric column, which is why it is written at submit time: it keeps this one indexed query.
     const stats = await prisma.answer.aggregate({ where, _avg: { numericValue: true } });
     const buckets = await prisma.answer.groupBy({
       by: ['numericValue'],
@@ -272,8 +252,7 @@ async function summarise(
         const value = index + 1;
         const count = buckets.find((b) => Number(b.numericValue) === value)?._count ?? 0;
         return { label: String(value), count, percent: percent(count, answered) };
-        // No valence. Whether a low rating is bad depends on the question, and inferring it
-        // from the arithmetic is exactly what CONF-004 forbids.
+        // No good/bad label: whether a low rating is bad depends on the question, and guessing is forbidden.
       }),
     };
   }
@@ -304,8 +283,7 @@ async function summarise(
         detractors,
         score: Math.round((promoters / answered) * 100 - (detractors / answered) * 100),
       },
-      // Valence IS a definition here — the instrument names these groups. This is the one
-      // place it is populated (CONF-004).
+      // Here the labels ARE part of the instrument, so this is the one place they are set.
       distribution: [
         { label: 'Promoters', count: promoters, percent: percent(promoters, answered), valence: 'positive' },
         { label: 'Passives', count: passives, percent: percent(passives, answered), valence: 'neutral' },
@@ -349,12 +327,11 @@ async function summarise(
     };
   }
 
-  // Free text has no distribution. The comments themselves live behind `response.read`,
-  // which is a different capability on purpose.
+  // Free text has no distribution. The comments themselves sit behind a different capability.
   return base;
 }
 
-/* ---------------------------------------------------------------- helpers */
+// Helpers.
 
 async function assertVisible(
   req: Request,
@@ -364,7 +341,7 @@ async function assertVisible(
   campaignId: string,
   capability: 'results.read' | 'response.read' | 'results.export',
 ) {
-  // The org's own noun, on both branches, for the same reason as campaigns/service.ts.
+  // The organisation's own noun on both branches, as in the campaigns service.
   const missing = `That ${nounsOf(req).campaign.one.toLowerCase()} does not exist.`;
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, orgId },
@@ -380,19 +357,13 @@ async function assertVisible(
   if (!campaign) throw new NotFoundError(missing);
 
   const visibility = await visibleUnits({ orgId, userId, capability, authzVersion });
-  // The SAME predicate the inbox's readableCampaigns uses, from one implementation. 58 §
-  // Acceptance asks that the two match for the same caller; sharing the function is how
-  // that is true by construction rather than by two people writing the same `some()`.
+  // The same visibility rule the inbox uses, from one implementation, so the two always agree.
   if (campaignInScope(campaign.subjects, visibility)) return campaign;
 
   throw new NotFoundError(missing);
 }
 
-/**
- * The filters are themselves scope-filtered: a head of department's subject and unit
- * dropdowns contain only their own unit, so a filter cannot be used to reach past a scope
- * the list already applied (40, INV-003).
- */
+// The filters are themselves scope-filtered, so a filter can never reach past the scope the list already applied.
 async function filterSubjects(
   req: Request,
   orgId: string,
@@ -434,27 +405,17 @@ function renderAnswer(value: unknown): string {
   return answer.text ?? '';
 }
 
-/** RFC 4180: quote anything containing a comma, a quote or a newline, and double the quotes. */
+// Quotes a CSV cell when it contains a comma, a quote or a newline, and doubles any inner quote.
 function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-/* ------------------------------------------------- the inbox's read path (58) */
+// The inbox's read path.
 
-/**
- * ONE FREE-TEXT COMMENT, across campaigns. The inbox's entire source of content.
- *
- * This lives here rather than in `features/inbox/` because the k-anonymity gate lives here,
- * and `38` § "Not built" already refused a per-subject breakdown for exactly this reason:
- * *"a second ungated path to them is what INV-007 exists to prevent"*. The inbox is a far
- * more tempting version of the same mistake — it is a list of individual comments, which is
- * precisely what the gate exists to withhold. So `features/inbox/` touches `inbox_state`
- * and nothing else; every word it renders comes from this function.
- *
- * THE SUPPRESSION IS NOT UNDONE BY AGGREGATION. The threshold is applied per campaign
- * BEFORE the merge, which is the mistake a naive UNION across campaigns would make: two
- * campaigns of two responses each do not become a readable four.
- */
+// One free-text comment at a time, across campaigns - the inbox's entire source of content.
+// It lives here because the anonymity gate lives here: the inbox is a list of individual comments,
+// which is exactly what that gate exists to withhold. The threshold is applied PER CAMPAIGN before
+// anything is merged, so two campaigns of two responses each never become a readable four.
 export type CommentRow = {
   responseId: string;
   questionId: string;
@@ -470,7 +431,7 @@ export type CommentRow = {
 export type CommentFilter = {
   campaignId?: string | undefined;
   subjectId?: string | undefined;
-  /** The inbox's per-caller state, expressed as ids. It never reaches into this query. */
+  // The inbox's per-caller state, as ids. It never reaches into this query.
   responseIds?: { in: string[] } | { notIn: string[] } | undefined;
   cursor?: string | undefined;
   limit: number;
@@ -498,9 +459,8 @@ export async function readComments(
 
   const total = await prisma.answer.count({ where });
 
-  // Paged over ANSWERS ordered by their response's timestamp, which lib/paginate.ts's
-  // afterCursorOn cannot express — it filters a column on the queried model, and this one
-  // is a column on a relation. The cursor is the same encoding, so a client cannot tell.
+  // Paged over answers ordered by their response's timestamp, which the shared paginator cannot express,
+  // because that column lives on a related table. The cursor encoding is the same, so a client cannot tell.
   const point = filter.cursor ? decodeCursor(filter.cursor) : null;
   const rows = await prisma.answer.findMany({
     where: {
@@ -525,11 +485,8 @@ export async function readComments(
   }));
 }
 
-/**
- * ONE selection and ONE mapper, shared by the inbox's page and the analysis corpus. Two
- * copies of this would be two answers to "what is a comment", and the second one would be
- * the one that quietly grew a respondent-shaped field.
- */
+// One selection and one mapper, shared by the inbox page and the analysis corpus,
+// so there is only ever one answer to "what is a comment".
 const COMMENT_SELECT = {
   id: true,
   value: true,
@@ -541,8 +498,7 @@ const COMMENT_SELECT = {
       submittedAt: true,
       campaign: { select: { id: true, name: true } },
       subject: { select: { id: true, name: true } },
-      // The rating on the SAME response. Not an average, not across responses — this is
-      // what one person said alongside what they wrote.
+      // The rating from the SAME response: what one person said alongside what they wrote.
       answers: {
         where: { question: { kind: 'rating' as const } },
         take: 1,
@@ -588,11 +544,8 @@ function toCommentRow(row: CommentQueryRow): CommentRow {
   };
 }
 
-/**
- * The campaigns whose comments this caller may read: visible under `response.read`, AND at
- * or above the k-anonymity threshold. Both halves, in one place, so neither can be applied
- * without the other.
- */
+// The campaigns whose comments this caller may read: visible to them AND at or above the anonymity
+// threshold. Both halves in one place, so neither can be applied without the other.
 export async function readableCampaigns(
   orgId: string,
   userId: string,
@@ -608,13 +561,12 @@ export async function readableCampaigns(
   });
   if (campaigns.length === 0) return [];
 
-  // EXACTLY 40's scope test, from exactly one implementation of it (INV-003).
+  // Exactly the results page's scope test, from one implementation of it.
   const visibility = await visibleUnits({ orgId, userId, capability: 'response.read', authzVersion });
   const visible = campaigns.filter((campaign) => campaignInScope(campaign.subjects, visibility));
   if (visible.length === 0) return [];
 
-  // PER CAMPAIGN, before anything is merged. A groupBy rather than a count each, but the
-  // arithmetic is the same one 40 does — and it is the whole reason this list is short.
+  // Counted per campaign, before anything is merged, which is what keeps this list short.
   const counts = await prisma.response.groupBy({
     by: ['campaignId'],
     where: { campaignId: { in: visible.map((campaign) => campaign.id) } },
@@ -628,7 +580,7 @@ export async function readableCampaigns(
   return visible.filter((campaign) => above.has(campaign.id)).map((campaign) => campaign.id);
 }
 
-/* ------------------------------------------- the analysis corpus (43, T-081) */
+// The corpus the analysis feature reads.
 
 export type CorpusFilter = {
   campaignId?: string | undefined;
@@ -638,26 +590,17 @@ export type CorpusFilter = {
   to?: Date | undefined;
 };
 
-/**
- * THE GATE IS THE TYPE. `comments` exists only on the `suppressed: false` branch, so a
- * caller cannot read a below-threshold corpus even by forgetting to check — the compiler
- * refuses. `40` and `58` both had to remember; this one cannot be forgotten.
- *
- * `features/analysis/` therefore holds no query at all, exactly as `features/inbox/` holds
- * none (DEC-058). It receives text, and everything it does to that text is arithmetic.
- */
+// The gate is the TYPE here: the comments field exists only on the not-suppressed branch, so a caller
+// cannot read a below-threshold corpus even by forgetting to check - the compiler refuses.
+// That is also why the analysis feature holds no query at all: it receives text and does arithmetic.
 export type Corpus = {
   responseCount: number;
   audienceEstimate: number | null;
   threshold: number;
 } & ({ suppressed: true } | { suppressed: false; comments: CommentRow[] });
 
-/**
- * A hard ceiling on what one request will analyse. Ordered newest first, so a very large
- * corpus analyses the most recent slice rather than an arbitrary one — and the ordering is
- * total (`submittedAt desc, id desc`), so the slice is the same slice twice, which is what
- * `43` § Acceptance means by determinism.
- */
+// A hard ceiling on what one request will analyse, newest first and totally ordered,
+// so the same request analyses the same slice every time.
 const MAX_CORPUS = 5_000;
 
 export async function readCorpus(
@@ -668,12 +611,8 @@ export async function readCorpus(
   filter: CorpusFilter,
 ): Promise<Corpus> {
   const threshold = config.K_ANON_THRESHOLD;
-  // ONE named campaign is asked about by id, so it gets the same answer every other
-  // by-id read gives: 404 when the caller may not see it (N-068). Without this, "you
-  // may not read this" arrived as `responseCount: 0`, which reports an empty corpus as
-  // a fact and hid D-042 for a whole demo run. A campaign the caller CAN see but which
-  // sits below the threshold still falls through to the suppressed branch below — the
-  // two answers must stay distinct for the reader and identical for the outsider.
+  // A campaign asked about by id gets the same answer every other by-id read gives: 404 when the caller
+  // may not see it. Reporting "0 responses" instead would state an empty corpus as a fact.
   if (filter.campaignId) {
     await assertVisible(req, orgId, userId, authzVersion, filter.campaignId, 'response.read');
   }
@@ -704,12 +643,8 @@ export async function readCorpus(
   const responseCount = await prisma.response.count({ where: responseWhere });
   const audienceEstimate = await estimateAudience(orgId, campaignIds, subjectWhere, filter);
 
-  // THE SECOND GATE, and it is the one the filters make necessary. `readableCampaigns`
-  // decides which campaigns may be read at all; this decides whether the SLICE somebody
-  // asked for is big enough to be safe. Without it, "analysis for this one subject" is a
-  // per-subject breakdown of three people, which is the request `38` § "Not built" refused.
-  //
-  // It is the same arithmetic `readResults` does over its own filtered `responseWhere`.
+  // The second gate, and the filters are what make it necessary: the first decides which campaigns may be
+  // read at all, this decides whether the SLICE somebody asked for is big enough to be safe.
   if (responseCount < threshold) {
     return { suppressed: true, responseCount, audienceEstimate, threshold };
   }
@@ -730,17 +665,9 @@ export async function readCorpus(
   };
 }
 
-/**
- * The denominator, or an honest `null`.
- *
- * `null` on three occasions, and each of them is a case where a number would be worse than
- * nothing: an `anyone` campaign has no audience to count; a subject or unit filter narrows
- * the numerator but not the rule, so the pair would no longer describe the same population;
- * and a date filter cuts the responses but not the invitations.
- *
- * This is `T-040`'s lesson (`N-044`) applied before it could happen again: a response rate
- * whose halves are measured differently is not a low rate, it is a wrong one.
- */
+// The denominator, or an honest null.
+// Null in three cases where a number would be worse than nothing: an open link has no audience to count,
+// a subject or unit filter narrows the responses but not the rule, and a date filter cuts responses but not invitations.
 async function estimateAudience(
   orgId: string,
   campaignIds: string[],

@@ -1,22 +1,10 @@
-// The engine's DATA. 43 § The engine, DEC-042.
-//
-// Kept apart from `engine.ts` on purpose: this file is a list of English words and it is
-// the half that will need tuning, while the arithmetic next door will not. Anyone
-// improving the analysis edits this file; nobody needs to read the other one.
-//
-// It is also the honest statement of what rule-based means. A lexicon knows that "broken"
-// is bad and "excellent" is good. It does not know that "wifi" and "internet" are the same
-// thing, and it will not learn. `43` § Reliability is the answer to that, and it is a
-// better answer than a confident wrong theme.
+// The word lists the analysis engine uses.
+// Kept apart from the engine because this is the half that needs tuning and the arithmetic does not.
+// It is also the honest statement of what rule-based means: it knows "broken" is bad, and it will
+// never learn that "wifi" and "internet" are the same thing.
 
-/**
- * Stop-words. Function words plus the verbs and hedges that appear in every second
- * sentence of written feedback and cluster with nothing.
- *
- * Deliberately NOT domain words. "Room", "food", "parking", "delivery" are exactly the
- * themes we are looking for; an organisation-specific stop list would be configuration,
- * and nobody has asked for it.
- */
+// Stop-words: function words, plus the verbs and hedges that appear in every second sentence.
+// Deliberately NOT domain words - "room", "food" and "parking" are exactly the themes we are looking for.
 export const STOP_WORDS: ReadonlySet<string> = new Set([
   'a', 'able', 'about', 'above', 'after', 'again', 'against', 'all', 'almost', 'also',
   'although', 'always', 'am', 'among', 'an', 'and', 'another', 'any', 'anyone', 'anything',
@@ -42,18 +30,8 @@ export const STOP_WORDS: ReadonlySet<string> = new Set([
   'which', 'while', 'who', 'whom', 'why', 'will', 'with', 'within', 'without', 'would',
   'yet', 'you', 'your', 'yours', 'yourself',
 
-  // --- ADDED 2026-08-25, FROM REAL SEEDED COMMENTS, NOT FROM A WORD LIST.
-  //
-  // The engine's first run over The Grand Palace's 229 comments returned `Twice` and
-  // `Dropped` as themes, sitting in the table beside `Checkout` and `Breakfast`. They come
-  // from real sentences — "we were moved rooms twice", "the wifi dropped a few times" — and
-  // the words are genuinely frequent. They are simply not TOPICS: nobody clicks through to
-  // "the comments mentioning twice".
-  //
-  // Generic verbs and adverbs, then. Domain nouns stay out of this list on purpose, which
-  // is the line the block above draws too: `room`, `parking` and `breakfast` are what we
-  // are hunting for. Stemming means one entry covers the inflections — `drop` catches
-  // `dropped` and `dropping`.
+  // Added from real seeded comments: generic verbs and adverbs that were coming back as "themes".
+  // Nobody clicks through to "the comments mentioning twice". Domain nouns stay out of this list.
   'twice', 'instead', 'anyway', 'somewhat', 'fairly', 'overall', 'throughout', 'meanwhile',
   'afterwards', 'alongside', 'regarding', 'apart', 'aside', 'along', 'across', 'behind',
   'beside', 'beyond', 'despite', 'except', 'unless', 'whereas', 'whenever', 'wherever',
@@ -64,22 +42,15 @@ export const STOP_WORDS: ReadonlySet<string> = new Set([
   'become', 'became', 'bring', 'brought', 'send', 'sent', 'show', 'shown', 'start', 'stop',
   'end', 'begin', 'began', 'appear', 'remain', 'stand', 'walk', 'talk', 'speak', 'spoke',
   'hear', 'heard', 'read', 'write', 'wrote', 'work',
-  // Second pass, from Northfield / Riverside / Meridian rather than from The Grand Palace.
-  // Bare adjectives and durations. `night`, `morning` and `evening` are deliberately NOT
-  // here: "noise carried at night" is a real complaint about a real time of day.
+  // A second pass, of bare adjectives and durations. Words like night and morning are deliberately kept,
+  // because "noise carried at night" is a real complaint about a real time of day.
   'actually', 'genuinely', 'explain', 'check', 'useful', 'interesting', 'long', 'short',
   'deep', 'big', 'small', 'high', 'low', 'new', 'full', 'whole', 'real', 'main',
   'day', 'week', 'month', 'year', 'hour', 'minute',
 ]);
 
-/**
- * A word within this many tokens BEFORE a sentiment word flips its sign. "not clean" is
- * not a compliment, and a lexicon that scores it as one is worse than no lexicon: it gets
- * the direction wrong on exactly the comments that matter most.
- *
- * Negators are themselves stop-words, so this is measured on the RAW token stream. That is
- * the reason `tokenise()` keeps both streams instead of only the filtered one.
- */
+// A word this many tokens BEFORE a sentiment word flips its sign: "not clean" is not a compliment.
+// Measured on the raw token stream, because negators are themselves stop-words.
 export const NEGATORS: ReadonlySet<string> = new Set([
   'not', 'no', 'never', 'none', 'nothing', 'nobody', 'nowhere', 'neither', 'nor',
   'cannot', 'cant', 'wont', 'dont', 'doesnt', 'didnt', 'isnt', 'wasnt', 'arent', 'werent',
@@ -88,27 +59,16 @@ export const NEGATORS: ReadonlySet<string> = new Set([
 
 export const NEGATION_WINDOW = 3;
 
-/**
- * Sentiment weights, written in PLAIN ENGLISH. `engine.ts` puts this map through the same
- * `stem()` the comments go through, so `delayed`, `delays` and `delaying` all reach the one
- * entry for `delay` and nobody has to know what the stemmer does.
- *
- * Hand-stemmed entries were the first version and they are a trap: they drift away from
- * whatever the stemmer actually does, silently, and the failure looks like a word that
- * simply never scores. Variants that stem APART — `love`/`loved`, `smell`/`smelly` — are
- * listed twice on purpose, which is cheap and is visible.
- *
- * Weights are -2..+2 and the twos are reserved for words that carry the whole sentence:
- * "excellent", "terrible", "useless". Everything else is a one, because a lexicon that
- * fine-tunes 1.3 against 1.7 is pretending to a precision it does not have.
- */
+// Sentiment weights, written in plain English: the engine stems this map with the same stemmer it
+// stems comments with, so delayed, delays and delaying all reach the one entry for delay.
+// Weights run -2 to +2, and a 2 is reserved for a word that carries the whole sentence.
 export const SENTIMENT: ReadonlyMap<string, number> = new Map([
-  // --- strong positive (+2): the word carries the whole sentence on its own
+  // Strong positive (+2): the word carries the sentence on its own.
   ['excellent', 2], ['outstanding', 2], ['superb', 2], ['fantastic', 2], ['brilliant', 2],
   ['perfect', 2], ['wonderful', 2], ['amazing', 2], ['exceptional', 2], ['flawless', 2],
   ['delightful', 2], ['delighted', 2], ['love', 2], ['loved', 2], ['impeccable', 2],
 
-  // --- positive (+1)
+  // Positive (+1).
   ['good', 1], ['great', 1], ['nice', 1], ['help', 1], ['helped', 1], ['helpful', 1],
   ['clear', 1], ['clean', 1], ['friendly', 1], ['comfortable', 1], ['quick', 1],
   ['fast', 1], ['easy', 1], ['smooth', 1], ['pleasant', 1], ['pleased', 1], ['polite', 1],
@@ -123,7 +83,7 @@ export const SENTIMENT: ReadonlyMap<string, number> = new Map([
   ['best', 1], ['better', 1], ['smile', 1], ['smiling', 1], ['calm', 1], ['modern', 1],
   ['bright', 1], ['tasty', 1], ['delicious', 1], ['gracious', 1], ['seamless', 1],
 
-  // --- negative (-1)
+  // Negative (-1).
   ['bad', -1], ['poor', -1], ['slow', -1], ['late', -1], ['dirty', -1], ['cold', -1],
   ['rude', -1], ['noisy', -1], ['noise', -1], ['crowded', -1], ['cramped', -1],
   ['smell', -1], ['smelly', -1], ['stained', -1], ['dusty', -1], ['old', -1],
@@ -140,7 +100,7 @@ export const SENTIMENT: ReadonlyMap<string, number> = new Map([
   ['stuck', -1], ['unfair', -1], ['worse', -1], ['worst', -1], ['sad', -1], ['angry', -1],
   ['upset', -1], ['cancelled', -1], ['canceled', -1], ['ignoring', -1],
 
-  // --- strong negative (-2)
+  // Strong negative (-2).
   ['terrible', -2], ['awful', -2], ['horrible', -2], ['appalling', -2], ['useless', -2],
   ['unacceptable', -2], ['disgusting', -2], ['dreadful', -2], ['abysmal', -2],
   ['hate', -2], ['broken', -2], ['broke', -2], ['break', -2], ['failed', -2],

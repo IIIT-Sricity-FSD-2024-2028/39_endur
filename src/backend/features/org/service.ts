@@ -1,4 +1,4 @@
-// Organisation reads and the wizard's single commit. 13 § Organisation, 31, 50 §1.
+// Reading the organisation, renaming it, changing its vocabulary, and the setup wizard's one commit.
 import { estimateSeconds, resolveLabels } from '@endur/shared';
 import type { LabelSet, OrgView, ResolvedLabels, SetupOrgBody, UpdateOrgBody } from '@endur/shared';
 import type { Request } from 'express';
@@ -9,12 +9,14 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { grantsForLevel, levelForRole, presetFor } from '../../presets/index.js';
 import { clearGrantCache } from '../../authz/index.js';
 
+// The organisation, as the console reads it.
 export async function readOrg(orgId: string): Promise<OrgView> {
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
   if (!org) throw new NotFoundError('That organisation does not exist.');
   return view(org);
 }
 
+// Rename the organisation or change its industry.
 export async function updateOrg(
   req: Request,
   orgId: string,
@@ -33,6 +35,7 @@ export async function updateOrg(
   });
 }
 
+// Change one or more of the organisation's words for its own things.
 export async function updateLabels(
   req: Request,
   orgId: string,
@@ -43,9 +46,7 @@ export async function updateLabels(
       where: { id: orgId },
       select: { labels: true },
     });
-    // Merge, do not replace. The settings screen edits one key at a time (41), and a
-    // whole-set write would silently drop every rename the org already had — the same
-    // reasoning as resolveLabels() merging per key rather than per set (22 §3).
+    // Merge, do not replace: the settings screen edits one word at a time, and a full write would drop the others.
     const merged = { ...(current.labels as LabelSet), ...labels };
     const org = await tx.organization.update({ where: { id: orgId }, data: { labels: merged } });
     req.ctx.audit.push({ action: 'org.update', targetType: 'organization', targetId: orgId });
@@ -53,14 +54,9 @@ export async function updateLabels(
   });
 }
 
-/**
- * The wizard's commit. ONE request, ONE transaction (31).
- *
- * Registration already built a minimal working org — a root unit, an Owner role, the
- * founder's position. Setup replaces that scaffolding with the real structure and moves
- * the founder onto it, so what comes out has exactly the roles and units that were chosen
- * and no leftovers from before the wizard ran.
- */
+// The setup wizard's commit: one request, one transaction.
+// Registration already made a minimal org; this replaces that scaffolding with the real structure
+// and moves the founder onto it, so nothing is left over from before the wizard ran.
 export async function setupOrg(
   req: Request,
   orgId: string,
@@ -71,9 +67,7 @@ export async function setupOrg(
   const root = validateStructure(body.units, resolveLabels(body.labels));
 
   return runInTransaction(req, async (tx) => {
-    // Setup GENERATES the canonical objects; it is not a parallel store (CONF-008). Once
-    // real data exists the structure pages own it, and re-running the generator would
-    // silently discard work.
+    // Setup only ever GENERATES the first structure. Once real data exists, the structure pages own it.
     const [subjects, campaigns] = await Promise.all([
       tx.subject.count({ where: { orgId } }),
       tx.campaign.count({ where: { orgId } }),
@@ -89,7 +83,7 @@ export async function setupOrg(
       select: { id: true },
     });
 
-    // 1 · units, parents first, so a child always has a parent row to point at.
+    // 1. Units, parents first, so a child always has a parent row to point at.
     const unitIds = new Map<string, string>();
     for (const unit of inParentOrder(body.units)) {
       const created = await tx.node.create({
@@ -111,9 +105,7 @@ export async function setupOrg(
     }
     const rootUnitId = unitIds.get(root.tempId) as string;
 
-    // 2 · roles. LEVEL IS THE ARRAY INDEX (31) — index 0 is level 1, the most senior. A
-    // client-supplied level and a client-supplied order can disagree, and then one of them
-    // is silently wrong.
+    // 2. Roles. The array order IS the level: index 0 is level 1, the most senior.
     const roleIds: string[] = [];
     for (const [index, role] of body.roles.entries()) {
       const created = await tx.node.create({
@@ -123,11 +115,8 @@ export async function setupOrg(
       roleIds.push(created.id);
     }
 
-    // 3 · the derived grant matrix (50 §1). The four rows are POSITIONS IN THE FEEDBACK LOOP,
-    // not positions in the list — L3 is the reviewee and L4 the respondent — so a ladder
-    // longer than four maps its BOTTOM role to 4 and its middle to 3 (`DEC-112`). Counting
-    // from the top put six roles of a ten-role college on the respondent row and left a
-    // Professor with five capabilities.
+    // 3. The seeded grants for each role. The four levels are places in the feedback loop, not places in the list,
+    // so a longer ladder maps its bottom role to level 4 and everyone in the middle to level 3.
     for (const [index, roleId] of roleIds.entries()) {
       const level = levelForRole(index, roleIds.length);
       await tx.grant.createMany({
@@ -137,8 +126,7 @@ export async function setupOrg(
           capability: grant.capability,
           scope: grant.scope,
           effect: 'allow' as const,
-          // Derived. Editing one in the powers grid clears this flag, so a later
-          // regeneration cannot silently revert an administrator's change (10 §9).
+          // Marked derived. Editing a cell in the powers grid clears the flag, so nothing later overwrites that change.
           derived: true,
           createdById: userId,
         })),
@@ -146,9 +134,7 @@ export async function setupOrg(
       });
     }
 
-    // 4 · move the founder onto the new structure: the most senior role, anchored at the
-    // root. Powers come from the POSITION and never from the role (INV-005), so this is
-    // the step that actually hands them the organisation.
+    // 4. Move the founder onto the new structure: the top role, at the root unit. Powers come from the POSITION.
     const person = await tx.node.findFirst({
       where: { orgId, kind: 'person', userId },
       select: { id: true },
@@ -169,14 +155,12 @@ export async function setupOrg(
       data: { orgId, type: 'member', parentId: person.id, childId: position.id, isPrimary: true },
     });
 
-    // 5 · remove the registration scaffolding. Cascades take its grants and edges with it,
-    // which is exactly why the founder's new position is created first — otherwise there is
-    // a statement in between where they hold nothing.
+    // 5. Remove the registration scaffolding. Done AFTER the new position exists, so they are never left holding nothing.
     if (scaffolding.length > 0) {
       await tx.node.deleteMany({ where: { orgId, id: { in: scaffolding.map((n) => n.id) } } });
     }
 
-    // 6 · starter templates, so the organisation has something to launch on day one.
+    // 6. Starter templates, so the organisation has something to launch on day one.
     if (body.includeTemplates) {
       for (const seed of preset.templates) {
         await tx.template.create({
@@ -201,8 +185,7 @@ export async function setupOrg(
       }
     }
 
-    // 7 · vocabulary, and the version bump. authzVersion is part of the grant cache key,
-    // so raising it here invalidates every cached decision for this tenant instantly.
+    // 7. Vocabulary, plus the permission version bump that invalidates every cached decision for this org.
     const settings = await bumpVersion(tx, orgId, {
       setupCompletedAt: new Date().toISOString(),
     });
@@ -214,19 +197,14 @@ export async function setupOrg(
     req.ctx.audit.push({ action: 'org.update', targetType: 'organization', targetId: orgId });
     return view(org);
   }).then((result) => {
-    // Belt and braces next to the authzVersion bump — but setup rewrites every grant in
-    // the organisation, and a stale entry here would be the founder's very first click.
+    // Belt and braces beside the version bump: setup rewrites every grant, and a stale entry would hit the founder's first click.
     clearGrantCache();
     return result;
   });
 }
 
-/**
- * Raise `settings.authzVersion`. Every write to nodes, edges or grants must go through
- * this in its own transaction: the version is part of the grant cache key, and a
- * permission change that does not bump it stays invisible for the cache's whole TTL —
- * which is a security bug, not a performance trade-off (11 §7).
- */
+// Raises settings.authzVersion. Every write to nodes, edges or grants must go through this,
+// because the version is part of the grant cache key - a change that skips it stays invisible for the cache's lifetime.
 export async function bumpVersion(
   tx: Tx,
   orgId: string,
@@ -241,19 +219,12 @@ export async function bumpVersion(
   return { ...settings, ...extra, authzVersion: current + 1 };
 }
 
-/**
- * Everything wrong with a submitted structure, found BEFORE the transaction opens. Failing
- * halfway through means the message is about a foreign key rather than about the form the
- * person is looking at.
- */
+// Checks a submitted structure BEFORE the transaction opens, so the error names the form and not a foreign key.
 function validateStructure(
   units: SetupOrgBody['units'],
   labels: ResolvedLabels,
 ): SetupOrgBody['units'][number] {
-  // The noun comes from the BODY, not from req.ctx (22 §6, T-044). This runs mid-wizard:
-  // the words the reader is looking at are the ones they picked two steps ago, which the
-  // database has not been told about yet. Reading the stored labels here would answer in
-  // the vocabulary they are in the middle of replacing.
+  // The nouns come from the submitted body, not the stored labels: mid-wizard, the reader is looking at words the database has not been told about yet.
   const unit = labels.unit.one.toLowerCase();
   const units_ = labels.unit.many.toLowerCase();
   const tempIds = new Set(units.map((unit) => unit.tempId));
@@ -273,7 +244,7 @@ function validateStructure(
   return roots[0] as SetupOrgBody['units'][number];
 }
 
-/** Parents before children, so unit creation never waits on a row that does not exist yet. */
+// Sorts units so parents come before their children.
 function inParentOrder(units: SetupOrgBody['units']): SetupOrgBody['units'] {
   const done = new Set<string>();
   const out: SetupOrgBody['units'] = [];
@@ -282,8 +253,7 @@ function inParentOrder(units: SetupOrgBody['units']): SetupOrgBody['units'] {
     const ready = remaining.filter(
       (unit) => unit.parentTempId === null || done.has(unit.parentTempId),
     );
-    // Unreachable: a cycle was rejected above. Present so a future edit to the validation
-    // cannot turn this into an infinite loop.
+    // Unreachable, since cycles were rejected above; kept so a future edit cannot cause an endless loop.
     if (ready.length === 0) break;
     for (const unit of ready) {
       out.push(unit);
@@ -294,6 +264,7 @@ function inParentOrder(units: SetupOrgBody['units']): SetupOrgBody['units'] {
   return out;
 }
 
+// Does any unit list itself as its own ancestor?
 function hasCycle(units: SetupOrgBody['units']): boolean {
   const parents = new Map(units.map((unit) => [unit.tempId, unit.parentTempId]));
   for (const unit of units) {
@@ -308,6 +279,7 @@ function hasCycle(units: SetupOrgBody['units']): boolean {
   return false;
 }
 
+// Turns an organisation row into the shape the client expects.
 function view(org: {
   id: string;
   name: string;
@@ -325,8 +297,7 @@ function view(org: {
     slug: org.slug,
     industry: org.industry,
     labels: resolveLabels(org.labels as LabelSet),
-    // What /app checks before rendering: an unconfigured org's home is empty and confusing,
-    // so the console redirects to the wizard instead (46 § Route & access).
+    // What the console checks before rendering: an unconfigured org is sent to the wizard instead of an empty home page.
     configured: typeof settings.setupCompletedAt === 'string',
     logoUrl: org.logoFileId ? urlFor(org.logoFileId) : null,
     createdAt: org.createdAt.toISOString(),

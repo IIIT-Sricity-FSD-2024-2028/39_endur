@@ -1,19 +1,14 @@
-// T-023 — results, and the k-anonymity gate. 13, 40, 52 §2.
-//
-// The gate is the task. Everything else here is arithmetic; the assertion that matters is
-// that below the threshold the per-question data is ABSENT FROM THE BODY — not hidden by
-// the client, not zeroed, not rounded.
+// Results, and the anonymity gate.
+// The gate is the task: below the threshold the per-question data is ABSENT from the body - not
+// hidden by the client, not zeroed, not rounded. Everything else here is arithmetic.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app, addStaff, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
 import { config } from '../lib/config.js';
 import { prisma } from '../db/client.js';
 
-/**
- * Export is a SILVER feature (16 §3), so a default-tier org gets 402 rather than a file.
- * Tests that are about the k-anonymity gate rather than about billing buy the tier first —
- * otherwise they would prove the entitlement check and nothing else.
- */
+// Export is a paid feature, so an organisation on the free tier gets 402 rather than a file.
+// Tests that are about the anonymity gate buy the tier first, or they would prove the plan check and nothing else.
 async function subscribeSilver(orgId: string) {
   const today = new Date();
   const nextYear = new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000);
@@ -58,7 +53,7 @@ async function campaignWithResponses(founder: Session, count: number) {
     const answers = questions.map((question) => {
       switch (question.kind) {
         case 'rating':
-          // 5,4,3,5,4,… — a spread, so an average of anything is a real average.
+          // A spread of scores, so an average of anything is a real average.
           return { questionId: question.id, value: { kind: 'rating', n: ((i * 2) % 5) + 1 } };
         case 'nps':
           return { questionId: question.id, value: { kind: 'nps', n: i % 2 === 0 ? 10 : 3 } };
@@ -100,14 +95,11 @@ describe('the k-anonymity gate — 52 §2', () => {
     expect(res.body.data.suppressed).toBe(true);
     expect(res.body.data.responseCount).toBe(config.K_ANON_THRESHOLD - 1);
 
-    // Absent from the BODY. Not an empty array, not zeroes — a client cannot render what
-    // it was never sent, and that is the difference between a privacy guarantee and a UI
-    // convention.
+    // Absent from the BODY: not an empty array and not zeroes. A client cannot render what it was never sent.
     expect(res.body.data.questions).toBeUndefined();
     expect(JSON.stringify(res.body)).not.toMatch(/average|distribution|npsMix/);
 
-    // The threshold travels with the response so the UI can explain it rather than show an
-    // error: "Results appear once 5 people have responded. 4 so far." (40).
+    // The threshold travels with the response, so the UI can explain it rather than show an error.
     expect(res.body.data.threshold).toBe(config.K_ANON_THRESHOLD);
   });
 
@@ -126,9 +118,8 @@ describe('the k-anonymity gate — 52 §2', () => {
     const founder = await setUpOrg();
     const { campaignId } = await campaignWithResponses(founder, config.K_ANON_THRESHOLD - 1);
 
-    // Bronze cannot export at all (16 §3) — a different question with a different remedy,
-    // and a different status code. 402 says "upgrade"; 403 would say "ask an
-    // administrator", and conflating them is exactly what DEC-011 separates.
+    // The free tier cannot export at all: a different question with a different remedy, so 402 says
+    // "upgrade" where a 403 would say "ask an administrator".
     const unpaid = await founder.agent.get(`/api/v1/campaigns/${campaignId}/export`);
     expect(unpaid.status).toBe(402);
 
@@ -179,7 +170,7 @@ describe('aggregation', () => {
     expect(nps?.npsMix?.promoters).toBe(3);
     expect(nps?.npsMix?.detractors).toBe(3);
     expect(nps?.npsMix?.score).toBe(0);
-    // Valence appears HERE because the instrument names these groups (CONF-004).
+    // Good and bad labels appear HERE because the instrument itself names these groups.
     expect(nps?.distribution?.find((row) => row.label === 'Detractors')?.valence).toBe('negative');
   });
 
@@ -190,8 +181,8 @@ describe('aggregation', () => {
       distribution?: Array<{ valence?: string }>;
     }>).find((question) => question.kind === 'rating');
 
-    // Whether a 2-out-of-5 is bad depends on the question. The client must never paint it
-    // red because the arithmetic went down (CONF-004).
+    // Whether a low score is bad depends on the question, so the client must never paint it red just
+    // because the arithmetic went down.
     expect(rating?.distribution?.every((row) => row.valence === undefined)).toBe(true);
   });
 
@@ -230,13 +221,12 @@ describe('aggregation', () => {
 
     const lines = res.text.trim().split('\n');
     expect(lines).toHaveLength(7);
-    // THE ORG'S OWN NOUN — this org calls a subject a "Module" (22 §6, 40 § Acceptance).
-    // It said "Subject" until T-040. A CSV header that says "Course" for a hotel is the
-    // vocabulary leak nobody thinks to check, because audit-vocab only scans the frontend.
+    // The organisation's OWN noun in the header: it said the generic word until this was fixed, and a
+    // header that says the wrong industry's word is the vocabulary leak nobody thinks to check.
     expect(lines[0]).toMatch(/^Submitted at,Module,/);
     expect(lines[0]).not.toMatch(/Subject/);
-    // There is no respondent column to export, which is the point (INV-006). A CSV that
-    // could name people would undo the schema guarantee at the last step.
+    // There is no respondent column to export, which is the point: a CSV that could name people would
+    // undo the schema's guarantee at the last step.
     expect(res.text).not.toMatch(/email|respondent|user_id/i);
   });
 });
@@ -252,9 +242,8 @@ describe('the response rate needs a denominator that exists — 40', () => {
     const { campaignId } = await campaignWithResponses(founder, config.K_ANON_THRESHOLD);
     const res = await founder.agent.get(`/api/v1/campaigns/${campaignId}/results`);
 
-    // This returned the SUBJECT COUNT until T-040, which made the rate
-    // responses-per-subject: every seeded demo campaign rendered a RESPONSE RATE between
-    // 1750% and 4675%, on the screen the evaluator opens straight after scanning.
+    // This used to return the SUBJECT count, which made the rate responses-per-subject and rendered
+    // demo campaigns at between 1750% and 4675%.
     expect(res.body.data.audienceEstimate).toBeNull();
     expect(res.body.data.responseRate).toBeNull();
     expect(res.body.data.responseCount).toBe(config.K_ANON_THRESHOLD);
@@ -281,8 +270,8 @@ describe('the response rate needs a denominator that exists — 40', () => {
       `/api/v1/campaigns/${campaign.body.data.id}/results`,
     );
 
-    // Zero responses, so the number is 0 — but it is a real 0 out of a real headcount,
-    // which is a different statement from "there is no such thing as a rate here".
+    // Zero responses, so the number is 0 - but a real 0 out of a real headcount, which is a different
+    // statement from "there is no such thing as a rate here".
     expect(res.body.data.audienceEstimate).not.toBeNull();
     expect(typeof res.body.data.audienceEstimate).toBe('number');
   });
@@ -303,8 +292,7 @@ describe('an archived subject keeps its history — 35 § Acceptance, 10 §9', (
     const archived = await withCsrf(founder, 'post', `/api/v1/subjects/${subjectId}/archive`).send({});
     expect(archived.status).toBe(200);
 
-    // Archiving is not deleting. The numbers somebody looked at last term are the same
-    // numbers today, which is the entire reason there is no DELETE for a subject.
+    // Archiving is not deleting: the numbers somebody looked at last term are the same numbers today.
     const after = await founder.agent.get(`/api/v1/campaigns/${campaignId}/results`);
     expect(after.status).toBe(200);
     expect(after.body.data.responseCount).toBe(count);
@@ -329,8 +317,8 @@ describe('an archived subject keeps its history — 35 § Acceptance, 10 §9', (
       audience: { kind: 'anyone' },
     });
 
-    // 404 rather than a silent drop: a campaign that quietly reviews fewer subjects than
-    // it was asked to is worse than one that refuses to be created.
+    // 404 rather than a silent drop: a campaign that quietly reviews fewer subjects than it was asked
+    // to is worse than one that refuses to be created.
     expect(res.status).toBe(404);
   });
 });
@@ -346,8 +334,8 @@ describe('results are scope-filtered like everything else', () => {
     });
 
     const res = await elsewhere.agent.get(`/api/v1/campaigns/${campaignId}/results`);
-    // The campaign's subjects all live in Section A. A 403 would confirm it exists and
-    // leak which departments are collecting feedback (13 §5).
+    // Every subject of this campaign lives in the other section, and a 403 would confirm it exists and
+    // leak which departments are collecting feedback.
     expect(res.status).toBe(404);
   });
 });

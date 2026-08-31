@@ -1,32 +1,21 @@
-// THE ENGINE. 43 § The engine, DEC-042.
-//
-// This file has no imports beyond its own lexicon. No Prisma, no Express, no `fetch`, no
-// `http`. That is not tidiness — it is DEC-042 being enforced instead of remembered:
-// `52` promises respondents anonymity, and the way to be sure their words never left the
-// process is for the code that reads them to have nothing to send them WITH.
-//
-// `analysis.test.ts` asserts that absence over the whole feature folder, so adding an
-// outbound client here fails a test rather than passing review.
-//
-// Everything below is arithmetic a person could do by hand with a dictionary:
-//   tokenise -> stop-words -> stem -> document frequency of unigrams and bigrams
-//            -> greedy co-occurrence merge into <= 12 themes
-//            -> a sentiment lexicon per comment, aggregated per theme
-//            -> Pearson r between a theme's presence and the response's own rating.
-//
-// It is deterministic, which is what makes `43` § Acceptance testable at all.
+// The analysis engine. It imports nothing but its own word lists: no database, no network, no HTTP.
+// That is how the promise that respondents' words never leave the process is enforced rather than remembered,
+// and a test asserts the absence over the whole folder.
+// Everything here is arithmetic a person could do by hand with a dictionary:
+//   split into words, drop stop-words, stem, count which words appear together, merge into at most
+//   12 themes, score each comment against the lexicon, then correlate a theme with the rating given.
 import { NEGATION_WINDOW, NEGATORS, SENTIMENT, STOP_WORDS } from './lexicon.js';
 
 export type Valence = 'positive' | 'neutral' | 'negative';
 
 export type Document = {
-  /** The RESPONSE. Two written answers on one response share it, and drivers dedupe on it. */
+  // The response. Two written answers on one response share it, so drivers can count a person once.
   responseId: string;
-  /** Unique per comment — `responseId:questionId`. The drill-through indexes on this. */
+  // Unique per comment. The drill-through looks comments up by this.
   key: string;
   text: string;
   at: Date;
-  /** The response's own rating, normalised by its own scale to 0..1. `null` if it had none. */
+  // The response's own rating, scaled to 0..1, or null when it had none.
   rating: number | null;
 };
 
@@ -37,7 +26,7 @@ export type Theme = {
   score: number;
   valence: Valence;
   delta: number | null;
-  /** Comment keys, in the input's own order. The drill-through's whole content. */
+  // The keys of the comments in this theme, in input order.
   members: string[];
 };
 
@@ -46,7 +35,7 @@ export type EngineResult = {
   trend: Array<{ date: string; positive: number; neutral: number; negative: number }>;
   themes: Theme[];
   drivers: Array<{ id: string; label: string; impact: number; valence: Valence }>;
-  /** Per-comment lexicon reading, keyed by `Document.key`. */
+  // The lexicon reading for each comment.
   valenceOf: Map<string, Valence>;
 };
 
@@ -56,60 +45,37 @@ export type EngineResult = {
  * and a reader is entitled to see them all before deciding whether to believe the output.
  */
 
-/** DEC-042 says at most twelve. A themes list nobody scrolls is a themes list nobody reads. */
+// At most twelve themes: a list nobody scrolls is a list nobody reads.
 const MAX_THEMES = 12;
-/** Below this a "theme" is one person with a bugbear, and naming it as a finding is a lie. */
+// Below this, a "theme" is one person with a bugbear, and naming it as a finding would be a lie.
 const MIN_MENTIONS = 3;
-/** Terms considered for clustering, by document frequency. Beyond this it is all noise. */
+// How many terms are considered for clustering, by how many comments they appear in.
 const CANDIDATE_POOL = 40;
-/**
- * A candidate whose documents are this far contained inside an existing theme's is a facet
- * of it, not a rival: `valet parking` inside `parking`. It is merged as an alias.
- */
+// A candidate this far inside an existing theme is a facet of it, not a rival: "valet parking" inside "parking".
 const MERGE_CONTAINMENT = 0.5;
-/**
- * ...AND that containment has to beat CHANCE by this much, which the first version missed
- * and only real data showed.
- *
- * On The Grand Palace's 229 comments, `room` appears in 113 of them — 49% of the corpus. A
- * flat 50% bar then merges almost anything into it, because a term in ten documents
- * overlaps a theme covering half the corpus about five times by coincidence. Four themes
- * came back from 229 comments and the engine looked confident about it.
- *
- * So the bar is `max(MERGE_CONTAINMENT, MERGE_LIFT × the host's share of the corpus)`: a
- * facet of `room` must be *inside* `room` far more often than a coin would put it there.
- * Small themes are unaffected — their share is low, so the flat 50% still governs.
- */
+// ...and the containment has to beat CHANCE by this much.
+// A word appearing in half the comments would otherwise swallow anything that overlapped it by luck,
+// which once turned 229 comments into four confident themes.
 const MERGE_LIFT = 2;
-/**
- * A word in more than this share of every comment describes the CORPUS, not a theme — the
- * hotel's comments all say "hotel". Applied only once there are enough comments for the
- * ratio to mean anything; on nine comments, six of them is not evidence of ubiquity.
- */
+// A word in more than this share of all comments describes the CORPUS, not a theme - every hotel comment
+// says "hotel". Only applied once there are enough comments for the ratio to mean anything.
 const UBIQUITY_CEILING = 0.6;
 const UBIQUITY_MIN_CORPUS = 20;
 const MAX_DRIVERS = 6;
-/** A correlation over two points is not a correlation. */
+// A correlation over two points is not a correlation.
 const MIN_RATED_FOR_DRIVER = 5;
-/** |r| below this is noise, and the server says `neutral` rather than picking a side. */
+// A correlation weaker than this is noise, and the server says neutral rather than picking a side.
 const DRIVER_DEADBAND = 0.1;
-/** Above this span, trend buckets are weeks. A year of daily points is not a line chart. */
+// Above this span the trend is bucketed by week: a year of daily points is not a line chart.
 const WEEKLY_ABOVE_DAYS = 90;
-/** Score bands. Stated once, so `themes` and `drivers` cannot disagree about what good is. */
+// The score bands, stated once, so themes and drivers cannot disagree about what good means.
 const POSITIVE_AT = 60;
 const NEGATIVE_AT = 40;
 
-/* -------------------------------------------------------------------- text */
+// Text handling.
 
-/**
- * A light stemmer — plurals, `-ing`, `-ed`, `-ly` and a trailing `e`. Not Porter, and it
- * does not need to be: it is applied to BOTH the comment and the lexicon, so the only
- * property required of it is that it maps the same word to the same thing twice.
- *
- * That is why the lexicon is written in plain English rather than in stems. Hand-stemmed
- * entries drift away from whatever the stemmer actually does, silently, and the failure
- * shows up as a word that simply never scores.
- */
+// A light stemmer: plurals, -ing, -ed, -ly and a trailing e. It does not need to be a good one,
+// because it is applied to both the comments and the word lists - it only has to be consistent.
 export function stem(word: string): string {
   if (word.length <= 3) return word;
   let out = word;
@@ -117,7 +83,7 @@ export function stem(word: string): string {
   if (out.endsWith('ies') && out.length > 4) out = `${out.slice(0, -3)}y`;
   else if (out.endsWith('sses')) out = out.slice(0, -2);
   else if (out.endsWith('ss')) {
-    /* keep: `less`, `class`, `success` are not plurals */
+    /* keep: less, class and success are not plurals */
   } else if (out.endsWith('s') && !out.endsWith('us') && !out.endsWith('is') && out.length > 3) {
     out = out.slice(0, -1);
   }
@@ -129,32 +95,22 @@ export function stem(word: string): string {
   return out.endsWith('e') && out.length > 4 ? out.slice(0, -1) : out;
 }
 
-/**
- * `running` -> `runn` -> `run`. Only after a suffix came off, so `staff` keeps both f's.
- *
- * `l`, `f` and `s` are DELIBERATELY NOT in the class. English has plenty of real words
- * ending `-ll`, `-ff` and `-ss` — `call`, `staff`, `pass` — and doubling them here made
- * `called` stem to `cal` while `call` stemmed to `call`, so the two never met. Doubled
- * `bb dd gg mm nn pp rr tt` at the end of a base word is rare enough that the trade is
- * one-directional.
- */
+// running -> runn -> run, and only after a suffix came off, so staff keeps both f's.
+// l, f and s are deliberately excluded: call, staff and pass are real words ending that way.
 const strip = (word: string): string =>
   /([bdgmnprt])\1$/.test(word) ? word.slice(0, -1) : word;
 
-/**
- * The stop list, put through `stem()` — the same trick the sentiment lexicon gets, and for
- * the same reason. Without it `times` stems to `time`, which IS a stop-word, and survives
- * as a theme candidate because only the raw form was ever checked.
- */
+// The stop list, run through the stemmer too, or "times" would survive as a theme candidate.
 const STEMMED_STOP: ReadonlySet<string> = new Set([...STOP_WORDS].map(stem));
 
 type Tokens = {
-  /** Every word, in order, including stop-words. Negation is measured on this. */
+  // Every word in order, including stop-words. Negation is measured on this.
   raw: string[];
-  /** The content words that survived, as `{ stem, at }` where `at` indexes into `raw`. */
+  // The content words that survived, with the position each came from.
   kept: Array<{ stem: string; surface: string; at: number }>;
 };
 
+// Splits text into words, keeping both the raw stream and the content words.
 export function tokenise(text: string): Tokens {
   const raw = text
     .toLowerCase()
@@ -192,6 +148,7 @@ const STEMMED: ReadonlyMap<string, number> = (() => {
  * is one unhappy person, and letting it weigh eight times as much in a mean would let one
  * reviewer decide a theme.
  */
+// The sentiment score for one comment, with negation applied.
 export function scoreText(tokens: Tokens): number {
   let total = 0;
   for (const token of tokens.kept) {
@@ -215,7 +172,7 @@ const valenceOfScore = (score: number): Valence =>
 
 /* ------------------------------------------------------------------ themes */
 
-/** `term -> the documents it appears in`, as indices into the document list. */
+// term -> which comments it appears in, as indexes into the document list.
 function termIndex(documents: Document[]): {
   frequency: Map<string, Set<number>>;
   surfaces: Map<string, Map<string, number>>;
@@ -241,9 +198,8 @@ function termIndex(documents: Document[]): {
       note(token.stem, index);
       noteSurface(token.stem, token.surface);
 
-      // Bigrams only from words ADJACENT IN THE ORIGINAL SENTENCE. "valet parking" is a
-      // phrase; "parking was awful" is not one, and joining `park` to `aw` across the
-      // stop-word between them would invent a theme nobody wrote.
+      // Two-word phrases only from words next to each other in the sentence: "valet parking" is a phrase,
+      // "parking was awful" is not.
       const next = kept[i + 1];
       if (next && next.at === token.at + 1) {
         const bigram = `${token.stem}-${next.stem}`;
@@ -256,7 +212,7 @@ function termIndex(documents: Document[]): {
   return { frequency, surfaces };
 }
 
-/** The most-written form of a term, ties alphabetical — so the label is stable. */
+// The most-written form of a term, ties broken alphabetically, so a theme's label is stable.
 function labelFor(term: string, surfaces: Map<string, Map<string, number>>): string {
   const forms = [...(surfaces.get(term) ?? new Map<string, number>())];
   forms.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
@@ -264,11 +220,11 @@ function labelFor(term: string, surfaces: Map<string, Map<string, number>>): str
   return best.charAt(0).toUpperCase() + best.slice(1);
 }
 
-/* -------------------------------------------------------------------- main */
+// The main entry point.
 
 export type EngineInput = {
   documents: Document[];
-  /** The equally-long window immediately before this one. Absent means `delta` is `null`. */
+  // The equally long window immediately before this one. Absent means there is no change figure.
   previous?: Document[] | undefined;
 };
 
@@ -296,6 +252,7 @@ export function analyse(input: EngineInput): EngineResult {
   };
 }
 
+// The sentiment trend over time, bucketed by day or by week.
 function trendOf(
   documents: Document[],
   scores: number[],
@@ -314,8 +271,8 @@ function trendOf(
     buckets.set(key, bucket);
   });
 
-  // Only buckets that HAVE comments. A zeroed day is a day nobody wrote, and drawing it as
-  // a point on the floor reads as a collapse in sentiment rather than as a quiet Tuesday.
+  // Only buckets that actually have comments: a zeroed day is a day nobody wrote, and drawing it
+  // as a point on the floor reads as a collapse in sentiment rather than a quiet Tuesday.
   return [...buckets]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, counts]) => ({ date, ...counts }));
@@ -323,7 +280,7 @@ function trendOf(
 
 const day = (at: Date): string => at.toISOString().slice(0, 10);
 
-/** ISO week, labelled by its Monday — a date, so the DTO's `date` field stays one type. */
+// An ISO week, labelled by its Monday, so the reply carries dates of one type.
 function weekStart(at: Date): string {
   const utc = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
   const shift = (utc.getUTCDay() + 6) % 7;
@@ -331,6 +288,7 @@ function weekStart(at: Date): string {
   return utc.toISOString().slice(0, 10);
 }
 
+// Finds the themes: frequent terms, merged where one is a facet of another.
 function themesOf(input: EngineInput, valenceOf: Map<string, Valence>): Theme[] {
   const { documents, previous } = input;
   if (documents.length === 0) return [];
@@ -343,13 +301,11 @@ function themesOf(input: EngineInput, valenceOf: Map<string, Valence>): Theme[] 
     .filter(([term, seen]) => !isOpinion(term) && seen.size >= MIN_MENTIONS && seen.size <= ceiling)
     .sort(
       (a, b) =>
-        // Frequency first.
+        // Most comments first.
         b[1].size - a[1].size ||
-        // Then the SHORTER term, so a unigram outranks a bigram it ties with and the theme
-        // comes out as `Location` with `great location` folded in, rather than the reverse.
-        // The general word is the better name for the group it heads.
+        // Then the shorter term, so "Location" heads the group and "great location" folds into it.
         a[0].split('-').length - b[0].split('-').length ||
-        // Then the term itself, so a tie can never depend on Map insertion order.
+        // Then the term itself, so a tie never depends on insertion order.
         a[0].localeCompare(b[0]),
     )
     .slice(0, CANDIDATE_POOL);
@@ -383,10 +339,8 @@ function themesOf(input: EngineInput, valenceOf: Map<string, Valence>): Theme[] 
         if (valence === 'positive') positive += 1;
         else if (valence === 'negative') negative += 1;
       }
-      // Laplace-smoothed share of the OPINIONATED comments that were positive. A share
-      // rather than a mean of weights, because the weights are -2..2 hand-written guesses
-      // and averaging them would present them as a measurement. The +1/+2 is what stops
-      // "one positive comment out of three" reading as a perfect 100.
+      // The share of opinionated comments that were positive, smoothed, so "one positive out of three"
+      // does not read as a perfect 100. A share rather than an average of the hand-written weights.
       const score = Math.round(((positive + 1) / (positive + negative + 2)) * 100);
 
       return {
@@ -402,36 +356,18 @@ function themesOf(input: EngineInput, valenceOf: Map<string, Valence>): Theme[] 
     .sort((a, b) => b.mentions - a.mentions || a.id.localeCompare(b.id));
 }
 
-/**
- * A THEME IS WHAT PEOPLE TALKED ABOUT. The lexicon is how they felt about it, and the two
- * are different columns of the same screen — so a word that only appears in the lexicon is
- * never a theme in its own right.
- *
- * The Grand Palace's real comments produced `Comfortable` sitting in the themes table
- * beside `Room` and `Checkout`, reading as a finding when it is an adjective. `43` says a
- * theme drills through to its source comments; "the comments mentioning comfortable" is not
- * a topic anybody would click.
- *
- * EVERY part has to be an opinion word, so `comfortable` goes and `comfortable-bed` stays —
- * a phrase with a noun in it is still about the noun. The cost is that `delay` and `noise`
- * cannot head a theme on their own, and that is accepted: they still colour the theme they
- * appear alongside, through exactly the sentiment scoring they are in the lexicon for.
- */
+// A theme is what people talked ABOUT; the lexicon is how they felt. So a term made only of opinion
+// words is never a theme on its own - "comfortable" is not a topic anybody would click through to,
+// but "comfortable bed" is, because it has a noun in it.
 const isOpinion = (term: string): boolean =>
   term.split('-').every((part) => STEMMED.has(part));
 
-/**
- * How contained a candidate must be before it counts as a facet rather than a rival.
- *
- * CAPPED AT 1, which is not a formality: a theme covering the whole corpus would otherwise
- * demand a containment of 2, and nothing can be more than entirely inside something. A real
- * facet of a ubiquitous theme would then split off as its own row — `great location` beside
- * `location`, which is the bug in the opposite direction from the one MERGE_LIFT fixes.
- */
+// How contained a candidate must be to count as a facet rather than a rival, capped at 1,
+// because nothing can be more than entirely inside something.
 const mergeBar = (hostSize: number, corpusSize: number): number =>
   Math.min(1, Math.max(MERGE_CONTAINMENT, (MERGE_LIFT * hostSize) / corpusSize));
 
-/** |A ∩ B| / |A| — how much of the candidate already sits inside the theme. */
+// How much of the candidate already sits inside the theme.
 function contained(candidate: Set<number>, theme: Set<number>): number {
   if (candidate.size === 0) return 0;
   let shared = 0;
@@ -439,20 +375,15 @@ function contained(candidate: Set<number>, theme: Set<number>): number {
   return shared / candidate.size;
 }
 
-/** The same theme's document count in another window — the union, as here, not a sum. */
+// The same theme's comment count in another window.
 function mentionsIn(frequency: Map<string, Set<number>>, terms: string[]): number {
   const union = new Set<number>();
   for (const term of terms) for (const index of frequency.get(term) ?? []) union.add(index);
   return union.size;
 }
 
-/**
- * Drivers. `43` and DEC-042 both define this as the correlation between a theme's presence
- * and the response's own rating — arithmetic over `numeric_value` (10 §4.4), not inference.
- *
- * PER RESPONSE, not per comment: a response answering two written questions would otherwise
- * contribute its single rating twice and count as two people who agree with themselves.
- */
+// Drivers: the correlation between a theme being mentioned and the rating that response gave.
+// Counted per RESPONSE, not per comment, so somebody who wrote two answers is not two people who agree.
 function driversOf(themes: Theme[], documents: Document[]): EngineResult['drivers'] {
   const ratingOf = new Map<string, number>();
   const responseOfComment = new Map<string, string>();
@@ -478,11 +409,7 @@ function driversOf(themes: Theme[], documents: Document[]): EngineResult['driver
           id: theme.id,
           label: theme.label,
           impact,
-          // The SERVER says which way is good (CONF-004). `impact` is a correlation, and a
-          // client deciding that a negative one is bad news would be inferring exactly the
-          // thing that is not safe to infer — a theme correlating with LOW ratings is bad
-          // for the organisation, and one correlating with low ratings on a question about
-          // problems reported is not.
+          // The server decides which way is good: a correlation on its own does not say whether a theme is bad news.
           valence:
             impact > DRIVER_DEADBAND
               ? 'positive'
@@ -496,11 +423,9 @@ function driversOf(themes: Theme[], documents: Document[]): EngineResult['driver
     .slice(0, MAX_DRIVERS);
 }
 
-/**
- * Pearson r, rounded to two places. `null` when either side has no variance — which is not
- * an edge case here: it is what happens when every response mentions a theme, or when every
- * rating is a 4. There is no correlation to report, and reporting 0 would say there was.
- */
+// Pearson correlation, rounded to two places. Null when either side has no variance - which happens
+// when every response mentions a theme, or every rating is a 4. Reporting 0 would claim there was no link.
+// Pearson correlation of two equal-length series.
 function pearson(xs: number[], ys: number[]): number | null {
   const n = xs.length;
   if (n === 0) return null;

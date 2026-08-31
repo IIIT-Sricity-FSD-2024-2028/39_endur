@@ -1,23 +1,17 @@
-// T-107 — a role ladder longer than four. DEC-112, and the demo run's F4/F2.
-//
-// THE MATRIX'S FOUR ROWS ARE POSITIONS IN THE FEEDBACK LOOP, NOT POSITIONS IN THE LIST. L3 is
-// the reviewee — the person feedback is about — and L4 is the respondent who gives it. The
-// mapping used to be `Math.min(index + 1, 4)`, which reads those two labels off whoever
-// happens to sit fourth and fifth, so a ten-role college put SIX roles on the respondent row.
-//
-// A Professor signed in and got an empty console: five capabilities, 403 on the campaigns
-// list, and no improvement loop at all. That was recovered by hand with thirty grant cells.
-//
-// THE ASSERTIONS ARE ON CAPABILITIES A PERSON WOULD NOTICE MISSING, not on the level integer.
-// A test that only checked `level === 3` would pass against a matrix whose level-3 row had
-// been emptied, which is the same shape of blindness that let this ship.
+// A role ladder longer than four.
+// The seeded matrix's four rows are places in the FEEDBACK LOOP, not places in the list: the third is
+// the reviewee and the fourth is the respondent who gives feedback.
+// The old mapping counted from the top, so a ten-role college put SIX roles on the respondent row and
+// a Professor signed in to an empty console with five capabilities.
+// The assertions are on capabilities a person would NOTICE missing, never on the level number - a test
+// that only checked the number would pass against an emptied row.
 import { describe, expect, it } from 'vitest';
 import { levelForRole } from '../presets/grant-matrix.js';
 import { registerOrg, withCsrf, SETUP_UNITS, SETUP_LABELS } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
 
-/** A real college ladder, which is the shape that broke. */
+// A real college ladder, which is the shape that broke.
 const COLLEGE_ROLES = [
   'Director',
   'Dean',
@@ -32,21 +26,16 @@ const COLLEGE_ROLES = [
 ].map((name) => ({ name }));
 
 describe('levelForRole — DEC-112', () => {
-  /**
-   * FOUR ROLES OR FEWER IS UNCHANGED, and this is the assertion that lets the change ship at
-   * all: every seeded preset has exactly four, so no existing organisation moves and `50` §1's
-   * table still describes what it describes.
-   */
+  // Four roles or fewer is unchanged, which is what lets this change ship at all: every seeded preset
+  // has exactly four, so no existing organisation moves.
   it('leaves a four-role ladder exactly where it was', () => {
     expect([0, 1, 2, 3].map((i) => levelForRole(i, 4))).toEqual([1, 2, 3, 4]);
     expect([0, 1, 2].map((i) => levelForRole(i, 3))).toEqual([1, 2, 3]);
     expect([0, 1].map((i) => levelForRole(i, 2))).toEqual([1, 2]);
   });
 
-  /**
-   * THE BOTTOM ROLE IS THE RESPONDENT AND THE MIDDLE IS THE REVIEWEE. Only ONE role gets the
-   * level-4 row now — the last — where six of ten used to.
-   */
+  // The bottom role is the respondent and the middle is the reviewee: only ONE role takes the bottom row
+  // now, where six of ten used to.
   it('gives a ten-role ladder one respondent row, not six', () => {
     const levels = COLLEGE_ROLES.map((_, i) => levelForRole(i, COLLEGE_ROLES.length));
     expect(levels).toEqual([1, 2, 3, 3, 3, 3, 3, 3, 3, 4]);
@@ -56,7 +45,7 @@ describe('levelForRole — DEC-112', () => {
     expect(old.filter((level) => level === 4)).toHaveLength(7);
   });
 
-  /** A Dean is not handed the organisation. Level 1 carries `org.delete` and `grant.update`. */
+  // A Dean is not handed the organisation: the top row carries delete and the powers grid.
   it('never promotes anybody into level 1 by being generous', () => {
     for (const count of [5, 6, 8, 10, 12]) {
       const levels = Array.from({ length: count }, (_, i) => levelForRole(i, count));
@@ -96,15 +85,14 @@ describe('a ten-role college gets a working Professor — F4, F2', () => {
     };
 
     const professor = await capsOf('Professor');
-    // THE FIVE-CAPABILITY CONSOLE IS GONE. Each of these is a screen that was 403 or empty.
+    // The five-capability console is gone: each of these is a screen that was 403 or empty.
     expect(professor.has('campaign.read')).toBe(true);
     expect(professor.has('campaign.create')).toBe(true);
     expect(professor.has('results.read')).toBe(true);
     expect(professor.has('response.read')).toBe(true);
     expect(professor.has('template.read')).toBe(true);
-    // F2 — the Gold improvement loop. `reflection.*` is `self` at levels 1–3 and ABSENT at 4,
-    // so a reviewee below the fourth position lost the entire tier AND could not be granted it
-    // back: the no-escalation guard needs a granter holding it at `all`, and nobody ever does.
+    // The improvement loop: it is self-scoped at the top three levels and absent at the fourth, so a
+    // reviewee below fourth place lost the whole tier AND could not be granted it back.
     expect(professor.has('reflection.create')).toBe(true);
     expect(professor.has('actionplan.create')).toBe(true);
     expect(professor.size).toBeGreaterThan(10);
@@ -114,15 +102,13 @@ describe('a ten-role college gets a working Professor — F4, F2', () => {
     expect(assistant.has('campaign.read')).toBe(true);
     expect(assistant.has('reflection.create')).toBe(true);
 
-    // The Sports Officer's job needs a bookable and a campaign in their own unit — F4's
-    // second and third symptoms.
+    // The Sports Officer's job needs a bookable and a campaign in their own unit.
     const sports = await capsOf('Sports Officer');
     expect(sports.has('campaign.create')).toBe(true);
     expect(sports.has('template.read')).toBe(true);
 
-    // AND THE STUDENT IS STILL THE RESPONDENT. The fix must not hand the bottom of the ladder
-    // the reviewee's powers — a student who can read every response in their unit is a worse
-    // bug than the one being fixed.
+    // And the student is STILL the respondent: handing the bottom of the ladder the reviewee's powers
+    // would be a worse bug than the one being fixed.
     const student = await capsOf('Student');
     expect(student.has('campaign.create')).toBe(false);
     expect(student.has('response.read')).toBe(false);
@@ -132,10 +118,7 @@ describe('a ten-role college gets a working Professor — F4, F2', () => {
     expect(student.has('announcement.read')).toBe(true);
   });
 
-  /**
-   * THE WARNING NARROWS WITH THE FIX. It used to name six roles; the honest count is one —
-   * the bottom of the ladder — and a warning that names most of the grid is one nobody reads.
-   */
+  // The warning narrows with the fix: it used to name six roles, and the honest count is one.
   it('warns about the bottom role only, not about six', async () => {
     const founder = await registerOrg('university', 'gold');
     expect(

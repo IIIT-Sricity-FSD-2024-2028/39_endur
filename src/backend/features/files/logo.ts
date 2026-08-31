@@ -1,9 +1,10 @@
-// The organisation logo. 41, 48.
+// The organisation logo: upload replaces the old one, delete removes it.
 import type { Request } from 'express';
 import { NotFoundError } from '../../lib/errors.js';
 import { runInTransaction } from '../../db/tx.js';
 import { discardFile, storeUpload, type FileView } from './service.js';
 
+// Stores the uploaded image and points the organisation at it, replacing any previous logo.
 export async function setLogo(req: Request, orgId: string, actorId: string): Promise<FileView> {
   const file = req.file;
   if (!file) throw new NotFoundError();
@@ -24,6 +25,7 @@ export async function setLogo(req: Request, orgId: string, actorId: string): Pro
   });
 }
 
+// Removes the organisation's logo and deletes the stored file.
 export async function removeLogo(req: Request, orgId: string): Promise<void> {
   return runInTransaction(req, async (tx) => {
     const org = await tx.organization.findUnique({

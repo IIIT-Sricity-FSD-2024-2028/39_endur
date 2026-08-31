@@ -1,10 +1,6 @@
-// Inbox routes. 13 § Inbox, 58.
-//
-// The five COMMENT routes carry `response.read` and nothing else. Marking your own inbox needs no
-// capability beyond seeing it, which is why there is no `inbox.*` module in `11` §3: the
-// state is one row per (user, response), so two administrators triaging the same campaign
-// never overwrite each other. A capability would imply a shared queue somebody can be
-// excluded from, and there is no such thing here.
+// Inbox routes.
+// The comment routes carry response.read and nothing else: marking your own inbox needs no capability,
+// because the state is one row per (user, response), so two people triaging the same campaign never clash.
 import { Router } from 'express';
 import {
   InboxListDto,
@@ -32,6 +28,7 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
 
 const version = (req: { ctx: { authzVersion?: number } }) => req.ctx.authzVersion ?? 0;
 
+// The comment queue, filtered by tab: all, unread or archived.
 inboxRouter.get(
   '/',
   authenticate,
@@ -46,9 +43,8 @@ inboxRouter.get(
   },
 );
 
-// Four verbs rather than one PATCH with a body. They are four distinct things a person
-// does to a card, each is a single click, and `POST /read` in a log is legible in a way
-// that `PATCH {read:true,archived:false}` is not (13 § Inbox names them individually).
+// Four verbs rather than one PATCH with a body: they are four distinct things a person does to a card,
+// and POST /read reads clearly in a log where PATCH {read:true,archived:false} does not.
 for (const action of ['read', 'unread', 'archive', 'unarchive'] as const) {
   inboxRouter.post(
     `/:responseId/${action}`,
@@ -61,30 +57,19 @@ for (const action of ['read', 'unread', 'archive', 'unarchive'] as const) {
         .then(() =>
           mark(req.ctx.orgId as string, userOf(req), version(req), params.responseId, action),
         )
-        // 204. There is no body worth sending: the client already knows what it asked for,
-        // and the card updated optimistically before the request left (58 § State).
+        // 204: there is no body worth sending, and the card already updated optimistically.
         .then(() => res.status(204).end())
         .catch(next);
     },
   );
 }
 
-// ---------------------------------------------------------------------------
-// From Endur — DEC-101, T-101, 13 § Inbox, 58 § From Endur.
-//
-// NO CAPABILITY AT ALL ON THESE TWO, and that is a decision rather than an omission.
-//
-// NOT `response.read`. That capability scopes which UNITS' responses you may see; it has
-// nothing to say about a message addressed to you BY NAME, and gating on it would mean an
-// administrator with no response scope could be sent a message they could never open.
-//
-// NOT A NEW `notification.*` MODULE IN `11` §3 either. A capability implies a shared queue
-// somebody can be excluded from; this queue is one reader's, because the ROW NAMES THEM. The
-// service scopes every query by `userId` from the session, which is where that is enforced —
-// `authenticate` establishes who is asking and the row does the rest (INV-010's shape: the
-// identity never comes from the request).
-// ---------------------------------------------------------------------------
+// Messages from Endur.
+// No capability on these two, deliberately: response.read decides which units' responses you may see,
+// and has nothing to say about a message addressed to you by name. The row names the reader, and the
+// service scopes every query by the signed-in user, which is where that is enforced.
 
+// Messages sent to this user by Endur.
 inboxRouter.get('/messages', authenticate, validate(InboxMessageListDto), (req, res, next) => {
   const { query } = req.data as { query: InboxMessageQuery };
   void readMessages(req.ctx.orgId as string, userOf(req), query)
@@ -92,9 +77,7 @@ inboxRouter.get('/messages', authenticate, validate(InboxMessageListDto), (req, 
     .catch(next);
 });
 
-// Two verbs, not one PATCH with a body — the same argument `13` § Inbox makes about the
-// comment queue's four: they are distinct things a person does to a card, each is one click,
-// and `POST /read` in a log is legible where `PATCH {read:true}` is not.
+// Two verbs, not one PATCH with a body - the same argument as the four above.
 for (const action of ['read', 'unread'] as const) {
   inboxRouter.post(
     `/messages/:id/${action}`,

@@ -1,24 +1,6 @@
-// THE OPENAPI DOCUMENT, BUILT FROM THE APP ITSELF. `DEC-115`, `13` §12.
-//
-// NOTHING HERE IS A LIST OF ROUTES. The document is assembled by walking the live Express
-// stack (`lib/routeTable.ts` — the same walker `routes.test.ts` asserts INV-003 over), reading
-// each route's Zod DTO off the `validate()` middleware and each route's capability off the
-// guard. So the three things a reader most needs are, by construction, the things the server
-// actually does:
-//
-//   REQUEST SCHEMA      the schema `validate()` parses the request against, not a copy of it
-//   REQUIRED CAPABILITY the string `requireCapability()` was called with, not a note beside it
-//   WHICH ROLES HOLD IT read from the seeded grant matrix that actually seeds them
-//
-// A hand-maintained `swagger.yaml` gets exactly these three wrong first, and gets them wrong
-// silently — a document that is confidently out of date is worse than none, because a reader
-// cannot tell. Here, a route added without a guard fails `routes.test.ts`, and a route added
-// without a response entry fails `openapi.test.ts`. The document cannot fall behind the code
-// without a red build.
-//
-// The one thing that IS hand-written is the response half — `openapi/responses.ts` — because
-// responses have no runtime schema to read. That file explains the two mechanisms that keep it
-// honest.
+// Builds the OpenAPI document by walking the running app, so it cannot drift from the code.
+// Request schemas come from validate(), required capabilities from requireCapability(),
+// and the "who holds this" tables from the same grant matrix that seeds real organisations.
 import type { Express } from 'express';
 import { ERROR_CODES, PLATFORM_CAPABILITY_CATALOGUE, type PlatformCapability } from '@endur/shared';
 import { GRANT_MATRIX, type Level } from '../presets/grant-matrix.js';
@@ -27,22 +9,13 @@ import { defineRef, splitDto, toJsonSchema, type ConvertContext, type JsonSchema
 import { RESPONSES, type ResponseSpec } from './responses.js';
 import { UnitNodeSchema } from './components.js';
 
-/**
- * NAMED SCHEMAS. Exactly one, and it is one because exactly one shape in the product is
- * recursive: `UnitNode.children` is `UnitNode[]`, which is the org tree — the thing the whole
- * "an organisation is data" claim rests on. JSON Schema expresses that with a `$ref`, and a
- * `$ref` needs a name that Zod does not carry, so it is supplied here.
- *
- * Everything else is inlined deliberately. A document that hoisted all sixty response shapes
- * into `components.schemas` reads worse, not better: Swagger UI shows an operation's response as
- * a name the reader then has to go and look up, rather than as the fields they came to see.
- */
+// Named schemas. Only one is needed: UnitNode contains UnitNodes, and JSON Schema needs a name for that loop.
 const REFS = new Map<Parameters<typeof toJsonSchema>[0], string>([[UnitNodeSchema, 'UnitNode']]);
 const CTX: ConvertContext = { refs: REFS };
 
 const VERSION = '1.0.0';
 
-/** Seeded role levels, in the words `50` §1 uses for them. Lower is more senior. */
+// The seeded role levels, in words. A lower number means more senior.
 const LEVEL_NAMES: Record<Level, string> = {
   1: 'L1 — the top role (Principal / General Manager / Owner)',
   2: 'L2 — a head of a unit (Section Head / Department Head)',
@@ -50,20 +23,8 @@ const LEVEL_NAMES: Record<Level, string> = {
   4: 'L4 — the most junior role (Learner / Guest)',
 };
 
-/**
- * WHO HOLDS THIS CAPABILITY WHEN AN ORGANISATION IS SEEDED, and at what scope.
- *
- * This is the "role description" half of the document, and it is READ FROM THE MATRIX THAT
- * ACTUALLY SEEDS THE GRANTS rather than written out again here. That matters more than it
- * sounds: `D-033` was a capability catalogued, entitled and documented, that appeared in NO row
- * of this matrix — so no role in any organisation held it and the route 403'd for everybody. A
- * document generated from the matrix says "no seeded role holds this" instead of implying
- * somebody does.
- *
- * It is a DEFAULT, never the rule. The powers grid (`33`) is where an organisation decides, and
- * `requireCapability()` asks the resolver on every request — so the honest sentence names the
- * seeded starting point and says who may change it.
- */
+// Describes which seeded roles hold a capability, read from the matrix that actually creates the grants.
+// It is only a starting point: every organisation re-decides this on its own powers grid.
 function rolesFor(capability: string): string {
   const row = GRANT_MATRIX[capability as keyof typeof GRANT_MATRIX];
   if (!row) {
@@ -85,7 +46,7 @@ function rolesFor(capability: string): string {
   ].join('\n');
 }
 
-/** The platform side has no resolver: two fixed roles and a lookup (`19` §3). */
+// The platform side has no resolver: two fixed operator roles and a lookup.
 function operatorRolesFor(capability: string): string {
   const entry = PLATFORM_CAPABILITY_CATALOGUE[capability as PlatformCapability];
   if (!entry) return '';
@@ -100,7 +61,7 @@ function operatorRolesFor(capability: string): string {
   ].join('\n');
 }
 
-/** The error envelope every non-2xx in the product answers with (`13` §5). */
+// The error envelope every non-2xx reply in the product uses.
 const ERROR_ENVELOPE: JsonSchema = {
   type: 'object',
   required: ['error'],
@@ -133,14 +94,7 @@ const ERROR_ENVELOPE: JsonSchema = {
   },
 };
 
-/**
- * The failures worth documenting per route, chosen by what the route actually is.
- *
- * NOT every status on every operation. A document that lists nine possible errors on all 150
- * routes has told the reader nothing — the interesting fact about `GET /campaigns/:id` is that
- * it answers **404 for a campaign the caller may not see**, and that fact drowns in a wall of
- * boilerplate.
- */
+// The failures worth documenting for one route, picked from what that route actually is.
 function errorsFor(route: {
   method: string;
   capabilities: string[];
@@ -184,7 +138,7 @@ function errorsFor(route: {
   return out;
 }
 
-/** The headers a caller may or must send, described per route rather than globally. */
+// The headers a caller may or must send on this route.
 function headersFor(route: { method: string; path: string }): unknown[] {
   const headers: unknown[] = [
     {
@@ -230,7 +184,7 @@ function headersFor(route: { method: string; path: string }): unknown[] {
   return headers;
 }
 
-/** Which tag a path belongs under. The first meaningful segment, said in words. */
+// Which section of the document a path belongs under.
 const TAGS: Array<[RegExp, string]> = [
   [/^\/api\/v1\/auth/, 'Auth'],
   [/^\/api\/v1\/org/, 'Organisation'],
@@ -254,10 +208,11 @@ const TAGS: Array<[RegExp, string]> = [
   [/^\/api\/v1\/platform/, 'Platform (Endur operators)'],
 ];
 
+// The tag for one path.
 const tagFor = (path: string): string =>
   TAGS.find(([pattern]) => pattern.test(path))?.[1] ?? 'System';
 
-/** Which security scheme applies. The four worlds have four different answers (`12` §3). */
+// Which credential a path needs. The four worlds have four different answers.
 function securityFor(path: string, guarded: boolean): unknown[] {
   if (path.startsWith('/api/v1/platform')) return [{ operatorSession: [] }];
   if (path.startsWith('/api/v1/public') || path === '/healthz') return [];
@@ -265,6 +220,7 @@ function securityFor(path: string, guarded: boolean): unknown[] {
   return guarded || path.startsWith('/api/v1/auth') ? [{ staffSession: [] }] : [{ staffSession: [] }];
 }
 
+// The long description shown for one operation, including who is allowed to call it.
 function describe(route: {
   path: string;
   capabilities: string[];
@@ -309,25 +265,21 @@ function describe(route: {
   return parts.join('\n');
 }
 
+// Assembles the whole document: one operation per mounted route, plus the shared components.
 export function buildOpenApiDocument(app: Express): Record<string, unknown> {
   const routes = enumerateRoutes(app);
   const paths: Record<string, Record<string, unknown>> = {};
 
   for (const route of routes) {
     const spec = RESPONSES[routeKey(route)];
-    // A route with no entry is a hole in the document, and `openapi.test.ts` fails on it by
-    // name. Skipping it here rather than throwing keeps the running server serving a document
-    // — a missing operation is a bug to fix, not a reason for `/docs` to 500.
+    // A route with no documented response is skipped here, and openapi.test.ts names it as a failure.
     if (!spec) continue;
 
     const url = openApiPath(route.path);
     const parts = route.dto ? splitDto(route.dto) : {};
     const parameters: unknown[] = [...headersFor(route)];
 
-    // PATH PARAMETERS COME FROM THE PATH, and their schemas from the DTO when it has them.
-    // Deriving the NAMES from the URL rather than the DTO is deliberate: OpenAPI requires
-    // every `{placeholder}` to be declared, and a DTO that forgot one would otherwise
-    // produce an invalid document rather than an incomplete one.
+    // Path parameters come from the PATH itself, with their schemas taken from the DTO where it has them.
     for (const name of pathParams(route.path)) {
       const fromDto = parts.params?.properties?.[name];
       parameters.push({
@@ -478,7 +430,7 @@ export function buildOpenApiDocument(app: Express): Record<string, unknown> {
       },
       schemas: {
         Error: ERROR_ENVELOPE,
-        // The one recursive shape, defined once so `children` can point back at it.
+        // The one recursive shape, defined once so children can point back at it.
         UnitNode: defineRef(UnitNodeSchema, CTX),
       },
     },

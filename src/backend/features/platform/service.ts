@@ -1,10 +1,6 @@
-// The estate, as numbers. 19 §5, 70 § Data contract.
-//
-// Every query in this file runs through `platformClient()`, and that is not a style choice:
-// it is what makes INV-011 a property of the code rather than a promise about the code. If
-// a handler here ever asks for content, the seam throws a `PlatformSeamViolation` — a
-// programming error, deliberately not a 403, because an INV-011 breach is a line to delete
-// rather than a refusal to render.
+// The estate, as numbers - what Endur's own operators read about their customers.
+// Every query here runs through the platform client, which is what makes "counts, never content"
+// a property of the code: asking it for content throws, rather than answering.
 import type { Request, Response } from 'express';
 import type {
   AnalyticsQuery,
@@ -41,8 +37,7 @@ import { hashPassword } from '../../auth/password.js';
 import { generateSecret, otpauthUrl } from '../../platform/totp.js';
 import { listLogFiles, readLogFile, exportLogFile } from '../../platform/logs/index.js';
 import { logDir, logToFile } from '../../lib/logger.js';
-// DEC-114. The support seam, deliberately NOT `platformClient()` — see the note above
-// `enterSupport` for why widening the seam would have been the wrong fix.
+// The support seam is deliberately NOT the platform client - see the note above enterSupport().
 import {
   endSupportSession,
   loadSupportSession,
@@ -60,13 +55,8 @@ const db = platformClient();
 const DAY = 24 * 60 * 60 * 1000;
 const thirtyDaysAgo = () => new Date(Date.now() - 30 * DAY);
 
-/**
- * A campaign that is LAUNCHED, not closed, and not past its end date. Deliberately derived
- * here rather than imported from `features/campaigns/status.ts`: that module reads a
- * tenant-bound row and this one counts across every tenant at once, and the two would have
- * to agree about a shape neither can see. The definition is small enough to state, and
- * stating it is honest about the seam.
- */
+// A campaign that is launched, not closed and not past its end date. Derived here rather than imported,
+// because the tenant version reads one organisation's row and this counts across all of them.
 const activeCampaignWhere = (now: Date) => ({
   publicToken: { not: null },
   closedAt: null,
@@ -90,13 +80,8 @@ type OrgRow = {
   } | null;
 };
 
-/**
- * Seats, computed live from `16` §5's formula rather than read from `subscriptions.seats`.
- *
- * The cached column is `T-057`'s job and nothing has ever written it (`D-012`'s sibling),
- * so reading it here would show 0 seats for every organisation on the estate list and look
- * like a broken screen rather than an unbuilt meter. Computing it is two counts.
- */
+// Seats, computed live from the formula rather than read from the stored column, which nothing has
+// ever written - reading it would show 0 seats for every customer and look like a broken screen.
 async function seatsFor(orgIds: string[]): Promise<Map<string, number>> {
   if (orgIds.length === 0) return new Map();
   const [users, subjects] = await Promise.all([
@@ -107,8 +92,7 @@ async function seatsFor(orgIds: string[]): Promise<Map<string, number>> {
     }),
     db.subject.groupBy({
       by: ['orgId'],
-      // Non-person subjects only: one with `linkedUserId` is already counted as a user
-      // above, and double-counting it would overstate a customer's bill.
+      // Non-person subjects only: one linked to a person is already counted as a user above.
       where: { orgId: { in: orgIds }, linkedUserId: null, archivedAt: null },
       _count: { _all: true },
     }),
@@ -120,14 +104,8 @@ async function seatsFor(orgIds: string[]): Promise<Map<string, number>> {
   return seats;
 }
 
-/**
- * `responses` HAS NO `org_id` — it is reached through its campaign (10 §8), which is
- * exactly what makes `db/tenant.ts`'s "scoping the parent scopes the child" true. So the
- * estate's two response numbers are grouped by campaign and folded back, rather than asked
- * of a column that does not exist.
- *
- * Both are still COUNT(*) and MAX(), which is the whole of what INV-011 permits.
- */
+// Responses carry no organisation id - they are reached through their campaign - so these two numbers
+// are grouped by campaign and folded back. Both are still a count and a maximum, which is all that is allowed.
 async function responseFacts(orgIds: string[]) {
   const campaigns = await db.campaign.findMany({
     where: { orgId: { in: orgIds } },
@@ -189,18 +167,15 @@ async function summarise(rows: OrgRow[]): Promise<PlatformOrgSummary[]> {
     name: row.name,
     slug: row.slug,
     industry: row.industry,
-    // DERIVED, NOT READ — DEC-113. The column lags: an expired row keeps saying `gold` until
-    // the customer next opens their own plan page and `readBilling` writes the move. The gate
-    // does not wait for that and neither does this, so the estate shows the tier the product is
-    // actually serving rather than the one the table has not caught up to.
+    // Derived, not read: the stored column lags until the customer next opens their own plan page,
+    // so the estate shows the tier the product is actually serving.
     tier: row.subscription ? effectiveTier(row.subscription) : 'bronze',
     subscriptionStatus: row.subscription?.status ?? 'none',
     periodEnd: row.subscription?.periodEnd.toISOString() ?? null,
     lapsedFrom: (row.subscription?.lapsedFrom as Tier | null) ?? null,
     seats: seats.get(row.id) ?? 0,
-    // `null` and not a number, because there is no seat LIMIT in the product: `16` §6
-    // describes over-limit behaviour and `T-057` is what would set the ceiling. A zero
-    // here would render as "over seats" for every customer, which is worse than absent.
+    // Null rather than a number, because there is no seat LIMIT in the product yet. A zero here would
+    // render as "over seats" for every customer.
     seatLimit: null,
     activeCampaigns: campaignCount.get(row.id) ?? 0,
     responsesLast30d: responseCount.get(row.id) ?? 0,
@@ -222,9 +197,8 @@ const ORG_SELECT = {
       tier: true,
       status: true,
       seats: true,
-      // DEC-113. `periodEnd` and `pendingTier` are what `effectiveTier()` needs; `lapsedFrom`
-      // is what the row prints. None of them is a count of anything a tenant owns, so the
-      // aggregate-only seam (INV-011, 19 §5) is untouched.
+      // These three fields are what the effective tier is worked out from, and none is a count of
+      // anything a tenant owns, so the counts-only rule is untouched.
       periodEnd: true,
       pendingTier: true,
       lapsedFrom: true,
@@ -246,10 +220,8 @@ export async function estate(query: EstateQuery): Promise<Paged<PlatformOrgSumma
       : {}),
   };
 
-  // Cursor pagination on `createdAt`, like every other list (13 §4). The estate list SORTS
-  // by last activity ascending in the UI (70), but paginating on an aggregate of another
-  // table is not a cursor — the client sorts the page it was given, and the filters are
-  // what narrow the estate rather than the scroll.
+  // Cursor pagination on creation date, like every other list. The page is sorted by last activity in
+  // the UI, but paginating on an aggregate of another table is not a cursor.
   const after = afterCursor(query.cursor);
 
   const [rows, total] = await Promise.all([
@@ -288,7 +260,7 @@ export async function orgDetail(id: string): Promise<PlatformOrgDetail> {
       db.user.count({ where: { orgId: id } }),
       db.subject.count({ where: { orgId: id, archivedAt: null } }),
       db.campaign.count({ where: { orgId: id } }),
-      // Through the campaign, because `responses` carries no `org_id` (10 §8).
+      // Through the campaign, because responses carry no organisation id.
       db.response.count({ where: { campaign: { orgId: id } } }),
       administratorsOf(id),
       db.platformAuditLog.findMany({
@@ -311,18 +283,9 @@ export async function orgDetail(id: string): Promise<PlatformOrgDetail> {
   };
 }
 
-/**
- * Who to contact — resolved SERVER-SIDE from who holds `org.update`, never supplied by the
- * client (70 § Acceptance). An operator typing an address is an operator who can typo a
- * customer's plan details to a stranger.
- *
- * A grants query rather than the resolver: the resolver answers "may THIS person do this
- * HERE" one user at a time, and the question here is "who, in this organisation" — for
- * which an allow-grant on `org.update` held by a role that somebody occupies, or by their
- * person node directly, is the honest approximation. It over-reports nobody: a deny would
- * make one of these people unable to act, and a support email reaching one extra
- * administrator is not a failure.
- */
+// Who to contact, worked out on the SERVER from who holds org.update, never supplied by the client:
+// an operator typing an address is an operator who can send a customer's plan details to a stranger.
+// A grants query rather than the resolver, because the question is "who, in this organisation".
 async function administratorsOf(orgId: string): Promise<Array<{ id: string; name: string; email: string }>> {
   const grants = await db.grant.findMany({
     where: {
@@ -336,9 +299,8 @@ async function administratorsOf(orgId: string): Promise<Array<{ id: string; name
   if (grants.length === 0) return [];
   const subjectIds = grants.map((grant) => grant.subjectId);
 
-  // A POSITION carries no `user_id` — the person does, and a `member` edge joins the two
-  // (10 §4). So the role-granted case is TWO HOPS, and writing it as one was the bug the
-  // administrators test caught: every organisation reported having nobody to contact.
+  // A position carries no account id - the person does, joined by a membership edge - so this is TWO hops.
+  // Written as one, every organisation reported having nobody to contact.
   const positions = await db.node.findMany({
     where: { orgId, kind: 'position', roleId: { in: subjectIds } },
     select: { id: true },
@@ -354,9 +316,9 @@ async function administratorsOf(orgId: string): Promise<Array<{ id: string; name
       kind: 'person',
       userId: { not: null },
       OR: [
-        // Granted to the person node directly.
+        // Granted to the person directly.
         { id: { in: subjectIds } },
-        // Or holding a position whose ROLE was granted it — the common case (11 §3).
+        // Or holding a position whose ROLE was granted it, which is the common case.
         { id: { in: memberships.map((row) => row.parentId) } },
       ],
     },
@@ -385,8 +347,7 @@ export async function stats(): Promise<PlatformStats> {
 
   const byTier = Object.fromEntries(TIERS.map((tier) => [tier, 0])) as Record<Tier, number>;
   for (const row of tiers) byTier[row.tier as Tier] = row._count._all;
-  // An org with no subscription row reads as bronze everywhere else (D-012), so it reads
-  // as bronze here too rather than vanishing from the tier mix.
+  // An organisation with no subscription row counts as bronze here too, rather than vanishing from the mix.
   const withRow = tiers.reduce((sum, row) => sum + row._count._all, 0);
   byTier.bronze += organizations - withRow;
 
@@ -401,11 +362,9 @@ export async function stats(): Promise<PlatformStats> {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Analytics. `71` — the estate at once, for the owner. `T-067`.
-// ---------------------------------------------------------------------------
+// Analytics: the whole estate at once, for the owner.
 
-/** `YYYY-MM` or `YYYY-Qn`, so a period is both sortable as a string and readable as a label. */
+// A period key like 2026-08 or 2026-Q3, so it sorts as a string and reads as a label.
 function periodKeyOf(date: Date, granularity: 'month' | 'quarter'): string {
   if (granularity === 'quarter') {
     return `${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`;
@@ -413,10 +372,7 @@ function periodKeyOf(date: Date, granularity: 'month' | 'quarter'): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-/** The ordered list of period keys covering `[from, to]`, inclusive — so a period with no
- *  activity still renders as a zero row rather than vanishing from the table (`71` decision 2:
- *  movement is reported per period, and a missing period reads as "nothing happened" only if
- *  it is actually there to read). */
+// Every period between two dates, inclusive, so a quiet month still renders as a zero row instead of vanishing.
 function periodsBetween(from: Date, to: Date, granularity: 'month' | 'quarter'): string[] {
   const step = granularity === 'quarter' ? 3 : 1;
   const periods: string[] = [];
@@ -432,17 +388,9 @@ function periodsBetween(from: Date, to: Date, granularity: 'month' | 'quarter'):
 
 const TIER_RANK = new Map(TIERS.map((tier, index) => [tier, index]));
 
-/**
- * The last instant of the day a date names — `D-044`, `DEC-103`.
- *
- * `<input type="date">` sends `2026-08-12` and `z.coerce.date()` reads it as midnight, so a
- * range query written `lte: to` excluded the whole of the last day the operator selected, and
- * a single-day window matched nothing at all. Every windowed query on both platform pages
- * runs through this.
- *
- * 999 MILLISECONDS, NOT `+ 1 DAY` WITH `lt`. Both are correct; this one keeps the comparison
- * `lte` everywhere, so no caller has to remember which of its two bounds is exclusive.
- */
+// The last instant of the day a date names.
+// A date input sends a bare day, which is read as midnight, so a plain "less than or equal" would drop
+// the whole of the last day selected - and a single-day window would match nothing at all.
 function endOfDay(value: Date): Date {
   const end = new Date(value.getTime());
   end.setUTCHours(23, 59, 59, 999);
@@ -452,23 +400,12 @@ function endOfDay(value: Date): Date {
 export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytics> {
   const now = new Date();
   const to = query.to ?? now;
-  // Twelve months back by default (`71` § Interactions) — a year of monthly movement is the
-  // window the owner opens the page to see, and quarter granularity reads the same range as
-  // four quarters rather than a shorter one.
+  // Twelve months back by default, which is the window the owner opens the page to see.
   const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
   const granularity = query.granularity;
 
-  // `to` IS INCLUSIVE TO THE END OF THE DAY NAMED — D-044.
-  //
-  // `<input type="date">` sends `2026-08-12`; `z.coerce.date()` reads that as
-  // `2026-08-12T00:00:00Z`; every query below is `lte: to`. SO THE WHOLE OF THE LAST DAY
-  // SELECTED WAS EXCLUDED, and a single-day window (`from` === `to`) matched nothing at all —
-  // which is what the owner met as "the date filters are not working".
-  //
-  // The adjustment is here rather than in the DTO because the DTO's job is to say the value
-  // is a date; what a date MEANS at the end of a range is this function's question, and
-  // `/ops/earnings` reads the same shape (`EarningsQuery = AnalyticsQuery`) and needs the
-  // same answer.
+  // The end date is inclusive to the end of that day, for the reason above. Done here rather than in
+  // the schema, because what a date MEANS at the end of a range is this function's question.
   const windowEnd = endOfDay(to);
 
   const [
@@ -485,8 +422,7 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
       db.organization.count(),
       db.subscription.count({ where: { status: 'trialing' } }),
       db.subscription.count({ where: { status: 'cancelled' } }),
-      // Excludes `trialing` — decision 1. An org with no subscription row folds into bronze,
-      // the same convention `stats()` already uses (D-012).
+      // Excludes trialing, and an organisation with no subscription row folds into bronze.
       db.organization.findMany({
         where: { OR: [{ subscription: null }, { subscription: { status: { not: 'trialing' } } }] },
         select: { id: true, subscription: { select: { tier: true } } },
@@ -495,23 +431,9 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
         where: { createdAt: { gte: from, lte: windowEnd } },
         select: { createdAt: true },
       }),
-      // MOVEMENT READS `payments` — DEC-102 — AND STILL READS `plan.override` BESIDE IT.
-      //
-      // THE DECISION SAID "RATHER THAN", AND "RATHER THAN" WOULD HAVE LOST A CASE THE SAME
-      // DECISION REQUIRES. `DEC-102`'s argument is that `plan.override` is the OPERATOR'S
-      // action, so the table had only ever counted what operators did while being labelled as
-      // the estate — true, and the remedy is to ADD the customer's own moves rather than to
-      // swap one partial source for another. Its own `not` clause settles it: downgraded
-      // "covers an operator override AND the scheduled expiry", and an override deliberately
-      // writes NO `payments` row (`OverridePlan`'s DTO comment: an operator who could name an
-      // amount could invent revenue). Replacing the source would have made an operator moving
-      // thirty organisations to Gold show as no movement at all.
-      //
-      // THE TWO SOURCES ARE DISJOINT BY CONSTRUCTION, so there is nothing to de-duplicate: a
-      // customer's own move writes a `payments` row and no platform audit row; an operator's
-      // override writes a platform audit row and no `payments` row. That is not a coincidence
-      // to rely on quietly — it is `19` §8's split between a sale and a support action, and if
-      // it ever stops being true this count double-counts, which is why it is written down.
+      // Movement reads BOTH the payments table and the operator's own audit log, because the two sources
+      // are disjoint: a customer's own move writes a payment and no audit row, an operator's override
+      // writes an audit row and no payment. Reading only one would miss half the estate's movement.
       db.payment.findMany({
         where: { createdAt: { gte: from, lte: windowEnd }, status: 'succeeded' },
         select: { createdAt: true, tier: true, fromTier: true },
@@ -528,10 +450,8 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
 
   const joined = organizations - trialing - cancelled;
 
-  // NO SEAT COLUMN — DEC-102. `DEC-080` prices per ORGANISATION, `subscriptions.seats` has
-  // never been written (`D-013`), and the live count `16` §5 computes is not billed on. A
-  // seat figure on the revenue owner's page measured something no invoice reads, and the
-  // `seatsFor()` call that produced it was the most expensive query on the page.
+  // No seat column here: the product prices per organisation, and a seat figure on the revenue page
+  // would measure something no invoice reads.
   const byTierMap = new Map<Tier, number>(TIERS.map((tier) => [tier, 0]));
   for (const row of tierRows) {
     const tier = (row.subscription?.tier ?? 'bronze') as Tier;
@@ -547,18 +467,11 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
     const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
     if (bucket) bucket.new += 1;
   }
-  /**
-   * ONE RULE FOR BOTH SOURCES: THE PREVIOUS PLAN AGAINST THE ONE THAT REPLACED IT.
-   *
-   * That is the owner's definition of a downgrade (`DEC-102`) and it is deliberately silent
-   * about WHO caused the move — with `DEC-096` a customer cannot move down at all, so the
-   * downgrades that reach here are an operator override and the scheduled expiry of
-   * `DEC-098`, and a rule that named a cause would have to be extended for each new one.
-   */
+  // One rule for both sources: the previous plan against the one that replaced it. It says nothing
+  // about who caused the move, because a rule that named a cause would need extending for each new one.
   const countMove = (at: Date, before?: string | null, after?: string | null): void => {
-    // A SIGNUP IS NOT A MOVE. `from_tier` is null on it, and the organisation is already
-    // counted under `new` from its own `created_at` — counting it here as well would put one
-    // organisation in two of four columns decision 2 insists are never netted.
+    // A signup is not a move: the organisation is already counted as new, and counting it here too would
+    // put one organisation in two columns.
     const fromRank = before ? TIER_RANK.get(before as Tier) : undefined;
     const toRank = after ? TIER_RANK.get(after as Tier) : undefined;
     if (fromRank === undefined || toRank === undefined || fromRank === toRank) return;
@@ -568,11 +481,10 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
     else bucket.downgraded += 1;
   };
 
-  // The customer's own moves — a join (`DEC-097`) and a scheduled expiry (`DEC-098`).
+  // The customer's own moves: a join, and a scheduled expiry.
   for (const row of planChanges) countMove(row.createdAt, row.fromTier, row.tier);
 
-  // The operator's. Same rule, different table, because an override takes no money and so
-  // writes no ledger row — see the query above.
+  // The operator's. Same rule, different table, because an override takes no money and writes no ledger row.
   for (const row of planOverrides) {
     const payload = row.payload as { from?: string; to?: string } | null;
     countMove(row.createdAt, payload?.from ?? null, payload?.to ?? null);
@@ -583,18 +495,9 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
   }
   const movement = periods.map((period) => ({ period, ...movementMap.get(period)! }));
 
-  // THE TRIAL COUNTERS ARE GONE — DEC-102, and the argument is that they could never move.
-  //
-  // `DEC-048` made registration write `status: 'active'`, so nothing on the sign-up path is
-  // ever `trialing`; and `converted` was a hardcoded `0` under a comment saying it had no
-  // source, so `conversionRate` was permanently the em-dash. TWO OF THE SIX HEADLINE CARDS
-  // WERE STRUCTURALLY INCAPABLE OF CHANGING, which is what the owner met when they created an
-  // organisation and Trials started did not move.
-  //
-  // The old comment's argument for the honest zero was right about honesty and wrong about
-  // the remedy: the honest thing to do with a metric that has no source is NOT TO PRINT IT.
-  // The DTO fields went with the queries, because a field left behind is a field something
-  // starts computing again.
+// The trial counters are gone, because they could never move: registration writes an active status,
+// so nothing is ever trialing, and the conversion rate had no source at all.
+// The honest thing to do with a metric that has no source is not to print it.
 
   const [orgsWithACampaign, orgsWithAResponse, allOrgIds] = await Promise.all([
     db.organization.count({ where: { campaigns: { some: {} } } }),
@@ -620,9 +523,8 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
   ]);
 
   return {
-    // `to` GOES BACK OUT AS THE DAY THAT WAS ASKED FOR, not as the 23:59:59 the query used —
-    // the page echoes this into its own date input, and an input that reads back a second
-    // later than what was typed is a control arguing with the person using it.
+    // The end date goes back out as the DAY that was asked for, not the 23:59:59 the query used, because
+    // the page echoes it into its own date input.
     window: { from: from.toISOString(), to: to.toISOString(), granularity },
     orgs: { total: organizations, joined, trialing, cancelled },
     byTier,
@@ -632,15 +534,10 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
   };
 }
 
-// ---------------------------------------------------------------------------
-// Earnings. `71` § Revenue, DEC-080 — the money, for the owner. `T-058`.
-// ---------------------------------------------------------------------------
+// Earnings: the money, for the owner.
 
-/**
- * A capture, as the earnings page reads one. The row is denormalised at write time
- * (`payer_name` is captured, never joined), so the only join here is the organisation's
- * NAME — an id is not something an owner can act on.
- */
+// A capture, as the earnings page reads one. The row is denormalised at write time, so the only join
+// here is the organisation's name.
 const PAYMENT_SELECT = {
   id: true,
   createdAt: true,
@@ -686,39 +583,18 @@ const paymentView = (row: PaymentRow) => ({
 const RECENT_PAYMENTS = 20;
 const RECENT_CHANGES = 10;
 
-/**
- * What the estate has paid. `platform.revenue.read`, owner only.
- *
- * THE SAME WINDOW AS `analytics()`, down to the twelve-month default, and deliberately so:
- * an owner reads the two pages one after the other, and two default ranges would make them
- * disagree about a quarter that has not changed.
- *
- * `byPeriod` INCLUDES EMPTY PERIODS AS ZERO, for the reason `periodsBetween` already gives
- * about movement — a month that vanishes from a revenue line reads as a gap in the data
- * rather than as a month nobody bought anything.
- *
- * `orgsOnTier` IS TODAY AND EVERYTHING ELSE IS THE WINDOW, and the legend on the page says
- * which is which. They are different questions — "who is on Gold now" against "what did
- * Gold earn since March" — and folding them into one number would answer neither.
- *
- * ONLY `succeeded` ROWS ARE COUNTED. Nothing writes any other status today; the filter is
- * here so that the day something does, a failed capture does not silently become revenue.
- */
+// What the estate has paid. The same twelve-month default window as analytics, so the two pages
+// cannot disagree about a quarter that has not changed.
+// Empty periods are included as zero, the current tier mix is TODAY while everything else is the
+// window, and only succeeded captures are counted.
 export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> {
   const now = new Date();
   const to = query.to ?? now;
   const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
   const granularity = query.granularity;
 
-  // `expiry` AND `lapse` ARE BOTH EXCLUDED — DEC-098, DEC-113. Both record a plan MOVE with no
-  // money on it (Rs 0), and this page is about money: counting either as a payment would leave
-  // the average capture dragged down by events where nothing was captured, and the count
-  // answering a different question from the sum beside it. `/ops/analytics` reads those rows
-  // for exactly the opposite reason — it wants the movement, not the money (DEC-102).
-  //
-  // WRITTEN AS A LIST, so the next zero-amount kind is a name added here rather than a second
-  // `not` somebody has to notice. `kind: { not: 'expiry' }` silently counted every lapse the
-  // day `DEC-113` landed, which is how a two-word predicate becomes a wrong revenue figure.
+  // Expiry and lapse rows are both excluded: they record a plan move with no money on it, and this page
+  // is about money. Written as a list, so the next zero-amount kind is a name added here.
   const UNPAID_KINDS = ['expiry', 'lapse'];
   const window = {
     createdAt: { gte: from, lte: to },
@@ -735,9 +611,7 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
       where: { status: 'succeeded', kind: { notIn: UNPAID_KINDS } },
       _sum: { amountMinor: true },
     }),
-    // The CURRENT mix. A missing subscription row folds into bronze — the same convention
-    // `stats()` and `analytics()` already use (D-012), and changing it in one place only
-    // would make three pages disagree about the same organisation.
+    // The CURRENT mix. A missing subscription row folds into bronze, the same convention every other page uses.
     db.organization.findMany({ select: { id: true, subscription: { select: { tier: true } } } }),
     db.payment.findMany({
       where: window,
@@ -782,9 +656,8 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
       tierBucket.revenueMinor += row.amountMinor;
     }
 
-    // Enterprise is never PURCHASED — it is operator-assigned (16 §4) and `joinTier`
-    // refuses it — so the per-period series carries the three sellable tiers and does not
-    // draw a line that is structurally always zero.
+    // Enterprise is never purchased - it is operator-assigned - so the per-period series carries only the
+    // three sellable tiers rather than drawing a line that is always zero.
     const tierSeries = tierPeriodMap.get(periodKeyOf(row.createdAt, granularity));
     if (tierSeries && (tier === 'bronze' || tier === 'silver' || tier === 'gold')) {
       tierSeries[tier] += 1;
@@ -804,8 +677,7 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
       revenueMinor,
       payments,
       orgsPaying: payingOrgs.size,
-      // `null`, never 0 — the same argument decision 3 makes about a conversion rate. A
-      // mean of no payments is not a payment of zero.
+      // Null, never 0: the average of no payments is not a payment of zero.
       averageMinor: payments === 0 ? null : Math.round(revenueMinor / payments),
       lifetimeRevenueMinor: lifetime._sum.amountMinor ?? 0,
     },
@@ -830,29 +702,20 @@ export async function overridePlan(
   if (!org) throw new NotFoundError();
   const from = org.subscription?.tier ?? 'bronze';
 
-  // INV-007, one feature over: the row and the change are one transaction, so there is no
-  // plan change without a record of who made it.
+  // The change and its audit row are one transaction, so there is no plan change with no record of who made it.
   await db.$transaction(async (tx) => {
     await tx.subscription.upsert({
       where: { orgId },
-      // `pendingTier: null` for `joinTier`'s reason (DEC-098): an operator who has just been
-      // asked to put an organisation on a tier has settled the question, and a scheduled move
-      // down surviving that would take the plan away weeks later with the support call
-      // already closed. An override is the newest fact about the plan, so it wins.
-      //
-      // `lapsedFrom: null` AND A FRESH PERIOD for the same reason, one step further — DEC-113.
-      // An override lands most often on an organisation that has just lapsed, and leaving the
-      // old dates would put the tier the operator granted straight back on an expired row: the
-      // very next read would lapse it again, undoing the support action inside a second and
-      // writing a ledger row saying so. A granted plan starts a period.
+      // Any scheduled move down is cleared: an operator has just settled the question, and a stale one
+      // would take the plan away weeks later. The lapse notice and the period are reset for the same
+      // reason - a granted plan starts a period, or the very next read would lapse it again.
       update: { tier, status: 'active', pendingTier: null, lapsedFrom: null, ...newPeriod() },
       create: {
         orgId,
         tier,
         status: 'active',
         seats: 0,
-        // ONE MONTH, from `billing/period.ts` — DEC-096. The third of four places that each
-        // hardcoded a year, and the one that used a different expression from registration's.
+        // One month, from the one place that decides how long a period is.
         ...newPeriod(),
       },
     });
@@ -884,29 +747,10 @@ export async function setSuspended(
   return { status: suspended ? 'suspended' : 'active' };
 }
 
-/**
- * 70 § Interactions, DEC-101, T-101.
- *
- * ~~Delivery in P2 is the RECORD.~~ THE OLD COMMENT'S ARGUMENT WAS HALF RIGHT AND THE MISSING
- * HALF WAS THE WHOLE FEATURE. It said there is no mail transport in this product and
- * inventing one would be a feature nobody asked for — true, and `63` is still P3 behind a
- * provider and `17` (`CONF-006`). But "delivery is the record" is only true if the record is
- * somewhere the RECIPIENT can reach, and the only row this wrote was to
- * `platform_audit_log` — THE OPERATOR'S OWN TABLE. The customer's administrators had no route
- * that read it and no screen that rendered it.
- *
- * SO THE OPERATOR WAS SHOWN "Sent to 3 administrators" AND NOBODY HAD BEEN SENT ANYTHING.
- * That is worse than an unbuilt feature: an unbuilt feature does not report success.
- *
- * TWO ROWS NOW, IN ONE TRANSACTION, and they are two different records rather than one
- * duplicated. The audit row is what the NEXT OPERATOR sees on `/platform/audit` — the
- * conversation this desk has had with this customer. The `notifications` rows are what the
- * CUSTOMER sees in `/app/inbox`. The body is copied onto both deliberately (`10` §5): a
- * shared string that one side could edit is a record of a message that was never sent.
- *
- * STILL NO CHANNEL. Nothing leaves the product; the recipient already visits the inbox, and
- * a row in a table they already open is not `63`'s scope.
- */
+// Sending a message to an organisation's administrators.
+// It writes TWO rows in one transaction, and they are different records: the audit row is what the
+// NEXT OPERATOR sees, and the notification rows are what the customer sees in their inbox.
+// Before both existed, the operator was shown "sent to 3 administrators" and nobody had been sent anything.
 export async function messageAdministrators(
   req: Request,
   orgId: string,
@@ -922,8 +766,7 @@ export async function messageAdministrators(
   }
 
   await db.$transaction(async (tx) => {
-    // THE CUSTOMER'S COPY — one row per recipient, because read state is the reader's (`58`)
-    // and a shared row cannot be read by one administrator and unread by another.
+    // The customer's copy: one row per recipient, because read state belongs to the reader.
     await tx.notification.createMany({
       data: recipients.map((person) => ({
         orgId,
@@ -934,8 +777,8 @@ export async function messageAdministrators(
       })),
     });
 
-    // The operator's. Same transaction, so `{ sentTo: n }` can never again be returned for a
-    // message that was not written — which is exactly the failure this replaces.
+    // The operator's copy, in the same transaction, so a success count can never be reported for a message
+    // that was not written.
     await writeAudit(tx, req, 'message.send', orgId, {
       subject,
       body,
@@ -1002,9 +845,7 @@ export async function readPlatformAudit(query: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Operators. 19 §6 — the one thing `owner` cannot do.
-// ---------------------------------------------------------------------------
+// Operators: the one thing only an owner can manage.
 
 const toOperator = (row: {
   id: string; email: string; name: string; role: string; status: string; lastLoginAt: Date | null;
@@ -1051,16 +892,12 @@ export async function createOperator(
     return row;
   });
 
-  // Returned ONCE, at creation, and never readable again — the same property an API key
-  // has (45). The new operator scans it; nothing stores it anywhere else.
+  // Returned once, at creation, and never readable again - the same property an API key has.
   return { ...toOperator(created), otpauthUrl: otpauthUrl(input.email, secret) };
 }
 
-/**
- * 19 §6, and both halves are the same failure: a platform with one locked-out owner and no
- * recovery path is an outage nobody can fix from inside. `33`'s lockout guard already
- * exists for exactly this reason on the org side, and the reasoning transfers unchanged.
- */
+// A platform with one locked-out owner and no recovery path is an outage nobody can fix from inside,
+// so the last owner cannot be demoted or disabled.
 export async function updateOperator(
   req: Request,
   id: string,
@@ -1084,9 +921,7 @@ export async function updateOperator(
   if (losingAnOwner) {
     const owners = await db.platformUser.count({ where: { role: 'owner', status: 'active' } });
     if (owners <= 2) {
-      // <= 2 rather than <= 1: the actor is themselves an owner (only owners hold
-      // `platform.operator.manage`), so "two left" means one after this change — and the
-      // actor could then be locked out by a password they forgot with nobody to reset it.
+      // Two rather than one, because the actor is themselves an owner: "two left" means one after this change.
       throw new ConflictError('That would leave the platform with a single owner.');
     }
   }
@@ -1103,15 +938,14 @@ export async function updateOperator(
   return toOperator(updated);
 }
 
-/** `72` § Interactions — the file picker's data. Pure filesystem read; no audit row, because
- *  listing what exists is not the operator action `19` §10 means (reading a file's content is). */
+// The log file picker's data. A pure filesystem read, and no audit row, because listing what exists is
+// not the operator action that has to be recorded - reading a file's contents is.
 export function listOperatorLogFiles(): LogFileMeta[] {
   return listLogFiles();
 }
 
-/** `18` §2 — where the files are written, how big a rotation gets and how long one survives.
- *  Read straight off the live config rather than restated, so the screen cannot claim a
- *  retention the writer is not honouring. */
+// Where the log files live, how big a rotation gets and how long one survives, read straight off the
+// live config, so the screen cannot claim a retention the writer is not honouring.
 export function logStoreMeta(): LogStoreMeta {
   return {
     dir: logDir,
@@ -1121,14 +955,9 @@ export function logStoreMeta(): LogStoreMeta {
   };
 }
 
-/**
- * `72` § Acceptance — "reading logs writes a `platform_audit_log` row. Reading is an operator
- * action and is audited like one." This is the one place in the platform surface a GET writes:
- * the file read itself is not transactional (it is disk, not the database), so the audit row
- * is written in its own one-statement transaction immediately after a successful read rather
- * than wrapped around the read — INV-007's "same transaction as the mutation" has nothing to
- * synchronise with here, there being no database mutation to race against.
- */
+// Reading a log file writes an audit row: reading is an operator action and is audited like one.
+// It is the one place on this surface where a GET writes. The row goes in after a successful read,
+// because the read is disk rather than the database and there is no transaction to bind it to.
 export async function readOperatorLogFile(
   req: Request,
   fileName: string,
@@ -1146,15 +975,9 @@ export async function readOperatorLogFile(
   return result;
 }
 
-/**
- * `DEC-074` — the export, and its audit row is the entire reason `72` § Out of scope could
- * reverse its "no download" position rather than argue around it. A read is a page on a
- * screen; this is a file that outlives both the session and the fourteen-day retention
- * window, so the row carries the format, EVERY filter and how many lines actually left.
- *
- * Written after a successful export for the same reason `logs.read`'s is: the copy is disk,
- * not the database, so there is no mutation for INV-007 to bind the row to.
- */
+// The export, and its audit row is the reason a download could be allowed at all: a read is a page on a
+// screen, this is a file that outlives both the session and the retention window, so the row records the
+// format, every filter, and how many lines actually left.
 export async function exportOperatorLogFile(
   req: Request,
   fileName: string,
@@ -1180,19 +1003,9 @@ export async function exportOperatorLogFile(
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// The Enterprise queue — DEC-100, T-100, 70 § The Enterprise queue, 19 §4.
-//
-// A WORK ITEM, NOT A NOTIFICATION. The owner's instruction was *"send a notif on owner admin
-// account"*, and a bell was the wrong shape for it: a bell clears on read, and what has to
-// survive is not "somebody was told" but "somebody has to ring this customer back". Reading
-// this queue changes nothing.
-//
-// OWNER ONLY — `platform.enterprise.read` / `.update`, both `OWNER_ONLY`. Staff see every
-// organisation because support helps one customer at a time; this is a REVENUE queue, and it
-// gets the split `DEC-080` already made between `platform.analytics.read` and
-// `platform.revenue.read`.
-// ---------------------------------------------------------------------------
+// The Enterprise queue: a work item, not a notification. A bell clears on read, and what has to survive
+// is "somebody has to ring this customer back". Reading the queue changes nothing.
+// Owner only, because this is a revenue queue, while support helps one customer at a time.
 
 const ENTERPRISE_SELECT = {
   id: true,
@@ -1222,9 +1035,7 @@ const enterpriseView = (row: EnterpriseRow): EnterpriseRequestRow => ({
   org: {
     id: row.org.id,
     name: row.org.name,
-    // A missing subscription row folds into bronze — the same convention `stats()`,
-    // `analytics()` and `earnings()` already use (D-012). Three pages agreeing about one
-    // organisation matters more than a fourth answer here.
+    // A missing subscription row folds into bronze, the same convention every other page uses.
     tier: (row.org.subscription?.tier ?? 'bronze') as Tier,
   },
   askedName: row.askedName,
@@ -1239,10 +1050,8 @@ export async function readEnterpriseQueue(
 ): Promise<EnterpriseRequestRow[]> {
   const rows = await db.enterpriseRequest.findMany({
     where: { status: query.status },
-    // OLDEST FIRST, and this is the one list on the platform surface that is not newest-first.
-    // Every other operator screen answers "what just happened"; a work queue answers "who has
-    // been waiting longest", and putting the newest request at the top of it is how the first
-    // customer who asked becomes the last one called.
+    // Oldest first, and this is the one list here that is not newest-first: a work queue answers "who has
+    // been waiting longest", and newest-first is how the first customer to ask becomes the last one called.
     orderBy: { createdAt: 'asc' },
     select: ENTERPRISE_SELECT,
   });
@@ -1250,17 +1059,9 @@ export async function readEnterpriseQueue(
   return rows.map(enterpriseView);
 }
 
-/**
- * Move a request along. `open` -> `contacted` -> `closed`, and back if somebody mis-clicked.
- *
- * NO STATE MACHINE. Three values and a free move between them, because the queue is worked by
- * one person and the cost of a wrong click is another click — a transition table would be
- * machinery guarding against a mistake that costs nothing.
- *
- * MOVING OFF `open` RELEASES THE PARTIAL UNIQUE INDEX, so a customer whose request was closed
- * can ask again. That is the behaviour we want and it is worth naming: the index says "one
- * OPEN request per organisation", never "one request ever".
- */
+// Moves a request along: open, contacted, closed, and back again if somebody mis-clicked.
+// No state machine, because the queue is worked by one person and a wrong click costs another click.
+// Moving off 'open' releases the unique index, so a customer whose request was closed can ask again.
 export async function updateEnterpriseRequest(
   req: Request,
   id: string,
@@ -1275,8 +1076,8 @@ export async function updateEnterpriseRequest(
       where: { id },
       data: {
         status,
-        // WHO CLOSED IT AND WHEN, cleared when it comes back to `open` — a handled-by that
-        // survives a reopen names an operator for work that is once again undone.
+        // Who closed it and when, cleared when it reopens, because a handled-by that survives a reopen
+        // names an operator for work that is undone again.
         ...(status === 'open'
           ? { handledBy: null, handledAt: null }
           : {
@@ -1288,41 +1089,18 @@ export async function updateEnterpriseRequest(
     await writeAudit(tx, req, 'enterprise.update', null, { requestId: id, status });
   });
 
-  // THE ROW THAT WAS UPDATED, re-read by its own id. Returning the first row of the new status
-  // instead would hand the caller somebody else's request whenever two are in the same state,
-  // and the page would show the wrong customer's name against the click.
+  // The row that was updated, re-read by its own id: returning the first row of the new status would
+  // hand back somebody else's request whenever two are in the same state.
   const row = await db.enterpriseRequest.findUnique({ where: { id }, select: ENTERPRISE_SELECT });
   if (!row) throw new NotFoundError();
   return enterpriseView(row);
 }
 
-/**
- * APPROVE AN ENTERPRISE REQUEST — grant the tier AND record the sale. `DEC-111`, `T-106`.
- *
- * THIS SUPERSEDES `DEC-100`'s LINE that *"the queue tracks the conversation, it does not
- * perform the sale"*. That was right about a queue and wrong about the product: the owner
- * worked a request to `closed`, went to the organisation's page, set the tier by hand through
- * `platform.plan.override` — and `overridePlan` deliberately writes NO `payments` row, so
- * **the one tier the product charges ₹4,999 for earned nothing**. Every Enterprise customer
- * was invisible to `/ops/earnings`.
- *
- * THE "INVENT REVENUE" OBJECTION DOES NOT APPLY HERE, and it is worth saying why rather than
- * quietly widening the seam. `OverridePlan`'s DTO refuses an amount because an operator who
- * could name one could write any number into the ledger. **This names none.** The price comes
- * from `PLAN_OPTIONS` through `recordPayment`, server-side, exactly as it does on the
- * customer's own join — the operator supplies a request id and nothing else.
- *
- * `overridePlan` STAYS MONEY-FREE, and that split is the point. Moving a customer's tier
- * because support asked is not a sale; approving a request they made at the catalogue price
- * is. Two verbs, because the product needs to be able to do one without the other.
- *
- * THE CAPTURE IS THE DIFFERENCE (`DEC-097`), like every other move: a Gold organisation
- * approved to Enterprise contributes ₹4,000, not ₹4,999, because they have already paid for
- * this period once.
- *
- * WHO PAID IS THE PERSON WHO ASKED, read off the request row rather than from the operator's
- * session — `payer_name` answers "who bought this", and the operator did not buy it.
- */
+// Approves an Enterprise request: grants the tier AND records the sale, in one transaction.
+// Before this existed, the owner set the tier by hand through the plan override - which writes no
+// payment row - so the one tier charged at the highest price earned nothing on the earnings page.
+// The operator names no amount: the price comes from the plan catalogue, exactly as on a customer's
+// own join, and the payer is the person who asked, read off the request row.
 export async function approveEnterpriseRequest(
   req: Request,
   id: string,
@@ -1345,9 +1123,7 @@ export async function approveEnterpriseRequest(
   const orgId = request.org.id;
   const from = (request.org.subscription?.tier ?? 'bronze') as Tier;
   if (from === 'enterprise') {
-    // Not an error worth a 500 and not a silent success either: the queue would otherwise
-    // capture a second time for a tier they already hold, which is DEC-096's equal-rank case
-    // arriving through a different door.
+    // Neither a 500 nor a silent success: approving again would capture a second time for a tier they hold.
     throw new ConflictError('That organisation is already on Enterprise.');
   }
 
@@ -1355,9 +1131,7 @@ export async function approveEnterpriseRequest(
   await db.$transaction(async (tx) => {
     await tx.subscription.upsert({
       where: { orgId },
-      // `pendingTier: null` for `joinTier`'s reason — a scheduled move down is stale the
-      // moment somebody buys their way up past it. `lapsedFrom: null` for DEC-113's: this is
-      // a plan they now hold, so the notice saying the last one ran out is spent.
+      // Any scheduled move down is stale once somebody buys their way past it, and the lapse notice is spent.
       update: {
         tier: 'enterprise',
         status: 'active',
@@ -1368,16 +1142,13 @@ export async function approveEnterpriseRequest(
       create: { orgId, tier: 'enterprise', status: 'active', seats: 0, ...newPeriod() },
     });
 
-    // THE SALE. Priced server-side from PLAN_OPTIONS, in the same transaction as the tier it
-    // pays for — INV-007's argument about audit rows, applied to money: a ledger that
-    // disagrees with the subscription table is worse than no ledger.
+    // The sale, priced on the server, in the same transaction as the tier it pays for.
     await recordPayment(tx, {
       orgId,
       tier: 'enterprise',
       fromTier: from,
-      // FULL PRICE WHEN THE BRONZE THEY SIT ON WAS NEVER BOUGHT — DEC-113, the same rule
-      // `joinTier` follows. An organisation that lapsed and then asked to be sold Enterprise
-      // would otherwise be credited ₹99 it never paid.
+      // Full price when the bronze they sit on was never bought: a lapsed organisation would otherwise be
+      // credited for a tier it never paid for.
       pricedFrom: request.org.subscription?.lapsedFrom ? null : from,
       kind: 'change',
       payerName: request.askedName,
@@ -1393,8 +1164,7 @@ export async function approveEnterpriseRequest(
       },
     });
 
-    // TWO ROWS, because two different things happened and an operator reading the log later
-    // needs both: the plan moved, and it moved because a request was approved.
+    // Two audit rows, because two things happened: the plan moved, and it moved because a request was approved.
     await writeAudit(tx, req, 'plan.override', orgId, { from, to: 'enterprise', reason: 'enterprise request approved' });
     await writeAudit(tx, req, 'enterprise.approve', orgId, { requestId: id });
   });
@@ -1405,29 +1175,13 @@ export async function approveEnterpriseRequest(
 }
 
 
-// ---------------------------------------------------------------------------
-// Support access — DEC-114, T-109, 19 §15
-// ---------------------------------------------------------------------------
+// Support access.
 
-/**
- * WHY THE WRITES BELOW DO NOT GO THROUGH `db` (THE PLATFORM SEAM), AND MUST NOT.
- *
- * Every other function in this file runs through `platformClient()`, and rule 3 of that seam
- * is *"an operator cannot write inside a tenant"*. Opening a support session writes two rows
- * inside a tenant — the synthetic `users` member, and the `support_sessions` row that names
- * it — so the obvious move is to add `User` and `SupportSession` to `WRITABLE_MODELS`.
- *
- * That would be the wrong fix, and the reason is the whole value of having a seam. The
- * allowlist is not per-function: adding `User` there makes `user.create` reachable from every
- * handler in this 900-line file, forever, including ones nobody has written yet. The
- * exception belongs to ONE operation, so it lives in ONE file — `db/support.ts` — which uses
- * the base client and says at the top why it is allowed to. The seam stays exactly as narrow
- * as it was; the door is a named file a reviewer opens rather than a wider wall.
- *
- * `Answer` is still unreachable from here, `Response` is still count-only, and nothing below
- * reads a tenant's content. INV-011 is untouched by this function — it is restated, for the
- * far wider door the session itself opens, by `SUPPORT_DENIED_CAPABILITIES`.
- */
+// Why the writes below do NOT go through the platform seam, and must not.
+// Opening a support session writes two rows inside a customer's organisation, and adding those tables
+// to the seam's allowlist would make them writable from every function in this file, forever.
+// The exception belongs to one operation, so it lives in one file - db/support.ts - which uses the base
+// client and says at the top why it is allowed to. Feedback content stays unreachable either way.
 export async function enterSupport(
   req: Request,
   res: Response,
@@ -1449,14 +1203,9 @@ export async function enterSupport(
   });
   if (!profile) throw new UnauthenticatedError();
 
-  // REGENERATE FIRST, for the reason `POST /auth/login` regenerates: session fixation. It
-  // matters more here, not less — whoever set a session id in this browser beforehand would
-  // otherwise hold a live id for a session that now has every capability in a customer's
-  // organisation attached to it.
-  //
-  // It also gives us the id the browser will actually carry, which is what the row is keyed
-  // on. Reading `req.sessionID` before this line would key the row to a session id that is
-  // about to be thrown away.
+  // Regenerate the session id FIRST, to prevent session fixation - it matters more here, because that
+  // id will carry a customer organisation's capabilities.
+  // It also gives us the id the browser will really use, which is what the support row is keyed on.
   await regenerate(req);
   req.session.support = true;
   req.session.orgId = orgId;
@@ -1469,14 +1218,12 @@ export async function enterSupport(
     sessionId: req.sessionID,
   });
 
-  // `userId` is written AFTER the row exists, so a crash between the two leaves a session
-  // that resolves nothing rather than one pointing at a member with no mandate.
+  // The member id is written after the row exists, so a crash between the two leaves a session that
+  // resolves nothing rather than one pointing at a member with no mandate.
   req.session.userId = session.userId;
   await save(req);
 
-  // The console's chain includes `csrfProtection`, and its self-heal only fires on a GET by
-  // a caller who already has a principal. Issuing here means the operator's first mutation
-  // works rather than failing once and telling them to reload.
+  // Issue a CSRF token here, so the operator's first write works instead of failing once and asking them to reload.
   issueCsrfToken(res);
 
   await db.$transaction(async (tx) => {
@@ -1484,8 +1231,8 @@ export async function enterSupport(
       reason,
       sessionId: session.id,
       expiresAt: session.expiresAt.toISOString(),
-      // Recorded on OUR side too, so the register answers "what could they see" without
-      // anybody having to know what the deny list said on the day.
+      // Recorded on our side too, so the register can answer "what could they see" without anybody having
+      // to remember what the deny list said that day.
       denied: [...SUPPORT_DENIED_CAPABILITIES],
     });
   });
@@ -1501,23 +1248,16 @@ export async function enterSupport(
       endedAt: null,
       active: true,
     },
-    // A PATH, not a URL and not a token. A link that granted access would be a credential
-    // sitting in a browser history and in every proxy log between here and there; the cookie
-    // this response already set is the credential, and it is httpOnly.
+    // A path, not a URL and not a token: a link that granted access would be a credential in a browser
+    // history and in every proxy log on the way. The cookie already set is the credential, and it is httpOnly.
     redirectTo: '/app',
     deniedCapabilities: [...SUPPORT_DENIED_CAPABILITIES],
   };
 }
 
-/**
- * Leave. Called from `/ops` while the operator still holds the org session cookie, and from
- * the customer console's own banner.
- *
- * IT ENDS THE ROW BEFORE IT DESTROYS THE SESSION. The row is what confers everything —
- * `authenticate` resolves it on every request — so ending it first means the access is gone
- * even if the destroy fails. The other order would leave a browser with no cookie and a live
- * row, which is a row anybody replaying a captured cookie could still use.
- */
+// Leave, called both from the operator console and from the banner inside the customer's console.
+// It ends the support ROW before destroying the session, because the row is what confers everything -
+// the other order would leave a live row and a browser that could replay a captured cookie.
 export async function leaveSupport(req: Request, res: Response): Promise<{ ok: true }> {
   const sessionId = req.sessionID;
   const live = await loadSupportSession(sessionId);
@@ -1535,14 +1275,9 @@ export async function leaveSupport(req: Request, res: Response): Promise<{ ok: t
   return { ok: true };
 }
 
-/**
- * The register. `70` § Support access renders it under one organisation; `/ops/audit` reads
- * the whole thing.
- *
- * STILL INV-011, and visibly so: an organisation's name, an operator's name and address, two
- * timestamps and a sentence the operator typed. Not one field here came out of a tenant's
- * data, which is the test every payload on this surface has to pass (13 §platform).
- */
+// The register of support visits.
+// Still counts-only in spirit: an organisation's name, an operator's name and address, two timestamps
+// and the reason they typed. Not one field here came out of a customer's data.
 export async function listSupportSessions(
   query: SupportSessionListQuery,
 ): Promise<SupportSessionRow[]> {
@@ -1550,10 +1285,9 @@ export async function listSupportSessions(
   const rows = await db.supportSession.findMany({
     where: {
       ...(query.orgId ? { orgId: query.orgId } : {}),
-      // `active` is COMPUTED, not stored, so it cannot be filtered on a column — a session is
-      // over because somebody left OR because it ran out, and only the first writes a row.
-      // Storing a boolean would mean a row that is false in the database and true in fact for
-      // however long it took a job to notice, which is the bug `applyExpiredDowngrade` was.
+      // Whether a session is active is COMPUTED, not stored: it ends because somebody left OR because it
+      // ran out, and only the first writes anything. A stored boolean would be false in the table and true
+      // in fact until something noticed.
       ...(query.active === true ? { endedAt: null, expiresAt: { gt: now } } : {}),
       ...(query.active === false ? { OR: [{ endedAt: { not: null } }, { expiresAt: { lte: now } }] } : {}),
     },

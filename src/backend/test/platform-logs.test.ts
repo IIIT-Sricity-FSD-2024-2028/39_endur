@@ -1,5 +1,5 @@
-// T-077 — `72` § Acceptance. The log viewer's backend half: two GET routes, a path guard
-// that fails closed on anything it did not expect, and one audit row per read.
+// The log viewer's backend: two read routes, a path guard that fails closed on anything unexpected,
+// and one audit row per read.
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -36,8 +36,8 @@ async function makeOperator(role: 'owner' | 'staff'): Promise<Operator> {
   return { agent, id: row.id };
 }
 
-// A fixed date well away from whatever "today" is, so these fixtures cannot collide with a
-// real file another test or a real request happens to write during the run.
+// A fixed date well away from today, so these fixtures cannot collide with a file a real request
+// happens to write during the run.
 const DATE = '2021-06-15';
 const APP_FILE = `app-${DATE}.log`;
 const ERROR_FILE = `error-${DATE}.log`;
@@ -57,15 +57,14 @@ beforeAll(() => {
   const requestId = unique('req');
   const rows = [
     line({ requestId, method: 'GET', path: '/api/v1/platform/orgs', status: 200, durationMs: 5, msg: 'request' }),
-    // The would-be-leaked field — `userIp` names nothing `parseLogLine` knows about, and
-    // must still be visible, under `extra`, not silently dropped (72 § Data contract).
+    // A field the parser knows nothing about must still be visible under 'extra', not silently dropped.
     line({ requestId: unique('other'), method: 'GET', path: '/x', status: 200, userIp: '203.0.113.9', msg: 'request' }),
     'this is not json and cannot be parsed',
   ].join('\n');
   fs.writeFileSync(appPath, `${rows}\n`);
 
-  // Same requestId as the app file's first line, in the error stream — so the requestId
-  // collapse has something to prove across BOTH files, not just one.
+  // The same request id in the error file too, so the "collapse to one request" view has something to
+  // prove across BOTH files.
   fs.writeFileSync(errorPath, `${line({ requestId, level: 50, msg: 'refused', status: 403 })}\n`);
 });
 
@@ -102,8 +101,8 @@ describe('the file name is the whole attack surface', () => {
     try {
       fs.symlinkSync(appPath, linkPath);
     } catch {
-      // Symlink creation needs a privilege this environment may not grant (Windows without
-      // developer mode) — the guard is still exercised by the traversal cases above.
+      // Creating a symlink needs a privilege this environment may not grant; the guard is still exercised
+      // by the traversal cases above.
       return;
     }
     try {
@@ -158,17 +157,10 @@ describe('reading a file', () => {
     expect(statuses).toEqual([200, 403]); // one from app-*.log, one from error-*.log
   });
 
-  // D-036, and the assertion is deliberately the WHOLE file rather than the first two pages.
-  // The old version stopped after page 2 and was red for four days against a diagnosis that
-  // said the fixture had shrunk below the 64 KB chunk so it was "asserting nothing". It was
-  // asserting the right thing: the reader lost 170 of these 220 lines and said hasMore false.
-  // A pagination test that walks two pages can only ever catch a bug in the first two pages —
-  // the property is that paging to the end yields the file, so that is what is written here.
-  //
-  // Both sizes are on purpose. UNDER one chunk is where `hasMore` was wrong (one read takes
-  // the scan to offset 0 while the limit is still capping the page), and OVER one chunk is
-  // where the cursor was wrong (it named the chunk start, so every line the limit left
-  // unreturned in that chunk was skipped). One fixture would have proved half of it.
+  // Paging asserted over the WHOLE file rather than the first two pages: a test that walks two pages can
+  // only catch a bug in the first two, and the property is that paging to the end yields the file.
+  // Both sizes are on purpose: under one chunk is where "has more" was wrong, and over one chunk is
+  // where the cursor was wrong.
   for (const [label, total, bulkDate] of [
     ['smaller than one 64 KB chunk', 220, '2021-06-16'],
     ['spanning several chunks', 900, '2021-06-18'],
@@ -179,9 +171,8 @@ describe('reading a file', () => {
       const bulkPath = path.join(logDir, bulkFile);
       const rows: string[] = [];
       for (let i = 0; i < total; i += 1) {
-        // A multi-byte character in every line: the cursor is a BYTE offset, and a reader
-        // measuring it in string length walks off a line boundary the first time somebody
-        // logs an accented name. Silent, and only above one chunk.
+        // A multi-byte character in every line: the cursor is a BYTE offset, and a reader measuring it in
+        // string length walks off a line boundary the first time somebody logs an accented name.
         rows.push(line({ msg: `line-${i}`, method: 'GET', path: '/x', status: 200, note: 'café ✓' }));
       }
       fs.writeFileSync(bulkPath, `${rows.join('\n')}\n`);
@@ -202,8 +193,8 @@ describe('reading a file', () => {
           cursor = res.body.page.nextCursor as string;
         }
 
-        // Newest first, every line exactly once, in order — which is the same statement as
-        // "no gap and no duplicate", said once instead of three times.
+        // Newest first, every line exactly once, in order - which says "no gap and no duplicate" once
+        // rather than three times.
         const expected = Array.from({ length: total }, (_, i) => `line-${total - 1 - i}`);
         expect(seen).toEqual(expected);
       } finally {
@@ -232,9 +223,8 @@ describe('reading a file', () => {
 
 describe('the file list', () => {
   it('behaves when file logging is off and there is nothing to list', async () => {
-    // `NODE_ENV=test` leaves `logToFile` false unless `LOG_TO_FILE` is set (18 §5), which is
-    // exactly the "fresh checkout, no files at all" state `72` § States asks for — an empty
-    // list, not an error, even though fixture files exist on disk from the tests above.
+    // Under test settings no files are written unless asked for, which is exactly the "fresh checkout,
+    // no files at all" state: an empty list, not an error.
     const owner = await makeOperator('owner');
     const res = await owner.agent.get('/api/v1/platform/logs');
     expect(res.status).toBe(200);
@@ -242,9 +232,8 @@ describe('the file list', () => {
   });
 });
 
-// T-090 — `DEC-074`. The export is a second entry point into the same filesystem read, so
-// the guard cases matter here as much as they do on the read route: a name allowlist that is
-// only applied on one of two routes is not an allowlist.
+// The export is a second entry point into the same filesystem read, so the guard cases matter here as
+// much as on the read route: an allowlist applied to only one of two routes is not an allowlist.
 describe('exporting a file', () => {
   it('runs the same name allowlist as the read route', async () => {
     const owner = await makeOperator('owner');
@@ -270,17 +259,15 @@ describe('exporting a file', () => {
     const lines = res.text.trim().split('\n').map((raw) => JSON.parse(raw) as { msg: string });
     expect(lines.length).toBeGreaterThan(0);
 
-    // FILE ORDER, OLDEST FIRST — the exact reverse of the viewer's newest-first page, which
-    // is the reason this is its own read rather than `tailRead` with a header (`DEC-074`).
-    // Asserted against the read route rather than against sorted timestamps, because an
-    // unparseable line's `at` is a synthetic fallback and sorting on it would be asserting
-    // the parser's fallback rather than the export's order.
+    // File order, OLDEST first - the exact reverse of the viewer's page, which is why this is its own read.
+    // Asserted against the read route rather than against sorted timestamps, because an unparseable line's
+    // time is a fallback and sorting on it would assert the parser rather than the export.
     const page = await owner.agent.get(`/api/v1/platform/logs/${APP_FILE}`);
     expect(page.status).toBe(200);
     const viewer = (page.body.data as { msg: string }[]).map((l) => l.msg);
     expect(lines.map((l) => l.msg)).toEqual([...viewer].reverse());
 
-    // The audit row is the whole reason `72` could reverse its "no download" position.
+    // The audit row is the whole reason a download could be allowed at all.
     const rows = await prisma.platformAuditLog.findMany({
       where: { actorId: owner.id, action: 'logs.export' },
     });

@@ -1,9 +1,6 @@
-// People, positions and CSV import. 13 § People, 34.
-//
-// A "person" here is two rows: a `users` row (the account) and a `person` node (the thing
-// the graph hangs grants off). They are separate because respondents are never users
-// (DEC-009) and because a person can exist in the graph before anyone activates an
-// account for them.
+// People, positions and the CSV import.
+// A person is two rows: a users row (the account) and a person node (what the graph hangs grants off).
+// They are separate because a person can exist in the structure long before anyone activates an account.
 import type {
   CreateAssignmentBody,
   CreatePersonBody,
@@ -28,13 +25,9 @@ import { assertPersonVisible as assertVisible, personScopeFilter } from './visib
 import { powersByPlace } from './powers.js';
 import { accountStatusOf } from '../accounts/status.js';
 
-/**
- * The list, scope-filtered by the API (INV-003).
- *
- * The rule itself lives in `visibility.ts`, because the detail route has to apply exactly
- * the same one — a row that appears in this table and then 404s when somebody clicks it is
- * the failure N-005 and N-016 are about.
- */
+// The list, already filtered to what this caller may see.
+// The filter itself lives in visibility.ts, because the detail route must apply exactly the same rule -
+// a row that appears in the list and then 404s when clicked is the bug that shares causes.
 export async function listPeople(
   orgId: string,
   userId: string,
@@ -46,10 +39,7 @@ export async function listPeople(
     return { data: [], page: { nextCursor: null, hasMore: false }, meta: { total: 0 } };
   }
 
-  // ONE predicate, shared with the detail route (visibility.ts). It used to be written out
-  // here and again inside assertVisible, and the two had already drifted: neither admitted
-  // a person with NO positions, which made everybody `POST /people` creates invisible to
-  // the caller who created them (D-026).
+  // One shared predicate. Written twice, the two copies drifted and hid every person who had no position yet.
   const scopeFilter = personScopeFilter(visibility, userId);
 
   const where = {
@@ -68,18 +58,19 @@ export async function listPeople(
   const [rows, total] = await Promise.all([
     prisma.node.findMany({
       where: { ...where, ...afterCursor(query.cursor) },
-      // limit + 1: the extra row is how `hasMore` is known without a second count query.
+      // limit + 1: the extra row is how "is there more" is known without a second count query.
       take: query.limit + 1,
       orderBy: CURSOR_ORDER,
       select: personSelect,
     }),
-    // Scope-filtered, so meta.total counts what the CALLER may see, not what exists (13 §4).
+    // Also scope-filtered, so the total counts what the caller may see, not what exists.
     prisma.node.count({ where }),
   ]);
 
   return pageOf(rows, query.limit, total, toSummary);
 }
 
+// One person: their details, positions, and what those positions let them do where.
 export async function readPerson(
   orgId: string,
   personId: string,
@@ -95,13 +86,13 @@ export async function readPerson(
   if (!person) throw new NotFoundError('That person does not exist.');
 
   const summary = toSummary(person);
-  // ONE implementation, shared with `/profile` (powers.ts). It used to be written out here,
-  // and the copy that would have appeared in 47's route is exactly the drift N-005 is about.
+  // One shared implementation with the profile page, so the two can never describe powers differently.
   const places = await powersByPlace(orgId, person.userId, summary.positions, authzVersion);
 
   return { ...summary, powersByPlace: places };
 }
 
+// Creates a person, plus an invited account when an email was given.
 export async function createPerson(
   req: Request,
   orgId: string,
@@ -114,8 +105,7 @@ export async function createPerson(
   if (taken) throw new ConflictError('Somebody with that email address is already here.');
 
   return runInTransaction(req, async (tx) => {
-    // `invited`, with no password hash. An account nobody has activated must not be
-    // sign-in-able, and a null hash is the state that says so (10 §2).
+    // Created as 'invited' with no password hash, which is the state that means "cannot sign in yet".
     const user = await tx.user.create({
       data: { orgId, email: body.email, name: body.name, status: 'invited' },
       select: { id: true },
@@ -129,6 +119,7 @@ export async function createPerson(
   });
 }
 
+// Renames a person or changes their email address.
 export async function updatePerson(
   req: Request,
   orgId: string,
@@ -147,10 +138,7 @@ export async function updatePerson(
 
   return runInTransaction(req, async (tx) => {
     if (body.name) await tx.node.update({ where: { id: personId }, data: { name: body.name } });
-    // NAME AND EMAIL ONLY. `status` used to be settable here and it was a fake revoke —
-    // it blocked new sign-ins while leaving live sessions and the password hash intact,
-    // under a weaker capability than `account.revoke`. D-024, and 57 § Revocation owns the
-    // real one.
+    // Name and email only. Status is not settable here: that would be a fake revoke, under a weaker capability.
     if (person.userId && (body.name || body.email)) {
       await tx.user.update({
         where: { id: person.userId },
@@ -166,6 +154,7 @@ export async function updatePerson(
   });
 }
 
+// Removes a person, their positions and their account, but not their history in the audit log.
 export async function deletePerson(
   req: Request,
   orgId: string,
@@ -183,8 +172,7 @@ export async function deletePerson(
 
   await runInTransaction(req, async (tx) => {
     await tx.node.delete({ where: { id: personId } });
-    // The user row goes too — but audit rows survive it, because an audit log that loses
-    // its history when somebody leaves is not an audit log (52 § Acceptance).
+    // The account row goes too, but audit rows survive it: a log that forgets people who left is not a log.
     if (person.userId) {
       await tx.user.update({ where: { id: person.userId }, data: { status: 'disabled' } });
     }
@@ -198,10 +186,7 @@ export async function deletePerson(
   return { ok: true };
 }
 
-/**
- * Giving somebody a position is a PERMISSION CHANGE, which is why it is its own endpoint
- * with its own capability and its own audit row (34, 14 §8).
- */
+// Giving somebody a position is a permission change, which is why it has its own capability and audit row.
 export async function addAssignment(
   req: Request,
   orgId: string,
@@ -218,9 +203,8 @@ export async function addAssignment(
   if (!unit) throw new NotFoundError(`That ${nounsOf(req).unit.one.toLowerCase()} does not exist.`);
 
   return runInTransaction(req, async (tx) => {
-    // The position node is shared by everyone holding the same role at the same unit, so
-    // it is found before it is created. Two "Tutor at Team A1" nodes would mean two places
-    // to attach a position-level grant, and only one of them would ever be checked.
+    // The position node is shared by everyone holding the same role at the same unit, so it is found before
+    // it is created. Two identical positions would mean two places to attach a grant, and only one checked.
     const position =
       (await tx.node.findFirst({
         where: { orgId, kind: 'position', roleId: role.id, unitId: unit.id },
@@ -279,6 +263,7 @@ export async function addAssignment(
   });
 }
 
+// Removes one assignment, and the powers that came with it.
 export async function removeAssignment(
   req: Request,
   orgId: string,
@@ -307,16 +292,10 @@ export async function removeAssignment(
   return { ok: true };
 }
 
-/* ------------------------------------------------------------------ import */
+// CSV import.
 
-/**
- * The preview step exists so nothing is guessed. The operator sees which columns were
- * found, five real rows, and — the important part — every role and unit name in the file
- * that this organisation does not have.
- *
- * Inventing the missing ones is not an option: the capability catalogue and the org
- * structure are things administrators map onto, never things a CSV defines (11 §3).
- */
+// The preview step, so nothing is guessed: it reports the columns found, a few real rows, and every
+// role or unit name in the file that this organisation does not have. Missing ones are never invented.
 export async function previewImport(orgId: string, csv: string): Promise<ImportPreview> {
   const { columns, rows } = parseCsv(csv);
 
@@ -337,8 +316,7 @@ export async function previewImport(orgId: string, csv: string): Promise<ImportP
   for (const row of rows) {
     if (row.roleName && !roleNames.has(row.roleName.toLowerCase())) unmatchedRoles.add(row.roleName);
     if (row.unitName && !unitNames.has(row.unitName.toLowerCase())) unmatchedUnits.add(row.unitName);
-    // The second unit column goes in the SAME list. It is mapped by the same control in the
-    // preview, so a name that appears in both columns is answered once.
+    // The second unit column shares the same list, so a name in both columns is answered once.
     if (row.alsoUnitName && !unitNames.has(row.alsoUnitName.toLowerCase())) {
       unmatchedUnits.add(row.alsoUnitName);
     }
@@ -355,19 +333,13 @@ export async function previewImport(orgId: string, csv: string): Promise<ImportP
   };
 }
 
-/**
- * The commit. Idempotent by email within the organisation, so a retried import updates
- * rather than duplicates — which matters because the caller most likely to retry is
- * somebody whose first attempt appeared to fail and did not.
- */
+// The commit. Idempotent by email, so a retried import updates people rather than duplicating them.
 export async function commitImport(
   req: Request,
   orgId: string,
   body: ImportPeopleBody,
 ): Promise<{ created: number; updated: number; assigned: number; skipped: string[] }> {
-  // The SAME resolution the INV-012 guard ran in front of this route (positions.ts). Two
-  // copies of "which role does this row mean" would eventually disagree, and the failure
-  // mode of that disagreement is a row the guard did not check and this loop did create.
+  // The same name resolution the escalation guard ran in front of this route, so the two cannot disagree.
   const maps = await nameMaps(orgId);
 
   const result = { created: 0, updated: 0, assigned: 0, skipped: [] as string[] };
@@ -376,9 +348,7 @@ export async function commitImport(
     for (const row of body.rows) {
       const { roleId, unitId, alsoUnitId } = resolveRow(maps, body, row);
 
-      // A row naming a role or unit nobody resolved is SKIPPED and reported, never
-      // silently imported without its position. Somebody who appears in the list with no
-      // access looks like a permissions bug rather than an unfinished import.
+      // A row naming a role or unit nobody could resolve is skipped and reported, never imported without its position.
       if ((row.roleName && !roleId) || (row.unitName && !unitId) || (row.alsoUnitName && !alsoUnitId)) {
         result.skipped.push(row.email);
         continue;
@@ -446,10 +416,7 @@ export async function commitImport(
         result.assigned += 1;
       }
 
-      // THE SECOND PLACE (N-071), and it is `isPrimary: false` — the home unit is where a
-      // person-anchored grant anchors, and a student's home unit is their department, not
-      // their hostel. A second primary would make that ambiguous, which `person-anchor`
-      // refuses to guess at.
+      // The optional second placement, marked not-primary: the home unit is where a person-level grant anchors.
       if (!alsoUnitId || alsoUnitId === unitId) continue;
 
       const alsoPosition =
@@ -497,11 +464,7 @@ export async function commitImport(
   return result;
 }
 
-/**
- * A deliberately small CSV reader. Quoted fields with embedded commas are handled because
- * real exports contain them; everything more exotic is not, because an import that half
- * understands a file is worse than one that says it cannot read it.
- */
+// A deliberately small CSV reader: quoted fields are handled because real exports have them, and nothing more exotic is.
 function parseCsv(csv: string): { columns: string[]; rows: ImportRow[] } {
   const lines = csv.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length === 0) return { columns: [], rows: [] };
@@ -514,8 +477,7 @@ function parseCsv(csv: string): { columns: string[]; rows: ImportRow[] } {
   const emailAt = index('email', 'email address', 'e-mail');
   const roleAt = index('role', 'title', 'position');
   const unitAt = index('unit', 'department', 'team', 'ward', 'property');
-  // N-071. The header words a person actually writes for "and they are also here": a
-  // student in a department AND a hostel, a nurse on a ward AND a rota.
+  // The header words people actually write for "they are also here": a student in a department and a hostel.
   const alsoAt = index('also in', 'also', 'second unit', 'additional unit', 'other unit');
 
   const rows: ImportRow[] = [];
@@ -535,6 +497,7 @@ function parseCsv(csv: string): { columns: string[]; rows: ImportRow[] } {
   return { columns, rows };
 }
 
+// Splits one CSV line, respecting quoted cells.
 function splitLine(line: string): string[] {
   const cells: string[] = [];
   let current = '';
@@ -559,7 +522,7 @@ function splitLine(line: string): string[] {
   return cells;
 }
 
-/* ----------------------------------------------------------------- shared */
+// Shared helpers.
 
 const personSelect = {
   id: true,
@@ -572,12 +535,9 @@ const personSelect = {
       status: true,
       lastLoginAt: true,
       disabledAt: true,
-      // READ, REDUCED TO A BOOLEAN IN toSummary(), AND NEVER RETURNED. `status` alone
-      // cannot answer "can this person sign in": `PATCH /people/:id` can set a status and
-      // the login query trusts the HASH, not the string (features/auth/router.ts). The
-      // panel must agree with the door, so it asks the same column the door asks.
+      // Read only to answer "can this person sign in", reduced to a boolean below and never returned.
       passwordHash: true,
-      // At most one row — a partial unique index on (user_id) WHERE accepted_at IS NULL.
+      // At most one row: a unique index allows only one open invite per user.
       accountInvites: {
         where: { acceptedAt: null },
         select: { expiresAt: true, createdAt: true },
@@ -590,10 +550,8 @@ const personSelect = {
     select: {
       id: true,
       isPrimary: true,
-      // T-051. `validTo` is 47's "any expiry date"; `unitId` is what stopped powersByPlace
-      // re-finding the unit by NAME, which collapsed two same-named units onto one row
-      // (powers.ts has the full account). `level` is 24's `<PersonChip>` rule that a role
-      // is always shown with its level — ORDERING ONLY (DEC-002), never a comparison.
+      // validTo is the assignment's expiry; unitId stops two same-named units collapsing into one row;
+      // level is used for ordering only, never for comparing power.
       validTo: true,
       child: {
         select: {
@@ -633,6 +591,7 @@ type PersonRow = {
   }>;
 };
 
+// Turns a person row into the summary shape the client reads.
 function toSummary(person: PersonRow): PersonSummary & { createdAt: string } {
   return {
     id: person.id,
@@ -644,16 +603,14 @@ function toSummary(person: PersonRow): PersonSummary & { createdAt: string } {
       roleId: edge.child.roleId,
       roleName: edge.child.role?.name ?? '',
       roleLevel: edge.child.role?.level ?? null,
-      // Nullable rather than coalesced to '', unlike the names beside it: a name is only
-      // ever printed, and an id can end up in a URL. An empty one would 404 quietly.
+      // Left nullable rather than made an empty string: an id can end up in a URL, and an empty one 404s quietly.
       unitId: edge.child.unitId,
       unitName: edge.child.unit?.name ?? '',
       isPrimary: edge.isPrimary,
       validTo: edge.validTo?.toISOString() ?? null,
     })),
     createdAt: person.createdAt.toISOString(),
-    // 57. Derived in ONE place, shared with the detail route, and the hash is reduced to a
-    // boolean HERE so it cannot travel any further than this expression.
+    // The account's state, worked out in one place and shared, with the password hash reduced to a boolean here.
     account: person.user
       ? accountStatusOf({
           hasPassword: person.user.passwordHash !== null,

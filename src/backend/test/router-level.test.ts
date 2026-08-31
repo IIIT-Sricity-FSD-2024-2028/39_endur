@@ -1,10 +1,6 @@
-// T-064 / D-017 — router-level middleware, proven by behaviour rather than by reading.
-//
-// Links 6-8 are mounted with `router.use()` inside each feature router, and the three
-// chains DIFFER (middleware/chains.ts). That difference is the whole point: if every
-// router had the same chain, it would belong in app.ts and calling it router-level would
-// be a label rather than a design.
-//
+// Router-level middleware, proven by behaviour rather than by reading the code.
+// The tenant, authenticate and CSRF links are mounted inside each feature router, and the three chains
+// DIFFER - which is the whole point: if every router had the same chain it would belong in app.ts.
 // Every request here is anonymous, so nothing below needs a fixture.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
@@ -20,8 +16,8 @@ describe('the console chain — tenant REQUIRED', () => {
   });
 
   it('applies to every route under the router, including ones that do not exist', async () => {
-    // `router.use()` matches all paths, so an unknown path INSIDE a mounted router is
-    // still refused for want of a tenant rather than reaching notFound.
+    // router.use() matches all paths, so an unknown path INSIDE a mounted router is still refused for
+    // want of an organisation rather than reaching the not-found handler.
     const res = await request(app).get('/api/v1/units/nope/nope');
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNRESOLVED_TENANT');
@@ -52,8 +48,8 @@ describe('the console chain — tenant REQUIRED', () => {
 describe('the auth chain — tenant OPTIONAL', () => {
   it('lets an anonymous request reach the handler, because signing in has no tenant yet', async () => {
     const res = await request(app).post('/api/v1/auth/login').send({});
-    // Whatever it answers, it is NOT "no organisation could be determined" — the request
-    // got past link 6 and was judged on its contents.
+    // Whatever it answers, it is NOT "no organisation could be determined": the request got past the
+    // tenant link and was judged on its contents.
     expect(res.body.error?.code).not.toBe('UNRESOLVED_TENANT');
     expect(res.status).toBe(422);
   });
@@ -76,7 +72,7 @@ describe('the respondent chain — its own CORS, no CSRF, uniform 404', () => {
       .get('/api/v1/public/campaigns/ZZZZZZZZ')
       .set('Origin', 'https://a-strangers-phone.example');
     expect(pub.headers['access-control-allow-origin']).toBe('*');
-    // The console's policy is credentialed and origin-checked, so it never answers `*`.
+    // The console's policy is credentialed and origin-checked, so it never answers with a wildcard.
     const console_ = await request(app)
       .get('/api/v1/org')
       .set('Origin', 'https://a-strangers-phone.example');
@@ -93,8 +89,7 @@ describe('the respondent chain — its own CORS, no CSRF, uniform 404', () => {
 
 describe('what is NOT in any router chain', () => {
   it('404s a path that matches no router, rather than demanding a tenant first', async () => {
-    // Before T-064 the global resolver matched /api/v1/* and answered 401 here, which is
-    // a confusing reply to "that route does not exist".
+    // With a global resolver this answered 401, which is a confusing reply to "that route does not exist".
     const res = await request(app).get('/api/v1/there-is-no-such-thing');
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');

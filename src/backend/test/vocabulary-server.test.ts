@@ -1,18 +1,9 @@
-// T-044 — the vocabulary audit's server half. 22 §5, §6, INV-001.
-//
-// `_MEMORY.md` N-044 wrote the brief for this file after the CSV export shipped with the
-// literal word "Subject" as a header: *"every user-facing string the SERVER produces is
-// outside the vocabulary check. 22 §6 lists three kinds — validation messages,
-// confirmation text, export headers. Only one of the three has been audited."*
-//
-// These are the other two. Every message below is rendered VERBATIM by a console page —
-// ten of them read `error.message` straight out of the envelope — so an English domain
-// noun here is INV-001 broken by the API, in a place `audit:vocab` cannot look, because it
-// scans the frontend where components render.
-//
-// The test org's nouns are SETUP_LABELS: Section, Module, Learner, Tutor, Review round.
-// None of them is an English default, which is what makes `not.toMatch(/unit/i)` a real
-// assertion rather than a coincidence.
+// The vocabulary audit's server half.
+// The CSV export once shipped with the literal word "Subject" as a header, and the lesson was that every
+// user-facing string the SERVER produces sits outside the automated vocabulary check.
+// Every message here is rendered verbatim by a console page, so an English domain noun in one of them
+// is the invariant broken by the API, in a place the frontend scan cannot look.
+// The test organisation's words are all non-default, which is what makes these assertions real.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import {
@@ -37,8 +28,8 @@ beforeAll(async () => {
 
 describe('the structure messages speak the org’s vocabulary — 22 §6', () => {
   it('refuses to delete a unit with children IN THE ORG’S NOUN, and counts in it', async () => {
-    // Section A has one child (Team A1), so this is also the plural-agreement case: the
-    // line used to build "unit" + "s" by hand, and "Faculty" pluralises to "Faculty".
+    // The section has one child, so this is also the plural case: the line used to add an "s" by hand,
+    // and not every word pluralises that way.
     const sectionA = await unitIdByName(founder.orgId, 'Section A');
     const res = await withCsrf(founder, 'delete', `/api/v1/units/${sectionA}`).send({});
 
@@ -50,10 +41,9 @@ describe('the structure messages speak the org’s vocabulary — 22 §6', () =>
   });
 
   it('says the org’s noun when the unit being MOVED INTO is not there', async () => {
-    // Reparent, not patch: `requireCapability` resolves `params.id` first and answers its
-    // own generic "Not found." for an id that is not there, so a bad :id never reaches the
-    // service at all. The new PARENT is in the body and is nobody's capability target,
-    // which makes this the path where the service's own message is what a reader sees.
+    // Reparent rather than patch: the capability check resolves the id first and answers its own generic
+    // "not found" for an id that is not there, so a bad id never reaches the service. The new PARENT is in
+    // the body and is nobody's permission target, which makes this the path where the service speaks.
     const teamA1 = await unitIdByName(founder.orgId, 'Team A1');
     const res = await withCsrf(founder, 'post', `/api/v1/units/${teamA1}/reparent`).send({
       newParentId: '00000000-0000-4000-8000-000000000000',
@@ -64,10 +54,8 @@ describe('the structure messages speak the org’s vocabulary — 22 §6', () =>
   });
 
   it('validates the wizard’s structure in the words the wizard is SHOWING', async () => {
-    // Mid-setup the database still holds whatever `register` created, and the reader is
-    // looking at the vocabulary they picked two steps ago. The message is built from the
-    // BODY's labels for that reason — reading the stored ones would answer in the words
-    // they are in the middle of replacing.
+    // Mid-wizard the database still holds what registration created, and the reader is looking at the
+    // words they picked two steps ago - so the message is built from the BODY's labels.
     const fresh = await registerOrg();
     const res = await withCsrf(fresh, 'post', '/api/v1/org/setup').send({
       industry: 'custom',
@@ -133,9 +121,8 @@ describe('the campaign messages speak the org’s vocabulary — 22 §6', () => 
   });
 
   it('says the org’s noun on the 404, on BOTH branches', async () => {
-    // The two branches — no row, and out of scope — must stay indistinguishable (13 §5).
-    // Speaking the org's vocabulary does not change that: what must not vary between them
-    // is the answer, not the language it is written in.
+    // The two branches - no row, and out of scope - must stay indistinguishable. Speaking the organisation's
+    // vocabulary does not change that: what must not vary is the answer, not the language.
     const missing = await founder.agent.get(
       '/api/v1/campaigns/00000000-0000-4000-8000-000000000000',
     );
@@ -149,8 +136,8 @@ describe('the campaign messages speak the org’s vocabulary — 22 §6', () => 
   });
 
   it('names the org’s noun when a template is still in use', async () => {
-    // "Template" is structural and correctly stays literal — a hotel calls it a template
-    // too (22 §1). What it is used BY is the org's word, and the count agrees with it.
+    // "Template" is structural and correctly stays literal - a hotel calls it a template too. What it is
+    // used BY is the organisation's own word, and the count agrees with it.
     const own = await withCsrf(founder, 'post', '/api/v1/templates').send({
       name: unique('Own form'),
       category: 'General',
@@ -184,9 +171,8 @@ describe('the campaign messages speak the org’s vocabulary — 22 §6', () => 
 
 describe('the tenantless routes still answer in words, not in undefined', () => {
   it('falls back to the default vocabulary where no org is resolved', async () => {
-    // Login, register and the respondent surface run before any tenant exists. A message
-    // builder there must render the generic noun rather than `undefined` — which is the
-    // whole reason nounsOf() has a fallback instead of call sites reaching into ctx.
+    // Login, registration and the respondent surface run before any organisation exists, so a message
+    // builder there must render the generic noun rather than the word "undefined".
     const res = await request(app).post('/api/v1/auth/login').send({ email: 'x', password: 'y' });
     expect(message(res)).not.toMatch(/undefined/);
   });

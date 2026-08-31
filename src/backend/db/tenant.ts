@@ -1,21 +1,9 @@
-// The tenant-bound Prisma client. Layer 1 of the two defences in 10 §8.
-//
-// Services call `ctx.db.subject.findMany()` and get org-scoped results without asking.
-// A service CANNOT construct a cross-tenant query without importing the raw client, and
-// lint forbids that outside this seam — which is what turns INV-010 from a rule people
-// remember into something the type system and the linter enforce together.
-//
-// Layer 2 is Postgres row-level security, deliberately redundant with this. If the
-// application ever forgets, the database still refuses. That is debt D-001.
+// The tenant-bound Prisma client: every query it runs is limited to one organisation automatically.
+// Postgres row-level security is the deliberate second layer behind it.
 import { Prisma } from '@prisma/client';
 import { prisma } from './client.js';
 
-/**
- * Models carrying `org_id` directly. Everything else — questions, responses, answers,
- * invitations, campaign_subjects — is reached only through one of these, so scoping the
- * parent scopes the child. Adding a model with `org_id` and forgetting to list it here is
- * the one way to get a tenant leak past this layer, so the list is asserted in a test.
- */
+// Models that carry org_id themselves. Everything else is reached through one of these, so scoping the parent is enough.
 const TENANT_MODELS = new Set([
   'User',
   'Node',
@@ -30,7 +18,7 @@ const TENANT_MODELS = new Set([
   'Announcement',
 ]);
 
-/** Reads that take a `where`. Writes are handled separately — see below. */
+// Read operations that take a where clause, so the orgId filter can be added to them.
 const SCOPED_READS = new Set([
   'findFirst',
   'findFirstOrThrow',
@@ -44,6 +32,7 @@ const SCOPED_READS = new Set([
 
 export type TenantClient = ReturnType<typeof tenantClient>;
 
+// Builds a Prisma client bound to one org: reads get filtered, creates get stamped.
 export function tenantClient(orgId: string) {
   return prisma.$extends({
     query: {
@@ -57,20 +46,14 @@ export function tenantClient(orgId: string) {
             return query(typed);
           }
 
-          // Creates get the tenant stamped on rather than filtered. A caller-supplied
-          // orgId is overwritten, not merged: there is no legitimate reason for one to
-          // differ from the request's tenant, and honouring it would be the exact hole
-          // this wrapper exists to close.
+          // Creates get the orgId stamped on. Any orgId the caller sent is overwritten, never merged.
           if (operation === 'create') {
             const typed = args as { data?: Record<string, unknown> };
             typed.data = { ...typed.data, orgId };
             return query(typed as typeof args);
           }
 
-          // findUnique / update / delete address a row by primary key, and Prisma will
-          // not accept a non-unique field in that `where`. They are left alone HERE and
-          // guarded by row-level security instead (D-001) — a by-id read of another
-          // tenant's row is the case layer 2 exists for.
+          // findUnique / update / delete find a row by primary key, so row-level security guards those.
           return query(args);
         },
       },

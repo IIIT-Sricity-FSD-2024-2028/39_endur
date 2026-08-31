@@ -1,8 +1,6 @@
-// T-025 — the seed's acceptance list. 50 §7.
-//
-// These check the seed's INPUTS rather than a seeded database, on purpose: they have to
-// fail on the day somebody adds a sixth preset or an eleventh question, not on the day
-// somebody remembers to run the seed. `npm run db:seed` proves the rest.
+// The seed's acceptance list.
+// These check the seed's INPUTS rather than a seeded database on purpose: they have to fail on the day
+// somebody adds a sixth preset or an eleventh question, not on the day somebody remembers to run it.
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,8 +27,7 @@ describe('presets — 50 §1, §2', () => {
   it('has no template over ten questions', () => {
     for (const preset of PRESET_LIST) {
       for (const template of preset.templates) {
-        // Short forms are the product thesis, not a preference (01 §5). This is the test
-        // 50 §7 asks for by name.
+        // Short forms are the product's whole idea, not a preference.
         expect(
           template.questions.length,
           `${preset.key} / ${template.name}`,
@@ -41,7 +38,7 @@ describe('presets — 50 §1, §2', () => {
 
   it('ships at least one one-question pulse per preset', () => {
     for (const preset of PRESET_LIST) {
-      // "A poll is a one-question template" (DEC-010), demonstrated rather than argued.
+      // "A poll is a one-question template", demonstrated rather than argued.
       expect(
         preset.templates.some((template) => template.questions.length === 1),
         preset.key,
@@ -52,8 +49,8 @@ describe('presets — 50 §1, §2', () => {
   it('gives every preset a working four-level structure and a full label set', () => {
     for (const preset of PRESET_LIST) {
       expect(preset.roles.length, preset.key).toBeGreaterThanOrEqual(2);
-      // Custom is NOT blank. Somebody who picks it and presses Continue four times must
-      // still end with a functioning organisation (50 §1).
+      // Custom is NOT blank: somebody who picks it and presses Continue four times must still end with
+      // a working organisation.
       expect(preset.units.length, preset.key).toBeGreaterThanOrEqual(1);
       expect(preset.units.filter((unit) => unit.parentTempId === null), preset.key).toHaveLength(1);
       expect(Object.keys(preset.labels).sort()).toEqual([
@@ -80,21 +77,11 @@ describe('presets — 50 §1, §2', () => {
 describe('INV-002 — nothing is education-specific outside the university preset', () => {
   it('confines Course, Faculty, Student and Semester to seed data', () => {
     const offenders: string[] = [];
-    // INV-002 bans these as IDENTIFIERS — a type, a table, an enum, a route — not as
-    // English. "a form about one course, one restaurant, one ward" in a comment is the
-    // invariant being explained, not broken, and a check that flags its own explanation
-    // is a check people learn to ignore (the same lesson the drift script learned at
-    // T-003).
-    //
-    // The identifier half is enforced continuously by `no-restricted-syntax` in
-    // eslint.config.js. What this adds is the half a syntax rule cannot see: the words
-    // appearing in strings, keys and paths outside the two directories allowed to hold
-    // them as DATA — `presets/**` and `database/seed/**`, both owned by 50-SEED-AND-DEMO
-    // in the MAP table.
-    //
-    // `packages/shared` is scanned too, and was not until T-031. It is imported by BOTH
-    // apps, so a noun leaking in there leaks into every screen — the widest blast radius
-    // in the repo and, until this line, the only source tree nobody was checking.
+    // Education words are banned as IDENTIFIERS - a type, a table, an enum, a route - not as English:
+    // a check that flags its own explanation is a check people learn to ignore.
+    // The identifier half is enforced by lint; this adds the half a syntax rule cannot see - the words
+    // appearing in strings, keys and paths outside the two folders allowed to hold them as DATA.
+    // The shared package is scanned too, because it is imported by both apps and has the widest reach.
     const banned = /\b(course|faculty|student|semester)s?\b/i;
     const stripComments = (source: string) =>
       source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -103,8 +90,7 @@ describe('INV-002 — nothing is education-specific outside the university prese
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          // Build output is generated FROM the sources being checked, so scanning it only
-          // ever reports the same finding twice.
+          // Build output is generated FROM the sources being checked, so scanning it reports everything twice.
           if (/^(node_modules|dist|dist-config|dist-types)$/.test(entry.name)) continue;
           walk(full, root);
           continue;
@@ -116,10 +102,8 @@ describe('INV-002 — nothing is education-specific outside the university prese
         if (relative.startsWith('database/seed/')) continue;
         // This file has to name them in order to look for them.
         if (relative.startsWith('test/')) continue;
-        // The fourth DATA location, and the newest: the landing page's vocabulary
-        // switcher advertises the presets to someone with no organisation yet, so
-        // `useLabels()` cannot serve it. Same category as `presets/**`, and the test
-        // below proves the two agree. 30 § Landing, CONF-011.
+        // The fourth place the words legitimately live as data: the landing page advertises the presets
+        // to somebody with no organisation yet, so the usual label hook cannot serve it.
         if (relative === 'vocabularies.ts') continue;
 
         const source = stripComments(readFileSync(full, 'utf8'));
@@ -131,10 +115,8 @@ describe('INV-002 — nothing is education-specific outside the university prese
     walk(backendRoot, backendRoot);
     walk(sharedRoot, sharedRoot);
 
-    // The generic model is the whole product claim. A `Course` type or a `student_id`
-    // column anywhere would make "nothing is education-specific" a slogan rather than a
-    // fact — and the demo turns a university into a hotel by renaming data, which only
-    // works if the code never learned the word.
+    // The generic model is the whole product claim: a Course type or a student_id column anywhere would
+    // make "nothing is education-specific" a slogan rather than a fact.
     expect(offenders).toEqual([]);
   });
 });
@@ -164,8 +146,8 @@ describe('demo organisations — 50 §3', () => {
 
       const templates = new Set(presetFor(org.industry).templates.map((t) => t.name));
       for (const campaign of org.campaigns) {
-        // A campaign naming a template its preset does not have would silently seed no
-        // campaign at all, and the org would look fine until somebody opened it.
+        // A campaign naming a template its preset does not have would silently seed no campaign at all,
+        // and the organisation would look fine until somebody opened it.
         expect(templates.has(campaign.template), `${org.name} / ${campaign.name}`).toBe(true);
       }
     }
@@ -175,8 +157,8 @@ describe('demo organisations — 50 §3', () => {
     for (const org of DEMO_ORGS) {
       const pool = COMMENT_POOLS[org.industry];
       expect(pool, org.industry).toBeDefined();
-      // Lorem ipsum in a comment list destroys the illusion instantly (50 §8), and so does
-      // the same sentence repeating down a column.
+      // Generated text in a comment list destroys the illusion instantly, and so does the same sentence
+      // repeating down a column.
       expect(pool?.positive.length ?? 0).toBeGreaterThanOrEqual(3);
       expect(pool?.negative.length ?? 0).toBeGreaterThanOrEqual(3);
     }
@@ -201,8 +183,8 @@ describe('the seed is deterministic — 50 §8', () => {
     const good = Array.from({ length: 4000 }, () => skewedRating(rng, 5, 0.85));
     const mean = good.reduce((sum, value) => sum + value, 0) / good.length;
 
-    // A well-liked subject averages around four, not around the midpoint. A flat
-    // distribution is the single most obvious tell that a results screen is fake (50 §3).
+    // A well-liked subject averages around four, not around the midpoint: a flat spread is the clearest
+    // sign a results screen is fake.
     expect(mean).toBeGreaterThan(3.6);
     expect(mean).toBeLessThan(4.6);
     // The tail is real: some people do give a 1.
@@ -211,8 +193,7 @@ describe('the seed is deterministic — 50 §8', () => {
     const poorRng = new Rng(42);
     const poor = Array.from({ length: 4000 }, () => skewedRating(poorRng, 5, 0.32));
     const poorMean = poor.reduce((sum, value) => sum + value, 0) / poor.length;
-    // And the deliberately weak subject is visibly, unmistakably worse — otherwise the
-    // results screen has nothing to show (50 §3).
+    // And the deliberately weak subject is unmistakably worse, or the results screen has nothing to show.
     expect(poorMean).toBeLessThan(mean - 1);
   });
 });

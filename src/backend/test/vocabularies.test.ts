@@ -1,14 +1,8 @@
-// T-031 — the landing page's pitch must be true.
-//
-// `PRESET_VOCABULARIES` in packages/shared is what `/` advertises to someone who has no
-// organisation and therefore no `useLabels()`. It is a hand-written copy of the real
-// preset labels, and a copy drifts. If somebody renames the university preset's `subject`
-// and the landing page still promises the old word, the first screen of the product is
-// telling a lie about the second — and nothing else in the repo would notice.
-//
-// This is the check that notices. It lives on the backend side because that is where the
-// presets are (src/backend/presets/**, owned by 50), and a frontend test cannot import
-// them without crossing the app boundary.
+// The landing page's pitch must be true.
+// The vocabulary list the public page advertises is a hand-written copy of the real preset labels, and
+// a copy drifts: rename a preset's word and the first screen of the product starts telling a lie about
+// the second, with nothing else in the repo noticing.
+// It lives on the backend side because that is where the presets are.
 import { describe, expect, it } from 'vitest';
 import { PRESET_VOCABULARIES, PITCH_KEYS, LabelKey } from '@endur/shared';
 import { presetFor } from '../presets/index.js';

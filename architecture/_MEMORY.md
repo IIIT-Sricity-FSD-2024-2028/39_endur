@@ -1830,6 +1830,22 @@ DEC-084  ACTIVE  2026-08-29  origin:claude  closes:OPEN-011  confirms:19 §9  ta
 ```
 
 ```
+DEC-115  ACTIVE  2026-08-31  origin:user  supersedes:DEC-084
+  decision OPERATOR TOTP STEP WIDENED TO 5 HOURS, WINDOW 0. STEP_SECONDS 30 -> 18000,
+           WINDOW 1 -> 0, in platform/totp.ts.
+  why      30 seconds was judged too early for the current seed/demo workflow -- an
+           operator re-reads a live code on every login, which is friction DEC-084
+           deliberately chose to keep for security reasons. this entry overrides that
+           choice on explicit user instruction rather than diverging from it silently.
+  not      DEC-084's blast-radius argument (a long-lived TOTP is close to a static
+           secret, and MFA is the one security control this project does not defer per
+           `19 §9`) is NOT refuted here, only overridden. re-litigate before relying on
+           this for anything beyond local seed/demo use.
+  where    STEP_SECONDS 18000, WINDOW 0, in platform/totp.ts.
+  see      DEC-084, 19 §9, src/backend/platform/totp.ts
+```
+
+```
 DEC-085  ACTIVE  2026-08-29  origin:claude  closes:OPEN-012  amends:31 § step 1, § step 4
   decision THE SETUP REDESIGN KEEPS ITS SHAPE AND GIVES BACK WHAT IT DROPPED BY ACCIDENT.
            the split pane on step 1 and the review-step dashboard preview STAY. restored:

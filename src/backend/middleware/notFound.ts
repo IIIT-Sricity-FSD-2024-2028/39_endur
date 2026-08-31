@@ -1,5 +1,4 @@
-// Link 15. An unmatched route becomes a typed error so it leaves through the same funnel
-// as everything else. No default Express HTML error page ever reaches a client.
+// Link 15. Turns an unmatched URL into a typed 404 error, so it leaves through the same funnel as everything else.
 import type { RequestHandler } from 'express';
 import { NotFoundError } from '../lib/errors.js';
 

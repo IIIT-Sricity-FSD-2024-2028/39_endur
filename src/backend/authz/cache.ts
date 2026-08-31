@@ -1,13 +1,5 @@
-// 11 §7. Two layers, both cheap.
-//
-// The per-principal cache has a 30-second TTL, but the TTL is NOT what keeps it correct.
-// `organizations.settings.authzVersion` is bumped in the same transaction as any write to
-// nodes, edges or grants, and it is part of the key — so a permission change invalidates
-// every entry for that tenant instantly. A 30-second window in which a revoked permission
-// still works is a security bug, not a performance trade-off.
-//
-// In-process Map for P1. Redis only if we ever run more than one API instance; do not add
-// it speculatively.
+// Short-lived cache of the grants a person holds, so one request does not hit the database twice.
+// The org's authzVersion is part of the key, so any permission change drops the old entries at once.
 import type { CandidateGrant } from './types.js';
 
 const TTL_MS = 30_000;
@@ -16,9 +8,11 @@ type Entry = { grants: CandidateGrant[]; expiresAt: number };
 
 const store = new Map<string, Entry>();
 
+// Cache key: which org, which user, and which version of that org's permissions.
 const keyFor = (orgId: string, userId: string, authzVersion: number) =>
   `${orgId}:${userId}:${authzVersion}`;
 
+// Reads cached grants, returning undefined if there are none or they have gone stale.
 export function getCachedGrants(
   orgId: string,
   userId: string,
@@ -34,6 +28,7 @@ export function getCachedGrants(
   return entry.grants;
 }
 
+// Stores this person's grants in the cache for the next 30 seconds.
 export function setCachedGrants(
   orgId: string,
   userId: string,
@@ -43,7 +38,7 @@ export function setCachedGrants(
   store.set(keyFor(orgId, userId, authzVersion), { grants, expiresAt: Date.now() + TTL_MS });
 }
 
-/** Tests and the seed need a clean slate; nothing in a request path should call this. */
+// Empties the cache. Only tests and the seed script use it, never a live request.
 export function clearGrantCache(): void {
   store.clear();
 }

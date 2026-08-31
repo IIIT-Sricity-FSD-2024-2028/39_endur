@@ -1,30 +1,14 @@
-// The fourth guard. 19 §9, and it is deliberately in the same style as `requireCapability`
-// for the same reason: authorisation is decided in middleware, never in a handler (INV-003).
-//
-// THE TWO GUARDS ARE NOT A HIERARCHY AND NEITHER IS A SUPERSET OF THE OTHER.
-//
-//   a `platform` principal fails `requireCapability` closed — it holds no grants, and the
-//     resolver has no target to resolve against because there is no organisation
-//   a `user` principal fails `requirePlatform` closed — 401, whatever they hold in `grants`
-//
-// They are different systems and the guards say so. 19 §9's hardest rule follows from it:
-// requireCapability and requirePlatform MUST NEVER BOTH APPEAR ON ONE ROUTE. A route is
-// either a tenant route or a platform route; both is a route whose authorisation model
-// nobody can state in one sentence, which is `12` §1's whole argument. `routes.test.ts`
-// asserts it, because "must never" without a test is a comment.
+// The guard for Endur's own operator console, written in the same style as requireCapability.
+// The two never appear on one route: a route is either a tenant route or a platform route, never both.
 import type { RequestHandler } from 'express';
 import { platformRoleHas, type PlatformCapability, type PlatformRole } from '@endur/shared';
 import { ForbiddenError, UnauthenticatedError } from '../lib/errors.js';
 import { loadOperator } from '../platform/session.js';
 
-/** The platform twin of CAPABILITY_TAG, so route enumeration can see this guard too. */
+// The platform twin of CAPABILITY_TAG, so route enumeration can see this guard too.
 export const PLATFORM_TAG = Symbol.for('endur.platformCapability');
 
-/**
- * Attaches the operator principal, or 401. Runs INSTEAD OF `tenantResolver`, not after it:
- * a platform request has no tenant, and reaching `tenantResolver` with no organisation
- * produces a confusing 400 where a clean 401 is the truth (19 §9).
- */
+// Attaches the operator principal, or answers 401. Runs instead of tenantResolver, since there is no tenant.
 export const requirePlatformAuth = (): RequestHandler => {
   const handler: RequestHandler = (req, _res, next) => {
     void loadOperator(req)
@@ -42,16 +26,7 @@ export const requirePlatformAuth = (): RequestHandler => {
   return handler;
 };
 
-/**
- * The capability check. One lookup, not a resolver — `19` §3 is explicit that a second
- * GRANT engine for a four-person internal team is over-engineering and would invite
- * confusion with the real one.
- *
- * A 403 here says WHICH capability, unlike the org side's deliberately vague message. The
- * argument for vagueness there is that a stranger must not learn the shape of somebody's
- * organisation from a series of refusals; here the reader is an Endur employee who already
- * knows the catalogue, and "staff cannot suspend an organisation" is the useful answer.
- */
+// The capability check: one lookup against the operator's role, and the 403 names the capability, since the reader works here.
 export const requirePlatform = (capability: PlatformCapability): RequestHandler => {
   const handler: RequestHandler = (req, _res, next) => {
     const principal = req.ctx.principal;

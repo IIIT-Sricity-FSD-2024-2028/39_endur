@@ -1,26 +1,16 @@
-// Multipart file upload. Link 4b — the ONE bypass of the JSON body parser (12 §4.4, 48).
-//
-// Written rather than installed, and that is a decision worth defending. `multer` would do
-// this in three lines, and it is one more dependency in a project whose middleware chain is
-// the graded artifact: the rule that every link is readable in this repository is worth more
-// here than three lines. The scope is deliberately tiny — ONE file, ONE field, images only,
-// hard-capped — and everything outside that grammar is refused rather than accommodated.
-//
-// The ordering constraint (12 §5): this runs INSTEAD of express.json for its routes, and it
-// runs BEFORE requireCapability, because a 2 MB body must not be buffered for a caller who
-// turns out to have no permission... which is exactly why the SIZE check happens as the
-// bytes arrive rather than after.
+// Multipart file upload: the one place that skips the JSON body parser.
+// Hand-written and deliberately small - one file, one field, images only, and the size is checked as bytes arrive.
 import type { Request, RequestHandler } from 'express';
 import { AppError } from '../lib/errors.js';
 import { sniff, stripMetadata, type ImageFacts } from '../lib/imageBytes.js';
 
 export type UploadedFile = {
-  /** The client's filename. Recorded for the error message and NEVER used on disk (48). */
+  // The client's filename. Recorded for messages and never used to build a path on disk.
   clientName: string;
-  /** What the client CLAIMED. Kept only so a mismatch can be reported. */
+  // The type the client claimed. Kept only so a mismatch can be reported.
   declaredType: string;
   facts: ImageFacts;
-  /** Metadata already stripped. Nothing else in the process sees the original bytes. */
+  // The image bytes, with metadata already stripped.
   bytes: Buffer;
 };
 
@@ -34,7 +24,7 @@ declare global {
 }
 
 export type ImageUploadOptions = {
-  /** The multipart field name. Anything else in the body is ignored. */
+  // The multipart field name to look for. Anything else in the body is ignored.
   field: string;
   maxBytes?: number;
   maxDimension?: number;
@@ -64,9 +54,7 @@ export function imageUpload(opts: ImageUploadOptions): RequestHandler {
           });
         }
 
-        // The claim is checked against the bytes, and the BYTES win. A .exe renamed .png
-        // arrives with `image/png` on it and fails here, which is the entire reason this
-        // check exists rather than an extension test (48).
+        // The claim is checked against the bytes and the bytes win, so a renamed .exe fails here.
         const facts = sniff(part.bytes);
         if (!facts) {
           throw new AppError(
@@ -76,8 +64,7 @@ export function imageUpload(opts: ImageUploadOptions): RequestHandler {
           );
         }
 
-        // Before anything decodes it: a 20000x20000 PNG is a few hundred kilobytes on disk
-        // and gigabytes in memory. Refusing on the header is the only cheap moment.
+        // Checked before anything decodes it: a huge image is small on disk and gigabytes in memory.
         if (facts.width > maxDimension || facts.height > maxDimension) {
           throw new AppError(
             'VALIDATION_FAILED',
@@ -106,26 +93,15 @@ function boundaryOf(req: Request): string | null {
   return boundary.length > 0 ? boundary : null;
 }
 
-/**
- * Read the body, refusing AT the limit rather than after it.
- *
- * The counter is what makes this safe: a 10 MB upload is destroyed after 2 MB has arrived,
- * so the cap bounds memory rather than merely reporting on it afterwards. Buffering the
- * permitted 2 MB is fine — it is the unbounded case that is the denial of service.
- */
+// Reads the whole body, but stops AT the size limit rather than after it, so memory stays bounded.
 function collect(req: Request, maxBytes: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
     let settled = false;
 
-    /**
-     * Stop reading, but do NOT destroy the socket — the same thing `raw-body` does for
-     * express.json's limit, and for the same reason: a destroyed request cannot carry the
-     * 413 back, so the caller would see a network error instead of a message telling them
-     * the file is too big. Unpipe and drain, ignore everything that still arrives (the
-     * `settled` flag), and let errorFunnel answer.
-     */
+    // Stop reading without destroying the socket: a destroyed request could not carry the 413 back,
+    // so the caller would see a network error instead of "that file is too big".
     const fail = (err: Error) => {
       if (settled) return;
       settled = true;
@@ -158,12 +134,7 @@ function collect(req: Request, maxBytes: number): Promise<Buffer> {
 
 type FilePart = { filename: string; contentType: string; bytes: Buffer };
 
-/**
- * Find the one part we want. Deliberately not a general multipart parser: it does not
- * handle nested multipart, does not decode transfer encodings, and returns the FIRST
- * matching file part rather than a collection. A narrower grammar is a smaller thing to
- * get wrong.
- */
+// Finds the one file part we want. Not a general multipart parser on purpose - a narrower grammar is easier to get right.
 function findFilePart(body: Buffer, boundary: string, field: string): FilePart | null {
   const delimiter = Buffer.from(`--${boundary}`, 'latin1');
   const separator = Buffer.from('\r\n\r\n', 'latin1');
@@ -171,7 +142,7 @@ function findFilePart(body: Buffer, boundary: string, field: string): FilePart |
   let cursor = body.indexOf(delimiter);
   while (cursor !== -1) {
     const headerStart = cursor + delimiter.length;
-    // `--` after the delimiter is the terminator, not another part.
+    // Two dashes after the delimiter mean the end of the body, not another part.
     if (body.toString('latin1', headerStart, headerStart + 2) === '--') return null;
 
     const headerEnd = body.indexOf(separator, headerStart);
@@ -187,8 +158,7 @@ function findFilePart(body: Buffer, boundary: string, field: string): FilePart |
 
     if (name === field && filename !== undefined) {
       return {
-        // Recorded, never used to build a path. `../../etc/passwd` is a legal filename and
-        // the only safe response to that is to not use it at all (48).
+        // Recorded, never used to build a path: "../../etc/passwd" is a legal filename.
         filename,
         contentType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1]?.trim() ?? '',
         bytes: body.subarray(headerEnd + separator.length, Math.max(bodyEnd, headerEnd)),

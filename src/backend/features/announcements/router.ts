@@ -1,15 +1,8 @@
-// Announcement routes. 13 § Announcements, T-094.
-//
-// FOUR CAPABILITIES AND NOT ONE `announcement.manage`, and the split that matters is
-// `create` from `publish`: drafting is not broadcasting. An organisation should be able to
-// let a coordinator write a notice without letting them reach everybody with it, and a
-// single verb makes that impossible to express (11 §3).
-//
-// `requireEntitlement` sits AFTER `requireCapability` on every write, which is the chain's
-// own order (app.ts links 10-11): 403 outranks 402, because telling somebody to buy an
-// upgrade for something they would not be allowed to use anyway is the wrong answer twice.
-// The read routes carry no entitlement at all — `announcement.read` is Bronze, so a
-// downgraded organisation still reads what it was already sent (16 §7).
+// Announcement routes.
+// Four capabilities rather than one, and the split that matters is create from publish: drafting is not
+// broadcasting, so a coordinator can write a notice without being able to send it to everybody.
+// The plan check always runs after the permission check, and the read routes carry none at all, because
+// a downgraded organisation must still read what it was already sent.
 import { Router } from 'express';
 import {
   AnnouncementIdDto,
@@ -44,7 +37,7 @@ import {
 
 export const announcementsRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2), like every other console router.
+// Links 6 to 8 for every route below, like every other console router.
 announcementsRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
@@ -55,17 +48,10 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
 
 const version = (req: { ctx: { authzVersion?: number } }) => req.ctx.authzVersion ?? 0;
 
-/**
- * Does this caller WRITE announcements, or only receive them?
- *
- * It decides what the list contains — drafts included, or only what was sent to them — and
- * it is a READ SHAPE, not an authorisation. The authorisation for every write is the
- * `requireCapability` on that route; this only answers "which rows are worth returning",
- * which is the same question `visibleUnits()` answers for every other list (INV-003).
- *
- * Through `heldCapabilities`, which is the map `useCan()` reads, so the console's own idea
- * of who can draft and the server's cannot drift.
- */
+// Does this caller WRITE announcements, or only receive them?
+// It decides what the list contains - drafts included, or only what was sent to them. It is a read
+// shape, not an authorisation: every write is guarded by its own capability check.
+// It asks the same capability map the console reads, so the two cannot disagree about who can draft.
 async function isWriter(req: { ctx: { orgId?: string } }, userId: string): Promise<boolean> {
   const held = await heldCapabilities(
     req.ctx.orgId as string,
@@ -76,6 +62,7 @@ async function isWriter(req: { ctx: { orgId?: string } }, userId: string): Promi
   return held['announcement.create'] !== undefined;
 }
 
+// The announcements this caller may see.
 announcementsRouter.get(
   '/',
   authenticate,
@@ -92,12 +79,8 @@ announcementsRouter.get(
   },
 );
 
-// BEFORE `/:id`, because Express matches in order and `preview` would otherwise be read as
-// an announcement id — the same ordering `campaignsRouter` applies to `/quick`.
-//
-// Gated on `announcement.create` rather than on `read`: it answers "how many people would
-// this reach", which is a composer's question and a fact about the org graph. Somebody who
-// cannot draft has no reason to be able to ask it about an arbitrary rule.
+// Before /:id, or Express would read "preview" as an announcement id.
+// Gated on create rather than read: "how many people would this reach" is a composer's question.
 announcementsRouter.post(
   '/preview',
   authenticate,
@@ -113,6 +96,7 @@ announcementsRouter.post(
   },
 );
 
+// One announcement, with its counts and the reader's own receipt.
 announcementsRouter.get(
   '/:id',
   authenticate,
@@ -135,6 +119,7 @@ announcementsRouter.get(
   },
 );
 
+// Creates a draft.
 announcementsRouter.post(
   '/',
   authenticate,
@@ -150,8 +135,8 @@ announcementsRouter.post(
   },
 );
 
-// Draft only — 409 once published, from the service. The words people have already read
-// must not change under them while their receipts still say they read them.
+// Draft only - the service answers 409 once published, because words people have already read must not
+// change under them while their receipts still say they read them.
 announcementsRouter.patch(
   '/:id',
   authenticate,
@@ -170,9 +155,7 @@ announcementsRouter.patch(
   },
 );
 
-// The irreversible one, and idempotent for the reason launch is: a double-click writes one
-// set of receipts, not two. The service is idempotent by state as well, so a repeat with a
-// fresh key still resolves the audience only once.
+// The irreversible one, and idempotent like launch: a double-click writes one set of receipts, not two.
 announcementsRouter.post(
   '/:id/publish',
   authenticate,
@@ -189,6 +172,7 @@ announcementsRouter.post(
   },
 );
 
+// Deletes an announcement and its receipts.
 announcementsRouter.delete(
   '/:id',
   authenticate,
@@ -204,9 +188,8 @@ announcementsRouter.delete(
   },
 );
 
-// `announcement.read` and NO entitlement. Dismissing a banner is part of reading it, and a
-// bronze organisation that could see a notice but not mark it read would be shown the same
-// banner forever.
+// Read capability and no plan gate: dismissing a banner is part of reading it, and a bronze organisation
+// that could see a notice but never mark it read would be shown the same banner forever.
 announcementsRouter.post(
   '/:id/read',
   authenticate,
@@ -216,8 +199,7 @@ announcementsRouter.post(
     const { params } = req.data as { params: { id: string } };
     void Promise.resolve()
       .then(() => markRead(req.ctx.orgId as string, userOf(req), params.id))
-      // 204: the client marked it read optimistically before the request left, exactly as
-      // the inbox does.
+      // 204: the client marked it read optimistically before the request left, exactly as the inbox does.
       .then(() => res.status(204).end())
       .catch(next);
   },

@@ -1,13 +1,6 @@
-// The GRANT resolver. 11 §5.
-//
-// Five properties, each of which a marker can ask about directly:
-//   1. DENY ALWAYS BEATS ALLOW (INV-004) — absolute. No scope, level, group membership
-//      or delegation overrides an explicit deny.
-//   2. A narrower scope wins a tie, so the trace names the most specific rule that applied.
-//   3. Powers are scoped to the ASSIGNMENT's unit (INV-005), via the anchor.
-//   4. Default is deny. No grant means no. There is no implicit permission anywhere.
-//   5. Every decision records which grant decided it — that is what powers the simulator,
-//      the audit log, and support debugging.
+// The permission resolver: decides whether one person may do one thing, and records why.
+// Rules it keeps: a deny always beats an allow, a narrower scope wins a tie, powers only
+// apply at the unit the person was assigned to, and no grant means no.
 import { SCOPE_BREADTH, type Capability } from '@endur/shared';
 import { collectGrants } from './collect.js';
 import { getCachedGrants, setCachedGrants } from './cache.js';
@@ -23,10 +16,11 @@ export type ResolveInput = {
   at?: Date;
   authzVersion?: number;
   paramMode?: ParamMode;
-  /** Per-request memo, so repeated checks in one handler cost one query (11 §7). */
+  // Memo, so several checks inside one request share a single lookup.
   memo?: Map<string, Promise<Decision>>;
 };
 
+// Answers one permission question, reusing the memo if the same question was already asked.
 export async function resolve(input: ResolveInput): Promise<Decision> {
   const at = input.at ?? new Date();
   const key = `${input.capability}:${targetKey(input.target)}`;
@@ -39,6 +33,7 @@ export async function resolve(input: ResolveInput): Promise<Decision> {
   return promise;
 }
 
+// Does the real work: load this person's grants, then run them through steps 2 to 7.
 async function run(input: ResolveInput, at: Date): Promise<Decision> {
   const { orgId, userId, capability, target } = input;
   const authzVersion = input.authzVersion ?? 0;
@@ -55,19 +50,18 @@ async function run(input: ResolveInput, at: Date): Promise<Decision> {
   const survivors: CandidateGrant[] = [];
 
   for (const grant of all) {
-    // Step 2 — capability match.
+    // Step 2 - skip grants that are about a different capability.
     if (grant.capability !== capability) continue;
 
     const trace = { grantId: grant.grantId, via: grant.via, scope: grant.scope, effect: grant.effect };
 
-    // Step 3 — validity, of the grant itself. (The edge and the unit's end date were
-    // already applied while collecting, because that is where they are visible.)
+    // Step 3 - skip grants that have expired or have not started yet.
     if (grant.validFrom > at || (grant.validTo && grant.validTo <= at)) {
       considered.push({ ...trace, rejectedBecause: 'expired' });
       continue;
     }
 
-    // Step 4 — scope, using the anchor unit.
+    // Step 4 - skip grants whose scope does not reach this target.
     const { covers, because } = await scopeCovers(grant, target, scopeCtx);
     if (!covers) {
       considered.push({ ...trace, rejectedBecause: because ?? 'out of scope' });
@@ -78,8 +72,7 @@ async function run(input: ResolveInput, at: Date): Promise<Decision> {
     survivors.push(grant);
   }
 
-  // Step 5 — ANY deny denies. Report the narrowest, because that is the most specific
-  // rule and therefore the most useful thing to tell someone.
+  // Step 5 - a single deny refuses the request; report the narrowest one, as it is the most specific.
   const denies = survivors.filter((grant) => grant.effect === 'deny');
   if (denies.length > 0) {
     const narrowest = narrowest_(denies);
@@ -92,7 +85,7 @@ async function run(input: ResolveInput, at: Date): Promise<Decision> {
     };
   }
 
-  // Step 6 — allow.
+  // Step 6 - no deny, so an allow wins and its params become the caller's limits.
   const allows = survivors.filter((grant) => grant.effect === 'allow');
   if (allows.length > 0) {
     const decisive = narrowest_(allows);
@@ -107,9 +100,7 @@ async function run(input: ResolveInput, at: Date): Promise<Decision> {
     };
   }
 
-  // Step 7 — default deny. `out_of_scope` and `expired` are distinguished from
-  // `no_grant` because they mean different things to the person reading the message:
-  // one is "ask someone else", the other is "nobody gave you this at all".
+  // Step 7 - nothing matched, so deny by default; the reason says whether any grant existed at all.
   const hadCapability = considered.length > 0;
   const reason = hadCapability
     ? considered.every((entry) => entry.rejectedBecause === 'expired')
@@ -120,7 +111,7 @@ async function run(input: ResolveInput, at: Date): Promise<Decision> {
   return { allowed: false, capability, reason, considered };
 }
 
-/** Narrowest scope wins; a tie is broken by the most senior role (lowest level number). */
+// Narrower scope wins; if two tie, the more senior role (lower level number) wins.
 function narrowest_(grants: CandidateGrant[]): CandidateGrant {
   return grants.reduce((a, b) => {
     const byScope = SCOPE_BREADTH[a.scope] - SCOPE_BREADTH[b.scope];
@@ -129,6 +120,7 @@ function narrowest_(grants: CandidateGrant[]): CandidateGrant {
   });
 }
 
+// Trims the deciding grant down to the few fields the answer carries.
 function describe(grant: CandidateGrant): NonNullable<Decision['decidedBy']> {
   return {
     grantId: grant.grantId,
@@ -141,6 +133,7 @@ function describe(grant: CandidateGrant): NonNullable<Decision['decidedBy']> {
   };
 }
 
+// Builds the memo key for a target.
 const targetKey = (target: Target): string =>
   'unitId' in target && target.unitId
     ? `${target.kind}:${target.unitId}`

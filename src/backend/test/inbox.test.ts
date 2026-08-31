@@ -1,10 +1,7 @@
-// T-079 — the response inbox. 58, 13 § Inbox.
-//
-// The mechanic is a read/unread/archived toggle and it is not the interesting half. The
-// interesting half is that this is A LIST OF INDIVIDUAL COMMENTS ACROSS CAMPAIGNS, which is
-// the most tempting place in the product to build a second path around the k-anonymity
-// gate — and `38` § "Not built" already refused one for exactly this reason.
-//
+// The response inbox.
+// The read/unread/archived mechanic is not the interesting half. The interesting half is that this is
+// a list of individual comments ACROSS campaigns, which is the most tempting place in the product to
+// build a second path around the anonymity gate.
 // So the assertions that matter are the ones about what does NOT come back.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
@@ -14,7 +11,7 @@ import { prisma } from '../db/client.js';
 
 const stranger = () => request(app);
 
-/** A launched campaign in one unit, with `count` responses, each carrying a comment. */
+// A launched campaign in one unit, with a set number of responses, each carrying a comment.
 async function campaignIn(
   founder: Session,
   opts: { unitName: string; subject: string; name: string; count: number },
@@ -98,7 +95,7 @@ const list = (session: Session, qs = '') =>
     cards: (res.body.data ?? []) as Card[],
   }));
 
-/* ---------------------------------------------------------------- the gate */
+// The gate.
 
 describe('the k-anonymity gate is the results service’s, and the inbox borrows it', () => {
   it('contributes NO ROWS from a campaign below the threshold — not a suppressed placeholder', async () => {
@@ -112,7 +109,7 @@ describe('the k-anonymity gate is the results service’s, and the inbox borrows
 
     const below = await list(founder, '?state=all');
     expect(below.status).toBe(200);
-    // ZERO, not "3 hidden". No count, no greyed card, no hint that anything exists (52 §2).
+    // Zero, not "3 hidden": no count, no greyed card, no hint that anything exists.
     expect(below.total).toBe(0);
     expect(below.cards).toEqual([]);
     expect(JSON.stringify(below.cards)).not.toMatch(/Quiet round comment/);
@@ -138,8 +135,8 @@ describe('the k-anonymity gate is the results service’s, and the inbox borrows
     await campaignIn(founder, { unitName: 'Section A', subject: 'A1', name: 'First half', count: each });
     await campaignIn(founder, { unitName: 'Section A', subject: 'A2', name: 'Second half', count: each });
 
-    // 2 × 4 = 8, which is comfortably over a threshold of 5. A naive UNION across campaigns
-    // would return all eight. The gate is applied PER CAMPAIGN, before the merge.
+    // Two campaigns of four is eight, comfortably over a threshold of five - a naive merge would return
+    // all eight. The gate is applied PER CAMPAIGN, before anything is merged.
     expect(each * 2).toBeGreaterThanOrEqual(config.K_ANON_THRESHOLD);
 
     const both = await list(founder, '?state=all');
@@ -148,7 +145,7 @@ describe('the k-anonymity gate is the results service’s, and the inbox borrows
   });
 });
 
-/* ------------------------------------------------------------ scope, INV-003 */
+// Scope.
 
 describe('scope filtering is 40’s, for the same caller', () => {
   let founder: Session;
@@ -170,8 +167,7 @@ describe('scope filtering is 40’s, for the same caller', () => {
       name: 'Section B round',
       count: config.K_ANON_THRESHOLD,
     });
-    // Level 2 is Section Head, anchored AT Section A. Their reach is the anchor's subtree
-    // (INV-005), which is Section A and Team A1 — never Section B.
+    // A Section Head anchored at Section A reaches that section and what is below it, never the next one.
     head = await addStaff(founder.orgId, { name: 'Head of A', level: 2, unitName: 'Section A' });
   });
 
@@ -188,9 +184,8 @@ describe('scope filtering is 40’s, for the same caller', () => {
   });
 
   it('MATCHES the responses endpoint exactly — the acceptance criterion, asserted by comparing', async () => {
-    // 58 § Acceptance: "Scope filtering matches 40's for the same caller — asserted by
-    // comparing the two". They share one predicate (canSee), so this is a regression guard
-    // on anybody re-implementing it.
+    // The inbox and the results page share one predicate, so this is a regression guard on anybody
+    // re-implementing either.
     for (const [campaignId, reachable] of [
       [sectionA.campaignId, true],
       [sectionB.campaignId, false],
@@ -215,7 +210,7 @@ describe('scope filtering is 40’s, for the same caller', () => {
   });
 });
 
-/* ------------------------------------------------------------------ INV-006 */
+// Anonymity.
 
 describe('a card carries no respondent attribute, because no column could supply one', () => {
   it('returns the comment, the question, the score and the date, and nothing about a person', async () => {
@@ -230,8 +225,8 @@ describe('a card carries no respondent attribute, because no column could supply
     const { cards } = await list(founder, '?state=all');
     const card = cards[0] as Card & Record<string, unknown>;
 
-    // An allowlist, not an absence check: a new field added to the DTO fails this test
-    // rather than sliding past it.
+    // An allowlist, not an absence check: a new field added to the response fails this test rather than
+    // sliding past it.
     expect(new Set(Object.keys(card))).toEqual(
       new Set([
         'id',
@@ -260,15 +255,14 @@ describe('a card carries no respondent attribute, because no column could supply
     });
 
     const { cards } = await list(founder, '?state=all&limit=100');
-    // The helper writes (i % 5) + 1, so the scores are 1..5 — whole numbers, one per
-    // response. An average over five of those would be 3, and no card says 3 five times.
+    // The helper writes whole-number scores, one per response, so an average would be a give-away.
     const scores = cards.map((card) => card.score).sort();
     expect(scores).toEqual([1, 2, 3, 4, 5]);
     expect(new Set(cards.map((card) => card.scoreMax))).toEqual(new Set([5]));
   });
 });
 
-/* ------------------------------------------------------------ the mechanic */
+// The mechanic.
 
 describe('read state belongs to the reader', () => {
   let founder: Session;
@@ -299,8 +293,7 @@ describe('read state belongs to the reader', () => {
   });
 
   it('does not touch anybody else’s queue', async () => {
-    // The founder marked one read above. The dean can see the same campaign and has read
-    // nothing, so their unread count is still the full set.
+    // The founder marked one read above; this reader has read nothing, so their unread count is the full set.
     const theirs = await list(other);
     expect(theirs.total).toBe(config.K_ANON_THRESHOLD);
     expect(theirs.cards.every((card) => card.read === false)).toBe(true);
@@ -322,8 +315,7 @@ describe('read state belongs to the reader', () => {
     expect(archived.cards.map((card) => card.id)).toEqual([responseId]);
     expect(archived.cards[0]?.archived).toBe(true);
 
-    // Gone from All as well. An archive click that left the card in All would be an
-    // archive click that did nothing.
+    // Gone from All as well: an archive click that left the card in All would be a click that did nothing.
     for (const state of ['all', 'unread', 'read'] as const) {
       const tab = await list(founder, `?state=${state}&limit=100`);
       expect(tab.cards.some((card) => card.id === responseId)).toBe(false);
@@ -331,7 +323,7 @@ describe('read state belongs to the reader', () => {
 
     await withCsrf(founder, 'post', `/api/v1/inbox/${responseId}/unarchive`).send({});
     expect((await list(founder, '?state=archived')).total).toBe(0);
-    // Archiving marked it read, and unarchiving does not undo that: it was read.
+    // Archiving marked it read, and unarchiving does not undo that: it WAS read.
     expect((await list(founder, '?state=read')).cards.map((c) => c.id)).toEqual([responseId]);
   });
 
@@ -364,7 +356,7 @@ describe('read state belongs to the reader', () => {
   });
 });
 
-/* ------------------------------------------- marking is gated like reading */
+// Marking is gated exactly like reading.
 
 describe('the write routes are gated too, or they become an oracle', () => {
   it('404s marking a response in a campaign the caller cannot reach', async () => {
@@ -412,7 +404,7 @@ describe('the write routes are gated too, or they become an oracle', () => {
   });
 });
 
-/* ----------------------------------------------------------------- paging */
+// Paging.
 
 describe('paging is over the filtered state, not over the page', () => {
   it('returns a full page of unread even when earlier rows are read', async () => {
@@ -427,8 +419,8 @@ describe('paging is over the filtered state, not over the page', () => {
     const all = await list(founder, '?state=all&limit=100');
     expect(all.total).toBe(12);
 
-    // Mark the four newest read. A naive implementation that pages first and filters after
-    // would return a page of two.
+    // Mark the four newest read: an implementation that pages first and filters afterwards would return
+    // a page of two.
     for (const card of all.cards.slice(0, 4)) {
       await withCsrf(founder, 'post', `/api/v1/inbox/${card.id}/read`).send({});
     }

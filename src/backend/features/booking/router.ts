@@ -1,16 +1,9 @@
-// Booking routes — the console half. 13 § Booking, T-095.
-//
-// FIVE CAPABILITIES AND NOT ONE `booking.manage`. Four of them are the ordinary CRUD shape;
-// `booking.cancel` is the one that had to be its own, because it reaches into a decision
-// SOMEBODY ELSE MADE and takes it back. Folded into `booking.update` it would mean an
-// organisation cannot let a receptionist add a slot without also letting them cancel a
-// guest's appointment (11 §3).
-//
-// `requireEntitlement` sits AFTER `requireCapability` on every route including the reads,
-// which is the chain's own order (app.ts links 10-11): 403 outranks 402. Unlike
-// announcements, NOTHING here is bronze — the whole surface is Gold — so the reads carry the
-// entitlement too. A downgraded organisation keeps its data and its PUBLIC LINK (16 §6, §7);
-// what it loses is this console.
+// Booking routes - the console half.
+// Five capabilities rather than one: cancel is its own, because it reaches into a decision somebody
+// ELSE made and takes it back, and an organisation should be able to let a receptionist add a slot
+// without also letting them cancel a guest's appointment.
+// The whole surface is Gold, so even the reads carry the plan check. A downgraded organisation keeps
+// its data and its public link; what it loses is this console.
 import { Router } from 'express';
 import {
   BookableIdDto,
@@ -40,22 +33,18 @@ import {
   updateBookable,
 } from './service.js';
 
-// TWO ROUTERS, TWO MOUNTS, and it is not an accident of prefixes.
-//
-// `/bookables` is the thing an organisation publishes; `/bookings` is what people did with
-// it. Hanging the cancel route off the bookable's prefix would have read as "a booking
-// belongs to a bookable in the URL as well as in the schema" — and the id in the path is a
-// BOOKING's, which nothing about `/bookables/:id/...` would suggest. The same split
-// `resultsRouter` already takes by mounting on `/campaigns` beside `campaignsRouter`.
+// Two routers, two mounts: /bookables is what the organisation publishes, /bookings is what people did
+// with it. The id in the cancel path is a BOOKING's, which nothing under /bookables/:id would suggest.
 export const bookablesRouter: Router = Router();
 export const bookingsRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2), like every other console router.
+// Links 6 to 8 for every route below, like every other console router.
 bookablesRouter.use(tenantChain);
 bookingsRouter.use(tenantChain);
 
 const orgOf = (req: { ctx: { orgId?: string } }): string => req.ctx.orgId as string;
 
+// Everything this organisation offers for booking.
 bookablesRouter.get(
   '/',
   authenticate,
@@ -69,6 +58,7 @@ bookablesRouter.get(
   },
 );
 
+// Creates a bookable.
 bookablesRouter.post(
   '/',
   authenticate,
@@ -83,6 +73,7 @@ bookablesRouter.post(
   },
 );
 
+// One bookable, with its slots.
 bookablesRouter.get(
   '/:id',
   authenticate,
@@ -97,6 +88,7 @@ bookablesRouter.get(
   },
 );
 
+// Renames a bookable or edits its details.
 bookablesRouter.patch(
   '/:id',
   authenticate,
@@ -111,8 +103,8 @@ bookablesRouter.patch(
   },
 );
 
-// THE WHOLE SET, like `PUT /templates/:id/questions`. A partial slot patch API needs a diff
-// protocol both sides have to agree about, and the set is small enough to send whole.
+// The whole set at once, like a template's questions: a partial patch would need a diff protocol both
+// sides have to agree about, and the set is small enough to send whole.
 bookablesRouter.put(
   '/:id/slots',
   authenticate,
@@ -127,8 +119,8 @@ bookablesRouter.put(
   },
 );
 
-// Mints the token, so it is idempotent for the reason launch is: a double-click on stage
-// must not produce two links, one of which is on the projector and the other on the card.
+// Mints the public link, so it is idempotent like a campaign launch: a double-click must not produce
+// two links, one on the projector and one on the card.
 bookablesRouter.post(
   '/:id/open',
   authenticate,
@@ -144,9 +136,8 @@ bookablesRouter.post(
   },
 );
 
-// NO entitlement. Closing is how an organisation stops a link it can no longer manage, and a
-// 402 in front of it would leave a downgraded customer's booking page open with no way to
-// shut it — the same argument that keeps `announcement.read` in bronze (16 §7).
+// No plan check: closing is how an organisation stops a link it can no longer manage, and a 402 here
+// would leave a downgraded customer's booking page open with no way to shut it.
 bookablesRouter.post(
   '/:id/close',
   authenticate,
@@ -160,6 +151,7 @@ bookablesRouter.post(
   },
 );
 
+// Deletes a bookable, its slots and its bookings.
 bookablesRouter.delete(
   '/:id',
   authenticate,
@@ -174,8 +166,7 @@ bookablesRouter.delete(
   },
 );
 
-// WHO BOOKED. The one console read that returns names, and it is `booking.read` rather than
-// a verb of its own because the whole surface is already Gold and already scoped `all`.
+// Who booked. The one console read that returns names.
 bookablesRouter.get(
   '/:id/bookings',
   authenticate,
@@ -190,7 +181,7 @@ bookablesRouter.get(
   },
 );
 
-// `booking.cancel`, and this route is the only reason that verb exists.
+// booking.cancel, and this route is the only reason that capability exists.
 bookingsRouter.post(
   '/:id/cancel',
   authenticate,

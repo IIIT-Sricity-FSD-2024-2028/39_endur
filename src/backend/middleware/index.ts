@@ -1,5 +1,4 @@
-// Barrel. app.ts imports ONLY from here, so the chain in app.ts reads as a list of names
-// and nothing else (12 §6).
+// One import point for all middleware, so the chain in app.ts reads as a plain list of names.
 export * from './context.js';
 export * from './requestId.js';
 export * from './requestLogger.js';

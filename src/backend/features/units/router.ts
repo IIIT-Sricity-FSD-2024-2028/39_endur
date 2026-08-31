@@ -1,4 +1,4 @@
-// Unit routes. 13 § Structure, 32.
+// Unit routes: the organisation's structure tree - read it, add to it, rename, move and delete.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import {
@@ -30,11 +30,10 @@ import {
 
 export const unitsRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 unitsRouter.use(tenantChain);
 
-/** Every handler here needs the signed-in user's id; a key or a respondent never reaches it. */
+// Every handler here needs the signed-in user's id, so an API key or a respondent never reaches one.
 const userOf = (req: Parameters<Parameters<Router['get']>[1]>[0]) => {
   const principal = req.ctx.principal;
   if (principal?.kind !== 'user') throw new UnauthenticatedError();
@@ -44,15 +43,13 @@ const userOf = (req: Parameters<Parameters<Router['get']>[1]>[0]) => {
 unitsRouter.get(
   '/',
   authenticate,
-  // A list asks "do you hold this anywhere", not "may you act on the organisation". The
-  // scope filtering inside readTree() is the authorisation (INV-003).
+  // A list asks "do you hold this anywhere": the scope filtering inside readTree() IS the authorisation.
   requireCapability('unit.read', { target: 'any' }),
   (req, res, next) => {
     void Promise.resolve()
       .then(() => readTree(req.ctx.orgId as string, userOf(req), req.ctx.authzVersion ?? 0))
-      // `meta` carries the forest's own totals. Summing the roots on the client would
-      // double-count a person placed under two of them, which is exactly the mistake the
-      // per-branch rollup exists to avoid (DEC-082).
+      // meta carries the totals for the whole forest, because summing the roots on the client would double-count
+      // a person placed under two of them.
       .then(({ tree, totals }) => res.json({ data: tree, meta: totals }))
       .catch(next);
   },
@@ -62,8 +59,7 @@ unitsRouter.post(
   '/',
   authenticate,
   validate(CreateUnitDto),
-  // The target is the PARENT: creating a unit is an act on the unit it goes inside, and
-  // that is the unit the caller's scope has to cover.
+  // The target is the PARENT: creating a unit is an act on the unit it goes inside.
   requireCapability('unit.create', { target: 'unit', from: 'body.parentId' }),
   (req, res, next) => {
     const { body } = req.data as { body: CreateUnitBody };
@@ -87,8 +83,7 @@ unitsRouter.patch(
   },
 );
 
-// A separate capability from update, deliberately: renaming a department is cosmetic,
-// moving it changes the scope of everyone inside it (32).
+// Moving is a separate capability from renaming: a rename is cosmetic, a move changes the scope of everyone inside.
 unitsRouter.post(
   '/:id/reparent',
   authenticate,
@@ -115,9 +110,7 @@ unitsRouter.delete(
   },
 );
 
-// What the branch's people ARE, not just how many — DEC-083. Asked for one unit at a time
-// rather than carried on every node of the tree: the panel shows one unit, and a per-node
-// breakdown would be roles × units on a page load that mostly never reads it.
+// What the branch's people ARE, not just how many. Asked one unit at a time, because the panel shows one unit.
 unitsRouter.get(
   '/:id/composition',
   authenticate,
@@ -131,8 +124,7 @@ unitsRouter.get(
   },
 );
 
-// Read-only, and the delete dialog is not actionable until it has answered. A confirmation
-// that asks "are you sure?" without saying what changes is one nobody reads (32).
+// Read-only preview of what a delete or a move would change; the confirm dialog waits for it.
 unitsRouter.get(
   '/:id/impact',
   authenticate,

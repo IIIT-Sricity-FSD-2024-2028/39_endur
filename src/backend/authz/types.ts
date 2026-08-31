@@ -1,7 +1,7 @@
-// The resolver's vocabulary. 11 §5.
+// The shared types the permission resolver speaks in.
 import type { Capability, Effect, Scope } from '@endur/shared';
 
-/** What permission is being asked about. Resolved from the request by requireCapability. */
+// What is being asked about: the whole org, a unit, a person, a subject, a campaign, or yourself.
 export type Target =
   | { kind: 'org' }
   | { kind: 'unit'; unitId: string }
@@ -10,17 +10,10 @@ export type Target =
   | { kind: 'campaign'; unitId?: string }
   | { kind: 'self'; userId: string };
 
-/**
- * How a grant was REACHED. Five of these are edges in the org graph; `support` is the sixth
- * and is not — it is DEC-114's minted grant, which belongs to no subject in the tenant
- * because the principal holding it belongs to no subject in the tenant. It is a member of
- * this union rather than a special case beside it so that every reader of a decision trace —
- * the simulator, the audit log, `<DecisionTrace>` — explains a support refusal without ever
- * being taught that support exists.
- */
+// How a grant reached the person: through themselves, a position, a role, a group, a delegation, or support access.
 export type Via = 'person' | 'position' | 'role' | 'group' | 'delegation' | 'support';
 
-/** A grant plus the unit it was reached THROUGH. The anchor is the crux of INV-005. */
+// One grant that might apply, plus the unit it was reached through.
 export type CandidateGrant = {
   grantId: string;
   capability: string;
@@ -29,15 +22,16 @@ export type CandidateGrant = {
   params: Record<string, number>;
   via: Via;
   subjectName: string;
-  /** The unit of the POSITION the grant was reached through. Undefined = whole org. */
+  // Unit of the position the grant came through. Empty means it covers the whole org.
   anchorUnitId?: string;
   anchorUnitName?: string;
-  /** Role level of the anchoring position, for tie-breaking. Lower = more senior. */
+  // Role level of that position, used to break ties. Lower number = more senior.
   level?: number;
   validFrom: Date;
   validTo?: Date;
 };
 
+// Why a decision came out the way it did.
 export type DecisionReason =
   | 'granted'
   | 'explicit_deny'
@@ -45,6 +39,7 @@ export type DecisionReason =
   | 'expired'
   | 'no_grant';
 
+// The final answer for one permission check, plus the reasoning behind it.
 export type Decision = {
   allowed: boolean;
   capability: Capability;
@@ -59,14 +54,7 @@ export type Decision = {
     effect: Effect;
   };
   params?: Record<string, number>;
-  /**
-   * The difference between a usable simulator and a useless one. "Blocked" teaches
-   * nothing; "on Night Bus he is an Editor, his Director powers apply only on Ayaan"
-   * teaches the whole model in one sentence.
-   *
-   * Returned to clients ONLY for simulator.run and for 403s outside production —
-   * actionable, without letting an outsider map the org's structure.
-   */
+  // The grants that were looked at and why each was rejected - this is what makes the simulator useful.
   considered: Array<{
     grantId: string;
     via: string;

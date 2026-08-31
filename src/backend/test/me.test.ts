@@ -1,14 +1,8 @@
-// T-028/T-029 — the capability set that /auth/me hands the SPA. 13 § Auth, 20 §6.
-//
-// The set is USABILITY, NEVER ENFORCEMENT (INV-003), and these tests are written to hold
-// that line rather than blur it: the last one proves the API still refuses an action the
-// set happens to advertise. If that test ever fails, the bug is in the route, not here.
-//
-// T-086 TURNED IT INTO A MAP of capability to widest-held scope. `capabilitiesOf` below
-// still returns the verbs, so every test written before that reads unchanged — which is
-// the point being asserted, not a convenience: carrying the scope was supposed to change
-// what the client KNOWS, never which capabilities it is told about. § scope holds that
-// line explicitly.
+// The capability set /auth/me hands the app.
+// The set is USABILITY, never enforcement: the last test proves the API still refuses an action the
+// set happens to advertise. If that one fails, the bug is in the route rather than here.
+// It is a map of capability to widest-held scope, so a menu can tell "only myself" from "a whole unit",
+// and the tests written before the scope existed read unchanged, which is itself the point.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CAPABILITIES, SCOPES, type HeldCapabilities } from '@endur/shared';
 import { prisma } from '../db/client.js';
@@ -27,8 +21,8 @@ const heldOf = async (session: Session): Promise<HeldCapabilities> => {
   return res.body.capabilities as HeldCapabilities;
 };
 
-/** The verbs alone — what this file asked for before T-086, and still the right question
- *  for every test about WHICH capabilities are reported rather than how far they reach. */
+// The verbs alone: the right question for every test about WHICH capabilities are reported rather
+// than how far they reach.
 const capabilitiesOf = async (session: Session): Promise<string[]> =>
   Object.keys(await heldOf(session));
 
@@ -38,7 +32,7 @@ describe('GET /auth/me', () => {
     expect(res.status).toBe(200);
     expect(res.body.user.id).toBe(founder.userId);
     expect(res.body.organization.id).toBe(founder.orgId);
-    // The vocabulary rides along so the first paint is already in the org's own words.
+    // The vocabulary rides along, so the first paint is already in the organisation's own words.
     expect(res.body.labels.unit.one).toBe('Section');
     expect(typeof res.body.capabilities).toBe('object');
     expect(Array.isArray(res.body.capabilities)).toBe(false);
@@ -69,13 +63,13 @@ describe('GET /auth/me', () => {
   it('is sorted and free of duplicates, so a diff between two sets is readable', async () => {
     const held = await capabilitiesOf(founder);
     expect([...held].sort()).toEqual(held);
-    // Duplicate-free is now structural rather than asserted — object keys cannot repeat —
-    // but the assertion stays, because it is the property being promised, not the mechanism.
+    // Now structural, because map keys cannot repeat - but the assertion stays, since it is the property
+    // being promised rather than the mechanism.
     expect(new Set(held).size).toBe(held.length);
   });
 });
 
-// T-086. The map exists so a nav gate can ask "does this reach past `self`" (D-027).
+// The map exists so a menu can ask "does this reach past myself".
 describe('scope', () => {
   it('names a scope from the catalogue for every capability it reports', async () => {
     const known = new Set<string>(SCOPES);
@@ -85,9 +79,8 @@ describe('scope', () => {
   });
 
   it('separates the universal `person.read: self` from a real one — the whole of D-027', async () => {
-    // Every role is seeded `person.read: self` so /app/profile opens (50 §1), which is why
-    // the VERB is useless as a nav gate: the founder and a respondent-level account both
-    // hold it. The scope is what tells them apart.
+    // Every role is seeded the self-scope read so the profile page opens, which is why the VERB alone is
+    // useless as a menu gate: the founder and a junior account both hold it.
     const learner = await addStaff(founder.orgId, {
       name: 'Scope Learner', level: 4, unitName: 'Section A',
     });
@@ -106,8 +99,8 @@ describe('scope', () => {
     });
     expect((await heldOf(staff))['campaign.read']).toBe('own_unit');
 
-    // A second, wider grant on the person themselves. The narrow one is still live; the
-    // question the map answers is "is there ANYWHERE this reaches further", so: subtree.
+    // A second, wider grant on the person themselves. The narrow one is still live, and the question the
+    // map answers is "is there anywhere this reaches further".
     const person = await prisma.node.findFirstOrThrow({
       where: { orgId: founder.orgId, kind: 'person', userId: staff.userId },
       select: { id: true },
@@ -124,9 +117,8 @@ describe('scope', () => {
   });
 
   it('gives the lowest level `subject.read` and nothing else in `organize`', async () => {
-    // The owner's ask, translated out of the university preset (INV-002): "only courses
-    // list". Seeded matrix, 50 §1 — so this asserts what EVERY organisation gets, not a
-    // fixture. It is the half of OPEN-009 that T-086 closed.
+    // The owner's ask, translated out of the university preset: the most junior role sees the subjects
+    // list and nothing else. This asserts what EVERY organisation gets, not a fixture.
     const learner = await addStaff(founder.orgId, {
       name: 'Organize Learner', level: 4, unitName: 'Section B',
     });
@@ -135,8 +127,8 @@ describe('scope', () => {
     expect(held['subject.read']).toBe('own_unit');
     expect(held['unit.read']).toBeUndefined();
     expect(held['role.read']).toBeUndefined();
-    // `person.read` is present at `self` and must stay that way — /app/profile needs it.
-    // "Hidden" is a job for the gate reading the scope, never for removing the grant.
+    // The self-scope read stays, because the profile page needs it: hiding a menu item is the gate's job,
+    // never a reason to remove the grant.
     expect(held['person.read']).toBe('self');
   });
 });
@@ -153,8 +145,8 @@ describe('denies', () => {
   });
 
   it('KEEPS a capability denied only at one unit — deliberately', async () => {
-    // Subtracting a unit-anchored deny would hide a button the person can legitimately
-    // use in the unit next door. The server still refuses the denied unit, with its trace.
+    // Subtracting a unit-scoped deny would hide a button the person can legitimately use next door.
+    // The server still refuses the denied unit, with its trace.
     const staff = await addStaff(founder.orgId, {
       name: 'Partly Denied', level: 1, unitName: 'Section A',
     });
@@ -175,8 +167,8 @@ describe('denies', () => {
     clearGrantCache();
 
     expect(await capabilitiesOf(staff)).toContain('subject.create');
-    // And it does not NARROW the reported scope either (T-086). An `own_unit` deny on one
-    // section is no reason to tell the client a `subtree` allow stops there.
+    // And it does not narrow the reported scope either: a deny on one section is no reason to tell the
+    // client that a wider allow stops there.
     expect((await heldOf(staff))['subject.create']).toBe('subtree');
   });
 
@@ -187,8 +179,8 @@ describe('denies', () => {
     const held = await capabilitiesOf(learner);
     expect(held).not.toContain('unit.create');
 
-    // The route refuses because requireCapability() says so — not because the client
-    // read the list above and declined to render a button.
+    // The route refuses because the middleware says so, not because the client read this list and
+    // declined to render a button.
     const unitId = await unitIdByName(founder.orgId, 'Root');
     const res = await learner.agent
       .post('/api/v1/units')

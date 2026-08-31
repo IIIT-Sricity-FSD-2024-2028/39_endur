@@ -1,8 +1,6 @@
-// T-016 — units, and the invariant that makes the whole product trustworthy. 13, 32.
-//
-// The tree is scope-filtered BY THE API (INV-003). Out-of-scope units are absent, not
-// greyed, and the client never filters for permission reasons. That is the property these
-// tests exist for; the CRUD around it is almost incidental by comparison.
+// Units, and the invariant that makes the whole product trustworthy.
+// The tree is filtered BY THE API: out-of-scope units are absent, not greyed out, and the client never
+// filters for permission reasons. That is what these tests exist for; the CRUD is almost incidental.
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   addStaff,
@@ -48,10 +46,10 @@ describe('GET /units — scope filtering is the API, not the UI', () => {
 
     expect(res.status).toBe(200);
     const names = flatten(res.body.data as Tree);
-    // `subtree` from the anchor: Section A and everything below it.
+    // Their own section and everything below it.
     expect(names.sort()).toEqual(['Section A', 'Team A1']);
-    // Section B is ABSENT — not present-and-greyed, not present-with-a-flag. A senior hat
-    // somewhere does not become senior powers everywhere (INV-005).
+    // The other section is ABSENT - not greyed and not flagged. A senior hat somewhere does not become
+    // senior powers everywhere.
     expect(names).not.toContain('Section B');
     expect(names).not.toContain('Root');
     // Their own unit is the root of what they see, so the tree renders without a gap.
@@ -77,8 +75,7 @@ describe('GET /units — scope filtering is the API, not the UI', () => {
     await denyPerson(founder.orgId, head.userId, 'unit.read', 'all');
 
     const res = await head.agent.get('/api/v1/units');
-    // A deny at scope `all` is not "one fewer unit" — it is the end of the question. No
-    // scope, level or membership overrides it.
+    // A deny at the widest scope is not "one fewer unit": it is the end of the question.
     expect(res.status).toBe(403);
   });
 
@@ -89,15 +86,10 @@ describe('GET /units — scope filtering is the API, not the UI', () => {
   });
 });
 
-/**
- * DEC-082. A `position` is a role-at-unit SLOT shared by everyone holding that role there
- * (`10` §2.1), so `count(kind='position')` answers "how many distinct roles are present"
- * — and every people-count in the product was reading it as "how many people".
- *
- * These tests exist at this level because the rollup moved here from the client under the
- * same decision: people have to be counted DISTINCT across a branch, which per-unit
- * scalars cannot express however they are added up.
- */
+  // A position is a role-at-unit SLOT shared by everyone holding that role there, so counting positions
+  // answers "how many distinct roles are present" - and every people count in the product was reading
+  // it as "how many people".
+  // People also have to be counted DISTINCT across a branch, which per-unit numbers cannot express.
 describe('GET /units — what a people count counts, DEC-082', () => {
   let founder: Session;
 
@@ -128,8 +120,8 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     return into;
   };
 
-  /** Places a person in a unit, REUSING the role-at-unit slot the way `createAssignment`
-   *  does. `addStaff` makes a fresh position per person and so cannot reach this bug. */
+  // Places a person in a unit, REUSING the role-at-unit slot the way the real route does: the general
+  // helper makes a fresh position per person and so cannot reach this bug.
   const place = async (
     name: string,
     unitName: string,
@@ -165,7 +157,7 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     await place('Tutor Two', 'Team A1');
     await place('Tutor Three', 'Team A1');
 
-    // One "Tutor at Team A1" position node, three people in it. The old count said 1.
+    // One position node, three people in it. The old count said 1.
     const slots = await prisma.node.count({
       where: { orgId: founder.orgId, kind: 'position', unit: { name: 'Team A1' } },
     });
@@ -183,7 +175,7 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     expect(after.get('Team A1')?.peopleTotal).toBe(4);
     expect(after.get('Section A')?.peopleTotal).toBe(4);
     expect(after.get('Root')?.peopleTotal).toBe(rootBefore + 1);
-    // The unit's OWN count is untouched by anything below it — it stays the primitive.
+    // The unit's own count is untouched by anything below it: it stays the primitive.
     expect(after.get('Section A')?.peopleCount).toBe(0);
   });
 
@@ -191,9 +183,8 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     const orgId = founder.orgId;
     const before = (await rows(founder)).get('Root')?.peopleTotal ?? 0;
 
-    // The same person, placed a second time in a DIFFERENT unit of the same branch. A
-    // rollup that adds per-unit counts reports them twice; Riverside's demo data has
-    // exactly one such nurse, which is what made a summed total wrong at the root.
+    // The same person placed a second time in a DIFFERENT unit of the same branch: a rollup that adds
+    // per-unit counts reports them twice.
     const personId = await place('Tutor Five', 'Team A1');
     const [roleId, sectionA] = await Promise.all([
       roleIdByLevel(orgId, 2),
@@ -211,7 +202,7 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     const after = await rows(founder);
     expect(after.get('Section A')?.peopleCount).toBe(1);
     expect(after.get('Team A1')?.peopleTotal).toBe(5);
-    // Five in Team A1 plus the one on Section A, who is one of the five: six, not seven.
+    // Five in the inner unit plus the one on the section, who is one of the five: six, not seven.
     expect(after.get('Section A')?.peopleTotal).toBe(5);
     expect(after.get('Root')?.peopleTotal).toBe(before + 1);
   });
@@ -220,9 +211,8 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     const before = (await rows(founder)).get('Section B')?.peopleTotal ?? 0;
     await place('Departed Tutor', 'Section B', { validTo: new Date(Date.now() - 60_000) });
 
-    // `valid_to` retains history rather than deleting access (`10` §2.2), and the GRANT
-    // resolver already ignores a lapsed edge. A count that did not would put somebody in a
-    // unit where they hold no powers at all.
+    // An expired assignment keeps history rather than deleting access, and the resolver already ignores
+    // it - a count that did not would put somebody in a unit where they hold no powers at all.
     expect((await rows(founder)).get('Section B')?.peopleTotal).toBe(before);
   });
 
@@ -245,8 +235,8 @@ describe('GET /units — what a people count counts, DEC-082', () => {
     });
 
     const scoped = await rows(head);
-    // Their world starts at Section A, so Root is absent and their total is their own
-    // branch. A total computed over the WHOLE tree would disclose the size of Section B.
+    // Their world starts at their own section, so the root is absent and their total is their own branch:
+    // a total over the whole tree would disclose the size of the section they cannot see.
     expect(scoped.has('Root')).toBe(false);
     expect(scoped.has('Section B')).toBe(false);
     const whole = await rows(founder);
@@ -345,8 +335,8 @@ describe('POST /units', () => {
       select: { settings: true },
     });
 
-    // A new unit changes what every `subtree` scope reaches. Without the bump, the grant
-    // cache would answer from before the change for the length of its TTL (11 §7).
+    // A new unit changes what every subtree scope reaches, so without the version bump the grant cache
+    // would answer from before the change.
     expect((after.settings as { authzVersion: number }).authzVersion).toBeGreaterThan(
       (before.settings as { authzVersion: number }).authzVersion,
     );
@@ -374,7 +364,7 @@ describe('POST /units/:id/reparent', () => {
       where: { orgId: founder.orgId, type: 'contains', childId: teamA1 },
       select: { parentId: true },
     });
-    // Exactly one parent within a dimension — the old edge is replaced, not accompanied.
+    // Exactly one parent within a dimension: the old edge is replaced, not accompanied.
     expect(edges).toEqual([{ parentId: sectionB }]);
   });
 
@@ -389,8 +379,8 @@ describe('POST /units/:id/reparent', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
-    // Nothing moved. A cycle here does not merely produce wrong answers — it is what the
-    // recursive queries' depth guard exists to survive (10 §6).
+    // Nothing moved: a loop here does not merely produce wrong answers, it is what the recursive queries'
+    // depth guard exists to survive.
     const edges = await prisma.edge.findMany({
       where: { orgId: founder.orgId, type: 'contains', childId: sectionB },
       select: { parent: { select: { name: true } } },
@@ -407,8 +397,8 @@ describe('POST /units/:id/reparent', () => {
   });
 });
 
-/** DEC-083 — the owner's second question: not "is the number right" but "does it mean
- *  anything", asked of a hospital where sixteen of thirty people are Patients. */
+// The composition panel: not "is the number right" but "does it mean anything", asked of a hospital
+// where half the people counted are patients.
 describe('GET /units/:id/composition', () => {
   let founder: Session;
 
@@ -454,7 +444,7 @@ describe('GET /units/:id/composition', () => {
     const res = await founder.agent.get(`/api/v1/units/${root}/composition`);
     expect(res.status).toBe(200);
     const rows = res.body.data.byRole as Array<{ roleName: string; count: number; level: number }>;
-    // Level ascending, so the panel reads the way /app/roles does rather than by size.
+    // Ordered by level, so the panel reads the way the roles page does rather than by size.
     expect(rows.map((row) => row.level)).toEqual([...rows.map((row) => row.level)].sort());
     expect(rows.find((row) => row.roleName === 'Learner')?.count).toBe(2);
     expect(rows.find((row) => row.roleName === 'Tutor')?.count).toBe(1);
@@ -470,7 +460,7 @@ describe('GET /units/:id/composition', () => {
     const tutors = (res.body.data.byRole as Array<{ roleName: string; count: number }>).find(
       (row) => row.roleName === 'Tutor',
     );
-    // Two positions, one Tutor. The row is distinct within itself.
+    // Two positions, one role: the row is distinct within itself.
     expect(tutors?.count).toBe(2);
   });
 
@@ -485,8 +475,8 @@ describe('GET /units/:id/composition', () => {
       total: number;
       byRole: Array<{ count: number }>;
     };
-    // Somebody holding two roles is honestly in both rows, so the sum may pass the total.
-    // The panel says so out loud; what must never happen is the total being inflated.
+    // Somebody holding two roles is honestly in both rows, so the rows may sum past the total. The panel
+    // says so out loud; what must never happen is the TOTAL being inflated.
     expect(byRole.reduce((sum, row) => sum + row.count, 0)).toBeGreaterThan(total);
     const distinct = await prisma.edge.findMany({
       where: { orgId: founder.orgId, type: 'member', child: { kind: 'position' } },
@@ -504,14 +494,13 @@ describe('GET /units/:id/composition', () => {
     const root = await unitIdByName(founder.orgId, 'Root');
     const sectionA = await unitIdByName(founder.orgId, 'Section A');
 
-    // Root is outside their subtree entirely, so it is a 404 — not a 403, which would
-    // confirm it exists (13 §5).
+    // The root is outside their subtree entirely, so it is a 404 - not a 403, which would confirm it exists.
     expect((await head.agent.get(`/api/v1/units/${root}/composition`)).status).toBe(404);
 
     const mine = await head.agent.get(`/api/v1/units/${sectionA}/composition`);
     const whole = await founder.agent.get(`/api/v1/units/${root}/composition`);
-    // And their own branch's breakdown is smaller than the org's — a composition that
-    // walked the real subtree would leak the size of Section B through its role rows.
+    // And their own branch's breakdown is smaller than the organisation's: a composition that walked the
+    // real subtree would leak the size of the section they cannot see.
     expect(mine.body.data.total).toBeLessThan(whole.body.data.total);
   });
 });
@@ -542,10 +531,8 @@ describe('DELETE /units/:id', () => {
     const res = await withCsrf(founder, 'delete', `/api/v1/units/${sectionA}`).send({});
 
     expect(res.status).toBe(409);
-    // In the ORG'S noun. This line asserted `/1 unit/` until T-044, which is to say it was
-    // pinning the bug in place: the message said "unit" because the code hardcoded it, and
-    // the test agreed. The count and the word have to agree too — see vocabulary-server
-    // for the full assertion (22 §5, §6).
+    // In the ORGANISATION'S noun. This line used to assert the English word, which is to say it pinned the
+    // bug in place - and the count and the word have to agree too.
     expect(res.body.error.message).toMatch(/1 section/);
   });
 
@@ -578,8 +565,7 @@ describe('tenant isolation on by-id routes — D-001 until RLS lands', () => {
     const theirUnit = await unitIdByName(theirs.orgId, 'Section A');
 
     const res = await withCsrf(mine, 'patch', `/api/v1/units/${theirUnit}`).send({ name: 'Taken' });
-    // 404 rather than 403: a 403 would confirm the unit exists to someone who cannot see
-    // it, which leaks the other organisation's structure (13 §5).
+    // 404 rather than 403: a 403 would confirm the unit exists to somebody who cannot see it.
     expect(res.status).toBe(404);
 
     const untouched = await prisma.node.findUniqueOrThrow({

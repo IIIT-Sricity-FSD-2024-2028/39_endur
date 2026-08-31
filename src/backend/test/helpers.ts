@@ -1,12 +1,8 @@
-// Shared test fixtures. 51 §4.
-//
-// Every integration test needs the same three things: an organisation that is actually set
-// up, a signed-in agent with a CSRF token, and a way to add a second person at a chosen
-// unit so scope filtering can be observed rather than assumed.
-//
-// The second person is created through Prisma rather than through the people API on
-// purpose — these fixtures must not depend on the feature under test in the file that uses
-// them, or a broken endpoint makes its own test pass by never running.
+// Shared test fixtures.
+// Every integration test needs the same three things: an organisation that is really set up, a signed-in
+// agent with a CSRF token, and a way to add a second person at a chosen unit so scope can be observed.
+// The second person is created through Prisma rather than the people API, so a broken endpoint cannot
+// make its own test pass by never running.
 import request from 'supertest';
 import type { Agent } from 'supertest';
 import { expect } from 'vitest';
@@ -25,7 +21,7 @@ export type Session = {
   orgId: string;
   userId: string;
   csrf: string;
-  /** The credentials this session was made with, for the tests that sign in a SECOND time. */
+  // The credentials this session was made with, for tests that sign in a second time.
   email: string;
   password: string;
 };
@@ -33,18 +29,9 @@ export type Session = {
 export const withCsrf = (session: Session, method: 'post' | 'patch' | 'put' | 'delete', path: string) =>
   session.agent[method](path).set('X-CSRF-Token', session.csrf);
 
-/**
- * Register an organisation and sign in as its founder.
- *
- * `tier` DEFAULTS TO BRONZE, and that default is chosen to leave every existing test saying
- * exactly what it said before DEC-048. Until T-088 no organisation had a `Subscription` row at
- * all and `requireEntitlement` fell through to bronze for all of them (D-012), so bronze is
- * what these fixtures have always effectively been. Registering at bronze keeps that true
- * while making it a row somebody chose rather than a fallback nobody noticed.
- *
- * A test that needs a paid surface asks for one here, or upserts the row directly the way
- * results.test.ts does.
- */
+// Registers an organisation and signs in as its founder.
+// The tier defaults to bronze, which is what these fixtures have always effectively been - now as a row
+// somebody chose rather than a fallback nobody noticed. A test that needs a paid surface asks for one.
 export async function registerOrg(industry = 'custom', tier: SignupTier = 'bronze'): Promise<Session> {
   const agent = request.agent(app);
   const email = `${unique('founder')}@example.test`;
@@ -102,6 +89,7 @@ export const SETUP_LABELS = {
 };
 
 /** Register, then run the wizard's single commit. The org that comes out is usable. */
+// Registers an organisation AND runs the setup wizard, so it has real units, roles and grants.
 export async function setUpOrg(industry = 'university', tier: SignupTier = 'bronze'): Promise<Session> {
   const session = await registerOrg(industry, tier);
   const res = await withCsrf(session, 'post', '/api/v1/org/setup').send({
@@ -115,6 +103,7 @@ export async function setUpOrg(industry = 'university', tier: SignupTier = 'bron
   return session;
 }
 
+// The id of a unit, by name.
 export const unitIdByName = async (orgId: string, name: string): Promise<string> => {
   const unit = await prisma.node.findFirstOrThrow({
     where: { orgId, kind: 'unit', name },
@@ -123,6 +112,7 @@ export const unitIdByName = async (orgId: string, name: string): Promise<string>
   return unit.id;
 };
 
+// The id of a role, by level.
 export const roleIdByLevel = async (orgId: string, level: number): Promise<string> => {
   const role = await prisma.node.findFirstOrThrow({
     where: { orgId, kind: 'role', level },
@@ -131,12 +121,8 @@ export const roleIdByLevel = async (orgId: string, level: number): Promise<strin
   return role.id;
 };
 
-/**
- * Add a second staff member holding one position, and sign them in.
- *
- * The unit is the ANCHOR — the crux of INV-005. Their powers apply where the position
- * sits, not everywhere their role's name suggests.
- */
+// Adds a second member of staff holding one position, and signs them in.
+// The unit is the ANCHOR: their powers apply where the position sits, not everywhere the role name suggests.
 export async function addStaff(
   orgId: string,
   opts: { name: string; level: number; unitName: string },
@@ -172,7 +158,7 @@ export async function addStaff(
   return { agent, orgId, userId: user.id, csrf: csrf.body.token as string, email, password };
 }
 
-/** Give one person an explicit deny. INV-004 says it beats everything, and tests say so too. */
+// Gives one person an explicit deny, so a test can prove a deny beats an allow.
 export async function denyPerson(
   orgId: string,
   userId: string,

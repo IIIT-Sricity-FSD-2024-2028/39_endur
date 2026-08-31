@@ -1,15 +1,8 @@
-// T-052 — the two guards the powers grid was specified with and shipped without, plus the
-// row labels it was specified with and shipped wrong. 33, 11 §5b, D-008.
-//
-// `T-017` built every route on this screen and `roles.test.ts` covers them. What it did not
-// build is the two refusals `33` spends two whole sections on:
-//
-//   § The lockout guard      a save leaving nobody able to edit powers is a 409
-//   § The escalation bound   a save raising a role above the saver is a 403 WOULD_ESCALATE
-//
-// Both were absent from `PUT /grants`, which carried `requireCapability('grant.update')` and
-// nothing else. That is `D-018`'s shape one screen along, and `33` names this screen as the
-// worse of the two: "editing a role's row raises everyone holding it".
+// The two refusals the powers grid was specified with and shipped without, plus its row labels:
+//   the lockout guard   - a save leaving nobody able to edit powers is a 409
+//   the escalation bound - a save raising a role above the saver is refused
+// Both were missing from the save route, which carried the capability check and nothing else - and
+// this is the screen where it matters most, because editing a role's row raises everyone holding it.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CAPABILITIES } from '@endur/shared';
 import { addStaff, setUpOrg, withCsrf, type Session } from './helpers.js';
@@ -25,13 +18,12 @@ const rolesOf = async (session: Session): Promise<Role[]> =>
 const put = (session: Session, cells: Cell[]) =>
   withCsrf(session, 'put', '/api/v1/grants').send({ cells });
 
-/* ------------------------------------------------------------------ D-008 */
+// The row labels.
 
 describe('the row labels are the ORGANISATION’s words — D-008', () => {
   let founder: Session;
   beforeAll(async () => {
-    // `setUpOrg` renames `campaign` to "Review round" and `subject` to "Module". The whole
-    // point of the fixture is that nothing here matches the code's own vocabulary.
+    // The fixture deliberately renames things, so nothing here matches the code's own vocabulary.
     founder = await setUpOrg();
   });
 
@@ -41,8 +33,7 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
     const catalogue = res.body.data as Array<{ key: string; label: string }>;
     const label = (key: string) => catalogue.find((entry) => entry.key === key)?.label;
 
-    // What shipped was "launch campaigns" — a hardcoded domain noun on the one grid a hotel
-    // administrator reads, which is INV-001 broken by a string derivation nothing audits.
+    // What shipped was a hardcoded domain noun on the one grid a hotel administrator reads.
     expect(label('campaign.launch')).toBe('open review rounds for answers');
     expect(label('subject.create')).toBe('add modules');
     expect(label('unit.reparent')).toBe('move sections to a different parent');
@@ -53,11 +44,8 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
   });
 
   it('says something a person would say for the objects that have NO label', async () => {
-    // `role`, `person`, `template` and `org` have no entry in `organization.labels` at all,
-    // and 33 § Interactions says deciding what those rows say is this document's work —
-    // which is why D-008 was filed rather than guessed at. The answer: they are Endur's own
-    // furniture, not the customer's world, so they correctly stay literal. That is INV-001's
-    // own carve-out ("Structural words … stay literal"), not an exception to it.
+    // Some objects have no entry in the organisation's labels at all - they are the product's own
+    // furniture rather than the customer's world, so they correctly stay literal.
     const res = await founder.agent.get('/api/v1/authz/capabilities');
     const catalogue = res.body.data as Array<{ key: string; label: string }>;
     const label = (key: string) => catalogue.find((entry) => entry.key === key)?.label;
@@ -67,36 +55,32 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
     expect(label('template.clone')).toBe('copy a template to build from');
     expect(label('org.delete')).toBe('delete the entire organisation');
 
-    // And the ones that are neither a label nor a plain plural — the cases the old
-    // derivation could not have reached however it was written.
+    // And the ones that are neither a label nor a plain plural: the cases a string derivation could not
+    // have reached however it was written.
     expect(label('grant.update')).toBe('change what every role is allowed to do');
     expect(label('audit.read')).toBe('read the activity log');
     expect(label('simulator.run')).toBe('test what somebody else can see');
   });
 
   it('no label is a derivation artefact', async () => {
-    // The old rule was `${verb} ${object}s`.replace(/ss$/, 'ses'), and nobody had read its
-    // output for the objects added after it was written: `results.read` produced "read
-    // resultses", `apikey.create` produced "create apikeys", `actionplan.read` produced
-    // "read actionplans". A table cannot drift like that; this asserts it has not.
+    // The old rule glued the verb to a pluralised object and produced phrases like "read resultses".
+    // A table cannot drift like that; this asserts it has not.
     const res = await founder.agent.get('/api/v1/authz/capabilities');
     const catalogue = res.body.data as Array<{ key: string; label: string }>;
 
-    // Against the catalogue itself and not a number typed here: a literal count fails on
-    // the day a module is added, which reports "a capability was added" as "the labels are
-    // wrong". What this test is actually about is the loop below (T-094).
+    // Checked against the catalogue itself rather than a number typed here.
     expect(catalogue).toHaveLength(CAPABILITIES.length);
     for (const entry of catalogue) {
-      // A missing phrase falls back to the raw key, deliberately: a key on screen is obvious
-      // where a plausible-looking derivation would ship.
+      // A missing phrase falls back to the raw key deliberately: a key on screen is obvious, where a
+      // plausible-looking derivation would ship.
       expect(entry.label).not.toBe(entry.key);
       expect(entry.label).not.toMatch(/eses\b|apikeys|actionplans|checkins/);
     }
   });
 
   it('uses the same words in a WARNING, because it is the same sentence', async () => {
-    // A fresh org has one warning and it names no object, so provoke one that does: a deny
-    // sitting on top of that role's own allow (INV-004 — the allow beneath never applies).
+    // A fresh organisation's only warning names no object, so this provokes one that does: a deny sitting
+    // on top of that role's own allow.
     const roles = await rolesOf(founder);
     const tutorId = roles.find((role) => role.level === 3)?.id ?? '';
     const shadow = await put(founder, [
@@ -114,9 +98,8 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
     expect(res.status).toBe(200);
     const messages = (res.body.data as Array<{ message: string }>).map((w) => w.message);
 
-    // The warnings and the row labels are ONE string builder. A second one would drift, and
-    // "both allowed and denied launch campaigns" is the drift arriving — in a sentence, to
-    // an administrator, on a screen whose whole claim is that it explains itself.
+    // The warnings and the row labels come from ONE string builder: a second one would drift, and the
+    // drift would arrive as a sentence to an administrator on a screen that claims to explain itself.
     expect(messages).toContainEqual(
       expect.stringContaining('“open review rounds for answers”'),
     );
@@ -124,7 +107,7 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
   });
 });
 
-/* ------------------------------------------------- 33 § The lockout guard */
+// The lockout guard.
 
 describe('the lockout guard — 33 § "the one unrecoverable mistake"', () => {
   let founder: Session;
@@ -139,9 +122,8 @@ describe('the lockout guard — 33 § "the one unrecoverable mistake"', () => {
   });
 
   it('refuses a save that would leave nobody able to edit powers', async () => {
-    // The seeded matrix gives `grant.update` to level 1 alone (11 §8), so removing it there
-    // removes it everywhere — and the capability that would put it back is the one just
-    // removed. There is no undo, because undo is a grid edit.
+    // Only the top level holds the grid capability, so removing it there removes it everywhere - and the
+    // capability that would put it back is the one just removed.
     const res = await put(founder, [
       { roleId: principalId, capability: 'grant.update', scope: null },
     ]);
@@ -151,15 +133,10 @@ describe('the lockout guard — 33 § "the one unrecoverable mistake"', () => {
   });
 
   it('allows the same removal when the save hands it to another role first', async () => {
-    // The guard is about the RESULTING matrix, never about the submitted cells. Handing the
-    // grid to a different role in one save is legal and sensible, and the guard must not
-    // stand in the way of it.
-    //
-    // A SEPARATE ORGANISATION, because this save is a one-way door: the founder is a
-    // Principal, so giving the grid away takes their own access with it. That is not a flaw
-    // in the test — it is exactly the case 33 says the SCREEN must warn about before saving
-    // ("You will not be able to edit powers after this"), and the assertion below is what
-    // makes the warning necessary rather than decorative.
+    // The guard is about the RESULTING matrix, never the submitted cells: handing the grid to a different
+    // role in one save is legal and must not be blocked.
+    // A separate organisation, because that save is a one-way door - which is exactly the case the SCREEN
+    // is supposed to warn about before saving.
     const org = await setUpOrg();
     const roles = await rolesOf(org);
     const theirPrincipal = roles.find((role) => role.level === 1)?.id ?? '';
@@ -172,8 +149,8 @@ describe('the lockout guard — 33 § "the one unrecoverable mistake"', () => {
     expect(res.status).toBe(200);
     clearGrantCache();
 
-    // And they cannot get it back. The server is right to refuse — they no longer hold
-    // `grant.update` — which is why the guard alone is not enough and the screen has to ask.
+    // And they cannot get it back: the server is right to refuse, which is why the guard alone is not
+    // enough and the screen has to ask first.
     const undo = await put(org, [
       { roleId: theirPrincipal, capability: 'grant.update', scope: 'all', effect: 'allow' },
     ]);
@@ -181,9 +158,8 @@ describe('the lockout guard — 33 § "the one unrecoverable mistake"', () => {
   });
 
   it('counts a DENY as not holding it — INV-004', async () => {
-    // A role both allowed and denied holds nothing, because a deny beats an allow
-    // absolutely. A guard that counted rows rather than outcomes would wave this through and
-    // lock the organisation out with a matrix that LOOKS like it has a holder.
+    // A role both allowed and denied holds nothing, so a guard that counted rows rather than outcomes
+    // would wave this through and lock the organisation out with a matrix that LOOKS like it has a holder.
     const res = await put(founder, [
       { roleId: principalId, capability: 'grant.update', scope: 'all', effect: 'deny' },
     ]);
@@ -198,7 +174,7 @@ describe('the lockout guard — 33 § "the one unrecoverable mistake"', () => {
   });
 });
 
-/* ------------------------------------------- 33 § The escalation bound */
+// The escalation bound.
 
 describe('the escalation bound on the grid — INV-012', () => {
   let founder: Session;
@@ -212,9 +188,8 @@ describe('the escalation bound on the grid — INV-012', () => {
     sectionHeadId = roles.find((role) => role.level === 2)?.id ?? '';
     tutorId = roles.find((role) => role.level === 3)?.id ?? '';
 
-    // A Section Head handed the powers grid — which is the realistic case, and the whole
-    // reason the bound exists. They may edit the matrix; they may not write a row into it
-    // that is stronger than they are.
+    // A Section Head handed the powers grid, which is the realistic case: they may edit the matrix, and
+    // may not write a row into it that is stronger than they are.
     const handover = await put(founder, [
       { roleId: sectionHeadId, capability: 'grant.update', scope: 'all', effect: 'allow' },
     ]);
@@ -227,15 +202,14 @@ describe('the escalation bound on the grid — INV-012', () => {
   });
 
   it('refuses a capability the saver does not hold AT ALL', async () => {
-    // `org.delete` is level 1 only. Nothing about `grant.update` implies it.
+    // That capability is top-level only, and nothing about holding the grid implies it.
     const res = await put(delegate, [
       { roleId: tutorId, capability: 'org.delete', scope: 'all', effect: 'allow' },
     ]);
 
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('WOULD_ESCALATE');
-    // NAMES THE CAPABILITY. INV-012's message is the only actionable part of the refusal,
-    // and a generic sentence on a button that worked one row above reads as a bug.
+    // It names the capability: a generic sentence on a button that worked one row above reads as a bug.
     expect(res.body.error.details.capability).toBe('org.delete');
     expect(res.body.error.message).toMatch(/do not hold it yourself/i);
   });
@@ -243,9 +217,8 @@ describe('the escalation bound on the grid — INV-012', () => {
   it('refuses a capability the saver holds only in PART of the organisation', async () => {
     const mine = await delegate.agent.get('/api/v1/auth/me');
     const held = mine.body.capabilities as Record<string, string>;
-    // The delegate holds `unit.update` at `subtree` — and so does the FOUNDER (50 §1 seeds
-    // level 1 that way, because a subtree from the root is the whole org). The scope word is
-    // identical; what differs is where it is anchored, which is the entire point.
+    // The delegate and the founder hold the same scope WORD - what differs is where it is anchored,
+    // which is the entire point.
     expect(held['unit.update']).toBe('subtree');
 
     // A grid cell names no unit. The role could be given to anybody anywhere, so a saver who
@@ -262,10 +235,9 @@ describe('the escalation bound on the grid — INV-012', () => {
   });
 
   it('allows a capability the saver DOES hold across the whole organisation', async () => {
-    // Templates are org-wide and have no unit (50 §1), so `template.update` is seeded at
-    // `all` even for a Section Head. Their reach is genuinely the whole organisation and the
-    // bound has nothing to object to — same role, same person, different answer, decided by
-    // where the grant reaches rather than by how senior the saver is.
+    // Templates are organisation-wide and have no unit, so this capability is seeded at the widest scope
+    // even for a section head: their reach really is the whole organisation, so the bound has nothing to
+    // object to. Same role, same person, different answer - decided by where the grant reaches.
     const mine = await delegate.agent.get('/api/v1/auth/me');
     expect((mine.body.capabilities as Record<string, string>)['template.update']).toBe('all');
 
@@ -297,9 +269,8 @@ describe('the escalation bound on the grid — INV-012', () => {
   });
 
   it('is computed from GRANTS, not from the role level', async () => {
-    // The same property `escalation.test.ts` asserts for positions, and for the same reason:
-    // a level comparison would re-introduce the integer-level model through a side door
-    // (DEC-002, CONF-002) and would be wrong the moment somebody edits this very grid.
+    // The same property the assignment tests assert, and for the same reason: a level comparison would
+    // be wrong the moment somebody edits this very grid.
     const grant = await founder.agent.get('/api/v1/grants');
     const cells = grant.body.data as Cell[];
     const headHasOrgDelete = cells.some(
@@ -323,9 +294,8 @@ describe('the escalation bound on the grid — INV-012', () => {
   });
 
   it('leaves the audit trail the grid is required to write', async () => {
-    // INV-007. A refused save must write NOTHING, or the log claims a change that did not
-    // happen — the guard runs as middleware, before the transaction opens, which is what
-    // makes that true rather than hoped for.
+    // A refused save must write NOTHING, or the log claims a change that did not happen. The guard runs
+    // as middleware, before the transaction opens, which is what makes that true.
     const before = await prisma.auditLog.count({
       where: { orgId: founder.orgId, action: 'grant.update' },
     });
@@ -341,7 +311,7 @@ describe('the escalation bound on the grid — INV-012', () => {
   });
 });
 
-/* ------------------------------------------------------------------ D-047 */
+/* ---- a self-scoped cell is bounded by holding it, not by holding it everywhere ---- */
 
 describe('a `self` cell is bounded by holding it, not by holding it everywhere — F2', () => {
   let founder: Session;
@@ -395,7 +365,7 @@ describe('a `self` cell is bounded by holding it, not by holding it everywhere �
   });
 });
 
-/* ------------------------------------------------------------------ D-048 */
+/* ---- the grid says when a role still holds only its starter row ---- */
 
 describe('the grid says when a role started from the clamped starter row — F4', () => {
   it('warns for the roles below the fourth, and not for the four the matrix describes', async () => {

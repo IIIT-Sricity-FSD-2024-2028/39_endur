@@ -1,7 +1,6 @@
-// 18 §2 — the bracketed on-disk log format, and the one property that makes it safe to
-// adopt: it is REVERSIBLE. /ops/logs and the log export both read these files through
-// `parseLogLine`, so a format the parser cannot turn back into the record that produced it
-// is not a nicer log, it is a broken log viewer. Every test here is a round trip.
+// The bracketed on-disk log format, and the property that makes it safe to use: it is REVERSIBLE.
+// The operator log viewer and the export both read these files back, so a format the parser cannot
+// turn into the record that produced it is a broken viewer, not a nicer log. Every test is a round trip.
 import { describe, expect, it } from 'vitest';
 import { formatLogRecord, localStamp, parseStamp } from '../lib/logFormat.js';
 import { parseLogLine } from '../platform/logs/parser.js';
@@ -68,7 +67,7 @@ describe('the on-disk line', () => {
         stack: 'ConflictError: x\n    at assertSomebody (/a/service.ts:304:9)',
       },
     });
-    // The tag is the code, so the eye finds it without reading the sentence.
+    // The tag is the error code, so the eye finds it without reading the sentence.
     expect(line).toContain('[WARN] [CONFLICT]');
     expect(parsed.msg).toBe('CONFLICT');
     expect(parsed.status).toBe(409);
@@ -77,7 +76,7 @@ describe('the on-disk line', () => {
       message: 'Keep at least one role able to change powers.',
       stack: 'ConflictError: x\n    at assertSomebody (/a/service.ts:304:9)',
     });
-    // A field nobody named still travels, and still looks unusual (72 § Data contract).
+    // A field nobody named still travels, and still looks unusual.
     expect(parsed.extra).toEqual({ code: 'CONFLICT' });
   });
 

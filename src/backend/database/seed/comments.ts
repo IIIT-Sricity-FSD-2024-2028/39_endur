@@ -1,11 +1,6 @@
-// Written comment pools. 50 §3, §8.
-//
-// A WRITTEN pool, not faker, and not lorem ipsum. Generated text destroys the illusion the
-// moment anybody reads one line of it, and the comment list is the part of the results
-// screen an evaluator actually leans in to read.
-//
-// Three pools per tone so the same sentence does not repeat down a column, and separate
-// vocabularies per industry so a hotel's comments do not read like a university's.
+// The pools of written comments used by the seed.
+// Real sentences, not generated text: the comment list is the part of a results screen people actually read.
+// Several pools per tone so nothing repeats down a column, and a separate vocabulary per industry.
 
 export type Tone = 'positive' | 'mixed' | 'negative';
 
