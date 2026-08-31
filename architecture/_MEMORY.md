@@ -2923,6 +2923,111 @@ DEC-113  BUILT   2026-08-31  origin:U  task:T-108
            schema.prisma `Subscription.lapsedFrom`; components/billing/PlanNoticeBanner.tsx;
            components/platform/OrgRow.tsx; 16 §7 §7d §8, 49, 70, 10 §.
   see      DEC-098, DEC-097, DEC-096, DEC-080, OPEN-005, 16 §7, T-108
+
+DEC-114  BUILT   2026-08-31  origin:U  task:T-109
+         SUPERSEDES: 19 §14's *"Operator impersonation ('log in as this customer') -- not
+         building"* row. it is the ONLY line this overturns; INV-011 and DEC-033 are untouched,
+         and are what the design is built on top of rather than around.
+  decision AN OPERATOR MAY ENTER A CUSTOMER'S OWN CONSOLE, AND THEIR POWERS THERE ARE GRANTS
+           RATHER THAN A BYPASS. one hour, a typed reason the customer reads verbatim on every
+           page, a synthetic member under the OPERATOR'S OWN NAME, and a deny list resolved as
+           `deny` grants at `all` scope. there is no `if (support)` anywhere in the chain.
+  why      the requirement came from outside: EVERY WORKFLOW IN THE PRODUCT MUST BE REACHABLE BY
+           THE SUPERUSER. 19 §5 already conceded the gap in words -- *"when a customer reports
+           'the results page looks wrong', an operator cannot look at their results... that is
+           slower, and it is the correct trade"* -- and named the workaround as *"the customer
+           grants a time-boxed in-org account through the normal person.create path"*. that
+           workaround IS this feature, done by hand and badly: an account the customer must
+           create, that nobody revokes, that costs a seat, that appears in their people list and
+           in their audiences, and whose audit rows name a person rather than an Endur employee.
+  why      19 §14'S OBJECTION WAS RIGHT AND IT WAS NARROW. read it again: *"no amount of consent
+           UI makes an Endur employee READING FEEDBACK compatible with what 01 §6 promises."*
+           the objection is to reading feedback, not to entering. so the feature is built with
+           the reading removed rather than with the objection argued away.
+  what     `SUPPORT_DENIED_CAPABILITIES` (packages/shared/src/support.ts) -- ten capabilities in
+           three groups. FEEDBACK CONTENT (response.read/export, results.read/export,
+           analysis.read) is INV-011 restated for a door far wider than the aggregate seam.
+           PERSONAL CONTENT (reflection.read, actionplan.read, checkin.read) is 44's private
+           loop between two named people, which is the same broken promise wearing a different
+           noun. IRREVERSIBLE OR FINANCIAL (org.delete, billing.update) is neither -- an
+           operator has `platform.plan.override` for the second, which takes no money and writes
+           no payment, and there is no right verb for the first.
+  what     A DENY LIST, NOT AN ALLOW LIST, and the direction is the decision. an allow list is a
+           thing somebody forgets to add to: ship a capability, the operator silently does not
+           hold it, it reads as a bug, and it gets "fixed" by widening. a deny list fails the
+           other way -- ship a capability and they hold it, and the only ones they do not hold
+           are the ones written down with a reason in the file a reviewer opens.
+  what     THE HOOK IS ONE `if` IN `authz/collect.ts`, on the NO-PERSON-NODE branch. every real
+           member of every organisation has a person node, so that branch is dead for them and
+           costs nothing; the synthetic member deliberately has none. putting it there rather
+           than in requireCapability is the whole difference between a grant and a bypass --
+           `resolve`, `visibleUnits` and `heldCapabilities` all read collectGrants, so all three
+           agree about what an operator holds without any of them being told operators exist,
+           and a fourth reader added later inherits it.
+  holds    INV-004 IS WHAT ENFORCES THE DENY LIST, unmodified. the operator holds the allow AND
+           the deny for `results.read`; the deny wins because a deny always wins. that also
+           makes the refusal `explicit_deny` rather than `no_grant`, which is the true sentence:
+           `no_grant` means "go and ask somebody", and there is nobody to ask.
+  holds    INV-007 SURVIVES ACROSS THE TABLE BOUNDARY, and that is what the synthetic `users`
+           row is FOR. platform_users and users are different tables (DEC-033) and a tenant's
+           audit row can only point at the second -- so without the synthetic member a support
+           action would appear in the customer's own log as an unattributed gap.
+  holds    INV-011 AND THE PLATFORM SEAM ARE UNTOUCHED. `platform/db.ts` was NOT widened:
+           `Answer` is still unreachable, `Response` is still count-only, and `User` /
+           `SupportSession` are not in WRITABLE_MODELS. the two writes live in `db/support.ts`
+           with the base client, because the allowlist is not per-function -- adding `User`
+           there would make user.create reachable from every handler in a 900-line file forever.
+           one operation, one file, said at the top of it.
+  holds    INV-003. requirePlatform and requireCapability still never appear on one route
+           (19 §9). the enter route is a PLATFORM route answering a platform question -- *"may
+           this operator open a session"* -- and every question afterwards is asked on a
+           different route by requireCapability, exactly as it is for the customer's own staff.
+           that the response sets a tenant cookie does not make it a tenant route.
+  what     THE BANNER IS NOT DECORATION, IT IS HALF THE ARGUMENT. `<SupportBanner>` sits in
+           <AppShell> above the top bar, undismissable, carrying the operator's name and their
+           typed reason verbatim. THE FIRST DRAFT WAS WRONG AND THE BUG IS WORTH RECORDING: it
+           rendered from the caller's own session, so the only person who ever saw the
+           disclosure was the operator it was disclosing. the customer is signed in to a
+           DIFFERENT session and carries no support flag. `SupportContext.viewer` plus one
+           indexed lookup on /auth/me is the fix -- a promise legible only to the person being
+           watched is not a promise.
+  cost     ONE EXTRA QUERY PER BOOT for every customer, to answer "is somebody from Endur inside
+           my organisation right now". paid deliberately: there is no version of this feature
+           worth having that would not pay it.
+  cost     THE OPERATOR STILL CANNOT DEBUG A RESULTS PAGE. 19 §5's honest paragraph survives
+           this entry intact for exactly the surfaces it was about -- what changed is that every
+           OTHER workflow is now reachable, which was the requirement.
+  not      NOT "log in as this customer". the operator acts as THEMSELVES: their name, their
+           email, their own row. no real person's audit trail is ever made to say something they
+           did not do, which was the half of impersonation that could never be made safe.
+  not      NOT A CUSTOMER-SIDE REVOKE BUTTON. ending somebody else's session is an action with a
+           target, so it is a capability question, and inventing `support.revoke` would put a
+           customer's staff in the position of cutting the operator off mid-fix on the one
+           screen where the fix is happening. THE HOUR IS THE CONTROL THEY HAVE, and it is
+           printed on the strip beside the disclosure.
+  not      NOT A CONSENT PROMPT. considered and rejected: a request the customer must approve
+           means the organisation that most needs help -- suspended, locked out, nobody reading
+           the email -- is the one nobody can reach. disclosure after the fact, on every page,
+           in an audited register, is both the stronger control and the reachable one.
+  not      NOT A SECOND PERMISSION MODEL. the shape rejected first was `if (principal.support)
+           return next()` in requireCapability, which is four lines and wrong twice: it is a
+           second model that drifts from the first (N-005 one layer down), and it is silently
+           TOTAL -- every capability shipped afterwards held by an operator without anybody
+           deciding it should be.
+  built    2026-08-31, T-109. 15 tests in test/support-access.test.ts. the two that matter are
+           the matched pair at the top: the operator can do the customer's work, AND cannot read
+           one line of their feedback. the deny test walks SUPPORT_DENIED_CAPABILITIES rather
+           than a hardcoded route, so deleting an entry fails there rather than quietly becoming
+           readable.
+  where    packages/shared/src/support.ts (new); platform-capabilities.ts (+2);
+           dto/platform.ts, dto/auth.ts; src/backend/db/support.ts (new); authz/support.ts
+           (new); authz/collect.ts, authz/types.ts (`via: 'support'`); middleware/
+           authenticate.ts, tenantResolver.ts, requireMembership.ts, context.ts;
+           features/platform/{router,service}.ts; features/auth/router.ts;
+           schema.prisma `SupportSession`; migration 20260831170000_support_sessions;
+           components/layout/SupportBanner.tsx; pages/platform/Console/OrgDetail.tsx;
+           store/authSlice.ts; 19 §15, 13 § Platform, 24, 70.
+  see      19 §14 (superseded row), 19 §5, INV-011, INV-004, INV-007, DEC-033, DEC-104, T-109
 ```
 
 ---
@@ -3895,6 +4000,23 @@ CONTESTED  src/frontend/components/** is written by 24 but consumed by every pag
                                     tables in database/schema.prisma. 10 owns the FILE;
                                     19 owns those two MODELS. (plan_prices was a third
                                     until DEC-035 deleted pricing outright.)
+                                    T-109 / DEC-114 adds FOUR paths, and the split is on
+                                    purpose because support access straddles two worlds:
+                                      packages/shared/src/support.ts        -> 19 (§15)
+                                      src/backend/db/support.ts             -> 19, NOT 10.
+                                        it sits in db/ beside graph.ts and tenant.ts because
+                                        it is the one file allowed across the boundary those
+                                        two enforce -- but WHAT it is allowed to do is 19's
+                                        decision, so 19 owns it. 10 still owns the folder.
+                                      src/backend/authz/support.ts          -> 19, NOT 11.
+                                        it MINTS CandidateGrants; it does not change how one
+                                        resolves. 11 owns the engine and every rule in it,
+                                        and this file is a caller that happens to live in
+                                        the same folder. the SupportSession model is 19's,
+                                        like platform_users.
+                                      components/layout/SupportBanner.tsx   -> 24, as chrome
+                                    the collect.ts hook (one `if` on the no-person-node
+                                    branch) is an EDIT to 11's file, not a claim on it.
 49-PAGE-plan-and-billing.md      -> src/frontend/pages/console/Plan/**
                                     src/backend/features/billing/**
                                     src/frontend/lib/billing.ts

@@ -8,6 +8,7 @@ import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
 import { AmbientBackground } from '../AmbientBackground.js';
 import { PlanNoticeBanner } from '../billing/PlanNoticeBanner.js';
+import { SupportBanner } from './SupportBanner.js';
 import { useAppSelector } from '../../store/index.js';
 
 /** Industries the vibe system has a colour pair for (`endur.css` "the switch"). `custom`
@@ -67,6 +68,17 @@ export function AppShell({
 
       {/* First focusable element on the page. 26 — and it is cheap now, expensive later. */}
       <a className="skip-link" href="#main">Skip to content</a>
+
+      {/* DEC-114. ABOVE THE TOP BAR, and it renders nothing on every ordinary session.
+          `<PlanNoticeBanner>` below is inside the content well because it is a fact about the
+          ORGANISATION and belongs with the organisation's pages; this is a fact about the
+          SESSION — everything under it, the navigation included, is being operated by
+          somebody who does not work here — so it sits outside the frame it describes.
+
+          NOT GATED ON `focused`. The setup wizard hides the sidebar because every item leads
+          somewhere empty; there is no version of "a stranger is signed in to your account"
+          that is worth hiding to keep a screen tidy. */}
+      <SupportBanner />
 
       <TopBar {...(focused ? {} : { onOpenMenu: () => setDrawerOpen(true) })} />
 

@@ -7,6 +7,8 @@
 //
 // Without this, anyone with a senior hat somewhere quietly gains senior powers everywhere.
 import { prisma } from '../db/client.js';
+import { supportGrantWindow } from '../db/support.js';
+import { mintSupportGrants } from './support.js';
 import type { CandidateGrant, Via } from './types.js';
 
 type GrantRow = {
@@ -29,7 +31,23 @@ export async function collectGrants(
     where: { orgId, kind: 'person', userId },
     select: { id: true, name: true },
   });
-  if (!personNode) return [];
+  // DEC-114. NO PERSON NODE IS THE HOOK, and this is the only line the support feature adds
+  // to the resolver's hot path.
+  //
+  // Every real member of every organisation has a person node — it is what `createPerson`
+  // writes and what an assignment hangs off — so this branch is dead for them and costs the
+  // query that was already happening. The synthetic member a support session acts as
+  // deliberately has none (`db/support.ts` explains the four things that absence buys), so
+  // it lands here, and here is where its powers come from.
+  //
+  // Putting the check HERE rather than in `requireCapability` is the difference between a
+  // grant and a bypass. `resolve`, `visibleUnits` and `heldCapabilities` all read this one
+  // function, so all three agree about what an operator holds without any of them being
+  // told that operators exist — and a fourth reader added later inherits it too.
+  if (!personNode) {
+    const window = await supportGrantWindow(orgId, userId, at);
+    return window ? mintSupportGrants(window.expiresAt) : [];
+  }
 
   // Active membership edges: assignments (person → position) and group membership.
   const memberships = await prisma.edge.findMany({

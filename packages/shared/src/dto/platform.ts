@@ -437,3 +437,60 @@ export type EnterpriseRequestRow = {
   handledAt: string | null;
 };
 
+
+/**
+ * SUPPORT ACCESS — DEC-114, `19` §15, `70` § Support access.
+ *
+ * `reason` IS REQUIRED AND HAS NO DEFAULT, and that is the whole difference between this and
+ * the feature `19` §14 refused. An operator who must type why they are entering somebody's
+ * account before the door opens is an operator whose entry has a stated purpose in the
+ * customer's own banner and in two audit trails. A default here would turn every entry into
+ * "routine support", which is what an unexplained entry looks like once there are a hundred
+ * of them.
+ *
+ * There is no `capabilities` field and there must not be one. What the session confers is
+ * decided by `SUPPORT_DENIED_CAPABILITIES` in one file, not negotiated per request — an
+ * operator who can name their own powers at the door is an operator who can name all of them.
+ */
+export const EnterSupport = z.object({
+  reason: textField(500).min(10, 'Say why you are entering this organisation — the customer sees this.'),
+});
+export const EnterSupportDto = dto({ params: OrgIdParam, body: EnterSupport });
+
+export const SupportSessionListQuery = z.object({
+  /** One organisation's history, for the org detail page. Absent = the whole register. */
+  orgId: z.string().uuid().optional(),
+  active: z.coerce.boolean().optional(),
+});
+export type SupportSessionListQuery = z.infer<typeof SupportSessionListQuery>;
+export const SupportSessionListDto = dto({ query: SupportSessionListQuery });
+
+/**
+ * One row of the register. STILL INV-011 — an organisation's name, an operator's name, two
+ * timestamps and a sentence the operator typed. Nothing here came out of a tenant's data.
+ */
+export type SupportSessionRow = {
+  id: string;
+  org: { id: string; name: string };
+  operator: { id: string; name: string; email: string };
+  reason: string;
+  startedAt: string;
+  expiresAt: string;
+  endedAt: string | null;
+  /** Computed, not stored: a row can be over because it was left OR because it ran out. */
+  active: boolean;
+};
+
+/**
+ * What `POST /platform/orgs/:id/support-session` answers with.
+ *
+ * `redirectTo` is a PATH the operator's browser then visits, and the org session cookie has
+ * already been set on this response. It is not a token and it is not a credential — a URL
+ * that granted access would be a credential in a browser history and in a proxy log.
+ */
+export type EnterSupportResponse = {
+  session: SupportSessionRow;
+  redirectTo: string;
+  /** Rendered at the door, so the operator sees the limits BEFORE they are inside them. */
+  deniedCapabilities: string[];
+};

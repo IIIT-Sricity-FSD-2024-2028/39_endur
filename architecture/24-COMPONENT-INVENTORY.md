@@ -908,6 +908,42 @@ the whole reason `lapsed_from` is a column and not a boolean. It carries **no da
 the rules are boundary conditions (the day itself, the day after, one day outside the window)
 and are worth asserting without rendering a shell.
 
+### `<SupportBanner>`  ·  **BUILT 2026-08-31 (`T-109`)**
+```ts
+{}   // reads s.auth.support — see below
+```
+Somebody from Endur is signed in to this organisation (`DEC-114`, `19` §15). **This component is
+not decoration on the support feature — it is half the argument for it.** `19` §14 refused
+operator impersonation, and what it actually refused was an operator inside a customer's account
+*invisibly*. `SUPPORT_DENIED_CAPABILITIES` answers the rest of that row's objection; this
+answers that half.
+
+**Above the top bar, not in the content well**, which is the one thing separating it from
+`<PlanNoticeBanner>` two entries up. A plan notice is a fact about the **organisation** and
+belongs with the organisation's pages. This is a fact about the **session** — every pixel below
+it, the navigation included, is being operated by somebody who does not work here — so it sits
+outside the frame it describes: full bleed, no radius, no margin, the way a browser's own
+permission bar does. It is **not** gated on `focused`: there is no version of *"a stranger is
+signed in to your account"* worth hiding to keep the setup wizard tidy.
+
+**It renders for BOTH sides, and getting that wrong was the bug worth recording.** The first
+draft read the caller's own session, so the only person who ever saw the disclosure was the
+operator it was disclosing — the customer is signed in to a *different* session and carries no
+support flag at all. `SupportContext.viewer` (`'operator' | 'member'`) plus one indexed lookup
+on `/auth/me` is the fix. One shape and one component for both, because they are the same fact
+told to two people and two components would be two places for the wording to drift.
+
+**Undismissable, and there is no setting that hides it.** A banner with a close button is a
+banner that is absent for the whole of the second visit. **Only the operator gets a Leave
+button** — ending somebody else's session is an action with a target and therefore a capability
+question, and a customer-side eject would put their staff in the position of cutting the
+operator off mid-fix. The hour is the control the customer has, and it is printed beside the
+disclosure.
+
+`minutesLeft()` ships beside it and is exported, for `daysUntil()`'s reason. It **floors** — so
+*"1 minute left"* never means ninety seconds — and the timer samples every **30 s**, twice per
+displayed unit, because a per-minute tick is right only half the time.
+
 ### `<OrgRow>`  ·  **BUILT 2026-08-26 (`T-066`)**
 ```ts
 { org: PlatformOrgSummary;

@@ -397,6 +397,9 @@ restated there rather than here because that document owns the surface.
 | GET | `/platform/enterprise-requests` | `platform.enterprise.read` — **owner only** | `T-100` |
 | PATCH | `/platform/enterprise-requests/:id` | `platform.enterprise.update` — **owner only** | `T-100` |
 | POST | `/platform/enterprise-requests/:id/approve` | `platform.enterprise.update` — **owner only** | **Grants Enterprise AND records the sale**, in one transaction — `DEC-111`. Names no amount: the price is read from `PLAN_OPTIONS` server-side, so this does not become a way for an operator to invent revenue |
+| POST | `/platform/orgs/:id/support-session` | `platform.support.enter` | **Opens an hour inside the customer's own console** — `DEC-114`, `19` §15. `reason` is required with no default and a 10-character minimum; the customer reads it verbatim on every page. Regenerates the session (fixation), sets `endur.sid` + `endur.csrf`, and answers `{ session, redirectTo, deniedCapabilities }`. `redirectTo` is a **path** — a URL that granted access would be a credential in a browser history |
+| POST | `/platform/support-session/leave` | **none** — `requirePlatformAuth` only | Ends the row **before** destroying the session, so access is gone even if the destroy fails. Uncapability-gated for `POST /auth/logout`'s reason: giving up access can never be the thing somebody is not permitted to do, and gating it on `platform.support.enter` would trap an operator whose role changed mid-session. Allowlisted in `routes.test.ts` with that reason |
+| GET | `/platform/support-sessions` | `platform.support.read` | The register. **Still INV-011** — an organisation's name, an operator's name and address, two timestamps and one sentence the operator typed. No field on it came out of a tenant's data |
 
 **INV-011 constrains every payload above:** counts, names, dates and enums only. No route on
 this prefix may return a response body, an answer, a comment or a respondent identity.

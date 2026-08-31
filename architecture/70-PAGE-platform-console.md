@@ -352,9 +352,64 @@ already uses.
 
 | Not building | Why |
 |---|---|
-| Reading a customer's responses, results or comments | INV-011. It is the product's central promise; there is no version of this that is acceptable |
-| Impersonation / "log in as" | `19` §14. The most useful support feature and the most dangerous one |
+| Reading a customer's responses, results or comments | INV-011. It is the product's central promise; there is no version of this that is acceptable — **and `DEC-114` did not soften it**: a support session resolves `response.read`, `response.export`, `results.read`, `results.export` and `analysis.read` as `deny` grants at `all` scope, which INV-004 makes unbeatable |
+| ~~Impersonation / "log in as"~~ | **SUPERSEDED 2026-08-31 — `DEC-114`, `19` §15. See "Support access" below.** `19` §14's objection was to an Endur employee *reading feedback*, not to entering, and the built feature removes the reading. It is also not impersonation — the operator acts **as themselves**, in a row under their own name, so no customer's audit trail is ever made to say something they did not do |
 | A ticketing system, threads, or an inbox for replies | A different product. One-way messaging plus a support address covers the actual need at this size |
-| Editing a customer's data — units, people, templates | If an operator can fix it, the customer's administrator can fix it, and then only one of them can be wrong |
+| ~~Editing a customer's data from this page~~ | **NARROWED 2026-08-31 — `DEC-114`.** Still true of `/ops` itself, and structurally so: `platform/db.ts` refuses every write into a tenant, so nothing on this page can edit a customer's units or people. What changed is that an operator can now open the customer's **own** console for an hour, where the customer's own capability checks decide every action and the customer can see them doing it — a different thing from a hidden edit affordance here |
 | Revenue figures | `71`. Owner-only, and a different question |
 | Cross-org search of content | Would require the content access INV-011 forbids |
+
+---
+
+## Support access  ·  **BUILT 2026-08-31 (`T-109`, `DEC-114`)**
+
+Contract: `19` §15 · Component: `<SupportBanner>` (`24`) · Routes: `13` § Platform
+
+### On `/ops/orgs/:id`
+
+A card headed **"Open this organisation's console"**, below the plan and above the message
+composer. One field and one button.
+
+| Element | Behaviour |
+|---|---|
+| The explanation | Names the duration, says the banner cannot be dismissed, and **lists what stays closed** — responses, results, analysis, check-in notes. An operator should meet the limits before they are inside them, not as a 403 |
+| **Why are you going in?** | Required, minimum ten characters. The customer reads it **verbatim** on every page for the next hour, and the field says so under the input |
+| **Open console** | Disabled until the reason is long enough — *the disabled button is the guard, never an early return* (`D-043`). The server's DTO enforces the same minimum, so the button is a convenience and not the control |
+
+**Absent, not disabled, for an operator without `platform.support.enter`** — the rule `DEC-104`
+set for the suspend card, and for its reason: a permanently dead control teaches a support
+operator to distrust every greyed control they meet. Both roles hold it today, so in practice
+the card is always present; the gate is there so that the day it is narrowed, the card vanishes
+rather than mocks.
+
+Pressing it **navigates the whole page** to `/app`, deliberately, rather than routing
+client-side. The response has just set a session cookie for a different world — the ops store
+holds an operator, the auth store holds nothing — and a client-side route change would carry
+both into a console that has never called `/auth/me`. A full navigation means the SPA boots
+from scratch and the banner is on the **first paint**, rather than appearing after a flash of an
+ordinary console.
+
+### Inside the customer's console
+
+`<SupportBanner>` renders above the top bar on every page, for **both audiences**:
+
+| Reader | Sentence |
+|---|---|
+| The operator | *"Support session. You are signed in to this organisation as yourself, and they can see that you are."* + their own reason + **Leave** |
+| The customer's staff | *"**Priya Raman** from Endur support is signed in to your organisation."* + the reason, verbatim + the time left |
+
+Both lines carry the same closing fact — *responses, results and check-in notes stay closed to
+them* — because a customer's first question on reading this is whether Endur can read their
+feedback, and **an assurance that requires navigation is not an assurance**.
+
+### The register
+
+`GET /platform/support-sessions` backs a read-only list: organisation, operator, reason, start,
+expiry, and whether it is still live. `active` is **computed, never stored** — a session is over
+because somebody left *or* because it ran out, and only the first writes a row. A stored boolean
+would be false in the database and true in fact for however long a job took to notice, which is
+exactly the shape of the bug `applyExpiredDowngrade` was (`DEC-113`).
+
+Every entry also writes a `platform_audit_log` row (`support.enter`) carrying the reason, the
+expiry and the deny list as it stood that day — so the register answers *"what could they see"*
+without anybody having to remember what the list said at the time.

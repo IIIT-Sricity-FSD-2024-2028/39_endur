@@ -36,6 +36,9 @@ const VIA: Record<string, string> = {
   group: 'group',
   person: 'grant made to them directly',
   delegation: 'delegation',
+  // DEC-114. The one `via` that is not an edge in the graph. Said in full words because a
+  // bare "support" beside four structural nouns reads as a role somebody was given.
+  support: 'Endur support session',
   default: 'default',
 };
 

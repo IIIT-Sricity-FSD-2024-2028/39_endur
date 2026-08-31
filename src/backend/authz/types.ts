@@ -10,7 +10,15 @@ export type Target =
   | { kind: 'campaign'; unitId?: string }
   | { kind: 'self'; userId: string };
 
-export type Via = 'person' | 'position' | 'role' | 'group' | 'delegation';
+/**
+ * How a grant was REACHED. Five of these are edges in the org graph; `support` is the sixth
+ * and is not — it is DEC-114's minted grant, which belongs to no subject in the tenant
+ * because the principal holding it belongs to no subject in the tenant. It is a member of
+ * this union rather than a special case beside it so that every reader of a decision trace —
+ * the simulator, the audit log, `<DecisionTrace>` — explains a support refusal without ever
+ * being taught that support exists.
+ */
+export type Via = 'person' | 'position' | 'role' | 'group' | 'delegation' | 'support';
 
 /** A grant plus the unit it was reached THROUGH. The anchor is the crux of INV-005. */
 export type CandidateGrant = {
