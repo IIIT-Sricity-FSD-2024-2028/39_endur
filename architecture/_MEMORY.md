@@ -5107,4 +5107,25 @@ N-073  `npm run db:migrate` RAN `prisma migrate dev`, WHICH IS THE ONE COMMAND N
        are HAND-WRITTEN, so there was never a job for `dev` to do. the failed row was cleared
        with `migrate resolve --rolled-back`; a failed row blocks every later migration until it
        is. see N-013, which predicted this in full, and 03 §5.
+
+N-074  <InlineName> COMMITTED TWICE ON ENTER, AND ONLY A NON-IDEMPOTENT CALLER COULD SEE IT.
+       found 2026-08-31 by the owner: naming a unit on /app/structure and pressing Enter created
+       two. the handler called `commit()` and then `blur()`, and `onBlur` IS `commit` -- `blur()`
+       is synchronous, so one keypress ran it twice with the same draft, because react had not
+       re-rendered and `next !== value` was still true the second time.
+       IT HAD ALWAYS DONE THIS. every caller until then was a RENAME, and writing the same name
+       twice is the same name. the structure page's `+` CREATES, and two identical creates are
+       two rows. a bug that is invisible until one caller stops being idempotent is the argument
+       FOR INV-007 rather than against it -- one implementation meant one fix for structure,
+       roles, subjects and setup, and `.blur()` appears nowhere else in the frontend.
+       THE TEST ASSERTED `toHaveBeenCalledWith`, WHICH DOES NOT COUNT, and passed against two
+       calls. for anything whose caller may not be idempotent, assert the COUNT. see N-013's
+       cousin trap in InlineName.test.tsx's own header: `.blur()` on an unfocused element is a
+       no-op, which is why Enter still commits directly rather than delegating to its blur --
+       five page-level tests fire Enter without focusing, and in a browser a keydown implies
+       focus but nothing enforces it.
+       RESOLUTION. a `committed` ref, shaped like the existing `reverting` one, tells the blur
+       Enter caused that there is nothing left to do; `onFocus` clears both, so neither flag
+       survives into an edit it was not set by. `reverting` had the same latent staleness.
+       24 §7's contract -- "Enter commits, Esc reverts, blur commits" -- is unchanged.
 ```

@@ -45,6 +45,18 @@ describe('<InlineName>', () => {
     expect(onCommit).toHaveBeenCalledWith('Provost');
   });
 
+  // The structure page's `+` is what found this: Enter created TWO units. Enter used to
+  // commit and THEN blur, and blur commits -- so every Enter fired twice, with the same
+  // draft both times because neither render had happened yet. A rename survived it (writing
+  // the same name twice is the same name), which is why it sat here unseen until a caller
+  // whose commit was not idempotent used it.
+  it('commits ONCE on Enter, not once for the key and again for the blur it causes', () => {
+    const { input, onCommit } = mount();
+    fireEvent.change(input, { target: { value: 'Provost' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
   it('commits on blur', () => {
     const { input, onCommit } = mount();
     fireEvent.change(input, { target: { value: 'Provost' } });
