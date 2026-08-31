@@ -290,7 +290,6 @@
 }
 .menu-item:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
 .menu-item[aria-current='true'] { background: var(--color-accent-100); color: var(--color-accent-700); }
-.menu-tag { margin-left: auto; }
 
 /* ── Sidebar — 232px, chrome, 40px pilled items inset 8px ─────────────── */
 .shell-rail { flex: none; width: 232px; align-self: stretch; background: var(--color-surface); }
@@ -711,21 +710,6 @@
   margin: 0; font-size: var(--text-meta); line-height: 1.55;
   color: color-mix(in srgb, var(--color-text) 62%, transparent);
 }
-
-/* Development only — `DEMO_ORGS` is [] in a production build, so this never renders
-   there and the credentials are not in the bundle at all (lib/demo.ts). */
-.auth-demo {
-  display: flex; flex-direction: column; gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  border: 1px dashed var(--color-divider);
-}
-.auth-demo-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.auth-demo-row .tag {
-  border: 0; cursor: pointer; font: inherit;
-  font-size: var(--text-meta); padding: 5px 12px;
-}
-.auth-demo-row .tag:hover { background: var(--color-accent-100); color: var(--color-accent-800); }
 
 @media (max-width: 899px) {
   .auth { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); max-width: 480px; }

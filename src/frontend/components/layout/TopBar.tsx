@@ -1,13 +1,11 @@
-// 56px, sticky, and it carries the second most important control in the demo.
-// design_specs/design/02 §3.
+// 56px, sticky. design_specs/design/02 §3.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Icon } from '../Icon.js';
 import { ThemeToggle } from '../ThemeToggle.js';
 import { useAppSelector } from '../../store/index.js';
-import { signOut, switchToDemoOrg } from '../../lib/session.js';
-import { DEMO_ORGS, isDemoBuild } from '../../lib/demo.js';
+import { signOut } from '../../lib/session.js';
 
 export function TopBar({
   onOpenMenu,
@@ -37,74 +35,13 @@ export function TopBar({
         <span>Endur</span>
       </Link>
 
-      <OrgSwitcher name={org?.name ?? ''} />
+      <span className="topbar-org">{org?.name ?? ''}</span>
 
       <div className="topbar-right">
         <ThemeToggle className="topbar-theme" />
         <UserChip name={user?.name ?? ''} email={user?.email ?? ''} />
       </div>
     </header>
-  );
-}
-
-/**
- * The org name, and — in a development build only — a way to become another demo org.
- *
- * When there is nowhere to switch to, this renders as plain text rather than a dead
- * dropdown. A chevron that opens an empty menu is worse than no chevron.
- */
-function OrgSwitcher({ name }: { name: string }): JSX.Element {
-  const org = useAppSelector((s) => s.auth.org);
-  const menu = useMenu();
-
-  if (!isDemoBuild()) return <span className="topbar-org">{name}</span>;
-
-  return (
-    <div className="menu-anchor" ref={menu.anchorRef}>
-      <button
-        type="button"
-        className="btn btn-ghost topbar-org"
-        onClick={menu.toggle}
-        aria-expanded={menu.open}
-        aria-haspopup="menu"
-      >
-        <span>{name}</span>
-        <Icon name="chevron" size={16} />
-      </button>
-
-      {menu.open &&
-        menu.rect &&
-        createPortal(
-          <div
-            ref={menu.panelRef}
-            className="menu is-portal elev-lg"
-            role="menu"
-            style={{ top: menu.rect.bottom + 9, left: menu.rect.left }}
-          >
-            <p className="utility menu-heading">Demo organizations</p>
-            {DEMO_ORGS.map((demo) => (
-              <button
-                key={demo.slug}
-                type="button"
-                role="menuitem"
-                className="menu-item"
-                // Current org first, so the menu reads as a state rather than a list of
-                // strangers.
-                aria-current={demo.name === org?.name}
-                onClick={() => void switchToDemoOrg(demo)}
-              >
-                <Icon name="organization" size={16} />
-                <span>{demo.name}</span>
-                <span className="tag tag-neutral menu-tag">{demo.industry}</span>
-              </button>
-            ))}
-            <p className="text-meta menu-note">
-              Development build only. Each one is a separate account, so this signs in again.
-            </p>
-          </div>,
-          document.body,
-        )}
-    </div>
   );
 }
 

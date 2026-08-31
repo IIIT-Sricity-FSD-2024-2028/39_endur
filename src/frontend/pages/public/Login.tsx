@@ -20,7 +20,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/Icon.js';
 import { ApiError } from '../../lib/api.js';
 import { useSignIn } from '../../lib/auth.js';
-import { DEMO_ORGS, isDemoBuild } from '../../lib/demo.js';
 import { AuthAside } from './AuthAside.js';
 
 /** Mirrors `Credentials` in packages/shared. The server is the authority; this only saves
@@ -206,30 +205,6 @@ export default function Login(): JSX.Element {
           New here? <Link className="btn btn-ghost" to="/start">Create your organization</Link>
         </p>
       </div>
-
-      {isDemoBuild() && (
-        <div className="auth-demo">
-          <p className="text-meta" id="demo-hint">
-            Development build — click to fill:
-          </p>
-          <div className="auth-demo-row">
-            {DEMO_ORGS.map((org) => (
-              <button
-                type="button"
-                key={org.slug}
-                className="tag tag-neutral"
-                onClick={() => {
-                  setEmail(org.email);
-                  setPassword(org.password);
-                  setError(null);
-                }}
-              >
-                {org.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       </div>
 
       <AuthAside />

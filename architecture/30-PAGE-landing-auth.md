@@ -107,9 +107,12 @@ A pending deep link (`location.state.from`, set by `RequireSession`) is honoured
 when the org is configured. Sending someone back to a page that cannot render yet is worse
 than losing their place.
 
-A **demo affordance** is specified in `design_specs/design/03` §3.2: prefilled credentials for
-the seeded orgs, visible only when `NODE_ENV !== 'production'`. It removes a typing beat on
-stage. It must be impossible to render in production — a build-time check, not a runtime flag.
+**No demo affordance.** `design_specs/design/03` §3.2 specifies prefilled credentials for the
+seeded orgs behind a build-time production check. It was built, and it was **removed on
+2026-08-31** — `OPEN-006`(a). A control that only ever renders in the team's own build is a
+second sign-in path to keep working for no user, and this page is now the form and nothing
+else. The seeded organisations still exist and are still signed into by typing the address.
+Do not reintroduce the prefill; §3.2 is superseded on this point.
 
 **Create organization.** Org name, owner name, work email, password. **Four fields, no
 industry picker** (`CONF-011`, amended 2026-08-19): asking here means asking blind, and the

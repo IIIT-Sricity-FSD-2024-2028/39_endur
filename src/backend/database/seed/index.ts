@@ -7,6 +7,7 @@ import { estimateSeconds } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { PRESET_LIST } from '../../presets/index.js';
 import { DEMO_ORGS, seedOrg, type SeededLogin } from './demo.js';
+import { IIIT_NAME, IIIT_SLUG, seedIiitSriCity } from './iiit.js';
 import { seedOperators } from './operators.js';
 
 // Printed at the end of the run, and the same login the dev sign-in box pre-fills.
@@ -73,6 +74,22 @@ async function main(): Promise<void> {
     console.log(`org:    ${spec.name} in ${Date.now() - orgStarted} ms`);
   }
 
+  // The hand-built college. Not a DEMO_ORGS row - its org chart is stated rather than generated,
+  // so it has its own module and its own call. Same skip-if-present guard as the four above.
+  {
+    const existing = await prisma.organization.findUnique({
+      where: { slug: IIIT_SLUG },
+      select: { id: true },
+    });
+    if (existing) {
+      console.log(`skip:   ${IIIT_NAME} already exists`);
+    } else {
+      const orgStarted = Date.now();
+      logins.push(...(await seedIiitSriCity(prisma, DEMO_PASSWORD)));
+      console.log(`org:    ${IIIT_NAME} in ${Date.now() - orgStarted} ms`);
+    }
+  }
+
   const [orgs, subjects, campaigns, responses] = await Promise.all([
     prisma.organization.count(),
     prisma.subject.count(),
@@ -92,7 +109,9 @@ async function main(): Promise<void> {
     console.log('');
     console.log('Sign in with any of these:');
     for (const login of logins) {
-      console.log(`  ${login.org.padEnd(24)} ${login.email.padEnd(32)} ${login.password}`);
+      console.log(
+        `  ${login.org.padEnd(24)} ${login.role.padEnd(26)} ${login.email.padEnd(38)} ${login.password}`,
+      );
     }
   }
 }

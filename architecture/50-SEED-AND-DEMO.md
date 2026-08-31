@@ -249,7 +249,7 @@ Library templates are seeded with `orgId = null` (`10` §4.2) and cloned into or
 
 ## 3. Demo organisations
 
-Four fully populated orgs, each with **historical responses** — not empty shells. An empty org
+Five fully populated orgs, each with **historical responses** — not empty shells. An empty org
 proves the schema; a populated one proves the product.
 
 | Org | Preset | Tier | Scale |
@@ -258,8 +258,62 @@ proves the schema; a populated one proves the product.
 | The Grand Palace | Hotel | **Silver** | 3 properties, 9 units, 12 subjects, ~25 staff, 2 campaigns, ~600 responses |
 | Riverside Hospital | Hospital | **Bronze** | 4 wards, 8 subjects, ~30 staff, 1 campaign, ~400 responses |
 | Meridian Consulting | Company | **Enterprise** | 5 teams, 10 projects, ~35 staff, 2 campaigns, ~500 responses |
+| IIIT Sri City | University | **Enterprise** | 3 systems, 10 units, 9 roles, 14 subjects, 15 staff, 30 respondents, 14 campaigns, ~350 responses |
 
-**One organisation per tier, added 2026-08-24 (`T-088`), and it is what `D-012` asked for.**
+### The fifth is hand-built, and that is the point — `N-078`, 2026-08-31
+
+The first four are **generated from a `DemoOrg` row**: a unit list, a subject list, and a staff
+count that `seedOrg` scatters across the tree at random levels. That is the right tool for
+proving one product on four industries, and it can say none of the things a real customer's
+organisation says. **IIIT Sri City is stated instead of generated**, in its own module
+(`seed/iiit.ts`), and it exists to carry the three claims the generated four cannot:
+
+1. **A person holds more than one position.** The Dean, the Chief Warden and the Mess Warden are
+   each *also* a member of faculty — a second `member` edge, not a second person — which is why
+   the college has 10 faculty and 15 staff. The two hostel caretakers and two mess vendor
+   managers hold exactly one seat each, and that single seat is the whole of the distinction.
+2. **A respondent belongs to three trees at once.** Each of the 30 students holds a Student seat
+   in a department, one in a hostel and one in a mess, so the same 30 people reconcile three
+   ways — 10+10+10 by branch, 15+15 by hostel, 18+12 by mess. This is `edges`' cross-dimension
+   rule (`10`) being used rather than described, and no student is duplicated to make it add up.
+   None of them has a `users` row: a respondent never holds an account (`DEC-009`), so a roster
+   this size costs the organisation no seats.
+3. **A common subject is anchored at the parent.** SEED is taken by all three branches, so it is
+   one subject on `Academics`, not three beside each other — three rows would be three result
+   sets that never add up, which is the one thing a common course must not be. `Hostel Services`
+   and `Mess Services` sit on their parent units for the same reason: a poll about Tuesday's
+   dinner is one question asked once.
+
+**A denominator here is either real or absent, and which one is a judgement per campaign.** A
+cycle covering seven courses collects roughly three responses per student, so dividing by a head
+count prints 300% — the fault `40` and `D-044` are both about. Multi-subject cycles therefore
+carry `{ kind: 'anyone' }` and show no rate at all; the single-subject polls carry the Student
+role, resolve to 30, and show a true one.
+
+**The content is written, not generated.** `comments.ts` is keyed by INDUSTRY, so it has
+something plausible to say about lecture pacing and nothing to say about a broken washing
+machine. `ResponsePlan.comments` (added with this org) lets a seed script the earliest responses
+per subject by hand, and the college uses it to run one thread end to end: six sentences in BH1's
+suggestion box about two washing machines broken for a fortnight → a hostel poll that ranks
+washing machines first → the institute-wide poll that puts hostel laundry above everything else.
+**Poll splits are ALLOCATED by largest remainder, never sampled** — 28 votes drawn against
+weights flips the winner often enough that it did, and because every seed shares one `Rng`,
+editing any weight upstream reshuffles every draw after it. A comment above a poll naming the
+complaint it confirms has to stay true when an unrelated line changes.
+
+**`FDFED` is the improvement story.** It scores ~2.2 in the odd-semester cycle with seven
+comments saying the same thing about a missing rubric, and ~3.0 in the even-semester cycle,
+where the comments are deliberately *not* repeated: repeating the diagnosis after the fix would
+say the fix never happened. `Mess B` is the other weak subject, and the institute-wide poll
+agrees with it rather than contradicting it.
+
+**The bookable is `T-095`'s capacity feature at real scale**: the FDFED evaluation, six slots of
+five, all thirty students booked into one. A booking carries a name on purpose — unlike a
+response it is not anonymous, because turning up is not feedback.
+
+### One organisation per tier
+
+**Added 2026-08-24 (`T-088`), and it is what `D-012` asked for.**
 Until then no demo org had a `Subscription` row at all, so all four were silently Bronze and
 the `402` path could be described but never shown. The assignment follows the demo script in
 §5 rather than being alphabetical: **Northfield** is opened first and is where the improve loop
@@ -267,7 +321,9 @@ lives, so Gold; **The Grand Palace** is step 2 and keeps analysis, so Silver; **
 Bronze, because the screen that says *"that feature is not included in your plan"* is only
 convincing on an organisation that genuinely is not on it; **Meridian** is Enterprise, a tier
 no picker offers (`DEC-048`), which is the only way to see that operator-assigned tiers are
-real.
+real. **IIIT Sri City is Enterprise too**, and deliberately not a fifth tier that does not
+exist: it is the tier a real customer of this size would be on, and a second Enterprise org
+proves the operator-assigned path is a path rather than a one-off.
 
 Response generation rules — realistic data is what makes the results screen convincing:
 
@@ -285,7 +341,7 @@ Response generation rules — realistic data is what makes the results screen co
 ## 4. Commands
 
 ```
-npm run db:seed            presets + library templates + 4 demo orgs
+npm run db:seed            presets + library templates + 5 demo orgs
 npm run db:seed -- --demo  demo orgs only, assumes presets exist
 npm run db:reset           drop → migrate → seed
 npm run ops:code           a live operator TOTP, so MFA is a feature and not an obstacle
@@ -313,8 +369,15 @@ refuses to run in production for the same reason.
 **`db:reset` must stay fast and reliable — it is the recovery path during a live demo.**
 Target under 30 seconds. Rehearse it.
 
-Seeded logins are printed at the end of the seed run and are the same credentials the
-development-only login affordance prefills (`30`).
+Seeded logins are printed at the end of the seed run. **They are no longer prefilled anywhere** —
+`30`'s development-only chips and the top bar's demo switcher were removed on 2026-08-31,
+`OPEN-006`(a), so this printout is the only place the credentials appear. IIIT Sri City prints
+ten of them, one per distinct VIEW of the organisation: signing in as the CSE HOD and then as the
+BH1 caretaker is the fastest proof that `requireCapability` is deciding and the UI is only
+rendering what it was handed (`INV-003`).
+
+Every organisation is skipped if its slug already exists, so a second `db:seed` is a no-op rather
+than a duplicate. Use `db:reset` to start over.
 
 ## 5. The demo script
 

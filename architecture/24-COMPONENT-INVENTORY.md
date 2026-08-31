@@ -72,10 +72,12 @@ the lists already scope-filter. Removing every gate here exposes nothing.
 
 ### `<TopBar>`
 ```ts
-{ orgs: OrgSummary[]; currentOrgId: string; onSwitchOrg: (id: string) => void; user: SessionUser }
+{ user: SessionUser }   // + the current org, read from the store
 ```
-The org switcher is the second most important control in the demo after the QR code — it is
-how you go from University to Hotel in one click. It stays in the top bar on mobile.
+**There is no org switcher.** The `orgs` / `currentOrgId` / `onSwitchOrg` signature above is
+superseded: a user belongs to exactly one organisation (`10`), so there was never anything to
+switch between and no endpoint in `13` that could list one. The dev-only re-auth stand-in was
+removed on 2026-08-31 — `OPEN-006`(a). The bar names the org as plain text.
 
 ### `<PageHeader>`
 ```ts
