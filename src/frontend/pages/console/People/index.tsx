@@ -155,7 +155,6 @@ export default function People(): JSX.Element {
           <Link className="person-open" to={`/app/people/${row.id}`} aria-label={`Open ${row.name}`}>
             <Icon name="disclosure" size={16} />
           </Link>
-          {row.status !== 'active' && <span className="tag tag-neutral">{row.status}</span>}
         </span>
       ),
     },

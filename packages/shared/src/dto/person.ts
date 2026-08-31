@@ -187,12 +187,27 @@ export type Position = {
   validTo: string | null;
 };
 
+/**
+ * NO `status`, AND THAT IS THE FIX FOR A BUG PEOPLE REPORTED FROM THE SCREEN.
+ *
+ * It used to carry `users.status` raw, and the list printed it beside the name whenever it
+ * was not `active`. `POST /people` writes `invited` — the state that says the hash is null
+ * and this account cannot open the door (`10` §2) — so EVERY person added on `/app/people`
+ * appeared already tagged "invited" while the Account column in the same row still offered
+ * the `Invite` button. One row, two answers, and the wrong one first.
+ *
+ * The column is a database state about a password hash. It was being read as a sentence
+ * about an email, and it cannot be one: a person awaiting activation and a person nobody
+ * has asked are BOTH `users.status = 'invited'` with a null hash, and only an unaccepted
+ * `account_invites` row tells them apart. `account` below is that question answered
+ * properly, server-side, in one place — so a second field that answers it approximately is
+ * not a convenience, it is a contradiction waiting to be rendered.
+ */
 export type PersonSummary = {
   id: string;
   userId: string | null;
   name: string;
   email: string | null;
-  status: string;
   positions: Position[];
   createdAt: string;
   /**

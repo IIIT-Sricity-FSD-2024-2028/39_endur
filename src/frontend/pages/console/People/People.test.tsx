@@ -15,7 +15,7 @@ import People from './index.js';
 const person = (
   over: Partial<PersonSummary> & { id: string; name: string },
 ): PersonSummary => ({
-  userId: `u-${over.id}`, email: `${over.id}@example.test`, status: 'active',
+  userId: `u-${over.id}`, email: `${over.id}@example.test`,
   positions: [], createdAt: '2026-08-01T00:00:00.000Z',
   account: { state: 'active', lastLoginAt: null }, ...over,
 });
@@ -155,6 +155,38 @@ describe('the list', () => {
     mount();
     const row = screen.getByDisplayValue('Bo Chen').closest('tr') as HTMLElement;
     expect(row.textContent).toContain('No position');
+  });
+
+  /**
+   * REPORTED: a person added on this screen showed "invited" the moment they appeared, and
+   * nobody had invited them.
+   *
+   * `POST /people` writes `users.status = 'invited'` with a null password hash — the state
+   * that says "this account cannot open the door" (`10` §2) — and the row printed that
+   * column raw. The string is a DATABASE state about a hash, and it was being read on
+   * screen as a SENTENCE about an email nobody had sent.
+   *
+   * `account` is the field that answers the question, derived server-side in one place
+   * (`features/accounts/status.ts`, `57` § States) and precise where the raw column cannot
+   * be: `invited` and `none` are the SAME `users.status` and the same null hash, and the
+   * only thing that separates "we are waiting for them" from "nobody has asked them" is
+   * whether an unaccepted `account_invites` row exists. The Account column already reads
+   * it, and already renders the right thing here — the `Invite` button.
+   *
+   * `PersonSummary.status` is GONE rather than merely unread, so the first guard on this is
+   * the type system and this test is the second. It is worth having both: the assertion is
+   * true of the screen however the account state is plumbed, and the reason the field was
+   * wrong here is a product reason, not a typing one.
+   */
+  it('does not say "invited" about somebody nobody has invited', () => {
+    // What `POST /people` returns for somebody just added: no account, and no invite.
+    const fresh = person({ id: 'p3', name: 'Kim Ali', account: { state: 'none' } });
+    list = { ...list, data: page([fresh]) };
+    mount([...ALL, 'account.create']);
+    const row = screen.getByDisplayValue('Kim Ali').closest('tr') as HTMLElement;
+    expect(row.textContent?.toLowerCase()).not.toContain('invited');
+    // And the column that IS about the account says the true thing: ask them.
+    expect(within(row).getByRole('button', { name: 'Invite' })).toBeTruthy();
   });
 });
 

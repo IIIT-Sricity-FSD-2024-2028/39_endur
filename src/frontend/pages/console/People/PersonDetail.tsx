@@ -210,11 +210,6 @@ export default function PersonDetail(): JSX.Element {
                 </p>
               </div>
 
-              {data?.status && data.status !== 'active' && (
-                <p className="field-help">
-                  Account status: <span className="tag tag-neutral">{data.status}</span>
-                </p>
-              )}
               {data?.createdAt && (
                 <p className="field-help">Added {formatDate(data.createdAt)}.</p>
               )}

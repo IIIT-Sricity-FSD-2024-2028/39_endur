@@ -639,7 +639,6 @@ function toSummary(person: PersonRow): PersonSummary & { createdAt: string } {
     userId: person.userId,
     name: person.name,
     email: person.user?.email ?? null,
-    status: person.user?.status ?? 'active',
     positions: person.edgesAsParent.map((edge) => ({
       edgeId: edge.id,
       roleId: edge.child.roleId,
