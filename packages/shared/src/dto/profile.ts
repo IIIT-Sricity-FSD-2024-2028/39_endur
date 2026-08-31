@@ -7,7 +7,7 @@
 // there they DO take an id and a wider scope — two questions, two routes.
 import { z } from 'zod';
 import { dto, nameField } from './common.js';
-import type { PersonSummary, PowersAtPlace } from './person.js';
+import type { PersonCampaign, PersonSummary, PowersAtPlace } from './person.js';
 
 /**
  * NAME ONLY, AND THE ABSENCE OF `email` IS THE SPECIFICATION (47 § Data contract).
@@ -76,4 +76,17 @@ export type ProfileView = {
   };
   positions: PersonSummary['positions'];
   powersByPlace: PowersAtPlace[];
+  /**
+   * WHAT YOU ARE BEING ASKED FOR — the same `PersonCampaign[]` `/people/:id` returns about
+   * somebody else, for the same reason `positions` and `powersByPlace` are shared: one
+   * shape, one renderer (`N-005`).
+   *
+   * ONE DIFFERENCE, AND IT IS NOT COSMETIC. The administrator's copy is filtered by their
+   * `campaign.read` scope; this one is not filtered at all. `campaign.read` is an
+   * ADMINISTRATIVE capability — it is what lets somebody manage a campaign — and gating
+   * your own list on it would hide "what am I supposed to fill in" from exactly the people
+   * being asked to fill it in, which is the whole population the feature is for. `self` is
+   * the correct scope and it is already the scope this route resolves under (`11` §4).
+   */
+  involvement: PersonCampaign[];
 };

@@ -28,7 +28,7 @@ export async function collectGrants(
   // No person node means this is a support session, so its powers come from a time-limited support grant.
   if (!personNode) {
     const window = await supportGrantWindow(orgId, userId, at);
-    return window ? mintSupportGrants(window.expiresAt) : [];
+    return window ? mintSupportGrants(window.expiresAt, window.role) : [];
   }
 
   // The person's live memberships: the positions they hold and the groups they belong to.

@@ -57,6 +57,7 @@ import type {
   MeResponse,
   OrgView,
   PaymentRecord,
+  PersonCampaign,
   PersonDetail,
   PersonSummary,
   PlatformAnalytics,
@@ -189,8 +190,28 @@ export const PersonSummarySchema = mirrors<PersonSummary>()(
   }),
 );
 
+// What a person is being asked for. No `responded` field, and INV-006 is why: `responses`
+// has no respondent column, so for an anonymous campaign nobody can answer that question -
+// and answering it only for the rest would single the anonymous ones out by their silence.
+export const PersonCampaignSchema = mirrors<PersonCampaign>()(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    status: z.enum(['open', 'scheduled']),
+    reason: z.enum(['audience', 'everyone', 'subject']),
+    via: z.string().nullable(),
+    startsAt: iso().nullable(),
+    endsAt: iso().nullable(),
+    anonymous: z.boolean(),
+    url: z.string().nullable(),
+  }),
+);
+
 export const PersonDetailSchema = mirrors<PersonDetail>()(
-  PersonSummarySchema.extend({ powersByPlace: z.array(PowersAtPlaceSchema) }),
+  PersonSummarySchema.extend({
+    powersByPlace: z.array(PowersAtPlaceSchema),
+    involvement: z.array(PersonCampaignSchema),
+  }),
 );
 
 export const ImportPreviewSchema = mirrors<ImportPreview>()(
@@ -239,6 +260,9 @@ export const MeResponseSchema = mirrors<MeResponse>()(
         viewer: z.enum(['operator', 'member']),
         operatorName: z.string(),
         operatorEmail: z.string(),
+        // DEC-115: the two Endur roles do NOT hold the same powers inside a customer's console,
+        // so the banner has to know which one is in the room before it promises anything.
+        role: z.enum(['owner', 'staff']),
         reason: z.string(),
         startedAt: iso(),
         expiresAt: iso(),
@@ -258,6 +282,7 @@ export const ProfileViewSchema = mirrors<ProfileView>()(
     }),
     positions: z.array(PositionSchema),
     powersByPlace: z.array(PowersAtPlaceSchema),
+    involvement: z.array(PersonCampaignSchema),
   }),
 );
 

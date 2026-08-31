@@ -1,9 +1,15 @@
 // /app/people/:id — one person. 34 § Interactions, design_specs/design/04 §4.4.
 //
-// Three blocks, in this order and for this reason: **identity, positions, then what those
-// positions actually confer.** The third is the payload. Everywhere else in the product the
+// Blocks in this order and for this reason: **identity, account, positions, then what those
+// positions actually confer.** The last is the payload. Everywhere else in the product the
 // scoping model is a paragraph of documentation; here it is a rendered fact — the same
 // person, two units, different powers, which is INV-005 without the paragraph.
+//
+// SINCE N-079 THERE IS ONE MORE, and it is the payload for a different reader. Every block
+// above is about POWER, and a respondent has none by construction (DEC-009: no account, no
+// grants) — so on the page of a student, a guest or a patient, all of them are empty and
+// the page said nothing at all about the person whose feedback the organisation runs on.
+// `<Involvement>` answers the question they are actually in the system for.
 //
 // It shares that block with `/app/profile` (47) rather than owning a copy: `<PowersByPlace>`,
 // one implementation, two placements (24 §4). What differs is who is reading. Here it is an
@@ -19,6 +25,7 @@ import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { InviteLink } from '../../../components/feedback/InviteLink.js';
 import { InlineName } from '../../../components/org/InlineName.js';
 import { PowersByPlace } from '../../../components/org/PowersByPlace.js';
+import { Involvement } from '../../../components/org/Involvement.js';
 import { Icon } from '../../../components/Icon.js';
 import { ApiError } from '../../../lib/api.js';
 import { useLabels } from '../../../lib/labels.js';
@@ -299,6 +306,31 @@ export default function PersonDetail(): JSX.Element {
               )}
             </div>
           </section>
+
+          {/* FOURTH, AND FOR MOST OF AN ORGANISATION IT IS THE ONLY ONE WITH AN ANSWER.
+              The three blocks above are all about POWER, and a respondent holds none — no
+              account, no grants (DEC-009) — so a student's page used to end here, empty,
+              while five polls addressed to their role were open one screen away (N-079).
+
+              Absent rather than empty when the caller holds no `campaign.read` anywhere:
+              the server returns [] in that case and cannot tell it from "nothing open", so
+              the section only renders when there is something to say. That is 46's rule —
+              a section the caller cannot read is absent, not greyed. */}
+          {(data?.involvement?.length ?? 0) > 0 && (
+            <section className="settings-card" aria-labelledby="person-involvement">
+              <h3 className="utility" id="person-involvement">
+                {labels.campaign.many} they are part of
+              </h3>
+              <div className="card">
+                <Involvement
+                  items={data?.involvement ?? []}
+                  who="them"
+                  emptyHint=""
+                  canOpenCampaign={can('campaign.read')}
+                />
+              </div>
+            </section>
+          )}
 
           <section className="settings-card" aria-labelledby="person-powers">
             <h3 className="utility" id="person-powers">What they can do, and where</h3>

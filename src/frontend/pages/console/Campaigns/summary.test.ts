@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { CampaignSummary } from '@endur/shared';
 import { summarise, type SummaryInput } from './summary.js';
 import { closeConsequence } from './summary-close.js';
-import { suppressionNote, timing } from './index.js';
+import { suppressionNote, timing } from './card.js';
 import { autoName } from './New.js';
 
 const WORD = { one: 'Quaxel', many: 'Quaxels' };

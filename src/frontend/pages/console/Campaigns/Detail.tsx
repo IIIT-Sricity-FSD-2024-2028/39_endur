@@ -21,7 +21,7 @@ import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
 import { formatDateTime } from '../../../lib/format.js';
 import { useCampaign, launchKey } from '../../../lib/campaigns.js';
-import { STATUS_TAG, timing } from './index.js';
+import { STATUS_TAG, timing } from './card.js';
 import { closeConsequence } from './summary-close.js';
 
 export default function CampaignDetail(): JSX.Element {

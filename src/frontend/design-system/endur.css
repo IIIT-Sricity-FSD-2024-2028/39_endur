@@ -3226,6 +3226,53 @@ html:active-view-transition * {
   .powers-module { grid-template-columns: 1fr; gap: 2px; }
 }
 
+/* <Involvement> — 34 § Interactions, 47 § Interactions. What somebody is being asked for,
+   on their own page and on an administrator's view of it (N-079).
+
+   Deliberately NOT a table. The list is short by nature — a person is in a handful of
+   campaigns, never a hundred — and a table would spend a header row saying "Name / Status /
+   Closes" about four rows of content. Each row is one line of name plus one of quiet meta,
+   which is the same shape the campaigns list uses at card size. */
+.involve { display: flex; flex-direction: column; gap: var(--space-4); }
+.involve-heading { margin: 0 0 var(--space-2); }
+.involve-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+
+/* The indent carries the grouping the way .powers-place's does: everything inside this rule
+   belongs to the heading above it. */
+.involve-group { border-left: 2px solid var(--color-border); padding-left: var(--space-3); }
+
+.involve-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "main open" "meta open";
+  align-items: center;
+  gap: 0 var(--space-3);
+  padding: var(--space-2) 0;
+}
+.involve-row + .involve-row { border-top: 1px solid var(--color-border); }
+
+.involve-main { grid-area: main; display: flex; align-items: center; gap: var(--space-2); }
+.involve-name { font-weight: 600; }
+a.involve-name { color: inherit; }
+
+.involve-meta { grid-area: meta; margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Separated by a dot rather than by a comma: the parts are unrelated facts, not a list. */
+.involve-meta > * + *::before { content: "·"; margin-right: var(--space-2); }
+
+.involve-open { grid-area: open; white-space: nowrap; }
+.involve-none { margin: 0; }
+
+/* The action drops under the row rather than squeezing the name on a narrow screen. */
+@media (max-width: 639px) {
+  .involve-row {
+    grid-template-columns: 1fr;
+    grid-template-areas: "main" "meta" "open";
+    align-items: start;
+    gap: var(--space-2) 0;
+  }
+  .involve-open { justify-self: start; }
+}
+
 .btn-tiny { padding: 2px var(--space-2); font-size: 12px; }
 .person-form { display: flex; flex-direction: column; gap: var(--space-3); }
 .person-form-note {

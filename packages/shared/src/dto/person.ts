@@ -242,10 +242,6 @@ export type PowersAtPlace = {
   capabilities: Array<{ capability: string; scope: string }>;
 };
 
-export type PersonDetail = PersonSummary & {
-  powersByPlace: PowersAtPlace[];
-};
-
 export type ImportPreview = {
   columns: string[];
   sample: ImportRow[];
@@ -255,4 +251,74 @@ export type ImportPreview = {
   unmatchedUnits: string[];
   /** Addresses already present. A re-run must update them, not duplicate them. */
   existingEmails: string[];
+};
+
+/**
+ * ONE CAMPAIGN A PERSON IS PART OF, from that person's side of it — `N-079`.
+ *
+ * **The gap this closes.** Everything else in the product looks at a campaign and asks who
+ * is in it. Nothing looked at a person and asked what they are in, so a respondent's page
+ * showed their positions and their powers and then stopped — and a respondent HOLDS NO
+ * POWERS (DEC-009: no account, no grants), which made the most populated page in the
+ * organisation the emptiest one on screen. Thirty students, five open polls addressed to
+ * them by role, and no way to see that from a student.
+ *
+ * `reason` is the whole shape, and the three values are not a ranking of importance — they
+ * are three genuinely different relationships, and collapsing them would make the list a
+ * lie in two directions at once:
+ *
+ * · `audience` — the campaign's `audienceRule` NAMES them, by role or by unit. They are in
+ *   its denominator (`38`, `DEC-037`); `via` is the position that put them there.
+ * · `everyone` — `{kind:'anyone'}`. It has no roll, so it names nobody and this person is
+ *   not special to it. Listed because it is open to them and they can answer it, and
+ *   `via` is `null` precisely because there is no position to name.
+ * · `subject` — the campaign is collecting ABOUT them: a subject on it is linked to their
+ *   account (`Subject.linkedUserId`, the reviewee of `44`). The opposite direction of
+ *   travel from the other two, and it wins when both are true.
+ *
+ * **`status` is never `draft` and never `closed`.** Not a filter applied on the way out —
+ * the question is what somebody is being asked for NOW, and a closed cycle is history that
+ * belongs on `40`. A draft has no link and no audience yet; putting one here would leak an
+ * unlaunched campaign onto the page of somebody who is not supposed to know it is coming.
+ *
+ * **THERE IS NO `responded` FIELD, AND THERE CANNOT BE ONE — INV-006.** `responses` has no
+ * respondent column, so for an anonymous campaign the schema genuinely cannot say whether
+ * this person answered. It could be said for the rest, and that is exactly why it is not:
+ * a "not yet" that appears on some rows and never on the anonymous ones would make the
+ * anonymous ones conspicuous by their silence, which is the same leak arriving as an
+ * absence. This page says what somebody is ASKED for. What they said is not on it.
+ */
+export type PersonCampaign = {
+  id: string;
+  name: string;
+  status: 'open' | 'scheduled';
+  reason: 'audience' | 'everyone' | 'subject';
+  /** The position or the subject that put them on this list; `null` for `everyone`. */
+  via: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Carried so a row can say "anonymous" without a second request (`38` § Share). */
+  anonymous: boolean;
+  /** The `/r/:token` link. Always present in practice — a campaign with no token is a
+   *  draft, and drafts are not returned — and nullable because the column is. */
+  url: string | null;
+};
+
+export type PersonDetail = PersonSummary & {
+  powersByPlace: PowersAtPlace[];
+  /**
+   * SCOPE-FILTERED FOR AN ADMINISTRATOR, UNFILTERED FOR THE PERSON THEMSELVES, and the
+   * split is deliberate (`34` § Capabilities).
+   *
+   * Reading somebody else's list is bounded by the caller's own `campaign.read` scope, so a
+   * hostel caretaker opening a student sees the hostel's campaigns and not the department's
+   * — the same rule the campaigns list runs, not a second copy of it. Holding none at all
+   * means the section is ABSENT rather than empty, matching `46`'s rule for a page a junior
+   * user opens.
+   *
+   * On `/profile` it is not gated at all, because it resolves under `self` and the
+   * alternative is absurd: `campaign.read` is an administrative capability, so gating it
+   * would hide "what am I being asked to fill in" from precisely the people being asked.
+   */
+  involvement: PersonCampaign[];
 };

@@ -28,7 +28,7 @@ import { useCampaign } from '../../../lib/campaigns.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { fetchExport, saveCsv, useResponses, useResults } from '../../../lib/results.js';
-import { STATUS_TAG } from '../Campaigns/index.js';
+import { STATUS_TAG } from '../Campaigns/card.js';
 import { statCards } from './stats.js';
 import { QuestionResult } from './QuestionResult.js';
 import { Comments } from './Comments.js';

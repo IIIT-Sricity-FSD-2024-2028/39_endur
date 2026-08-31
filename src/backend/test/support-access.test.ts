@@ -78,10 +78,11 @@ describe('support access — DEC-114', () => {
     expect(created.status).toBe(201);
   });
 
-  it('and still cannot read one line of the customer’s feedback', async () => {
+  it('and a STAFF operator still cannot read one line of the customer’s feedback', async () => {
     // The counts-never-content rule, restated for the wider door. It walks the deny LIST rather than a
     // hardcoded route, so a capability removed from that list fails here rather than becoming readable.
-    const operator = await makeOperator();
+    // STAFF explicitly, since DEC-115: the list is the support job's, and the owner is not doing that job.
+    const operator = await makeOperator('staff');
     const session = await enter(operator, org.orgId);
 
     const me = await session.agent.get('/api/v1/auth/me');
@@ -103,7 +104,7 @@ describe('support access — DEC-114', () => {
   it('refuses a denied capability as an EXPLICIT DENY, with the grant that decided it', async () => {
     // The sentence matters as much as the status code: "nobody gave you this" would send an operator
     // hunting a customer's powers grid for a row that must never exist. An explicit deny is the true answer.
-    const operator = await makeOperator();
+    const operator = await makeOperator('staff');
     // The session is opened for its side effect and the resolver is then asked directly, because the
     // interesting thing here is the decision's reason rather than a status code.
     await enter(operator, org.orgId);
@@ -138,6 +139,67 @@ describe('support access — DEC-114', () => {
     });
     expect(allowed.allowed).toBe(true);
     expect(allowed.decidedBy?.via).toBe('support');
+  });
+
+  it('but an ENDUR OWNER holds every capability there is, results included', async () => {
+    // DEC-115, and the bug it fixes: an owner could build a customer's campaign and then not open the
+    // page that campaign produced, which made the console useless for the exact person accountable for it.
+    // Asserted THREE ways, because the failure was a three-layer one - the capability map the UI renders
+    // tabs from, the resolver's own answer, and the route.
+    const operator = await makeOperator('owner');
+    const session = await enter(operator, org.orgId);
+
+    // 1. The map: nothing is missing from it. Walked against the whole catalogue rather than against the
+    // staff deny list, so a capability added tomorrow is covered by this test the day it ships.
+    const { CAPABILITIES } = await import('@endur/shared');
+    const me = await session.agent.get('/api/v1/auth/me');
+    expect(me.status).toBe(200);
+    const missing = CAPABILITIES.filter((capability) => !me.body.capabilities[capability]);
+    expect(missing, `an Endur owner should hold everything, but is missing: ${missing.join(', ')}`)
+      .toEqual([]);
+
+    // 2. The resolver: allowed, and by a support grant rather than by some accidental membership.
+    clearGrantCache();
+    const { resolve } = await import('../authz/index.js');
+    const support = await prisma.supportSession.findFirst({
+      where: { orgId: org.orgId, endedAt: null },
+      orderBy: { startedAt: 'desc' },
+      select: { userId: true },
+    });
+    const decision = await resolve({
+      orgId: org.orgId,
+      userId: support!.userId,
+      capability: 'results.read',
+      target: { kind: 'org' },
+    });
+    expect(decision.allowed).toBe(true);
+    expect(decision.decidedBy?.via).toBe('support');
+    // No deny was minted at all, which is the actual change - not "an allow that happens to win".
+    expect(decision.considered.some((entry) => entry.effect === 'deny')).toBe(false);
+
+    // 3. The wire. A campaign that does not exist answers 404; the point is that it is not a 403.
+    const results = await session.agent.get(
+      `/api/v1/campaigns/${'0'.repeat(8)}-0000-0000-0000-000000000000/results`,
+    );
+    expect(results.status).not.toBe(403);
+  });
+
+  it('and the owner’s wider door is still disclosed and still recorded', async () => {
+    // Widening what the owner may see does NOT widen it quietly. The customer's banner and the register
+    // are what make DEC-115 defensible, so they are asserted here rather than assumed.
+    const target = await setUpOrg();
+    const operator = await makeOperator('owner');
+    const entered = await operator.agent
+      .post(`/api/v1/platform/orgs/${target.orgId}/support-session`)
+      .send({ reason: REASON });
+    expect(entered.status).toBe(201);
+    // Empty, and empty on purpose: the owner is blocked from nothing.
+    expect(entered.body.data.deniedCapabilities).toEqual([]);
+
+    // The customer, in their own session, is still told a stranger is inside.
+    const me = await target.agent.get('/api/v1/auth/me');
+    expect(me.body.support.viewer).toBe('member');
+    expect(me.body.support.operatorName).toBe(operator.name);
   });
 
   it('tells the CUSTOMER’S OWN staff that somebody from Endur is inside', async () => {

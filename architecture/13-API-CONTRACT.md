@@ -151,6 +151,26 @@ request per cell would make undo incoherent and the warnings recomputed dozens o
 Specified in `57-FEATURE-accounts-and-invites.md`. Activation itself is **unauthenticated** and
 lives under `/auth`, not here — the person activating has no session yet, by definition.
 
+**`GET /:id` also answers what that person is being ASKED for** (`PersonDetail.involvement`,
+`N-079`). No new route and no new capability: it is the inverse of the audience rule the
+campaigns list already reads, and inverting a rule the caller may already read grants nothing.
+Two scopes meet on the one field, which is why it is worth stating here:
+
+| Reader | Filtered by |
+|---|---|
+| An administrator, on somebody else | their own `campaign.read` scope — the same `scopeToCampaigns` the campaigns list runs |
+| The person themselves, on `/profile` | **nothing** |
+
+The second row is not a gap. `campaign.read` is an administrative capability; gating your own
+list on it would hide *"what am I supposed to fill in"* from every respondent and every junior
+member of staff — the entire population the field exists for. `/profile` resolves under `self`
+(`11` §4) and that is the correct scope for a fact about yourself.
+
+**The field never says whether they answered, and no future version may add it** (INV-006).
+`responses` has no respondent column, so for an anonymous campaign the schema genuinely cannot
+answer it; answering it only for the rest would make the anonymous rows conspicuous by their
+silence, which is the same disclosure arriving as an absence.
+
 ### Accounts — `/api/v1/people/:id/account` · and the unauthenticated half
 
 | Method | Path | C |
@@ -252,6 +272,9 @@ a role. The route also takes **no id**, which is what guarantees the only passwo
 reach is the caller's own — `57` § *"Why an administrator still cannot set a password"* is the
 same rule from the other side. It is therefore the one authenticated route on the
 route-enumeration allowlist (`12` §7), with that argument written beside it.
+
+`GET /` also carries `involvement` — see § People above for the one way it differs from the
+administrator's copy.
 
 **Since `T-051` `ProfileView` reuses `/people/:id`'s types** — `Position` and `PowersAtPlace`
 from `dto/person.ts` — rather than declaring narrower lookalikes. `47` § Data contract has the

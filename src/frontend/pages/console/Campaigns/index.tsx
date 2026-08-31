@@ -13,8 +13,9 @@ import { Icon } from '../../../components/Icon.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
-import { formatDate, pluralise } from '../../../lib/format.js';
+import { pluralise } from '../../../lib/format.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
+import { QUICK_CATEGORIES, STATUS_TAG, suppressionNote, timing } from './card.js';
 import { QuickDialog } from './QuickDialog.js';
 
 /** The four values the derivation can produce (DEC-016), plus "everything". */
@@ -25,60 +26,6 @@ const FILTERS: Array<{ key: CampaignStatus | 'all'; label: string }> = [
   { key: 'draft', label: 'Draft' },
   { key: 'closed', label: 'Closed' },
 ];
-
-/** Status is DATA, derived on read — so the tag is a lookup, never a computation here. */
-export const STATUS_TAG: Record<CampaignStatus, { label: string; className: string }> = {
-  open: { label: 'Collecting', className: 'tag tag-accent-2' },
-  scheduled: { label: 'Scheduled', className: 'tag tag-neutral' },
-  draft: { label: 'Draft', className: 'tag tag-neutral is-draft' },
-  closed: { label: 'Closed', className: 'tag tag-outline' },
-};
-
-/**
- * The two categories `POST /campaigns/quick` writes (`DEC-088`). They are DATA — a reader
- * who edits the category loses the badge and nothing else breaks, which is the cost that
- * decision accepted in exchange for having no discriminator column.
- */
-export const QUICK_CATEGORIES = ['Poll', 'Suggestion box'];
-
-/**
- * The sentence a quick campaign's card owes its owner before anybody asks (`T-092`).
- *
- * A suggestion box collects anonymously and shows NOTHING until `resultsThreshold` people
- * have answered — the k-anonymity gate, enforced in SQL (INV-005) — so the first two
- * answers on stage land in a screen that looks broken. It is not broken, and the honest fix
- * is to say the number, never to lower it.
- *
- * Only on the quick surfaces: a feedback round is read on the Results page, which says the
- * same thing itself, and repeating it on every card in the list would be noise.
- */
-export function suppressionNote(campaign: CampaignSummary): string | null {
-  if (!QUICK_CATEGORIES.includes(campaign.templateCategory)) return null;
-  if (campaign.status === 'draft') return null;
-  if (campaign.responseCount >= campaign.resultsThreshold) return null;
-  return `Answers appear once ${campaign.resultsThreshold} people have responded. ${campaign.responseCount} so far.`;
-}
-
-/** "ends in 6 days" / "starts 1 Sep". The line that makes a card feel live. */
-export function timing(campaign: CampaignSummary, now = Date.now()): string | null {
-  if (campaign.status === 'closed') {
-    return campaign.closedAt ? `closed ${formatDate(campaign.closedAt)}` : 'closed';
-  }
-  if (campaign.status === 'scheduled' && campaign.startsAt) {
-    return `starts ${formatDate(campaign.startsAt)}`;
-  }
-  if (campaign.status === 'open' && campaign.endsAt) {
-    // FLOOR, not ceil. With ceil, a campaign closing in six hours reads "ends in 1 day" —
-    // it rounds AWAY from the deadline, which is the one direction that misleads. Floor
-    // says "ends today" for anything inside twenty-four hours, which is what is true.
-    const remaining = new Date(campaign.endsAt).getTime() - now;
-    if (remaining < 0) return 'ending';
-    const days = Math.floor(remaining / 86_400_000);
-    if (days === 0) return 'ends today';
-    return `ends in ${pluralise(days, 'day', 'days')}`;
-  }
-  return null;
-}
 
 export default function Campaigns(): JSX.Element {
   const labels = useLabels();

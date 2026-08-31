@@ -3044,6 +3044,58 @@ DEC-114  BUILT   2026-08-31  origin:U  task:T-109
            components/layout/SupportBanner.tsx; pages/platform/Console/OrgDetail.tsx;
            store/authSlice.ts; 19 §15, 13 § Platform, 24, 70.
   see      19 §14 (superseded row), 19 §5, INV-011, INV-004, INV-007, DEC-033, DEC-104, T-109
+
+DEC-115  BUILT   2026-09-01  origin:U  task:T-109
+         SUPERSEDES: the "one deny list, both roles" half of DEC-114. the rest of DEC-114 --
+         the hour, the typed reason, the synthetic member, grants-not-a-bypass -- is UNTOUCHED
+         and this entry depends on all of it.
+  decision `SUPPORT_DENIED_CAPABILITIES` APPLIES TO THE `staff` ROLE ONLY. an endur OWNER
+           entering a customer's console holds EVERY capability in the catalogue, results and
+           responses included. `supportDeniedFor(role)` is the single source; `staff` gets the
+           unchanged list, `owner` gets the empty one.
+  why      THE BUG WAS THAT THE OWNER COULD BUILD A THING AND THEN NOT SEE WHAT IT DID. they
+           could create a campaign, launch it, close it -- and then get a 403 on the results
+           page that campaign exists to produce. that is not a narrower door, it is a door into
+           half a room, and it made the console useless for the one person accountable for the
+           estate. DEC-114 itself was argued from "every workflow in the product must be
+           reachable by the superuser"; applying the support deny list to the owner contradicted
+           the sentence the feature was built on.
+  why      EVERY REASON IN THE DENY LIST IS A REASON ABOUT THE SUPPORT JOB, NOT ABOUT ENDUR.
+           re-read `packages/shared/src/support.ts`: the list is justified by 19 §3's "is this
+           customer OK?", which is answerable from counts. the owner is not answering that
+           question -- they are the accountable party for the estate. one role does a bounded
+           job and gets bounded powers; the other carries the accountability and gets the reach
+           that goes with it. collapsing the two into one array was the mistake.
+  holds    THIS IS STILL NOT A BYPASS, WHICH IS THE WHOLE REASON IT IS DEFENSIBLE. the owner's
+           powers are minted candidates handed to `resolve()` like anybody's. INV-004 still
+           applies (a deny would still beat them, there just are not any), INV-007 still names
+           the deciding grant in the CUSTOMER'S audit log, and `42` still explains an owner's
+           decision the same way it explains a member's. there is still no `if (support)`.
+  holds    INV-005 IS NOT THIS LIST'S TO RELAX AND WAS NOT RELAXED. k-anonymity and the
+           anonymous seam live in SQL beneath every reader. an owner holding `results.read`
+           sees exactly what a member holding `results.read` sees -- suppressed cells stay
+           suppressed, and an anonymous response still has no retrievable respondent.
+  holds    INV-011 AND THE PLATFORM SEAM ARE UNTOUCHED. `platform/db.ts` is still aggregate-only
+           and no `platform.` capability gained anything. this widens the SUPPORT door for one
+           role; it does not widen what the operator console itself can reach.
+  holds    THE DISCLOSURE FOLLOWS THE POWERS, AND THAT COST A COMPONENT CHANGE. `<SupportBanner>`
+           used to say "responses, results and check-in notes stay closed to them" flat out.
+           that sentence became FALSE for an owner session the moment this landed, and a promise
+           the customer cannot rely on is worse than no promise. `SupportContext.role` is on the
+           wire and `reachOf()` says the true thing for each role -- the owner's version states
+           full access plainly rather than reaching for softer words.
+  cost     the customer's protection against an owner is now DISCLOSURE AND THE REGISTER rather
+           than capability. that is a real reduction and it is the one being accepted here: the
+           banner cannot be dismissed, the reason is verbatim, the hour still expires by itself,
+           and `support.enter` records the role and the (empty) deny list. OPEN: whether an
+           enterprise customer can contractually refuse owner-level entry.
+  files    packages/shared/src/support.ts (`supportDeniedFor`, `isSupportDeniedFor`,
+           `SupportContext.role`); authz/support.ts (`mintSupportGrants(validTo, role)`);
+           authz/collect.ts; db/support.ts (`supportGrantWindow` returns the role, `asRole`);
+           features/platform/service.ts (audit `role` + role-aware `deniedCapabilities`);
+           openapi/components.ts; components/layout/SupportBanner.tsx (`reachOf`);
+           test/support-access.test.ts.
+  see      DEC-114, 19 §15, 19 §3, INV-004, INV-005, INV-007, INV-011, T-109
 ```
 
 ---
@@ -4014,6 +4066,31 @@ components/org/PowersByPlace.tsx -> owned by 24 §4 like every component. ONE
                                     (INV-009). `onWhy` is 42's link and is UNWIRED until
                                     T-054 -- a link into a <Placeholder> is what
                                     design_specs/design/02 §7 forbids.
+features/people/involvement.ts   -> 34's file, shared with 47's /profile route the way
+                                    powers.ts above it is (N-079). THE ONE INVERSE of an
+                                    audience rule: features/campaigns/audience.ts answers
+                                    "who is in this campaign", this answers "what is this
+                                    person in". a second copy is guaranteed to disagree
+                                    with the denominator on 40, so test/involvement.test.ts
+                                    pins the pair on the same data. it matches in memory
+                                    and audience.ts matches in SQL -- that is the whole
+                                    reason the pair test exists, and matchOf() copies
+                                    positionFilter's expired-position omission ON PURPOSE.
+components/org/Involvement.tsx   -> owned by 24 §4. ONE implementation, TWO placements,
+                                    the same pair as PowersByPlace: 34's /people/:id and
+                                    47's /profile. `who` is the only word they disagree
+                                    about. it imports STATUS_TAG and timing() from
+                                    pages/console/Campaigns/card.ts -- one status
+                                    vocabulary, not a fourth copy.
+pages/console/Campaigns/card.ts  -> 38's file, SPLIT OUT OF ITS index.tsx BY N-079 and the
+                                    reason is a bundle, not tidiness. STATUS_TAG, timing(),
+                                    QUICK_CATEGORIES and suppressionNote() had four readers
+                                    -- the list, Detail, Results and now <Involvement> --
+                                    and importing them from the PAGE module pulled the
+                                    whole campaigns list into /app/people and /app/profile,
+                                    <ShareSheet> and its QR library included (~30 kB for
+                                    two screens with no QR code). NOT summary.ts next
+                                    door: that one writes the LAUNCH step's sentence.
 lib/paginate.ts                  -> owned by 13 §4 (cursor pagination)
 authz/held.ts                    -> owned by 13 § Auth + DEC-019. the UI capability set.
                                     NOT the resolver and must not grow into one.
@@ -5343,4 +5420,59 @@ N-076  `PersonSummary` CARRIED `users.status` RAW, AND EVERY PERSON EVER ADDED W
        now asserts the DB column and `toBeUndefined()` on the wire.
        A SECOND FIELD THAT ANSWERS AN ALREADY-DERIVED QUESTION APPROXIMATELY is not a
        convenience. it is a contradiction waiting for a renderer.
+
+N-079  A PERSON'S PAGE COULD NOT SAY WHAT THAT PERSON WAS PART OF, SO THE MOST NUMEROUS PEOPLE
+       IN AN ORGANISATION HAD THE EMPTIEST PAGE IN IT. 34, 47, 13 § People, built 2026-09-01.
+       reported 2026-09-01 by the owner, on the seeded college: "open a student profile -- the
+       feedback involving them doesn't actually show up".
+       THE SHAPE OF THE GAP. every query in the product ran one way. a campaign holds an
+       `audience_rule`, and features/campaigns/audience.ts turns that rule into a COUNT
+       (`countAudience`, 40's denominator) or into a set of account ids (`audienceUsers`, 61's
+       recipients). nothing ever asked it BACKWARDS, so there was no way to go from a person to
+       the campaigns that name them -- and no screen had ever needed to, because every screen
+       was built for an administrator looking at a campaign.
+       WHY IT LANDED HARDEST ON RESPONDENTS. /app/people/:id had four blocks -- identity,
+       account, positions, powers -- and ALL FOUR ARE ABOUT POWER. a respondent holds none by
+       construction: DEC-009 gives them no users row, so authz/collect.ts has nothing to collect
+       and powersByPlace is empty by definition. opening one of seed/iiit.ts's 30 students
+       showed three empty blocks and a fourth reading "No account. They cannot sign in.", while
+       five polls addressed to the Student role were collecting one screen away. the page said
+       nothing whatever about the person the organisation exists to hear from.
+       RESOLUTION. `involvement: PersonCampaign[]` on `PersonDetail` and on `ProfileView`, one
+       resolver in features/people/involvement.ts, one renderer in components/org/Involvement.tsx
+       -- the shape <PowersByPlace> already established, and the same two placements. NO NEW
+       ENDPOINT AND NO NEW CAPABILITY: inverting an audience rule the caller may already read
+       discloses nothing the campaigns list does not.
+       THREE REASONS, NOT ONE LIST. `audience` (the rule NAMES them, by role or unit -- they are
+       in the denominator), `everyone` ({kind:'anyone'}, which names nobody and is listed only
+       because it is open to them), and `subject` (the campaign collects ABOUT them -- a subject
+       linked to their account, 44's reviewee). collapsing them would claim two false things at
+       once: that a poll for every student is personally about this one, and that a review OF
+       somebody is merely something they may answer.
+       TWO SCOPES ON ONE FIELD, AND THE SECOND IS THE LOAD-BEARING ONE. an administrator reading
+       somebody else is bounded by their own `campaign.read` (the same `scopeToCampaigns` the
+       campaigns list runs, not a copy). a person reading their OWN, on /profile, is bounded by
+       nothing -- because `campaign.read` is an ADMINISTRATIVE capability, and gating it there
+       would hide "what am I supposed to fill in" from every respondent and every junior member
+       of staff, which is the whole population the field is for. this is 11 §8's `self`-forgotten
+       bug arriving in a new place, and it was one line away from being written.
+       THERE IS NO `responded` FIELD AND THERE CANNOT BE ONE -- INV-006. `responses` has no
+       respondent column, so for an anonymous campaign the schema genuinely cannot answer it. it
+       COULD be answered for the rest, from `campaign_participants`, and that is exactly why it
+       is not: a "not yet" appearing on some rows and never on the anonymous ones would single
+       the anonymous ones out by their silence. the same disclosure, arriving as an absence.
+       THE MATCHER IS IN MEMORY AND THE DENOMINATOR IS IN SQL, WHICH IS THE ONE DRIFT RISK. one
+       query per campaign was the alternative and it is worse. test/involvement.test.ts pins the
+       pair on the same data -- every person whose page lists a round is inside that round's own
+       `countAudience` roll -- the pattern features/campaigns/status.ts uses for `whereStatus`.
+       matchOf() therefore copies an omission deliberately: neither it nor `positionFilter`
+       drops a position whose `validTo` has passed, and fixing that HERE alone would make a
+       person's page and 40's response rate disagree about the same campaign.
+       COST, AND IT WAS CAUGHT BY THE BUILD RATHER THAN BY REVIEW. `timing()` was widened from
+       `CampaignSummary` to the four fields it reads, so a `PersonCampaign` can print the same
+       sentence -- the alternative was a fourth copy of "ends in 3 days". it and STATUS_TAG
+       then had to MOVE, to pages/console/Campaigns/card.ts: importing them from the page
+       module dragged the campaigns list into /app/people and /app/profile, <ShareSheet> and
+       its QR library with it, ~30 kB for two screens that show no QR code. Results/index.tsx
+       had been importing them across pages since T-081 and paid the same cost unnoticed.
 ```
