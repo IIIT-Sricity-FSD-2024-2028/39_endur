@@ -2398,7 +2398,35 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-31 (latest) · `npm run db:migrate` was the one command N-013 warns about
+### 2026-08-31 (latest) · Enter on the structure page created two units
+
+**Found by the owner on `/app/structure`:** naming a new unit and pressing Enter added it twice.
+
+`<InlineName>` (`components/org/InlineName.tsx`, `24` §7) had `onBlur={commit}` and an Enter
+handler that called `commit()` **and then** `blur()`. `blur()` is synchronous, so one keypress ran
+the handler twice, with the same draft both times — React had not re-rendered, so `next !== value`
+was still true on the second pass.
+
+**It has always done this. Only the caller was new.** Every previous caller was a RENAME, and
+writing the same name twice is the same name, so the second commit was invisible. The structure
+page's `+` does not rename, it CREATES, and two identical creates are two units.
+
+**Fixed:** Enter still commits directly — leaving it to the blur would mean Enter does nothing on
+an input nothing had focused — and a `committed` ref, shaped like the existing `reverting` one,
+tells the blur it caused that there is nothing left to do. `onFocus` clears both, so neither flag
+survives into an edit it was not set by; `reverting` had the same latent staleness and now does
+not.
+
+- one implementation, N placements (INV-007) — the single change fixes structure, roles, subjects
+  and setup, and `.blur()` appears nowhere else in the frontend
+- **the test that should have caught it asserted `toHaveBeenCalledWith`, which does not count.**
+  It passed against two calls. There is now one asserting `toHaveBeenCalledTimes(1)`, written
+  failing first (2 calls) and then passing
+- the five page-level tests that fire Enter at an **unfocused** input still pass, and that is the
+  reason Enter was not left to the blur. `InlineName.test.tsx`'s own header documents that trap
+- 1578 tests pass (612 backend, 966 frontend), typecheck 0, lint 0, both audits clean
+
+### 2026-08-31 · `npm run db:migrate` was the one command N-013 warns about
 
 **Found by the owner running the step `T-108` told them to run.** `npm run db:migrate` ran
 `prisma migrate dev`. It prompted for a migration name, generated one, and failed applying it:

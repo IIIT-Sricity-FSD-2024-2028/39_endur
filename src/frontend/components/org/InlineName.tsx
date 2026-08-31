@@ -40,6 +40,8 @@ export function InlineName({
    * first version of that test passed for the wrong reason.
    */
   const reverting = useRef(false);
+  /** Set by Enter, read by the blur it causes -- see `onBlur`. Same shape as `reverting`. */
+  const committed = useRef(false);
 
   // Follow the source of truth when it changes underneath — a reorder, an undo, a preset
   // swap. Without this the input keeps showing the old name and the next blur writes it
@@ -79,10 +81,32 @@ export function InlineName({
       placeholder={placeholder}
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
+      onBlur={() => {
+        // The blur Enter just caused has nothing left to do. Without this it commits a SECOND
+        // time, with the same draft both times, because `blur()` is synchronous and React has
+        // not re-rendered -- so `next !== value` is still true. Renaming twice to the same
+        // name hid it for as long as every caller was a rename; the structure page's `+` does
+        // not rename, it CREATES, and Enter there made two units.
+        if (committed.current) {
+          committed.current = false;
+          return;
+        }
+        commit();
+      }}
+      onFocus={() => {
+        // Neither flag survives into an edit it was not set by. Both are cleared by the blur
+        // they expect, and both are left standing when that blur never comes -- Escape or
+        // Enter on an input nothing had focused. Clearing on the way IN closes that off
+        // without either handler having to reason about whether its blur arrived.
+        committed.current = false;
+        reverting.current = false;
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
+          // Committed HERE rather than left to the blur below, so Enter works on an input
+          // that is not focused -- `blur()` would be a no-op and the key would do nothing.
+          committed.current = true;
           commit();
           event.currentTarget.blur();
         }
