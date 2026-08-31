@@ -5,6 +5,97 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
+UPDATED   2026-09-01  (N-080 -- THE COLLEGE NOW HAS A HISTORY, A ROSTER WITH ADDRESSES,
+                       NAMED REVIEWEES, AND AN IMPROVE LOOP AT FOUR STATES.
+                       ROOT RUNNER: 1647/1647 across 125 files (666 api + 981 web), typecheck
+                       0, lint 0, drift + vocab clean. ONE FILE TOUCHED: seed/iiit.ts.
+                       NO MIGRATION, NO NEW ENDPOINT, NO NEW CAPABILITY, NO DTO CHANGE.
+                       !! THE ASK, four items against the IIIT Sri City preset: activity logs
+                       ("check if this works in the first place"), emails on all members,
+                       persons linked to each course, and reflections closed AND ongoing.
+                       !! ITEM 1 -- THE ACTIVITY LOG WORKS AND ALWAYS DID. counted before
+                       touching anything: the four DEMO_ORGS carry 11 audit rows each and
+                       iiit-sri-city carried 0. demo.ts has seedActivityLog and iiit.ts never
+                       had an equivalent, because db/tx.ts writes those rows FROM A LIVE
+                       REQUEST and a freshly seeded org has made none. 26 rows now, and the
+                       screen renders them (verified through GET /api/v1/audit, not the table).
+                       !! ONLY THE DIRECTOR CAN OPEN THAT SCREEN, and this is worth knowing
+                       before anybody calls it broken: `audit.read` is S('all') in the grant
+                       matrix -- level 1 and nobody else. chief.warden@ gets a clean 403.
+                       readAudit therefore takes its visibility.all branch and scopeFilter
+                       never runs at this college.
+                       !! THE TWO SEEDED DENIALS CARRY NO TARGET, ON PURPOSE, and this is
+                       where demo.ts is WRONG and iiit.ts is right. writeDenial says it in as
+                       many words -- "a refusal names no target row" -- and writes
+                       targetType: null for every 403 the product has ever refused.
+                       demo.ts's seeded denial sets a target, which is a row the running
+                       system cannot produce. left alone there; not copied here.
+                       !! ITEM 2 -- AN EMAIL LIVES ON `users` AND NOWHERE ELSE. so all 30
+                       students opened on "No account" with no address, because iiit.ts wrote
+                       people nodes with no user row at all. they have `status: 'invited'`
+                       with a NULL hash now -- WHICH IS THE STATE THAT CANNOT BE SIGNED IN TO,
+                       and is exactly what createPerson() writes for every person added
+                       through the product (schema.prisma says so above AccountInvite). the
+                       seed was disagreeing with the only route that creates people.
+                       !! DEC-009 IS UNTOUCHED AND WAS CHECKED, NOT ASSUMED. it is about
+                       ANSWERING: every seeded campaign is still access:'public', the token
+                       is still the only credential, `responses` still has no column that
+                       could name a respondent (INV-006), and NO AccountInvite row is minted
+                       for any of the 30 -- there is no link to accept. BILLING IS UNCHANGED
+                       AND MEASURED: seatsFor counts status:'active', so GET /billing still
+                       reports 15 seats. 45/45 people now carry an address.
+                       !! ITEM 3 -- `linked_user_id` IS THE ONLY PERSON-TO-SUBJECT LINK THE
+                       SCHEMA HAS, and 0 of 14 subjects had one. that is why /app/reflect was
+                       empty for all 15 staff: mySubjects() returned nothing. 11 are linked
+                       now -- 7 courses to faculty in their OWN department, BH1/BH2 to their
+                       caretakers, Mess A/B to their vendor managers.
+                       !! HOSTEL SERVICES AND MESS SERVICES ARE DELIBERATELY LEFT UNOWNED.
+                       they are the parent-level subjects the system-wide polls hang off, and
+                       the two wardens already reach them by subtree. linking them too would
+                       make one laundry complaint arrive twice -- once at BH1's caretaker and
+                       again at their supervisor as a reflection of their own.
+                       !! IT ALSO FIXED N-079 AT THIS COLLEGE FOR FREE. involvement.ts's
+                       reason:'subject' compares subject.linkedUserId to person.userId, so
+                       with zero linked subjects that branch was UNREACHABLE here and every
+                       row said 'audience' or 'everyone'. faculty-4@'s profile now reads
+                       "subject via FDFED".
+                       !! ITEM 4 -- FOUR REFLECTIONS AT FOUR DIFFERENT STATES, because a
+                       screen that only ever shows a FINISHED loop teaches nothing about the
+                       ordering rule the feature exists for. finalised (FDFED, closed),
+                       planned-not-finalised (Mess B, closed, check-in BOOKED with a null
+                       heldAt), reflected-only (BH1, closed), and reflected on a round STILL
+                       OPEN (Gen AI). every other cycle stays 'due'.
+                       !! FDFED IS THE ONE THAT EXPLAINS THE REST OF THE COLLEGE. it was
+                       seeded at 0.34 in the odd semester and 0.46 in the even one and
+                       NOTHING IN THE DATA SAID WHY. the reflection is dated two days after
+                       that round closed, the plan answers the comments literally (publish
+                       the rubric in week 1; cap teams at four), the HOD held the check-in,
+                       and the next cycle is the result. THE GAP IS REAL AND WAS READ BACK
+                       OFF THE API: self 4 against received 2.14, 2.0, 2.0, 2.14 and NPS 8
+                       against 3.43. that is what "the criteria were never written down"
+                       looks like from the front of the room.
+                       !! THE ONGOING ONE IS ALSO THE K-ANONYMITY CASE. Gen AI's mid-course
+                       check has 3 responses against a threshold of 5, so readGap returns
+                       suppressed:true and NO rows -- a reviewee who HAS recorded their own
+                       assessment and is still shown nothing. it cannot be demonstrated on a
+                       closed round here because every closed round cleared the threshold.
+                       !! SELF-ANSWERS ARE A FRACTION OF THE SCALE, NOT EIGHT HAND-WRITTEN
+                       NUMBERS. 0.8 against a subject seeded at 0.34 is a stated intention,
+                       and it stays one when a template gains a question.
+                       !! TO SEE IT: npm run db:seed -> admin@ -> Activity (26 rows, two
+                       denials); faculty-4@ -> Reflect -> the finalised FDFED loop and its
+                       gap; faculty-8@ -> Reflect -> Gen AI, suppressed; caretaker.bh1@ ->
+                       Reflect -> reflected, no plan; any student in People -> an address.
+                       !! ONE PRE-EXISTING BUG NOTED, NOT FIXED, NOT MINE: audit/service.ts
+                       scopeFilter finds people with
+                       `kind:'position', unitId, userId:{not:null}` -- but POSITION NODES
+                       NEVER CARRY userId in this codebase (person nodes do). so a
+                       non-org-wide caller can never see a person-targeted audit row. it is
+                       invisible at IIIT because only level 1 holds audit.read, and it would
+                       bite the first org that widens that grant.)
+
+```
+```
 UPDATED   2026-09-01  (N-079 -- A PERSON'S PAGE NOW SAYS WHAT THAT PERSON IS PART OF.
                        ROOT RUNNER: 1641/1642 across 125 files (the one red is platform.test's
                        TOTP-window case, PRE-EXISTING and unrelated). typecheck 0, lint 0,
@@ -2589,7 +2680,130 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-09-01 (latest) · the earnings page was right and the estate was the lie
+### 2026-09-01 (latest) · `N-080` — the college gets a history, addresses, reviewees and a loop
+
+**The ask, four items against the IIIT Sri City preset:** activity logs *("check if this works in
+the first place")*, emails on all members, persons linked to each course, and reflections both
+closed and ongoing. `1647/1647` across 125 files (666 api + 981 web), typecheck 0, lint 0, drift +
+vocab clean. **One file touched — `src/backend/database/seed/iiit.ts`. No migration, no new
+endpoint, no new capability, no DTO change.** Every claim below was verified through the running
+API with a real cookie session, not by reading the tables.
+
+**!! ITEM 1 — THE ACTIVITY LOG WORKS, AND ALWAYS DID.** Counted before touching anything: the four
+`DEMO_ORGS` carry 11 `audit_log` rows each and `iiit-sri-city` carried **0**. `demo.ts` has
+`seedActivityLog`; `iiit.ts` never had an equivalent. That is not a broken feature — `db/tx.ts`
+writes those rows **from a live request**, so a freshly seeded organisation has an empty log by
+construction, and this college's history has to be *stated* for the same reason its org chart is.
+26 rows now, spanning both semesters, and `GET /api/v1/audit` renders them with actor and target
+names resolved.
+
+**!! ONLY THE DIRECTOR CAN OPEN THAT SCREEN**, which is worth knowing before anybody calls it
+broken again. `audit.read` is `S('all')` in the grant matrix — level 1 and nobody else. Signing in
+as `chief.warden@` and hitting the route returns a clean **403**. `readAudit` therefore takes its
+`visibility.all` branch here and `scopeFilter` never runs at all.
+
+**!! THE TWO SEEDED DENIALS CARRY NO TARGET, AND THAT IS THE FAITHFUL SHAPE.** `writeDenial` says
+it in as many words — *"a refusal names no target row; the actor, action and time are the security
+event"* — and it writes `targetType: null` for every 403 the product has ever refused. `demo.ts`'s
+seeded denial sets a target, which is a row the running system **cannot produce**. Left alone
+there, deliberately not copied here. The two are BH1's caretaker reaching for Mess B's results
+(`results.read` at `own_unit`, and Mess B is not their unit) and Mess B's vendor manager trying to
+archive the subject their own 2.0 is attached to (`subject.archive` stops at level 2).
+
+**!! ITEM 2 — AN EMAIL LIVES ON `users` AND NOWHERE ELSE.** `toSummary` reads
+`person.user?.email ?? null`, so with no user row there is no address anywhere to put one. All 30
+students opened on *"No account. They cannot sign in."* with a blank address field. They now hold a
+`users` row with `status: 'invited'` and a **NULL password hash** — the one state that cannot be
+signed in to, and precisely what `createPerson()` writes for every person added through the
+product. `schema.prisma` says so above `AccountInvite`: *"a `users` row already exists for every
+person in the graph, written by createPerson() with `status = 'invited'` and a NULL
+passwordHash"*. The seed was disagreeing with the only route that creates people.
+
+**!! DEC-009 IS UNTOUCHED, AND THAT WAS CHECKED RATHER THAN ASSUMED.** DEC-009 is about
+*answering*: every seeded campaign here is still `access: 'public'`, the opaque token is still the
+only credential, `responses` still has no column that could name a respondent (INV-006), and **no
+`AccountInvite` row is minted for any of the 30** — there is no link to accept, so nobody
+authenticates. `accountStatusOf` correctly still reports `state: 'none'` for them, because that
+state means *"has never been given a key"*, which remains true. **Billing is unchanged and was
+measured, not reasoned about:** `seatsFor` counts `status: 'active'`, and `GET /api/v1/billing`
+still reports `{ activeUsers: 15, nonPersonSubjects: 3 }`. 45 of 45 people now carry an address,
+and `studentEmail()` is the single expression both the roster and the `14` evaluation booker derive
+it from — two copies is how a booking ends up naming somebody the People list has never heard of.
+
+**!! ITEM 3 — `linked_user_id` IS THE ONLY PERSON-TO-SUBJECT LINK THE SCHEMA HAS**, and 0 of this
+college's 14 subjects had one. That is the whole reason `/app/reflect` was empty for all 15 members
+of staff: `mySubjects()` returned nothing, so the Faculty role — described in `iiit.ts` itself as
+*"the reviewee level: reads its own results"* — had nothing it was the reviewee **of**. 11 subjects
+are linked now: the seven courses to faculty holding a seat in that course's **own** department,
+BH1 and BH2 to their own caretakers, Mess A and Mess B to their own vendor managers. SEED is the
+exception that proves the rule — it is anchored at `academics` because all three branches take it,
+so its reviewee is the Dean, who is anchored there too.
+
+**!! `Hostel Services` AND `Mess Services` ARE DELIBERATELY LEFT UNOWNED.** They are the
+parent-level subjects the system-wide polls hang off, and the Chief Warden and Mess Warden already
+reach them by `subtree`. Linking them as well would make one complaint about laundry arrive twice —
+once at BH1's caretaker and again at their supervisor as a reflection of their own — and a reviewee
+whose results are somebody else's results is the one thing a gap must never be.
+
+**!! IT ALSO MADE `N-079` REACHABLE AT THIS COLLEGE, FOR FREE.** `involvement.ts` decides
+`reason: 'subject'` by comparing `subject.linkedUserId` to `person.userId`. With zero linked
+subjects that branch was **unreachable** here and every involvement row said `audience` or
+`everyone` — the "this round is about you" sentence could not be produced by this organisation at
+all. `faculty-4@`'s own profile now reads `subject · via FDFED`.
+
+**!! ITEM 4 — FOUR REFLECTIONS AT FOUR DIFFERENT STATES**, because a screen that only ever shows a
+*finished* loop teaches nothing about the ordering rule the feature exists for:
+
+| state | subject | round | what it shows |
+|---|---|---|---|
+| `finalised` | FDFED | Odd semester (closed) | plan finalised, check-in held by the HOD |
+| `planned` | Mess B | Mess feedback (closed) | plan written, check-in **booked** with a null `heldAt` |
+| `reflected` | BH1 | Hostel review (closed) | assessment written, no plan — which is why the hostels ran a poll instead |
+| `reflected` | Gen AI | mid-course check (**open**) | the ongoing one, and the k-anonymity case |
+
+Every other cycle stays `due`, which is the fourth state and the most common one.
+
+**!! FDFED IS THE ONE THAT EXPLAINS THE REST OF THE COLLEGE.** It was seeded at `0.34` in the odd
+semester and `0.46` in the even one and **nothing in the data said why**. The reflection is dated
+two days after that round closed, the plan answers the written comments literally (*publish the
+evaluation rubric in week 1*; *cap project teams at four*), the CSE HOD held the check-in, and the
+next cycle is the result. **The gap is real and was read back off `GET /reflect/:id/gap`:** self
+`4` against received `2.14`, `2.0`, `2.0`, `2.14`, and NPS `8` against `3.43`. A `+1.86` to `+2.0`
+blind spot is what *"the evaluation criteria were never written down anywhere"* looks like from the
+front of the room.
+
+**!! THE ONGOING ONE IS ALSO THE ANONYMITY GATE, AND IT HAD TO BE.** Gen AI's mid-course check
+carries 3 responses against a threshold of 5, so `readGap` returns `suppressed: true` with **no
+rows at all** — a reviewee who *has* recorded their own assessment and is still shown nothing,
+which is INV-005 doing exactly what it says. It could not be demonstrated on a closed round here,
+because every closed round at this college cleared the threshold.
+
+**!! THE SELF-ANSWERS ARE A FRACTION OF THE SCALE, NOT EIGHT HAND-WRITTEN NUMBERS.** One `self`
+value between 0 and 1 fills the whole form, so `0.8` against a subject seeded at `0.34` is a
+**stated intention** about the size of the gap rather than an accident of eight literals — and it
+stays one when a template gains a question. The instrument is the campaign's own template
+throughout (INV-008); self and received are the same questions or the subtraction means nothing.
+
+**To see it:** `npm run db:seed`, then
+
+- `admin@iiit-sri-city.endur.test` → **Activity** — 26 rows across both semesters, two denials.
+- `faculty-4@` → **Reflect** — the finalised FDFED loop, and its gap.
+- `faculty-8@` → **Reflect** — Gen AI, still open, suppressed.
+- `caretaker.bh1@` → **Reflect** — reflected, no plan.
+- `admin@` → **People** → any student — a name, an address, and still no way in.
+
+All passwords `endur-demo-password`.
+
+**!! ONE PRE-EXISTING BUG FOUND, NOT FIXED, AND NOT INTRODUCED HERE.**
+`features/audit/service.ts`'s `scopeFilter` builds its set of in-scope people with
+`prisma.node.findMany({ kind: 'position', unitId: { in: unitIds }, userId: { not: null } })` — but
+**position nodes never carry `userId` in this codebase**; person nodes do, and a position is a seat
+rather than a person. That query returns nothing, so a caller whose `audit.read` is narrower than
+`all` can never see a person- or user-targeted audit row. It is invisible at IIIT because only
+level 1 holds `audit.read` and that path takes the `visibility.all` short-circuit, and it would
+bite the first organisation that widens the grant. Left for a session that owns that file.
+
+### 2026-09-01 · the earnings page was right and the estate was the lie
 
 **Reported by the owner:** *"two enterprise estates yet only ₹500 earned — they must have paid
 sometime in the past, no?"* Yes, and they hadn't. `1647/1647`, typecheck 0, lint 0. **No

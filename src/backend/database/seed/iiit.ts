@@ -156,6 +156,14 @@ const FACULTY_BY_DEPARTMENT: Array<{ unit: UnitKey; count: number }> = [
 
 const STUDENTS_TOTAL = 30;
 
+/**
+ * A student's address, DERIVED IN ONE PLACE. Two things need it — the `users` row at 5 and the
+ * evaluation booking at 14 — and two independent copies of this expression is exactly how a
+ * booking ends up naming somebody the People list has never heard of.
+ */
+const studentEmail = (name: string): string =>
+  `${name.toLowerCase().replace(/\s+/g, '.')}@student.${IIIT_SLUG}.endur.test`;
+
 /** 6 teams of 5, which is every student exactly once. */
 const TEAM_COUNT = 6;
 const TEAM_SIZE = 5;
@@ -478,34 +486,62 @@ export async function seedIiitSriCity(
     6: { role: 'hod', unit: 'aids', email: `hod.aids@${IIIT_SLUG}.endur.test` },
   };
 
+  // KEPT, not discarded, because 7 assigns each course a named owner and 16 makes that owner a
+  // reviewee. `addStaff` already returns the ids; throwing them away and looking the person back
+  // up by email later would be a second answer to "who teaches DSA" that could disagree with this one.
+  const faculty: Array<{ userId: string; personId: string; name: string }> = [];
   for (const [index, department] of facultyUnits.entries()) {
     const hat = SECOND_HAT[index];
     const seats: Array<{ role: RoleKey; unit: UnitKey }> = hat
       ? // Leadership seat first, so it is the primary one and the People list leads with it.
         [{ role: hat.role, unit: hat.unit }, { role: 'faculty', unit: department }]
       : [{ role: 'faculty', unit: department }];
-    addStaff(hat?.email ?? `faculty-${index + 1}@${IIIT_SLUG}.endur.test`, seats);
+    faculty.push(addStaff(hat?.email ?? `faculty-${index + 1}@${IIIT_SLUG}.endur.test`, seats));
   }
 
   // 4b. The support staff who run a place and are explicitly NOT faculty. One seat each, and
   //     that single seat is the whole of the distinction the owner drew.
-  addStaff(`caretaker.bh1@${IIIT_SLUG}.endur.test`, [{ role: 'caretaker', unit: 'bh1' }]);
-  addStaff(`caretaker.bh2@${IIIT_SLUG}.endur.test`, [{ role: 'caretaker', unit: 'bh2' }]);
-  addStaff(`vendor.mess-a@${IIIT_SLUG}.endur.test`, [{ role: 'vendor', unit: 'mess-a' }]);
-  addStaff(`vendor.mess-b@${IIIT_SLUG}.endur.test`, [{ role: 'vendor', unit: 'mess-b' }]);
+  const caretakerBh1 = addStaff(`caretaker.bh1@${IIIT_SLUG}.endur.test`, [{ role: 'caretaker', unit: 'bh1' }]);
+  const caretakerBh2 = addStaff(`caretaker.bh2@${IIIT_SLUG}.endur.test`, [{ role: 'caretaker', unit: 'bh2' }]);
+  const vendorMessA = addStaff(`vendor.mess-a@${IIIT_SLUG}.endur.test`, [{ role: 'vendor', unit: 'mess-a' }]);
+  const vendorMessB = addStaff(`vendor.mess-b@${IIIT_SLUG}.endur.test`, [{ role: 'vendor', unit: 'mess-b' }]);
 
-  // 5. The 30 students. NO USER ROWS — a respondent never holds an account (DEC-009), and
-  //    `seatsFor` bills active users, so the roster costs the college nothing.
+  // 5. The 30 students, each with a NAME AND AN ADDRESS AND NO WAY IN.
+  //
+  //    THE ROW IS `status: 'invited'` WITH A NULL HASH, WHICH IS THE ONE STATE THAT CANNOT BE
+  //    SIGNED IN TO. That is not a compromise on DEC-009, it is the shape `createPerson()`
+  //    already writes for every person added through the product — schema.prisma says so above
+  //    `AccountInvite`: "a `users` row already exists for every person in the graph, written by
+  //    createPerson() with `status = 'invited'` and a NULL passwordHash". A roster seeded WITHOUT
+  //    those rows was the seed disagreeing with the only route that creates people, and it showed:
+  //    an email is stored on `users` and nowhere else, so all 30 opened on "No account. They
+  //    cannot sign in." with no address to write to.
+  //
+  //    DEC-009 IS ABOUT ANSWERING, AND NOTHING HERE TOUCHES IT. Every seeded campaign is
+  //    `access: 'public'`, the token stays the only credential, `responses` still has no column
+  //    that could name a respondent (INV-006), and nobody accepts an invite that is never minted
+  //    — there is no `AccountInvite` row for any of these 30.
+  //
+  //    AND IT STILL COSTS THE COLLEGE NOTHING: `seatsFor` counts `status: 'active'`, so the
+  //    billable seat count is the 15 members of staff, exactly as it was before.
   //
   //    Branch, hostel and mess are INTERLEAVED rather than aligned, because a hostel whose
   //    residents are all one branch is not a hostel — and the arithmetic still lands exactly:
   //    10/10/10, 15/15, 18/12.
   const studentNames: string[] = [];
+  // Deliberately NOT merged into `staffUserIds`: that list is who an announcement is addressed to
+  // at 15, and a student is not an administrator.
+  const studentUserIds: string[] = [];
   for (let index = 0; index < STUDENTS_TOTAL; index += 1) {
     const personId = randomUUID();
+    const userId = randomUUID();
     const name = nextName();
     studentNames.push(name);
-    people.push({ id: personId, orgId, kind: 'person', name });
+    // No `passwordHash`, so the column stays NULL: an account that exists to be written to and
+    // listed, and that no password will open.
+    users.push({ id: userId, orgId, email: studentEmail(name), name, status: 'invited' });
+    people.push({ id: personId, orgId, kind: 'person', name, userId });
+    studentUserIds.push(userId);
 
     const department: UnitKey = index < 10 ? 'cse' : index < 20 ? 'ece' : 'aids';
     const hostel: UnitKey = index % 2 === 0 ? 'bh1' : 'bh2';
@@ -631,7 +667,49 @@ export async function seedIiitSriCity(
     },
   ]);
 
-  // 7. Subjects: seven courses and six places.
+  // 7. Subjects: seven courses and six places, ELEVEN OF THEM WITH A NAMED PERSON ANSWERABLE.
+  //
+  //    `linked_user_id` IS THE ONLY PERSON-TO-SUBJECT LINK THE SCHEMA HAS, and it is the whole
+  //    of what makes a subject a REVIEWEE rather than a heading. Without it `mySubjects()`
+  //    returns nothing, `/app/reflect` is empty for all 15 members of staff, and the Faculty
+  //    role — described three screens up as "the reviewee level: reads its own results" — has
+  //    nothing it is the reviewee OF. It also decides `reason: 'subject'` in `features/people/involvement.ts`
+  //    block, which is how a person's own page says "this round is about you".
+  //
+  //    OWNERSHIP IS DRAWN FROM THE UNIT, NEVER ACROSS IT. Every course goes to somebody holding
+  //    a faculty seat in that course's own department, every block to its own caretaker, every
+  //    mess to its own vendor manager. SEED is the exception that proves it: it is anchored at
+  //    `academics` because all three branches take it, so its reviewee is the Dean, who is
+  //    anchored there too.
+  //
+  //    `Hostel Services` and `Mess Services` ARE DELIBERATELY LEFT UNOWNED. They are the
+  //    parent-level subjects the system-wide polls hang off, and the Chief Warden and Mess
+  //    Warden already reach them by `subtree`. Linking them as well would make one complaint
+  //    about laundry arrive twice — once at BH1's caretaker and once again at their supervisor
+  //    as a reflection of their own — and a reviewee whose results are somebody else's results
+  //    is the one thing a gap must never be.
+  const OWNER: Record<string, string> = {
+    // CSE. The HOD teaches DSA; FDFED — the weak one, and the course the whole improvement
+    // story hangs off — belongs to a plain member of faculty, so the loop at 16 runs at the
+    // reviewee level rather than at an administrator's.
+    DSA: (faculty[1] as { userId: string }).userId,
+    FDFED: (faculty[3] as { userId: string }).userId,
+    // ECE. Both of its faculty own a course, and one of them is also the Mess Warden.
+    VLSI: (faculty[4] as { userId: string }).userId,
+    SS: (faculty[5] as { userId: string }).userId,
+    // AIDS. Gen AI goes to `faculty-8@`, the plain faculty login printed at the bottom of this
+    // file, so the one ONGOING reflection is reachable from an advertised sign-in.
+    'Gen AI': (faculty[7] as { userId: string }).userId,
+    ML: (faculty[9] as { userId: string }).userId,
+    // Common to all three branches, anchored at Academics, and so is its reviewee.
+    SEED: (faculty[0] as { userId: string }).userId,
+
+    BH1: caretakerBh1.userId,
+    BH2: caretakerBh2.userId,
+    'Mess A': vendorMessA.userId,
+    'Mess B': vendorMessB.userId,
+  };
+
   const subjectId = new Map<string, string>();
   for (const subject of [...COURSES, ...FACILITIES]) {
     const created = await prisma.subject.create({
@@ -640,6 +718,8 @@ export async function seedIiitSriCity(
         name: subject.name,
         unitId: unitId.get(subject.unit) as string,
         type: 'general',
+        // Left NULL for the two parent-level facilities, and that null is a decision (above).
+        linkedUserId: OWNER[subject.name] ?? null,
       },
       select: { id: true },
     });
@@ -1142,7 +1222,7 @@ export async function seedIiitSriCity(
         bookings.push({
           slotId: slots[team]?.id as string,
           name,
-          email: `${name.toLowerCase().replace(/\s+/g, '.')}@student.${IIIT_SLUG}.endur.test`,
+          email: studentEmail(name),
           cancelToken: mintToken(),
         });
       }
@@ -1174,6 +1254,311 @@ export async function seedIiitSriCity(
       skipDuplicates: true,
     });
   }
+
+
+  // 16. THE IMPROVE LOOP, AT FOUR DIFFERENT POINTS ALONG IT.
+  //
+  //     A screen that only ever shows a FINISHED loop teaches nothing about the ordering rule
+  //     the feature exists for, so the four below are deliberately at four different states —
+  //     `finalised`, `planned`, `reflected` and, by leaving the other cycles alone, `due`.
+  //     Three sit on CLOSED rounds and one on a round that is still OPEN, because a reflection
+  //     written mid-cycle is the normal case and a product that only supports the post-mortem
+  //     would be a different product.
+  //
+  //     THE ORDERING IS NOT DECORATION. `readGap` 404s until a reflection exists, so the
+  //     reviewee's own number is recorded before they can see the one they were given. Seeding
+  //     the reflection with a LATER `submittedAt` than the responses would quietly describe the
+  //     opposite — somebody marking their own homework — so every `submittedAt` here is after
+  //     the round closed only where the round is closed, and mid-window where it is not.
+  const campaignRows = await prisma.campaign.findMany({
+    where: { orgId },
+    select: { id: true, name: true },
+  });
+  const campaignByName = new Map(campaignRows.map((row) => [row.name, row.id]));
+  // Throws rather than skipping: a renamed campaign above must break the seed loudly, not
+  // silently produce a college with no reflections in it.
+  const cid = (name: string): string => {
+    const id = campaignByName.get(name);
+    if (!id) throw new Error(`iiit seed: no campaign named ${name}`);
+    return id;
+  };
+
+  /**
+   * A reviewee's own answers, ON THE CAMPAIGN'S OWN INSTRUMENT (INV-008). Self and received have
+   * to be the same questions or the gap subtracts two different things.
+   *
+   * `self` is a FRACTION OF THE SCALE rather than eight hand-written numbers, so the size of the
+   * gap is a stated intention — 0.8 against a subject seeded at 0.34 is a blind spot on purpose —
+   * and stays that way when a template gains a question.
+   */
+  const selfAnswers = async (
+    template: string,
+    self: number,
+    line: string,
+  ): Promise<Prisma.InputJsonValue> => {
+    const questions = await prisma.question.findMany({
+      where: { templateId: templateId.get(template) as string },
+      orderBy: { position: 'asc' },
+      select: { id: true, kind: true, config: true },
+    });
+    const scaled = (max: number): number => Math.min(max, Math.max(1, Math.round(self * max)));
+    return questions.map((question) => {
+      const config = question.config as { max?: number; options?: string[] };
+      switch (question.kind) {
+        case 'rating':
+          return { questionId: question.id, value: { kind: 'rating', n: scaled(config.max ?? 5) } };
+        case 'nps':
+          return { questionId: question.id, value: { kind: 'nps', n: scaled(10) } };
+        case 'yesno':
+          return { questionId: question.id, value: { kind: 'yesno', yes: self >= 0.6 } };
+        case 'single':
+          return {
+            questionId: question.id,
+            value: { kind: 'single', option: (config.options ?? ['—'])[0] as string },
+          };
+        case 'multi':
+          return {
+            questionId: question.id,
+            value: { kind: 'multi', options: (config.options ?? ['—']).slice(0, 1) },
+          };
+        default:
+          return { questionId: question.id, value: { kind: 'text', text: line } };
+      }
+    });
+  };
+
+  const addReflection = async (spec: {
+    campaign: string;
+    subject: string;
+    template: string;
+    author: string;
+    self: number;
+    line: string;
+    daysAgo: number;
+    plan?: {
+      items: Array<{ text: string; dueAt: null; status: 'open' | 'done' }>;
+      finalisedDaysAgo: number | null;
+    };
+    checkin?: { supervisor: string; notes: string; heldDaysAgo: number | null };
+  }): Promise<void> => {
+    const reflection = await prisma.reflection.create({
+      data: {
+        orgId,
+        campaignId: cid(spec.campaign),
+        subjectId: sid(spec.subject),
+        authorUserId: spec.author,
+        answers: await selfAnswers(spec.template, spec.self, spec.line),
+        submittedAt: new Date(Date.now() - spec.daysAgo * DAY),
+      },
+      select: { id: true },
+    });
+    if (!spec.plan) return;
+
+    const plan = await prisma.actionPlan.create({
+      data: {
+        orgId,
+        reflectionId: reflection.id,
+        items: spec.plan.items,
+        // Immutable once set, and the database enforces it with a trigger rather than trusting
+        // the service — so this value is written at creation, never patched afterwards.
+        finalisedAt:
+          spec.plan.finalisedDaysAgo === null
+            ? null
+            : new Date(Date.now() - spec.plan.finalisedDaysAgo * DAY),
+      },
+      select: { id: true },
+    });
+    if (!spec.checkin) return;
+
+    await prisma.checkin.create({
+      data: {
+        orgId,
+        actionPlanId: plan.id,
+        supervisorUserId: spec.checkin.supervisor,
+        notes: spec.checkin.notes,
+        // A null `heldAt` is a check-in that is BOOKED and has not happened. That is a state the
+        // screen has to render, and it only exists in the data if something seeds it.
+        heldAt:
+          spec.checkin.heldDaysAgo === null
+            ? null
+            : new Date(Date.now() - spec.checkin.heldDaysAgo * DAY),
+      },
+    });
+  };
+
+  // 16a. FINALISED — and this is the one that explains the rest of the college. FDFED was seeded
+  //      at 0.34 in the odd semester and 0.46 in the even one, and until now nothing in the data
+  //      said WHY it moved. The reflection is dated two days after the round closed, the plan
+  //      answers the comments literally (the rubric, the team size), the HOD held the check-in,
+  //      and the next cycle is the result. Self 0.8 against a received 0.34 is the biggest gap
+  //      in the organisation, on purpose: that is what "the criteria were never written down"
+  //      looks like from the front of the room.
+  await addReflection({
+    campaign: 'Odd semester course feedback',
+    subject: 'FDFED',
+    template: 'Course feedback',
+    author: (faculty[3] as { userId: string }).userId,
+    self: 0.8,
+    line: 'The team project is the strongest part of the course and I would keep it as it is.',
+    daysAgo: 182,
+    plan: {
+      items: [
+        { text: 'Publish the evaluation rubric in week 1, before the first submission', dueAt: null, status: 'done' },
+        { text: 'Cap project teams at four', dueAt: null, status: 'done' },
+        { text: 'Rebalance the term: three weeks frontend, three backend', dueAt: null, status: 'open' },
+      ],
+      finalisedDaysAgo: 176,
+    },
+    checkin: {
+      supervisor: (faculty[1] as { userId: string }).userId,
+      notes:
+        'Rubric went out in week 1 this term and the teams are at four. Sequencing is the one still open — we will look at it again before the next offering.',
+      heldDaysAgo: 150,
+    },
+  });
+
+  // 16b. PLANNED, NOT FINALISED — the plan is written and the conversation has not happened yet.
+  //      The check-in is BOOKED with a null `heldAt`, which is the state between the two.
+  await addReflection({
+    campaign: 'Mess feedback — A and B',
+    subject: 'Mess B',
+    template: 'Mess feedback',
+    author: vendorMessB.userId,
+    self: 0.7,
+    line: 'Quality is steady. The second batch at dinner is where we lose time.',
+    daysAgo: 10,
+    plan: {
+      items: [
+        { text: 'Serve the second dinner batch from a fresh tray', dueAt: null, status: 'open' },
+        { text: 'Move to a two-week dinner rotation', dueAt: null, status: 'open' },
+        { text: 'Second clean of the wash area, after lunch', dueAt: null, status: 'open' },
+      ],
+      finalisedDaysAgo: null,
+    },
+    checkin: {
+      supervisor: (faculty[5] as { userId: string }).userId,
+      notes: 'Booked for after the Tuesday dinner poll closes.',
+      heldDaysAgo: null,
+    },
+  });
+
+  // 16c. REFLECTED, AND NOTHING MORE — which is why the hostels ran a poll. The caretaker wrote
+  //      their assessment and stopped; six people had already written to the suggestion box about
+  //      the same two washing machines, and with no plan on record the complaint had to become a
+  //      question the whole hostel answered instead.
+  await addReflection({
+    campaign: 'Hostel review — BH1 and BH2',
+    subject: 'BH1',
+    template: 'Hostel review',
+    author: caretakerBh1.userId,
+    self: 0.6,
+    line: 'Cleaning and water are in reasonable shape. Laundry is the one I cannot fix from here.',
+    daysAgo: 24,
+  });
+
+  // 16d. THE ONGOING ONE, and the only cycle here whose campaign is still collecting. It is also
+  //      the k-anonymity case: three responses against a threshold of five, so `readGap` returns
+  //      `suppressed: true` and NO rows at all. A reviewee who has recorded their own assessment
+  //      and is still shown nothing is the gate doing exactly what INV-005 says it does, and it
+  //      cannot be demonstrated on a closed round because every closed round here cleared it.
+  await addReflection({
+    campaign: 'Gen AI — mid-course check',
+    subject: 'Gen AI',
+    template: 'Course feedback',
+    author: (faculty[7] as { userId: string }).userId,
+    self: 0.75,
+    line: 'Material is current and the compute quota is the thing I would change first.',
+    daysAgo: 1,
+  });
+
+  // 17. THE ACTIVITY LOG. `db/tx.ts` writes these rows from a live request, so a freshly seeded
+  //     college has an empty one — every other organisation's history happened before the seed
+  //     ran, and this one's has to be stated for the same reason its org chart is.
+  //
+  //     ONLY THE DIRECTOR CAN OPEN THIS SCREEN. `audit.read` is `S('all')` in the grant matrix,
+  //     which is level 1 and nobody else, so `readAudit` takes its `visibility.all` branch and
+  //     the scope filter never runs. That is worth knowing before reading the rows below: they
+  //     are written to be read by one person.
+  //
+  //     THE TWO DENIALS CARRY NO TARGET, AND THAT IS NOT AN OMISSION. `writeDenial` says it in
+  //     as many words — "a refusal names no target row; the actor, action and time are the
+  //     security event" — and it writes `targetType: null` for every 403 the product has ever
+  //     refused. A seeded denial with a target would be a row the running system cannot produce.
+  const auditRows: Array<{
+    actor: string;
+    action: string;
+    targetType?: 'unit' | 'role' | 'subject' | 'campaign' | 'template' | 'person';
+    targetId?: string;
+    outcome?: 'denied';
+    daysAgo: number;
+  }> = [
+    // The setup, in the order the wizard actually runs it.
+    { actor: director.userId, action: 'org.update', targetType: 'unit', targetId: unitId.get('root') as string, daysAgo: 212 },
+    { actor: director.userId, action: 'role.create', targetType: 'role', targetId: roleId.get('faculty') as string, daysAgo: 211 },
+    { actor: director.userId, action: 'template.create', targetType: 'template', targetId: templateId.get('Hostel review') as string, daysAgo: 210 },
+    // The 30 students arrived in one paste, which is what `person.import` is for.
+    { actor: director.userId, action: 'person.import', targetType: 'unit', targetId: unitId.get('academics') as string, daysAgo: 209 },
+    { actor: (faculty[1] as { userId: string }).userId, action: 'subject.create', targetType: 'subject', targetId: sid('FDFED'), daysAgo: 208 },
+
+    // The odd semester, and the row that follows it is the one 16a acts on.
+    { actor: director.userId, action: 'campaign.create', targetType: 'campaign', targetId: cid('Odd semester course feedback'), daysAgo: 206 },
+    { actor: director.userId, action: 'campaign.launch', targetType: 'campaign', targetId: cid('Odd semester course feedback'), daysAgo: 205 },
+    { actor: (faculty[0] as { userId: string }).userId, action: 'campaign.close', targetType: 'campaign', targetId: cid('Odd semester course feedback'), daysAgo: 184 },
+    { actor: (faculty[0] as { userId: string }).userId, action: 'results.export', targetType: 'campaign', targetId: cid('Odd semester course feedback'), daysAgo: 183 },
+    { actor: (faculty[1] as { userId: string }).userId, action: 'subject.update', targetType: 'subject', targetId: sid('FDFED'), daysAgo: 180 },
+
+    // The even semester, which is where FDFED's number moves.
+    { actor: director.userId, action: 'campaign.create', targetType: 'campaign', targetId: cid('Even semester course feedback'), daysAgo: 63 },
+    { actor: director.userId, action: 'campaign.launch', targetType: 'campaign', targetId: cid('Even semester course feedback'), daysAgo: 62 },
+    { actor: (faculty[0] as { userId: string }).userId, action: 'campaign.close', targetType: 'campaign', targetId: cid('Even semester course feedback'), daysAgo: 41 },
+
+    // The hostels. Dates match the campaign's own window: opened 40 days ago, closed 26.
+    { actor: (faculty[2] as { userId: string }).userId, action: 'campaign.create', targetType: 'campaign', targetId: cid('Hostel review — BH1 and BH2'), daysAgo: 41 },
+    { actor: (faculty[2] as { userId: string }).userId, action: 'campaign.launch', targetType: 'campaign', targetId: cid('Hostel review — BH1 and BH2'), daysAgo: 40 },
+    { actor: (faculty[2] as { userId: string }).userId, action: 'campaign.close', targetType: 'campaign', targetId: cid('Hostel review — BH1 and BH2'), daysAgo: 26 },
+
+    // DENIAL ONE, and it is the scope working rather than a bug: BH1's caretaker holds
+    // `results.read` at `own_unit`, and Mess B is not their unit. Somebody who has just read six
+    // complaints about the food going looking for the mess numbers is the most ordinary 403 there is.
+    { actor: caretakerBh1.userId, action: 'results.read', outcome: 'denied', daysAgo: 33 },
+
+    // The messes, on the same rule: opened 22 days ago, closed 12.
+    { actor: (faculty[5] as { userId: string }).userId, action: 'campaign.create', targetType: 'campaign', targetId: cid('Mess feedback — A and B'), daysAgo: 23 },
+    { actor: (faculty[5] as { userId: string }).userId, action: 'campaign.launch', targetType: 'campaign', targetId: cid('Mess feedback — A and B'), daysAgo: 22 },
+    { actor: (faculty[5] as { userId: string }).userId, action: 'campaign.close', targetType: 'campaign', targetId: cid('Mess feedback — A and B'), daysAgo: 12 },
+
+    // DENIAL TWO. Mess B closed at 2.0 and its vendor manager tried to archive the subject the
+    // numbers are attached to; `subject.archive` stops at level 2, so it does not reach them.
+    // A log that could not show this is a log that answers half the question an administrator asks.
+    { actor: vendorMessB.userId, action: 'subject.archive', outcome: 'denied', daysAgo: 11 },
+
+    // The last fortnight, the part somebody scrolling the screen sees first.
+    { actor: (faculty[6] as { userId: string }).userId, action: 'campaign.create', targetType: 'campaign', targetId: cid('Gen AI — mid-course check'), daysAgo: 3 },
+    { actor: (faculty[6] as { userId: string }).userId, action: 'campaign.launch', targetType: 'campaign', targetId: cid('Gen AI — mid-course check'), daysAgo: 3 },
+    { actor: director.userId, action: 'person.update', targetType: 'person', targetId: studentUserIds[0] as string, daysAgo: 2 },
+    { actor: director.userId, action: 'campaign.create', targetType: 'campaign', targetId: cid('Which should the institute fix first this semester?'), daysAgo: 4 },
+    { actor: director.userId, action: 'campaign.launch', targetType: 'campaign', targetId: cid('Which should the institute fix first this semester?'), daysAgo: 4 },
+  ];
+
+  await prisma.auditLog.createMany({
+    data: auditRows.map((row) => ({
+      orgId,
+      actorUserId: row.actor,
+      action: row.action,
+      targetType: row.targetType ?? null,
+      targetId: row.targetId ?? null,
+      outcome: row.outcome ?? 'allowed',
+      // WHICH grant decided it (INV-007), and on a refusal it is the most useful field there is:
+      // the narrowest deny that stopped it, which is the answer to "whom do I ask".
+      ...(row.outcome === 'denied'
+        ? { decidedBy: { via: 'default', effect: 'deny' } }
+        : {}),
+      requestId: null,
+      // No `ip`. The read path allow-lists six columns and deliberately excludes it, so seeding
+      // one would store something no screen can ever show.
+      createdAt: new Date(Date.now() - row.daysAgo * DAY),
+    })),
+  });
 
   // The logins worth printing: one per distinct VIEW of this organisation. Signing in as the
   // CSE HOD and then as the BH1 caretaker is the fastest proof that `requireCapability` is doing
