@@ -93,7 +93,7 @@ async function guard(req: Request, capability: Capability, opts: CapabilityOptio
   // and leak the organisation's structure to somebody outside it. A resource they CAN see
   // but may not act on answers 403 WITH the trace, because that is actionable — it tells
   // them whom to ask.
-  if (decision.reason === 'out_of_scope' && (await invisible(req, capability, opts))) {
+  if (decision.reason === 'out_of_scope' && (await invisible(req, opts))) {
     await record(req, capability, decision);
     throw new NotFoundError();
   }
@@ -124,17 +124,27 @@ async function record(req: Request, capability: Capability, decision?: Decision)
 /**
  * Is the target outside what the caller can read at all?
  *
- * Answered with the module's own read capability — `unit.read` for a unit, `campaign.read`
- * for a campaign — because "can you see it" is exactly the question that capability
- * settles. Only unit-anchored targets can be checked this cheaply; anything else falls
- * through to 403, which is the safe direction: it never turns a visible resource into a
- * confusing 404.
+ * ASKED WITH `unit.read`, ALWAYS, because the only target this function ever sees is a
+ * UNIT — everything without a `unitId` returns false two lines up. That is the safe
+ * direction and it is also the honest one: 13 §5 splits on whether the caller can see
+ * THE RESOURCE THE REQUEST NAMES, and for a unit-anchored guard the resource the request
+ * names is the unit in `body.unitId` or `params.id`.
+ *
+ * It used to derive `<module>.read` from the acting capability, which is right for
+ * `unit.update` (`unit.read`) and near enough for `subject.create` (`subject.read`), and
+ * WRONG for `assignment.create`: there is no `assignment.read` in the catalogue and there
+ * should not be — an assignment is never read on its own, it is read as part of the person
+ * who holds it. So the visibility question was asked with a capability nobody holds,
+ * `visibleUnits` correctly answered "nowhere", and every out-of-scope assignment came back
+ * `404 Not found.` — including one at a unit the caller had just picked out of their own
+ * unit menu. 13 §5 calls that case a 403 precisely because it is actionable; "Not found."
+ * for a unit on their own screen reads as a bug in the product.
+ *
+ * A derived name that silently means "deny everything" when the capability does not exist
+ * is the failure mode worth naming here: nothing errored, and a security-shaped default
+ * hid a usability bug for as long as nobody was scoped tightly enough to hit it.
  */
-async function invisible(
-  req: Request,
-  capability: Capability,
-  opts: CapabilityOptions,
-): Promise<boolean> {
+async function invisible(req: Request, opts: CapabilityOptions): Promise<boolean> {
   const principal = req.ctx.principal;
   const orgId = req.ctx.orgId;
   if (principal?.kind !== 'user' || !orgId) return false;
@@ -143,11 +153,10 @@ async function invisible(
   const unitId = 'unitId' in target ? target.unitId : undefined;
   if (!unitId) return false;
 
-  const readCapability = `${capability.split('.')[0] ?? ''}.read` as Capability;
   const visibility = await visibleUnits({
     orgId,
     userId: principal.id,
-    capability: readCapability,
+    capability: 'unit.read',
     authzVersion: req.ctx.authzVersion ?? 0,
     memo: (req.ctx.visibilityMemo ??= new Map()) as never,
   });

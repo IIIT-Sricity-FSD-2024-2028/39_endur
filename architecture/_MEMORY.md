@@ -5128,4 +5128,58 @@ N-074  <InlineName> COMMITTED TWICE ON ENTER, AND ONLY A NON-IDEMPOTENT CALLER C
        Enter caused that there is nothing left to do; `onFocus` clears both, so neither flag
        survives into an edit it was not set by. `reverting` had the same latent staleness.
        24 §7's contract -- "Enter commits, Esc reverts, blur commits" -- is unchanged.
+
+N-075  A DERIVED CAPABILITY NAME THAT DOES NOT EXIST MEANT "DENY EVERYTHING", AND TURNED EVERY
+       OUT-OF-SCOPE ASSIGNMENT INTO A 404. 13 §5, requireCapability.ts, T-018.
+       reported 2026-08-31 by the owner, alongside the observation that the escalation refusal
+       on the same screen is exactly right: "That position includes 'org.update', which you do
+       not hold yourself." two refusals, one page, and only one of them said anything.
+       `invisible()` decides the 404-versus-403 split. it asked "can the caller see the target
+       at all" using `${capability.split('.')[0]}.read` -- `unit.read` for `unit.update`,
+       `subject.read` for `subject.create`. THERE IS NO `assignment.read`. the catalogue has
+       `assignment.create` and `assignment.delete` and nothing else, correctly: an assignment
+       is never read on its own, it is read as part of the person who holds it. so the
+       visibility question was asked with a capability nobody holds, `visibleUnits` answered
+       "nowhere" -- which is right -- and every out-of-scope `POST /people/:id/assignments`
+       returned `404 {"message":"Not found."}`, including at a unit the caller had just picked
+       out of their own unit menu.
+       THE FAILURE MODE IS THE LESSON, not the missing capability. a name built by string
+       concatenation from another name has no compiler behind it, and when it resolves to
+       nothing the authz layer's default is DENY -- so the mistake presents as extra security
+       and nothing errors. it stayed hidden because it only fires for a caller scoped tightly
+       enough to be refused: the founder never sees it. audited the whole surface: of 108
+       requireCapability calls only 8 are unit-anchored, and `assignment.create` was the only
+       one whose module has no `.read`. `account.*` and `simulator.*` also lack one and neither
+       is unit-anchored, so neither ever reached this line.
+       RESOLUTION. `invisible()` asks `unit.read`, unconditionally. it is not a widening: the
+       only target it ever sees IS a unit -- everything without a `unitId` returns false two
+       lines earlier -- and 13 §5 splits on whether the caller can see the resource the request
+       NAMES, which for a unit-anchored guard is the unit in `body.unitId` or `params.id`. both
+       halves are now tested in people.test.ts: a Section Head (`unit.read: subtree`,
+       `assignment.create: own_unit`) gets 403 `out_of_scope` at Team A1, which they can see and
+       may not act on, and 404 at Section B, which they cannot see at all. the visibility half
+       of each test probes `GET /units/:id/composition` first, so neither can pass vacuously.
+
+N-076  `PersonSummary` CARRIED `users.status` RAW, AND EVERY PERSON EVER ADDED WAS TAGGED
+       "invited" BY A SCREEN THAT HAD NOT INVITED THEM. 34, 57 § States, T-050.
+       reported 2026-08-31 by the owner. `POST /people` writes `users.status = 'invited'` with
+       a null hash -- 10 §2's way of saying this account cannot open the door -- and the DTO
+       passed the column through, so /app/people printed it beside the name for anybody not
+       `active`. the SAME ROW's Account column, reading `account`, correctly offered the
+       `Invite` button. one row, two answers, and the wrong one first.
+       THE COLUMN CANNOT ANSWER THE QUESTION IT WAS BEING ASKED. `status` is a fact about a
+       password hash; the screen was reading it as a sentence about an email. a person awaiting
+       activation and a person nobody has asked are both `users.status = 'invited'` with a null
+       hash, and only an unaccepted `account_invites` row separates them -- which is precisely
+       what `accountStatusOf` exists to decide, and what the DTO's own comment on `account` had
+       said in writing since 57 was built. the field beside it went on contradicting it.
+       RESOLUTION. `status` REMOVED from `PersonSummary` rather than merely unrendered, so the
+       tag cannot come back: it had exactly two readers, the list row and the detail panel's
+       "Account status:" line, and both were the bug. `accountStatusOf` still reads the column
+       server-side, where it belongs. no doc claimed the field -- 34 § Data names it only on
+       `UpdatePersonBody`, where D-024 already removed it for a different reason. the backend
+       test that asserted `res.body.data.status === 'invited'` is how this passed review, and
+       now asserts the DB column and `toBeUndefined()` on the wire.
+       A SECOND FIELD THAT ANSWERS AN ALREADY-DERIVED QUESTION APPROXIMATELY is not a
+       convenience. it is a contradiction waiting for a renderer.
 ```

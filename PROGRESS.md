@@ -2398,7 +2398,51 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-31 (latest) · Enter on the structure page created two units
+### 2026-08-31 (latest) · two owner reports — a phantom "invited" tag, and a 404 that meant 403
+
+**Both found on `/app/people`, and the owner named the contrast themselves:** the escalation
+refusal on that page is exemplary — *"That position includes 'org.update', which you do not hold
+yourself."* — while adding a position to a unit slightly out of scope answered
+`404 {"message": "Not found."}`. Same screen, same caller, one refusal that teaches and one that
+tells them the thing they are looking at does not exist.
+
+**1 · The phantom tag.** `POST /people` writes `users.status = 'invited'` with a null password
+hash — `10` §2's way of saying the account cannot open the door — and `PersonSummary` carried that
+column raw. The list printed it beside the name for anybody not `active`, so every person an
+administrator added was labelled "invited" **in the same row that still offered them the Invite
+button**. The column is a fact about a hash; the screen was reading it as a sentence about an
+email, and it cannot be one — a person awaiting activation and a person nobody has asked are both
+`invited` with a null hash, and only an unaccepted `account_invites` row separates them. That is
+exactly what `account` already answers, derived server-side in one place (`57` § States).
+
+**Fixed by removing `status` from `PersonSummary`**, not merely by deleting the render: it had
+exactly two readers — the list row and the detail panel's "Account status:" line — and both were
+the bug. `accountStatusOf` still reads the column server-side, where it belongs.
+
+**2 · The 404 that should have been a 403.** `requireCapability`'s `invisible()` decides the split,
+and asked "can the caller see the target" using `<module>.read` derived from the acting capability.
+**There is no `assignment.read`** — and there should not be; an assignment is read as part of the
+person who holds it. So the question was asked with a capability nobody holds, `visibleUnits`
+correctly answered "nowhere", and *every* out-of-scope assignment 404'd — including at a unit the
+caller had just picked out of their own unit menu.
+
+**Fixed:** `invisible()` asks `unit.read`, unconditionally. Not a widening — the only target it
+ever sees is a unit, since everything without a `unitId` returns false two lines earlier.
+
+- **the failure mode is the lesson.** A capability name built by string concatenation has no
+  compiler behind it, and when it resolves to nothing the authz default is DENY — so the mistake
+  presents as extra security and nothing errors. Audited the surface: of 108 `requireCapability`
+  calls only 8 are unit-anchored, and `assignment.create` was the only one whose module has no
+  `.read`. `account.*` and `simulator.*` also lack one; neither is unit-anchored
+- both halves are now tested: a Section Head gets **403 `out_of_scope`** at Team A1 (visible, may
+  not act) and **404** at Section B (cannot see at all). Each test probes
+  `GET /units/:id/composition` first so it cannot pass vacuously
+- the backend test asserting `res.body.data.status === 'invited'` is how the phantom tag passed
+  review. It now asserts the DB column, and `toBeUndefined()` on the wire
+- ledger: **N-075**, **N-076**. 1581 tests pass (614 backend, 967 frontend), typecheck 0, lint 0,
+  both audits clean
+
+### 2026-08-31 · Enter on the structure page created two units
 
 **Found by the owner on `/app/structure`:** naming a new unit and pressing Enter added it twice.
 

@@ -89,14 +89,23 @@ describe('POST /people', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.positions).toEqual([]);
-    expect(res.body.data.status).toBe('invited');
 
     const user = await prisma.user.findFirstOrThrow({
       where: { orgId: founder.orgId, name: 'New Person' },
-      select: { passwordHash: true },
+      select: { passwordHash: true, status: true },
     });
-    // An account nobody has activated must not be sign-in-able.
+    // An account nobody has activated must not be sign-in-able, and `invited` is the
+    // column that says so — a fact about the HASH, asserted where the hash is.
     expect(user.passwordHash).toBeNull();
+    expect(user.status).toBe('invited');
+
+    // AND IT DOES NOT TRAVEL. This line used to read `expect(res.body.data.status).toBe(
+    // 'invited')`, which is how the phantom tag on /app/people passed review: the response
+    // carried a raw database state and the list printed it beside the name, so every person
+    // an administrator added was labelled "invited" in the same row that still offered them
+    // the Invite button. `account` is the derived answer and the only one on the wire.
+    expect(res.body.data.status).toBeUndefined();
+    expect(res.body.data.account).toEqual({ state: 'none' });
   });
 
   // D-026 — THE DEADLOCK, as a test. Found while building T-072, and it was live in
@@ -228,6 +237,77 @@ describe('POST /people/:id/assignments — the two-hat case', () => {
 
     expect((await withCsrf(founder, 'post', path).send(body)).status).toBe(201);
     expect((await withCsrf(founder, 'post', path).send(body)).status).toBe(409);
+  });
+
+  /**
+   * 13 §5, BOTH HALVES OF IT, on the one route where the split was getting decided by an
+   * accident rather than by the rule.
+   *
+   * `requireCapability`'s `invisible()` asks "can the caller see the target at all" using
+   * `<module>.read` — `unit.read` for `unit.update`, `subject.read` for `subject.create`.
+   * There is no `assignment.read`: the catalogue has `assignment.create` and
+   * `assignment.delete` and nothing else, because an assignment is never read on its own,
+   * it is read as part of the person who holds it. So the visibility question was asked
+   * with a capability NOBODY HOLDS, every caller saw nothing, and every out-of-scope
+   * assignment answered 404 — including at a unit sitting in plain sight in the caller's
+   * own tree, which they had just picked out of a unit menu.
+   *
+   * A Section Head is the exact shape: `unit.read: subtree` reaches Team A1, while
+   * `assignment.create: own_unit` stops at Section A. They can see the place and may not
+   * act there, which is 13 §5's definition of a 403 — "actionable, it tells you whom to
+   * ask" — and "Not found." for a unit on their own screen is the opposite of actionable.
+   */
+  it('says 403 when the caller can SEE the unit but may not assign there — 13 §5', async () => {
+    const founder = await setUpOrg();
+    const head = await addStaff(founder.orgId, {
+      name: 'Scoped Head',
+      level: 2,
+      unitName: 'Section A',
+    });
+    const person = await withCsrf(founder, 'post', '/api/v1/people').send({
+      name: 'Scoped Target',
+      email: `scoped-${Date.now()}@example.test`,
+    });
+
+    // Team A1 is INSIDE Section A, so `unit.read: subtree` reaches it and the head can read
+    // the unit directly. Asserted, because the whole point of the case is that the unit is
+    // visible — if this ever stops being true the test below is testing nothing.
+    const teamA1 = await unitIdByName(founder.orgId, 'Team A1');
+    expect((await head.agent.get(`/api/v1/units/${teamA1}/composition`)).status).toBe(200);
+
+    const res = await withCsrf(head, 'post', `/api/v1/people/${person.body.data.id}/assignments`).send({
+      roleId: await roleIdByLevel(founder.orgId, 3),
+      unitId: teamA1,
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+    // The wording is the actionable half: they hold this capability, just not here.
+    expect(res.body.error.details.reason).toBe('out_of_scope');
+  });
+
+  /** The other half, unchanged: a unit they cannot see must not be confirmed to exist. */
+  it('still says 404 for a unit outside the caller\'s reach entirely — 13 §5', async () => {
+    const founder = await setUpOrg();
+    const head = await addStaff(founder.orgId, {
+      name: 'Sectioned Head',
+      level: 2,
+      unitName: 'Section A',
+    });
+    const person = await withCsrf(founder, 'post', '/api/v1/people').send({
+      name: 'Other Section Target',
+      email: `other-${Date.now()}@example.test`,
+    });
+
+    const sectionB = await unitIdByName(founder.orgId, 'Section B');
+    expect((await head.agent.get(`/api/v1/units/${sectionB}/composition`)).status).toBe(404);
+
+    const res = await withCsrf(head, 'post', `/api/v1/people/${person.body.data.id}/assignments`).send({
+      roleId: await roleIdByLevel(founder.orgId, 3),
+      unitId: sectionB,
+    });
+
+    expect(res.status).toBe(404);
   });
 });
 
