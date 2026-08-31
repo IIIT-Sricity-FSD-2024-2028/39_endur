@@ -6,7 +6,6 @@
 import { useEffect } from 'react';
 import type { MeResponse } from '@endur/shared';
 import { apiGet, apiPost, setUnauthenticatedHandler } from './api.js';
-import type { DemoOrg } from './demo.js';
 import { useAppDispatch } from '../store/index.js';
 import { labelsCleared, labelsLoaded, signedIn, signedOut } from '../store/index.js';
 
@@ -48,20 +47,6 @@ export function useBootSession(): void {
       cancelled = true;
     };
   }, [dispatch]);
-}
-
-/**
- * Become another demo organisation. DEVELOPMENT ONLY — `DEMO_ORGS` is empty in a
- * production build, so nothing can reach this (lib/demo.ts).
- *
- * A user belongs to exactly one org, so this is a real sign-in, not a tenant switch. The
- * full reload afterwards is deliberate: it re-runs boot, which re-hydrates the vocabulary
- * from scratch and guarantees no page is left holding the previous org's data.
- */
-export async function switchToDemoOrg(org: DemoOrg): Promise<void> {
-  await apiPost('/auth/logout').catch(() => undefined);
-  await apiPost('/auth/login', { email: org.email, password: org.password });
-  window.location.assign('/app');
 }
 
 /** Sign out. The server destroys the record — clearing the cookie alone would leave a

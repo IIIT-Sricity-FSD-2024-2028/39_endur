@@ -175,8 +175,9 @@ this is the ten-second proof and this is the screen it happens on.
 - [x] Campaign cards link to results and expose `Share` directly
 - [x] At most two prompts render at once — capped by the server, and the page renders the
       list it is handed rather than second-guessing it in either direction
-- [~] Switching org re-renders the vocabulary chips before anything else — the chips read the
-      store and the page reads `useLabels()`; the switch itself is `OPEN-006`'s re-auth
+- [x] The vocabulary chips render from the store, before anything else on the page — the
+      chips read it directly and the page reads `useLabels()`. There is no org switch to
+      re-render for: `OPEN-006`(a) removed the switcher, and signing in is a fresh boot
 - [x] k-anon suppression applies to every number shown here (`40`) — on the server, for the
       stats and the comments both (T-024, asserted again at T-041)
 - [x] Every noun from `useLabels()` (INV-001) — the page test mounts with the nonsense

@@ -1,14 +1,13 @@
 // The four demo organisations, fully populated with historical responses rather than left empty.
 // An empty org proves the schema; a populated one proves the product.
 import { estimateSeconds } from '@endur/shared';
-import type { QuestionKind } from '@endur/shared';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, levelForRole, presetFor } from '../../presets/index.js';
 import { mintToken } from '../../features/campaigns/token.js';
 import { newPeriod } from '../../billing/period.js';
-import { poolFor, type Tone } from './comments.js';
-import { Rng, skewedNps, skewedRating, skewedTimestamp } from './random.js';
+import { Rng } from './random.js';
+import { seedResponses } from './responses.js';
 import { ORGANISATION_SUBJECT } from '../../features/campaigns/visibility.js';
 import type { Tier } from '@endur/shared';
 
@@ -900,113 +899,4 @@ async function seedActivityLog(
       createdAt: new Date(Date.now() - row.daysAgo * DAY),
     })),
   });
-}
-
-type ResponsePlan = {
-  rng: Rng;
-  industry: string;
-  campaignId: string;
-  templateId: string;
-  subjects: Array<{ id: string; quality: number }>;
-  perSubject: number;
-  startsAt: Date;
-  endsAt: Date;
-};
-
-// Writes the responses in bulk rather than one at a time, so db:reset stays under 30 seconds.
-async function seedResponses(prisma: PrismaClient, plan: ResponsePlan): Promise<void> {
-  const questions = await prisma.question.findMany({
-    where: { templateId: plan.templateId },
-    orderBy: { position: 'asc' },
-    select: { id: true, kind: true, config: true },
-  });
-  if (questions.length === 0) return;
-
-  const responses: Prisma.ResponseCreateManyInput[] = [];
-  const plans: Array<{ index: number; quality: number }> = [];
-
-  for (const subject of plan.subjects) {
-    // Counts vary per subject: the same number everywhere reads as fake at a glance.
-    const count = Math.max(
-      1,
-      Math.round(plan.perSubject * (0.6 + plan.rng.next() * 0.8)),
-    );
-    for (let i = 0; i < count; i += 1) {
-      plans.push({ index: responses.length, quality: subject.quality });
-      responses.push({
-        campaignId: plan.campaignId,
-        subjectId: subject.id,
-        submittedAt: skewedTimestamp(plan.rng, plan.startsAt, plan.endsAt),
-        channel: plan.rng.chance(0.55) ? 'qr' : 'link',
-        durationMs: plan.rng.int(25_000, 180_000),
-      });
-    }
-  }
-
-  await prisma.response.createMany({ data: responses });
-
-  const created = await prisma.response.findMany({
-    where: { campaignId: plan.campaignId },
-    orderBy: { submittedAt: 'asc' },
-    select: { id: true, subjectId: true },
-  });
-  const qualityBySubject = new Map(plan.subjects.map((s) => [s.id, s.quality]));
-
-  const answers: Prisma.AnswerCreateManyInput[] = [];
-  for (const response of created) {
-    const quality = qualityBySubject.get(response.subjectId ?? '') ?? 0.6;
-    for (const question of questions) {
-      // Not everybody answers every optional question.
-      if (question.kind === 'text' && !plan.rng.chance(0.35)) continue;
-      answers.push(answerFor(plan, question, quality, response.id));
-    }
-  }
-
-  await prisma.answer.createMany({ data: answers, skipDuplicates: true });
-}
-
-function answerFor(
-  plan: ResponsePlan,
-  question: { id: string; kind: string; config: unknown },
-  quality: number,
-  responseId: string,
-): Prisma.AnswerCreateManyInput {
-  const { rng } = plan;
-  const config = question.config as { max?: number; options?: string[] };
-  const base = { responseId, questionId: question.id };
-
-  switch (question.kind as QuestionKind) {
-    case 'rating': {
-      const n = skewedRating(rng, config.max ?? 5, quality);
-      // The numeric value is always written alongside the raw value, never on its own.
-      return { ...base, value: { kind: 'rating', n }, numericValue: n };
-    }
-    case 'nps': {
-      const n = skewedNps(rng, quality);
-      return { ...base, value: { kind: 'nps', n }, numericValue: n };
-    }
-    case 'yesno':
-      return { ...base, value: { kind: 'yesno', yes: rng.chance(quality) } };
-    case 'single':
-      return {
-        ...base,
-        value: { kind: 'single', option: rng.pick(config.options ?? ['—']) },
-      };
-    case 'multi':
-      return {
-        ...base,
-        value: {
-          kind: 'multi',
-          options: rng.sample(config.options ?? ['—'], rng.int(1, 2)),
-        },
-      };
-    default: {
-      // Comment tone follows the subject's quality, so words and numbers agree.
-      const tone: Tone = rng.chance(quality) ? 'positive' : rng.chance(0.5) ? 'mixed' : 'negative';
-      return {
-        ...base,
-        value: { kind: 'text', text: rng.pick(poolFor(plan.industry, tone)) },
-      };
-    }
-  }
 }

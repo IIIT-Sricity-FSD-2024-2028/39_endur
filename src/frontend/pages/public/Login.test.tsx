@@ -205,15 +205,6 @@ describe('sign in — 30 §3.2', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
     expect(password.getAttribute('type')).toBe('password');
   });
-
-  it('fills both fields from a demo chip — this is the beat it saves on stage', () => {
-    mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Northfield University' }));
-    expect(screen.getByLabelText<HTMLInputElement>('Email').value).toBe(
-      'admin@northfield.endur.test',
-    );
-    expect(screen.getByLabelText<HTMLInputElement>('Password').value.length).toBeGreaterThan(0);
-  });
 });
 
 /**
@@ -222,7 +213,7 @@ describe('sign in — 30 §3.2', () => {
  * It can only be reached by somebody who holds an activated account in more than one
  * organisation AND uses the same password for them: with different passwords the server
  * signs them straight in, and with one account it never comes up. No seeded organisation
- * shares an address, so the demo never sees this screen.
+ * shares an address, so this screen is rarely reached.
  */
 const AMBIGUOUS = () =>
   new ApiError({
@@ -231,9 +222,6 @@ const AMBIGUOUS = () =>
     message: 'That sign-in works for more than one organization.',
     requestId: 'req-1',
     details: {
-      // Deliberately NOT the seeded org names: the demo affordance renders those as
-      // prefill chips on this very page, and two buttons with one name is an ambiguous
-      // query rather than an ambiguous account.
       organizations: [
         { id: 'org-a', name: 'Aster Health Partners' },
         { id: 'org-b', name: 'Borden Institute' },

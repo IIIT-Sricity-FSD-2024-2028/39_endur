@@ -3586,25 +3586,35 @@ OPEN-005  RESOLVED-BY:DEC-016  2026-08-19
   stale row rather than a broken demo, and each can be derived on read the same way if it
   ever needs to be. see 17-BACKGROUND-JOBS.md.
 
-OPEN-006  REVISIT:2026-08-24  blocks:nothing-for-M0  found 2026-08-19 building T-030
+OPEN-006  RESOLVED 2026-08-31 -> option (a). found 2026-08-19 building T-030
   THE ORG SWITCHER HAS NO DATA BEHIND IT. 24 §2 gives <TopBar> `orgs: OrgSummary[]` and
   design_specs/design/02 §3 calls it the second most important control in the demo — "how
   you go from University to Hotel in one click". but a user belongs to exactly ONE
   organisation: users.org_id is non-null and (org_id, email) is the unique key (10), there
   is no membership join table, and 13 has no endpoint that could list switchable orgs. the
   four demo orgs are four separate accounts.
-  DONE FOR NOW, and it is honest rather than a stand-in: the switcher lists the seeded demo
-  orgs and switches by RE-AUTHENTICATING, gated at BUILD TIME the same way 30's login
-  prefill is — DEMO_ORGS is [] in a production bundle, so the branch and its credentials are
-  eliminated as dead code. verified by grepping dist/. when there is nowhere to switch to it
-  renders as plain text, not a dropdown that opens an empty menu.
-  THE REAL CHOICES, for whoever picks one:
-    a. leave it. one account per org is a defensible product statement, and the demo works.
+  IT WAS, until 2026-08-31, a build-time-stripped stage affordance: the switcher listed the
+  seeded demo orgs and switched by RE-AUTHENTICATING, and 30's login page prefilled their
+  credentials from the same array. DEMO_ORGS was [] in a production bundle, so both were
+  eliminated as dead code.
+  THE CHOICES WERE:
+    a. leave it. one account per org is a defensible product statement.
     b. a memberships table (user, org, role) — the correct multi-tenant answer, and a schema
        change plus a session-scoped current_org. too big before M0.
     c. one demo super-account with positions in all four orgs. cheapest of the real fixes,
        but it makes the demo path differ from the product's.
-  see  src/frontend/lib/demo.ts, components/layout/TopBar.tsx, 24 §2
+  RESOLVED 2026-08-31 -> (a), and the affordance is GONE FROM THE UI ENTIRELY, not merely
+  build-gated. the product is being finished, and a dev-only control that only ever appears
+  in the team's own build is a second sign-in path to keep working for no user. the top bar
+  now names the org as plain text; the login page is the form and nothing else.
+  WHAT WENT: src/frontend/lib/demo.ts (deleted), <OrgSwitcher> in components/layout/TopBar.tsx,
+  switchToDemoOrg() in lib/session.ts, .auth-demo/.auth-demo-row/.menu-tag in the design
+  system, and the two tests that covered them.
+  WHAT STAYED, DELIBERATELY: the four seeded organisations themselves. src/backend/database/
+  seed/demo.ts is untouched and `npm run db:seed` still creates Northfield / Grand Palace /
+  Riverside / Meridian with their accounts. showcasing means TYPING the address now, which
+  is what any other user does.
+  see  components/layout/TopBar.tsx, 24 §2, 30 § Sign in
 
 OPEN-007  RESOLVED-BY:DEC-033  2026-08-23   (raised and answered the same day)
   THERE IS NO ENDUR OPERATOR, AND ONE CANNOT BE ADDED BY GRANTING SOMEBODY MORE.
@@ -3816,8 +3826,9 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     components/Icon.tsx owns the closed icon vocabulary
                                     (design_specs/design/01 §5). a concept without an
                                     agreed icon must be added THERE before it is used.
-                                    lib/demo.ts is the build-time-stripped stage
-                                    affordance — see OPEN-006 and 30 § Sign in.
+                                    lib/demo.ts WAS the build-time-stripped stage
+                                    affordance. deleted 2026-08-31 with OPEN-006(a); do
+                                    not reintroduce it. no path is owned here now.
 25..29                           -> PLACEHOLDERS. 29 is unassigned. no paths owned.
 30..45 page docs                 -> src/frontend/pages/<world>/<Page>/**
                                     + src/backend/features/<feature>/**
@@ -3974,6 +3985,18 @@ _MEMORY.md                       -> architecture/_MEMORY.md
                                     the ONLY two directories where an education noun may
                                     appear, and then only as DATA (INV-002). Both are
                                     exempt in eslint.config.js and in test/seed.test.ts.
+                                    seed/responses.ts is the SHARED response generator,
+                                    extracted from demo.ts 2026-08-31 (N-078). a second
+                                    copy of the rating skew is a second results screen
+                                    that can drift out of agreement with the first.
+                                    seed/iiit.ts is the FIFTH organisation and the only
+                                    hand-built one -- its org chart is stated, not
+                                    generated from a DemoOrg row, because a DemoOrg row
+                                    cannot say "this person is also a faculty" or "this
+                                    respondent is in three trees". it is NOT in DEMO_ORGS
+                                    and has its own call in seed/index.ts; seed.test.ts's
+                                    "ships the four the demo script names" is still
+                                    correct and must stay four.
                                     also holds the two DEVELOPMENT-ONLY affordances that
                                     are not seeds: seed/ops-code.ts (prints a live TOTP,
                                     DEC-084) and seed/contention.ts (`demo:contention`,

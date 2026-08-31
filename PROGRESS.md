@@ -5,6 +5,79 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
+UPDATED   2026-08-31  (N-078 -- A FIFTH ORGANISATION, HAND-BUILT: IIIT SRI CITY, ENTERPRISE.
+                       ROOT RUNNER: 1620/1621 across 123 files (the one red is platform.test's
+                       TOTP-window case and is PRE-EXISTING -- reproduced on a stashed tree).
+                       typecheck 0, lint 0, drift + vocab clean. NO MIGRATION.
+                       !! THE ASK: a college on the highest tier -- academics (CSE/ECE/AIDS
+                       under a Dean, an HOD each, two courses each plus a common SEED),
+                       hostels (BH1/BH2 under a Chief Warden, a caretaker each), a mess
+                       (Mess A/B under a Mess Warden, a vendor manager each), 30 students,
+                       10 faculty, and the feedback ALREADY RUN -- suggestions, polls,
+                       comments and a slot booker.
+                       !! IT IS NOT A DEMO_ORGS ROW, AND THAT IS THE DESIGN. seedOrg
+                       GENERATES an org from a shape: N staff scattered at random levels.
+                       that shape cannot say "the Dean is ALSO a faculty" (a second member
+                       edge, not a second person -- which is why 10 faculty and 15 staff),
+                       nor "the caretaker deliberately is NOT", nor "this student is in
+                       three trees at once". so seed/iiit.ts STATES the chart.
+                       !! THE THIRD DIMENSION IS THE STRUCTURAL PROOF. each of the 30
+                       students holds three member edges -- department, hostel, mess -- so
+                       the same 30 people reconcile three ways: 10+10+10, 15+15, 18+12. 10
+                       says edges are per-dimension and a node may have many parents across
+                       them; this is the first place we USE it instead of describing it.
+                       none has a users row (DEC-009), so the roster costs no seats.
+                       !! A DENOMINATOR IS EITHER REAL OR ABSENT, PER CAMPAIGN. a cycle over
+                       seven courses collects ~3 responses per student, so a head count
+                       prints 300% -- 40 and D-044's fault exactly. multi-subject cycles
+                       carry {kind:'anyone'} and show NO rate; single-subject polls carry
+                       the Student role, resolve to 30, and show a true one.
+                       !! POLL SPLITS ARE ALLOCATED, NOT SAMPLED, and this was a real bug
+                       caught in the data. 28 votes drawn against weights 14/8 put the
+                       WRONG option first -- twice -- and every seed shares one Rng, so
+                       editing any weight upstream reshuffles every draw after it. a comment
+                       naming the complaint a poll confirms would have been true until
+                       somebody touched an unrelated line. largest remainder now.
+                       !! responses.ts IS EXTRACTED FROM demo.ts AND SHARED. it also lost a
+                       trap on the way out: it re-queried the whole campaign for ids, so a
+                       SECOND call re-processed the FIRST call's rows and was saved only by
+                       skipDuplicates. it owns the ids now.
+                       !! TO SEE IT: npm run db:seed -> sign in as caretaker.bh1@ and read
+                       BH1's suggestion box, then as admin@ and open the hostel poll. six
+                       people wrote about the same two washing machines; the poll ranks them
+                       first; the institute-wide poll puts hostel laundry above everything.
+                       ALL PASSWORDS endur-demo-password.)
+
+```
+UPDATED   2026-08-31  (N-077 -- THE DEMO AFFORDANCES ARE GONE FROM THE UI. OPEN-006 is
+                       RESOLVED as (a). no migration, no new capability, no endpoint.
+                       FRONTEND 971/971 across 71 files, typecheck 0, lint 0, build passes,
+                       drift + vocab clean. backend untouched.
+                       !! THE ASK: the login page is shipping, so the "Development build --
+                       click to fill" credential chips go, and any other demo-shaped
+                       affordance with them.
+                       !! WHAT WENT: lib/demo.ts (DELETED), the prefill row on 30's sign-in
+                       card, <OrgSwitcher> in TopBar, switchToDemoOrg() in lib/session.ts,
+                       .auth-demo/.auth-demo-row/.menu-tag, and the two tests on them.
+                       !! WHAT STAYED, AND THIS IS THE POINT: THE FOUR ORGANISATIONS. seed/
+                       demo.ts is untouched and `npm run db:seed` still creates Northfield /
+                       Grand Palace / Riverside / Meridian with working accounts. the
+                       accounts were never the problem -- the SHORTCUT INTO THEM was. you
+                       showcase by typing the address, like every other user.
+                       !! BUILD-GATING WAS NOT ENOUGH, WHICH IS THE WHOLE JUDGEMENT. the
+                       prefill and the switcher were already dead code in a production
+                       bundle, so nothing was leaking. they went anyway: a second sign-in
+                       path that only ever renders in our own build is a path we keep
+                       working, test and typecheck for no user. OPEN-006 asked whether to
+                       fix the switcher or leave it -- (a) leave it, and once nothing is
+                       switching, the control is a chevron over an empty menu.
+                       !! FOUR DOCS AMENDED, none silently: 30 § Sign in and 24 § <TopBar>
+                       (the orgs/currentOrgId/onSwitchOrg signature is superseded), 46's
+                       [~] switching-org row, and design_specs 03 § Demo affordance + 02 §
+                       Org switcher are struck through rather than deleted, so the next
+                       reader finds the removal instead of the spec.)
+
+```
 UPDATED   2026-08-31  (T-109 -- SUPPORT ACCESS. THE SUPERUSER CAN DRIVE EVERY WORKFLOW.
                        DEC-114, which SUPERSEDES ONE ROW OF 19 §14 and nothing else.
                        ROOT RUNNER: 1602/1602 across 122 files. typecheck 0, lint 0, build
@@ -2460,7 +2533,121 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-31 (latest) · `T-109` — support access: the superuser can drive every workflow
+### 2026-08-31 (latest) · `N-078` — a fifth organisation, hand-built: IIIT Sri City
+
+**A college on Enterprise, with its history already run.** Three systems (Academics, Hostels,
+Mess), 10 units, 9 roles, 15 staff, 30 respondents, 14 subjects, 14 campaigns and ~350 responses,
+built by `src/backend/database/seed/iiit.ts` and called from `seed/index.ts` beside the four
+generated ones. `1620/1621` across 123 files, typecheck 0, lint 0, drift + vocab clean. **No
+migration.** The one red test is `platform.test.ts`'s TOTP-window case and is **pre-existing** —
+reproduced on a stashed tree before any of this.
+
+**!! WHY IT IS NOT A `DEMO_ORGS` ROW.** `seedOrg` *generates* an organisation from a shape: a unit
+list, a subject list, and a staff count scattered across the tree at random levels. That is the
+right tool for proving one product on four industries and it can express none of this college:
+that the Dean, the Chief Warden and the Mess Warden are each **also** a member of faculty — a
+second `member` edge, not a second person, which is exactly why there are **10 faculty and 15
+staff** — or that the two hostel caretakers and two mess vendor managers hold **one** seat each
+and that single seat is the whole of the distinction the owner drew. So this file **states** the
+chart. `seed.test.ts`'s *"ships the four the demo script names"* is still correct and stays four.
+
+**!! THE THIRD DIMENSION IS THE STRUCTURAL PROOF, AND IT IS THE FIRST TIME WE USE IT.** Each of
+the 30 students holds three `member` edges — a Student seat in a department, one in a hostel, one
+in a mess — so the same 30 people reconcile three different ways: **10+10+10** by branch,
+**15+15** by hostel, **18+12** by mess. `10` has always said edges are per-dimension and that a
+node may have many parents across them; every org before this one described that and none of them
+exercised it. Nobody is duplicated to make the arithmetic work, and the assignments are
+**interleaved rather than aligned** — a hostel whose residents are all one branch is not a hostel.
+None of the 30 has a `users` row (`DEC-009`), so `seatsFor` bills nothing for the roster.
+
+**!! A DENOMINATOR IS EITHER REAL OR ABSENT, AND WHICH ONE IS A JUDGEMENT PER CAMPAIGN.** A cycle
+covering seven courses collects roughly three responses per student, so dividing by a head count
+prints 300% — `40` and `D-044`'s fault precisely. Multi-subject cycles therefore carry
+`{ kind: 'anyone' }` and show **no rate at all**; the single-subject polls carry the Student role,
+resolve to 30, and show a true one. Getting this wrong would have put a fabricated percentage on
+the first screen anybody opens.
+
+**!! POLL SPLITS ARE ALLOCATED BY LARGEST REMAINDER, NOT SAMPLED — and that was found in the data,
+not reasoned about.** The first version weighted `rng.pick`, and 28 votes against weights of 14
+and 8 put the **wrong option first, twice running**. Worse, every seed shares one `Rng`, so
+editing any weight *upstream* reshuffles every draw after it: a comment above a poll naming the
+complaint it confirms would have been true until somebody edited an unrelated line. The visible
+result is now a fact of the file.
+
+**!! `responses.ts` IS EXTRACTED FROM `demo.ts` AND SHARED, and it lost a trap on the way out.**
+The old shape wrote responses with `createMany` and then **re-queried the whole campaign** for
+their ids — so a second call on the same campaign re-processed the first call's rows, and was
+saved from duplicating every answer only by `skipDuplicates`. It owns the ids now: one fewer round
+trip, and a scripted comment can no longer be silently swallowed. It also gained
+`ResponsePlan.comments` and a per-subject exact `count`.
+
+**!! THE CONTENT IS WRITTEN, NOT GENERATED, BECAUSE THE POOL CANNOT SPEAK ABOUT A HOSTEL.**
+`comments.ts` is keyed by **industry**, so it has something plausible to say about lecture pacing
+and nothing whatever to say about a broken washing machine. The college runs one thread end to
+end: six sentences in **BH1's suggestion box** about two machines broken for a fortnight and three
+entries in the register → **"Which should the hostels fix first?"** ranking washing machines first
+→ the **institute-wide poll** putting hostel laundry above everything else. `FDFED` is the other
+thread: ~2.2 with seven comments about a missing rubric in the odd semester, ~3.0 in the even one,
+where the comments are deliberately **not** repeated — repeating the diagnosis after the fix would
+say the fix never happened. `Mess B` at ~2.0 is what the institute poll's second place agrees
+with.
+
+**!! ALSO SHIPPED:** three suggestion boxes (one per system, all open, every response scripted and
+counted exactly), five polls, two purpose-written templates (`Hostel review`, `Mess feedback` —
+*"How would you rate the study spaces?"* is not a question about a mess), an announcement with
+real receipts, and the **FDFED evaluation booker: six slots of five, all thirty students booked**,
+which is `T-095`'s capacity feature at the size it was built for. One campaign sits at 3 responses
+against the threshold of 5, so k-anonymity suppression can be watched refusing to render.
+
+**!! FOR THE NEXT SESSION.** Ten logins print at the end of `db:seed`, one per distinct **view**:
+`admin@`, `dean@`, `hod.cse@`, `hod.ece@`, `hod.aids@`, `chief.warden@`, `caretaker.bh1@`,
+`mess.warden@`, `vendor.mess-b@`, `faculty-8@` — all `@iiit-sri-city.endur.test`, all
+`endur-demo-password`. Signing in as the CSE HOD and then as the BH1 caretaker is the fastest
+proof that `requireCapability` is deciding and the UI only renders what it was handed (`INV-003`).
+`50` §3 carries the full rationale.
+
+### 2026-08-31 · `N-077` — the demo affordances are removed from the UI
+
+**`OPEN-006` is resolved as (a).** The sign-in page's *"Development build — click to fill"*
+credential chips and the top bar's demo org switcher are gone, along with the module behind
+both. No migration, no capability, no endpoint. Frontend `971/971` across 71 files, typecheck
+0, lint 0, build passes, drift + vocab clean. The backend is untouched.
+
+**!! THE FOUR ORGANISATIONS STAY.** `src/backend/database/seed/demo.ts` is not modified and
+`npm run db:seed` still creates Northfield / The Grand Palace / Riverside / Meridian with
+working accounts. What was removed is the **shortcut into them**, not the accounts — showcasing
+now means typing `admin@northfield.endur.test` like any other user does.
+
+**!! BUILD-GATING WAS NOT THE SAME AS REMOVING, AND THAT IS THE JUDGEMENT HERE.** `DEMO_ORGS`
+was `[]` under `import.meta.env.PROD`, so neither the chips nor the credentials ever reached a
+production bundle — this was not a leak, and the original acceptance grep still passed. They
+went anyway. A second sign-in path that renders only in the team's own build is still a path
+somebody keeps working, keeps typechecking and keeps two tests for, on behalf of no user. And
+`OPEN-006` had already established there is nothing to switch between: `users.org_id` is
+non-null and `(org_id, email)` is the unique key, so once you decline (b) a memberships table
+and (c) a super-account, the switcher is a chevron over a menu of strangers.
+
+**!! WHAT WENT.** `src/frontend/lib/demo.ts` deleted; the prefill block in
+`pages/public/Login.tsx`; `<OrgSwitcher>` in `components/layout/TopBar.tsx`, which becomes
+`<span className="topbar-org">`; `switchToDemoOrg()` in `lib/session.ts`; `.auth-demo`,
+`.auth-demo-row` and `.menu-tag` in `endur.css`; and the two tests that covered them —
+`Login.test.tsx`'s *"fills both fields from a demo chip"* and `TopBar.test.tsx`'s *"offers the
+demo organisations only when there are any"*. `.auth-main` stays: it carries the `page-in`
+animation, not the demo row.
+
+**!! FOUR DOCS AMENDED, AND NOT ONE SILENTLY.** `architecture/30` § Sign in now says there is
+no demo affordance and why. `architecture/24` § `<TopBar>` marks the
+`orgs / currentOrgId / onSwitchOrg` signature superseded — that prop shape had no data behind
+it since 19 Aug. `architecture/46`'s acceptance row for *"switching org re-renders the
+vocabulary chips"* goes from `[~]` to `[x]` with the reason. In `design_specs`, 03 § Demo
+affordance and 02 § Org switcher are **struck through rather than deleted**, pointing at
+`OPEN-006`, so a reader who goes looking for the spec finds the removal instead of the spec.
+
+**!! FOR THE NEXT SESSION.** `test/platform.test.ts` › *"accepts a code one step either side of
+now"* is red, and it is **pre-existing** — reproduced on a stashed tree before any of this.
+It is TOTP-window, unrelated, and still unowned.
+
+### 2026-08-31 · `T-109` — support access: the superuser can drive every workflow
 
 **`DEC-114`. It supersedes exactly one row of `19` §14 and nothing else.** An operator opens a
 customer's own console for an hour, from `/ops/orgs/:id`, with a typed reason the customer reads
