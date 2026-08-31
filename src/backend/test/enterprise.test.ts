@@ -1,13 +1,8 @@
-// T-100 / T-101 — the two affordances that used to end at the operator. DEC-100, DEC-101.
-//
-// ONE FILE, BECAUSE THEY ARE ONE FINDING. The operator's console had two controls that
-// reported success and reached nobody: a message that wrote to `platform_audit_log` — THE
-// OPERATOR'S OWN TABLE — and returned `{ sentTo: 3 }`, and an Enterprise tier the product
-// calls "arranged with us" with no way for a customer to ask.
-//
-// THE ASSERTIONS ARE ON WHAT THE CUSTOMER CAN REACH, never on what the operator was told.
-// `{ sentTo: 3 }` was true about a row nobody could read, which is exactly why a test of the
-// return value would have passed throughout.
+// The two affordances that used to end at the operator.
+// One file, because they are one finding: the operator console had two controls that reported success
+// and reached nobody - a message written only to Endur's own table, and an Enterprise tier with no way
+// for a customer to ask for it.
+// Every assertion here is on what the CUSTOMER can reach, never on what the operator was told.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { changeCostMinor } from '@endur/shared';
@@ -56,27 +51,19 @@ describe('a customer can ask to be sold Enterprise — DEC-100', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.status).toBe('open');
     expect(rows[0]?.note).toBe('Two hundred staff, starting in January.');
-    // WHO ASKED, CAPTURED. The row outlives the account (`10` §5), so this is a string on the
-    // request rather than a join that could come back null.
+    // Who asked, captured as a string: the row outlives the account, so a join could come back null.
     expect(rows[0]?.askedName).toBe('Founder');
 
-    // A PRICE IS NOT A CHECKOUT. Nothing moved and nothing was captured — the customer is not
-    // on Enterprise when the dialog closes, and no `payments` row exists to suggest they paid.
+    // A price is not a checkout: nothing moved and nothing was captured.
     const subscription = await prisma.subscription.findUnique({ where: { orgId: founder.orgId } });
     expect(subscription?.tier).toBe('bronze');
     expect(await prisma.payment.count({ where: { orgId: founder.orgId, tier: 'enterprise' } }))
       .toBe(0);
   });
 
-  /**
-   * A SECOND ASK WHILE ONE IS OPEN IS A 409, AND THE DATABASE IS WHAT DECIDES IT.
-   *
-   * The two requests are fired IN PARALLEL on purpose. A read-then-write check in the handler
-   * passes a sequential test and loses to two simultaneous clicks — which is the exact failure
-   * the queue exists to prevent, because it leaves the owner ringing the same customer twice.
-   * The partial unique index `(org_id) WHERE status = 'open'` cannot lose that race, so this
-   * test is written the only way that can tell the two implementations apart.
-   */
+  // A second request while one is open is a 409, and the DATABASE is what decides it.
+  // The two requests are fired in parallel on purpose: a read-then-write check passes a sequential
+  // test and loses to two simultaneous clicks, which would leave the owner ringing the same customer twice.
   it('refuses a second open request, even under two simultaneous clicks', async () => {
     const founder = await registerOrg('custom', 'bronze');
 
@@ -127,27 +114,21 @@ describe('the queue is the owner’s — DEC-100, 19 §4', () => {
     const closed = await owner.patch(`/api/v1/platform/enterprise-requests/${row!.id}`)
       .send({ status: 'closed' });
     expect(closed.status).toBe(200);
-    // THE ROW THAT WAS UPDATED, not the first row of the new status — two requests in one
-    // state would otherwise hand the page the wrong customer's name.
+    // The row that was UPDATED, not the first row in the new status: two requests in one state would
+    // otherwise hand the page the wrong customer's name.
     expect(closed.body.data.id).toBe(row!.id);
     expect(closed.body.data.status).toBe('closed');
 
-    // ONE **OPEN** ROW PER ORG, never one row ever. A customer whose request was closed can
-    // ask again, and the index says so by keying on `status = 'open'`.
+    // One OPEN row per organisation, never one row ever: a customer whose request was closed can ask again.
     expect((await ask(founder)).status).toBe(201);
     expect(await prisma.enterpriseRequest.count({ where: { orgId: founder.orgId } })).toBe(2);
   });
 });
 
 describe('a message from Endur reaches the customer — DEC-101', () => {
-  /**
-   * THE BUG, AND IT REPORTED SUCCESS. `messageAdministrators` wrote one `platform_audit_log`
-   * row and returned `{ sentTo: n }`. That table is the OPERATOR'S; the customer's
-   * administrators had no route that read it and no screen that rendered it.
-   *
-   * SO THE ASSERTION IS THE CUSTOMER'S OWN GET, driven with the customer's own session. A
-   * test on the return value, or on the audit row, would have passed the whole time.
-   */
+  // The bug, and it reported success: the message wrote one row to Endur's own audit table and returned
+  // "sent to 3". The customer's administrators had no route that read it and no screen that rendered it.
+  // So the assertion is the CUSTOMER's own GET, with the customer's own session.
   it('lands in the administrator’s inbox, read with their own session', async () => {
     const org = await setUpOrg();
     const owner = await makeOperator('owner');
@@ -186,18 +167,14 @@ describe('a message from Endur reaches the customer — DEC-101', () => {
     const after = await org.agent.get('/api/v1/inbox/messages?state=unread');
     expect(after.body.data).toHaveLength(0);
 
-    // AND BACK. "I will deal with this later" is a real thing to say about a message from
-    // your vendor, and a read mark that cannot be undone makes the first click a decision.
+    // And back: "I will deal with this later" is a real thing to say about a message from your vendor.
     expect((await withCsrf(org, 'post', `/api/v1/inbox/messages/${id}/unread`).send()).status)
       .toBe(204);
     expect((await org.agent.get('/api/v1/inbox/messages?state=unread')).body.data).toHaveLength(1);
   });
 
-  /**
-   * THE STREAM IS THE READER'S, NOT THE ORGANISATION'S. A message addressed to one
-   * administrator by name must not be readable by a colleague, and the scope is enforced in
-   * the WHERE rather than checked after the read — an id is not an authorisation.
-   */
+  // The stream belongs to the READER, not the organisation: a message addressed to one administrator
+  // must not be readable by a colleague, and the scope is in the WHERE rather than checked afterwards.
   it('is scoped to the addressee, not to the organisation', async () => {
     const org = await setUpOrg();
     const owner = await makeOperator('owner');
@@ -215,17 +192,9 @@ describe('a message from Endur reaches the customer — DEC-101', () => {
 });
 
 describe('approving an Enterprise request is a SALE — DEC-111', () => {
-  /**
-   * THE BUG THIS CLOSES IS A NUMBER THAT WAS ALWAYS ZERO. The owner worked a request to
-   * `closed`, went to the organisation's page and set the tier by hand through
-   * `platform.plan.override` — and `overridePlan` deliberately writes NO `payments` row. So
-   * the one tier the product charges ₹4,999 for earned nothing, and every Enterprise customer
-   * was invisible to `/ops/earnings`.
-   *
-   * THE ASSERTION IS ON THE OWNER'S EARNINGS TOTAL, before and after, because that is the
-   * number that was wrong. Asserting the `payments` row alone would pass against a ledger the
-   * earnings page filters back out.
-   */
+  // The bug this closes is a number that was always zero: approving by hand through the plan override
+  // writes no payment row, so the most expensive tier in the product earned nothing on the earnings page.
+  // The assertion is on the owner's earnings total, before and after, because that is what was wrong.
   it('moves the tier AND moves the money', async () => {
     const founder = await registerOrg('custom', 'gold');
     expect((await ask(founder, 'we are ready')).status).toBe(201);
@@ -240,13 +209,12 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
     expect(approved.status).toBe(200);
     expect(approved.body.data.status).toBe('closed');
 
-    // THE PLAN MOVED.
+    // The plan moved.
     const subscription = await prisma.subscription.findUnique({ where: { orgId: founder.orgId } });
     expect(subscription?.tier).toBe('enterprise');
     expect(subscription?.status).toBe('active');
 
-    // THE DIFFERENCE WAS CAPTURED — DEC-097, not the full ₹4,999. They already hold Gold for
-    // this period, and charging the whole new price would bill the overlap twice.
+    // The DIFFERENCE was captured, not the full price: they already hold the lower tier for this period.
     const payments = await paymentsOf(founder.orgId);
     const sale = payments[payments.length - 1];
     expect(sale?.kind).toBe('change');
@@ -254,16 +222,12 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
     expect(sale?.fromTier).toBe('gold');
     expect(sale?.amountMinor).toBe(changeCostMinor('gold', 'enterprise'));
     expect(sale?.amountMinor).toBe(499900 - 99900);
-    // WHO BOUGHT IT IS THE PERSON WHO ASKED, off the request row — the operator did not buy it.
+    // Who bought it is the person who ASKED, off the request row - the operator did not buy it.
     expect(sale?.payerName).toBe('Founder');
 
-    // AND IT REACHES THE PAGE THE OWNER READS.
-    //
-    // ASSERTED ON THIS ORGANISATION'S ROW, never on the estate total. The suite runs in
-    // parallel and other files are registering organisations the whole time, so a
-    // before-and-after on `lifetimeRevenueMinor` measures them too — it passed alone and
-    // failed in the full run, which is the flake this comment exists to stop somebody
-    // rewriting back in.
+    // And it reaches the page the owner reads.
+    // Asserted on THIS organisation's row, never on the estate total: the suite runs in parallel, so a
+    // before-and-after on the estate figure would measure other test files too.
     const after = await owner.get('/api/v1/platform/earnings');
     expect(after.status).toBe(200);
     const mine = (after.body.data.recent as Array<{ orgId: string; tier: string; amountMinor: number }>)
@@ -272,7 +236,7 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
     expect(mine?.amountMinor).toBe(changeCostMinor('gold', 'enterprise'));
   });
 
-  /** A second approve is a 409, not a second capture. DEC-096's equal-rank rule, other door. */
+  // A second approve is a 409, not a second capture.
   it('refuses to approve an organisation that is already on Enterprise', async () => {
     const founder = await registerOrg('custom', 'silver');
     expect((await ask(founder)).status).toBe(201);
@@ -284,7 +248,7 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
     expect((await owner.post(`/api/v1/platform/enterprise-requests/${row!.id}/approve`)).status)
       .toBe(200);
 
-    // Ask again (the closed request released the partial unique index), then approve again.
+    // Ask again - closing the first request released the unique index - then approve again.
     expect((await ask(founder)).status).toBe(201);
     const second = await owner.get('/api/v1/platform/enterprise-requests');
     const again = (second.body.data as Array<{ id: string; org: { id: string } }>)
@@ -300,7 +264,7 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
     expect(captures).toHaveLength(1);
   });
 
-  /** Staff cannot approve. It is the queue's own owner-only verb, not `plan.override`. */
+  // Staff cannot approve: it is the queue's own owner-only verb, not the plan override.
   it('refuses staff and names the capability', async () => {
     const founder = await registerOrg('custom', 'bronze');
     expect((await ask(founder)).status).toBe(201);
@@ -315,11 +279,8 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
     expect(JSON.stringify(res.body)).toContain('platform.enterprise.update');
   });
 
-  /**
-   * `overridePlan` STAYS MONEY-FREE, and that split is the point rather than an oversight: a
-   * support action that moved a customer's tier is not a sale, and if it started writing
-   * ledger rows an operator fixing a mistake would invent revenue every time.
-   */
+  // The plan override stays money-free, and that split is the point: a support action that moved a
+  // customer's tier is not a sale, and if it wrote ledger rows an operator fixing a mistake would invent revenue.
   it('leaves the operator’s plain override writing no ledger row', async () => {
     const founder = await registerOrg('custom', 'bronze');
     const owner = await makeOperator('owner');

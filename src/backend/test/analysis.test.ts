@@ -1,15 +1,9 @@
-// T-081 — the analysis backend. 43, DEC-042.
-//
-// Three things are being tested and they are not the same thing.
-//
-//   1. THE DECISION, asserted by absence. DEC-042 says no comment text leaves the process,
-//      and `43` § Acceptance says to prove that by there being no outbound client in the
-//      feature rather than by reading the code. That is the first describe, and it is the
-//      only test here that would still matter if the engine were replaced tomorrow.
-//   2. THE ENGINE, which is a pure function and needs no database. Determinism is the load-
-//      bearing property: the drill-through recomputes rather than storing, so a theme that
-//      moved between two identical requests would 404 on a card the page is displaying.
-//   3. THE GATES, of which there are three — capability, entitlement, and k-anonymity.
+// The analysis backend. Three different things are tested here:
+//   1. the DECISION, proved by absence - there is no outbound client anywhere in the feature,
+//      so comment text cannot leave the process;
+//   2. the ENGINE, which is a pure function and needs no database. Determinism is load-bearing,
+//      because the drill-through recomputes rather than storing;
+//   3. the GATES: capability, plan, and anonymity.
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -26,21 +20,16 @@ import {
 import { config } from '../lib/config.js';
 import { analyse, stem, tokenise, type Document } from '../features/analysis/engine.js';
 
-/* ------------------------------------------------------------- 1. DEC-042 */
+// 1. No outbound client in the feature.
 
 describe('DEC-042 — no comment text leaves the process, asserted by absence', () => {
-  // Resolved from THIS FILE, not from the working directory. The repo runs vitest twice —
-  // once at the root and once inside `src/backend` — and a cwd-relative path passes in one
-  // and fails to collect in the other, which is how this test spent its first run not
-  // running at all.
+  // Resolved from THIS file, not the working directory: the suite runs from two places, and a relative
+  // path would silently collect nothing in one of them.
   const dir = fileURLToPath(new URL('../features/analysis', import.meta.url));
   const files = readdirSync(dir).filter((name) => name.endsWith('.ts'));
 
-  /**
-   * Comments are stripped before the scan. A check that its own explanatory comment can
-   * trip is a check somebody deletes the comment to satisfy, and then it stops catching
-   * the real thing — the same lesson `audit-vocab.mjs` learned twice (`N-023`).
-   */
+  // Comments are stripped before the scan, so a check cannot be satisfied by deleting the comment
+  // that explains it.
   const code = (name: string): string =>
     readFileSync(`${dir}/${name}`, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -168,7 +157,7 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
     expect(stem('delays')).toBe(stem('delayed'));
     expect(stem('friendly')).toBe(stem('friends'));
     // And `staff` keeps both its f's: the double-consonant rule only runs after a suffix
-    // actually came off, or every word ending in a doubled letter would lose one.
+    // ...only after a suffix actually came off, or every word ending in a doubled letter would lose one.
     expect(stem('staff')).toBe('staff');
   });
 
@@ -185,8 +174,7 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
         doc(2, 'everything else was fine', null),
       ],
     }).themes;
-    // Two is one person with a bugbear and a second who agreed. Printing it as a finding
-    // in a list headed "themes" is the lie 43 § Reliability exists to refuse.
+    // Two mentions is one person with a bugbear and a second who agreed: printing it as a finding is a lie.
     expect(themes).toEqual([]);
   });
 
@@ -201,8 +189,7 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
 
   it('reports NO driver at all when every rating is identical', () => {
     const flat = HOTEL.map((document) => ({ ...document, rating: 0.5 }));
-    // There is no correlation to report, and a 0 would say there was one and that it was
-    // zero. `43` would then render "no impact" for a theme nothing is known about.
+    // There is no correlation to report, and a 0 would claim there was one and that it was zero.
     expect(analyse({ documents: flat }).drivers).toEqual([]);
   });
 
@@ -226,18 +213,16 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
       at: new Date(Date.UTC(2026, 0, 1 + i * 30)),
     }));
     const weekly = analyse({ documents: spread }).trend;
-    // Every bucket label is a Monday. A year of daily points is not a line chart.
+    // Every bucket label is a Monday: a year of daily points is not a line chart.
     for (const point of weekly) {
       expect(new Date(`${point.date}T00:00:00Z`).getUTCDay()).toBe(1);
     }
   });
 
-  /* --- the three fixes the SEEDED corpora found that twelve fixtures did not --- */
+  // The three fixes the real seeded comments found that a dozen fixtures did not.
 
   it('does not swallow a small theme into a big one that overlaps it BY CHANCE', () => {
-    // Ten of twenty comments mention the rooms, so any term overlaps `room` about half the
-    // time for free. `lift` appears in six comments, three of them also about rooms — a
-    // containment of exactly 0.5, which is precisely what coincidence produces here.
+    // Half the comments mention rooms, so anything overlaps that theme about half the time by pure chance.
     const documents = [
       ...Array.from({ length: 7 }, (_, i) => doc(i, 'the room was fine', null)),
       ...Array.from({ length: 3 }, (_, i) => doc(10 + i, 'the room is near the lift', null)),
@@ -245,8 +230,7 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
       ...Array.from({ length: 7 }, (_, i) => doc(30 + i, 'reception was busy', null)),
     ];
     const ids = analyse({ documents }).themes.map((theme) => theme.id);
-    // A flat 50% bar merged this away and returned FOUR themes from The Grand Palace's 229
-    // comments while looking confident about it. The bar has to beat chance, not meet it.
+    // A flat 50% bar merged everything away and returned four confident themes from 229 comments.
     expect(ids).toContain('lift');
     expect(ids).toContain('room');
   });
@@ -256,8 +240,7 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
       doc(i, 'the bed was comfortable and the pillows were comfortable', null),
     );
     const ids = analyse({ documents }).themes.map((theme) => theme.id);
-    // `Comfortable` came back from real data sitting beside `Checkout` and `Breakfast`,
-    // reading as a finding when it is an adjective.
+    // An adjective came back sitting beside real topics, reading as a finding when it is not one.
     expect(ids).not.toContain('comfort');
     expect(ids).toContain('bed');
   });
@@ -268,18 +251,15 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
     );
     const ids = analyse({ documents }).themes.map((theme) => theme.id);
     expect(ids).toEqual(['location']);
-    // The unigram heads it and the bigram folds in, because the general word is the better
-    // name for the group. Two rows saying `Location` and `Great location` is the bug the
-    // merge-bar CEILING exists for — without it, a theme covering the whole corpus demands
-    // a containment of 2 and nothing can ever be a facet of it.
+    // The single word heads the theme and the phrase folds into it, because the general word is the better name.
   });
 
   it('stems words ending -ll, -ff and -ss without eating a letter', () => {
-    // `called` used to stem to `cal` while `call` stemmed to `call`, so the two never met.
+    // "called" used to stem differently from "call", so the two never met.
     expect(stem('called')).toBe(stem('call'));
     expect(stem('staff')).toBe('staff');
     expect(stem('passes')).toBe(stem('pass'));
-    // And the rule still does its job where the doubling really is a suffix artefact.
+    // And the rule still works where the doubling really is a suffix artefact.
     expect(stem('running')).toBe('run');
     expect(stem('dropped')).toBe(stem('drop'));
   });
@@ -294,11 +274,11 @@ describe('the engine — rule-based, and deterministic because 43 § Acceptance 
   });
 });
 
-/* --------------------------------------------------------------- 3. gates */
+// 3. The gates.
 
 const stranger = () => request(app);
 
-/** A launched campaign whose written answers are the exact texts given. */
+// A launched campaign whose written answers are exactly the texts given.
 async function campaignWith(
   founder: Session,
   opts: {
@@ -306,7 +286,7 @@ async function campaignWith(
     subject: string;
     name: string;
     entries: Array<[string, number]>;
-    /** A second subject on the SAME campaign, taking the last `n` entries. */
+  // A second subject on the SAME campaign, taking the last few entries.
     also?: { subject: string; take: number };
   },
 ): Promise<{ campaignId: string; subjectId: string; alsoId: string | null }> {
@@ -425,8 +405,8 @@ describe('the two gates 43 exists to demonstrate — 402 and 403, never confused
     const founder = await setUpOrg('university', 'bronze');
     const res = await view(founder);
     expect(res.status).toBe(402);
-    // The remedy is an upgrade, and the body says which one. A 403 here would tell a paying
-    // administrator to go and ask themselves for permission (DEC-011).
+    // The remedy is an upgrade, and the body says which one. A 403 would tell a paying administrator
+    // to go and ask themselves for permission.
     expect(res.error?.details).toMatchObject({ requiredTier: 'silver', currentTier: 'bronze' });
   });
 
@@ -460,7 +440,7 @@ describe('the k-anonymity gate applies here exactly as it does on 40', () => {
     const res = await view(founder);
     expect(res.status).toBe(200);
     expect(res.body?.suppressed).toBe(true);
-    // Not zeroed, not empty arrays. ABSENT — a client cannot render what it never received.
+    // Not zeroed and not empty arrays - ABSENT. A client cannot render what it never received.
     expect(res.body).not.toHaveProperty('themes');
     expect(res.body).not.toHaveProperty('sentiment');
     expect(res.body).not.toHaveProperty('trend');
@@ -469,9 +449,8 @@ describe('the k-anonymity gate applies here exactly as it does on 40', () => {
 
   it('suppresses a FILTER that narrows below the threshold INSIDE a readable campaign', async () => {
     const founder = await setUpOrg('university', 'silver');
-    // ONE campaign, eight responses, split five and three across two subjects. The campaign
-    // is comfortably over the threshold, so `readableCampaigns` — the first gate — lets it
-    // straight through. Only the second gate can refuse the smaller subject.
+    // One campaign, eight responses, split five and three between two subjects. The campaign is over the
+    // threshold, so only the second gate can refuse the smaller subject.
     const thin = ENTRIES.length - config.K_ANON_THRESHOLD;
     expect(thin).toBeLessThan(config.K_ANON_THRESHOLD);
     const campaign = await campaignWith(founder, {
@@ -486,18 +465,16 @@ describe('the k-anonymity gate applies here exactly as it does on 40', () => {
     expect(whole.body?.suppressed).toBe(false);
     expect(whole.body?.reliability.responseCount).toBe(ENTRIES.length);
 
-    // `40` counts its threshold over the FILTERED set, and so does this. Without it,
-    // "analysis for this one subject" is a per-subject breakdown of three people — the exact
-    // request `38` § "Not built" refused, arrived at through a query parameter instead of a
-    // route. The campaign gate cannot see this one: the campaign is fine, the slice is not.
+    // The threshold is counted over the FILTERED set, or "analysis for this one subject" becomes a
+    // per-subject breakdown of three people, reached through a query parameter.
     const narrow = await view(founder, `?subjectId=${campaign.alsoId as string}`);
     expect(narrow.status).toBe(200);
     expect(narrow.body?.suppressed).toBe(true);
     expect(narrow.body?.reliability.responseCount).toBe(thin);
     expect(narrow.body).not.toHaveProperty('themes');
 
-    // And the larger subject in the same campaign still analyses, so the refusal above is
-    // the threshold doing its job rather than the filter simply being broken.
+    // And the larger subject still analyses, so the refusal above is the threshold working rather than
+    // the filter being broken.
     const wide = await view(founder, `?subjectId=${campaign.subjectId}`);
     expect(wide.body?.suppressed).toBe(false);
     expect(wide.body?.reliability.responseCount).toBe(config.K_ANON_THRESHOLD);
@@ -530,10 +507,9 @@ describe('the analysis itself, over real submitted responses', () => {
   it('carries reliability alongside the numbers, and says the sample is thin', async () => {
     const res = await view(founder);
     expect(res.body?.reliability.responseCount).toBe(ENTRIES.length);
-    // Eight responses. `43` § Reliability: presenting eight the way you present eight
-    // hundred is the most common way a feedback dashboard lies.
+    // Eight responses: presenting eight the way you present eight hundred is how a dashboard lies.
     expect(res.body?.reliability.confidence).toBe('low');
-    // `anyone` has no denominator, and a rate needs one. T-040's lesson (N-044).
+    // An open link has no denominator, and a rate needs one.
     expect(res.body?.reliability.responseRate).toBeNull();
   });
 
@@ -546,8 +522,8 @@ describe('the analysis itself, over real submitted responses', () => {
     expect(detail.status).toBe(200);
     const comments = detail.body.data.comments as Array<{ comment: string; valence: string }>;
     expect(comments.length).toBe(parking?.mentions);
-    // Every one of them genuinely contains the word. A theme whose sources do not mention it
-    // is an unfalsifiable label, which is `43` § Interactions' whole argument for this route.
+    // Every source comment genuinely contains the word: a theme whose sources do not mention it is a label
+    // nobody can check.
     for (const comment of comments) expect(comment.comment.toLowerCase()).toMatch(/park/);
     expect(detail.body.data.id).toBe('park');
   });
@@ -572,14 +548,13 @@ describe('the analysis itself, over real submitted responses', () => {
     expect((await view(reader)).status).toBe(200);
     expect((await reader.agent.get('/api/v1/analysis/themes/park')).status).toBe(200);
 
-    // Take away the right to read what one person wrote, and the drill-through goes with it
-    // even though `analysis.read` is untouched. `40`: "a head of department may reasonably
-    // have the first without the second."
+    // Take away the right to read what one person wrote and the drill-through goes with it, even though
+    // the analysis capability is untouched.
     await denyPerson(founder.orgId, reader.userId, 'response.read', 'all');
     expect((await reader.agent.get('/api/v1/analysis/themes/park')).status).toBe(403);
 
-    // And the overview now analyses nothing, because the CORPUS is scoped by response.read.
-    // It does not 403 — there is simply nothing this person may read (INV-003, INV-004).
+    // And the overview now analyses nothing, because the corpus is scoped by the same capability.
+    // It does not 403: there is simply nothing this person may read.
     const after = await view(reader);
     expect(after.status).toBe(200);
     expect(after.body?.suppressed).toBe(true);

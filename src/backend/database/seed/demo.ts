@@ -1,8 +1,5 @@
-// The four demo organisations. 50 §3.
-//
-// Fully populated, with HISTORICAL RESPONSES — not empty shells. An empty org proves the
-// schema; a populated one proves the product, and the difference is what the evaluator
-// actually sees.
+// The four demo organisations, fully populated with historical responses rather than left empty.
+// An empty org proves the schema; a populated one proves the product.
 import { estimateSeconds } from '@endur/shared';
 import type { QuestionKind } from '@endur/shared';
 import type { Prisma, PrismaClient } from '@prisma/client';
@@ -21,39 +18,25 @@ export type DemoOrg = {
   name: string;
   slug: string;
   industry: string;
-  /**
-   * ONE ORG PER TIER, which is what D-012 asked for and what makes the 402 path demonstrable
-   * on a real organisation rather than only in a test.
-   *
-   * The assignment follows the demo script (50 §5) rather than being alphabetical. Northfield
-   * is opened first and is where the improve loop lives, so it is Gold. The Grand Palace is
-   * step 2 and keeps analysis, so Silver. Riverside is Bronze — somebody has to be, and the
-   * screen that says "that feature is not included in your plan" is only convincing on an org
-   * that genuinely is not on it. Meridian is Enterprise, a tier no picker offers (DEC-048),
-   * which is the only way to see that operator-assigned tiers are real.
-   */
+  // One organisation per tier, so the "not included in your plan" screen can be shown on a real org.
   tier: Tier;
-  /** The RNG seed. Fixed per org, so every run produces the same organisation. */
+  // The random seed. Fixed per org, so every run builds the same organisation.
   seed: number;
   units: Array<{ tempId: string; name: string; parentTempId: string | null }>;
-  /** Subject names, and which unit each belongs to. */
+  // Subject names, and which unit each one belongs to.
   subjects: Array<{ name: string; unit: string }>;
   staff: number;
   campaigns: Array<{
     name: string;
     template: string;
-    /** Days ago the window opened; null closedAt means it is still running. */
+    // How many days ago the window opened; a null closedAt means it is still running.
     startedDaysAgo: number;
     lengthDays: number;
     closed: boolean;
-    /** Roughly how many people answer per subject. */
+    // Roughly how many people answer per subject.
     responsesPerSubject: number;
   }>;
-  /**
-   * T-106. One live poll per org — `campaign.*` is bronze (16 §3 `entitlements.ts`), so
-   * every tier gets this, unlike announcements (silver+) and booking (gold+). A poll IS a
-   * one-question campaign (DEC-088); this seeds the same shape `quickCreate` would.
-   */
+    // One live poll per org. A poll is just a one-question campaign, and campaigns are in every tier.
   poll: { question: string; options: string[]; votes: number };
 };
 
@@ -289,11 +272,7 @@ const LAST = [
 
 export type SeededLogin = { org: string; email: string; password: string; role: string };
 
-/**
- * Build one demo organisation, end to end, inside a single transaction so a failure
- * halfway leaves nothing behind. `db:reset` is the live recovery path during a demo, and a
- * half-seeded org is worse than an empty database.
- */
+// Builds one demo organisation end to end, in a single transaction, so a failure leaves nothing half-made.
 export async function seedOrg(
   prisma: PrismaClient,
   spec: DemoOrg,
@@ -316,18 +295,12 @@ export async function seedOrg(
   });
   const orgId = org.id;
 
-  // The subscription, written for the same reason `register` writes one (DEC-048): an org
-  // without a row falls through requireEntitlement's bronze backstop, and a demo org silently
-  // on the wrong tier is a demo that proves the opposite of what it claims. ONE MONTH from
-  // today (DEC-096), billing nothing — see auth/service.ts for why the period is honest but
-  // inert. This was the FOURTH copy of the period length and the one the change order missed;
-  // it is here because a seeded org whose period disagrees with a registered org's is a demo
-  // that lies about the product.
+  // The subscription row, so the org really is on its tier. One month from today, billing nothing.
   await prisma.subscription.create({
     data: { orgId, tier: spec.tier, status: 'active', ...newPeriod() },
   });
 
-  // 1 · units and the contains edges.
+  // 1. Units, and the edges that put each one inside its parent.
   const unitIds = new Map<string, string>();
   for (const unit of spec.units) {
     const created = await prisma.node.create({
@@ -347,7 +320,7 @@ export async function seedOrg(
       })),
   });
 
-  // 2 · roles, from the preset, with the derived grant matrix on each.
+  // 2. Roles from the preset, each with the seeded grant matrix applied.
   const roleIds: string[] = [];
   for (const [index, role] of preset.roles.entries()) {
     const created = await prisma.node.create({
@@ -368,14 +341,11 @@ export async function seedOrg(
     });
   }
 
-  // 3 · staff. The first is the demo login; the rest populate the org so a people list and
-  //     a powers grid have something to show.
+  // 3. Staff. The first person is the demo login; the rest fill out the people list and powers grid.
   const unitKeys = spec.units.map((unit) => unit.tempId);
   let adminUserId = '';
   let adminName = '';
-  // A second person, captured for the reflect loop's check-in — a plan is reviewed by
-  // somebody other than its author, and picking one at seed time is simpler than resolving
-  // "who supervises the admin" from the grant table for a demo that only needs one row.
+  // A second person, kept for the check-in later: a plan is reviewed by somebody other than its author.
   let supervisorUserId = '';
   const staffUserIds: string[] = [];
   for (let index = 0; index < spec.staff; index += 1) {
@@ -384,8 +354,7 @@ export async function seedOrg(
       index === 0
         ? `admin@${spec.slug}.endur.test`
         : `${spec.slug}-${index}@endur.test`;
-    // Level 1 for the first person, then a spread down the hierarchy — most people sit at
-    // the bottom, which is what makes a subtree scope visibly different from `all`.
+    // Level 1 for the first person, then a spread downwards - most people sit at the bottom, as in a real org.
     const level = index === 0 ? 0 : rng.chance(0.15) ? 1 : rng.chance(0.4) ? 2 : 3;
     const unitKey = index === 0 ? 'root' : rng.pick(unitKeys.slice(1));
 
@@ -438,7 +407,7 @@ export async function seedOrg(
   }
   if (!supervisorUserId) supervisorUserId = adminUserId;
 
-  // 4 · templates, copied from the preset.
+  // 4. Templates, copied from the preset.
   const templateIds = new Map<string, string>();
   for (const seed of preset.templates) {
     const template = await prisma.template.create({
@@ -464,8 +433,7 @@ export async function seedOrg(
     templateIds.set(seed.name, template.id);
   }
 
-  // 5 · subjects. ONE of them is deliberately poor, so the results screen has something to
-  //     show beyond a wall of fours (50 §3).
+  // 5. Subjects. One is deliberately poor, so the results screen has something to show.
   const subjectIds = new Map<string, string>();
   const quality = new Map<string, number>();
   for (const [index, subject] of spec.subjects.entries()) {
@@ -479,15 +447,11 @@ export async function seedOrg(
       select: { id: true },
     });
     subjectIds.set(subject.name, created.id);
-    // Index 2 is the weak one, everywhere. Fixed rather than random so the demo script can
-    // name it and it is the same subject at every rehearsal.
+    // Index 2 is the weak one, everywhere. Fixed rather than random, so the demo script can name it.
     quality.set(subject.name, index === 2 ? 0.32 : 0.55 + rng.next() * 0.4);
   }
 
-  // 5b · the admin's own self-review subject, linked by `linkedUserId` — the ONLY thing
-  //      `myCycle()` checks (improve/service.ts). Without a subject like this the demo
-  //      login has no reviewee row anywhere and /app/reflect is permanently empty, on
-  //      every org, regardless of how much else is seeded.
+  // 5b. The admin's own review subject, so the reflect page has a cycle to open.
   const selfSubjectName = `${adminName} — Self Review`;
   const selfSubject = await prisma.subject.create({
     data: {
@@ -500,7 +464,7 @@ export async function seedOrg(
     select: { id: true },
   });
 
-  // 6 · campaigns and their responses.
+  // 6. Campaigns and their responses.
   const campaignRecords: Array<{
     id: string;
     name: string;
@@ -527,8 +491,7 @@ export async function seedOrg(
         publicToken: mintToken(),
         ...(campaign.closed ? { closedAt: endsAt } : {}),
         subjects: {
-          // The self-review subject rides along on every regular campaign, exactly like
-          // any other subject — that is what makes it a cycle rather than a fixture.
+          // The self-review subject rides along on every campaign, exactly like any other subject.
           create: [...subjectIds.values(), selfSubject.id].map((subjectId) => ({ subjectId })),
         },
       },
@@ -550,10 +513,7 @@ export async function seedOrg(
       endsAt,
     });
 
-    // Only the FIRST campaign gets crowd responses on the self subject too, and enough of
-    // them to clear the k-anon threshold — that is the one cycle whose gap actually
-    // renders. The rest stay reviewee-only, which is what keeps their cycles at "due"
-    // instead of every single one resolving on day one of a fresh database.
+    // Only the first campaign gets enough crowd responses on the self subject to clear the anonymity threshold.
     if (campaignIndex === 0) {
       await seedResponses(prisma, {
         rng,
@@ -568,9 +528,7 @@ export async function seedOrg(
     }
   }
 
-  // 6b · the self-review reflection, plan, and check-in for that first campaign — so
-  //      /app/reflect opens on a FINISHED loop (44's three steps, all done) rather than
-  //      an evaluator having to run the whole thing live to see what it looks like.
+  // 6b. A finished reflection, plan and check-in, so the improve page opens on a completed loop.
   const anchor = campaignRecords[0];
   if (anchor) {
     await seedSelfReflection(prisma, {
@@ -583,9 +541,7 @@ export async function seedOrg(
     });
   }
 
-  // 7 · the under-subscribed open campaign, so k-anonymity suppression is REACHABLE during
-  //     the demo (50 §3, §7). Without it the gate is a paragraph in a doc rather than
-  //     something an evaluator can watch happen.
+  // 7. An under-subscribed campaign, so anonymity suppression can actually be watched happening.
   const pulse = [...templateIds.entries()].find(([name]) => name.includes('pulse'));
   if (pulse) {
     const startsAt = new Date(Date.now() - 3 * DAY);
@@ -612,19 +568,14 @@ export async function seedOrg(
       campaignId: created.id,
       templateId: pulse[1],
       subjects: [{ id: firstSubject, quality: 0.7 }],
-      // Deliberately below the k-anon threshold of 5.
+      // Deliberately below the anonymity threshold of 5.
       perSubject: 2,
       startsAt,
       endsAt: new Date(),
     });
   }
 
-  // 7a · T-106. ONE LIVE POLL, on every org regardless of tier — `campaign.*` is bronze
-  //     (`billing/entitlements.ts` §3), so a poll is the one quick-launch surface every
-  //     seeded org can actually use. Built the same way `quickCreate` builds one (DEC-088,
-  //     DEC-089): a one-question single-choice template, anchored to the org's own
-  //     singleton subject, launched with a public token — just written directly since a
-  //     seed run has no `req` to hand `runInTransaction`.
+  // 7a. One live poll on every org, built the same way the quick-create button builds one.
   {
     const orgSubject =
       (await prisma.subject.findFirst({
@@ -685,17 +636,11 @@ export async function seedOrg(
     });
   }
 
-  // 7b · T-096. ONE PUBLISHED ANNOUNCEMENT AND ONE OPEN BOOKABLE, on the orgs whose tier
-  //      actually buys them. A silver org gets the announcement; a gold or enterprise org
-  //      gets both. Seeding a gold feature onto the bronze org would put a row on a screen
-  //      that answers 402 — the demo would show a bookable nobody in that organisation can
-  //      open, which teaches the opposite of what the tier ladder is there to teach.
+  // 7b. One announcement and one bookable, but only on the orgs whose tier actually includes them.
   const tierRank = ['bronze', 'silver', 'gold', 'enterprise'].indexOf(spec.tier);
 
   if (tierRank >= 1) {
-    // Published, with RECEIPTS FOR EVERY MEMBER OF STAFF — written here exactly as
-    // `publishAnnouncement` writes them, because the number that makes the feature worth
-    // looking at is a fraction and a fraction needs a denominator (13 § Announcements).
+    // Published, with a read receipt row for every member of staff, because the headline number is a fraction.
     const announcement = await prisma.announcement.create({
       data: {
         orgId,
@@ -711,10 +656,7 @@ export async function seedOrg(
       data: staffUserIds.map((userId, index) => ({
         announcementId: announcement.id,
         userId,
-        // A THIRD OF THEM HAVE READ IT. Nought of forty reads as broken and forty of forty
-        // reads as fake; a real fraction is the only one that looks like a working product.
-        // The admin is NOT among them, so their own banner is unread when they sign in and
-        // the feature is visible on Home without navigating to it.
+        // About a third have read it: none looks broken, all looks fake. The admin has not, so their banner shows.
         readAt: index > 0 && index % 3 === 0 ? new Date(Date.now() - DAY) : null,
       })),
       skipDuplicates: true,
@@ -722,10 +664,7 @@ export async function seedOrg(
   }
 
   if (tierRank >= 2) {
-    // The bookable, open, with THREE SLOTS AND THE MIDDLE ONE NEARLY FULL. That last part
-    // is the whole reason this is seeded rather than created on stage: "1 left" is the state
-    // the capacity work exists to produce, and waiting for four volunteers to book from the
-    // audience is not a demo, it is a queue.
+    // The bookable, open, with three slots and the middle one nearly full, so "1 left" is on screen at once.
     const firstSubjectId = [...subjectIds.values()][0] as string;
     const bookable = await prisma.bookable.create({
       data: {
@@ -755,10 +694,7 @@ export async function seedOrg(
       ),
     );
 
-    // Two of the middle slot's three places taken, so it renders "1 left" the moment the
-    // page loads. Names and emails are fixtures and identified ON PURPOSE — a booking is a
-    // different privacy contract from a response (DEC-090), and the seed is where that
-    // difference first becomes visible on screen.
+    // Two of the middle slot's three places taken. Bookings are identified on purpose: unlike a response, a booking is not anonymous.
     const takers = [
       { slot: 1, name: 'Asha Nair', email: 'asha.nair@example.test' },
       { slot: 1, name: 'Daniel Okafor', email: 'daniel.okafor@example.test' },
@@ -774,11 +710,7 @@ export async function seedOrg(
     });
   }
 
-  // 8 · the activity log. Written directly rather than earned through the middleware,
-  //     because a seed run does not make real requests — but `56`'s reader does not care
-  //     how a row got there, only that it is shaped like one `requireCapability` would have
-  //     written. Without this, "Activity log" is a permanently empty screen on every demo
-  //     org, which is not a state a walkthrough can show anybody anything from.
+  // 8. The activity log, written directly, so the screen is not empty on a fresh database.
   await seedActivityLog(prisma, {
     orgId,
     adminUserId,
@@ -794,13 +726,7 @@ export async function seedOrg(
   return logins;
 }
 
-/**
- * The self-reviewee's own reflection, action plan, and one check-in — the whole `44` loop,
- * finished, on the campaign the reviewee just got real crowd responses on. Answers are
- * generic rather than random: this is one fixed row an evaluator will open and read, not
- * three thousand nobody looks at individually (contrast `answerFor`, which is the opposite
- * case on purpose).
- */
+// The reviewee's own reflection, action plan and check-in: the whole improve loop, finished, on the first campaign.
 async function seedSelfReflection(
   prisma: PrismaClient,
   params: {
@@ -882,11 +808,7 @@ async function seedSelfReflection(
   });
 }
 
-/**
- * A believable spread of activity-log rows, spanning the capabilities `56`'s reader
- * actually filters on (`action`, `targetType`, `outcome`) — including one denial, since a
- * log that only ever shows allows does not demonstrate the column exists.
- */
+// A believable spread of activity-log rows, including one denial, so the outcome column has something to show.
 async function seedActivityLog(
   prisma: PrismaClient,
   params: {
@@ -949,8 +871,7 @@ async function seedActivityLog(
       : []),
     ...(someSubjectId
       ? [{
-          // The one denial — a scope that legitimately does not reach this subject, not a
-          // bug (44 § the deny-always-beats-allow invariant, DEC- table in `_MEMORY.md`).
+          // The one denial: a scope that legitimately does not reach this subject, not a bug.
           actorUserId: params.supervisorUserId,
           action: 'subject.archive',
           targetType: 'subject',
@@ -992,13 +913,7 @@ type ResponsePlan = {
   endsAt: Date;
 };
 
-/**
- * Responses, written with createMany rather than one call per row.
- *
- * `db:reset` has to stay under 30 seconds because it is the recovery path during a live
- * demo (50 §4), and ~3,000 responses at six answers each is ~20,000 rows — which is a
- * couple of seconds in bulk and most of a minute one at a time.
- */
+// Writes the responses in bulk rather than one at a time, so db:reset stays under 30 seconds.
 async function seedResponses(prisma: PrismaClient, plan: ResponsePlan): Promise<void> {
   const questions = await prisma.question.findMany({
     where: { templateId: plan.templateId },
@@ -1011,7 +926,7 @@ async function seedResponses(prisma: PrismaClient, plan: ResponsePlan): Promise<
   const plans: Array<{ index: number; quality: number }> = [];
 
   for (const subject of plan.subjects) {
-    // Counts VARY by subject. A uniform hundred per subject reads as fake at a glance.
+    // Counts vary per subject: the same number everywhere reads as fake at a glance.
     const count = Math.max(
       1,
       Math.round(plan.perSubject * (0.6 + plan.rng.next() * 0.8)),
@@ -1041,8 +956,7 @@ async function seedResponses(prisma: PrismaClient, plan: ResponsePlan): Promise<
   for (const response of created) {
     const quality = qualityBySubject.get(response.subjectId ?? '') ?? 0.6;
     for (const question of questions) {
-      // Not everybody answers everything. A form where every optional question is filled
-      // in is another thing that reads as generated.
+      // Not everybody answers every optional question.
       if (question.kind === 'text' && !plan.rng.chance(0.35)) continue;
       answers.push(answerFor(plan, question, quality, response.id));
     }
@@ -1064,7 +978,7 @@ function answerFor(
   switch (question.kind as QuestionKind) {
     case 'rating': {
       const n = skewedRating(rng, config.max ?? 5, quality);
-      // numeric_value written alongside value, never independently (10 §4.4).
+      // The numeric value is always written alongside the raw value, never on its own.
       return { ...base, value: { kind: 'rating', n }, numericValue: n };
     }
     case 'nps': {
@@ -1087,9 +1001,7 @@ function answerFor(
         },
       };
     default: {
-      // Tone tracks the subject's quality, so the weak subject's comments read like the
-      // weak subject's ratings. Comments that disagree with the numbers are the fastest
-      // way to make a results screen look assembled rather than collected.
+      // Comment tone follows the subject's quality, so words and numbers agree.
       const tone: Tone = rng.chance(quality) ? 'positive' : rng.chance(0.5) ? 'mixed' : 'negative';
       return {
         ...base,

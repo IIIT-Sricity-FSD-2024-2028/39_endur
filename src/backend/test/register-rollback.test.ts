@@ -1,26 +1,9 @@
-// T-031 — "a failed registration leaves no organisation behind" (30 § Acceptance).
-//
-// This is the acceptance criterion that matters most on this page and the one hardest to
-// fake: a half-created org has a user who exists, cannot see anything, and cannot retry
-// because their address is taken. The service comments say so; nothing proved it.
-//
-// THE FORCED FAILURE IS REAL, NOT INJECTED. `uniqueSlug()` runs OUTSIDE the transaction
-// (features/auth/service.ts) because it reads COMMITTED rows, so several registrations naming
-// the same organisation at the same moment all read "that slug is free", and all but one then
-// collide on the unique index INSIDE the transaction. Argon2 hashing takes ~100ms and the slug
-// SELECT takes ~1ms, so every request below clears the check long before the winner commits —
-// the collision is reliable rather than lucky.
-//
-// WHAT CHANGED AT T-049 (`D-006`): the collision still happens, and the losing attempt is still
-// rolled back — but the service now takes the next slug and tries again instead of answering
-// 500. So the observable outcome inverted: every contender is expected to SUCCEED, on a
-// distinct slug. The rollback property did not stop being tested. It is tested by every retry:
-// an attempt that left half an organisation behind would show up below as an org count that
-// exceeds the number of winners, or as a user belonging to an org that does not exist.
-//
-// The distinct slugs are what prove the retry ran at all. All six requests compute the same
-// base slug before any of them commits, so six different slugs can only mean five collisions
-// were caught and retried.
+// A failed registration leaves no organisation behind.
+// A half-created org has a user who exists, cannot see anything, and cannot retry because their
+// address is taken. The service said so; nothing proved it.
+// The forced failure is real rather than injected: the slug is chosen OUTSIDE the transaction, so
+// simultaneous registrations of the same name all read "free" and all but one then collide inside it.
+// Password hashing takes far longer than the slug lookup, so the collision is reliable rather than lucky.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app, unique } from './helpers.js';
@@ -45,8 +28,8 @@ describe('POST /auth/register rolls back completely — 30 § Acceptance, 15 §5
     const won = results.filter((res) => res.status === 201);
     const lost = results.filter((res) => res.status !== 201);
 
-    // D-006. A slug collision is not the caller's mistake and not theirs to fix, so nobody
-    // gets an error page for choosing a name somebody else chose a millisecond earlier.
+    // A slug collision is not the caller's mistake and not theirs to fix, so nobody gets an error page
+    // for choosing a name somebody else chose a millisecond earlier.
     expect(lost.map((res) => res.status)).toEqual([]);
     expect(won).toHaveLength(CONTENDERS);
 

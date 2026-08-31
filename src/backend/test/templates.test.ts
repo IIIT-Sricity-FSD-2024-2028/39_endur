@@ -1,4 +1,4 @@
-// T-020 — templates and the bulk question save. 13, 36, 37, DEC-010.
+// Templates, and saving the whole question set at once.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setUpOrg, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
@@ -31,8 +31,7 @@ describe('templates', () => {
       questionCount: number;
       estimatedSeconds: number;
     }>;
-    // Six since T-093 added a Poll and a Suggestion box seed to every preset, so the start
-    // gallery is never empty and a university's poll is not a hotel's.
+    // Six, because every preset also seeds a poll and a suggestion box, so the start gallery is never empty.
     expect(templates.map((template) => template.name).sort()).toEqual([
       'Course feedback',
       'Facilities pulse',
@@ -41,16 +40,14 @@ describe('templates', () => {
       'Semester review',
       'Suggestion box',
     ]);
-    // Both derived, never entered by hand. A card showing a hand-typed question count
-    // drifts from the form the moment anybody edits it (36).
+    // Both derived and never typed by hand: a stored question count drifts the moment anybody edits the form.
     const course = templates.find((template) => template.name === 'Course feedback');
     expect(course?.questionCount).toBe(8);
     expect(course?.estimatedSeconds).toBeGreaterThan(0);
 
-    // No seeded template exceeds ten questions. Short forms are the product thesis, not a
-    // preference (01 §5).
+    // No seeded template has more than ten questions: short forms are the product's whole idea.
     expect(templates.every((template) => template.questionCount <= 10)).toBe(true);
-    // And one of them is a single question — DEC-010 made concrete rather than argued.
+    // And one of them is a single question, which makes "a poll is a one-question template" concrete.
     expect(templates.some((template) => template.questionCount === 1)).toBe(true);
   });
 
@@ -59,7 +56,7 @@ describe('templates', () => {
     expect(res.status).toBe(200);
     const questions = res.body.data.questions as Array<{ position: number; kind: string }>;
     expect(questions.map((question) => question.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    // Six kinds, frozen (DEC-010).
+    // Six question kinds, frozen.
     expect(
       questions.every((question) =>
         ['rating', 'single', 'multi', 'text', 'yesno', 'nps'].includes(question.kind),
@@ -77,8 +74,8 @@ describe('templates', () => {
     const res = await withCsrf(founder, 'put', `/api/v1/templates/${id}/questions`).send({
       questions: [
         rating('First'),
-        // A position sent by the client is ignored: array order is the only ordering, or a
-        // client-supplied position and a client-supplied order can disagree (37).
+        // A position sent by the client is ignored: the array order is the only ordering, or the two
+        // could disagree.
         { ...rating('Second'), position: 99 },
         {
           kind: 'text',
@@ -115,8 +112,8 @@ describe('templates', () => {
     });
 
     expect(res.status).toBe(200);
-    // One request, one transaction. The deferrable unique on (template_id, position) is
-    // what makes this a straight rewrite rather than a shuffle through temporary values.
+    // One request, one transaction: a deferred unique index is what makes this a straight rewrite
+    // rather than a shuffle through temporary values.
     expect((res.body.data.questions as Array<{ text: string }>).map((q) => q.text)).toEqual([
       'Q8',
       'Q7',
@@ -141,8 +138,7 @@ describe('templates', () => {
     ).send({
       questions: [{ kind: 'yesno', text: 'Broken', config: { kind: 'nps' }, required: false }],
     });
-    // The union is discriminated on `kind`; a mismatch would store a shape the renderer
-    // cannot read (14 §4).
+    // The config must match the question's kind, or the form would store a shape the renderer cannot read.
     expect(res.status).toBe(409);
   });
 
@@ -158,8 +154,8 @@ describe('templates', () => {
     expect(first.status).toBe(201);
     expect(first.body.data.clonedFromId).toBe(seeded);
     expect(first.body.data.questionCount).toBe(8);
-    // Same id back. Clone lands the user straight in the builder, so a second copy
-    // appearing behind them is invisible until it is confusing (36).
+    // The same id back: cloning drops the user into the builder, so a second copy behind them is
+    // invisible until it becomes confusing.
     expect(second.body.data.id).toBe(first.body.data.id);
 
     const copies = await prisma.template.count({
@@ -175,14 +171,13 @@ describe('a template in use by a launched campaign is read-only', () => {
     const templates = await founder.agent.get('/api/v1/templates');
     const templateId = (templates.body.data as Array<{ id: string }>)[0]?.id as string;
 
-    // Launched == a public token exists. Minting it is the irreversible act (DEC-016).
+    // Launched means a public token exists, and minting it is the irreversible act.
     await prisma.campaign.create({
       data: {
         orgId: founder.orgId,
         templateId,
         name: 'Running',
-        // Unique per run: tokens are globally unique and this database is not reset
-        // between runs, so a literal passes once and collides forever.
+        // Unique per run: tokens are globally unique and this database is not reset between runs.
         publicToken: `T${Date.now().toString(36).toUpperCase().slice(-7)}`,
       },
     });
@@ -193,8 +188,8 @@ describe('a template in use by a launched campaign is read-only', () => {
     const edit = await withCsrf(founder, 'patch', `/api/v1/templates/${templateId}`).send({
       name: 'Renamed mid-flight',
     });
-    // Editing questions under a running campaign would invalidate the responses already
-    // collected — half the respondents answered a different form (37).
+    // Editing questions under a running campaign would invalidate the responses already collected:
+    // half the respondents would have answered a different form.
     expect(edit.status).toBe(409);
     expect(edit.body.error.message).toMatch(/Duplicate/i);
 
@@ -208,9 +203,8 @@ describe('a template in use by a launched campaign is read-only', () => {
     const rows = templates.body.data as Array<{ id: string; campaignCount: number }>;
     const templateId = rows[0]?.id as string;
 
-    // T-035 added the count. Without it the library card cannot say "Used in 2 campaigns"
-    // and the delete dialog has to discover the 409 by pressing the button, which is
-    // exactly the "are you sure?" the consequence rule exists to replace (36, 24 §6).
+    // Without the count the library card cannot say "used in 2 campaigns", and the delete dialog would
+    // have to discover the refusal by pressing the button.
     expect(rows.every((template) => template.campaignCount === 0)).toBe(true);
 
     for (const name of ['One', 'Two']) {
@@ -230,8 +224,8 @@ describe('a template in use by a launched campaign is read-only', () => {
     );
     expect(used?.campaignCount).toBe(2);
 
-    // And the count agrees with what DELETE actually does. A number that disagrees with
-    // the refusal behind it would be worse than no number.
+    // And the count agrees with what delete actually does: a number that disagreed with the refusal
+    // behind it would be worse than no number.
     const remove = await withCsrf(founder, 'delete', `/api/v1/templates/${templateId}`).send({});
     expect(remove.status).toBe(409);
   });
@@ -253,8 +247,7 @@ describe('the shared library', () => {
     const edit = await withCsrf(founder, 'patch', `/api/v1/templates/${library.id}`).send({
       name: 'Hijacked',
     });
-    // Readable by everyone, writable by nobody — answered as 404 so there is one rule
-    // rather than two.
+    // Readable by everyone and writable by nobody, answered as 404 so there is one rule rather than two.
     expect(edit.status).toBe(404);
   });
 });

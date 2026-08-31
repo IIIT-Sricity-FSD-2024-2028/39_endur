@@ -1,9 +1,5 @@
-// Templates and their questions. 13 § Templates, 36, 37, DEC-010.
-//
-// Templates are org-wide artefacts with no unit, which is why the seeded matrix gives
-// `template.*` the `all` scope: scope is about the org graph, and templates are not in it
-// (50 §1). That one line explains most of what looks unusual in this file — there is no
-// unit filtering here, because there is no unit to filter on.
+// Templates and their questions.
+// A template belongs to the whole organisation and to no unit, which is why nothing here filters by unit.
 import { estimateSeconds } from '@endur/shared';
 import type {
   CreateTemplateBody,
@@ -21,10 +17,7 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { counted, nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
 
-/**
- * The shared library: `orgId IS NULL` (10 §4.2). One copy for everybody, cloned into an
- * organisation on demand rather than duplicated into every org at signup.
- */
+// The shared library: rows with no organisation. One copy for everybody, cloned on demand rather than duplicated at signup.
 export async function listLibrary(filters: {
   industry?: string;
   category?: string;
@@ -41,6 +34,7 @@ export async function listLibrary(filters: {
   return templates.map(toSummary);
 }
 
+// This organisation's own templates.
 export async function listTemplates(
   orgId: string,
   query: { cursor?: string; limit: number; q?: string },
@@ -61,11 +55,10 @@ export async function listTemplates(
   return pageOf(rows, query.limit, total, toSummary);
 }
 
+// One template with its questions, from the org or from the shared library.
 export async function readTemplate(orgId: string, templateId: string): Promise<TemplateDetail> {
   const template = await prisma.template.findFirst({
-    // A library template (orgId null) is readable by every org; an org's own template is
-    // readable only by that org. Both cases in one where clause, because "or it is in the
-    // library" is genuinely part of the visibility rule here.
+    // A library template is readable by every org; an org's own template only by that org.
     where: { id: templateId, OR: [{ orgId }, { orgId: null }] },
     select: { ...templateSelect, questions: { orderBy: { position: 'asc' }, select: questionSelect } },
   });
@@ -85,6 +78,7 @@ export async function readTemplate(orgId: string, templateId: string): Promise<T
   };
 }
 
+// Creates an empty template.
 export async function createTemplate(
   req: Request,
   orgId: string,
@@ -97,8 +91,8 @@ export async function createTemplate(
         name: body.name,
         category: body.category,
         description: body.description ?? null,
-        // Derived from the questions, and a blank template has none. Never accepted as
-        // input: a template must not be able to claim it is shorter than it is (36).
+        // Derived from the questions, and a new template has none. Never taken from the request,
+        // so a template cannot claim to be shorter than it is.
         estimatedSeconds: 0,
       },
       select: templateSelect,
@@ -112,6 +106,7 @@ export async function createTemplate(
   });
 }
 
+// Renames a template or edits its description.
 export async function updateTemplate(
   req: Request,
   orgId: string,
@@ -135,12 +130,7 @@ export async function updateTemplate(
   });
 }
 
-/**
- * Clone a library template — or one of the org's own — into this organisation.
- *
- * `cloned_from_id` is recorded (10 §4.2), which is what later lets us say "23 orgs use a
- * variant of this template" without keeping a separate usage table.
- */
+// Copies a template into this organisation. The source id is recorded, so "23 orgs use a variant of this" needs no extra table.
 export async function cloneTemplate(
   req: Request,
   orgId: string,
@@ -192,15 +182,9 @@ export async function cloneTemplate(
   return readTemplate(orgId, created);
 }
 
-/**
- * The whole question set, replaced in one transaction (13 §3, 37).
- *
- * The builder autosaves a DOCUMENT, not a stream of field edits, and reordering is one
- * operation on an array rather than N position updates. `position` is derived from array
- * index and is never sent — the deferrable unique on (template_id, position) is what lets
- * the whole set be rewritten inside a single transaction without shuffling through
- * temporary values (10 §4.2).
- */
+// Replaces the whole question set in one transaction.
+// The builder saves a document, not one field at a time, and each question's position comes from its
+// place in the array, never from the client.
 export async function putQuestions(
   req: Request,
   orgId: string,
@@ -211,9 +195,7 @@ export async function putQuestions(
   await assertEditable(req, templateId);
 
   for (const question of body.questions) {
-    // The config union is discriminated on `kind`, and a mismatch would store a shape the
-    // renderer cannot read. Zod checks the config's own shape; this checks that it belongs
-    // to the question it is attached to (14 §4).
+    // The config must match the question's own kind, or the form would store a shape the renderer cannot read.
     if (question.config.kind !== question.kind) {
       throw new ConflictError(
         `A ${question.kind} question cannot carry a ${question.config.kind} configuration.`,
@@ -247,6 +229,7 @@ export async function putQuestions(
   return readTemplate(orgId, templateId);
 }
 
+// Deletes a template, unless a campaign already uses it.
 export async function deleteTemplate(
   req: Request,
   orgId: string,
@@ -256,10 +239,7 @@ export async function deleteTemplate(
 
   const inUse = await prisma.campaign.count({ where: { templateId } });
   if (inUse > 0) {
-    // Deleting would cascade the questions away and leave every collected answer pointing
-    // at nothing. The campaign's history is the reason this is a 409 and not a soft delete.
-    // "Template" is structural — a hotel calls it a template too (22 §1). The thing it is
-    // used BY is not: that is the org's own noun, and the count agrees with it (22 §5).
+    // Deleting would leave every collected answer pointing at nothing, so a template in use is a 409, not a soft delete.
     throw new ConflictError(
       `That template is used by ${counted(inUse, nounsOf(req).campaign).toLowerCase()}. Delete or close those first.`,
     );
@@ -272,25 +252,20 @@ export async function deleteTemplate(
   return { ok: true };
 }
 
-/* ---------------------------------------------------------------- helpers */
+// Helpers.
 
+// Throws unless this template belongs to this organisation.
 async function assertOwned(orgId: string, templateId: string): Promise<void> {
   const template = await prisma.template.findFirst({
     where: { id: templateId, orgId },
     select: { id: true },
   });
-  // A library template is readable by everyone and writable by nobody. Answering 404 keeps
-  // that one rule instead of two.
+  // A library template is readable by everyone and writable by nobody, and 404 keeps that one rule instead of two.
   if (!template) throw new NotFoundError('That template does not exist.');
 }
 
-/**
- * A template used by a LAUNCHED campaign is read-only.
- *
- * Editing questions under a running campaign would invalidate the responses already
- * collected — half the respondents answered a different form. The builder shows a banner
- * with `Duplicate to edit` rather than silently disabling controls (37).
- */
+// A template used by a launched campaign is read-only: editing it would mean half the respondents
+// answered a different form. The builder offers "duplicate to edit" instead.
 async function isLocked(templateId: string): Promise<boolean> {
   const launched = await prisma.campaign.count({
     where: { templateId, NOT: { publicToken: null } },
@@ -298,6 +273,7 @@ async function isLocked(templateId: string): Promise<boolean> {
   return launched > 0;
 }
 
+// Throws when the template is locked by a launched campaign.
 async function assertEditable(req: Request, templateId: string): Promise<void> {
   if (await isLocked(templateId)) {
     throw new ConflictError(
@@ -316,9 +292,7 @@ const templateSelect = {
   clonedFromId: true,
   estimatedSeconds: true,
   createdAt: true,
-  // Both counts in the same query as the row. `campaignCount` is what the delete dialog
-  // states before it is pressed, and fetching it per card would turn a 20-card library
-  // into 21 requests (36).
+  // Both counts come back with the row, so a 20-card library is one request rather than 21.
   _count: { select: { questions: true, campaigns: true } },
 };
 
@@ -344,6 +318,7 @@ type TemplateRow = {
   _count: { questions: number; campaigns: number };
 };
 
+// Turns a template row into the summary shape the client reads.
 function toSummary(template: TemplateRow): TemplateSummary {
   return {
     id: template.id,
@@ -351,8 +326,7 @@ function toSummary(template: TemplateRow): TemplateSummary {
     category: template.category,
     description: template.description,
     industry: template.industry,
-    // Both DERIVED. A card that showed a hand-entered question count would drift from the
-    // form the moment anyone edited it (36).
+    // Both derived: a stored question count would drift the moment somebody edited the form.
     questionCount: template._count.questions,
     estimatedSeconds: template.estimatedSeconds,
     campaignCount: template._count.campaigns,

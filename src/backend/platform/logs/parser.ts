@@ -1,10 +1,5 @@
-// Turns one raw line from `app-*.log` / `error-*.log` into a `LogLine`. 72 § Data contract.
-//
-// `requestLogger` and `errorFunnel` write pino JSON with a fixed set of fields
-// (`requestId`, `method`, `path`, `status`, `durationMs`, `orgId`, `principal`, `err`) plus
-// pino's own (`time`, `level`, `msg`, `pid`, `hostname`, `env`). EVERYTHING ELSE — a field
-// nobody named here — lands in `extra`, because a field that was not expected to be on a
-// log line is the one worth seeing, not hiding (72 § Data contract, 56 § Anonymity).
+// Turns one raw line from a log file back into a LogLine object.
+// Known fields are named; anything unexpected lands in 'extra', because an unexpected field is the one worth seeing.
 import type { LogLine } from '@endur/shared';
 import { TAIL_FIELD, decodeValue, levelFromName, parseStamp } from '../../lib/logFormat.js';
 
@@ -13,13 +8,7 @@ const KNOWN_KEYS = new Set([
   'requestId', 'method', 'path', 'status', 'durationMs', 'orgId', 'principal', 'err',
 ]);
 
-/**
- * `72` § States — "an unparseable line is rendered raw and flagged, never skipped." The
- * `LogLine` contract has no separate "this line failed to parse" field, so the flag is
- * carried the same way an unexpected field is: through `extra`. `level: 0` is below every
- * real pino level (10=trace and up), so an unparsed line is visibly distinct without a
- * schema change.
- */
+// An unparseable line is shown raw and flagged with level 0, never skipped.
 function unparsed(raw: string, fallbackDate: string): LogLine {
   return {
     at: `${fallbackDate}T00:00:00.000Z`,
@@ -30,11 +19,7 @@ function unparsed(raw: string, fallbackDate: string): LogLine {
 }
 
 export function parseLogLine(raw: string, fallbackDate: string): LogLine {
-  // Two formats, on purpose. Files written since the bracketed format landed look like
-  // `[2026-08-25 …] [pid] [INFO] [HTTP] …`; files still inside the 14-day retention window
-  // from before it are pino JSON. Dropping the JSON branch would have blanked a week of
-  // history on /ops/logs the day the writer changed, which is not an acceptable way to
-  // change a log format.
+  // Two formats on purpose: the bracketed format written now, and pino JSON from files still inside retention.
   if (raw.startsWith('[')) return parseTextLine(raw, fallbackDate);
 
   let obj: unknown;
@@ -82,14 +67,9 @@ export function parseLogLine(raw: string, fallbackDate: string): LogLine {
 }
 
 
-/**
- * The bracketed on-disk format, read back. `lib/logFormat.ts` owns the grammar and the
- * encoding helpers — this file must never grow its own copy of either, for the same reason
- * the log reader borrows the writer's filename regex rather than restating it.
- */
+// Reads the bracketed on-disk format back. The grammar lives in lib/logFormat.ts and is never copied here.
 function parseTextLine(raw: string, fallbackDate: string): LogLine {
-  // `[-]` where the pid should be: a record that carried none (a converted older file), never
-  // a guess at whose process it was.
+  // A dash where the pid should be means the record carried none; never guess one.
   const head = /^\[([^\]]+)\] \[(\d+|-)\] \[([A-Z0-9]+)\] \[([^\]]*)\](.*)$/.exec(raw);
   if (!head?.[1] || !head[3]) return unparsed(raw, fallbackDate);
 
@@ -100,15 +80,11 @@ function parseTextLine(raw: string, fallbackDate: string): LogLine {
   const tag = head[4] ?? '';
   const body = (head[5] ?? '').trim();
 
-  // A summary the writer had to quote is read FIRST, off the front, and the `key=value` tail
-  // is whatever follows it. Peeling the tail first would reach inside the quotes and take a
-  // `req=…` that was part of somebody's message — which is precisely the case the writer
-  // quoted it to prevent.
+  // A quoted summary is read first, off the front, so a key=value inside somebody's message is not taken for a field.
   const quoted = body.startsWith('"') ? readQuoted(body) : null;
   let rest = quoted ? quoted.rest : body;
 
-  // Otherwise the tail is peeled off the END, one field at a time, because that is the only
-  // edge of the line whose position is known: the summary in front of it is free text.
+  // Otherwise fields are peeled off the END, one at a time, because the free-text summary has no fixed length.
   const fields = new Map<string, unknown>();
   for (;;) {
     const match = TAIL_FIELD.exec(rest);
@@ -122,8 +98,7 @@ function parseTextLine(raw: string, fallbackDate: string): LogLine {
   const str = (key: string): string | undefined => {
     const value = fields.get(key);
     if (typeof value === 'string') return value;
-    // A bare `42` decodes as a number; an id or a code that happens to look numeric is still
-    // the string it was written as. Anything else was never a scalar and is not a string.
+    // A bare 42 becomes a number; anything quoted stays the string it was written as.
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
     return undefined;
   };
@@ -136,14 +111,12 @@ function parseTextLine(raw: string, fallbackDate: string): LogLine {
   const line: LogLine = {
     at,
     level,
-    // What the formatter dropped as implied, put back: a request line's `msg` is `request`,
-    // an error line's is its code, and a plain line's is the summary itself.
+    // Puts back the msg the writer left out as implied: 'request' for an HTTP line, the code for an error.
     msg: str('msg') ?? (isHttp ? 'request' : tag !== 'APP' && tag !== '' ? tag : summary),
   };
 
   if (isHttp) {
-    // `<METHOD> <PATH>[ <status>][ <ms>ms]` — the summary IS the structured fields here,
-    // which is what keeps a request line short enough to read.
+    // For a request line the summary IS the fields: method, path, status and duration.
     const http = /^(\S+) (\S+)(?: (\d{3}))?(?: (\d+)ms)?$/.exec(summary);
     if (http?.[1] && http[2]) {
       line.method = http[1];
@@ -184,9 +157,7 @@ function parseTextLine(raw: string, fallbackDate: string): LogLine {
 }
 
 
-/** Reads a leading JSON string off `body`, returning it and what follows. Hand-scanned
- *  rather than regexed: the scan has to respect backslash escapes to find the real closing
- *  quote, and a regex that does that correctly is less readable than the loop. */
+// Reads a leading JSON string off the text, scanned by hand so backslash escapes are respected.
 function readQuoted(body: string): { value: string; rest: string } | null {
   for (let i = 1; i < body.length; i += 1) {
     const ch = body[i];

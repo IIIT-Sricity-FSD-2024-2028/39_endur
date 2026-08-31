@@ -1,11 +1,6 @@
-// Runs in every worker, before any test file is imported — which is what makes it work.
-// lib/config.ts parses DATABASE_URL at module load, and `process.loadEnvFile()` does not
-// overwrite a variable that is already set, so setting it here wins over the repo `.env`
-// for the whole worker.
-//
-// globalSetup already does this in the parent. This is deliberate duplication: it is the
-// line that has to be true, and depending on env inheritance through a worker boundary to
-// carry it is a bet with the development database as the stake (D-004).
+// Runs in every test worker before any test file is imported, which is what makes it work:
+// config.ts reads DATABASE_URL at import time, and a variable already set wins over the repo .env.
+// globalSetup does this too - the duplication is deliberate, because the stake is the development database.
 import os from 'node:os';
 import path from 'node:path';
 import { testDatabaseUrl } from './database.js';
@@ -13,8 +8,5 @@ import { testDatabaseUrl } from './database.js';
 process.env.DATABASE_URL = testDatabaseUrl();
 process.env.NODE_ENV = 'test';
 
-// Uploads (48) write real bytes. Point them at a temp directory for the same reason the
-// database is redirected: a test run must not leave anything behind in the tree, and a
-// suite that writes into src/backend/storage/ would quietly accumulate every image every
-// run has ever uploaded.
+// Uploads write real bytes, so they are pointed at a temp folder: a test run must leave nothing behind.
 process.env.STORAGE_DIR ??= path.join(os.tmpdir(), 'endur-test-storage');

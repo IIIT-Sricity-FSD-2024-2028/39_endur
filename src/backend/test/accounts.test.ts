@@ -1,10 +1,7 @@
-// T-072 — account provisioning, revocation and activation. 57 § Acceptance.
-//
-// The property every test here is written around: AN ADMINISTRATOR NEVER KNOWS A CREDENTIAL
-// THAT WORKS. They mint a link, the link is shown once, the person chooses their own
-// password. An administrator who could set a dean's password could sign in as the dean, and
-// every audit row from that session would name the dean — the org chart intact and the
-// audit log fiction.
+// Account provisioning, revocation and activation.
+// Every test here is written around one property: an administrator never knows a credential that works.
+// They mint a link, it is shown once, and the person chooses their own password - otherwise an
+// administrator could sign in as somebody else and every audit row would name the wrong person.
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import {
@@ -21,7 +18,7 @@ import { prisma } from '../db/client.js';
 import { clearGrantCache } from '../authz/index.js';
 import { hashInviteToken } from '../auth/inviteToken.js';
 
-/** A person with no positions — the common case, and the one 57 says must always work. */
+// A person with no positions: the common case, and the one that must always work.
 async function barePerson(orgId: string, name: string): Promise<{ personId: string; userId: string }> {
   const user = await prisma.user.create({
     data: { orgId, email: `${unique('invitee')}@example.test`, name, status: 'invited' },
@@ -34,7 +31,7 @@ async function barePerson(orgId: string, name: string): Promise<{ personId: stri
   return { personId: person.id, userId: user.id };
 }
 
-/** Give them a position, so the escalation bound has something to bound. */
+// Give them a position, so the escalation bound has something to bound.
 async function positionAt(orgId: string, personId: string, level: number, unitName: string) {
   const [roleId, unitId] = await Promise.all([
     roleIdByLevel(orgId, level),
@@ -67,13 +64,13 @@ describe('provisioning — the key, not the powers', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.personName).toBe('Newcomer');
     expect(res.body.data.url).toMatch(/\/activate\/[0-9A-Za-z]{43}$/);
-    // 7 days, and the test asserts the window rather than the exact millisecond.
+    // 7 days, asserted as a window rather than an exact millisecond.
     const days = (Date.parse(res.body.data.expiresAt) - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(6.9);
     expect(days).toBeLessThan(7.1);
   });
 
-  // "Only sha256(token) is stored — asserted by searching the row for the plaintext."
+  // Only the hash of the token is stored, checked by searching the whole row for the plaintext.
   it('stores only the hash, so the link cannot be recovered from the database', async () => {
     const { personId, userId } = await barePerson(founder.orgId, 'Newcomer');
     const res = await withCsrf(founder, 'post', `/api/v1/people/${personId}/account`).send({});
@@ -84,8 +81,7 @@ describe('provisioning — the key, not the powers', () => {
     // The plaintext appears nowhere in the row, under any column name.
     expect(JSON.stringify(row)).not.toContain(token);
 
-    // And no read anywhere returns it either: the person payload carries the STATE of the
-    // account, never the credential.
+    // And no read returns it either: the person payload carries the STATE of the account, never the credential.
     const person = await founder.agent.get(`/api/v1/people/${personId}`);
     expect(JSON.stringify(person.body)).not.toContain(token);
     expect(person.body.data.account.state).toBe('invited');
@@ -104,7 +100,7 @@ describe('provisioning — the key, not the powers', () => {
     expect(res.body.error.message).toMatch(/re-issue/i);
   });
 
-  // "Re-issuing invalidates the previous link, with no window where both work."
+  // Re-issuing invalidates the previous link, with no window where both work.
   it('re-issuing kills the first link in the statement that creates the second', async () => {
     const { personId, userId } = await barePerson(founder.orgId, 'Newcomer');
     const first = await withCsrf(founder, 'post', `/api/v1/people/${personId}/account`).send({});
@@ -115,8 +111,7 @@ describe('provisioning — the key, not the powers', () => {
     expect(second.status).toBe(201);
     expect(secondToken).not.toBe(firstToken);
 
-    // Exactly one live row, and it is the new one. The partial unique index is what makes
-    // this true rather than a deleteMany that could be raced.
+    // Exactly one live row, and it is the new one - the unique index is what makes that true.
     const live = await prisma.accountInvite.findMany({ where: { userId, acceptedAt: null } });
     expect(live).toHaveLength(1);
     expect(live[0]?.tokenHash).toBe(hashInviteToken(secondToken));
@@ -144,7 +139,7 @@ describe('provisioning — the key, not the powers', () => {
       'account.revoke',
     ]);
     expect(rows.every((row) => row.targetType === 'person')).toBe(true);
-    // The ACTOR is the administrator — this is not an anonymous action (DEC-045).
+    // The actor is the administrator: this is not an anonymous action.
     expect(rows.every((row) => row.actorUserId === founder.userId)).toBe(true);
   });
 });
@@ -155,9 +150,7 @@ describe('INV-012 — provisioning is bounded by the inviter’s own reach', () 
 
   beforeEach(async () => {
     founder = await setUpOrg();
-    // Level 2 holds `account.create: subtree` in the seeded matrix (50 §1), anchored at
-    // Section A. That is the realistic shape: a head of department who provisions their own
-    // people and nobody else's.
+    // A head of department who provisions their own people and nobody else's, which is the realistic shape.
     head = await addStaff(founder.orgId, { name: 'Head', level: 2, unitName: 'Section A' });
     clearGrantCache();
   });
@@ -170,13 +163,11 @@ describe('INV-012 — provisioning is bounded by the inviter’s own reach', () 
     expect(res.status).toBe(201);
   });
 
-  // THE HOLE THIS CLOSES. The positions were already there and were inert; the account is
-  // what turns an org-chart entry into an actor. Without the bound, "assign the senior role
-  // while you still may, then hand over the key" is an escalation in two legal calls.
+  // The hole this closes: the positions were already there and inert, and the account is what turns an
+  // org-chart entry into an actor. Without the bound it is an escalation in two legal calls.
   it('refuses to hand a key to somebody who outranks the inviter, and names the power', async () => {
     const { personId } = await barePerson(founder.orgId, 'Registrar');
-    // A LEVEL-1 position anchored inside the head's own section, so scope is not what
-    // refuses this — the head may act at Section A all day. What refuses it is the power.
+    // A senior position INSIDE the head's own section, so scope is not what refuses this - the power is.
     await positionAt(founder.orgId, personId, 1, 'Section A');
 
     const res = await withCsrf(head, 'post', `/api/v1/people/${personId}/account`).send({});
@@ -184,7 +175,7 @@ describe('INV-012 — provisioning is bounded by the inviter’s own reach', () 
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('WOULD_ESCALATE');
     expect(typeof res.body.error.details.capability).toBe('string');
-    // Nothing was minted. A refusal that left a live link behind would be the whole bug.
+    // Nothing was minted: a refusal that left a live link behind would be the whole bug.
     const live = await prisma.accountInvite.count({ where: { orgId: founder.orgId } });
     expect(live).toBe(0);
   });
@@ -199,8 +190,8 @@ describe('INV-012 — provisioning is bounded by the inviter’s own reach', () 
     expect(res.body.error.code).toBe('WOULD_ESCALATE');
   });
 
-  // ORDER IS A SECURITY PROPERTY. Run the bound before the visibility check and
-  // WOULD_ESCALATE becomes an oracle for "who outranks me" across the whole organisation.
+  // Order is a security property: run the bound before the visibility check and its refusal becomes a way
+  // to find out who outranks you.
   it('404s for a person outside the caller’s scope rather than telling them why', async () => {
     const { personId } = await barePerson(founder.orgId, 'Elsewhere');
     await positionAt(founder.orgId, personId, 1, 'Section B');
@@ -227,8 +218,8 @@ describe('activation — the person sets their own password', () => {
     url = res.body.data.url as string;
   });
 
-  // GET BEFORE POST: a bare password box reached from a pasted link is indistinguishable
-  // from a phishing page, and this link arrived over WhatsApp.
+  // The page greets the person before asking for a password, because a bare password box reached from a
+  // pasted link is indistinguishable from a phishing page.
   it('greets the person by name and names the organisation before asking for anything', async () => {
     const res = await request(app).get(`/api/v1/auth/activate/${tokenFrom(url)}`);
 
@@ -236,7 +227,7 @@ describe('activation — the person sets their own password', () => {
     expect(res.body.data.personName).toBe('Priya Menon');
     expect(typeof res.body.data.organizationName).toBe('string');
     expect(res.body.data.organizationName.length).toBeGreaterThan(0);
-    // The email is NOT here. A leaked link must not become an address harvester.
+    // The email is NOT here: a leaked link must not become an address harvester.
     expect(Object.keys(res.body.data).sort()).toEqual([
       'expiresAt',
       'organizationLogoUrl',
@@ -252,8 +243,7 @@ describe('activation — the person sets their own password', () => {
       .send({ password: 'a-long-enough-password' });
 
     expect(res.status).toBe(200);
-    // SIGNED IN ALREADY. Landing on a login form after setting a password is the most
-    // pointless screen in software.
+    // Signed in already, so nobody lands on a login form right after choosing a password.
     const me = await agent.get('/api/v1/auth/me');
     expect(me.status).toBe(200);
     expect(me.body.user.id).toBe(userId);
@@ -265,7 +255,7 @@ describe('activation — the person sets their own password', () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     expect(user.status).toBe('active');
     expect(user.passwordHash).not.toBeNull();
-    // Stored as a hash, never as the password. argon2id's prefix is the cheap assertion.
+    // Stored as a hash, never as the password itself.
     expect(user.passwordHash).toMatch(/^\$argon2id\$/);
   });
 
@@ -287,7 +277,7 @@ describe('activation — the person sets their own password', () => {
     expect(before.map((row) => row.sid)).not.toContain(after[0]?.sid);
   });
 
-  // "An expired token, a used token and an unknown token return identical responses."
+  // An expired token, a used token and an unknown token all return identical responses.
   it('answers identically for unknown, expired and already-used links', async () => {
     const unknown = 'z'.repeat(43);
 
@@ -318,7 +308,7 @@ describe('activation — the person sets their own password', () => {
     expect(bodies[2]).toEqual(bodies[0]);
   });
 
-  // "Two concurrent activations of one token yield one 200 and one dead end."
+  // Two activations of one token at the same moment: one succeeds and one gets the dead end.
   it('lets exactly one of two simultaneous activations through', async () => {
     const token = tokenFrom(url);
     const [a, b] = await Promise.all([
@@ -334,9 +324,8 @@ describe('activation — the person sets their own password', () => {
     expect(rows[0]?.acceptedAt).not.toBeNull();
   });
 
-  // INV-007, and the shape of the row is the point. There was no principal — there could
-  // not have been — so the row carries no actor and no address, and `target_id` is what
-  // says who activated. The address is recoverable through `request_id` in the request log.
+  // The audit row carries no actor and no address, because there was no principal - and there could not
+  // have been. The target says who activated, and the request id joins it to the request log.
   it('audits the activation with no actor and no IP, in the INVITING organisation', async () => {
     await request(app)
       .post(`/api/v1/auth/activate/${tokenFrom(url)}`)
@@ -352,8 +341,8 @@ describe('activation — the person sets their own password', () => {
     expect(row.requestId).toBeTruthy();
   });
 
-  // The tenant of an activation comes from the TOKEN, ahead of any session in the browser.
-  // A stranger signed in elsewhere must not drag the audit row into their own organisation.
+  // The organisation comes from the TOKEN, ahead of any session in the browser, so a stranger signed in
+  // elsewhere cannot drag the audit row into their own organisation.
   it('files the activation under the invite’s organisation even when a stranger is signed in', async () => {
     const other = await setUpOrg();
 
@@ -376,7 +365,7 @@ describe('activation — the person sets their own password', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.error.details.fields[0].path).toBe('body.password');
-    // The link is NOT consumed by a failed attempt.
+    // The link is not consumed by a failed attempt.
     const still = await request(app).get(`/api/v1/auth/activate/${tokenFrom(url)}`);
     expect(still.status).toBe(200);
   });
@@ -398,9 +387,8 @@ describe('revocation — immediate, and it leaves the person standing', () => {
     ).id;
   });
 
-  // THE PROPERTY 15 §2 CLAIMS FOR COOKIE SESSIONS, and this is the route that spends it.
-  // `authenticate` never reads `users.status`, so without the sessions DELETE the revoked
-  // browser would keep working until the session expired on its own.
+  // What cookie sessions buy, spent here: authenticate never reads the account status, so without deleting
+  // the sessions a revoked browser would keep working until its session expired.
   it('ends a live session on the very next request', async () => {
     const before = await victim.agent.get('/api/v1/auth/me');
     expect(before.status).toBe(200);
@@ -447,7 +435,7 @@ describe('revocation — immediate, and it leaves the person standing', () => {
     const again = await withCsrf(founder, 'post', `/api/v1/people/${personId}/account/reset`).send({});
     expect(again.status).toBe(201);
 
-    // Between the re-issue and the activation the truthful state is "waiting for them".
+    // Between the re-issue and the activation, the truthful state is "waiting for them".
     const pending = await founder.agent.get(`/api/v1/people/${personId}`);
     expect(pending.body.data.account.state).toBe('invited');
 
@@ -460,8 +448,8 @@ describe('revocation — immediate, and it leaves the person standing', () => {
     expect(user.disabledAt).toBeNull();
   });
 
-  // There is no password reset in this product and no mailer behind one, so an owner who
-  // revokes their own sign-in has locked the organisation permanently. Same guard as 33.
+  // There is no password reset in this product, so an owner revoking their own sign-in would lock the
+  // organisation for good.
   it('refuses to let anybody revoke their own sign-in', async () => {
     const own = await prisma.node.findFirstOrThrow({
       where: { orgId: founder.orgId, kind: 'person', userId: founder.userId },
@@ -483,7 +471,7 @@ describe('revocation — immediate, and it leaves the person standing', () => {
     const res = await withCsrf(head, 'delete', `/api/v1/people/${personId}/account`).send();
 
     expect(res.status).toBe(403);
-    // And the other two verbs ARE theirs — which is the whole reason there are three.
+    // And the other two verbs ARE theirs, which is the whole reason there are three.
     const junior = await barePerson(founder.orgId, 'Junior');
     await positionAt(founder.orgId, junior.personId, 3, 'Section A');
     const invite = await withCsrf(head, 'post', `/api/v1/people/${junior.personId}/account`).send({});
@@ -491,10 +479,9 @@ describe('revocation — immediate, and it leaves the person standing', () => {
   });
 });
 
-// D-024 — the fake revoke. `PATCH /people/:id { status: 'disabled' }` was a second way to
-// disable an account, behind `person.update` rather than `account.revoke`, and it left live
-// sessions and the password hash alone. The administrator saw "disabled" and believed access
-// had ended; the target's browser kept working.
+// The fake revoke: setting a status through the people route was a second way to disable an account,
+// behind a weaker capability, and it left live sessions and the password hash alone.
+// The administrator saw "disabled" and believed access had ended; the target's browser kept working.
 describe('D-024 — there is exactly one way to disable an account', () => {
   it('ignores a status on the person update, and the session survives it', async () => {
     const founder = await setUpOrg();
@@ -516,16 +503,15 @@ describe('D-024 — there is exactly one way to disable an account', () => {
     expect(user.status).toBe('active');
     expect(user.passwordHash).not.toBeNull();
 
-    // And the honest consequence: nothing about their access changed, which is exactly
-    // what the route now claims. Ending access is DELETE /people/:id/account.
+    // And nothing about their access changed, which is exactly what the route now claims.
     const still = await victim.agent.get('/api/v1/auth/me');
     expect(still.status).toBe(200);
   });
 });
 
 describe('the surface itself', () => {
-  // "An administrator cannot set a password on any route — asserted by the route
-  // enumeration, not by reading the handlers."
+  // An administrator cannot set a password on any route, asserted by enumerating the routes rather than
+  // by reading the handlers.
   it('exposes no route that accepts a password for somebody else', async () => {
     const founder = await setUpOrg();
     const { personId } = await barePerson(founder.orgId, 'Newcomer');
@@ -538,8 +524,7 @@ describe('the surface itself', () => {
       expect(res.status).toBe(201);
     }
 
-    // Both calls succeeded and NEITHER set anything: the person still cannot sign in, and
-    // the only way in is the link. A route that honoured that body would fail here.
+    // Both calls succeeded and neither set anything: the only way in is still the link.
     const user = await prisma.node.findFirstOrThrow({
       where: { id: personId },
       select: { user: { select: { passwordHash: true } } },

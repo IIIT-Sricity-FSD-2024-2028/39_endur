@@ -1,13 +1,6 @@
-// ROUTE → RESPONSE. `DEC-115`, `13` §12.
-//
-// One entry per route the app mounts, and `openapi.test.ts` asserts that the set of keys here
-// and the set of routes `enumerateRoutes()` finds are THE SAME SET, in both directions. That is
-// what makes this table maintainable rather than a thing that rots: add a route and the test
-// names it; delete one and the test names the orphan entry. Nobody has to remember.
-//
-// `summary` is the one-line description Swagger UI shows beside the path. It says what the route
-// is FOR — the capability it needs is rendered separately, from the guard itself, because that
-// fact already exists in the code and a second copy here would be a second thing to keep true.
+// One entry per route: what it answers with, and a one-line summary for the docs page.
+// openapi.test.ts checks this table and the real route list are the same set in both directions,
+// so adding a route without documenting it, or leaving an orphan entry behind, fails the build.
 import { z } from 'zod';
 import {
   AccountInviteSchema,
@@ -78,12 +71,12 @@ import {
 } from './components.js';
 
 export type ResponseSpec = {
-  /** The success status. `13` §5's rule: 201 creates, 204 deletes, 200 everything else. */
+  // The success status: 201 for a create, 204 for a delete, 200 for everything else.
   status: number;
-  /** The success body. `undefined` for 204 — a schema for "no content" is a contradiction. */
+  // The success body. undefined for 204, where there is no content to describe.
   schema?: z.ZodTypeAny;
   summary: string;
-  /** Non-JSON success bodies: the CSV export and the two image routes. */
+  // For non-JSON replies: the CSV export and the two image routes.
   contentType?: string;
 };
 
@@ -92,17 +85,17 @@ const created = (schema: z.ZodTypeAny, summary: string): ResponseSpec => ({ stat
 const noContent = (summary: string): ResponseSpec => ({ status: 204, summary });
 const done = (summary: string): ResponseSpec => ({ status: 200, schema: Ok, summary });
 
-/** `{ data, meta }` — the units tree carries its totals in `meta` rather than a second call. */
+// { data, meta } - the units tree carries its totals in meta rather than needing a second call.
 const withMeta = (inner: z.ZodTypeAny, meta: z.ZodTypeAny) =>
   z.object({ data: inner, meta });
 
-/** A file row, the shape both avatar and logo uploads answer with. */
+// A file row: the shape both avatar and logo uploads answer with.
 const FileRow = z.object({ id: z.string(), url: z.string() });
-/** The two-number answer every "how many rows did that touch" route gives. */
+// The two-number answer every "how many rows did that touch" route gives.
 const Counted = z.object({ created: z.number(), updated: z.number() }).partial();
 
 export const RESPONSES: Record<string, ResponseSpec> = {
-  /* ---- the documentation surface — 13 §12 -------------------------------- */
+  /* ---- the documentation surface ----------------------------------------- */
   'GET /api/v1/docs/': {
     status: 200,
     summary:
@@ -350,7 +343,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
     contentType: 'image/*',
   },
 
-  /* ---- the respondent surface — 39, 13 §6 -------------------------------- */
+  /* ---- the respondent surface -------------------------------------------- */
   'GET /api/v1/public/campaigns/:token': ok(
     data(PublicCampaignSchema),
     'The form behind a QR code. No account, no session — DEC-009: respondents are never users.',

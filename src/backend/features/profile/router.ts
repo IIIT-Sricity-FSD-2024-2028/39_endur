@@ -1,8 +1,6 @@
-// The signed-in user's own account. 13 § Uploads, 47.
-//
-// Separate from `/people/:id` on purpose: this is somebody acting on themselves, and it is
-// the cleanest demonstration of the `self` scope in `11` §4 — the target is built from the
-// PRINCIPAL, so there is no id in the request for a caller to point somewhere else.
+// The signed-in user's own account.
+// Separate from /people/:id on purpose: here the target is built from the PRINCIPAL, so there is no
+// id in the request that a caller could point at somebody else.
 import { Router } from 'express';
 import { ChangePasswordDto, UpdateProfileDto } from '@endur/shared';
 import type { ChangePasswordBody, UpdateProfileBody } from '@endur/shared';
@@ -19,22 +17,22 @@ import { changePassword, readProfile, updateProfile } from './service.js';
 
 export const profileRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2).
+// Links 6 to 8 for every route below.
 profileRouter.use(tenantChain);
 
-/** Principal or nothing. Every handler below is about the caller and takes no id. */
+// The caller, or nothing. Every handler here is about them and takes no id.
 const me = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
   const principal = req.ctx.principal;
   if (principal?.kind !== 'user' || !principal.id) throw new UnauthenticatedError();
   return principal.id;
 };
 
+// The caller's own profile.
 profileRouter.get(
   '/',
   authenticate,
-  // `self`, and it is reachable by EVERY role because `person.read: self` is seeded to all
-  // of them (50 §1). A profile page somebody cannot open is the bug a default-deny model
-  // produces when `self` is forgotten, and 47 § States says a 403 here means a broken seed.
+  // 'self' scope, reachable by every role, because person.read at self scope is seeded to all of them.
+  // A 403 on this route means a broken seed, not a permission decision.
   requireCapability('person.read', { target: 'self' }),
   (req, res, next) => {
     void readProfile(req.ctx.orgId as string, me(req), req.ctx.authzVersion ?? 0)
@@ -43,6 +41,7 @@ profileRouter.get(
   },
 );
 
+// Renames the caller.
 profileRouter.patch(
   '/',
   authenticate,
@@ -56,19 +55,9 @@ profileRouter.patch(
   },
 );
 
-/**
- * NO `requireCapability`, AND THAT IS THE SPECIFICATION (13 § Profile, 47 § Capabilities).
- *
- * Holding the session IS the authorisation, and no capability could stand in for it:
- * `person.update` is held over other people's subtrees, and an administrator must not be
- * able to set somebody else's password (`57` § "Why an administrator still cannot set a
- * password"). Gating this on a capability would make the route look safer while being
- * strictly wider than the session check it replaced.
- *
- * `authenticate` is therefore the whole guard, plus the current password inside the
- * service. INV-003 is not bent by this: the decision is still made in the chain, by the
- * middleware whose job it is.
- */
+// No capability check here, and that is the specification: holding the session IS the authorisation.
+// person.update is held over OTHER people's units, and an administrator must never be able to set
+// somebody else's password - gating on it would make this route look safer while being wider.
 profileRouter.post(
   '/password',
   authenticate,
@@ -80,10 +69,8 @@ profileRouter.post(
     void (async () => {
       await changePassword(req, orgId, userId, body);
 
-      // 15 § Session hygiene — regenerate on a credential change. AFTER the write and
-      // outside its transaction: a new session id must never outlive a change that rolled
-      // back. The two ids are re-set by hand because regenerate() empties the session, and
-      // forgetting that is how a password change silently signs the caller out.
+      // A credential changed, so the session id is regenerated - after the write and outside its transaction,
+      // and both ids are re-set by hand, because regenerating empties the session.
       await regenerate(req);
       req.session.userId = userId;
       req.session.orgId = orgId;
@@ -96,12 +83,8 @@ profileRouter.post(
 
 const upload = imageUpload({ field: 'file', maxBytes: config.UPLOAD_MAX_MB * 1024 * 1024 });
 
-/**
- * `upload` sits in link 9's slot — it IS the validation for this route — so it runs before
- * requireCapability, exactly as `validate()` does (12 §5). Parsing before authorising is
- * also what keeps the refusal clean: rejecting mid-upload would reset the connection and
- * the caller would see a network error rather than a 403.
- */
+// The upload middleware is this route's validation, so it runs before the permission check.
+// Parsing first also keeps a refusal clean: rejecting mid-upload would look like a network error.
 profileRouter.post('/avatar', authenticate, upload, requireCapability('person.update', { target: 'self' }), (req, res, next) => {
   const principal = req.ctx.principal;
   if (principal?.kind !== 'user') return next(new UnauthenticatedError());
@@ -110,6 +93,7 @@ profileRouter.post('/avatar', authenticate, upload, requireCapability('person.up
     .catch(next);
 });
 
+// Removes the caller's avatar.
 profileRouter.delete('/avatar', authenticate, requireCapability('person.update', { target: 'self' }), (req, res, next) => {
   const principal = req.ctx.principal;
   if (principal?.kind !== 'user') return next(new UnauthenticatedError());

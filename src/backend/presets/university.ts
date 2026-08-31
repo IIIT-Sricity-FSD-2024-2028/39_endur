@@ -1,8 +1,5 @@
-// The university preset. 50 §1.
-//
-// THE ONLY FILE IN THE CODEBASE WHERE EDUCATION VOCABULARY IS ALLOWED, and only as data
-// (INV-002). Every word below is a string in a seed, never an identifier, a type, a table
-// or a route. Rename them in the wizard and the product is a hotel.
+// The university preset. The only file where education vocabulary appears, and only as data:
+// every word here is a string in a seed, never a type, table or route. Rename them and it is a hotel.
 import type { Preset } from './types.js';
 import { multi, nps, rating, single, text_, yesno } from './types.js';
 
@@ -31,10 +28,7 @@ export const university: Preset = {
     campaign: { one: 'Feedback cycle', many: 'Feedback cycles' },
   },
   templates: [
-    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
-    // empty and each industry's example reads as its own — a hotel poll is not a university
-    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
-    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    // The two quick-start forms, seeded per industry so the gallery is never empty. Both are ordinary one-question templates.
     {
       name: 'Room poll',
       category: 'Poll',

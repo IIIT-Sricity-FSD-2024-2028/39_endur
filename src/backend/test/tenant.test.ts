@@ -1,8 +1,6 @@
-// Tenant isolation. 12 §7, 10 §8. Requires a live database.
-//
-// The forged-orgId case is the one that matters: INV-010 says a body-supplied tenant is an
-// attack, not an input, and this asserts that claim mechanically rather than trusting that
-// every future service author remembers it.
+// Tenant isolation. Needs a live database.
+// The forged organisation id is the case that matters: an org id in a request body is an attack and
+// not an input, and this asserts that mechanically rather than trusting every future author to remember.
 import { afterAll, describe, expect, it } from 'vitest';
 import { prisma } from '../db/client.js';
 import { tenantClient } from '../db/tenant.js';

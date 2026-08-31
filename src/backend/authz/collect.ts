@@ -1,11 +1,4 @@
-// Step 1 — gather every grant that could possibly apply, each PAIRED WITH ITS ANCHOR UNIT.
-//
-// The anchor is the whole point. A grant on a ROLE has no unit of its own; the unit comes
-// from the POSITION through which the grant was reached. Someone who is Director on
-// Project Ayaan and Editor on Night Bus reaches the Director grants anchored at Ayaan
-// only — on Night Bus those grants do not apply at all (INV-005).
-//
-// Without this, anyone with a senior hat somewhere quietly gains senior powers everywhere.
+// Step 1 of a permission check: gather every grant that could apply, each tagged with the unit it came through.
 import { prisma } from '../db/client.js';
 import { supportGrantWindow } from '../db/support.js';
 import { mintSupportGrants } from './support.js';
@@ -22,6 +15,7 @@ type GrantRow = {
   subject: { id: string; name: string; kind: string };
 };
 
+// Collects every grant this person could use in this org at this moment.
 export async function collectGrants(
   orgId: string,
   userId: string,
@@ -31,25 +25,13 @@ export async function collectGrants(
     where: { orgId, kind: 'person', userId },
     select: { id: true, name: true },
   });
-  // DEC-114. NO PERSON NODE IS THE HOOK, and this is the only line the support feature adds
-  // to the resolver's hot path.
-  //
-  // Every real member of every organisation has a person node — it is what `createPerson`
-  // writes and what an assignment hangs off — so this branch is dead for them and costs the
-  // query that was already happening. The synthetic member a support session acts as
-  // deliberately has none (`db/support.ts` explains the four things that absence buys), so
-  // it lands here, and here is where its powers come from.
-  //
-  // Putting the check HERE rather than in `requireCapability` is the difference between a
-  // grant and a bypass. `resolve`, `visibleUnits` and `heldCapabilities` all read this one
-  // function, so all three agree about what an operator holds without any of them being
-  // told that operators exist — and a fourth reader added later inherits it too.
+  // No person node means this is a support session, so its powers come from a time-limited support grant.
   if (!personNode) {
     const window = await supportGrantWindow(orgId, userId, at);
     return window ? mintSupportGrants(window.expiresAt) : [];
   }
 
-  // Active membership edges: assignments (person → position) and group membership.
+  // The person's live memberships: the positions they hold and the groups they belong to.
   const memberships = await prisma.edge.findMany({
     where: {
       orgId,
@@ -58,8 +40,7 @@ export async function collectGrants(
       validFrom: { lte: at },
       OR: [{ validTo: null }, { validTo: { gt: at } }],
     },
-    // isPrimary decides where a PERSON-node grant anchors (11 §4, DEC-044). Without it
-    // every per-person override at a unit scope is silently inert -- see below.
+    // isPrimary decides which unit a grant placed on the person themselves anchors at.
     select: { childId: true, isPrimary: true },
   });
 
@@ -78,17 +59,15 @@ export async function collectGrants(
     },
   });
 
-  /** subjectNodeId → the anchor to use for grants found on it. */
+  // For each subject node, the anchor (unit, role level, how it was reached) to use for its grants.
   const anchors = new Map<
     string,
-    // `| undefined` rather than optional: these are built from nullable relations, and
-    // exactOptionalPropertyTypes distinguishes "absent" from "present and undefined".
+    // Written with an explicit undefined so "no unit" and "field missing" stay different.
     { via: Via; name: string; unitId?: string | undefined; unitName?: string | undefined; level?: number | undefined }
   >();
 
   for (const node of targetNodes) {
-    // A position inside a unit whose end date has passed grants nothing. Temporary units
-    // cascade end dates precisely so nobody has to remember to revoke anything (10 §9).
+    // A position inside a unit whose end date has passed grants nothing.
     if (node.endsAt && node.endsAt <= at) continue;
 
     if (node.kind === 'position') {
@@ -97,14 +76,13 @@ export async function collectGrants(
         unitName: node.unit?.name,
         level: node.role?.level ?? undefined,
       };
-      // (b) grants on the position itself, and on its role — both anchored at the
-      //     position's unit, never at the role, which has no unit.
+      // Grants on the position and on its role both anchor at the position's unit.
       anchors.set(node.id, { via: 'position', name: node.name, ...anchor });
       if (node.role) anchors.set(node.role.id, { via: 'role', name: node.role.name, ...anchor });
     }
 
     if (node.kind === 'group') {
-      // (c) a group's scope unit, if it declares one; absent means the whole org.
+      // A group anchors at its scope unit if it declares one, otherwise the whole org.
       const meta = node.meta as { scopeUnitId?: string } | null;
       anchors.set(node.id, {
         via: 'group',
@@ -114,26 +92,14 @@ export async function collectGrants(
     }
   }
 
-  // (a) direct grants on the person node — per-individual overrides, rare by design.
-  //
-  // ANCHORED AT THE PERSON'S HOME UNIT, and getting this wrong was D-020: until
-  // 2026-08-23 this line set no unit at all, so scopeCovers() correctly refused every
-  // unit-scoped person grant a claim ("no anchor means no claim") and A PER-PERSON DENY AT
-  // own_unit OR subtree DID NOTHING. INV-004 says a deny beats an allow unconditionally; a
-  // deny that never applies never beats anything, and an administrator using 33's
-  // per-person override to block somebody in their department was writing a row that
-  // looked like it worked. Every existing test used scope `all`, which needs no anchor,
-  // which is why four audits missed it.
-  //
-  // It is computed AFTER targetNodes because it reads the positions those rows describe.
+  // Grants placed straight on the person, anchored at their home unit (see homeUnit below).
   anchors.set(personNode.id, {
     via: 'person',
     name: personNode.name,
     ...homeUnit(memberships, targetNodes),
   });
 
-  // (d) delegations INTO positions the principal holds: the delegator's grants, anchored
-  //     at the delegation's unit and clipped to its validity window.
+  // Delegations into positions this person holds: the delegator's grants, only while the delegation lasts.
   const heldPositions = targetNodes.filter((node) => node.kind === 'position').map((n) => n.id);
   if (heldPositions.length > 0) {
     const delegations = await prisma.edge.findMany({
@@ -189,30 +155,7 @@ export async function collectGrants(
   });
 }
 
-/**
- * The unit a per-person grant anchors at. DEC-044, extending 11 §4.
- *
- * The primary position's unit, and failing that a lone position's unit:
- *
- *   1 primary position          -> its unit. This is 11 §4 as originally written.
- *   no primary, exactly ONE     -> that one's unit. `isPrimary` defaults to FALSE on
- *                                  CreateAssignmentBody, so the ordinary "give this person
- *                                  a position" call produces no primary at all — a strict
- *                                  primary-only rule would leave per-person overrides inert
- *                                  for the commonest case in the product, which is the very
- *                                  bug this function exists to fix.
- *   no primary, TWO OR MORE     -> NO ANCHOR, and therefore no unit-scoped claim.
- *                                  `isPrimary` exists to resolve exactly this ambiguity.
- *                                  Picking one arbitrarily would anchor somebody's override
- *                                  at whichever row the database happened to return first,
- *                                  and a permission system that is non-deterministic is
- *                                  worse than one that is narrow.
- *   no positions                -> no anchor. 11 §4's "absent => self only", unchanged.
- *
- * The last two cases still reach `self` and `all` grants, which need no anchor. What they
- * cannot reach is a unit scope — and scopeCovers() records "the grant has no anchor unit"
- * in the decision trace, so the simulator (42) says why rather than leaving it a mystery.
- */
+// Works out the unit a per-person grant anchors at: the primary position's unit, or the only position's unit.
 function homeUnit(
   memberships: Array<{ childId: string; isPrimary: boolean }>,
   targetNodes: Array<{ id: string; kind: string; unit: { id: string; name: string } | null }>,
@@ -225,8 +168,7 @@ function homeUnit(
   );
   const primary = positions.filter((node) => primaryIds.has(node.id));
 
-  // More than one position flagged primary is a data error, not a tie to break. Treat it
-  // as ambiguous rather than picking: the alternative is a silent, order-dependent answer.
+  // Two positions flagged primary is bad data, so call it ambiguous instead of guessing one.
   const chosen =
     primary.length === 1 ? primary[0] : primary.length === 0 && positions.length === 1 ? positions[0] : undefined;
 

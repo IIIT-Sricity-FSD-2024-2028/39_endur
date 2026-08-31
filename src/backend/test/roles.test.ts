@@ -1,9 +1,7 @@
-// T-017 — roles and the powers grid. 13, 33, 11 §8.
-//
-// The grid is where an administrator changes what a role can do. Three properties decide
-// whether it can be trusted: levels come from order and never from the client, a saved cell
-// stops being `derived` so regeneration cannot revert it, and `scope: null` genuinely
-// removes a power rather than storing an empty one.
+// Roles and the powers grid.
+// Three properties decide whether the grid can be trusted: levels come from the order and never from
+// the client, a saved cell stops being "derived" so a regeneration cannot revert it, and clearing a
+// cell genuinely removes the power rather than storing an empty one.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { addStaff, setUpOrg, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
@@ -39,8 +37,7 @@ describe('POST /roles and POST /roles/reorder', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.level).toBe(5);
-    // Default deny is the floor (11 §5). Copying the level's seeded matrix here would hand
-    // out powers nobody chose, and the grid is where powers are chosen.
+    // Default deny is the floor: copying the level's seeded matrix here would hand out powers nobody chose.
     expect(res.body.data.grantCount).toBe(0);
   });
 
@@ -51,8 +48,8 @@ describe('POST /roles and POST /roles/reorder', () => {
 
     const res = await withCsrf(founder, 'post', '/api/v1/roles/reorder').send({
       orderedIds: reversed,
-      // Ignored, and that is the point: a client-supplied level and a client-supplied order
-      // can disagree, and then one of them is silently wrong (33).
+      // Ignored, and that is the point: a client-supplied level and a client-supplied order can disagree,
+      // and then one of them is silently wrong.
       levels: [9, 9, 9, 9, 9],
     });
 
@@ -124,8 +121,7 @@ describe('GET and PUT /grants — the matrix', () => {
       where: { orgId: founder.orgId, subjectId: tutorId, capability: 'subject.create' },
       select: { derived: true, scope: true },
     });
-    // Once an administrator has moved a cell, a later regeneration must not silently put
-    // the seeded value back (10 §9).
+    // Once an administrator has moved a cell, a later regeneration must not put the seeded value back.
     expect(grant.derived).toBe(false);
     expect(grant.scope).toBe('own_unit');
   });
@@ -139,8 +135,7 @@ describe('GET and PUT /grants — the matrix', () => {
     const remaining = await prisma.grant.count({
       where: { orgId: founder.orgId, subjectId: tutorId, capability: 'results.read' },
     });
-    // Absence IS the removal. Default deny means there is no "off" row to store, so the
-    // grid has to be able to say "no grant" and have it mean it (11 §5).
+    // Absence IS the removal: with default deny there is no "off" row to store.
     expect(remaining).toBe(0);
   });
 
@@ -157,9 +152,8 @@ describe('GET and PUT /grants — the matrix', () => {
       cells: [{ roleId: tutorId, capability: 'unit.read', scope: null }],
     });
 
-    // No sleep, no cache clear in the test. If authzVersion were not part of the key, this
-    // would still return 200 for the length of the TTL — which is a security bug, not a
-    // performance trade-off (11 §7).
+    // No sleep and no cache clear in the test: if the permission version were not part of the cache key,
+    // this would still answer 200 for the length of the cache's lifetime.
     const afterwards = await tutor.agent.get('/api/v1/units');
     expect(afterwards.status).toBe(403);
   });
@@ -168,8 +162,8 @@ describe('GET and PUT /grants — the matrix', () => {
     const res = await withCsrf(founder, 'put', '/api/v1/grants').send({
       cells: [{ roleId: tutorId, capability: 'campaign.obliterate', scope: 'all' }],
     });
-    // The catalogue is defined by the application, never by the user (11 §3). A typo here
-    // would create a grant that nothing ever checks.
+    // The catalogue is defined by the application, never by the user: a typo would create a grant that
+    // nothing ever checks.
     expect(res.status).toBe(409);
   });
 });
@@ -197,12 +191,12 @@ describe('GET /grants/warnings', () => {
     expect(res.status).toBe(200);
 
     const warnings = res.body.data as Array<{ kind: string; message: string }>;
-    // Deny wins absolutely (INV-004), so the allow beneath it never applies — which reads
-    // as a working power in the grid and is not one.
+    // A deny wins absolutely, so the allow beneath it never applies - which reads as a working power in
+    // the grid and is not one.
     expect(warnings.some((warning) => warning.kind === 'deny_shadows_allow')).toBe(true);
     expect(warnings.some((warning) => warning.kind === 'self_approval')).toBe(true);
-    // None of these blocks the save. An administrator who is stopped from a legal
-    // configuration stops trusting the tool.
+    // None of these blocks the save: an administrator stopped from a legal configuration stops trusting
+    // the tool.
     expect(warnings.every((warning) => typeof warning.message === 'string')).toBe(true);
   });
 });
@@ -214,17 +208,12 @@ describe('GET /authz/capabilities', () => {
 
     expect(res.status).toBe(200);
     const catalogue = res.body.data as Array<{ key: string; module: string; phase: string }>;
-    // 73 since T-095 added the Booking module (read/create/update/delete/cancel, 11 §3);
-    // 68 since T-094 added Announcements (read/create/publish/delete); 64 before that,
-    // since T-072 added Accounts.
-    // The number is asserted rather than derived on purpose: a capability appearing in the
-    // catalogue is a permission the powers grid will render and an administrator can hand
-    // out, so it should never arrive without somebody changing this line.
+    // The number is asserted rather than derived on purpose: a capability in the catalogue is a permission
+    // the grid will render and an administrator can hand out, so it should never arrive unnoticed.
     expect(catalogue).toHaveLength(73);
     expect(catalogue.some((entry) => entry.key === 'campaign.launch')).toBe(true);
     expect(catalogue.some((entry) => entry.module === 'Accounts')).toBe(true);
-    // Phase travels with each capability so the grid can grey out P3 rows without needing
-    // a second table (T-003's note on CAPABILITY_CATALOGUE).
+    // The phase travels with each capability, so the grid can grey out future rows without a second table.
     expect(catalogue.some((entry) => entry.phase === 'P3')).toBe(true);
   });
 });

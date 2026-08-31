@@ -1,11 +1,6 @@
-// The respondent surface. 13 §6, 39, DEC-009, INV-006.
-//
-// Two rules govern everything in this file:
-//
-//   1. The payload is built from an EXPLICIT ALLOWLIST. Omission is a thing you forget; an
-//      allowlist is a thing you have to add to. This is reachable by anyone with a link.
-//   2. Invalid, unlaunched, closed and expired tokens produce the SAME 404. An existence
-//      probe must not be able to tell them apart.
+// The respondent surface: reading a public form and submitting answers.
+// Two rules run through the whole file: the payload is built from an explicit allowlist, because anyone
+// with a link reaches it; and every reason a token fails produces the SAME 404.
 import { resolveLabels } from '@endur/shared';
 import type {
   CampaignAccess,
@@ -22,22 +17,16 @@ import { ConflictError, ValidationError } from '../../lib/errors.js';
 import { uniform404, type LiveCampaign } from './resolve.js';
 import { z } from 'zod';
 
-/**
- * The allowlist. Every key below is one somebody deliberately added; nothing arrives here
- * because a row happened to carry it.
- *
- * The campaign is already resolved and already gated (12 §4.10c) — this function does no
- * lookup and makes no access decision. It maps.
- */
+// The allowlist. Every key here was added deliberately; nothing arrives just because a row carried it.
+// The campaign was already resolved and gated, so this function only maps.
 export function readPublicCampaign(campaign: LiveCampaign): PublicCampaign {
   return {
     campaignName: campaign.name,
     organizationName: campaign.org.name,
     labels: resolveLabels(campaign.org.labels as LabelSet),
     anonymous: campaign.anonymous,
-    // Which of the two promises this form makes (52 §1). `<AccessNotice>` needs the PAIR:
-    // an `organization` campaign keeps "the answer is anonymous" and gives up "nobody knows
-    // you took part", and a respondent told the wrong one has been misled.
+    // Which promise this form makes: a members-only campaign keeps "your answer is anonymous" but not
+    // "nobody knows you took part", and a respondent told the wrong one has been misled.
     access: campaign.access as CampaignAccess,
     estimatedSeconds: campaign.template.estimatedSeconds,
     subjects: campaign.subjects
@@ -54,17 +43,13 @@ export function readPublicCampaign(campaign: LiveCampaign): PublicCampaign {
   };
 }
 
+// Records one submission: the participant row, the response, and its answers, in one transaction.
 export async function submitResponse(
   req: Request,
   campaign: LiveCampaign,
   body: SubmitResponseBody,
-  /**
-   * The member behind an `organization` submission, from requireMembership, or null.
-   *
-   * It is passed IN rather than read from `req.ctx` here, so that the one place in the
-   * codebase that touches a respondent's identity is a named parameter somebody has to
-   * hand over on purpose. It reaches exactly one table, and that table has three columns.
-   */
+  // The member behind a members-only submission, or null. Passed in as a named argument on purpose,
+  // so the one place that touches a respondent's identity is something somebody had to hand over.
   memberId: string | null,
 ): Promise<SubmitResult> {
   const subjectId = resolveSubject(
@@ -76,10 +61,8 @@ export async function submitResponse(
 
   const count = await runInTransaction(req, async (tx) => {
     if (restricted && memberId) {
-      // FIRST, so that a second submission aborts the transaction before a response row is
-      // written. The refusal comes from the PRIMARY KEY and not from a service read: a
-      // check-then-insert has a race, and this is the one table where losing that race
-      // means one person answering twice (10 §10).
+      // Written FIRST, so a second submission aborts before any answer row exists. The refusal comes from
+      // the primary key, not from a read, because check-then-insert has a race and this is the table where losing it matters.
       await tx.campaignParticipant
         .create({ data: { campaignId: campaign.id, userId: memberId } })
         .catch((error: unknown) => {
@@ -90,13 +73,9 @@ export async function submitResponse(
         });
     }
 
-    // The row this writes has NO respondent column and never will (INV-006). It cannot
-    // identify who answered because it has nothing to identify them with — anonymity is a
-    // property of the schema, not a setting the application respects.
-    //
-    // THAT IS TRUE ON THIS PATH TOO, and this is the path where somebody would be tempted:
-    // `memberId` is in scope, right here, and it does not appear below. The participant row
-    // above says THAT they answered; this one says WHAT was said; nothing joins them.
+    // The response row has NO respondent column and never will: anonymity is a property of the schema,
+    // not a setting. memberId is in scope here and deliberately does not appear below - the participant row
+    // says THAT somebody answered, this one says WHAT was said, and nothing joins the two.
     const response = await tx.response.create({
       data: {
         campaignId: campaign.id,
@@ -112,20 +91,13 @@ export async function submitResponse(
         responseId: response.id,
         questionId: answer.questionId,
         value: answer.value as never,
-        // Written ALONGSIDE value, never independently (10 §4.4). Extracting
-        // (value->>'n')::numeric on every row at read time is the difference between a
-        // fast results page and a slow one, and it cannot be backfilled honestly later.
+        // The numeric value is written alongside the raw value, never on its own: it is what keeps the results page fast.
         ...(answer.numericValue !== null ? { numericValue: answer.numericValue } : {}),
       })),
     });
 
-    // INV-007 covers every state change, and a submission is the most consequential one in
-    // the product — so the row goes in even though no principal is credited with it.
-    //
-    // `flushAudit` strips the actor AND the ip from this action for every principal kind
-    // (DEC-045). On an `organization` campaign the submitter IS a signed-in user, so the
-    // ordinary rule would have written their id and their address next to a response
-    // committed in the same transaction. Sort both by time, zip them, and INV-006 is gone.
+    // A submission is a state change, so it is audited - but with no actor and no IP, whoever submitted.
+    // Otherwise a signed-in member's id would sit next to a response committed in the same transaction.
     req.ctx.audit.push({
       action: 'response.submit',
       targetType: 'campaign',
@@ -135,35 +107,30 @@ export async function submitResponse(
     return tx.response.count({ where: { campaignId: campaign.id } });
   });
 
-  // The number the thank-you page shows. It has to agree with the results count, which is
-  // why it is read inside the same transaction that wrote the row (39 § Acceptance).
+  // The number the thank-you page shows, read inside the same transaction so it agrees with the results.
   return { ok: true, responseCount: count };
 }
 
-/**
- * A P2002 on `campaign_participants` is the one-per-member rule firing, and nothing else.
- * Any other unique violation in that transaction is a real bug and must not be reported to
- * a respondent as "you have already answered".
- */
+// A duplicate on the participants table is the one-per-member rule firing. Any other unique violation is a real bug.
 function isDuplicateParticipant(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
     return false;
   }
-  // Postgres reports the constraint's columns as an array; other providers use a string.
+  // Postgres reports the constraint columns as an array; other databases use a string.
   const target = error.meta?.['target'];
   if (Array.isArray(target)) return target.includes('campaign_id') || target.includes('campaignId');
   return typeof target === 'string' && target.includes('campaign');
 }
 
-/* ---------------------------------------------------------------- helpers */
+// Helpers.
 
+// Picks which subject this submission is about.
 function resolveSubject(available: string[], requested?: string): string | undefined {
   if (requested) {
     if (!available.includes(requested)) throw uniform404();
     return requested;
   }
-  // One subject is the common case — a form about one course, one restaurant, one ward —
-  // and asking the respondent to pick from a list of one would be noise.
+  // One subject is the common case - one course, one restaurant, one ward - and picking from a list of one is noise.
   if (available.length === 1) return available[0];
   if (available.length === 0) return undefined;
   throw new ValidationError(
@@ -191,14 +158,9 @@ type PreparedAnswer = {
   numericValue: number | null;
 };
 
-/**
- * The semantic half of validation (14 §4).
- *
- * `validate()` has already checked that each answer is a well-formed member of the union.
- * What it cannot check is whether the answer fits the question it is attached to — the
- * schema has never seen the question row. Both failures produce the same 422 shape so the
- * respondent UI renders them identically.
- */
+// The second half of validation: the schema already checked each answer's shape, but it has never seen
+// the question row, so this checks the answer actually fits the question it is attached to.
+// Both kinds of failure come back in the same 422 shape, so the respondent UI renders them the same way.
 export function validateAnswersAgainstTemplate(
   questions: QuestionRow[],
   answers: SubmitResponseBody['answers'],
@@ -213,8 +175,7 @@ export function validateAnswersAgainstTemplate(
     const at = (field: string) => ['body', 'answers', index, field];
 
     if (!question) {
-      // An answer to a question that is not on this form. Not a 404 — the form is fine,
-      // the submission is not.
+      // An answer to a question that is not on this form: the form is fine, the submission is not.
       issues.push({
         code: z.ZodIssueCode.custom,
         path: at('questionId'),
@@ -293,6 +254,6 @@ export function validateAnswersAgainstTemplate(
   return prepared;
 }
 
-/** Only the two numeric kinds have one. Everything else aggregates by counting. */
+// Only the two numeric kinds have a number; everything else is aggregated by counting.
 const numericOf = (value: SubmitResponseBody['answers'][number]['value']): number | null =>
   value.kind === 'rating' || value.kind === 'nps' ? value.n : null;

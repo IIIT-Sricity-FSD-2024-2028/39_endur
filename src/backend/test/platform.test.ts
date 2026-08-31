@@ -1,9 +1,6 @@
-// T-059 — the platform side. 19 § Acceptance.
-//
-// The tests below are the acceptance list, and the FIRST TWO are the ones that matter:
-// INV-011 is what we sell, and the doc is explicit that it must be "enforced by the
-// platform client returning aggregates only, not by a UI that declines to render them".
-// A test that proves the UI is careful would be testing the wrong thing entirely.
+// The platform side.
+// The first two tests are the ones that matter: an operator reads counts and never content, and that
+// has to be enforced by the platform client refusing, not by a UI that declines to render.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { CAPABILITY_CATALOGUE } from '@endur/shared';
@@ -37,9 +34,8 @@ describe('INV-011 — counts, never content', () => {
   const db = platformClient();
 
   it('cannot select `answers` — the test that tries', async () => {
-    // The literal acceptance line: "The platform client cannot select `answers` — asserted
-    // by a test that tries." Both spellings, because a handler reaching for content reaches
-    // for it directly OR through the campaign it already had.
+    // The literal acceptance line: the platform client cannot select answers, asserted by trying it -
+    // both directly and through the campaign a handler already had.
     await expect(db.answer.findMany({})).rejects.toThrow(PlatformSeamViolation);
     await expect(
       db.campaign.findMany({ select: { id: true, responses: { select: { answers: true } } } }),
@@ -47,18 +43,16 @@ describe('INV-011 — counts, never content', () => {
   });
 
   it('counts responses and refuses to return one', async () => {
-    // The seam is not "no responses at all" — an operator has to be able to answer "is this
-    // customer collecting?". It is that the ONLY two questions available about a response
-    // are how many and how recently, neither of which can carry a sentence.
+    // The seam is not "no responses at all": an operator must be able to answer "is this customer
+    // collecting?". It is that the only two questions are how many and how recently.
     await expect(db.response.count()).resolves.toBeTypeOf('number');
     await expect(db.response.findMany({ take: 1 })).rejects.toThrow(/may only count them/);
     await expect(db.response.findFirst({})).rejects.toThrow(PlatformSeamViolation);
   });
 
   it('cannot write inside a customer organisation', async () => {
-    // No platform capability in 19 §4 means "edit a tenant's data". The two rows an
-    // operator IS supposed to change — the plan and the suspension — are the two models
-    // the seam allows through.
+    // No operator capability means "edit a customer's data". The two rows an operator IS supposed to
+    // change - the plan and the suspension - are the two the seam allows.
     await expect(db.subject.deleteMany({ where: {} })).rejects.toThrow(/writes inside a customer/);
     await expect(db.node.updateMany({ where: {}, data: { name: 'x' } })).rejects.toThrow(
       PlatformSeamViolation,
@@ -73,8 +67,8 @@ describe('the two catalogues stay apart', () => {
   });
 
   it('no tier entitles a platform capability', () => {
-    // 19 §4's actual worry: the per-module wildcard expansion TIER_ENTITLEMENTS uses would
-    // sweep them up, and an organisation could then BUY operator access.
+    // The real worry: the per-module wildcard the entitlement map uses would sweep them up, and an
+    // organisation could then BUY operator access.
     for (const [tier, capabilities] of Object.entries(TIER_ENTITLEMENTS)) {
       expect(
         [...capabilities].filter((capability) => String(capability).startsWith('platform.')),
@@ -92,8 +86,8 @@ describe('the two worlds refuse each other', () => {
   });
 
   it('an org user reaching a platform route gets 401, whatever they hold', async () => {
-    // The founder holds every capability in the org catalogue. It buys nothing here,
-    // because there is no grant that means "operator" and no column that says it (DEC-033).
+    // The founder holds every capability in the organisation catalogue, and it buys nothing here, because
+    // there is no grant that means "operator".
     for (const path of ['/api/v1/platform/orgs', '/api/v1/platform/stats', '/api/v1/platform/audit']) {
       const res = await staffSession.agent.get(path);
       expect(res.status, path).toBe(401);
@@ -102,15 +96,15 @@ describe('the two worlds refuse each other', () => {
 
   it('an operator reaching a tenant route is refused, not served an empty result', async () => {
     const owner = await makeOperator('owner');
-    // `endur.ops` is path-scoped to /api/v1/platform, so the console request arrives with
-    // no session at all — and the tenant chain refuses it before a handler runs.
+    // The operator cookie is scoped to the platform path, so a console request arrives with no session at
+    // all and the tenant chain refuses it before a handler runs.
     const res = await owner.agent.get('/api/v1/home');
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNRESOLVED_TENANT');
   });
 
   it('two cookies coexist in one browser without either being confused for the other', async () => {
-    // 19 §7's acceptance line, and the whole argument for a second cookie NAME.
+    // The whole argument for a second cookie NAME.
     const owner = await makeOperator('owner');
     const both = request.agent(app);
     const me = await owner.agent.get('/api/v1/platform/me');
@@ -141,8 +135,8 @@ describe('operator login', () => {
 
     expect(wrongCode.status).toBe(401);
     expect(wrongPassword.status).toBe(401);
-    // Identical messages. An attacker who learns the password was right has learned the
-    // password, and this is the account that reaches every customer's plan data.
+    // Identical messages: an attacker who learns the password was right has learned the password, and
+    // this account reaches every customer's plan data.
     expect(wrongCode.body.error.message).toBe(wrongPassword.body.error.message);
 
     const ok = await agent
@@ -168,15 +162,13 @@ describe('the estate', () => {
     expect(res.status).toBe(200);
     const detail = res.body.data;
 
-    // The acceptance line asks for field by field, so this is field by field: everything
-    // on the contract is a number, a name, a date or an enum, and the serialised body
+    // Field by field: everything on the contract is a number, a name, a date or an enum, and the body
     // contains no key that could carry feedback.
     expect(Object.keys(detail).sort()).toEqual(
       [
         'activeCampaigns', 'administrators', 'counts', 'createdAt', 'id', 'industry',
-        // DEC-113. Two dates-and-enums about the PLAN, added when expiry became real. They
-        // pass the same bar as everything else on this list: `periodEnd` is a date and
-        // `lapsedFrom` is a tier, and neither can carry a word a respondent wrote.
+        // Two dates-and-enums about the PLAN, added when expiry became real: neither can carry a word a
+        // respondent wrote.
         'lapsedFrom', 'periodEnd',
         'lastActivityAt', 'name', 'planHistory', 'responsesLast30d', 'seatLimit', 'seats',
         'slug', 'subscriptionStatus', 'suspendedAt', 'tier',
@@ -196,8 +188,8 @@ describe('the estate', () => {
       .post(`/api/v1/platform/orgs/${org.orgId}/message`)
       .send({ subject: 'Checking in', body: 'How is it going?' });
     expect(res.status).toBe(200);
-    // The founder holds `org.update` and is therefore the recipient — a fact the client
-    // never supplied and could not have supplied: the DTO has no recipient field.
+    // The founder holds the update capability and is therefore the recipient - a fact the client never
+    // supplied and could not have.
     expect(res.body.data.sentTo).toBeGreaterThan(0);
   });
 });
@@ -220,14 +212,12 @@ describe('operator actions', () => {
     expect(done.status).toBe(200);
     expect(await prisma.platformAuditLog.count({ where: { targetOrgId: org.orgId } })).toBe(before + 1);
 
-    // 19 §6 / 70: suspension cuts the STAFF SESSION, on the next request rather than at the
-    // next sign-in — and it is the same session that was working a line ago.
+    // Suspension cuts the STAFF session on the next request rather than at the next sign-in, and it is
+    // the same session that was working a line ago.
     const cut = await org.agent.get('/api/v1/home');
     expect(cut.status).toBe(403);
-    // AND SIGNING IN AGAIN IS REFUSED AT THE SIGN-IN (N-070). Until then login answered
-    // 200 with a working session and the first console call answered 403 — the user was let
-    // in and then told nothing useful at the moment they could act on it. The refusal comes
-    // AFTER the password is checked, so it is never an oracle for which organisations exist.
+    // And signing in again is refused AT the sign-in - after the password is checked, so it is never a
+    // way to find out which organisations exist.
     const again = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: org.email, password: org.password });
@@ -258,8 +248,8 @@ describe('operator actions', () => {
     const log = await owner.agent.get(`/api/v1/platform/audit?orgId=${org.orgId}&action=plan.override`);
     expect(log.status).toBe(200);
     expect(log.body.data).toHaveLength(1);
-    // Enterprise is not on the sign-up picker (DEC-048) — an operator is the only way in,
-    // and this is the row that proves who let them in.
+    // Enterprise is not on the sign-up picker, so an operator is the only way in, and this row proves
+    // who let them in.
     expect(log.body.data[0].payload).toMatchObject({ from: 'bronze', to: 'enterprise' });
   });
 
@@ -270,8 +260,7 @@ describe('operator actions', () => {
     const self = await owner.agent.patch(`/api/v1/platform/operators/${owner.id}`).send({ role: 'staff' });
     expect(self.status).toBe(409);
 
-    // Somebody else is fair game, which is what makes the rule above about SELF rather
-    // than about owners in general.
+    // Somebody else is fair game, which is what makes the rule above about SELF rather than about owners.
     const promote = await owner.agent.patch(`/api/v1/platform/operators/${other.id}`).send({ role: 'owner' });
     expect(promote.status).toBe(200);
     expect(promote.body.data.role).toBe('owner');
@@ -281,7 +270,7 @@ describe('operator actions', () => {
     const staff = await makeOperator('staff');
     const res = await staff.agent.get('/api/v1/platform/operators');
     expect(res.status).toBe(403);
-    // The message NAMES the capability, unlike the org side's deliberately vague 403: the
+    // The message NAMES the capability, unlike the deliberately vague refusal on the customer side: the
     // reader here is an Endur employee who already knows the catalogue.
     expect(res.body.error.message).toContain('platform.operator.manage');
   });
@@ -308,24 +297,14 @@ describe('analytics — `71`, `T-067`', () => {
     expect(res.status).toBe(200);
     const byTier = res.body.data.byTier as Array<{ tier: string }>;
     const gold = byTier.find((row) => row.tier === 'gold');
-    // The org just set to trialing-gold must not appear in the gold row's count — a byTier
-    // total is meaningless to compare directly (other suites create other orgs concurrently),
-    // so the assertion is the SHAPE of the exclusion rather than an exact number.
+    // Other suites create organisations concurrently, so the assertion is the SHAPE of the exclusion
+    // rather than an exact number.
     expect(res.body.data.orgs.trialing).toBeGreaterThan(0);
     expect(gold).toBeTruthy();
   });
 
-  /**
-   * THE TRIAL FIGURES ARE GONE FROM THE RESPONSE, NOT JUST FROM THE PAGE — DEC-102.
-   *
-   * This replaces an assertion that `conversionRate` was `null` until a trial completed. That
-   * assertion was correct and it was permanently correct: `DEC-048` made registration write
-   * `status: 'active'`, so nothing on the sign-up path is ever trialing, and `converted` was
-   * a hardcoded `0`. IT WAS A TEST PINNING A FIGURE THAT COULD NOT MOVE.
-   *
-   * The FIELD is asserted absent rather than the card, because a field left on the contract is
-   * a field something starts computing again — and the page would be free to print it.
-   */
+  // The trial figures are gone from the RESPONSE, not just from the page: they could never move, so the
+  // old assertion pinned a figure that was permanently correct and permanently still.
   it('prints no trial figures at all, because nothing can ever write one', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.agent.get('/api/v1/platform/analytics');
@@ -333,11 +312,8 @@ describe('analytics — `71`, `T-067`', () => {
     expect(res.body.data).not.toHaveProperty('trials');
   });
 
-  /**
-   * NO SEATS ANYWHERE ON THIS PAGE — DEC-102. `DEC-080` prices per organisation and
-   * `subscriptions.seats` has never been written (`D-013`), so a seat column on the revenue
-   * owner's page measured something no invoice reads.
-   */
+  // No seats anywhere on this page: the product prices per organisation, and the stored seat column has
+  // never been written.
   it('reports no seat figures — nothing is billed on them', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.agent.get('/api/v1/platform/analytics');
@@ -348,16 +324,9 @@ describe('analytics — `71`, `T-067`', () => {
     }
   });
 
-  /**
-   * `to` INCLUDES THE DAY IT NAMES — D-044, and this is the owner's report about the date
-   * filters. `<input type="date">` sends a bare date, `z.coerce.date()` reads it as midnight,
-   * and every query was `lte: to` — so the whole of the last day selected was excluded and a
-   * SINGLE-DAY WINDOW MATCHED NOTHING AT ALL.
-   *
-   * The single-day case is the assertion, because it is the one that cannot be explained away
-   * as an off-by-one nobody would notice: from = to = today must contain an organisation
-   * created today.
-   */
+  // The end date includes the day it names.
+  // A date input sends a bare day, read as midnight, and every query compared "less than or equal", so
+  // the last day selected was excluded and a single-day window matched nothing at all.
   it('includes the whole of the day named by `to`, so a one-day window is not empty', async () => {
     await setUpOrg();
     const owner = await makeOperator('owner');
@@ -372,20 +341,13 @@ describe('analytics — `71`, `T-067`', () => {
       .reduce((sum, row) => sum + row.new, 0);
     expect(created).toBeGreaterThan(0);
 
-    // The window is echoed back as the DAY that was asked for, not as the 23:59:59 the query
-    // ran with — the page puts this straight back into its own date input.
+    // The window is echoed back as the DAY that was asked for, because the page puts it straight back
+    // into its own date input.
     expect((res.body.data.window.to as string).slice(0, 10)).toBe(today);
   });
 
-  /**
-   * A CUSTOMER'S OWN UPGRADE IS MOVEMENT, AND IT NEVER USED TO BE — DEC-102.
-   *
-   * `movement` read `plan.override` audit rows, which are the OPERATOR'S action; a customer
-   * joining a higher tier writes `billing.update` to the tenant `audit_log` and a row to
-   * `payments`, and the query read neither. So the table was labelled as the estate and
-   * counted only what operators did. This drives the customer's own route, which is the path
-   * that produced nothing before.
-   */
+  // A customer's own upgrade counts as movement, and it never used to: the query read only the operator's
+  // audit rows, so the table was labelled as the estate and counted only what operators did.
   it('counts a customer upgrading their own plan, from the payment ledger', async () => {
     const org = await registerOrg('custom', 'bronze');
     const owner = await makeOperator('owner');
@@ -425,8 +387,7 @@ describe('analytics — `71`, `T-067`', () => {
         }),
         { new: 0, upgraded: 0, downgraded: 0, churned: 0 },
       );
-    // Bronze -> gold is an upgrade; the suspend is a churn. Both figures are present and
-    // distinct, and there is no combined/net field anywhere on the response to check against.
+    // One upgrade and one churn: both figures present and distinct, with no combined field anywhere.
     expect(totals.upgraded).toBeGreaterThan(0);
     expect(totals.churned).toBeGreaterThan(0);
     expect(res.body.data.movement[0]).not.toHaveProperty('net');
@@ -438,8 +399,7 @@ describe('analytics — `71`, `T-067`', () => {
 
     const detail = await owner.agent.get(`/api/v1/platform/orgs/${org.orgId}`);
     expect(detail.status).toBe(200);
-    // `lastActivityAt: null` — never collected, which `isQuietOrg` (imported by both this
-    // endpoint and `<OrgRow>`'s chip) excludes from "quiet" on purpose (decision 4, `70`).
+    // Never collected is deliberately not counted as "quiet".
     expect(detail.body.data.lastActivityAt).toBeNull();
 
     const res = await owner.agent.get('/api/v1/platform/analytics');
@@ -460,13 +420,13 @@ describe('analytics — `71`, `T-067`', () => {
 
 describe('csrf and the tenant surface are untouched', () => {
   it('a staff mutation still needs its CSRF token', async () => {
-    // A guard against the way this task could have broken the other three worlds: the
-    // platform router mounts none of links 6–8, so the check is that the console still does.
+    // A guard against breaking the other worlds: the platform router mounts none of the tenant links,
+    // so this checks the console still does.
     const org = await setUpOrg();
     const withoutToken = await org.agent.post('/api/v1/units').send({ name: 'Nope' });
     expect(withoutToken.status).toBe(403);
-    // Not "succeeds" — "gets past link 8". A 422 from `validate` means the token WAS
-    // accepted and the body was wrong, which is exactly the distinction under test.
+    // Not "succeeds" but "gets past the CSRF link": a validation error means the token WAS accepted and
+    // the body was wrong, which is exactly the distinction under test.
     const withToken = await withCsrf(org, 'post', '/api/v1/units').send({ name: 'Fine' });
     expect(withToken.status).not.toBe(403);
   });

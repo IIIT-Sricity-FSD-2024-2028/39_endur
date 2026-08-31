@@ -1,12 +1,9 @@
-// Step 6 — combining params across several surviving allows.
-//
-// This is what lets ONE capability carry different strength at different levels — a
-// supervisor approving up to 5,000 and a department head up to 25,000 — instead of
-// inventing five artificial roles to encode limits (11 §3).
+// Combines the numeric limits (params) carried by grants, so one capability can be stronger at a higher level.
 import type { CandidateGrant } from './types.js';
 
 export type ParamMode = 'union' | 'highest';
 
+// Merges the params of every allow that survived the check into one set of limits.
 export function combineParams(
   allows: CandidateGrant[],
   mode: ParamMode = 'union',
@@ -15,12 +12,12 @@ export function combineParams(
   if (withParams.length === 0) return undefined;
 
   if (mode === 'highest') {
-    // Params from the most senior assignment only. Lower level number = more senior.
+    // 'highest' mode: take the params of the most senior assignment only.
     const best = withParams.reduce((a, b) => ((a.level ?? 99) <= (b.level ?? 99) ? a : b));
     return { ...best.params };
   }
 
-  // union: the strongest value the person holds anywhere wins.
+  // 'union' mode: for each limit, the strongest value the person holds anywhere wins.
   const out: Record<string, number> = {};
   for (const grant of withParams) {
     for (const [key, value] of Object.entries(grant.params)) {

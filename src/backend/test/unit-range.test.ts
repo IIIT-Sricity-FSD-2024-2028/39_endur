@@ -1,10 +1,6 @@
-// T-033 — the range grammar. 32 § Range syntax.
-//
-// `Floor 1..8` is one of doc 32's acceptance items, and the interesting half is the second
-// one: `1..10000` must be refused. The grammar lives in packages/shared because BOTH sides
-// read it — the client to preview and to say why 10000 is too many, the server to expand
-// and to enforce the cap where it cannot be skipped. This file is what keeps the two
-// honest about what a range means.
+// The range grammar: "Floor 1..8" creates eight sibling units in one request.
+// The interesting half is that a huge range must be refused. The grammar lives in the shared package
+// because both sides read it - the client to preview it, the server to expand it and enforce the cap.
 import { describe, expect, it } from 'vitest';
 import {
   CreateUnitBody,
@@ -42,7 +38,7 @@ describe('parseUnitRange — 32 § Range syntax', () => {
   });
 
   it('refuses to treat a bare range as a name — there would be nothing to call them', () => {
-    // "1..8" with no stem parses as a plain name rather than eight unnamed units.
+    // A range with no stem parses as a plain name rather than eight unnamed units.
     expect(parseUnitRange('1..8')).toEqual({ name: '1..8' });
   });
 

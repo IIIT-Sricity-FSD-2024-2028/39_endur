@@ -1,20 +1,9 @@
-// The platform route tree. 19 §11.
-//
-// ONE PREFIX, and every route under it is platform-only. That is what makes the surface
-// greppable and what lets the route-enumeration test assert that no `platform.` capability
-// appears anywhere else in the app — and that no route here carries `requireCapability`.
-//
-// THE CHAIN IS DELIBERATELY DIFFERENT FROM EVERY OTHER ROUTER, and each difference is a
-// requirement rather than a saving (19 §9):
-//
-//   NO tenantResolver   — a platform request resolves no organisation. Reaching the
-//                         resolver with none produces a confusing 400 where 401 is the truth
-//   NO authenticate     — that link reads `req.session` and would attach a `user`. The
-//                         operator principal comes from `endur.ops` and nowhere else
-//   NO csrfProtection   — replaced by the cookie's own `sameSite: 'lax'` plus the fact that
-//                         every mutating route here is a POST/PATCH from an operator's own
-//                         console on the same origin. See the note on the login route
-//   requirePlatformAuth — instead of all three
+// The platform route tree - Endur's own operator console.
+// One prefix, and every route under it is platform-only, which is what lets a test assert that no
+// platform capability appears anywhere else and that no route here uses the tenant capability check.
+// The chain is deliberately different from every other router: no tenant resolver (there is no
+// organisation), no tenant authenticate (the principal comes from the endur.ops cookie), and no CSRF
+// middleware - requirePlatformAuth stands in for all three.
 import { Router } from 'express';
 import {
   AnalyticsListDto,
@@ -79,15 +68,12 @@ import {
 
 export const platformRouter: Router = Router();
 
-/**
- * ONE MESSAGE FOR EVERY FAILURE, and it does not say which half was wrong.
- *
- * The org login makes the same choice for user enumeration (15 §2). Here it matters more:
- * an attacker who learns that a password is right but the code is wrong has learned that
- * the password is right, and this is the account that reaches every customer's plan data.
- */
+// One message for every kind of login failure, which does not say which half was wrong.
+// Learning that the password was right but the code was wrong is learning the password, and this
+// account reaches every customer's plan data.
 const REFUSED = 'That email, password or code is not right.';
 
+// Operator login: email, password and a two-factor code.
 platformRouter.post(
   '/auth/login',
   scopedRateLimits.platformLogin,
@@ -100,8 +86,8 @@ platformRouter.post(
         select: { id: true, passwordHash: true, status: true, mfaSecret: true },
       });
 
-      // The dummy verification for an unknown address, same as the org side: returning
-      // instantly is a free oracle for which addresses are real.
+      // A dummy verification for an unknown address, as on the org side: an instant answer is a free
+      // way to find out which addresses are real.
       const passwordOk = await verifyPassword(operator?.passwordHash ?? null, body.password);
       if (!operator || operator.status !== 'active' || !passwordOk) {
         throw new UnauthenticatedError(REFUSED);
@@ -118,17 +104,15 @@ platformRouter.post(
   },
 );
 
+// Operator logout.
 platformRouter.post('/auth/logout', (req, res, next) => {
   void endSession(req, res)
     .then(() => res.json({ ok: true }))
     .catch(next);
 });
 
-/**
- * NO CAPABILITY, and it is the platform twin of `/auth/me`: the question "who am I" cannot
- * be gated on a permission held by the person asking it. `requirePlatformAuth` is the
- * whole check, and without the cookie this 401s.
- */
+// No capability: "who am I" cannot be gated on a permission held by the person asking.
+// Without the cookie this answers 401.
 platformRouter.get('/me', requirePlatformAuth(), (req, res, next) => {
   void (async () => {
     const operator = await loadOperator(req);
@@ -142,10 +126,11 @@ platformRouter.get('/me', requirePlatformAuth(), (req, res, next) => {
   })().catch(next);
 });
 
-// Everything below needs an operator. Mounted once rather than repeated per route, so a
-// route added later cannot be added unauthenticated by omission.
+// Everything below needs an operator. Mounted once rather than repeated, so a route added later
+// cannot end up unauthenticated by omission.
 platformRouter.use(requirePlatformAuth());
 
+// The estate: every customer organisation, with counts only.
 platformRouter.get(
   '/orgs',
   validate(EstateListDto),
@@ -156,6 +141,7 @@ platformRouter.get(
   },
 );
 
+// One organisation's detail.
 platformRouter.get(
   '/orgs/:id',
   validate(PlatformOrgDto),
@@ -166,15 +152,12 @@ platformRouter.get(
   },
 );
 
+// Estate-wide usage numbers.
 platformRouter.get('/stats', requirePlatform('platform.usage.read'), (_req, res, next) => {
   void stats().then((data) => res.json({ data })).catch(next);
 });
 
-/**
- * `71` § Route & access — OWNER ONLY, and the reason survives DEC-035's removal of money:
- * this is the estate-wide shape of the business's own position, and `platform.org.read`
- * (both roles) is what support needs one organisation at a time.
- */
+// Owner only: this is the estate-wide shape of the business. Support reads one organisation at a time.
 platformRouter.get(
   '/analytics',
   validate(AnalyticsListDto),
@@ -185,14 +168,8 @@ platformRouter.get(
   },
 );
 
-/**
- * `/ops/earnings` — the money. DEC-080, `71` § Revenue.
- *
- * OWNER ONLY, behind its OWN capability rather than `platform.analytics.read`. The two were
- * one capability while DEC-035 stood and there was no revenue to separate; DEC-080 splits
- * them because the questions separated: support reads adoption to help a customer, and
- * nobody needs a revenue total to do that.
- */
+// The money, owner only and behind its own capability: support reads adoption to help a customer,
+// and nobody needs a revenue total to do that.
 platformRouter.get(
   '/earnings',
   validate(EarningsListDto),
@@ -203,6 +180,7 @@ platformRouter.get(
   },
 );
 
+// Suspends or restores an organisation.
 platformRouter.post(
   '/orgs/:id/plan',
   validate(OverridePlanDto),
@@ -218,6 +196,7 @@ platformRouter.post(
   },
 );
 
+// Overrides an organisation's plan.
 platformRouter.post(
   '/orgs/:id/suspend',
   validate(SuspendDto),
@@ -233,6 +212,7 @@ platformRouter.post(
   },
 );
 
+// Sends a message to an organisation's administrators.
 platformRouter.post(
   '/orgs/:id/message',
   validate(OrgMessageDto),
@@ -248,6 +228,7 @@ platformRouter.post(
   },
 );
 
+// Endur's own audit trail.
 platformRouter.get(
   '/audit',
   validate(PlatformAuditListDto),
@@ -258,22 +239,15 @@ platformRouter.get(
   },
 );
 
-/**
- * `72` § "The file name is the whole attack surface" — the client picks a name from THIS
- * list; it never supplies a pattern the server turns into a directory scan.
- */
+// The client picks a file name from THIS list; it never supplies a pattern the server turns into a scan.
 platformRouter.get('/logs', validate(LogListDto), requirePlatform('platform.logs.read'), (_req, res) => {
-  // `meta` carries WHERE the files are and how long they last (`18` §2). It rides on the list
-  // rather than a route of its own because it is the same question — "what is on disk" — and
-  // a second call to answer half of it is a second thing to authorise.
+  // The meta says where the files are and how long they last. It rides on the list because it is the
+  // same question - what is on disk - and a second route would be a second thing to authorise.
   res.json({ data: listOperatorLogFiles(), meta: logStoreMeta() });
 });
 
-/**
- * `72` § Acceptance — both roles hold `platform.logs.read` (unlike analytics): the person
- * who needs a stack trace at 2am is support, and an on-call tool the on-call person cannot
- * open is not a tool.
- */
+// Both operator roles hold the log capability, unlike analytics: the person who needs a stack trace at
+// 2am is support, and an on-call tool the on-call person cannot open is not a tool.
 platformRouter.get(
   '/logs/:file',
   validate(LogReadDto),
@@ -286,14 +260,8 @@ platformRouter.get(
   },
 );
 
-/**
- * `DEC-074` — the export. Mounted BEFORE `/logs/:file` would be a concern if `:file` could
- * ever match `x/export`, and it cannot: a path segment does not contain a slash and the name
- * allowlist rejects anything that is not `app|error-<date>[.n].log` anyway.
- *
- * `platform.logs.export`, not `platform.logs.read`: a read is a page on a screen, an export
- * is a file that outlives the session and the retention window (`19` §4).
- */
+// The export gets its own capability: a read is a page on a screen, an export is a file that outlives
+// the session and the retention window.
 platformRouter.get(
   '/logs/:file/export',
   validate(LogExportDto),
@@ -303,8 +271,8 @@ platformRouter.get(
     void exportOperatorLogFile(req, params.file, query)
       .then((result) => {
         res.setHeader('Content-Type', result.contentType);
-        // The filename is server-built from an already-allowlisted name plus a timestamp, so
-        // there is nothing user-supplied left in this header to escape.
+        // The filename is built by the server from an already-allowlisted name, so nothing user-supplied
+        // remains in this header.
         res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
         res.setHeader('X-Log-Lines', String(result.lines));
         if (result.truncated) res.setHeader('X-Log-Truncated', 'true');
@@ -314,10 +282,12 @@ platformRouter.get(
   },
 );
 
+// The operator accounts.
 platformRouter.get('/operators', requirePlatform('platform.operator.manage'), (_req, res, next) => {
   void listOperators().then((data) => res.json({ data })).catch(next);
 });
 
+// Creates an operator.
 platformRouter.post(
   '/operators',
   validate(CreateOperatorDto),
@@ -330,6 +300,7 @@ platformRouter.post(
   },
 );
 
+// Edits an operator's role or status.
 platformRouter.patch(
   '/operators/:id',
   validate(UpdateOperatorDto),
@@ -343,14 +314,8 @@ platformRouter.patch(
   },
 );
 
-/**
- * THE ENTERPRISE QUEUE — DEC-100, T-100, 70 § The Enterprise queue.
- *
- * TWO OWNER-ONLY CAPABILITIES, split the way every other pair on this surface is: reading the
- * queue changes nothing, and working it is the action that has to be attributable. Staff hold
- * neither — this is a REVENUE queue, and `19` §4's argument is that support helps one customer
- * at a time while the owner is the one who sells.
- */
+// The Enterprise queue: two owner-only capabilities, split as every other pair here is - reading the
+// queue changes nothing, and working it is the action that has to be attributable.
 platformRouter.get(
   '/enterprise-requests',
   validate(EnterpriseQueueDto),
@@ -363,8 +328,7 @@ platformRouter.get(
   },
 );
 
-// PATCH, as `13` § platform specifies it: this modifies one field of an existing row
-// rather than creating anything, and the catalogue is the contract.
+// PATCH, because this changes one field of an existing row rather than creating anything.
 platformRouter.patch(
   '/enterprise-requests/:id',
   validate(EnterpriseUpdateDto),
@@ -380,13 +344,9 @@ platformRouter.patch(
   },
 );
 
-/**
- * APPROVE — grant Enterprise and record the sale in one transaction. DEC-111, T-106.
- *
- * `platform.enterprise.update`, not `platform.plan.override`: this is the queue's own verb, and
- * the two are deliberately different actions. An override is a support action that takes no
- * money; an approval is a sale at the catalogue price. Holding one should not imply the other.
- */
+// Approve: grants Enterprise and records the sale in one transaction.
+// Its own capability, not the plan override: an override is a support action that takes no money,
+// while an approval is a sale at the catalogue price.
 platformRouter.post(
   '/enterprise-requests/:id/approve',
   validate(PlatformOrgDto),
@@ -400,34 +360,13 @@ platformRouter.post(
 );
 
 
-/**
- * SUPPORT ACCESS — DEC-114, T-109, `19` §15, `70` § Support access.
- *
- * `19` §14 listed impersonation under "not building", and this supersedes that row rather
- * than quietly diverging from it. What changed is not the appetite — that section already
- * called it *"the single most useful support feature"* — but that the objection it raised is
- * answerable, and the answer is three properties this route enforces at the door:
- *
- *   THE OPERATOR ACTS AS THEMSELVES. `19` §14's real objection was `01` §6: an Endur employee
- *   reading a customer's feedback. Nothing here reads feedback — `SUPPORT_DENIED_CAPABILITIES`
- *   resolves as `deny` grants at `all` scope, and INV-004 makes a deny unbeatable. And the
- *   account they act as is a synthetic member under their OWN name, never a customer's, so no
- *   real person's audit trail is ever made to say something they did not do.
- *
- *   THE CUSTOMER IS TOLD, AND CANNOT BE UNTOLD. `<SupportBanner>` is in `<AppShell>`, on every
- *   console page, carrying the operator's name and the reason they typed. An operator working
- *   invisibly inside somebody's account is a different feature and it is still not built.
- *
- *   IT STOPS BY ITSELF. One hour, in the row, checked in the query on every request. "Remember
- *   to press Leave" is not a control, for the same reason a position carries `validTo`.
- *
- * THIS ROUTE CARRIES `requirePlatform` AND NEVER `requireCapability`, which keeps `19` §9's
- * hardest rule intact — a route is a tenant route or a platform route, never both. That the
- * response sets a TENANT session cookie does not make it a tenant route: the authorisation
- * question this route answers is *"may this operator open a support session"*, and that is a
- * platform question with a platform answer. Every question asked afterwards is asked on a
- * different route, by `requireCapability`, exactly as it is for a customer's own staff.
- */
+// Support access: an operator works inside a customer's console as a limited member of it.
+// Three properties make it acceptable, and this route enforces them at the door:
+//   the operator acts as THEMSELVES, under a synthetic account in their own name, and is denied
+//   the capabilities that would let them read feedback;
+//   the customer is told, by a banner on every console page that cannot be turned off;
+//   it stops by itself after an hour, checked on every request rather than relying on Leave.
+// It carries the platform guard and never the tenant one, so a route is still either one or the other.
 platformRouter.post(
   '/orgs/:id/support-session',
   validate(EnterSupportDto),
@@ -440,28 +379,15 @@ platformRouter.post(
   },
 );
 
-/**
- * Leave. NO CAPABILITY, and that is deliberate rather than an omission.
- *
- * Ending your own session is the platform twin of `POST /auth/logout`: giving up access can
- * never be the thing somebody is not permitted to do. Gating it on `platform.support.enter`
- * would mean an operator whose role was changed mid-session could not close the session that
- * role had opened — the one state where leaving matters most.
- *
- * It is reachable while the operator still holds `endur.ops`; the console's own banner calls
- * it too, which is why it does not require the operator to be back on `/ops` first.
- */
+// Leave. No capability: giving up access can never be the thing somebody is not permitted to do,
+// and an operator whose role changed mid-session must still be able to close the session it opened.
 platformRouter.post('/support-session/leave', (req, res, next) => {
   void leaveSupport(req, res)
     .then((data) => res.json({ data }))
     .catch(next);
 });
 
-/**
- * The register. `platform.support.read`, split from `.enter` for the reason every other pair
- * on this surface is split: reading it changes nothing, and entering is the action that has
- * to be attributable.
- */
+// The register of support visits. Reading it is split from entering, as every other pair here is.
 platformRouter.get(
   '/support-sessions',
   validate(SupportSessionListDto),

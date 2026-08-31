@@ -1,22 +1,10 @@
-// The improve loop. 44, T-083.
-//
-// THE ORDERING CONSTRAINT IS THE FEATURE. The reviewee records their own assessment FIRST,
-// before seeing what anybody else said. If they see the scores first the reflection becomes
-// a rationalisation of whatever the scores were, and the gap — the actually useful output —
-// cannot exist.
-//
-// `44`: "This is enforced in the API, not in the UI." So `readGap()` throws 404 when there
-// is no reflection, and there is deliberately NO endpoint and NO DTO that returns a
-// reviewee's received scores on their own. A client that ignores the lock has nothing to
-// ask for.
-//
-// TWO SURFACES, TWO SCOPES, and getting this wrong exposes somebody's private
-// self-assessment to a peer:
-//   · reflection / gap / plan  -- the REVIEWEE's own, and `self` is enforced here by the
-//     subject's `linkedUserId`, not by a scope string. There is no path to another
-//     person's reflection at any level.
-//   · check-ins                -- the SUPERVISOR's, and their reach is the resolver's own
-//     `visibleUnits()` for `checkin.create`. One implementation of scope, shared (INV-003).
+// The improve loop.
+// The ORDERING is the feature: the reviewee records their own assessment BEFORE seeing what anyone
+// else said, or the reflection just becomes a rationalisation of the scores and the gap means nothing.
+// That is enforced here, not in the UI - the gap 404s until a reflection exists, and no route returns
+// the received scores alone.
+// Two surfaces, two scopes: the reflection, gap and plan are the reviewee's OWN, decided by the subject
+// being linked to their account; check-ins are the supervisor's, and their reach is the resolver's.
 import type {
   AnswerValue,
   CheckinBody,
@@ -36,14 +24,13 @@ import { config } from '../../lib/config.js';
 import { visibleUnits } from '../../authz/index.js';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 
-/** `ValidationError` takes a ZodError; this is the same envelope for a check Zod cannot
- *  make — cross-referencing an answer against its own question row (14 §4). */
+// The same error envelope for a check a schema cannot make: comparing an answer against its own question row.
 const fieldError = (message: string): AppError =>
   new AppError('VALIDATION_FAILED', 'Some fields need attention.', {
     fields: [{ path: 'body.answers', message }],
   });
 
-/** The subjects this caller IS. `self` in the only form that means anything here. */
+// The subjects this caller IS: 'self' in the only form that means anything here.
 async function mySubjects(orgId: string, userId: string) {
   return prisma.subject.findMany({
     where: { orgId, linkedUserId: userId, archivedAt: null },
@@ -51,6 +38,7 @@ async function mySubjects(orgId: string, userId: string) {
   });
 }
 
+// Every cycle this person is a reviewee in, with its state.
 export async function readCycles(orgId: string, userId: string): Promise<ReflectionCycle[]> {
   const subjects = await mySubjects(orgId, userId);
   if (subjects.length === 0) return [];
@@ -65,8 +53,7 @@ export async function readCycles(orgId: string, userId: string): Promise<Reflect
       },
     },
   });
-  // Draft campaigns are not cycles. Nothing has been asked of anybody yet, and a
-  // "reflection due" for a campaign that may never launch is a task invented by the tool.
+  // Draft campaigns are not cycles: nothing has been asked of anybody yet.
   const live = links.filter((link) => link.campaign.publicToken !== null);
   if (live.length === 0) return [];
 
@@ -110,11 +97,8 @@ export async function readCycles(orgId: string, userId: string): Promise<Reflect
     .sort((a, b) => (a.status === 'due' ? -1 : 0) - (b.status === 'due' ? -1 : 0));
 }
 
-/**
- * The campaign's OWN question set, unchanged (INV-008). Not a parallel "reflection
- * template": self and received have to be the same shapes or the gap arithmetic is
- * comparing two different instruments.
- */
+// The campaign's OWN questions, unchanged: self and received have to be the same instrument,
+// or the gap arithmetic compares two different things.
 export async function readForm(
   orgId: string,
   userId: string,
@@ -149,6 +133,7 @@ export async function readForm(
   };
 }
 
+// Records the reviewee's own answers for a cycle.
 export async function submitReflection(
   orgId: string,
   userId: string,
@@ -157,8 +142,7 @@ export async function submitReflection(
 ): Promise<{ id: string }> {
   const { campaign, subject } = await myCycle(orgId, userId, campaignId);
   if (subject.id !== body.subjectId) {
-    // The body names a subject; the caller's own link decides which one is legal. A
-    // mismatch is somebody reflecting on behalf of another person.
+    // The body names a subject, but the caller's own link decides which one is legal.
     throw new ForbiddenError('That is not your own review.');
   }
 
@@ -190,12 +174,12 @@ export async function submitReflection(
     });
     return created;
   } catch {
-    // The unique index doing its job. Submitting twice is not an error to debug — it is
-    // the mechanism refusing a rewrite after the fact (44).
+    // The unique index refusing a rewrite after the fact, which is the mechanism working, not a bug.
     throw new ConflictError('You have already recorded your assessment for this cycle.');
   }
 }
 
+// The gap: their own answers beside the averages they received.
 export async function readGap(
   orgId: string,
   userId: string,
@@ -221,9 +205,8 @@ export async function readGap(
       },
     },
   });
-  // THE ORDERING CONSTRAINT, AND IT IS A 404 RATHER THAN A 403 ON PURPOSE. There is
-  // nothing here yet — not something withheld from this caller, which is what a 403 would
-  // claim. It becomes readable the moment they write their own (44 § Data contract).
+  // The ordering constraint, as a 404 rather than a 403: there is nothing here YET, which is different
+  // from something being withheld. It becomes readable the moment they write their own.
   if (!reflection) throw new NotFoundError();
 
   const responseWhere = { campaignId, subjectId: subject.id };
@@ -256,9 +239,8 @@ export async function readGap(
     plan,
   };
 
-  // THE SAME GATE AS `40`, ON THE SAME SIDE OF THE WIRE. Below the threshold there are no
-  // `rows` at all -- not zeroed, absent. A reviewee with three responses reading an
-  // average is a reviewee who can work out who said what (52 §2, INV-007).
+  // The same anonymity gate as the results page: below the threshold there are no rows at all, because
+  // a reviewee with three responses reading an average can work out who said what.
   if (responseCount < threshold) return { ...head, suppressed: true };
 
   const questions = await prisma.question.findMany({
@@ -289,8 +271,7 @@ export async function readGap(
       text: question.text,
       self,
       received: received === null ? null : Math.round(received * 100) / 100,
-      // BOTH OR NEITHER. A delta against a missing half is not a small gap, it is a
-      // number about nothing — the same lesson N-044 taught the response rate.
+      // Both halves or neither: a difference measured against a missing half is a number about nothing.
       delta:
         self === null || received === null ? null : Math.round((self - received) * 100) / 100,
       scaleMax: scaleMaxOf(question.kind, question.config),
@@ -300,6 +281,7 @@ export async function readGap(
   return { ...head, suppressed: false, rows };
 }
 
+// Creates or updates the action plan for a cycle.
 export async function createPlan(
   orgId: string,
   userId: string,
@@ -311,8 +293,7 @@ export async function createPlan(
     where: { campaignId_subjectId: { campaignId, subjectId: subject.id } },
     select: { id: true, plan: { select: { id: true, finalisedAt: true } } },
   });
-  // A plan is step 3 and it follows step 2. Writing one before the reflection exists would
-  // be planning against results you have not been allowed to see.
+  // A plan is step 3 and follows step 2: writing one first would be planning against results you have not seen.
   if (!reflection) throw new NotFoundError();
   if (reflection.plan?.finalisedAt) {
     throw new ConflictError('That plan is finalised and cannot be changed.');
@@ -337,6 +318,7 @@ export async function createPlan(
   };
 }
 
+// Marks an action plan final, so it stops changing.
 export async function finalisePlan(
   orgId: string,
   userId: string,
@@ -357,14 +339,10 @@ export async function finalisePlan(
   return { finalisedAt: (updated.finalisedAt as Date).toISOString() };
 }
 
-/* ------------------------------------------------------- the supervisor's side */
+// The supervisor's side.
 
-/**
- * A check-in is the ONE surface here that reaches past the caller's own row, so its reach
- * is the resolver's, not a hand-written subtree walk. `visibleUnits('checkin.create')`
- * returns exactly what the grant table says, which is what stops this from becoming a
- * second permission model (INV-003).
- */
+// A check-in is the one surface here that reaches past the caller's own row, so its reach comes from
+// the resolver rather than a hand-written subtree walk.
 async function assertSupervises(
   orgId: string,
   userId: string,
@@ -383,10 +361,11 @@ async function assertSupervises(
   if (visibility.all) return { id: plan.id };
   const unitId = plan.reflection.subject.unitId;
   if (unitId && visibility.unitIds.includes(unitId)) return { id: plan.id };
-  // 404, not 403: a plan outside the caller's scope must not be confirmed to exist (13 §5).
+  // 404, not 403: a plan outside the caller's scope must not be confirmed to exist.
   throw new NotFoundError();
 }
 
+// Records a supervisor's check-in against a plan.
 export async function createCheckin(
   orgId: string,
   userId: string,
@@ -406,6 +385,7 @@ export async function createCheckin(
   });
 }
 
+// Edits or finalises an existing check-in.
 export async function patchCheckin(
   orgId: string,
   userId: string,
@@ -419,8 +399,7 @@ export async function patchCheckin(
   });
   if (!checkin) throw new NotFoundError();
   await assertSupervises(orgId, userId, authzVersion, checkin.actionPlanId);
-  // The database refuses this too (the trigger). Checking here as well is not redundancy:
-  // it produces a 409 with a sentence, rather than a 500 from a raised exception.
+  // The database refuses this too, but checking here turns a raised exception into a 409 with a sentence.
   if (checkin.finalisedAt) throw new ConflictError('That check-in is finalised.');
 
   const updated = await prisma.checkin.update({
@@ -435,9 +414,9 @@ export async function patchCheckin(
   return { id: updated.id, finalisedAt: updated.finalisedAt?.toISOString() ?? null };
 }
 
-/* ------------------------------------------------------------------- helpers */
+// Helpers.
 
-/** The campaign and the caller's OWN subject in it, or 404. The `self` gate, once. */
+// The campaign and the caller's OWN subject in it, or 404. The self gate, in one place.
 async function myCycle(orgId: string, userId: string, campaignId: string) {
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, orgId },
@@ -449,13 +428,12 @@ async function myCycle(orgId: string, userId: string, campaignId: string) {
     where: { campaignId, subject: { orgId, linkedUserId: userId, archivedAt: null } },
     select: { subject: { select: { id: true, name: true, unitId: true } } },
   });
-  // Not a 403. Somebody who is not a reviewee in this cycle has no business knowing the
-  // cycle exists, and the sidebar item is theirs only because the capability is seeded.
+  // Not a 403: somebody who is not a reviewee in this cycle has no business knowing it exists.
   if (!link) throw new NotFoundError();
   return { campaign, subject: link.subject };
 }
 
-/** The comparable half. `text` and `multi` have no number and say so rather than pretending. */
+// The comparable half of an answer. Text and multi-select have no number and say so rather than pretending.
 function numeric(value: AnswerValue | undefined): number | null {
   if (!value) return null;
   switch (value.kind) {
@@ -469,6 +447,7 @@ function numeric(value: AnswerValue | undefined): number | null {
   }
 }
 
+// The top of a rating scale for one question, used to normalise the numbers.
 function scaleMaxOf(kind: string, questionConfig: unknown): number | null {
   if (kind === 'nps') return 10;
   if (kind === 'yesno') return 1;

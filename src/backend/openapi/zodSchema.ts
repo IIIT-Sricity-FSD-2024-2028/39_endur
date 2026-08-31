@@ -1,27 +1,9 @@
-// Zod → OpenAPI 3.1 Schema Object. `DEC-115`, `13` §12.
-//
-// WHY THIS IS HAND-WRITTEN AND NOT `zod-to-json-schema`.
-//
-// Two reasons, and the first is the boring one: `package-lock.json` carries the Windows
-// esbuild binary for the other machine on this project, so `npm install <anything>` fails to
-// reconcile the tree on Linux and succeeds only by rewriting the lock in a way that breaks the
-// other developer. A documentation feature is not worth that.
-//
-// The second is the one that would have mattered anyway. The input to this file is not "any
-// Zod schema" — it is `packages/shared/src/dto/**`, which is a bounded, reviewed vocabulary
-// this project owns. `assertConvertible()` at the bottom is asserted over EVERY DTO in the
-// catalogue by `openapi.test.ts`, so the day somebody reaches for a construct this does not
-// handle, a test says so by name rather than the spec quietly emitting `{}` for a field.
-// A general converter would emit something plausible for the same schema and never tell
-// anyone.
-//
-// WHAT IT REFUSES TO DO IS THE POINT. An unknown construct THROWS. A documentation generator
-// that silently degrades produces a document that is confidently wrong, which is worse than no
-// document — a reader cannot tell the difference between "this field takes any JSON" and "the
-// generator did not understand this field".
+// Converts a Zod schema into an OpenAPI schema, by hand rather than with a library.
+// The input is only our own DTOs, and an unknown construct THROWS rather than emitting something
+// plausible - openapi.test.ts runs every mounted DTO through it, so a gap is named by CI.
 import type { z } from 'zod';
 
-/** OpenAPI 3.1 Schema Object, as much of one as this file emits. */
+// The bit of OpenAPI's schema object this file emits.
 export type JsonSchema = {
   type?: string | string[];
   format?: string;
@@ -53,7 +35,7 @@ export class UnsupportedSchema extends Error {
   }
 }
 
-/** Zod v3 keeps everything on `_def`. This is the one place that reaches in. */
+// Zod keeps everything on _def. This is the one place that reaches into it.
 type Def = {
   typeName: string;
   description?: string;
@@ -80,14 +62,7 @@ type Def = {
 
 const defOf = (schema: z.ZodTypeAny): Def => (schema as unknown as { _def: Def })._def;
 
-/**
- * The string checks worth publishing, and the ones deliberately dropped.
- *
- * `trim` and `toLowerCase` are TRANSFORMS, not constraints — they describe what the server
- * does to the value after accepting it, and putting them in the schema would tell a client
- * that `" Ravi "` is invalid when it is accepted and stored as `"Ravi"`. `13` §12's rule is
- * that the document describes what the API ACCEPTS.
- */
+// The string rules worth publishing. trim and toLowerCase are left out: they change the value, they do not reject it.
 function applyStringChecks(out: JsonSchema, checks: Def['checks']): void {
   for (const check of checks ?? []) {
     switch (check.kind) {
@@ -117,33 +92,17 @@ function applyNumberChecks(out: JsonSchema, checks: Def['checks']): void {
   }
 }
 
-/**
- * NAMED SCHEMAS, SO A RECURSIVE ONE CAN REFER TO ITSELF.
- *
- * The org tree is the only recursive shape in the product — `UnitNode.children` is
- * `UnitNode[]` — and it is written as `z.lazy()` because TypeScript cannot infer a
- * self-referential type without help. Inlining it would not terminate.
- *
- * JSON Schema's answer is a `$ref`, which needs a NAME, which Zod does not carry. So the caller
- * supplies one: `spec.ts` registers `UnitNodeSchema` as `UnitNode`, converts it once into
- * `components.schemas`, and every later encounter — including the one inside `children` — comes
- * back as a reference instead of another copy.
- */
+// Named schemas, so a recursive one can point at itself. The org tree is the only such shape.
 export type ConvertContext = { refs?: Map<z.ZodTypeAny, string> };
 
-/**
- * Convert one schema. `path` is carried for the error message only — a generator that throws
- * `no rule for ZodTuple` without saying where is a generator somebody greps the whole DTO
- * folder for.
- */
+// Converts one schema. 'path' is carried only so an error can say where the problem is.
 export function toJsonSchema(schema: z.ZodTypeAny, path = '', ctx?: ConvertContext): JsonSchema {
   const named = ctx?.refs?.get(schema);
   if (named) return { $ref: `#/components/schemas/${named}` };
   return convert(schema, path, ctx);
 }
 
-/** The body of the conversion. Split out so the `$ref` short-circuit above runs exactly once
- *  per schema and `defineRef()` can bypass it to emit the definition itself. */
+// The body of the conversion, split out so the $ref shortcut above runs once per schema.
 function convert(schema: z.ZodTypeAny, path: string, ctx?: ConvertContext): JsonSchema {
   const def = defOf(schema);
   const described = (out: JsonSchema): JsonSchema =>
@@ -158,16 +117,14 @@ function convert(schema: z.ZodTypeAny, path: string, ctx?: ConvertContext): Json
     case 'ZodNumber': {
       const out: JsonSchema = { type: 'number' };
       applyNumberChecks(out, def.checks);
-      // `z.coerce.number()` accepts the STRING a query parameter actually arrives as. Saying
-      // `type: number` alone would document a request no browser can make on a query string.
+      // z.coerce.number() accepts the string a query parameter really arrives as.
       if (def.coerce) return described({ ...out, type: [out.type as string, 'string'] });
       return described(out);
     }
     case 'ZodBoolean':
       return described(def.coerce ? { type: ['boolean', 'string'] } : { type: 'boolean' });
     case 'ZodDate':
-      // ISO 8601 on the wire, always — `z.coerce.date()` is what turns it into a Date, and
-      // the client never sends anything but a string.
+      // Dates travel as ISO strings; z.coerce.date() is what turns one into a Date.
       return described({ type: 'string', format: 'date-time' });
     case 'ZodLiteral':
       return described({ const: def.value });
@@ -190,16 +147,12 @@ function convert(schema: z.ZodTypeAny, path: string, ctx?: ConvertContext): Json
       const required: string[] = [];
       for (const [key, value] of Object.entries(shape)) {
         properties[key] = toJsonSchema(value, path ? `${path}.${key}` : key, ctx);
-        // OPTIONAL AND DEFAULTED ARE BOTH "the caller may omit it", and only the first is
-        // obvious. A field with `.default(50)` is not required of the caller — documenting it
-        // as required would make every list endpoint look like it needs a `limit`.
+        // Optional and defaulted both mean "the caller may leave it out", so neither is marked required.
         if (!isOptionalish(value)) required.push(key);
       }
       const out: JsonSchema = { type: 'object', properties };
       if (required.length > 0) out.required = required;
-      // `validate()` STRIPS unknown keys rather than rejecting them (12 §4.9), so the honest
-      // document says extra properties are not part of the contract rather than that they are
-      // an error. `false` would promise a 4xx that never comes.
+      // validate() strips unknown keys instead of rejecting them, so the document says they are simply not part of the contract.
       out.additionalProperties = false;
       return described(out);
     }
@@ -222,12 +175,11 @@ function convert(schema: z.ZodTypeAny, path: string, ctx?: ConvertContext): Json
       });
     }
     case 'ZodOptional':
-      // The OPTIONALITY is recorded by the parent object's `required` list, not here — an
-      // OpenAPI schema has no "optional" of its own. So this unwraps and nothing else.
+      // Optionality is recorded in the parent object's required list, so this only unwraps.
       return toJsonSchema(def.innerType as z.ZodTypeAny, path, ctx);
     case 'ZodNullable': {
       const inner = toJsonSchema(def.innerType as z.ZodTypeAny, path, ctx);
-      // 3.1 spells nullable as a type union, unlike 3.0's `nullable: true`.
+      // OpenAPI 3.1 writes nullable as a type union, unlike 3.0's nullable: true.
       const type = inner.type;
       if (typeof type === 'string') return { ...inner, type: [type, 'null'] };
       if (Array.isArray(type)) return { ...inner, type: [...type, 'null'] };
@@ -238,18 +190,14 @@ function convert(schema: z.ZodTypeAny, path: string, ctx?: ConvertContext): Json
       return { ...inner, default: def.defaultValue?.() };
     }
     case 'ZodEffects':
-      // `.refine()` and `.transform()`. `nameField()` is the one that matters: the RULE it adds
-      // ("at least one letter") is a sentence a schema cannot carry, and it is already the
-      // field's own error message. The shape underneath is what the document describes.
+      // .refine() and .transform() carry rules a schema cannot express, so the shape underneath is what is described.
       return toJsonSchema(def.schema as z.ZodTypeAny, path, ctx);
     case 'ZodPipeline':
       return toJsonSchema(def.out as z.ZodTypeAny, path, ctx);
     case 'ZodCatch':
       return toJsonSchema(def.innerType as z.ZodTypeAny, path, ctx);
     case 'ZodLazy':
-      // Unregistered: inline it. That is right for a lazy schema used only to defer evaluation,
-      // and it does not terminate for a genuinely recursive one — which is exactly why
-      // `spec.ts` registers the one recursive schema in the product rather than hoping.
+      // Not registered, so inline it. A genuinely recursive schema must be registered instead, or this would not terminate.
       return toJsonSchema((def.getter as () => z.ZodTypeAny)(), path, ctx);
     case 'ZodAny':
     case 'ZodUnknown':
@@ -261,7 +209,7 @@ function convert(schema: z.ZodTypeAny, path: string, ctx?: ConvertContext): Json
   }
 }
 
-/** Optional to the CALLER: `.optional()`, `.default()`, or either wrapped in the other. */
+// Optional from the caller's point of view: .optional(), .default(), or one wrapped in the other.
 function isOptionalish(schema: z.ZodTypeAny): boolean {
   const def = defOf(schema);
   if (def.typeName === 'ZodOptional' || def.typeName === 'ZodDefault') return true;
@@ -269,37 +217,19 @@ function isOptionalish(schema: z.ZodTypeAny): boolean {
   return false;
 }
 
-/**
- * Walk a DTO and throw on the first construct with no rule. Called by `openapi.test.ts` over
- * every DTO the app actually mounts, which is what turns "this converter is incomplete" from
- * something a reader notices into something CI says.
- */
+// Walks a DTO and throws on the first construct with no rule. Run by the tests over every mounted DTO.
 export function assertConvertible(schema: z.ZodTypeAny, path = ''): void {
   toJsonSchema(schema, path);
 }
 
-/**
- * Emit a named schema's DEFINITION, bypassing the `$ref` short-circuit that every other
- * reference to it takes. This is what puts `UnitNode` into `components.schemas` while
- * `children` inside it still comes out as `{ $ref: '#/components/schemas/UnitNode' }`.
- */
+// Emits a named schema's definition, so UnitNode lands in components.schemas while children stays a $ref.
 export function defineRef(schema: z.ZodTypeAny, ctx: ConvertContext): JsonSchema {
   const def = (schema as unknown as { _def: Def })._def;
   const inner = def.typeName === 'ZodLazy' ? (def.getter as () => z.ZodTypeAny)() : schema;
   return convert(inner, '', ctx);
 }
 
-/**
- * Split a `dto({ body, query, params })` composite into its three halves.
- *
- * The composite exists because `validate()` parses one thing (`14` §3); OpenAPI wants the body
- * and the parameters described separately. This is the one place that knows the composite's
- * shape, so the DTO helper and the document cannot disagree about what a request is.
- *
- * An EMPTY object comes back as `undefined` rather than as `{}` — `dto()` fills the missing
- * halves with `z.object({}).optional()`, and publishing those would put an empty request body
- * on every GET in the product.
- */
+// Splits a dto({ body, query, params }) back into its three halves, since OpenAPI describes them separately.
 export function splitDto(schema: z.ZodTypeAny): {
   body?: JsonSchema;
   query?: JsonSchema;

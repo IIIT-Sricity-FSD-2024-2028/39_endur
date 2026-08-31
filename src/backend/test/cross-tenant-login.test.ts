@@ -1,25 +1,10 @@
-// A cross-tenant account lockout, found on 2026-08-19 while checking T-031's acceptance
-// list and reproduced end-to-end before it was touched. CONF-013.
-//
-// THE BUG. `users` is unique on `(org_id, email)`, not on `email` (10), and login had no
-// organisation to discriminate by — it took `findFirst({ where: { email } })`. So:
-//
-//   1. Amara registers Org A with amara@example.test and can sign in.
-//   2. ANYONE holding `person.create` in ANY other organisation adds a person with that
-//      same address. Legal under the schema, and it needs no special privilege.
-//   3. That creates an `invited` user row with `passwordHash: null`. `findFirst` matched
-//      it, `verifyPassword` failed against a null hash, and Amara — who did nothing and
-//      cannot see the other organisation — was locked out of her own account.
-//
-// Measured: 200 before the invite, 401 after, on one unrelated POST /people.
-//
-// RESOLVED 2026-08-24 BY DEC-049, which supersedes CONF-013. The address stays PER-TENANT
-// and login verifies the password against every activated account on it, capped and oldest
-// first. The tests below are no longer pinning a mitigation; they pin the answer.
-//
-// The second half of this file covers the HONEST collision, which the mitigation left open
-// and which was measured rather than theorised before it was fixed: a person with a real
-// account in two organisations could only ever sign in to the older one.
+// A cross-tenant account lockout, found and reproduced end to end before it was touched.
+// The bug: an email is unique per organisation, not globally, and login had no organisation to
+// discriminate by - so anyone who could add a person in ANY other organisation could create an
+// unactivated row on somebody's address and lock the real owner out of their own account.
+// The fix verifies the password against every activated account on that address, oldest first.
+// The second half of this file covers the honest collision: one person with real accounts in two
+// organisations, who could previously only ever sign in to the older one.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app, setUpOrg, unique, withCsrf } from './helpers.js';
@@ -33,12 +18,8 @@ const login = (email: string, password: string = PASSWORD, orgId?: string) =>
 
 const tokenFrom = (url: string) => url.split('/activate/')[1] as string;
 
-/**
- * A SECOND, FULLY ACTIVATED account on an address that already has one, built the way a
- * real one is built: create the person, mint the link (T-072), follow it, choose a
- * password. Nothing here is adversarial and nothing needs a privilege an ordinary
- * administrator does not have.
- */
+// A second, fully activated account on an address that already has one, built the way a real one is:
+// create the person, mint the link, follow it, choose a password. Nothing here is adversarial.
 async function secondAccountFor(email: string, password: string): Promise<string> {
   const other = await setUpOrg();
   const person = await withCsrf(other, 'post', '/api/v1/people').send({ name: 'Same Person', email });
@@ -63,7 +44,7 @@ describe('login when one address exists in two organisations — CONF-013', () =
     expect(res.status).toBe(201);
     expect((await login(victim)).status).toBe(200);
 
-    // An unrelated tenant, with nothing but the founder's ordinary permissions.
+    // An unrelated organisation, with nothing but its founder's ordinary permissions.
     const stranger = await registerOrg();
     const invited = await withCsrf(stranger, 'post', '/api/v1/people')
       .send({ name: 'Whoever', email: victim });
@@ -93,8 +74,7 @@ describe('login when one address exists in two organisations — CONF-013', () =
     expect((await agent.post('/api/v1/auth/login').send({ email: victim, password: PASSWORD })).status)
       .toBe(200);
 
-    // The real test of the fix: landing in the wrong tenant would be far worse than a
-    // lockout, so assert the organisation and not merely the status code.
+    // Landing in the WRONG organisation would be far worse than a lockout, so the test asserts which one.
     const me = await agent.get('/api/v1/auth/me');
     expect(me.body.organization.id).toBe(ownOrgId);
   });
@@ -104,23 +84,16 @@ describe('login when one address exists in two organisations — CONF-013', () =
     const org = await registerOrg();
     await withCsrf(org, 'post', '/api/v1/people').send({ name: 'Invitee', email: invitee });
 
-    // Uniform failure, same as an address nobody has ever heard of.
+    // Uniform failure, exactly as for an address nobody has ever heard of.
     const attempt = await login(invitee);
     expect(attempt.status).toBe(401);
     expect(attempt.body.error.message).toBe('That email or password is not right.');
   });
 });
 
-/**
- * THE HONEST COLLISION — DEC-049, and it was a silent permanent lockout rather than the
- * "ambiguity" CONF-013 described.
- *
- * Measured 2026-08-24, through the real routes, before anything was changed: activate a
- * second account on an address that already had one, choose a password, get signed in by
- * the activation — and then never be able to log in again. The correct password returned
- * 401 forever, because `findFirst` ordered `createdAt asc` only ever compared against the
- * older row. `T-072` made reaching that state one click and a link, the day before.
- */
+// The honest collision, which was a silent permanent lockout rather than mere ambiguity:
+// activate a second account on an address that already had one, get signed in by the activation,
+// and then never be able to log in again, because only the older row was ever compared against.
 describe('a person with a real account in two organisations — DEC-049', () => {
   it('can sign in to the one they just activated, not only the older one', async () => {
     const shared = `${unique('both')}@example.test`;
@@ -135,8 +108,7 @@ describe('a person with a real account in two organisations — DEC-049', () => 
 
     const newerOrgId = await secondAccountFor(shared, OTHER);
 
-    // Two activated rows, two passwords, and BOTH open — each to its own organisation.
-    // This returned 401 before DEC-049.
+    // Two activated rows, two passwords, and BOTH open - each to its own organisation.
     const toNewer = request.agent(app);
     expect((await toNewer.post('/api/v1/auth/login').send({ email: shared, password: OTHER })).status)
       .toBe(200);
@@ -148,10 +120,8 @@ describe('a person with a real account in two organisations — DEC-049', () => 
     expect((await toOlder.get('/api/v1/auth/me')).body.organization.id).toBe(olderOrgId);
   });
 
-  /**
-   * The one case that needs a question, and it needs one only because the password cannot
-   * tell the two apart. Costs nothing on stage: no seeded organisation shares an address.
-   */
+  // The one case that needs a question, and only because the password cannot tell the two apart.
+  // It costs nothing on stage: no seeded organisation shares an address.
   it('asks which organisation when the SAME password opens both', async () => {
     const shared = `${unique('same')}@example.test`;
 
@@ -168,8 +138,8 @@ describe('a person with a real account in two organisations — DEC-049', () => 
 
     const offered = ambiguous.body.error.details.organizations as Array<{ id: string; name: string }>;
     expect(offered.map((org) => org.id).sort()).toEqual([olderOrgId, newerOrgId].sort());
-    // Named, so the choice is answerable. Only ever sent to somebody who has just proved
-    // the password for every organisation in the list.
+    // Named, so the choice is answerable - and only ever sent to somebody who has just proved the
+    // password for every organisation in the list.
     expect(offered.every((org) => typeof org.name === 'string' && org.name.length > 0)).toBe(true);
 
     // Answering it signs them in to the one they picked.
@@ -181,12 +151,8 @@ describe('a person with a real account in two organisations — DEC-049', () => 
     expect((await agent.get('/api/v1/auth/me')).body.organization.id).toBe(newerOrgId);
   });
 
-  /**
-   * `orgId` NARROWS, IT NEVER UNLOCKS. It is the answer to a question the server asked, so
-   * a wrong one has to fail exactly like a wrong password — same status, same words. If it
-   * behaved as a hint that could be tried against other rows it would be a way to probe
-   * which organisations an address belongs to.
-   */
+  // The organisation id NARROWS, it never unlocks: a wrong one has to fail exactly like a wrong password,
+  // or it would become a way to probe which organisations an address belongs to.
   it('refuses a wrong orgId exactly as it refuses a wrong password', async () => {
     const shared = `${unique('narrow')}@example.test`;
     await request(app).post('/api/v1/auth/register').send({
@@ -203,7 +169,7 @@ describe('a person with a real account in two organisations — DEC-049', () => 
     expect(wrongPassword.body.error.message).toBe(wrongOrg.body.error.message);
   });
 
-  /** A disabled account is not a candidate, so revoking one un-ambiguates the address. */
+  // A disabled account is not a candidate, so revoking one removes the ambiguity.
   it('does not offer a disabled account as a choice', async () => {
     const shared = `${unique('disabled')}@example.test`;
     await request(app).post('/api/v1/auth/register').send({
@@ -217,7 +183,7 @@ describe('a person with a real account in two organisations — DEC-049', () => 
       where: { email: shared, orgId: newerOrgId }, data: { status: 'disabled' },
     });
 
-    // One usable account again, so no question — and it is the one still live.
+    // One usable account again, so no question - and it is the one still live.
     const agent = request.agent(app);
     expect((await agent.post('/api/v1/auth/login').send({ email: shared, password: PASSWORD })).status)
       .toBe(200);

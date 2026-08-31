@@ -1,9 +1,5 @@
-// The custom preset. 50 §1.
-//
-// CUSTOM IS NOT BLANK, and that is the whole point of the entry. Someone who picks Custom
-// and presses Continue four times must still end with a working organisation — a blank
-// start is the enemy (customization.md §8). The generic words here are the same ones
-// DEFAULT_LABELS falls back to, so an org that renames nothing still reads sensibly.
+// The custom preset, and it is deliberately NOT blank: pressing Continue four times must still
+// produce a working organisation. Its generic words are the same ones the default labels use.
 import type { Preset } from './types.js';
 import { nps, rating, single, text_, yesno } from './types.js';
 
@@ -29,10 +25,7 @@ export const custom: Preset = {
     campaign: { one: 'Campaign', many: 'Campaigns' },
   },
   templates: [
-    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
-    // empty and each industry's example reads as its own — a hotel poll is not a university
-    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
-    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    // The two quick-start forms, seeded per industry so the gallery is never empty. Both are ordinary one-question templates.
     {
       name: 'Quick poll',
       category: 'Poll',

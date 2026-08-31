@@ -1,14 +1,9 @@
-// T-083 — the improve loop. 44 § Acceptance.
-//
-// Deliberately short. Four things here are load-bearing and the rest is arithmetic:
-//
-//   1. THE ORDERING CONSTRAINT. The gap is unreadable until the reviewee has written their
-//      own assessment, and it is the API that refuses — 44 calls this the most defensible
-//      novelty claim in the product after the permission engine.
-//   2. 402 vs 403, and 403 first (DEC-011).
-//   3. SELF MEANS SELF. There is no path to another person's reflection at any level.
-//   4. FINALISED MEANS FINALISED, enforced by the trigger rather than the service — 44 is
-//      explicit that a service test would be testing the wrong layer.
+// The improve loop. Four things here are load-bearing and the rest is arithmetic:
+//   1. the ordering constraint - the gap is unreadable until the reviewee has written their own
+//      assessment, and it is the API that refuses;
+//   2. 402 versus 403, with 403 first;
+//   3. self means self: there is no path to another person's reflection at any level;
+//   4. finalised means finalised, enforced by the database trigger rather than the service.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { addStaff, app, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
@@ -19,7 +14,7 @@ const stranger = () => request(app);
 
 type Cycle = { campaignId: string; subjectId: string; status: string };
 
-/** A launched campaign with `n` responses, whose subject IS the given user. */
+// A launched campaign with some responses, whose subject IS the given user.
 async function cycleFor(
   founder: Session,
   reviewee: Session,
@@ -31,8 +26,8 @@ async function cycleFor(
     unitId,
   });
   const subjectId = subject.body.data.id as string;
-  // The link is what makes this person the reviewee. There is no API for it yet (`35` owns
-  // subject editing), and inventing one to make a test pass would be the wrong direction.
+  // The link is what makes this person the reviewee. There is no API for it yet, and inventing one
+  // to make a test pass would be the wrong direction.
   await prisma.subject.update({ where: { id: subjectId }, data: { linkedUserId: reviewee.userId } });
 
   const templates = await founder.agent.get('/api/v1/templates');
@@ -78,7 +73,7 @@ async function cycleFor(
   return { campaignId, subjectId, questionIds: questions.map((question) => question.id) };
 }
 
-/** The reflection body, rating everything at `n` so the gap is arithmetic we can predict. */
+// The reflection body, rating everything the same, so the gap is arithmetic we can predict.
 const reflection = (subjectId: string, questionIds: string[], kinds: string[], n: number) => ({
   subjectId,
   answers: questionIds.map((id, index) => {
@@ -108,24 +103,22 @@ describe('the improve loop', () => {
     kinds = questions.map((question) => question.kind);
   });
 
-  /* ------------------------------------------------------- the two gates */
+  // The two gates.
 
   it('402s below Gold, and 403s without the capability — never confused', async () => {
     const bronze = await setUpOrg('university', 'bronze');
     const paid = await bronze.agent.get('/api/v1/reflect');
-    // The founder holds `reflection.read` at `self`, so this can only be the tier. That is
-    // the pair D-012 made impossible to demonstrate until T-088 wrote the row.
+    // The founder holds the capability, so this can only be the tier.
     expect(paid.status).toBe(402);
     expect(paid.body.error.details.requiredTier).toBe('gold');
 
     const lowest = await addStaff(gold.orgId, { name: 'Respondent Level', level: 4, unitName: 'Section A' });
     const denied = await lowest.agent.get('/api/v1/reflect');
-    // L4 is the respondent-level role and holds no `reflection.read` at all (50 §1). A 403
-    // here rather than a 402: their organisation HAS paid.
+    // The lowest role holds no reflection capability at all, so this is a 403: their organisation HAS paid.
     expect(denied.status).toBe(403);
   });
 
-  /* ----------------------------------------------- the ordering constraint */
+  // The ordering constraint.
 
   it('refuses the gap until the reflection exists — and it is the API that refuses', async () => {
     const before = await reviewee.agent.get(`/api/v1/reflect/${cycle.campaignId}/gap`);
@@ -145,16 +138,16 @@ describe('the improve loop', () => {
     const rows = gap.body.data.rows as Array<{
       questionId: string; self: number | null; received: number | null; delta: number | null;
     }>;
-    // Every question, not a parallel "reflection template" (INV-008).
+    // Every question, not a parallel "reflection template".
     expect(rows.map((row) => row.questionId).sort()).toEqual([...cycle.questionIds].sort());
 
     const rating = rows.find((row) => row.self === 5 && row.received === 3);
     expect(rating?.delta).toBe(2);
-    // A blind spot and under-confidence are different facts and neither is a grade
-    // (44 § The gap view). The payload carries no valence, no label, no judgement.
+    // A blind spot and under-confidence are different facts and neither is a grade: the payload carries
+    // no label and no judgement.
     expect(Object.keys(rating ?? {})).not.toContain('valence');
 
-    // Where one half has no number, the delta is null rather than a number about nothing.
+    // Where one half has no number, the difference is null rather than a number about nothing.
     const text = rows.find((row) => row.received === null);
     expect(text?.delta).toBeNull();
   });
@@ -165,14 +158,13 @@ describe('the improve loop', () => {
     expect(again.status).toBe(409);
   });
 
-  /* ------------------------------------------------------------ self is self */
+  // Self is self.
 
   it('gives one reviewee no path to another reviewee\'s cycle', async () => {
     const peer = await addStaff(gold.orgId, { name: 'A Peer', level: 3, unitName: 'Section A' });
-    // Same level, same unit, and a Gold organisation — everything except being the subject.
+    // Same level, same unit, and a paid organisation - everything except being the subject.
     const gap = await peer.agent.get(`/api/v1/reflect/${cycle.campaignId}/gap`);
-    // 404, not 403: somebody who is not a reviewee in this cycle has no business learning
-    // that it exists (13 §5).
+    // 404, not 403: somebody who is not a reviewee in this cycle has no business learning it exists.
     expect(gap.status).toBe(404);
 
     const cycles = await peer.agent.get('/api/v1/reflect');
@@ -187,7 +179,7 @@ describe('the improve loop', () => {
     expect(res.status).toBe(404);
   });
 
-  /* ------------------------------------------------------- the k-anon gate */
+  // The anonymity gate.
 
   it('suppresses the gap below the threshold, with no rows at all', async () => {
     const thin = await addStaff(gold.orgId, { name: 'Thinly Reviewed', level: 3, unitName: 'Section B' });
@@ -207,14 +199,13 @@ describe('the improve loop', () => {
     const gap = await thin.agent.get(`/api/v1/reflect/${small.campaignId}/gap`);
     expect(gap.status).toBe(200);
     expect(gap.body.data.suppressed).toBe(true);
-    // ABSENT, not zeroed. A reviewee with three responses reading an average is a reviewee
-    // who can work out who said what (52 §2, INV-007).
+    // Absent, not zeroed: a reviewee with three responses reading an average can work out who said what.
     expect(gap.body.data.rows).toBeUndefined();
-    // Their own reflection is still theirs to see — it is the OTHERS' answers being withheld.
+    // Their own reflection is still theirs to see - it is the OTHERS' answers being withheld.
     expect(gap.body.data.reflectedAt).toBeTruthy();
   });
 
-  /* --------------------------------------------------------- the plan, and 44's trigger */
+  // The plan, and the database trigger behind it.
 
   it('takes a plan, finalises it once, and then the DATABASE refuses a change', async () => {
     const created = await withCsrf(reviewee, 'post', `/api/v1/reflect/${cycle.campaignId}/plan`)
@@ -229,8 +220,8 @@ describe('the improve loop', () => {
       .send({ items: [{ text: 'Something else entirely', status: 'open' }] });
     expect(edit.status).toBe(409);
 
-    // THE ASSERTION 44 ASKS FOR BY NAME: "trigger test, not a service test". Going around
-    // the service entirely — this is a direct write — and the database still refuses.
+    // A trigger test, not a service test: this writes directly, going around the service entirely,
+    // and the database still refuses.
     await expect(
       prisma.actionPlan.update({ where: { id: planId }, data: { items: [] } }),
     ).rejects.toThrow(/finalised/i);
@@ -245,8 +236,8 @@ describe('the improve loop', () => {
       .send({ actionPlanId: plan.id, notes: 'Discussed. Agreed to revisit in March.' });
     expect(held.status).toBe(200);
 
-    // A peer at the same level in a DIFFERENT unit holds `checkin.create` at `own_unit`,
-    // which does not reach this plan. 404, so the plan is not confirmed to exist.
+    // A peer at the same level in a DIFFERENT unit does not reach this plan, and gets 404 rather than
+    // having the plan's existence confirmed.
     const outsider = await addStaff(gold.orgId, { name: 'Elsewhere', level: 3, unitName: 'Section B' });
     const refused = await withCsrf(outsider, 'post', '/api/v1/checkins')
       .send({ actionPlanId: plan.id, notes: 'not mine to hold' });

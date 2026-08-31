@@ -1,12 +1,8 @@
-// T-015 — the organisation surface and the wizard's single commit. 13 § Organisation, 31.
-//
-// The property worth testing here is not "setup returns 201". It is that ONE request
-// produces a WHOLE working organisation: the chosen roles at the right levels, the chosen
-// tree wired with `contains` edges, the derived grant matrix, the founder re-anchored onto
-// the new structure, the starter templates, and no leftovers from registration.
-//
-// A half-applied setup is the failure mode 31 exists to prevent, so the assertions below
-// deliberately look at the database rather than at the response body.
+// The organisation surface and the setup wizard's single commit.
+// The property worth testing is not that setup returns 201, but that ONE request produces a whole
+// working organisation: the chosen roles at the right levels, the tree wired together, the seeded
+// grants, the founder moved onto the new structure, the starter templates, and no leftovers.
+// So the assertions look at the database rather than at the response body.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { Agent } from 'supertest';
@@ -18,7 +14,7 @@ const app = createApp();
 
 const unique = (tag: string) => `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
-/** Registration signs the caller in, so the agent carries the session and CSRF cookies. */
+// Registration signs the caller in, so the agent already carries the session and CSRF cookies.
 async function registerOrg(industry: string) {
   const agent = request.agent(app);
   const email = `${unique('org')}@example.test`;
@@ -39,7 +35,7 @@ async function registerOrg(industry: string) {
   };
 }
 
-/** supertest types set-cookie loosely; every assertion below wants the raw header lines. */
+// supertest types the set-cookie header loosely, and every assertion here wants the raw lines.
 const setCookies = (res: { headers: Record<string, unknown> }): string[] => {
   const raw = res.headers['set-cookie'];
   return Array.isArray(raw) ? (raw as string[]) : [];
@@ -79,11 +75,11 @@ describe('GET /org', () => {
     const res = await agent.get('/api/v1/org');
 
     expect(res.status).toBe(200);
-    // Registration already applied the preset's vocabulary, so the console never renders
-    // generic words to someone who has already said what kind of organisation this is.
+    // Registration already applied the preset's vocabulary, so nothing generic is ever shown to somebody
+    // who has already said what kind of organisation this is.
     expect(res.body.data.labels.unit.one).toBe('Property');
     expect(res.body.data.labels.respondent.many).toBe('Guests');
-    // No wizard has run: /app must redirect to /app/setup rather than render an empty home.
+    // No wizard has run, so the console must send them to setup rather than render an empty home.
     expect(res.body.data.configured).toBe(false);
   });
 });
@@ -111,12 +107,11 @@ describe('GET /org/presets', () => {
     for (const preset of presets) {
       expect(preset.roles.length).toBeGreaterThanOrEqual(2);
       expect(preset.units.length).toBeGreaterThanOrEqual(1);
-      // Short forms are the product thesis, not a preference (01 §5, 50 §2).
+      // Short forms are the product's whole idea, not a preference.
       for (const template of preset.templates) {
         expect(template.questionCount).toBeLessThanOrEqual(10);
       }
-      // Every preset ships a one-question form, which is what makes "a poll is a
-      // one-question template" concrete rather than theoretical (DEC-010).
+      // Every preset ships a one-question form, which is what makes "a poll is a one-question template" real.
       expect(preset.templates.some((template) => template.questionCount === 1)).toBe(true);
     }
   });
@@ -190,8 +185,7 @@ describe('POST /org/setup — one request, one transaction', () => {
         select: { capability: true, scope: true, effect: true, derived: true },
       });
 
-      // 50 §1 is blunt about this row: without the universal self grants, a default-deny
-      // model silently produces an unopenable profile page for everyone.
+      // Without the universal self grants, a default-deny model silently produces an unopenable profile page.
       expect(grants).toContainEqual({
         capability: 'person.read',
         scope: 'self',
@@ -204,11 +198,9 @@ describe('POST /org/setup — one request, one transaction', () => {
         effect: 'allow',
         derived: true,
       });
-      // Presets ship NO deny grants. A deny is a deliberate administrator act, and seeding
-      // one would teach the wrong lesson about a rule that is absolute (INV-004).
+      // Presets ship NO deny grants: a deny is a deliberate administrator act.
       expect(grants.every((grant) => grant.effect === 'allow')).toBe(true);
-      // Every seeded row is derived, so an administrator's later edit cannot be silently
-      // reverted by a regeneration (10 §9).
+      // Every seeded row is marked derived, so a later edit cannot be silently reverted by a regeneration.
       expect(grants.every((grant) => grant.derived)).toBe(true);
     }
 
@@ -225,12 +217,10 @@ describe('POST /org/setup — one request, one transaction', () => {
       where: { orgId, subjectId: bottom?.id ?? "" },
       select: { capability: true },
     });
-    // L4 is the respondent-level role: org.read so the vocabulary loads, `subject.read` so
-    // the one list they should see is reachable (T-086, closing half of OPEN-009),
-    // `announcement.read` because being SENT something is not a permission anybody should
-    // have to be given (T-094), the two self rows so their profile opens, and nothing else.
-    // This list is deliberately exact — it is what EVERY organisation gets by default, and a
-    // row added here without a reason should fail rather than pass quietly.
+    // The most junior role gets exactly this: the organisation read so the vocabulary loads, the subjects
+    // list, announcements because being SENT something is not a permission anybody has to be given, and
+    // the two self rows so their profile opens. The list is deliberately exact, because it is what EVERY
+    // organisation gets by default.
     expect(bottomGrants.map((grant) => grant.capability).sort()).toEqual([
       'announcement.read',
       'org.read',
@@ -252,8 +242,8 @@ describe('POST /org/setup — one request, one transaction', () => {
       select: { name: true, role: { select: { name: true } }, unit: { select: { name: true } } },
     });
     expect(positions).toHaveLength(1);
-    // The anchor is the crux of INV-005: the founder's powers apply at Northfield and
-    // below because their POSITION sits there, not because their role is senior.
+    // The anchor is the crux: the founder's powers apply here and below because their POSITION sits here,
+    // not because their role is senior.
     expect(positions[0]?.role?.name).toBe('Principal');
     expect(positions[0]?.unit?.name).toBe('Northfield');
 
@@ -271,8 +261,7 @@ describe('POST /org/setup — one request, one transaction', () => {
       orderBy: { name: 'asc' },
     });
 
-    // Six since T-093 added a Poll and a Suggestion box seed to every preset, so the start
-    // gallery is never empty and a university's poll is not a hotel's.
+    // Six, because every preset also seeds a poll and a suggestion box, so the start gallery is never empty.
     expect(templates.map((template) => template.name)).toEqual([
       'Course feedback',
       'Facilities pulse',
@@ -285,8 +274,8 @@ describe('POST /org/setup — one request, one transaction', () => {
       expect(template.industry).toBe('university');
       expect(template._count.questions).toBeGreaterThan(0);
       expect(template._count.questions).toBeLessThanOrEqual(10);
-      // Derived from the question kinds, never entered by hand — a template cannot claim
-      // to be shorter than it is (36).
+      // Derived from the question kinds and never entered by hand: a template cannot claim to be shorter
+      // than it is.
       expect(template.estimatedSeconds).toBeGreaterThan(0);
     }
   });
@@ -298,8 +287,8 @@ describe('POST /org/setup — one request, one transaction', () => {
     });
     expect(org.industry).toBe('university');
     expect((org.labels as { unit: { one: string } }).unit.one).toBe('Section');
-    // The grant cache is keyed on authzVersion, so a setup that did not raise it would
-    // leave the founder's first click resolving against the pre-setup grants (11 §7).
+    // The grant cache is keyed on the permission version, so a setup that did not raise it would leave the
+    // founder's first click resolving against the pre-setup grants.
     expect((org.settings as { authzVersion: number }).authzVersion).toBeGreaterThan(1);
   });
 
@@ -316,8 +305,8 @@ describe('POST /org/setup — one request, one transaction', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
-    // Nothing was written: the check runs before the transaction opens, so the failure is
-    // about the form rather than about a foreign key.
+    // Nothing was written: the check runs before the transaction opens, so the failure is about the form
+    // rather than about a foreign key.
     const units = await prisma.node.findMany({
       where: { orgId: session.orgId, kind: 'unit' },
       select: { name: true },
@@ -347,8 +336,8 @@ describe('PATCH /org/labels', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.labels.subject.one).toBe('Venue');
-    // The renames the org already had survive a single-key edit. A whole-set write would
-    // silently discard them (22 §3).
+    // The renames the organisation already had survive a single-word edit, which a whole-set write would
+    // silently discard.
     expect(res.body.data.labels.unit.one).toBe('Property');
   });
 });
@@ -366,9 +355,9 @@ describe('the guards are real', () => {
     expect(res.body.error.code).toBe('CSRF_FAILED');
   });
 
-  // D-009. The CSRF cookie had no lifetime while the session cookie had seven days, so
-  // closing the browser left a signed-in caller with no token and no way back: the error
-  // says "reload", a reload is all GETs, and nothing but login re-issued the cookie.
+  // The CSRF cookie once had no lifetime while the session cookie lasted seven days, so closing the
+  // browser left a signed-in caller with no token and no way back: the error says "reload", a reload
+  // is all GETs, and nothing but login re-issued the cookie.
   it('gives the CSRF cookie a lifetime, so it does not die with the browser', async () => {
     const agent = request.agent(app);
     const res = await agent.post('/api/v1/auth/register').send({

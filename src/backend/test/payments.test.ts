@@ -1,19 +1,9 @@
-// T-058 — the payment ledger and the earnings page. DEC-080.
-//
-// THREE PROPERTIES, AND THEY ARE THE THREE DEC-080 RESTS ON:
-//
-//   1 · A plan change writes exactly ONE capture, priced by the SERVER, with the real
-//       from-tier on it. The client sends a tier and a label; it cannot send an amount, and
-//       if it could, nothing would read it. SINCE DEC-097 the amount is the DIFFERENCE, and
-//       `from_tier` stopped being a label on the row and became an input to its price.
-//   2 · `paymentRef` IS NOT AN AUTHORISATION INPUT. A join with no reference still joins and
-//       still records a capture — because a gate on a client-generated string would be
-//       INV-003 inverted, and there is no gateway to verify one against.
-//   3 · `/platform/earnings` is OWNER ONLY. `staff` gets a 403 naming the capability, the
-//       same shape `/platform/analytics` has had since `71`.
-//
-// Signup captures are covered next door in `tiers.test.ts`, beside the subscription row they
-// are written with — the two are one transaction and the assertions belong together.
+// The payment ledger and the earnings page. Three properties:
+//   1. a plan change writes exactly ONE capture, priced by the SERVER, with the real from-tier on it,
+//      and the amount is the DIFFERENCE between the two tiers;
+//   2. a payment reference is a label, not an authorisation input - a join with none still joins;
+//   3. the earnings page is owner-only, and staff get a 403 naming the capability.
+// Signup captures are covered next door, beside the subscription row they are written with.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { changeCostMinor, priceOf, type PlatformEarnings } from '@endur/shared';
@@ -54,38 +44,32 @@ describe('a plan change writes one capture — DEC-080', () => {
   it('records the move, priced by the server, with the tier they came from', async () => {
     const founder = await registerOrg('custom', 'bronze');
 
-    // UNIQUE PER RUN. `payments.reference` is unique across the whole table — that is what
-    // stops a double-submitted dialog billing twice — so a literal here would pass once and
-    // then 500 on every later run against the same test database.
+    // Unique per run: the reference column is unique across the whole table, which is what stops a
+    // double-submitted dialog billing twice - so a literal here would pass once and then fail forever.
     const reference = `endur_${unique('ref')}`;
     const res = await join(founder, { tier: 'gold', paymentRef: reference });
     expect(res.status).toBe(200);
     expect(res.body.data.tier).toBe('gold');
 
     const payments = await paymentsOf(founder.orgId);
-    // Two: the signup capture, then this one. The signup row is `tiers.test.ts`'s subject.
+    // Two rows: the signup capture, then this one.
     expect(payments).toHaveLength(2);
     const change = payments[1];
     expect(change?.kind).toBe('change');
     expect(change?.tier).toBe('gold');
     expect(change?.fromTier).toBe('bronze');
-    // THE DIFFERENCE, NOT THE DESTINATION — DEC-097. ₹999 − ₹99 = ₹900. Asserted against the
-    // shared formula AND against the literal, because a test that only calls
-    // `changeCostMinor` would agree with a broken `changeCostMinor`.
+    // The DIFFERENCE, not the destination. Asserted against the shared formula AND against the literal,
+    // because a test that only calls the formula would agree with a broken formula.
     expect(change?.amountMinor).toBe(changeCostMinor('bronze', 'gold'));
     expect(change?.amountMinor).toBe(priceOf('gold') - priceOf('bronze'));
     expect(change?.amountMinor).toBe(90000);
     expect(change?.reference).toBe(reference);
-    // WHO PAID, captured rather than joined — the row has to still read correctly after the
-    // user is renamed or removed.
+    // Who paid, captured rather than joined: the row has to read correctly after the user is renamed or removed.
     expect(change?.payerName).toBe('Founder');
   });
 
-  /**
-   * THE SERVER PRICES IT. There is no field on `JoinTierBody` for an amount, so this asserts
-   * the property by trying to smuggle one past `validate()` — a stripped unknown key, and a
-   * row that costs what Silver costs regardless.
-   */
+  // The server prices it: there is no field for an amount, so this tries to smuggle one past validation
+  // and asserts the row costs what the tier costs regardless.
   it('ignores any amount the client tries to name', async () => {
     const founder = await registerOrg('custom', 'bronze');
     const res = await join(founder, { tier: 'silver', amountMinor: 1, priceMinor: 1 });
@@ -95,13 +79,8 @@ describe('a plan change writes one capture — DEC-080', () => {
     expect(payments[1]?.amountMinor).toBe(changeCostMinor('bronze', 'silver'));
   });
 
-  /**
-   * THE LEDGER STOPS OVERSTATING — DEC-097, and this is the assertion the decision exists
-   * for. Under the old rule an organisation that walked Bronze → Silver → Gold contributed
-   * ₹99 + ₹499 + ₹999 = ₹1,597 to `/ops/earnings` for a customer holding ONE ₹999 plan. It
-   * now sums to exactly what the estate holds, and the property is stated as a SUM rather
-   * than as three row assertions because the sum is what the earnings page reads.
-   */
+  // The ledger stops overstating: walking up two tiers used to contribute all three prices for a customer
+  // holding one plan. Asserted as a SUM, because the sum is what the earnings page reads.
   it('sums to the plan they end on, however many steps they took to get there', async () => {
     const founder = await registerOrg('custom', 'bronze');
     expect((await join(founder, { tier: 'silver' })).status).toBe(200);
@@ -112,35 +91,26 @@ describe('a plan change writes one capture — DEC-080', () => {
     expect(payments.reduce((sum, row) => sum + row.amountMinor, 0)).toBe(priceOf('gold'));
   });
 
-  /**
-   * THE LADDER IS ONE-WAY, AND THE SERVER IS WHERE THAT IS DECIDED — DEC-096.
-   *
-   * This calls the route DIRECTLY rather than driving `/app/plan`, and that is the whole
-   * point: the page stops OFFERING a downgrade, and `13` § Billing is a documented route
-   * anything can call. A rule the client enforces is a rule that is not enforced (INV-003).
-   */
+  // The ladder is one-way, and the SERVER is where that is decided.
+  // This calls the route directly rather than driving the page: a rule the client enforces is not enforced.
   it('refuses a move DOWN, writes nothing, and says why', async () => {
     const founder = await registerOrg('custom', 'gold');
     const res = await join(founder, { tier: 'silver' });
 
     expect(res.status).toBe(409);
-    // The message names where they are and what to do instead — "invalid tier" would be
-    // untrue about a tier the page is showing them.
+    // The message names where they are and what to do instead - "invalid tier" would be untrue about a
+    // tier the page is showing them.
     expect(res.body.error.message).toMatch(/only move up/i);
     expect(res.body.error.message).toMatch(/no refunds/i);
 
-    // NOTHING WAS WRITTEN. A refusal that had already moved the tier or captured money would
-    // be worse than allowing the move.
+    // Nothing was written: a refusal that had already moved the tier or captured money would be worse
+    // than allowing the move.
     const after = await prisma.subscription.findUnique({ where: { orgId: founder.orgId } });
     expect(after?.tier).toBe('gold');
     expect(await paymentsOf(founder.orgId)).toHaveLength(1);
   });
 
-  /**
-   * STANDING STILL IS NOT A PURCHASE. A double-submitted dialog, or a customer pressing the
-   * card they are already on, must not capture a second time — and `changeCostMinor` would
-   * price it at ₹0, so without this check the ledger would grow a free row per click.
-   */
+  // Standing still is not a purchase: pressing the card you are already on must not capture again.
   it('refuses a move to the tier they are already on', async () => {
     const founder = await registerOrg('custom', 'silver');
     const res = await join(founder, { tier: 'silver' });
@@ -150,11 +120,8 @@ describe('a plan change writes one capture — DEC-080', () => {
     expect(await paymentsOf(founder.orgId)).toHaveLength(1);
   });
 
-  /**
-   * A REFERENCE IS A LABEL, NOT A PROOF. A join with none is a valid join — the alternative
-   * is a tier gated on a string React invented, which is exactly the decision INV-003 says
-   * the client never gets to make. The row is still written, with a reference we minted.
-   */
+  // A reference is a label, not a proof: a join with none is a valid join, and the row is still written
+  // with a reference we minted.
   it('joins and records without a reference at all', async () => {
     const founder = await registerOrg('custom', 'bronze');
     const res = await join(founder, { tier: 'silver' });
@@ -165,7 +132,7 @@ describe('a plan change writes one capture — DEC-080', () => {
     expect(payments[1]?.reference).toMatch(/^endur_/);
   });
 
-  /** Enterprise is refused before anything is written — no tier change, and no capture. */
+  // Enterprise is refused before anything is written: no tier change, and no capture.
   it('writes nothing when the tier is refused', async () => {
     const founder = await registerOrg('custom', 'bronze');
     expect((await join(founder, { tier: 'enterprise' })).status).toBe(409);
@@ -191,12 +158,11 @@ describe('the earnings page is the owner’s — DEC-080, 19 §4', () => {
     const res = await owner.get('/api/v1/platform/earnings');
     expect(res.status).toBe(200);
 
-    // Typed, not `any`: the assertions below walk into arrays, and an untyped envelope
-    // makes every one of them an unsafe call that asserts nothing about the real shape.
+    // Typed rather than loose, because the assertions below walk into arrays.
     const data = res.body.data as PlatformEarnings;
     expect(data.currency).toBe('INR');
-    // Integers all the way to the client — a float crossing the wire is a rounding error
-    // waiting for somebody downstream to sum it.
+    // Whole numbers all the way to the client: a decimal crossing the wire is a rounding error waiting
+    // for somebody to sum it.
     expect(Number.isInteger(data.totals.revenueMinor)).toBe(true);
     expect(data.totals.revenueMinor).toBeGreaterThanOrEqual(priceOf('gold'));
     expect(data.byTier.map((row) => row.tier))
@@ -205,17 +171,14 @@ describe('the earnings page is the owner’s — DEC-080, 19 §4', () => {
     expect(data.recent.some((row) => row.orgId === founder.orgId)).toBe(true);
   });
 
-  /**
-   * A MEAN OF NO PAYMENTS IS NOT ZERO — the same argument `71` decision 3 makes about a
-   * conversion rate, and the page renders a dash for it rather than ₹0.
-   */
+  // A mean of no payments is not zero, so the page renders a dash rather than a zero amount.
   it('returns a null average for a window with no captures in it', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.get('/api/v1/platform/earnings?from=2019-01-01&to=2019-12-31');
     expect(res.status).toBe(200);
     expect(res.body.data.totals.payments).toBe(0);
     expect(res.body.data.totals.averageMinor).toBeNull();
-    // The lifetime figure ignores the window on purpose — it is the one all-time number.
+    // The lifetime figure ignores the window on purpose: it is the one all-time number.
     expect(res.body.data.totals.lifetimeRevenueMinor).toBeGreaterThan(0);
   });
 });

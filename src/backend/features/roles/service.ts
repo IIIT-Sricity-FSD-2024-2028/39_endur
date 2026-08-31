@@ -1,9 +1,6 @@
-// Roles and the powers grid. 13, 33, 11 §8, 50 §1.
-//
-// Two things live here that look similar and are not. A ROLE is a node with an ordering
-// number. A GRANT is a row saying that node may do something at some scope. Levels order
-// roles for the seeded defaults and for nothing else — the enforcement is always the grant
-// (DEC-002, CONF-002).
+// Roles and the powers grid.
+// A ROLE is a node with an order number. A GRANT is a row saying that role may do something at some scope.
+// The order only decides the seeded defaults; what is enforced is always the grant.
 import { CAPABILITY_CATALOGUE, describeCapability, type Capability } from '@endur/shared';
 import type { ResolvedLabels } from '@endur/shared';
 import type {
@@ -26,6 +23,7 @@ import { clearGrantCache, simulate, type Decision, type Target } from '../../aut
 import { bumpVersion } from '../org/service.js';
 import { grantsForLevel, levelForRole } from '../../presets/grant-matrix.js';
 
+// Every role in the organisation, with how many people hold each.
 export async function listRoles(orgId: string): Promise<RoleView[]> {
   const roles = await prisma.node.findMany({
     where: { orgId, kind: 'role' },
@@ -39,11 +37,7 @@ export async function listRoles(orgId: string): Promise<RoleView[]> {
   });
   if (roles.length === 0) return [];
 
-  // `_count.positionsWithRole` used to answer this, and it counted role-at-unit SLOTS —
-  // DEC-082. "Nurse" existing in five wards read as five people whatever the rosters said,
-  // and Riverside's sixteen patients read as four. The number is load-bearing: the delete
-  // dialog uses it to decide whether a reassignment target is required at all, so a role
-  // held by ten people in one unit could be deleted as though one slot were one person.
+  // Distinct PEOPLE per role, not role-at-unit slots: the delete dialog decides what to ask on this number.
   const assignments = await prisma.edge.findMany({
     where: {
       orgId,
@@ -72,6 +66,7 @@ export async function listRoles(orgId: string): Promise<RoleView[]> {
   }));
 }
 
+// Creates a role at the bottom of the ladder.
 export async function createRole(
   req: Request,
   orgId: string,
@@ -83,20 +78,18 @@ export async function createRole(
       select: { level: true },
       orderBy: { level: 'desc' },
     });
-    // A new role lands at the bottom. Anywhere else would silently re-rank everyone above
-    // it, and re-ranking is what POST /roles/reorder is for.
+    // A new role lands at the bottom; anywhere else would silently re-rank everything above it.
     const role = await tx.node.create({
       data: { orgId, kind: 'role', name: body.name, level: (last?.level ?? 0) + 1 },
       select: { id: true, name: true, level: true },
     });
-    // A new role starts with NO grants. Default deny is the floor (11 §5): copying the
-    // level's seeded matrix here would hand out powers nobody asked for, and the grid is
-    // where powers are chosen.
+    // A new role starts with NO grants. Default deny is the floor, and the grid is where powers are chosen.
     req.ctx.audit.push({ action: 'role.create', targetType: 'role', targetId: role.id });
     return { id: role.id, name: role.name, level: role.level ?? 0, peopleCount: 0, grantCount: 0 };
   });
 }
 
+// Renames a role.
 export async function updateRole(
   req: Request,
   orgId: string,
@@ -110,8 +103,7 @@ export async function updateRole(
       data: { name: body.name },
       select: { id: true, name: true, level: true },
     });
-    // Renaming a role is the vocabulary claim in miniature: "Dean" becomes "General
-    // Manager" and nothing else in the system moves.
+    // Renaming a role is the vocabulary claim in miniature: "Dean" becomes "General Manager" and nothing else moves.
     req.ctx.audit.push({ action: 'role.update', targetType: 'role', targetId: roleId });
     return {
       id: role.id,
@@ -123,7 +115,7 @@ export async function updateRole(
   });
 }
 
-/** Levels are derived from the order of the array. They are never sent (33). */
+// Reorders the roles. The level comes from the array order and is never sent by the client.
 export async function reorderRoles(
   req: Request,
   orgId: string,
@@ -135,8 +127,7 @@ export async function reorderRoles(
   });
   const known = new Set(existing.map((role) => role.id));
   if (body.orderedIds.length !== known.size || body.orderedIds.some((id) => !known.has(id))) {
-    // A partial order is ambiguous about everything it leaves out, and guessing would
-    // quietly re-rank a role nobody mentioned.
+    // A partial list is ambiguous, and guessing would quietly re-rank a role nobody mentioned.
     throw new ConflictError('The order must list every role exactly once.');
   }
 
@@ -154,6 +145,7 @@ export async function reorderRoles(
   return listRoles(orgId);
 }
 
+// Deletes a role. Refuses while people still hold it, unless the caller names where to move them.
 export async function deleteRole(
   req: Request,
   orgId: string,
@@ -161,10 +153,7 @@ export async function deleteRole(
   body: DeleteRoleBody,
 ): Promise<{ ok: true }> {
   await assertRole(orgId, roleId);
-  // DISTINCT PEOPLE, not positions — DEC-082. Counting position rows was wrong in both
-  // directions here: it read five wards' worth of "Nurse" slots as five people, and it
-  // refused to delete a role that EXISTS in some units but nobody actually holds, telling
-  // the caller to reassign people who are not there.
+  // Distinct people again: counting slots would overcount holders and refuse to delete a role nobody holds.
   const assignments = await prisma.edge.findMany({
     where: {
       orgId,
@@ -177,8 +166,7 @@ export async function deleteRole(
   const held = new Set(assignments.map((edge) => edge.parentId)).size;
 
   if (held > 0 && !body.reassignTo) {
-    // Deleting cascades the positions away, and with them everyone's access. Refusing with
-    // the number is the honest answer.
+    // Deleting cascades the positions away, and everyone's access with them, so it refuses with the number.
     throw new ConflictError(
       `${held} ${held === 1 ? 'person holds' : 'people hold'} that role. Say which role they should hold instead.`,
     );
@@ -203,8 +191,9 @@ export async function deleteRole(
   return { ok: true };
 }
 
-/* -------------------------------------------------------------- the grid */
+// The grid.
 
+// The grid as it stands: one cell per role and capability.
 export async function readMatrix(orgId: string): Promise<GrantCell[]> {
   const grants = await prisma.grant.findMany({
     where: { orgId, subject: { kind: 'role' } },
@@ -220,17 +209,9 @@ export async function readMatrix(orgId: string): Promise<GrantCell[]> {
   }));
 }
 
-/**
- * The whole matrix, one transaction (13 §3).
- *
- * Two properties matter more than the write itself:
- *
- *  - a cell with `scope: null` REMOVES the grant. Default deny means an absent row is the
- *    way to take a power away, so the grid needs to be able to express absence.
- *  - every cell this touches has `derived` cleared. A derived row is one the seed wrote;
- *    once an administrator has moved it, a later regeneration must not silently put it
- *    back (10 §9).
- */
+// Saves the whole matrix in one transaction.
+// A cell with no scope REMOVES the grant, because with default deny an absent row is how a power is taken away.
+// Every cell touched stops being "derived", so a later regeneration cannot silently undo the change.
 export async function writeMatrix(
   req: Request,
   orgId: string,
@@ -246,9 +227,7 @@ export async function writeMatrix(
   for (const cell of body.cells) {
     if (!known.has(cell.roleId)) throw new NotFoundError('That role does not exist.');
     if (!(cell.capability in CAPABILITY_CATALOGUE)) {
-      // The catalogue is defined by the application, never by the user (11 §3).
-      // Administrators assign existing verbs to their own role names; they never invent
-      // verbs, and a typo here would create a grant nothing ever checks.
+      // The catalogue is fixed by the application: administrators map existing verbs onto their own role names.
       throw new ConflictError(`"${cell.capability}" is not a capability.`);
     }
   }
@@ -274,7 +253,7 @@ export async function writeMatrix(
           scope: cell.scope,
           effect: cell.effect,
           params: cell.params ?? {},
-          // Cleared, always. This row is now an administrator's choice.
+          // Always cleared: this row is now an administrator's own choice.
           derived: false,
           createdById: userId,
         },
@@ -292,35 +271,14 @@ export async function writeMatrix(
   return readMatrix(orgId);
 }
 
-/**
- * THE LOCKOUT GUARD — 33 § "The lockout guard". `409`, never a warning.
- *
- * A grid that leaves no role holding `grant.update` is the one unrecoverable mistake on that
- * screen: the organisation can still be used and can never be re-configured, because the
- * capability that would fix it is the capability nobody holds any more. There is no undo,
- * because undo is a grid edit.
- *
- * It is the ONLY place in the product where an administrator's explicit intent is overridden,
- * and 33 argues the exception rather than assuming it: everything else the grid can express
- * is a legal configuration somebody might mean, and blocking on a judgement call is how
- * administrators learn to fight the tool. This one is not a judgement call — it is a state
- * from which the tool cannot be operated at all.
- *
- * COMPUTED ON THE RESULTING MATRIX, NOT ON THE SUBMITTED CELLS. `PUT /grants` writes the
- * cells it is given and leaves the rest alone, so a body that merely does not MENTION
- * `grant.update` is fine, and a body that removes the last holder is not. Checking the body
- * would refuse the first and allow the second, which is exactly backwards.
- *
- * Not middleware, unlike the escalation bound next to it, and the difference is real: this is
- * not an authorisation question. The caller is permitted to make this change; the resulting
- * state is the thing that is refused. `409`, the same shape as "that is not a capability".
- */
+// The lockout guard: refuses a save that would leave NO role able to edit the powers grid.
+// It is the one unrecoverable state on that screen, because fixing it needs the very capability nobody holds.
+// Checked against the RESULTING matrix, not against the submitted cells.
 async function assertSomebodyCanStillEditPowers(
   orgId: string,
   body: PutGrantsBody,
 ): Promise<void> {
-  // Only a body that TOUCHES grant.update can remove the last holder. Every other save skips
-  // the query entirely, which matters because the grid saves the whole visible matrix.
+  // Only a save that touches grant.update can remove the last holder, so every other save skips this query.
   const touches = body.cells.some((cell) => cell.capability === 'grant.update');
   if (!touches) return;
 
@@ -336,8 +294,7 @@ async function assertSomebodyCanStillEditPowers(
     after.set(cell.roleId, cell.scope === null ? 'none' : cell.effect);
   }
 
-  // INV-004: a deny beats an allow, so a role holding both holds nothing. A holder is a
-  // role whose resulting cell is an allow and nothing else.
+  // A deny beats an allow, so a role holding both holds nothing.
   const holders = [...after.values()].filter((effect) => effect === 'allow');
   if (holders.length > 0) return;
 
@@ -347,11 +304,7 @@ async function assertSomebodyCanStillEditPowers(
   );
 }
 
-/**
- * What the grid warns about. None of these is an error — they are all legal states that
- * are usually mistakes, and the difference matters: an administrator who is blocked from a
- * legal configuration stops trusting the tool.
- */
+// What the grid warns about. None of these is an error: they are legal states that are usually mistakes.
 export async function grantWarnings(
   orgId: string,
   labels: ResolvedLabels,
@@ -371,8 +324,7 @@ export async function grantWarnings(
   const warnings: GrantWarning[] = [];
   const roleName = new Map(roles.map((role) => [role.id, role.name]));
 
-  // 1 · a capability nobody holds. Usually harmless; occasionally it means the one role
-  //     that could launch a campaign was renamed into a role that cannot.
+  // 1. A capability no role holds at all.
   const held = new Set(grants.filter((g) => g.effect === 'allow').map((g) => g.capability));
   for (const [capability, meta] of Object.entries(CAPABILITY_CATALOGUE)) {
     if (meta.phase !== 'P1' && meta.phase !== 'P2') continue;
@@ -384,9 +336,7 @@ export async function grantWarnings(
     });
   }
 
-  // 2 · a deny sitting on top of that role's own allow. Deny wins absolutely (INV-004), so
-  //     the allow beneath it never applies — which reads as a working power in the grid and
-  //     is not one.
+  // 2. A deny sitting on top of that same role's allow, which looks like a working power and is not.
   for (const grant of grants.filter((g) => g.effect === 'deny')) {
     const shadowed = grants.some(
       (other) =>
@@ -403,8 +353,7 @@ export async function grantWarnings(
     });
   }
 
-  // 3 · a role that can change its own powers. Legal, and the top role has to be able to,
-  //     but worth saying out loud when it is true of someone further down.
+  // 3. A role that can change its own powers. Expected at the top, worth saying further down.
   for (const grant of grants) {
     if (grant.capability !== 'grant.update' || grant.effect !== 'allow') continue;
     warnings.push({
@@ -415,25 +364,7 @@ export async function grantWarnings(
     });
   }
 
-  // 4 · the thin starter row. `GRANT_MATRIX` describes four rows and the level-4 one is
-  //     deliberately small — no `template.*`, no `campaign.read`, no `booking.*`, no
-  //     `announcement.create` — because it is the RESPONDENT's row.
-  //
-  //     THE WARNING NOW MEANS SOMETHING NARROWER THAN IT DID. Until `DEC-112` every role
-  //     below the fourth was clamped onto that row, so a ten-role college came out of the
-  //     wizard with SIX roles able to do almost nothing and this warning named all six. The
-  //     mapping is fixed: only the BOTTOM role takes the respondent row now. So what is left
-  //     to warn about is one role — the last — and the warning is still worth keeping,
-  //     because "the bottom of your ladder can read and answer and nothing else" is a real
-  //     thing to check rather than to discover.
-  //
-  //     It is not an error. The administrator is meant to edit the grid, and this is said
-  //     where the grid already reads its warnings.
-  //     ASKED OF THE SAME FUNCTION THAT ASSIGNED THE GRANTS, never inferred from the level
-  //     number. `node.level` is the role's POSITION (1..n) and the matrix row is a different
-  //     thing entirely — reading "is this the highest number" would answer "is it last",
-  //     which is true of the bottom role under any mapping and so would have gone on passing
-  //     while the warning named one role out of the six that were actually thin.
+  // 4. The bottom role still holding only its thin starter row, which is worth checking rather than discovering.
   const clamped = roles.filter(
     (role) => role.level !== null && levelForRole(role.level - 1, roles.length) === MATRIX_LEVELS,
   );
@@ -454,20 +385,14 @@ export async function grantWarnings(
   return warnings;
 }
 
-/** How many levels `GRANT_MATRIX` describes. `DEC-112` decides which role takes which. */
+// How many rows the seeded matrix describes.
 const MATRIX_LEVELS = 4;
 
 
-/** The capabilities that clamped row hands out — a row holding only these was never edited. */
+// The capabilities that bottom row hands out; a role holding only these has never been edited.
 const DERIVED_L4 = new Set<string>(grantsForLevel(MATRIX_LEVELS).map((grant) => grant.capability));
 
-/**
- * The catalogue, for the grid. Grouped exactly as 11 §3 groups it.
- *
- * TAKES THE TENANT'S NOUNS SINCE T-052 (`D-008`). The row labels of the powers grid are
- * user-facing domain nouns, so INV-001 applies to them exactly as it applies to a component:
- * a hotel's grid reads *"open guest surveys for answers"*, not *"launch campaigns"*.
- */
+// The catalogue for the grid, in the tenant's own words: a hotel reads "open guest surveys", not "launch campaigns".
 export const capabilityCatalogue = (labels: ResolvedLabels): CapabilityMeta[] =>
   Object.entries(CAPABILITY_CATALOGUE).map(([key, meta]) => ({
     key,
@@ -476,12 +401,7 @@ export const capabilityCatalogue = (labels: ResolvedLabels): CapabilityMeta[] =>
     phase: meta.phase,
   }));
 
-/**
- * `POST /authz/simulate` — 42. Resolves the DTO's target into the resolver's own `Target`
- * and calls `simulate()`, which is `resolve()` itself (`authz/simulate.ts`). Nothing here
- * touches the algorithm; it only turns a subject or campaign id into the unit `resolve()`
- * already knows how to scope against.
- */
+// The simulator: turns the request's target into the resolver's own target and calls resolve(). It never re-implements the rules.
 export async function runSimulation(
   orgId: string,
   authzVersion: number,
@@ -493,17 +413,15 @@ export async function runSimulation(
     userId: body.principalUserId,
     capability: body.capability,
     target: await resolveSimTarget(orgId, body.target, labels),
-    // Spread rather than passed as `at: body.at`. `ResolveInput.at` is optional and means
-    // "now" when absent; under exactOptionalPropertyTypes an explicit `undefined` is not
-    // the same thing as an absent key, and only the absent key says "now" (`11` §7).
+    // Spread rather than passed as at: body.at - an explicit undefined is not the same as an absent key,
+    // and only the absent key means "now".
     ...(body.at ? { at: body.at } : {}),
     authzVersion,
   });
 }
 
-// Takes the tenant's nouns for the same reason `grantWarnings` does (`D-008`, INV-001):
-// these two messages are SENTENCES SHOWN TO AN ADMINISTRATOR, and a hotel operator being
-// told *"that subject does not exist"* is being shown a column name.
+// Takes the tenant's nouns, because these messages are sentences shown to an administrator:
+// a hotel operator told "that subject does not exist" is being shown a column name.
 async function resolveSimTarget(
   orgId: string,
   target: SimulateBody['target'],
@@ -536,8 +454,7 @@ async function resolveSimTarget(
 }
 
 async function assertRole(orgId: string, roleId: string): Promise<void> {
-  // D-001 again: the tenant client cannot scope a by-id where, so this is checked by hand
-  // until RLS lands (10 §8).
+  // The tenant-bound client cannot filter a by-id lookup, so the organisation is checked by hand here.
   const role = await prisma.node.findFirst({
     where: { id: roleId, orgId, kind: 'role' },
     select: { id: true },

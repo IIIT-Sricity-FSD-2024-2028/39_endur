@@ -1,16 +1,9 @@
-// T-110 — the API document. `DEC-115`, `13` §12.
-//
-// FOUR TESTS, AND THE FIRST TWO ARE WHY THE DOCUMENT CAN BE TRUSTED.
-//
-// Generated documentation is only worth more than hand-written documentation if it cannot fall
-// behind. `routes.test.ts` already makes a route without a guard a build failure; these make a
-// route without a documented response, and a DTO the converter cannot express, build failures
-// too. Between the three, the ways a route can exist without being correctly described are
-// closed.
-//
-// The fourth is the one no type system could do: it parses REAL RESPONSES from the running app
-// through the schemas the document publishes. `mirrors<T>()` in `components.ts` proves the
-// schema matches the TYPE; this proves the handler matches the schema.
+// The API document.
+// Generated documentation is only worth more than hand-written documentation if it cannot fall behind.
+// The route test already makes an unguarded route a build failure; these make an undocumented route,
+// and a DTO the converter cannot express, build failures too.
+// The last test is the one no type system could do: it parses REAL responses from the running app
+// through the schemas the document publishes.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { z } from 'zod';
@@ -37,8 +30,7 @@ const routes = enumerateRoutes(createApp());
 
 describe('the document describes every route, and only real ones', () => {
   it('every mounted route has a documented response', () => {
-    // THE TEST THAT KEEPS IT HONEST. Add a route and this names it — which is the difference
-    // between a document that is generated and a document that is merely generated ONCE.
+    // The test that keeps it honest: add a route and this names it.
     const undocumented = routes.map(routeKey).filter((key) => !RESPONSES[key]);
     expect(
       undocumented,
@@ -47,8 +39,8 @@ describe('the document describes every route, and only real ones', () => {
   });
 
   it('every documented response belongs to a route that exists', () => {
-    // The other direction, and it is the half that rots silently: a route deleted or renamed
-    // leaves an entry describing something nobody can call.
+    // The other direction, and the half that rots silently: a route deleted or renamed leaves an entry
+    // describing something nobody can call.
     const live = new Set(routes.map(routeKey));
     const orphans = Object.keys(RESPONSES).filter((key) => !live.has(key));
     expect(orphans, 'these entries in openapi/responses.ts describe no route').toEqual([]);
@@ -57,9 +49,8 @@ describe('the document describes every route, and only real ones', () => {
 
 describe('every DTO can be published', () => {
   it('the converter has a rule for every construct the app actually mounts', () => {
-    // `zodSchema.ts` THROWS on a construct it does not understand rather than emitting `{}`,
-    // precisely so this test can exist. A general-purpose converter would emit something
-    // plausible for an unknown schema and nobody would ever find out.
+    // The converter THROWS on a construct it does not understand rather than emitting an empty schema,
+    // precisely so this test can exist.
     const failures: string[] = [];
     for (const route of routes) {
       if (!route.dto) continue;
@@ -82,9 +73,8 @@ describe('the document itself', () => {
 
   it('is OpenAPI 3.1 and covers every route', () => {
     expect(doc.openapi).toBe('3.1.0');
-    // UNIQUE KEYS, not raw counts. `mount()`'s registry is module-level and a test process
-    // builds several apps out of the same singleton routers, so the walker can legitimately
-    // report one route more than once. What must hold is that the SET matches.
+    // Compared as unique keys rather than raw counts: a test process builds several apps out of the same
+    // routers, so the walker can legitimately report one route more than once.
     const operations = new Set(
       Object.entries(doc.paths).flatMap(([url, methods]) =>
         Object.keys(methods).map((method) => `${method.toUpperCase()} ${url}`),
@@ -96,9 +86,8 @@ describe('the document itself', () => {
   });
 
   it('names the capability AND the roles that hold it, on every guarded route', () => {
-    // The requirement this whole feature exists for: a reader must be able to see, per endpoint,
-    // what they need in order to call it. The capability comes from the guard and the roles from
-    // the seeded matrix — neither is retyped here or in the document.
+    // The requirement this whole feature exists for: a reader can see, per endpoint, what they need in
+    // order to call it - taken from the guard and the seeded matrix, never retyped.
     const people = doc.paths['/api/v1/people/']?.get as {
       description: string;
       'x-capability': string[];
@@ -113,12 +102,11 @@ describe('the document itself', () => {
     const create = doc.paths['/api/v1/people/']?.post as { parameters: Array<{ name: string }> };
     expect(create.parameters.map((p) => p.name)).toContain('X-CSRF-Token');
 
-    // A GET carries no CSRF token — the middleware exempts safe methods, and a document that
-    // demanded one would be describing a request nobody makes.
+    // A GET carries no CSRF token, and a document that demanded one would describe a request nobody makes.
     const list = doc.paths['/api/v1/people/']?.get as { parameters: Array<{ name: string }> };
     expect(list.parameters.map((p) => p.name)).not.toContain('X-CSRF-Token');
 
-    // The respondent surface has no ambient authority to protect, so no token (DEC-009).
+    // The respondent surface has no ambient authority to protect, so no token.
     const submit = doc.paths['/api/v1/public/campaigns/{token}/responses']?.post as {
       parameters: Array<{ name: string }>;
     };
@@ -135,8 +123,8 @@ describe('the document itself', () => {
     };
     expect(Object.keys(schema.properties).sort()).toEqual(['email', 'name']);
     expect(schema.required.sort()).toEqual(['email', 'name']);
-    // `14` §8: no create-person DTO accepts a role, a level or a capability. The document says
-    // so because the DTO says so — there is no second list to keep in step.
+    // No create-person request accepts a role, a level or a capability. The document says so because the
+    // schema says so - there is no second list to keep in step.
     expect(Object.keys(schema.properties)).not.toContain('roleId');
   });
 
@@ -152,8 +140,8 @@ describe('the document itself', () => {
       parameters: Array<{ name: string; in: string; required: boolean }>;
     };
     const limit = list.parameters.find((p) => p.name === 'limit');
-    // `.default(50)` means the CALLER may omit it — documenting it as required would put a
-    // mandatory `limit` on every list endpoint in the product.
+    // A defaulted field means the CALLER may omit it: documenting it as required would put a mandatory
+    // limit on every list endpoint in the product.
     expect(limit?.in).toBe('query');
     expect(limit?.required).toBe(false);
   });
@@ -181,14 +169,10 @@ describe('the document itself', () => {
   });
 });
 
-/**
- * THE ROUND TRIP. A generated document can still be wrong in the one way generation cannot
- * catch: a handler that does not return what its type claims.
- *
- * `.strict()` is the point of this suite. `mirrors<T>()` proves a schema has no MISSING field;
- * only parsing a real body proves it has no EXTRA one — and an undocumented field is exactly the
- * kind of thing that accumulates quietly until a document is no longer worth reading.
- */
+// The round trip. A generated document can still be wrong in the one way generation cannot catch:
+// a handler that does not return what its type claims.
+// Strict parsing is the point - a compile-time check proves no field is MISSING, and only parsing a
+// real body proves there is no EXTRA one.
 describe('the published schemas parse what the server actually sends', () => {
   let org: Session;
 

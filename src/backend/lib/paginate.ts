@@ -1,26 +1,14 @@
-// Cursor pagination. 13 §4.
-//
-// Not offset pagination. Offset on a growing table returns duplicate rows and skips
-// others while someone else is inserting — and a live campaign inserts into `responses`
-// by definition, so the one list most likely to be watched during a demo is the one
-// offset would get wrong.
-//
-// The cursor encodes the sort key of the last row returned, so the next page asks for
-// "everything after this exact row" rather than "skip 50". Rows inserted meanwhile shift
-// nothing.
+// Cursor pagination: each page asks for "everything after this exact row" instead of "skip 50".
+// Offset paging would duplicate or skip rows while new ones are being inserted, which a live campaign does constantly.
 import type { Page } from '@endur/shared';
 import { AppError } from './errors.js';
 
-/**
- * What every cursor-paginated list returns. `meta.total` is scope-filtered (INV-003).
- *
- * An ALIAS of the shared type, not a second declaration: this shape is a contract the
- * client reads, and it was declared twice — differently — until T-034 (N-029).
- */
+// What every paginated list returns. meta.total is already filtered to what the caller may see.
 export type Paged<T> = Page<T>;
 
 export type CursorPoint = { createdAt: Date; id: string };
 
+// Packs a row's sort key into an opaque cursor string.
 export function encodeCursor(point: CursorPoint): string {
   return Buffer.from(
     JSON.stringify({ t: point.createdAt.toISOString(), i: point.id }),
@@ -28,6 +16,7 @@ export function encodeCursor(point: CursorPoint): string {
   ).toString('base64url');
 }
 
+// Unpacks a cursor back into a sort key, or fails with 400.
 export function decodeCursor(cursor: string): CursorPoint {
   try {
     const raw: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
@@ -38,18 +27,12 @@ export function decodeCursor(cursor: string): CursorPoint {
     if (Number.isNaN(createdAt.getTime())) throw new Error('bad date');
     return { createdAt, id: i };
   } catch {
-    // A cursor is opaque to the client, so a malformed one is a bug or a probe, never a
-    // typo. 400 rather than a silent reset to page one: silently restarting a paginated
-    // export would drop rows without anyone noticing.
+    // A cursor is opaque to the client, so a broken one is a bug or a probe: fail with 400 rather than silently restarting.
     throw new AppError('BAD_REQUEST', 'That page cursor is not valid.');
   }
 }
 
-/**
- * The `where` fragment for "strictly after this point", with `id` as the tiebreak so rows
- * created in the same millisecond still have a total order. Without the tiebreak a page
- * boundary landing inside a batch insert repeats or drops rows.
- */
+// The "strictly after this point" filter, with id as a tiebreak so rows made in the same millisecond still have an order.
 export const afterCursor = (cursor: string | undefined) => {
   if (!cursor) return {};
   const { createdAt, id } = decodeCursor(cursor);
@@ -58,38 +41,28 @@ export const afterCursor = (cursor: string | undefined) => {
   };
 };
 
-/** Newest first, everywhere. The tiebreak has to be part of the sort, not just the filter. */
+// Newest first, everywhere. The tiebreak has to be in the sort as well as the filter.
 export const CURSOR_ORDER = [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
 
-/**
- * Most tables sort by `created_at`. `responses` sorts by `submitted_at` — it has no
- * created_at, because for a response those would be the same instant and a second column
- * would be a second thing to get wrong (10 §4.4).
- */
+// Same thing for tables that sort by another column: responses use submitted_at, not created_at.
 export const afterCursorOn = (field: 'createdAt' | 'submittedAt', cursor: string | undefined) => {
   if (!cursor) return {};
   const { createdAt, id } = decodeCursor(cursor);
   return { OR: [{ [field]: { lt: createdAt } }, { [field]: createdAt, id: { lt: id } }] };
 };
 
+// The sort order for a table that uses another timestamp column.
 export const orderOn = (field: 'createdAt' | 'submittedAt') =>
   [{ [field]: 'desc' as const }, { id: 'desc' as const }];
 
-/**
- * Call the query with `limit + 1` rows and hand the result here: the extra row is how
- * `hasMore` is known without a second count query.
- *
- * The cursor is taken from the DATABASE row, before any mapping — a response shape usually
- * carries `createdAt` as an ISO string, and building a cursor from that would round-trip
- * the timestamp through two conversions for no reason.
- */
+// Turns rows into a page. Ask the query for limit + 1 rows: the extra one is how hasMore is known
+// without a second query. The cursor is built from the database row, before any mapping.
 export function pageOf<Row extends { id: string }, Out = Row>(
   rows: Row[],
   limit: number,
   total: number,
   map: (row: Row) => Out = (row) => row as unknown as Out,
-  // Which timestamp forms the cursor. Defaults to createdAt, which every table but
-  // `responses` has.
+  // Which timestamp forms the cursor. Defaults to createdAt, which every table but responses has.
   point: (row: Row) => CursorPoint = (row) => row as unknown as CursorPoint,
 ): Paged<Out> {
   const hasMore = rows.length > limit;

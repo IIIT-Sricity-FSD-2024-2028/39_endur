@@ -1,7 +1,5 @@
-// Role, grant and capability routes. 13 § Roles and powers, 33.
-//
-// Roles and grants are mounted separately (`/roles`, `/grants`, `/authz`) but share one
-// router file, because they are one screen and one mental model: the powers grid.
+// Role, grant and simulator routes.
+// They share one file because they are one screen and one idea: the powers grid.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import {
@@ -44,8 +42,7 @@ export const rolesRouter: Router = Router();
 export const grantsRouter: Router = Router();
 export const authzRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 rolesRouter.use(tenantChain);
 grantsRouter.use(tenantChain);
 authzRouter.use(tenantChain);
@@ -56,14 +53,16 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
   return principal.id;
 };
 
-/* ------------------------------------------------------------------ roles */
+// Roles.
 
+// Every role, with how many people hold each.
 rolesRouter.get('/', authenticate, requireCapability('role.read', { target: 'any' }), (req, res, next) => {
   void listRoles(req.ctx.orgId as string)
     .then((roles) => res.json({ data: roles }))
     .catch(next);
 });
 
+// Creates a role.
 rolesRouter.post(
   '/',
   authenticate,
@@ -77,8 +76,7 @@ rolesRouter.post(
   },
 );
 
-// Reorder is registered BEFORE /:id so that "reorder" is never read as a role id. Express
-// matches in registration order, and this is the classic way to lose an hour.
+// Registered BEFORE /:id, or Express would read "reorder" as a role id.
 rolesRouter.post(
   '/reorder',
   authenticate,
@@ -92,6 +90,7 @@ rolesRouter.post(
   },
 );
 
+// Renames a role.
 rolesRouter.patch(
   '/:id',
   authenticate,
@@ -105,6 +104,7 @@ rolesRouter.patch(
   },
 );
 
+// Deletes a role, reassigning its holders if the body says where to.
 rolesRouter.delete(
   '/:id',
   authenticate,
@@ -118,38 +118,34 @@ rolesRouter.delete(
   },
 );
 
-/* ----------------------------------------------------------------- grants */
+// Grants - the powers grid itself.
 
+// The powers grid as it stands.
 grantsRouter.get('/', authenticate, requireCapability('grant.read'), (req, res, next) => {
   void readMatrix(req.ctx.orgId as string)
     .then((cells) => res.json({ data: cells }))
     .catch(next);
 });
 
-// Registered before nothing in particular, but kept above the bulk PUT so the two are read
-// together: the warnings are what the grid shows next to the save button.
+// The grid's warnings, kept beside the save button they appear next to.
 grantsRouter.get('/warnings', authenticate, requireCapability('grant.read'), (req, res, next) => {
-  // The tenant's nouns, because a warning is a SENTENCE shown to an administrator — the
-  // same INV-001 rule as the grid's row labels, and the same one implementation (D-008).
+  // The tenant's own nouns, because a warning is a sentence an administrator reads.
   void grantWarnings(req.ctx.orgId as string, nounsOf(req))
     .then((warnings) => res.json({ data: warnings }))
     .catch(next);
 });
 
+// Saves the grid.
 grantsRouter.put(
   '/',
   authenticate,
   validate(PutGrantsDto),
   requireCapability('grant.update'),
-  // Link 10b — INV-012 on the grid, T-052. `grant.update` says you may EDIT the matrix; it
-  // does not say you may write a row more powerful than yourself into it. Until this line
-  // the route asked only the first question, which is `D-018`'s shape one screen along.
-  // AFTER requireCapability and never instead of it: it can only ever refuse.
+  // Link 10b. grant.update says you may edit the grid; it does not say you may write in a power
+  // you do not hold yourself. It runs after the capability check and can only refuse.
   requireNoGrantEscalation(),
-  // Entitlements answer a different question from capabilities: "has this org paid for
-  // it", not "may this person" (DEC-011). grant.update is Bronze — correct handling of
-  // who-can-see-what is never an upgrade (01 §6) — so this passes for every tier, and it
-  // is here to keep the two checks visibly separate.
+  // The plan check asks a different question from the permission check. grant.update is in every tier,
+  // so this always passes - it is here to keep the two checks visibly separate.
   requireEntitlement('grant.update'),
   (req, res, next) => {
     const { body } = req.data as { body: PutGrantsBody };
@@ -159,17 +155,14 @@ grantsRouter.put(
   },
 );
 
-/* ------------------------------------------------------------------ authz */
+// The capability catalogue and the simulator.
 
-// The catalogue the grid renders its rows from. Guarded by org.read rather than left open
-// (DEC-018): org.read is seeded to every role, so everyone who can sign in can read it,
-// and the route-enumeration allowlist stays as small as it was built to be.
+// The catalogue the grid builds its rows from, guarded by org.read, which every role holds.
 authzRouter.get('/capabilities', authenticate, requireCapability('org.read'), (req, res) => {
   res.json({ data: capabilityCatalogue(nounsOf(req)) });
 });
 
-// 42 — the simulator. Guarded by simulator.run rather than left open: it reveals the org's
-// permission structure (`considered` included), so it is not a default-for-everyone read.
+// The permission simulator. Guarded, because its answer describes the organisation's permission structure.
 authzRouter.post(
   '/simulate',
   authenticate,
@@ -177,8 +170,7 @@ authzRouter.post(
   requireCapability('simulator.run'),
   (req, res, next) => {
     const { body } = req.data as { body: SimulateBody };
-    // The tenant's nouns, because the 404s this can raise are sentences an administrator
-    // reads — the same INV-001 rule as the warnings above (`D-008`).
+    // The tenant's nouns again, because the errors this can raise are sentences an administrator reads.
     void runSimulation(req.ctx.orgId as string, req.ctx.authzVersion ?? 0, body, nounsOf(req))
       .then((decision) => res.json({ data: decision }))
       .catch(next);

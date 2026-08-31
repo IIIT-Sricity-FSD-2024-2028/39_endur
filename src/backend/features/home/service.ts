@@ -1,23 +1,18 @@
-// The home dashboard. 13 § Home, 46.
-//
-// ONE endpoint, one round trip. A dashboard that fires six requests is six chances to be
-// slow on venue wifi, and it is the first screen an evaluator sees after login.
-//
-// The other rule here is that a section the caller cannot read is ABSENT (INV-003). Not
-// empty, not greyed, not present-with-a-flag — absent. A low-level user gets a smaller,
+// The home dashboard: one endpoint, one round trip.
+// A section the caller cannot read is ABSENT, not greyed out, so a junior user gets a smaller
 // coherent page rather than a page full of locks.
 import { CampaignAccess } from '@endur/shared';
 import type { HomeView, StatWindow } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { config } from '../../lib/config.js';
 import { seesNothing, visibleUnits, type Visibility } from '../../authz/index.js';
-// The same predicate the campaigns list uses, not a second copy of it — this file held
-// the second copy until DEC-093, and only one of the two got fixed when D-042 was found.
+// The same visibility rule the campaigns list uses, not a second copy of it.
 import { scopeToCampaigns } from '../campaigns/visibility.js';
 import { whereStatus } from '../campaigns/status.js';
 import { countAudience, ruleOf } from '../campaigns/audience.js';
 import { publicUrlFor } from '../campaigns/token.js';
 
+// Everything the dashboard needs, in one call.
 export async function readHome(
   orgId: string,
   userId: string,
@@ -68,7 +63,7 @@ export async function readHome(
   const stats = await readStats(orgId, canReadResults, activeCampaigns.length, window);
   const view: HomeView = { stats, prompts: [], configured };
 
-  // Sections, each present only if its capability is.
+  // Each section appears only if the caller holds the capability behind it.
   if (!seesNothing(canReadCampaigns)) {
     view.activeCampaigns = activeCampaigns.map((campaign) => ({
       id: campaign.id,
@@ -76,14 +71,12 @@ export async function readHome(
       subjectCount: campaign._count.subjects,
       responseCount: campaign._count.responses,
       endsAt: campaign.endsAt?.toISOString() ?? null,
-      // Carried here so the card's Share opens a QR on the click rather than after a
-      // request (46 § Data contract). It is one column the query already had to read.
+      // Carried here so the Share button opens a QR immediately instead of after another request.
       url: campaign.publicToken
         ? publicUrlFor(config.PUBLIC_BASE_URL, campaign.publicToken)
         : null,
       anonymous: campaign.anonymous,
-      // One more column the query already reads, so the sheet can warn about a restricted
-      // link at the point somebody shares it (24 §6).
+      // One more column the query already reads, so the share sheet can warn about a members-only link.
       access: CampaignAccess.catch('public').parse(campaign.access),
     }));
   }
@@ -101,20 +94,11 @@ export async function readHome(
   return view;
 }
 
-/* ---------------------------------------------------------------- sections */
+// The sections.
 
-/**
- * The instant a window opens, or `null` for "all time" — DEC-031.
- *
- * Windows start at MIDNIGHT, not at "now minus 24 hours". A count that silently drops this
- * morning's responses as the afternoon wears on is a count nobody can reconcile against
- * what they saw an hour ago. `7d` is therefore today plus the six days before it.
- *
- * Midnight is the SERVER's midnight, which is the same approximation `readStats` already
- * made for its "today" card. It is honest for a single-timezone organisation and off by
- * hours for a distributed one; making it exact needs a timezone on the org, which is a
- * schema change and not this task's (noted at DEC-031).
- */
+// When a window starts, or null for "all time".
+// Windows begin at MIDNIGHT, not "now minus 24 hours", so a count does not silently drop this morning's
+// responses as the afternoon wears on. It is the server's midnight, which is honest for a single-timezone org.
 export function windowStart(window: StatWindow, now: Date = new Date()): Date | null {
   if (window === 'all') return null;
   const start = new Date(now);
@@ -134,17 +118,9 @@ type CampaignFacts = {
   _count: { subjects: number; responses: number };
 };
 
-/**
- * Was this campaign collecting at any point inside the window?
- *
- * It decides who is allowed into the response rate's DENOMINATOR, and getting it wrong is
- * the same class of mistake as `N-043`: a campaign that closed in March contributes its
- * whole audience to a rate measured over last week, and the rate collapses toward zero for
- * a reason that has nothing to do with last week.
- *
- * Never launched means never collected, so a draft is out on the token alone (DEC-016).
- * A campaign still open has no end, which is why a null `ended` passes.
- */
+// Was this campaign collecting at any point inside the window?
+// It decides which campaigns are allowed into the response rate's denominator: one that closed in March
+// would otherwise drag a rate measured over last week towards zero.
 function collectedDuring(campaign: CampaignFacts, since: Date | null, now: Date): boolean {
   if (!campaign.publicToken) return false;
   if (campaign.startsAt && campaign.startsAt.getTime() > now.getTime()) return false;
@@ -153,6 +129,7 @@ function collectedDuring(campaign: CampaignFacts, since: Date | null, now: Date)
   return ended === null || ended.getTime() >= since.getTime();
 }
 
+// The four stat cards, and the response rate behind them.
 async function readStats(
   orgId: string,
   visibility: Visibility,
@@ -160,8 +137,7 @@ async function readStats(
   window: StatWindow,
 ): Promise<HomeView['stats']> {
   if (seesNothing(visibility)) {
-    // A legitimate state for a low-permission role, and it must not look like an error:
-    // zeroes with no sections beneath them, and an empty state rather than four cards (46).
+    // A legitimate state for a low-permission role, so it must not look like an error: an empty state, not four zero cards.
     return {
       window,
       responses: 0,
@@ -199,14 +175,9 @@ async function readStats(
     }),
   ]);
 
-  // The k-anon gate applies to every number here too (46 § Acceptance): home must not
-  // become a way to read a suppressed campaign's results one aggregate at a time. Campaign
-  // totals below the threshold are excluded from the rate rather than rounded.
-  //
-  // GATED ON THE ALL-TIME TOTAL, not the windowed one, and that is deliberate: gating on
-  // the window would make a campaign appear in the rate and vanish again as the range
-  // moved, which reads as a bug and leaks the same aggregate anyway to anyone who changes
-  // the range twice.
+  // The anonymity gate applies to these numbers too: home must not become a way to read a suppressed
+  // campaign one aggregate at a time. Gated on the all-time total, so a campaign does not appear and
+  // vanish again as the date range moves.
   const countable = campaigns.filter(
     (campaign) =>
       campaign._count.responses >= config.K_ANON_THRESHOLD &&
@@ -223,24 +194,10 @@ async function readStats(
   };
 }
 
-/**
- * Responses over people asked, across the campaigns where "people asked" is a real number
- * and the campaign was actually running during the window.
- *
- * **This summed `_count.subjects` until T-041** — the same substitution `N-043` found in
- * `readResults`, in a second reader nobody knew existed, on the FIRST screen after sign-in.
- * Measured against the seeded demo before the fix: Northfield 3161%, Grand Palace 2654%,
- * Meridian 2610%, Riverside 4675%.
- *
- * A campaign whose audience is `anyone` is dropped from **both** sides rather than having
- * its responses counted against everybody else's audience — that would be a third wrong
- * number rather than a compromise. When no campaign has an audience, there is no rate, and
- * the card says so instead of showing one.
- *
- * The numerator is counted per campaign rather than reusing the org-wide windowed total,
- * because the two sets differ: a campaign below the k-anon threshold contributes responses
- * to `stats.responses` and neither side of this fraction.
- */
+// Responses over people asked, across the campaigns where "people asked" is a real number and the
+// campaign was actually running during the window.
+// A campaign whose audience is an open link is dropped from BOTH sides, rather than counting its
+// responses against everybody else's audience. With no countable audience there is simply no rate.
 async function orgResponseRate(
   orgId: string,
   campaigns: CampaignFacts[],
@@ -273,9 +230,10 @@ async function orgResponseRate(
 
 type Comment = NonNullable<HomeView['recentComments']>[number];
 
+// A few recent comments, from campaigns that are past the anonymity threshold.
 async function readComments(orgId: string, visibility: Visibility): Promise<Comment[]> {
-  // Only from campaigns that are already past the threshold. Reading one comment from a
-  // three-response campaign on the dashboard would defeat the gate on the results page.
+  // Only from campaigns already past the threshold: one comment from a three-response campaign here
+  // would defeat the gate on the results page.
   const open = await prisma.campaign.findMany({
     where: { orgId, ...scopeToCampaigns(visibility) },
     select: { id: true, _count: { select: { responses: true } } },
@@ -307,13 +265,8 @@ async function readComments(orgId: string, visibility: Visibility): Promise<Comm
     .filter((comment) => comment.text.length > 0);
 }
 
-/**
- * Setup nudges, at most two, in priority order:
- *   no subjects → no campaigns → setup incomplete → over seats.
- *
- * A prompt for an action the caller cannot take is not shown — telling somebody to add
- * something they have no permission to add is worse than saying nothing.
- */
+// Setup nudges, at most two, in priority order: no subjects, no campaigns, setup incomplete, over seats.
+// A prompt for something the caller has no permission to do is never shown.
 async function buildPrompts(
   orgId: string,
   context: { configured: boolean; canCreateSubjects: boolean; hasCampaigns: boolean },

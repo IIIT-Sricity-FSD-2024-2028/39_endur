@@ -1,4 +1,4 @@
-// Subject routes. 13 § Subjects, 35.
+// Subject routes: the things feedback is collected about.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import {
@@ -22,8 +22,7 @@ import {
 
 export const subjectsRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 subjectsRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
@@ -32,6 +31,7 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
   return principal.id;
 };
 
+// The subject list, filtered to the units the caller may see.
 subjectsRouter.get(
   '/',
   authenticate,
@@ -48,6 +48,7 @@ subjectsRouter.get(
   },
 );
 
+// One subject, with its history of feedback cycles.
 subjectsRouter.get(
   '/:id',
   authenticate,
@@ -64,12 +65,12 @@ subjectsRouter.get(
   },
 );
 
+// Creates a subject inside a unit.
 subjectsRouter.post(
   '/',
   authenticate,
   validate(CreateSubjectDto),
-  // A subject IS anchored to a unit, so unlike a person the guard can name the target
-  // directly and the scope check happens before the handler runs.
+  // A subject IS anchored to a unit, so the guard can name the target directly, unlike a person.
   requireCapability('subject.create', { target: 'unit', from: 'body.unitId' }),
   (req, res, next) => {
     const { body } = req.data as { body: CreateSubjectBody };
@@ -79,6 +80,7 @@ subjectsRouter.post(
   },
 );
 
+// Renames a subject, or moves it to another unit.
 subjectsRouter.patch(
   '/:id',
   authenticate,
@@ -102,8 +104,7 @@ subjectsRouter.patch(
   },
 );
 
-// Archive, never delete: a subject with responses attached has to survive for the history
-// to mean anything (10 §9).
+// Archive, never delete: a subject with responses must survive for the history to mean anything.
 subjectsRouter.post(
   '/:id/archive',
   authenticate,

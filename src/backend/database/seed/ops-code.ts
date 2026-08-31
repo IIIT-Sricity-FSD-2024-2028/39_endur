@@ -1,10 +1,5 @@
-// Prints the current TOTP code for each seeded operator.
-//
-// The demo needs a working six-digit code and an authenticator app is a phone away, so
-// this is the affordance that makes MFA a feature to show rather than an obstacle to
-// apologise for. It reads `mfa_secret` from the database, which is precisely why it is a
-// DEVELOPMENT script: anything that can print a code can bypass the second factor, so it
-// refuses to run in production rather than trusting nobody will.
+// Prints the current two-factor code for each seeded operator, so a demo does not need a phone.
+// It reads the secret from the database, which is why it refuses to run in production.
 import { prisma } from '../../db/client.js';
 import { isProd } from '../../lib/config.js';
 import { currentCode } from '../../platform/totp.js';

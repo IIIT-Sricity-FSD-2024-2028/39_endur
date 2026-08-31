@@ -1,13 +1,7 @@
-// The Analyze layer. 43, DEC-042.
-//
-// THIS FILE HAS NO QUERY IN IT, AND MUST NOT GROW ONE. It imports `readCorpus()` from the
-// results service and `analyse()` from the engine next door, and that is the whole of its
-// access to anything. `features/inbox/` is built the same way for the same reason
-// (DEC-058): a list of individual comments is what the k-anonymity gate exists to
-// withhold, and analysis is a list of individual comments with arithmetic on top.
-//
-// `readCorpus` returns a UNION whose `comments` field exists only on the unsuppressed
-// branch, so the gate here is not a check that could be forgotten — it is the type.
+// The analysis layer.
+// This file has NO query in it and must not grow one: it reads the corpus from the results service,
+// which owns the anonymity gate, and runs the engine next door over the text.
+// The corpus type only has a comments field on the not-suppressed branch, so the gate cannot be forgotten.
 import type { AnalysisQuery, AnalysisView, ThemeDetail, ThemeSummary } from '@endur/shared';
 import type { Request } from 'express';
 import { NotFoundError } from '../../lib/errors.js';
@@ -15,12 +9,13 @@ import { readCorpus, type Corpus, type CorpusFilter } from '../results/service.j
 import type { CommentRow } from '../results/service.js';
 import { analyse, type Document, type Theme } from './engine.js';
 
-/** Below this many responses the numbers are indicative; above the second, they hold up. */
+// Below the first number the figures are indicative; above the second they hold up.
 const MEDIUM_AT = 30;
 const HIGH_AT = 100;
-/** A known response rate under this downgrades confidence one step. See `confidenceOf`. */
+// A known response rate below this lowers the confidence by one step.
 const THIN_RATE = 0.2;
 
+// The analysis overview for the current filters.
 export async function readAnalysis(
   req: Request,
   orgId: string,
@@ -33,8 +28,7 @@ export async function readAnalysis(
 
   const reliability = reliabilityOf(corpus);
   if (corpus.suppressed) {
-    // Nothing but the counts. Not zeroed themes, not an empty sentiment split — absent,
-    // exactly as `40` does it, because a client cannot render what it never received.
+    // Nothing but the counts: no zeroed themes, no empty sentiment split - a client cannot render what it never received.
     return { suppressed: true, threshold: corpus.threshold, reliability };
   }
 
@@ -44,8 +38,7 @@ export async function readAnalysis(
 
   const result = analyse({
     documents: corpus.comments.map(documentOf),
-    // The previous window is gated too. A `delta` is a count derived from that window, and
-    // a count from a below-threshold window is still information about it.
+    // The comparison window is gated too: a change figure is still information about that window.
     ...(previous && !previous.suppressed
       ? { previous: previous.comments.map(documentOf) }
       : {}),
@@ -63,12 +56,8 @@ export async function readAnalysis(
   };
 }
 
-/**
- * The drill-through. It recomputes rather than reading a stored theme, which is what makes
- * the engine's determinism load-bearing rather than a nicety: the same corpus produces the
- * same twelve themes here as it did on the overview, or this route 404s on an id the page
- * is currently displaying.
- */
+// The drill-through recomputes rather than storing themes, which is what makes the engine's determinism
+// load-bearing: the same corpus must produce the same themes here as on the overview.
 export async function readTheme(
   req: Request,
   orgId: string,
@@ -81,9 +70,7 @@ export async function readTheme(
 
   const window = windowOf(query);
   const corpus = await readCorpus(req, orgId, userId, authzVersion, { ...filterOf(query), ...window.now });
-  // Suppressed and absent produce THE SAME 404. A distinct "below the threshold" message
-  // here would confirm that comments exist and are being withheld, which is the one thing
-  // the suppression is for (52 §2, and the same reasoning as the inbox's write routes).
+  // Suppressed and "no such theme" give the SAME 404: a distinct message would confirm that comments exist.
   if (corpus.suppressed) throw new NotFoundError(missing);
 
   const byKey = new Map(corpus.comments.map((comment) => [keyOf(comment), comment]));
@@ -114,7 +101,7 @@ export async function readTheme(
   };
 }
 
-/* ---------------------------------------------------------------- plumbing */
+// Plumbing.
 
 const keyOf = (comment: CommentRow): string => `${comment.responseId}:${comment.questionId}`;
 
@@ -123,8 +110,7 @@ const documentOf = (comment: CommentRow): Document => ({
   key: keyOf(comment),
   text: comment.comment,
   at: comment.submittedAt,
-  // Normalised by its OWN scale, because a 4 out of 5 and a 4 out of 10 are different
-  // opinions and a correlation cannot be run over a column that mixes them.
+  // Normalised by its own scale, because 4 out of 5 and 4 out of 10 are different opinions.
   rating:
     comment.score === null || comment.scoreMax === null || comment.scoreMax <= 1
       ? null
@@ -146,14 +132,9 @@ const filterOf = (query: AnalysisQuery): Omit<CorpusFilter, 'from' | 'to'> => ({
   ...(query.subjectId ? { subjectId: query.subjectId } : {}),
 });
 
-/**
- * `to` is INCLUSIVE of the day a person picked — they chose a date on a calendar, not an
- * instant — so it becomes an exclusive bound at that day's midnight plus one.
- *
- * The comparison window exists only when both ends are given. Anchoring "the period before"
- * to an open-ended range would mean inventing a start date, and `delta` would then be a
- * number measured against a window nobody chose.
- */
+// The 'to' date is inclusive of the day somebody picked, so it becomes midnight the following day.
+// The comparison window exists only when both ends are given, or the change figure would be measured
+// against a window nobody chose.
 function windowOf(query: AnalysisQuery): {
   now: { from?: Date; to?: Date };
   previous: { from: Date; to: Date } | null;
@@ -172,6 +153,7 @@ function windowOf(query: AnalysisQuery): {
   return { now, previous: { from: new Date(from.getTime() - span), to: from } };
 }
 
+// How much weight to put on these numbers, from the response count and rate.
 function reliabilityOf(corpus: Corpus): AnalysisView['reliability'] {
   const rate =
     corpus.audienceEstimate && corpus.audienceEstimate > 0
@@ -185,16 +167,8 @@ function reliabilityOf(corpus: Corpus): AnalysisView['reliability'] {
   };
 }
 
-/**
- * `43` § Reliability calls this the differentiator, and it is: a 4.6 from eight responses
- * and a 4.6 from eight hundred are different facts, and presenting them identically is the
- * most common way a feedback dashboard lies.
- *
- * Count first, then ONE downgrade when the rate is known and thin — because forty responses
- * out of a thousand invitations is forty people who felt strongly enough to write, and that
- * is a different population from forty out of fifty. The rate can only ever lower the
- * reading, never raise it: a high rate on nine responses is still nine people.
- */
+// Confidence: a 4.6 from eight responses and a 4.6 from eight hundred are different facts.
+// Count first, then one downgrade when the response rate is known and thin. The rate can only lower it.
 function confidenceOf(responseCount: number, rate: number | null): 'low' | 'medium' | 'high' {
   const base = responseCount >= HIGH_AT ? 'high' : responseCount >= MEDIUM_AT ? 'medium' : 'low';
   if (rate === null || rate >= THIN_RATE) return base;

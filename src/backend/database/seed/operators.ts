@@ -1,14 +1,6 @@
-// The two operator accounts. 19 §3, 50.
-//
-// Seeded rather than registered, because there is no public path in and there must not be
-// one (19 §14): operators are created by an `owner`, and the first `owner` has to come
-// from somewhere. This is that somewhere.
-//
-// DETERMINISTIC LIKE THE REST OF THE SEED (50 §8) — including the TOTP secrets. A random
-// secret would mean the demo could not produce a working code without somebody scanning a
-// QR at rehearsal time, and a rehearsal that cannot be repeated is not a rehearsal. These
-// two secrets are development credentials in a public repository and are worth exactly
-// what that implies; a real deployment creates its first owner by hand.
+// The two Endur operator accounts, seeded because there is no public sign-up for them.
+// Their two-factor secrets are fixed like the rest of the seed, so a rehearsal can be repeated;
+// they are development credentials in a public repository and are worth exactly that.
 import type { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../../auth/password.js';
 import { currentCode, otpauthUrl } from '../../platform/totp.js';

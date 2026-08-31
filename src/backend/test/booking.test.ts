@@ -1,15 +1,12 @@
-// Booking — T-095. 13 § Booking, DEC-090.
-//
-// What these tests are actually about, in one line each:
-//
-//   · CAPACITY HOLDS UNDER CONCURRENCY — N+1 phones on a capacity-N slot, exactly N succeed
-//   · the loser gets 409 and not 400 — a well-formed request that lost a race
-//   · cancelling FREES the place, and the remaining count says so immediately
-//   · a booker cancels with their own token and NO account
-//   · the TIER LADDER is visible from outside — 402 below gold, 403 without the capability
-//   · a bad, unopened or closed token is ONE 404, so the route is not an existence oracle
-//   · the public payload names NOBODY who has booked
-//   · DEC-090 holds structurally: nothing in features/booking/ reads `responses`
+// Booking. What these tests are about, one line each:
+//   capacity holds under concurrency - N+1 phones on a capacity-N slot, exactly N succeed
+//   the loser gets 409 and not 400, because the request was fine and simply lost a race
+//   cancelling frees the place, and the remaining count says so immediately
+//   a booker cancels with their own token and no account
+//   the tier ladder is visible from outside - 402 below gold, 403 without the capability
+//   a bad, unopened or closed token is ONE 404, so the route is not an existence oracle
+//   the public payload names nobody who has booked
+//   and nothing in the booking feature reads the responses table
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +28,7 @@ async function subscribe(orgId: string, tier: 'gold' | 'silver' | 'bronze'): Pro
 const HOUR = 60 * 60 * 1000;
 const at = (hoursFromNow: number) => new Date(Date.now() + hoursFromNow * HOUR).toISOString();
 
-/** A bookable with one slot of the given capacity, open, and its public token. */
+// A bookable with one slot of the given capacity, open, and its public token.
 async function openOne(owner: Session, capacity: number): Promise<{ id: string; token: string }> {
   const created = await withCsrf(owner, 'post', '/api/v1/bookables').send({
     name: `Room ${Math.random().toString(36).slice(2, 8)}`,
@@ -63,8 +60,7 @@ describe('booking', () => {
   beforeAll(async () => {
     owner = await setUpOrg('hotel');
     await subscribe(owner.orgId, 'gold');
-    // Level 2 holds `booking.create` and `booking.update` and NOT `booking.cancel` — the
-    // seeded gap that makes cancel worth being its own verb (50 §1).
+    // This level can create and update but not cancel: the seeded gap that makes cancel its own verb.
     coordinator = await addStaff(owner.orgId, {
       name: 'Coordinator',
       level: 2,
@@ -72,14 +68,9 @@ describe('booking', () => {
     });
   });
 
-  /**
-   * THE TEST THIS FEATURE EXISTS FOR.
-   *
-   * Four phones, one place. Fired concurrently and not in sequence, because a
-   * count-then-insert passes a sequential test and double-books a live room: both readers
-   * see `capacity - 1` before either writes. The row lock in `book()` is what makes exactly
-   * one of these win, and this assertion is the only thing that proves the lock is there.
-   */
+  // The test this feature exists for.
+  // Four phones, one place, fired at the same moment rather than in sequence - a count-then-insert
+  // passes a sequential test and double-books a live room. The row lock is what makes exactly one win.
   it('lets exactly N of N+1 concurrent bookings through, and 409s the rest', async () => {
     const capacity = 2;
     const { token } = await openOne(owner, capacity);
@@ -95,8 +86,7 @@ describe('booking', () => {
     const created = results.filter((res) => res.status === 201);
     const refused = results.filter((res) => res.status === 409);
     expect(created).toHaveLength(capacity);
-    // 409 AND NOT 400. The request was well-formed and lost a race, and telling the loser to
-    // fix their form sends them to look for a mistake that is not there.
+    // 409 and not 400: telling the loser to fix their form sends them looking for a mistake that is not there.
     expect(refused).toHaveLength(2);
     expect(results.every((res) => res.status === 201 || res.status === 409)).toBe(true);
 
@@ -124,11 +114,10 @@ describe('booking', () => {
     const cancelled = await withCsrf(owner, 'post', `/api/v1/bookings/${bookingId}/cancel`).send();
     expect(cancelled.status).toBe(204);
 
-    // Derived, not stored: the count changed because a row is now cancelled, and no counter
-    // had to be decremented anywhere for it to be right.
+    // Derived, not stored: the count changed because a row is cancelled, with no counter to decrement.
     expect((await publicRead(token)).body.data.slots[0].remaining).toBe(1);
 
-    // And somebody else can have it.
+    // And somebody else can have the place.
     const next = await takeSlot(token, slotId, 'Ravi');
     expect(next.status).toBe(201);
   });
@@ -141,22 +130,18 @@ describe('booking', () => {
     const cancelToken = taken.body.data.cancelToken as string;
     expect(cancelToken).toHaveLength(8);
 
-    // No session, no CSRF token, no capability. The token is the authorisation, and it
-    // reaches exactly the one row it was minted for.
+    // No session, no CSRF token, no capability: the token is the authorisation and reaches exactly one row.
     const cancelled = await request(app).post(`/api/v1/public/bookings/${cancelToken}/cancel`);
     expect(cancelled.status).toBe(204);
     expect((await publicRead(token)).body.data.slots[0].remaining).toBe(1);
 
-    // Idempotent: pressing it twice is what a booker on a slow phone actually does.
+    // Idempotent, because pressing it twice is what a booker on a slow phone actually does.
     const again = await request(app).post(`/api/v1/public/bookings/${cancelToken}/cancel`);
     expect(again.status).toBe(204);
   });
 
-  /**
-   * 13 §6, and the omission that matters is the NAMES. A link that tells a stranger who is
-   * coming to the clinic on Tuesday is a worse leak than anything the campaign payload could
-   * make, and `capacity` is withheld with it: remaining is what a booker needs.
-   */
+  // The public payload leaves out the NAMES, and the capacity with them: a link that told a stranger who
+  // is coming on Tuesday would be a worse leak than anything else here.
   it('tells a stranger how many places are left and nothing about who took the rest', async () => {
     const { token } = await openOne(owner, 3);
     const slotId = (await publicRead(token)).body.data.slots[0].id as string;
@@ -173,8 +158,7 @@ describe('booking', () => {
     const unknown = await publicRead('ZZZZZZZZ');
     expect(unknown.status).toBe(404);
 
-    // Never opened — no token to try, so the closest probe is the console id, which must not
-    // work as a public token either.
+    // Never opened, so there is no token to try - the closest probe is the console id, which must not work either.
     const draft = await withCsrf(owner, 'post', '/api/v1/bookables').send({ name: 'Not open' });
     const unopened = await publicRead(draft.body.data.id as string);
     expect(unopened.status).toBe(404);
@@ -184,7 +168,7 @@ describe('booking', () => {
     await withCsrf(owner, 'post', `/api/v1/bookables/${id}/close`).send();
     const closed = await publicRead(token);
     expect(closed.status).toBe(404);
-    // The same sentence for all three. A different message is an existence oracle.
+    // The same sentence for all three, because a different message is an existence oracle.
     expect(closed.body.error.message).toBe(unknown.body.error.message);
   });
 
@@ -195,8 +179,7 @@ describe('booking', () => {
       'post',
       `/api/v1/bookables/${created.body.data.id}/open`,
     ).send();
-    // 409: the request is fine, the row is not ready. A link to an empty page is worse than
-    // no link, because a scanner cannot tell it from a broken product.
+    // 409: the request is fine, the row is not ready. A link to an empty page is worse than no link.
     expect(opened.status).toBe(409);
   });
 
@@ -208,8 +191,7 @@ describe('booking', () => {
     const replaced = await withCsrf(owner, 'put', `/api/v1/bookables/${id}/slots`).send({
       slots: [{ startsAt: at(48), endsAt: at(49), capacity: 1 }],
     });
-    // The cascade would silently drop an appointment, and the person losing it is not in the
-    // room to notice.
+    // The cascade would silently drop an appointment, and the person losing it is not in the room to notice.
     expect(replaced.status).toBe(409);
   });
 
@@ -220,13 +202,13 @@ describe('booking', () => {
     const bookingId = (await owner.agent.get(`/api/v1/bookables/${id}/bookings`)).body.data[0]
       .id as string;
 
-    // The coordinator can add slots — they hold `booking.update`.
+    // The coordinator can add slots.
     const ownBookable = await withCsrf(coordinator, 'post', '/api/v1/bookables').send({
       name: 'Coordinator room',
     });
     expect(ownBookable.status).toBe(201);
 
-    // And cannot take back somebody else's decision.
+    // And cannot take back somebody else's booking.
     const refused = await withCsrf(
       coordinator,
       'post',
@@ -235,11 +217,8 @@ describe('booking', () => {
     expect(refused.status).toBe(403);
   });
 
-  /**
-   * THE TIER LADDER, FROM THE OUTSIDE. 402 is what a silver organisation gets, and 403 is
-   * what a role without the capability gets — never the other way round, because the chain
-   * runs `requireCapability` before `requireEntitlement` (app.ts links 10-11).
-   */
+  // The tier ladder from outside: 402 for an organisation on a lower plan, 403 for a role without the
+  // capability - never the other way round, because the capability check runs first.
   it('402s a silver organisation and keeps the public link answering', async () => {
     const { token } = await openOne(owner, 2);
     const slotId = (await publicRead(token)).body.data.slots[0].id as string;
@@ -253,8 +232,7 @@ describe('booking', () => {
       const created = await withCsrf(owner, 'post', '/api/v1/bookables').send({ name: 'Nope' });
       expect(created.status).toBe(402);
 
-      // 16 §6: a guest holding a link did not choose the plan and is not punished for it.
-      // The console goes away; the booking page does not.
+      // A guest holding a link did not choose the plan: the console goes away, the booking page does not.
       expect((await publicRead(token)).status).toBe(200);
       expect((await takeSlot(token, slotId, 'Downgraded')).status).toBe(201);
     } finally {
@@ -263,29 +241,20 @@ describe('booking', () => {
   });
 });
 
-/**
- * DEC-090, ASSERTED STRUCTURALLY RATHER THAN BY REVIEW.
- *
- * A booking is identified and a response is anonymous forever (INV-006), and the way that
- * promise dies is not by somebody deleting it — it is by a future query in this directory
- * joining the two. A grep is a blunt instrument and it is the right one here: it survives
- * somebody who never read the header comment, which review does not.
- */
+// The identified/anonymous split, asserted structurally rather than by review.
+// The promise dies not by somebody deleting it but by a future query in this folder joining the two,
+// so this greps the directory - blunt, and it survives somebody who never read the header comment.
 describe('bookings and responses never meet — DEC-090', () => {
   it('has no query in features/booking/ that touches the responses table', () => {
-    // Resolved from THIS FILE, never from `process.cwd()` — D-037's lesson, and this guard
-    // was still making the mistake. Run from `src/backend` the old path was right; run from
-    // the repo root, which D-037 made the correct command, `readdirSync` threw and the guard
-    // reported on nothing. A rule that only holds from one working directory is not a rule,
-    // and a structural guard is the last place that should depend on how it was launched.
+    // Resolved from THIS file, never from the working directory: a rule that only holds when the suite is
+    // launched from one place is not a rule.
     const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'features', 'booking');
     const files = readdirSync(dir).filter((name) => name.endsWith('.ts'));
     expect(files.length).toBeGreaterThan(0);
 
     for (const name of files) {
       const source = readFileSync(join(dir, name), 'utf8');
-      // Comments are where the rule is EXPLAINED, so they are stripped before it is checked
-      // — otherwise the explanation would fail the test it exists to justify.
+      // Comments are where the rule is explained, so they are stripped before it is checked.
       const code = source
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .split('\n')

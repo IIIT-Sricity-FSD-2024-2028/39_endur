@@ -1,9 +1,9 @@
-// Typed errors. Every one of these leaves through errorFunnel and nowhere else, which is
-// what makes "no route can produce a body outside the envelope" (12 §8) checkable.
+// The typed errors used across the app. Every one leaves through errorFunnel, so replies always share one shape.
 import type { ZodError } from 'zod';
 import type { DecidedBy, ErrorCode, FieldError } from '@endur/shared';
 import { statusForCode } from '@endur/shared';
 
+// The base error: a code, a message, optional details, and the HTTP status that goes with the code.
 export class AppError extends Error {
   readonly status: number;
   constructor(
@@ -17,6 +17,7 @@ export class AppError extends Error {
   }
 }
 
+// A failed schema check, carrying one entry per bad field.
 export class ValidationError extends AppError {
   constructor(zodError: ZodError) {
     super('VALIDATION_FAILED', 'Some fields need attention.', {
@@ -30,26 +31,14 @@ export class ValidationError extends AppError {
   }
 }
 
-/**
- * Denied a capability on something you CAN see: actionable, so it says who decided.
- * Something out of scope returns NotFoundError instead — a 403 there would confirm the
- * resource exists and leak org structure (13 §5).
- */
+// Denied a capability on something you CAN see, so the message says who decided. Something you cannot see returns 404 instead.
 export class ForbiddenError extends AppError {
   constructor(message: string, decidedBy?: DecidedBy) {
     super('FORBIDDEN', message, decidedBy ? { decidedBy } : undefined);
   }
 }
 
-/**
- * INV-012 (11 §5b). Refused not because the caller may not act, but because the act would
- * create an actor more powerful than they are.
- *
- * It names the capability on purpose. The caller can plainly see they hold
- * `assignment.create` — they just used it on the row above — so a bare "not allowed" reads
- * to them as a bug rather than a rule. The answer they need is WHICH power they were about
- * to hand out that they do not have.
- */
+// Refused because the action would create somebody more powerful than the caller. It names the capability, so the rule is clear.
 export class WouldEscalateError extends AppError {
   constructor(message: string, capability: string, unitName?: string) {
     super('WOULD_ESCALATE', message, {
@@ -59,18 +48,7 @@ export class WouldEscalateError extends AppError {
   }
 }
 
-/**
- * DEC-037. An `organization`-access campaign, reached without a staff session for it.
- *
- * Reachable ONLY behind a resolved token (12 §4.10c): every invalid, unlaunched, closed and
- * expired token still 404s before `access` is ever consulted. So this 401 discloses nothing
- * the working token in the caller's hand did not already disclose — which is the whole
- * reason the gate runs second and not first.
- *
- * The body carries the organisation's display name and nothing else, so the respond world
- * can say WHICH organisation to sign in to. That name is not a leak: the caller is holding a
- * working link to a campaign belonging to it.
- */
+// A members-only campaign reached without a staff session for that organisation. Carries the org name so the page can say where to sign in.
 export class SignInRequiredError extends AppError {
   constructor(organizationName: string) {
     super('SIGN_IN_REQUIRED', `Only people in ${organizationName} can answer this one.`, {
@@ -79,7 +57,7 @@ export class SignInRequiredError extends AppError {
   }
 }
 
-/** DEC-037. Signed in — to somebody else's organisation. */
+// Signed in, but to a different organisation than the campaign belongs to.
 export class NotAMemberError extends AppError {
   constructor(organizationName: string) {
     super('NOT_A_MEMBER', 'This form belongs to a different organisation.', {
@@ -88,29 +66,28 @@ export class NotAMemberError extends AppError {
   }
 }
 
+// The resource does not exist, or the caller may not even know that it does.
 export class NotFoundError extends AppError {
   constructor(message = 'Not found.') {
     super('NOT_FOUND', message);
   }
 }
 
+// Nobody is signed in.
 export class UnauthenticatedError extends AppError {
   constructor(message = 'Sign in to continue.') {
     super('UNAUTHENTICATED', message);
   }
 }
 
+// The request clashes with the current state, such as a duplicate name.
 export class ConflictError extends AppError {
   constructor(message: string) {
     super('CONFLICT', message);
   }
 }
 
-/**
- * Zod's defaults are developer-facing. "String must contain at least 1 character(s)" is
- * not what a respondent should read. Rules from design_specs/design/10 §4: say what is
- * wrong and what to do, sentence case, no exclamation marks, never blame the user.
- */
+// Rewrites Zod's developer-facing messages into plain sentences a respondent can act on.
 function humanise(message: string, path: (string | number)[]): string {
   const field = fieldName(path);
   if (/^Required$/i.test(message)) return `${field} is required.`;
@@ -124,7 +101,7 @@ function humanise(message: string, path: (string | number)[]): string {
   return message.endsWith('.') ? message : `${message}.`;
 }
 
-/** "body.questions.0.text" -> "Text". The path still addresses the field for the UI. */
+// Turns a field path like "body.questions.0.text" into a readable name like "Text".
 function fieldName(path: (string | number)[]): string {
   const last = [...path].reverse().find((part) => typeof part === 'string' && part !== 'body');
   if (typeof last !== 'string') return 'This field';

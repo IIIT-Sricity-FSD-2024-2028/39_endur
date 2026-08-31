@@ -1,20 +1,10 @@
-// F1 and N6 of Mithil/demo_college_run.md, as tests. D-047, N-068.
-//
-// A quick poll and a suggestion box hang off the per-organisation singleton subject, which
-// has NO unit (DEC-089). `features/campaigns/visibility.ts` says what that means and every
-// campaign reader is supposed to ask it. `features/results/service.ts` carried its OWN copy
-// of the predicate, missing the organisation-subject clause, and the two `select`s feeding
-// it did not even fetch `subject.type` — so the clause could not have been evaluated had it
-// been written there.
-//
-// The effect was not a corner case. No seeded role holds `results.read` or `response.read`
-// at `all` — the widest seeded scope is `subtree` — so `visibility.all` is false for
-// EVERYBODY, and the copy's single clause matched nothing. A poll with nine votes answered
-// 404 on its own results to the founder of the organisation that created it, while
-// `GET /campaigns/:id` answered 200 on the same id one line earlier.
-//
-// These tests are therefore written as the founder. If they ever need a special role to
-// pass, the bug is back.
+// A poll's own results, and the bug that hid them.
+// A quick poll hangs off the per-organisation subject, which has NO unit. The shared visibility rule
+// says what that means, but the results service carried its own copy without that clause - and did not
+// even fetch the field it would have needed.
+// Because no seeded role reads results everywhere, the copy matched nothing for EVERYBODY: a poll with
+// nine votes answered 404 on its own results to the founder who created it.
+// So these tests are written as the founder: if they ever need a special role to pass, the bug is back.
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app, setUpOrg, withCsrf, type Session } from './helpers.js';
@@ -23,7 +13,7 @@ import { prisma } from '../db/client.js';
 
 const stranger = () => request(app);
 
-/** Analysis is a Silver surface (16 §3), so a test about visibility buys the tier first. */
+// Analysis is a paid surface, so a test about visibility buys the tier first.
 async function subscribeSilver(orgId: string): Promise<void> {
   const today = new Date();
   const nextYear = new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000);
@@ -34,7 +24,7 @@ async function subscribeSilver(orgId: string): Promise<void> {
   });
 }
 
-/** A quick campaign with `count` answers through the public link, as a room would. */
+// A quick campaign with a set number of answers through the public link, as a room would give them.
 async function quickWithResponses(
   founder: Session,
   purpose: 'poll' | 'suggestion',
@@ -110,8 +100,7 @@ describe('a suggestion box reaches the inbox — the quieter half of F1', () => 
   });
 
   it('puts its free-text answers in the comment queue', async () => {
-    // Reading comments is the whole stated purpose of the inbox, and a suggestion box is
-    // nothing BUT comments. It contributed zero of them.
+    // Reading comments is the whole purpose of the inbox, and a suggestion box is nothing but comments.
     const inbox = await founder.agent.get('/api/v1/inbox');
     expect(inbox.status).toBe(200);
     const items = inbox.body.data as Array<{ campaign?: { id?: string } }>;
@@ -133,9 +122,8 @@ describe('/analysis on a campaign the caller may not see answers 404 — N6', ()
     await subscribeSilver(two.orgId);
     const pollId = await quickWithResponses(one, 'poll', config.K_ANON_THRESHOLD + 1);
 
-    // `responseCount: 0` for an invisible campaign is a lie about a corpus that exists,
-    // and it is the answer that hid F1 for most of a demo run. Every other by-id read in
-    // the product answers 404 here, so this one does too.
+    // Reporting zero responses for an invisible campaign is a lie about a corpus that exists, and it is
+    // what hid this for most of a demo run. Every other by-id read answers 404 here, so this one does too.
     const foreign = await two.agent.get(`/api/v1/analysis?campaignId=${pollId}`);
     expect(foreign.status).toBe(404);
 
@@ -148,7 +136,7 @@ describe('/analysis on a campaign the caller may not see answers 404 — N6', ()
     await subscribeSilver(founder.orgId);
     const thin = await quickWithResponses(founder, 'poll', 1);
     const res = await founder.agent.get(`/api/v1/analysis?campaignId=${thin}`);
-    // Visible, and suppressed. A 404 here would tell the owner their own poll had vanished.
+    // Visible, and suppressed: a 404 here would tell the owner their own poll had vanished.
     expect(res.status).toBe(200);
     expect(res.body.data.suppressed).toBe(true);
     expect(await prisma.campaign.count({ where: { id: thin } })).toBe(1);

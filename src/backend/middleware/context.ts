@@ -1,47 +1,18 @@
-// The request context: ONE object, built up by the chain, never mutated by handlers.
-//
-// Each link adds its own field and nothing else reaches back to change it. That is what
-// makes the chain readable top to bottom — you can point at any link and say exactly what
-// it contributed.
+// The request context: one object that each middleware adds its own field to, and handlers only read.
 import type { RequestHandler } from 'express';
-// The resolver owns Decision. This file used to declare a placeholder copy, from before
-// authz/ existed; two definitions of the same shape is exactly the drift the DTO approach
-// is meant to prevent.
+// Decision belongs to the permission resolver; importing it keeps a single definition of that shape.
 import type { Decision } from '../authz/types.js';
 import type { PlatformRole, ResolvedLabels, SupportContext } from '@endur/shared';
 
 export type { Decision };
 
-/** Set by authenticate (T-007). Three kinds, so downstream links need not care which. */
+// Who is making the request. Set by authenticate, in four kinds, so later links need not care which.
 export type Principal =
-  /**
-   * `support` — DEC-114, and it is a FIELD ON THE USER PRINCIPAL rather than a fifth kind.
-   *
-   * That placement was the design decision, and it was made by counting. Thirty-odd call
-   * sites across the codebase read `principal.kind !== 'user'` to mean *"is this somebody
-   * with an account in this organisation"*, and a fifth kind would have made every one of
-   * them wrong in a different way — some failing closed, some open, none obviously. A
-   * support principal genuinely IS a user of this organisation: it has a `users` row, it
-   * resolves grants, it appears in the audit log. The only thing that differs is where its
-   * grants came from and who is really typing, and those are two extra facts, not a
-   * different kind of thing.
-   *
-   * `id` is the SYNTHETIC MEMBER's id, never the operator's. `platform_users` and `users`
-   * are different tables on purpose (DEC-033), and a tenant's audit row can only point at
-   * the second — so this is what makes a support action attributable inside the customer's
-   * own log rather than showing up as an unexplained gap.
-   */
+  // A signed-in staff user. 'support' is filled in when an Endur operator is working inside this org.
   | { kind: 'user'; id: string; orgId: string; support?: SupportContext }
   | { kind: 'apiKey'; id: string; orgId: string; scopes: string[] }
   | { kind: 'respondent'; campaignId: string; orgId: string }
-  /**
-   * T-059, DEC-033. THE ONLY PRINCIPAL WITH NO `orgId`, and that absence is the design:
-   * an operator belongs to Endur rather than to a customer, so there is no organisation
-   * for `tenantResolver` to resolve and none for a grant to be anchored in (19 §7).
-   *
-   * It carries a ROLE rather than a set of capabilities because the platform side has two
-   * fixed roles and no resolver (19 §3) — `platformRoleHas()` is the whole decision.
-   */
+  // An Endur operator on the platform side: the only principal with no orgId, since they belong to Endur.
   | { kind: 'platform'; id: string; role: PlatformRole };
 
 export type AuditIntent = {
@@ -53,45 +24,23 @@ export type AuditIntent = {
 export type RequestContext = {
   requestId: string;
   startedAt: number;
-  /** Set by tenantResolver (T-006). NEVER read from a request body — INV-010. */
+  // Set by tenantResolver, never read from a request body.
   orgId?: string;
-  /**
-   * organizations.settings.authzVersion, read alongside the tenant. It is part of the
-   * grant cache key, so a permission change invalidates every cached decision for this
-   * tenant instantly — the 30-second TTL is only a backstop (11 §7). Resolving it per
-   * request is what makes that true; a constant here would leave a revoked permission
-   * working for the length of the TTL, which is a security bug and not a trade-off.
-   */
+  // The org's permission version. It is part of the grant cache key, so a permission change applies at once.
   authzVersion?: number;
-  /**
-   * The tenant's vocabulary, resolved, read alongside authzVersion in the same query
-   * (T-044). 22 §6 has specified this since revision one — "the label set is on req.ctx
-   * after tenantResolver, and message builders take it" — because THE SERVER PRODUCES
-   * USER-FACING STRINGS TOO. `That unit does not exist.` renders verbatim in the console
-   * (10 pages read `error.message`), so a hotel was told about a "unit" until T-044.
-   *
-   * Absent on the tenantless routes, which is why `nounsOf()` exists rather than call
-   * sites reaching in here and finding `undefined` on the login screen.
-   */
+  // The tenant's own words for unit, subject and so on, so even server error messages use its vocabulary.
   labels?: ResolvedLabels;
-  /** Set by authenticate (T-007). */
+  // Set by authenticate.
   principal?: Principal;
-  /**
-   * Set by requireCapability (T-012). Carried forward on purpose: the audit row records
-   * WHICH GRANT decided it (INV-007), and the resolver is the only thing that knows.
-   */
+  // Set by requireCapability and kept, so the audit row can record which grant decided it.
   decision?: Decision;
-  /** Appended by handlers, flushed by ctx.tx inside the mutation's own transaction. */
+  // Audit rows added by handlers, written by ctx.tx inside the mutation's own transaction.
   audit: AuditIntent[];
-  /** Per-request resolver memo (11 §7). Correct by construction: a request is a snapshot. */
+  // Per-request memo of permission decisions; safe because one request is one snapshot in time.
   authzMemo?: Map<string, Promise<Decision>>;
-  /**
-   * The list-side equivalent, for visibleUnits(). Separate from authzMemo because it
-   * answers a different question and caches a different shape — a list handler asks it
-   * twice, once for the rows and once for the scope-filtered count.
-   */
+  // The same idea for visibility lookups, which a list handler asks twice: once for rows, once for the count.
   visibilityMemo?: Map<string, Promise<unknown>>;
-  /** Set by ctx.tx once the audit rows are flushed; read by the auditWriter safety net. */
+  // Set by ctx.tx once the audit rows are written; read by the auditWriter safety net.
   auditWritten?: boolean;
 };
 
@@ -100,16 +49,13 @@ declare global {
   namespace Express {
     interface Request {
       ctx: RequestContext;
-      /** Narrowed by validate(); handlers read this, never req.body (14 §3). */
+      // The validated request data, set by validate(). Handlers read this, never req.body.
       data: unknown;
     }
   }
 }
 
-/**
- * Bootstraps ctx. Runs first so that every later link — including a failure in the very
- * next one — has somewhere to record itself.
- */
+// Creates ctx at the very start, so every later link has somewhere to record itself.
 export const context: RequestHandler = (req, _res, next) => {
   req.ctx = { requestId: '', startedAt: Date.now(), audit: [] };
   next();

@@ -1,7 +1,6 @@
-// Registration builds a WORKING organisation in ONE transaction: org, root unit, an
-// Owner role, the founder's user + person node, their position, the membership edge, and
-// the level-1 grants. Partially-created orgs are the worst possible failure here — a user
-// who exists but cannot see anything, with no way to retry because their email is taken.
+// Registration builds a working organisation in ONE transaction: the org, a root unit, an Owner role,
+// the founder's account and person, their position, the subscription, the payment and the level-1 grants.
+// A half-created organisation is the worst outcome here, so it is all-or-nothing.
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/client.js';
@@ -12,27 +11,13 @@ import { recordPayment } from '../../billing/payments.js';
 import { newPeriod } from '../../billing/period.js';
 import type { RegisterBody } from '@endur/shared';
 
-/**
- * D-006. `uniqueSlug()` cannot run inside the transaction — it reads COMMITTED rows, and a
- * transaction cannot see the ones it is racing. So two people naming their organisation the
- * same thing in the same second both read "that slug is free", and the loser collides on the
- * unique index.
- *
- * The collision is correct and the rollback is correct; the 500 was not. A slug is derived
- * from a name the caller is allowed to reuse — it is not their mistake and not theirs to fix,
- * so the fix is to take the next slug and try again rather than to hand them an error page.
- *
- * Five attempts, and the RETRY MUST NOT SCAN. Retrying the sequential search turns one
- * collision into a queue: six contenders all re-read, all find `acme-2` free, and five collide
- * again — the loser needs as many attempts as there are contenders, which is exactly how the
- * first version of this failed. A retry takes a random suffix instead, so the field spreads out
- * in one round however many are racing.
- */
+// How many times to retry when two people register the same organisation name at the same moment.
+// The retry uses a random suffix rather than scanning again, so racing callers spread out in one round.
 const SLUG_ATTEMPTS = 5;
 
+// Registers a new organisation, retrying only if the name's slug was taken in a race.
 export async function register(input: RegisterBody) {
-  // Hashed ONCE, outside the loop. Argon2 is ~100ms by design and a retry is not a reason
-  // to pay it again.
+  // Hashed once, outside the loop: argon2 is deliberately slow, and a retry is no reason to pay for it twice.
   const passwordHash = await hashPassword(input.password);
 
   for (let attempt = 1; ; attempt += 1) {
@@ -41,25 +26,21 @@ export async function register(input: RegisterBody) {
       return await createOrganisation(input, passwordHash, slug);
     } catch (error) {
       if (attempt >= SLUG_ATTEMPTS || !isSlugCollision(error)) throw error;
-      // Nothing to clean up: the transaction rolled the whole attempt back, which is the
-      // property register-rollback.test.ts exists to prove.
+      // Nothing to clean up - the transaction rolled the whole attempt back.
     }
   }
 }
 
-/**
- * A P2002 on `slug` and a P2002 on anything else are different events. Only this one is safe
- * to retry — retrying a genuine conflict would just fail five times more slowly, and hide
- * what actually happened.
- */
+// Only a slug collision is safe to retry; any other unique-constraint error is a real conflict.
 function isSlugCollision(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
   const target = error.meta?.['target'];
-  // Postgres reports the constraint's columns as an array; other providers use a string.
+  // Postgres reports the constraint columns as an array; other databases use a string.
   if (Array.isArray(target)) return target.includes('slug');
   return typeof target === 'string' && target.includes('slug');
 }
 
+// Writes every row a new organisation needs, in one transaction.
 function createOrganisation(input: RegisterBody, passwordHash: string, slug: string) {
   return prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({
@@ -67,9 +48,7 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
         name: input.orgName,
         slug,
         industry: input.industry,
-        // The chosen preset's vocabulary from the very first request, so the console
-        // never shows generic words to somebody who already said what kind of organisation
-        // this is. The wizard can still change every one of them (50 §1).
+        // The chosen preset's vocabulary from the very first request, so nothing generic is ever shown.
         labels: presetFor(input.industry).labels,
         settings: { authzVersion: 1 },
       },
@@ -79,9 +58,7 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
       data: { orgId: org.id, email: input.email, name: input.name, passwordHash },
     });
 
-    // meta.seededBy marks the scaffolding. POST /org/setup replaces this structure with
-    // the one the wizard chose, and it has to know which rows it may remove — identifying
-    // them by name would delete a real unit the moment somebody called theirs "Owner".
+    // meta.seededBy marks the scaffolding, so the setup wizard knows which rows it may replace.
     const scaffold = { seededBy: 'register' };
     const unit = await tx.node.create({
       data: { orgId: org.id, kind: 'unit', name: input.orgName, meta: scaffold },
@@ -101,45 +78,13 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
               isPrimary: true },
     });
 
-    // THE SUBSCRIPTION ROW — D-012 repaid, DEC-048. IN THE SAME TRANSACTION as everything
-    // else, for the reason this whole function exists: an organisation that exists without one
-    // is a half-created organisation, and the half that is missing is the one every
-    // entitlement decision reads. `requireEntitlement` would answer for it by falling back to
-    // bronze, which is precisely how D-012 stayed invisible for a month — a default that looks
-    // like an answer.
-    //
-    // `status: 'active'` FROM THE FIRST REQUEST. There is no `trialing` on this path: DEC-048
-    // removed it, and 16 §7 records why — both arguments for a 14-day Gold trial were
-    // arguments about PRICE. DEC-080 has given the product prices back, and the trial STAYS
-    // deleted: expiring one needs a scheduler OPEN-005 still says nobody owns, and a
-    // countdown nothing enforces is a promise the product cannot keep.
-    //
-    // THE PERIOD IS A MONTH, AND THE MONTH IS WHAT WAS PAID FOR — DEC-096, and it was a year
-    // until 31 Aug. `periodStart`/`periodEnd` are NOT NULL in the schema (10, `subscriptions`)
-    // and a subscription genuinely has a period. Nothing still happens when it ends — there is
-    // no renewal and no dunning (DEC-080 § not) — but the dates are no longer decorative: they
-    // are the span the capture below covers, the plan picker prices "/ month" against them,
-    // and DEC-098 is about to make `period_end` the date a scheduled downgrade fires on.
-    //
-    // THE LENGTH COMES FROM `billing/period.ts` AND NOWHERE ELSE. It used to be
-    // `setFullYear(+1)` here and `+ 365 * DAY` in two other services, which already disagreed
-    // by a day in a leap year — nothing read the difference, which is exactly why it survived.
-    //
-    // `seats` stays at its default 0 because D-013's meter does not exist yet, and a number
-    // nothing recomputes is worse than a zero that is obviously unbuilt.
+    // The subscription row, in the same transaction: an org without one is half-created, and the missing
+    // half is what every plan check reads. Active from the first request, for one calendar month.
     await tx.subscription.create({
       data: { orgId: org.id, tier: input.tier, status: 'active', ...newPeriod() },
     });
 
-    // THE CAPTURE, IN THE SAME TRANSACTION as the subscription it pays for — DEC-080, and
-    // the same argument the subscription row itself makes one paragraph up. A payment that
-    // survived a rolled-back registration would be revenue attributed to an organisation
-    // that does not exist, and `/ops/earnings` sums this table without asking whether each
-    // org_id resolves.
-    //
-    // `fromTier` IS NULL AND THAT IS A FACT, not a gap: there was no plan before this one.
-    // The amount is not passed — `recordPayment` prices the tier server-side, and the
-    // client's `paymentRef` is carried as a label rather than trusted as a proof.
+    // The payment, also in the same transaction. The amount is priced on the server; the client's reference is only a label.
     await recordPayment(tx, {
       orgId: org.id,
       tier: input.tier,
@@ -149,8 +94,7 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
       reference: input.paymentRef ?? null,
     });
 
-    // Level-1 grants, on the ROLE. Anchoring comes from the position at resolve time —
-    // that is INV-005, and it is why these rows carry no unit of their own.
+    // The level-1 grants, placed on the ROLE. The unit comes from the position at the time the permission is checked.
     await tx.grant.createMany({
       data: grantsForLevel(1).map((grant) => ({
         orgId: org.id, subjectId: role.id, capability: grant.capability,
@@ -162,19 +106,9 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
   });
 }
 
-/**
- * `contended` means the caller just lost a race for this name.
- *
- * The uncontended path scans in order, so the ordinary case — somebody registering "Acme"
- * next week when `acme` already exists — still gets the readable `acme-2`. That path involves
- * no race at all: the row it read is committed and is not going anywhere.
- *
- * The contended path deliberately does NOT read first. Under a race that read is precisely
- * the thing that lies, and everyone who believes it picks the same answer. A random suffix is
- * unguessable by the other contenders, which is what makes them spread out. It is not verified
- * either — 16.7M values, and the unique index plus the retry loop are a better guard than a
- * SELECT that was already proven to be stale.
- */
+// Turns an organisation name into a free URL slug.
+// Normally it scans in order, so a second Acme becomes acme-2. After losing a race it takes a random
+// suffix instead, because under contention the read everybody trusts is the thing that lies.
 async function uniqueSlug(name: string, contended: boolean): Promise<string> {
   const base =
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'org';

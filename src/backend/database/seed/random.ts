@@ -1,11 +1,5 @@
-// Deterministic pseudo-randomness for the seed. 50 §8.
-//
-// DETERMINISTIC, never randomised: the demo must be identical every run. A seed that
-// produces different numbers each time makes "the ratings look wrong today" impossible to
-// investigate, and turns a rehearsal into no evidence at all.
-//
-// mulberry32 — 32 bits of state, four lines, and the same sequence on every machine. There
-// is no need for anything stronger here: nothing in a seed is a secret.
+// Predictable pseudo-random numbers for the seed, so the demo data is identical on every run and machine.
+// mulberry32: four lines and 32 bits of state. Nothing in a seed is a secret, so nothing stronger is needed.
 
 export class Rng {
   private state: number;
@@ -14,7 +8,7 @@ export class Rng {
     this.state = seed >>> 0;
   }
 
-  /** [0, 1) */
+  // A number from 0 up to but not including 1.
   next(): number {
     this.state = (this.state + 0x6d2b79f5) >>> 0;
     let t = this.state;
@@ -35,7 +29,7 @@ export class Rng {
     return this.next() < probability;
   }
 
-  /** A few distinct picks, without repeats. Used for multi-select answers. */
+  // A few different picks with no repeats. Used for multi-select answers.
   sample<T>(items: readonly T[], count: number): T[] {
     const pool = [...items];
     const out: T[] = [];
@@ -46,22 +40,10 @@ export class Rng {
   }
 }
 
-/**
- * Ratings are NOT uniform (50 §3). Real feedback skews positive with a long negative tail,
- * and a flat distribution is the single most obvious tell that a results screen is fake.
- *
- * `quality` moves the whole curve: 0.9 is a well-liked subject, 0.3 is the one that
- * deliberately scores badly so the results screen has something to show.
- */
+// Ratings are not spread evenly: real feedback leans positive with a thin negative tail,
+// and a flat spread is the clearest sign a results screen is fake. 'quality' shifts the whole curve.
 export function skewedRating(rng: Rng, max: number, quality: number): number {
-  // Order statistics rather than arithmetic on a single uniform. Taking the HIGHEST of a
-  // few draws produces a mode near the top with a thin tail running down — which is the
-  // actual shape of collected ratings. Taking the LOWEST produces its mirror, which is what
-  // a genuinely disliked subject looks like.
-  //
-  // Blending a uniform toward the top instead (the obvious first attempt) pulls the mean to
-  // the middle and gives every subject an average near 2.5, so nothing stands out and the
-  // results screen has nothing to show.
+  // Taking the highest of a few draws puts the peak near the top with a thin tail; the lowest mirrors it for a poor subject.
   const strength = Math.round(Math.abs(quality - 0.5) * 6);
   const upward = quality >= 0.5;
 
@@ -74,17 +56,14 @@ export function skewedRating(rng: Rng, max: number, quality: number): number {
   return Math.min(max, Math.max(1, 1 + Math.round(u * (max - 1))));
 }
 
-/** NPS: promoters cluster at 9-10, detractors spread across 0-6. */
+// NPS: promoters cluster at 9 and 10, detractors spread across 0 to 6.
 export function skewedNps(rng: Rng, quality: number): number {
   if (rng.chance(quality * 0.75)) return rng.int(9, 10);
   if (rng.chance(0.45)) return rng.int(7, 8);
   return rng.int(0, 6);
 }
 
-/**
- * Response times spread across the window, with a spike at the start and another before
- * the close (50 §3). Uniform timestamps read as generated the moment anyone sorts by date.
- */
+// Response times spread across the window, with a rush at the start and another before the close.
 export function skewedTimestamp(rng: Rng, startsAt: Date, endsAt: Date): Date {
   const span = endsAt.getTime() - startsAt.getTime();
   const roll = rng.next();

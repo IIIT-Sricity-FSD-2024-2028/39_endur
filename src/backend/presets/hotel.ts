@@ -1,7 +1,5 @@
-// The hotel preset. 50 §1.
-//
-// This is the one that lands the demo's core claim. Switching from the university to this
-// org changes every noun on every screen with no code path involved (50 §5, step 2).
+// The hotel preset. This is the one that shows the core claim:
+// switching to this organisation changes every noun on every screen, with no code involved.
 import type { Preset } from './types.js';
 import { nps, rating, single, text_, yesno } from './types.js';
 
@@ -30,10 +28,7 @@ export const hotel: Preset = {
     campaign: { one: 'Guest survey', many: 'Guest surveys' },
   },
   templates: [
-    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
-    // empty and each industry's example reads as its own — a hotel poll is not a university
-    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
-    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    // The two quick-start forms, seeded per industry so the gallery is never empty. Both are ordinary one-question templates.
     {
       name: 'Lobby poll',
       category: 'Poll',
@@ -87,8 +82,7 @@ export const hotel: Preset = {
     {
       name: 'Quick pulse',
       category: 'Guest',
-      // One question. This is DEC-010 made concrete: a poll IS a one-question template,
-      // and there is no poll entity anywhere in the product.
+      // One question. A poll IS a one-question template; there is no poll entity anywhere in the product.
       description: 'One question. A poll, without the product needing a poll feature.',
       questions: [nps('How likely are you to stay with us again?')],
     },

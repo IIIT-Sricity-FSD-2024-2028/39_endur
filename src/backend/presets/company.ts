@@ -1,8 +1,5 @@
-// The company preset. 50 §1.
-//
-// Also the fallback when an evaluator names something unexpected. A gym is a Company; an
-// NGO is a Company. Picking the nearest preset and renaming three things handles the hard
-// question gracefully instead of freezing (31 § Step 1).
+// The company preset, also the fallback for anything unexpected: a gym is a Company, an NGO is a Company.
+// Picking the nearest preset and renaming a few things handles an odd request gracefully.
 import type { Preset } from './types.js';
 import { multi, nps, rating, single, text_, yesno } from './types.js';
 
@@ -31,10 +28,7 @@ export const company: Preset = {
     campaign: { one: 'Review cycle', many: 'Review cycles' },
   },
   templates: [
-    // T-093. THE TWO QUICK SURFACES, seeded per industry so the start gallery is never
-    // empty and each industry's example reads as its own — a hotel poll is not a university
-    // poll. Both are ordinary one-question templates: the CATEGORY is the whole of what
-    // marks them (`DEC-088`), and neither adds a kind, a table or a column.
+    // The two quick-start forms, seeded per industry so the gallery is never empty. Both are ordinary one-question templates.
     {
       name: 'Standup poll',
       category: 'Poll',

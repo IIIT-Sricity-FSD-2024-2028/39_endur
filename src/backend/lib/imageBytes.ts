@@ -1,24 +1,6 @@
-// What an uploaded image ACTUALLY is, and what it stops carrying before it is stored. 48.
-//
-// Two jobs, both done on the bytes themselves and neither trusting the client:
-//
-//   sniff()          the real format and its dimensions, from magic bytes and headers.
-//                    Content-Type and a filename extension are claims; these are facts.
-//
-//   stripMetadata()  removes the segments that carry EXIF GPS, device identifiers, XMP and
-//                    IPTC, without decoding the image.
-//
-// > **This is NOT the re-encode `48` § Validation specifies, and the difference is
-// > deliberate — see `OPEN-008`.** Re-encoding means decoding to a bitmap and writing a new
-// > file, which needs an image library, which is a dependency nobody has approved. Stripping
-// > removes the metadata that re-encoding was there to remove (GPS, device, author, embedded
-// > thumbnails) and leaves the pixel data untouched.
-// >
-// > What stripping does NOT give us, stated so it is not forgotten: it does not neutralise a
-// > polyglot file whose payload hides inside the image data itself. What makes that
-// > survivable here is that stored files are only ever SERVED as bytes with a fixed
-// > Content-Type and never executed, parsed as anything else, or handed to a shell — and
-// > respondent uploads, the case where a hostile file is likely, are out of scope entirely.
+// Works out what an uploaded image really is, and strips its metadata before it is stored.
+// sniff() reads the true format and size from the bytes, since content type and file extension are only claims.
+// stripMetadata() removes EXIF GPS, device ids, XMP and IPTC without decoding the picture.
 export type ImageKind = 'png' | 'jpeg' | 'webp';
 
 export type ImageFacts = { kind: ImageKind; mime: string; ext: string; width: number; height: number };
@@ -31,19 +13,18 @@ const MIME: Record<ImageKind, string> = {
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-/** The format, from the bytes. `null` means "not one of the three we accept". */
+// The format and size, read from the bytes. null means it is not a PNG, JPEG or WebP.
 export function sniff(buf: Buffer): ImageFacts | null {
   const kind = detect(buf);
   if (!kind) return null;
   const size =
     kind === 'png' ? pngSize(buf) : kind === 'jpeg' ? jpegSize(buf) : webpSize(buf);
-  // A file we can identify but cannot measure is a file we do not understand well enough
-  // to store. Refusing is the safe direction; the alternative is skipping the dimension
-  // check, which is the decompression-bomb defence (48).
+  // If we can name it but not measure it, refuse: the size check is what stops a decompression bomb.
   if (!size) return null;
   return { kind, mime: MIME[kind], ext: kind === 'jpeg' ? 'jpg' : kind, ...size };
 }
 
+// Which of the three formats these bytes are, from their magic numbers.
 function detect(buf: Buffer): ImageKind | null {
   if (buf.length >= 8 && buf.subarray(0, 8).equals(PNG_SIGNATURE)) return 'png';
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpeg';
@@ -56,17 +37,13 @@ function detect(buf: Buffer): ImageKind | null {
   return null;
 }
 
-/** IHDR is always the first chunk, so width and height are at fixed offsets. */
+// PNG: the IHDR chunk is always first, so width and height sit at fixed offsets.
 function pngSize(buf: Buffer): { width: number; height: number } | null {
   if (buf.length < 24 || buf.toString('latin1', 12, 16) !== 'IHDR') return null;
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
 
-/**
- * Walk the segment list to the first SOF marker. Dimensions are NOT at a fixed offset in a
- * JPEG — anything before SOF can be any length, which is also why an EXIF block can be
- * megabytes and why reading it blind would be a mistake.
- */
+// JPEG: walk the segments to the first SOF marker, because the size is not at a fixed offset.
 function jpegSize(buf: Buffer): { width: number; height: number } | null {
   let i = 2;
   while (i + 9 < buf.length) {
@@ -75,7 +52,7 @@ function jpegSize(buf: Buffer): { width: number; height: number } | null {
       continue;
     }
     const marker = buf[i + 1] ?? 0;
-    // Standalone markers carry no length.
+    // These markers carry no length field.
     if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
       i += 2;
       continue;
@@ -90,7 +67,7 @@ function jpegSize(buf: Buffer): { width: number; height: number } | null {
   return null;
 }
 
-/** Three container flavours, and a logo could be any of them. */
+// WebP: three container flavours, and a logo could be any of them.
 function webpSize(buf: Buffer): { width: number; height: number } | null {
   for (const chunk of riffChunks(buf)) {
     const body = buf.subarray(chunk.start, chunk.start + chunk.length);
@@ -103,7 +80,7 @@ function webpSize(buf: Buffer): { width: number; height: number } | null {
       return { width: body.readUInt16LE(6) & 0x3fff, height: body.readUInt16LE(8) & 0x3fff };
     }
     if (chunk.id === 'VP8L' && body.length >= 5) {
-      // Lossless: 14-bit width-1 and height-1 packed across bytes 1..4.
+      // Lossless: 14-bit width-1 and height-1 packed across bytes 1 to 4.
       const bits = body.readUInt32LE(1);
       return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
     }
@@ -116,6 +93,7 @@ const read24 = (buf: Buffer, at: number) =>
 
 type RiffChunk = { id: string; start: number; length: number; headerAt: number };
 
+// Walks a WebP file's flat chunk list.
 function* riffChunks(buf: Buffer): Generator<RiffChunk> {
   let i = 12; // past 'RIFF' + size + 'WEBP'
   while (i + 8 <= buf.length) {
@@ -127,24 +105,14 @@ function* riffChunks(buf: Buffer): Generator<RiffChunk> {
   }
 }
 
-/**
- * Remove the metadata segments. The pixel data is byte-identical afterwards; only the
- * blocks that describe WHERE and WITH WHAT the image was made are gone.
- */
+// Removes the metadata blocks. The pixels are byte-identical afterwards.
 export function stripMetadata(buf: Buffer, kind: ImageKind): Buffer {
   if (kind === 'jpeg') return stripJpeg(buf);
   if (kind === 'png') return stripPng(buf);
   return stripWebp(buf);
 }
 
-/**
- * Drops APP1 (EXIF and XMP — this is the GPS one), APP13 (IPTC/Photoshop, which carries
- * author and location) and COM comments.
- *
- * APP0 (JFIF density), APP2 (ICC colour profile) and APP14 (Adobe colour transform) are
- * KEPT on purpose: none of them identifies a person or a place, and dropping ICC or Adobe
- * silently shifts the colours of the image we were asked to store.
- */
+// JPEG: drops EXIF, XMP, IPTC and comments, but keeps the colour profile blocks, or the colours would shift.
 function stripJpeg(buf: Buffer): Buffer {
   const out: Buffer[] = [buf.subarray(0, 2)]; // SOI
   let i = 2;
@@ -169,7 +137,7 @@ function stripJpeg(buf: Buffer): Buffer {
   return Buffer.concat(out);
 }
 
-/** Ancillary text and EXIF chunks go; everything the decoder needs stays. */
+// PNG: drops text, EXIF and timestamp chunks; everything the decoder needs stays.
 function stripPng(buf: Buffer): Buffer {
   const DROP = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']);
   const out: Buffer[] = [buf.subarray(0, 8)];
@@ -186,9 +154,7 @@ function stripPng(buf: Buffer): Buffer {
   return Buffer.concat(out);
 }
 
-/** RIFF is a flat chunk list, so EXIF and XMP lift straight out — and the VP8X flags that
- *  advertise them have to be cleared too, or a reader goes looking for chunks that are no
- *  longer there. */
+// WebP: lifts out the EXIF and XMP chunks, and clears the VP8X flags that advertised them.
 function stripWebp(buf: Buffer): Buffer {
   const kept: Buffer[] = [];
   let changed = false;

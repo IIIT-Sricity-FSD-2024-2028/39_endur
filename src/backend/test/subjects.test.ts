@@ -1,9 +1,7 @@
-// T-019 — subjects. 13 § Subjects, 35, 10 §9.
-//
-// T-034 added the detail payload: `GET /:id` answers with the summary PLUS the cycles this
-// subject has been through. That history is what 35 § Interactions calls "the first hint of
-// the Improve layer" — and the property worth pinning is that the counts are per SUBJECT,
-// not per campaign.
+// Subjects.
+// The detail payload answers with the summary plus the cycles this subject has been through, which is
+// the first hint of the improve layer - and the property worth pinning is that the counts are per
+// SUBJECT, not per campaign.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { addStaff, setUpOrg, unique, unitIdByName, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
@@ -29,8 +27,7 @@ describe('subjects', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.unitName).toBe('Section A');
-    // Computed server-side, in the same query. An 18-row list must be one request, not
-    // nineteen (35).
+    // Computed on the server in the same query: an 18-row list must be one request, not nineteen.
     expect(res.body.data.activeCampaigns).toBe(0);
     expect(res.body.data.totalResponses).toBe(0);
     expect(res.body.data.lastResponseAt).toBeNull();
@@ -49,8 +46,8 @@ describe('subjects', () => {
     });
 
     expect(res.status).toBe(201);
-    // No second entity, no second code path. The reviewee IS a subject with a link set —
-    // which is why nothing in the schema is called Reviewee.
+    // No second entity and no second code path: the reviewee IS a subject with a link set, which is why
+    // nothing in the schema is called Reviewee.
     expect(res.body.data.linkedUserName).toBe('Linked Tutor');
   });
 
@@ -85,8 +82,7 @@ describe('subjects', () => {
     });
 
     const res = await head.agent.get(`/api/v1/subjects/${bOnly.id}`);
-    // A 403 would confirm the subject exists to somebody who cannot see it, which leaks
-    // the shape of the organisation (13 §5).
+    // A 403 would confirm the subject exists to somebody who cannot see it, and leak the shape of the org.
     expect(res.status).toBe(404);
   });
 
@@ -101,9 +97,8 @@ describe('subjects', () => {
     expect(archived.status).toBe(200);
     expect(archived.body.data.archivedAt).not.toBeNull();
 
-    // Still there. A subject with responses attached has to survive for the history to
-    // mean anything (10 §9) — archiving is how it leaves the working set without leaving
-    // the record.
+    // Still there: a subject with responses has to survive for the history to mean anything, and archiving
+    // is how it leaves the working set without leaving the record.
     const row = await prisma.subject.findUnique({ where: { id }, select: { id: true } });
     expect(row).not.toBeNull();
 
@@ -131,9 +126,8 @@ describe('subjects', () => {
     });
     const subjectId = created.body.data.id as string;
 
-    // A second subject in the same campaigns. Its responses must NOT be counted here —
-    // that is the difference between "responses about this subject" and "responses to the
-    // campaign", and it is the one a per-campaign count would get wrong.
+    // A second subject in the same campaigns, whose responses must NOT be counted here: that is the
+    // difference between "responses about this subject" and "responses to the campaign".
     const other = await withCsrf(founder, 'post', '/api/v1/subjects').send({
       name: 'Other Subject',
       unitId: sectionA,
@@ -179,10 +173,10 @@ describe('subjects', () => {
       campaignName: string; responseCount: number; status: string;
     }>;
     expect(cycles.map((cycle) => cycle.campaignName)).toEqual(['Spring cycle', 'Autumn cycle']);
-    // Two of the three spring responses were about this subject; the third was not.
+    // Two of the three responses that term were about this subject; the third was not.
     expect(cycles[0]?.responseCount).toBe(2);
     expect(cycles[0]?.status).toBe('closed');
-    // Never launched, so it is a draft however its dates read (DEC-016).
+    // Never launched, so it is a draft however its dates read.
     expect(cycles[1]?.responseCount).toBe(1);
     expect(cycles[1]?.status).toBe('draft');
     // The summary half is still there.
@@ -199,15 +193,13 @@ describe('subjects', () => {
       name: 'Trespassing Module',
       unitId: sectionB,
     });
-    // Section B is outside their subtree entirely, so they cannot even see it: 404.
+    // The other section is outside their subtree entirely, so they cannot even see it: 404.
     expect(res.status).toBe(404);
   });
 
   it("refuses the reserved type 'organisation' — DEC-093", async () => {
-    // `type` is free text the client picks, and ONE value of it decides visibility: a
-    // campaign anchored to the organisation subject is visible to every reader who may
-    // read campaigns at all. Left settable, `subject.create` would be enough to widen the
-    // audience of your own campaign — a permission written in a text column.
+    // The type is free text the client picks, and ONE value of it decides visibility - left settable,
+    // creating a subject would be enough to widen the audience of your own campaign.
     const res = await withCsrf(founder, 'post', '/api/v1/subjects').send({
       name: 'Not the organisation',
       unitId: sectionA,
@@ -216,9 +208,9 @@ describe('subjects', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
-    // Named under the field that caused it, so the form can point at it (13 § Errors).
+    // Named under the field that caused it, so the form can point at it.
     expect(res.body.error.details.fields[0].path).toBe('body.type');
-    // And nothing was written under a different type instead — refused, not rewritten.
+    // And nothing was written under a different type instead: refused, not rewritten.
     expect(
       await prisma.subject.count({ where: { orgId: founder.orgId, name: 'Not the organisation' } }),
     ).toBe(0);

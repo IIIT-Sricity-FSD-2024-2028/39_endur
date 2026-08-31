@@ -1,11 +1,7 @@
-// T-051 — /api/v1/profile. 47 § Acceptance, 13 § Profile.
-//
-// The acceptance list for `47` is unusual in that most of it is about what the route CANNOT
-// do: it cannot change an email, it cannot be pointed at somebody else, and it cannot be
-// opened by nobody. Those are the tests worth having here, because every one of them is a
-// property that would fail silently — a profile page that quietly 403s for the lowest role
-// level is invisible until somebody at that level signs in, which until `T-072` made
-// account provisioning one click was nobody.
+// The profile routes.
+// Most of what matters here is what the route CANNOT do: it cannot change an email, it cannot be
+// pointed at somebody else, and it cannot fail to open for the most junior role - each of which
+// would fail silently until somebody at that level actually signed in.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '../db/client.js';
 import request from 'supertest';
@@ -37,10 +33,8 @@ describe('GET /profile', () => {
   });
 
   it('OPENS FOR SOMEBODY WITH NO ADMINISTRATIVE CAPABILITY AT ALL — 47 § Acceptance', async () => {
-    // The lowest role level holds `org.read`, `subject.read: own_unit` and the two universal
-    // `self` grants, and nothing else (50 §1). If this ever 403s, the seed has lost `person.read
-    // self` and the failure mode is a whole page nobody can open — which is precisely the
-    // bug a default-deny model produces when `self` is forgotten.
+    // The lowest role holds only a handful of grants, including the two universal self ones. If this ever
+    // 403s, the seed has lost the self read and a whole page becomes unopenable.
     const learner = await addStaff(founder.orgId, {
       name: 'Profile Learner', level: 4, unitName: 'Section A',
     });
@@ -53,16 +47,13 @@ describe('GET /profile', () => {
     const [position] = (await profileOf(founder)).positions;
     expect(position?.roleLevel).toBe(1);
     expect(position?.unitId).toBeTruthy();
-    // Open ended, and `null` rather than absent: "no end date" is an answer.
+    // Open ended, and null rather than absent: "no end date" is an answer.
     expect(position?.validTo).toBeNull();
   });
 
   it('COMES FROM THE RESOLVER — a deny takes a power off the page (INV-004)', async () => {
-    // The strongest available proof that this list is `resolve()`'s answer and not a
-    // second one assembled from the role's grants: an explicit person-level DENY is
-    // invisible to anything that reads the seeded matrix, and INV-004 says it wins
-    // absolutely. If `powersByPlace` still showed `campaign.launch` after this, it was
-    // never asking the resolver.
+    // The strongest available proof that this list comes from the resolver rather than from the role's
+    // grants: a person-level DENY is invisible to anything reading the seeded matrix, and it wins absolutely.
     const staff = await addStaff(founder.orgId, {
       name: 'Denied Powers', level: 1, unitName: 'Section A',
     });
@@ -74,32 +65,28 @@ describe('GET /profile', () => {
     await denyPerson(founder.orgId, staff.userId, 'campaign.launch', 'all');
     const after = await profileOf(staff);
     expect(held(after).has('campaign.launch')).toBe(false);
-    // And only that one went. A page that emptied would prove nothing about the deny.
+    // And only that one went: a page that emptied would prove nothing about the deny.
     expect(held(after).size).toBeGreaterThan(1);
   });
 
   it('carries the SCOPE beside each capability, and it is the seeded one', async () => {
-    // "You hold results.read here" and "you hold it over everything below here" are
-    // different answers, and 47's whole reason for existing is somebody answering "why
-    // can I not see that?" for themselves. The scope is the half that answers it.
+    // "You hold this here" and "you hold it everywhere below here" are different answers, and the scope
+    // is the half that lets somebody answer "why can I not see that?" for themselves.
     const head = await addStaff(founder.orgId, {
       name: 'Scoped Head', level: 3, unitName: 'Section A',
     });
     const capabilities = (await profileOf(head)).powersByPlace[0]?.capabilities ?? [];
     const byName = new Map(capabilities.map((c) => [c.capability, c.scope]));
-    // 50 §1: L3's campaign and person rows are both `own_unit`. `person.read` is the one
-    // to assert, because every role ALSO holds it at `self` universally — so a `self` here
-    // would mean the page was reporting the universal grant and hiding the real one, which
-    // is D-027 arriving on a second screen.
+    // The read capability is the one to assert, because every role also holds it at self scope - a self
+    // here would mean the page was reporting the universal grant and hiding the real one.
     expect(byName.get('campaign.read')).toBe('own_unit');
     expect(byName.get('person.read')).toBe('own_unit');
     expect(byName.get('template.read')).toBe('all');
   });
 
   it('PROVES INV-005 — powers on one unit do not appear under another', async () => {
-    // Two positions at two DIFFERENT units. The second is at the lowest level, so its power
-    // list is strictly smaller — and if the two rows ever came back identical, the powers
-    // were being resolved against one unit twice.
+    // Two positions at two DIFFERENT units, the second more junior, so its power list is strictly smaller -
+    // identical rows would mean the powers were resolved against one unit twice.
     const twoHats = await addStaff(founder.orgId, {
       name: 'Two Places', level: 1, unitName: 'Section A',
     });
@@ -120,32 +107,23 @@ describe('GET /profile', () => {
     await prisma.edge.create({
       data: { orgId: founder.orgId, type: 'member', parentId: person.id, childId: position.id },
     });
-    // A new position is new grants, and the resolver caches per (org, user, authzVersion).
+    // A new position is new grants, and the resolver caches per person and permission version.
     clearGrantCache();
 
     const profile = await profileOf(twoHats);
     expect(profile.powersByPlace).toHaveLength(2);
     const [a, b] = profile.powersByPlace;
     expect(a?.unitId).not.toBe(b?.unitId);
-    // The unit ids are distinct AND the answers differ. Distinct ids alone would still pass
-    // if the resolver had been handed the same unit twice and the labels merely differed.
+    // The unit ids are distinct AND the answers differ: distinct ids alone would still pass if the
+    // resolver had been handed the same unit twice.
     expect(a?.capabilities.length).not.toBe(b?.capabilities.length);
   });
 
   it('KEEPS TWO SAME-NAMED UNITS APART — the bug T-051 fixed, and the only test that sees it', async () => {
-    // `nodes` has no unique on (org_id, kind, name) and `POST /units` does not check, so two
-    // units CAN share a name — "Year 1" under two different faculties is the ordinary case.
-    //
-    // Until T-051, `readPerson` had no unit id to work with (personSelect fetched position
-    // NAMES only) and re-found the unit by name:
-    //
-    //     where: { orgId, kind: 'position', unit: { name: position.unitName } }
-    //
-    // For a person holding a position in each of two same-named units, both loop passes
-    // resolved to whichever position node came back first — so one unit's powers printed
-    // under the other's heading, on the one screen in the product built to demonstrate that
-    // powers do NOT leak between units. Everything else about this test would pass with the
-    // old code, because every other fixture in this repo gives its units distinct names.
+    // Two units CAN share a name - "Year 1" under two faculties is the ordinary case.
+    // The old code re-found the unit BY NAME, so for a person holding a position in each, both passes
+    // resolved to whichever row came back first, and one unit's powers printed under the other's heading -
+    // on the one screen built to show that powers do not leak between units.
     const root = await unitIdByName(founder.orgId, 'Root');
     const [twinA, twinB] = await Promise.all([
       prisma.node.create({
@@ -168,8 +146,8 @@ describe('GET /profile', () => {
       where: { orgId: founder.orgId, kind: 'person', userId: staff.userId },
       select: { id: true },
     });
-    // Two DIFFERENT roles, so the two places must come back with different power counts —
-    // the assertion the old code could not satisfy, because it resolved one unit twice.
+    // Two DIFFERENT roles, so the two places must come back with different power counts - the assertion
+    // the old code could not satisfy.
     const [high, low] = await Promise.all([
       prisma.node.findFirstOrThrow({ where: { orgId: founder.orgId, kind: 'role', level: 1 }, select: { id: true } }),
       prisma.node.findFirstOrThrow({ where: { orgId: founder.orgId, kind: 'role', level: 4 }, select: { id: true } }),
@@ -187,11 +165,10 @@ describe('GET /profile', () => {
 
     const places = (await profileOf(staff)).powersByPlace.filter((p) => p.unitName === 'Twin');
     expect(places).toHaveLength(2);
-    // Two distinct units, addressed by ID and not by the name they share.
+    // Two distinct units, addressed by id and not by the name they share.
     expect(new Set(places.map((p) => p.unitId)).size).toBe(2);
     expect([...new Set(places.map((p) => p.unitId))].sort()).toEqual([twinA.id, twinB.id].sort());
-    // And they carry DIFFERENT answers. Distinct ids alone would still pass if the resolver
-    // had been handed one unit twice and only the labels differed.
+    // And they carry different answers, not merely different labels.
     expect(places[0]?.capabilities.length).not.toBe(places[1]?.capabilities.length);
   });
 });
@@ -205,8 +182,8 @@ describe('PATCH /profile', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.user.name).toBe('After Rename');
 
-    // `users.name` drives the session chip; `nodes.name` drives every list. Writing one is
-    // the bug where somebody renames themselves and the people page never notices.
+    // The name lives in two tables: writing one is the bug where somebody renames themselves and the
+    // people page never notices.
     const user = await prisma.user.findFirstOrThrow({
       where: { id: staff.userId }, select: { name: true },
     });
@@ -217,16 +194,10 @@ describe('PATCH /profile', () => {
   });
 
   it('IGNORES AN EMAIL — the key does not exist on the DTO — 47 § Data contract', async () => {
-    // Changing an address is an identity change and belongs to an administrator with an
-    // audit trail. `UpdateProfileBody` has no `email` key, so Zod strips it in `validate()`
-    // and the handler is never handed one.
-    //
-    // Ignored rather than 422, matching `PATCH /people/:id` and `status` — the same shape
-    // D-024 settled, asserted by accounts.test.ts as "ignores a status on the person
-    // update". Refusing would be defensible; being INCONSISTENT about which unknown keys
-    // are refused would not, and this is the weaker-looking half of the pair only because
-    // no UI in the product sends it. What matters is that the address cannot change, and
-    // the second assertion is the one that says so.
+    // Changing an address is an identity change and belongs to an administrator with an audit trail, so
+    // the schema has no email field and it is stripped before the handler sees it.
+    // Ignored rather than refused, matching the people route: being inconsistent about which unknown keys
+    // are refused would be worse. What matters is that the address cannot change.
     const before = (await profileOf(founder)).user.email;
     const res = await withCsrf(founder, 'patch', '/api/v1/profile')
       .send({ name: 'Founder', email: 'somewhere-else@example.test' });
@@ -247,9 +218,8 @@ describe('POST /profile/password', () => {
       .send({ currentPassword: CURRENT, newPassword: 'a-brand-new-password' });
     expect(res.status).toBe(200);
 
-    // One agent each. A second login on an agent that just signed in carries a session, and
-    // link 8 then requires a CSRF token — the 403 that would come back says nothing about
-    // the password, which is what this test is asking about.
+    // One agent each: a second login on an agent that just signed in carries a session, and the CSRF link
+    // would then answer 403, which says nothing about the password.
     const withNew = await request.agent(app).post('/api/v1/auth/login')
       .send({ email, password: 'a-brand-new-password' });
     expect(withNew.status).toBe(200);
@@ -263,12 +233,11 @@ describe('POST /profile/password', () => {
     const res = await withCsrf(staff, 'post', '/api/v1/profile/password')
       .send({ currentPassword: 'not-their-password', newPassword: 'a-brand-new-password' });
 
-    // 422 with a field, NOT 401. A 401 from inside the console trips the SPA's global
-    // session handler, and "you have been signed out" is a lie about what just happened.
+    // A field error, not a 401: a 401 from inside the console would sign the person out for a typo.
     expect(res.status).toBe(422);
     expect(res.body.error.details.fields[0].path).toBe('body.currentPassword');
 
-    // And it really did not change: the original still works.
+    // And it really did not change: the original password still works.
     const email = (await profileOf(staff)).user.email;
     const fresh = request.agent(app);
     expect((await fresh.post('/api/v1/auth/login').send({ email, password: CURRENT })).status).toBe(200);
@@ -291,8 +260,8 @@ describe('POST /profile/password', () => {
     const olds = new Set(before.map((row) => row.sid));
     expect(after.every((row) => !olds.has(row.sid))).toBe(true);
 
-    // And the caller is still signed in — regenerate() empties the session, so a route that
-    // forgets to put the ids back signs somebody out of their own password change.
+    // And the caller is still signed in: regenerating empties the session, so a route that forgets to put
+    // the ids back would sign somebody out of their own password change.
     expect((await staff.agent.get('/api/v1/auth/me')).status).toBe(200);
   });
 
@@ -312,9 +281,8 @@ describe('POST /profile/password', () => {
   });
 
   it('EXPOSES NO WAY TO NAME SOMEBODY ELSE — the whole of `self` scope', async () => {
-    // There is no id parameter to supply, so this asserts the SHAPE of the surface rather
-    // than a refusal: a route that took a target would be a route an administrator could
-    // point at a subordinate, which `57` forbids outright.
+    // There is no id parameter to supply, so this asserts the SHAPE of the surface: a route that took a
+    // target would be a route an administrator could point at a subordinate.
     const staff = await addStaff(founder.orgId, { name: 'No Target', level: 2, unitName: 'Section A' });
     const res = await withCsrf(staff, 'post', `/api/v1/profile/password/${founder.userId}`)
       .send({ currentPassword: CURRENT, newPassword: 'a-brand-new-password' });

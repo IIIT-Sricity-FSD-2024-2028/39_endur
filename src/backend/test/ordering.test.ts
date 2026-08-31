@@ -1,9 +1,6 @@
-// Ordering tests. 12 §7: "deliberately mis-order two links and assert the failure is loud."
-//
-// This is the test that proves the ordering table in 12 §5 is a REQUIREMENT and not a
-// comment. Each case below builds a deliberately wrong chain and asserts it breaks — if
-// one of these ever starts passing, the constraint it protects has quietly stopped being
-// real.
+// Ordering tests: deliberately mis-order two links in the chain and assert the failure is loud.
+// This is what proves the ordering table is a requirement and not a comment - if one of these ever
+// starts passing, the constraint it protects has quietly stopped being real.
 import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
@@ -24,7 +21,7 @@ describe('chain ordering constraints', () => {
     });
 
     const res = await request(wrong).get('/boom');
-    // Express's default handler answers instead: HTML, and the leaked message.
+    // Express's own handler answers instead: HTML, and the leaked message.
     expect(res.headers['content-type']).not.toMatch(/json/);
     expect(res.body.error).toBeUndefined();
   });
@@ -42,9 +39,8 @@ describe('chain ordering constraints', () => {
     expect(res.headers['content-type']).toMatch(/json/);
     expect(res.body.error.code).toBe('INTERNAL');
     expect(res.body.error.requestId).toBeTruthy();
-    // Outside production the funnel DOES append the message, deliberately — it is the
-    // fastest way to see what actually threw. What never crosses the boundary in any
-    // environment is the stack.
+    // Outside production the funnel does append the message deliberately, because it is the fastest way
+    // to see what threw. The stack never crosses the boundary in any environment.
     expect(res.body.error.message).toContain('kaboom');
     expect(JSON.stringify(res.body)).not.toMatch(/at \w+ \(|\.ts:\d+/);
   });
@@ -63,8 +59,8 @@ describe('chain ordering constraints', () => {
   it('tenantResolver BEFORE the session is loaded cannot resolve an org — N-014', async () => {
     const wrong = express();
     wrong.use(context, requestId);
-    // Router-level now (T-064): the console's variant, mounted where a session has not
-    // been loaded. Same N-014 point — the ORDER is what makes it resolvable, not the link.
+    // The console's own chain, mounted where the session has not been loaded yet: the ORDER is what
+    // makes the tenant resolvable, not the link itself.
     wrong.use(tenantResolver({ required: true }));
     wrong.post('/api/v1/anything', (_q, res) => res.json({ ok: true }));
     wrong.use(errorFunnel);

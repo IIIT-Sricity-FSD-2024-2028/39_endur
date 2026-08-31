@@ -1,26 +1,7 @@
-// RESPONSE SCHEMAS. `DEC-115`, `13` §12.
-//
-// The request half of the document needs no file like this: `validate()` already parses every
-// request against a Zod DTO, so `openapi/spec.ts` reads the schema the server actually enforces
-// and cannot describe a different one. Responses have no such schema — `13` states them as
-// TypeScript types, which exist only at compile time and cannot be walked at runtime.
-//
-// So they are written here, once, as Zod. Two mechanisms stop them from becoming fiction, and
-// neither is discipline:
-//
-//   1 · `mirrors<T>()` IS A COMPILE-TIME CHECK. Each schema is passed through it with the
-//       shared TypeScript type as the parameter, so a schema whose inferred output is missing a
-//       field, or has one at the wrong type, FAILS `tsc`. Rename a field in `PersonSummary` and
-//       the build breaks here — which is the whole reason to write these in Zod rather than as
-//       hand-typed JSON Schema literals, which nothing could check.
-//
-//   2 · `openapi.test.ts` PARSES REAL RESPONSES THROUGH THEM. `mirrors<T>()` cannot catch an
-//       EXTRA field (an object with more properties is still assignable), and it cannot catch a
-//       handler that returns something other than what its type claims. A live round trip
-//       through `.strict()` catches both.
-//
-// Between them: the document cannot describe a field the type does not have, and cannot omit
-// one the server actually sends.
+// The response shapes for the API document, written once here in Zod.
+// Requests need no such file, because validate() already parses every request against a schema.
+// Two things keep these honest: mirrors<T>() fails the build when a schema does not match the shared
+// TypeScript type, and openapi.test.ts parses real responses through them, which catches extra fields.
 import { z } from 'zod';
 import {
   AnswerValue,
@@ -111,38 +92,13 @@ import type {
   UnitTreeTotals,
 } from '@endur/shared';
 
-/**
- * The compile-time half. `z.ZodType<T>` is satisfied only by a schema whose OUTPUT is
- * assignable to `T`, so a missing or mistyped field is a type error at the call site rather
- * than a wrong line in a published document.
- *
- * It deliberately does not catch an EXTRA field — an object type with more properties is
- * assignable to one with fewer, and there is no way to say "exactly these" that survives
- * `exactOptionalPropertyTypes` without a tangle of conditional types that would fail on
- * optionals for reasons unrelated to correctness. The live round trip catches extras instead,
- * which also catches the case a type system never could: a handler that does not return what
- * its own type says.
- */
+// The compile-time half: a schema whose output does not match the shared type is a type error right here.
 const mirrors =
   <T>() =>
   <S extends z.ZodType<Mirrorable<T>, z.ZodTypeDef, unknown>>(schema: S): S =>
     schema;
 
-/**
- * THE ONE CONCESSION, AND IT IS TO `exactOptionalPropertyTypes` RATHER THAN TO CORRECTNESS.
- *
- * `03`'s tsconfig turns that flag on, so `rows?: GapRow[]` means *"absent, or an array"* and
- * refuses `undefined` as a VALUE. Zod cannot express that distinction: `.optional()` always
- * infers `rows?: GapRow[] | undefined`. Without this the three schemas with optional fields
- * would each need a cast, and a cast turns the compile-time check off for the whole schema —
- * losing the guarantee on twenty correct fields to accommodate one.
- *
- * So the widening is surgical. A key is relaxed **only when `undefined` is already part of its
- * declared type** — which is exactly the optional ones, plus the handful typed `unknown` (Zod
- * reports those optional too, for the same reason: `undefined extends unknown`). Every REQUIRED
- * key of a concrete type is untouched, so a schema that omits one, or types one wrongly, still
- * fails to compile. That is the property worth keeping, and it is kept.
- */
+// A narrow widening for optional fields only, so one optional key cannot force a cast that would switch the check off.
 type Mirrorable<T> = T extends readonly (infer U)[]
   ? Mirrorable<U>[]
   : T extends Date
@@ -156,7 +112,7 @@ type Mirrorable<T> = T extends readonly (infer U)[]
 const iso = () => z.string().datetime();
 const id = () => z.string().uuid();
 
-/** A named ref, so `{ id, name }` pairs read as one thing in the document. */
+// A named { id, name } pair, so it reads as one thing in the document.
 const named = z.object({ id: z.string(), name: z.string() });
 
 const Tier = z.enum(TIERS);
@@ -164,22 +120,13 @@ const Scope = z.enum(SCOPES);
 const ReflectState = z.enum(REFLECT_STATES);
 const StatWindow = z.enum(StatWindows);
 
-/**
- * ALL 73 CAPABILITIES, ENUMERATED IN THE DOCUMENT. `11` §3 is the catalogue and this is it on
- * the wire — a reader of the spec can see the entire vocabulary of things anyone can be
- * permitted to do, which is the single most useful thing this API's documentation can show.
- */
+// Every capability, listed out, so a reader can see the whole vocabulary of things anyone can be allowed to do.
 const CapabilityEnum = z.enum(CAPABILITIES as [Capability, ...Capability[]]);
 
 const Label = z.object({ one: z.string(), many: z.string() });
 const Labels = z.record(z.string(), Label);
 
-/**
- * THE FIVE VOCABULARY KEYS, NAMED. `22` §2 — `ResolvedLabels` is a fixed record, not an open
- * one, and spelling the keys out is the single most illustrative thing this document contains:
- * it is INV-001 visible on the wire. Switch organisation and the same five keys come back
- * saying Property, Restaurant, Guest — with no code change anywhere.
- */
+// The five vocabulary keys, named. Switch organisation and the same keys come back saying Property, Guest, and so on.
 const ResolvedLabelsSchema = z.object({
   unit: Label,
   subject: Label,
@@ -198,7 +145,7 @@ const DecidedBy = z.object({
   effect: z.enum(['allow', 'deny']).optional(),
 });
 
-/** `10` §2's account lifecycle, as the four states `57` § States names. */
+// The four states an account can be in.
 export const AccountStatusSchema = mirrors<AccountStatus>()(
   z.discriminatedUnion('state', [
     z.object({ state: z.literal('none') }),
@@ -285,8 +232,7 @@ export const MeResponseSchema = mirrors<MeResponse>()(
       industry: z.string(),
     }),
     labels: Labels,
-    // The map `useCan()` reads: capability → the WIDEST scope it is held at. Absent means not
-    // held. It is what the UI may OFFER and never what the caller may DO (INV-003).
+    // The map useCan() reads: capability -> the widest scope it is held at. It says what the UI may OFFER, never what the caller may DO.
     capabilities: z.record(z.string(), Scope),
     support: z
       .object({
@@ -343,7 +289,7 @@ export const PresetViewSchema = mirrors<PresetView>()(
   }),
 );
 
-/** Recursive: the org tree is a graph, and `db/graph.ts`'s CTE returns it nested. */
+// Recursive, because the org tree is a tree and the database returns it already nested.
 export const UnitNodeSchema: z.ZodType<UnitNode> = z.lazy(() =>
   z.object({
     id: z.string(),
@@ -427,10 +373,7 @@ export const CapabilityMetaSchema = mirrors<CapabilityMeta>()(
   }),
 );
 
-/**
- * The simulator's answer, and `considered` is the half that makes it worth having. `42`: a bare
- * "blocked" teaches nothing; the trace names the rule that decided and every rule that did not.
- */
+// The simulator's answer. 'considered' is the useful half: it names the rule that decided and the ones that did not.
 export const DecisionViewSchema = z.object({
   allowed: z.boolean(),
   capability: CapabilityEnum,
@@ -574,12 +517,7 @@ export const LaunchResultSchema = mirrors<LaunchResult>()(
   z.object({ publicToken: z.string(), url: z.string(), status: CampaignStatus }),
 );
 
-/**
- * K-ANONYMITY IS VISIBLE IN THE SCHEMA, and that is not a documentation flourish — it is how
- * the type enforces it (`INV-006`, `52` §2). Below `K_ANON_THRESHOLD` the body has NO
- * `questions` key at all, so a caller cannot read results that do not exist by forgetting to
- * check `suppressed`.
- */
+// Anonymity is visible in the type: below the k-anonymity threshold the body has no questions key at all.
 export const ResultsViewSchema = mirrors<ResultsView>()(
   z.object({
     responseCount: z.number(),
@@ -914,8 +852,7 @@ export const PaymentRecordSchema = mirrors<PaymentRecord>()(
     tier: Tier,
     fromTier: Tier.nullable(),
     kind: z.enum(['signup', 'change', 'expiry', 'lapse']),
-    // MINOR UNITS, ALWAYS — `DEC-080`. A rupee amount as a float is an accounting document
-    // that disagrees with itself at the third decimal place.
+    // Always minor units (paise). Money as a decimal number disagrees with itself at the third place.
     amountMinor: z.number(),
     currency: z.literal('INR'),
     payerName: z.string(),
@@ -969,8 +906,7 @@ export const PublicBookableSchema = mirrors<PublicBookable>()(
     name: z.string(),
     description: z.string().nullable(),
     orgName: z.string(),
-    // NO `capacity` — a respondent is told what is left, never how full it is. Publishing the
-    // capacity would let a stranger infer how many colleagues booked which slot.
+    // No capacity field: a respondent is told what is left, never how full a slot is.
     slots: z.array(
       z.object({ id: z.string(), startsAt: iso(), endsAt: iso(), remaining: z.number() }),
     ),
@@ -996,9 +932,7 @@ export const PublicCampaignSchema = mirrors<PublicCampaign>()(
 
 export const SubmitResultSchema = z.object({ ok: z.literal(true), responseCount: z.number() });
 
-/* -------------------------------------------------------------------------- */
-/* Platform — `19`. A separate catalogue, a separate principal, separate shapes */
-/* -------------------------------------------------------------------------- */
+// Platform shapes for Endur's own operators: a separate catalogue and a separate principal.
 
 export const PlatformMeResponseSchema = mirrors<PlatformMeResponse>()(
   z.object({
@@ -1008,9 +942,7 @@ export const PlatformMeResponseSchema = mirrors<PlatformMeResponse>()(
       email: z.string(),
       role: z.enum(['owner', 'staff']),
     }),
-    // The operator's own catalogue, enumerated — the platform twin of `CapabilityEnum`, and
-    // kept rigidly separate from it (19 §4). A `platform.` string must never reach the org
-    // catalogue, and a document that showed one list would suggest they are interchangeable.
+    // The operator's own catalogue, kept strictly apart from the organisation one.
     capabilities: z.array(z.enum(PLATFORM_CAPABILITIES as [PlatformCapability, ...PlatformCapability[]])),
   }),
 );
@@ -1028,7 +960,7 @@ export const PlatformOrgSummarySchema = mirrors<PlatformOrgSummary>()(
     seats: z.number(),
     seatLimit: z.number().nullable(),
     activeCampaigns: z.number(),
-    // A COUNT. `INV-011` as a type: no field on this contract could carry a response.
+    // A count only: no field on this contract could carry a response.
     responsesLast30d: z.number(),
     lastActivityAt: iso().nullable(),
     suspendedAt: iso().nullable(),
@@ -1055,8 +987,7 @@ export const PlatformStatsSchema = mirrors<PlatformStats>()(
   z.object({
     organizations: z.number(),
     suspended: z.number(),
-    // `Record<Tier, number>` — a FIXED four-key record, not an open one, so the tiers are named.
-    // The document is better for it: a reader sees the whole tier vocabulary in the response.
+    // A fixed four-key record, so every tier name appears in the document.
     byTier: z.object({
       bronze: z.number(),
       silver: z.number(),
@@ -1243,21 +1174,15 @@ export const EnterSupportResponseSchema = mirrors<EnterSupportResponse>()(
   }),
 );
 
-/* -------------------------------------------------------------------------- */
-/* Envelopes — the three shapes every route in the product answers with        */
-/* -------------------------------------------------------------------------- */
+// The three envelope shapes every route in the product answers with.
 
-/** `{ ok: true }`. Logout, mark-read, and the rest of the "it happened" routes. */
+// { ok: true } - logout, mark-read, and the other "it happened" replies.
 export const Ok = z.object({ ok: z.literal(true) });
 
-/** `{ data: T }`. One thing. */
+// { data: T } - one thing.
 export const data = <T extends z.ZodTypeAny>(inner: T) => z.object({ data: inner });
 
-/**
- * `13` §4's paginated envelope, exactly. `meta.total` is SCOPE-FILTERED — it counts what the
- * caller may see, not what exists (INV-003), which is the one thing about it a reader of this
- * document could not guess.
- */
+// The paginated envelope. meta.total counts what the caller may see, not what exists.
 export const page = <T extends z.ZodTypeAny>(inner: T) =>
   z.object({
     data: z.array(inner),
@@ -1265,7 +1190,7 @@ export const page = <T extends z.ZodTypeAny>(inner: T) =>
     meta: z.object({ total: z.number() }),
   });
 
-/** The unpaginated list — `{ data: T[] }` plus whatever `meta` that route carries. */
+// The unpaginated list: { data: T[] } plus whatever meta that route carries.
 export const list = <T extends z.ZodTypeAny>(inner: T) => z.object({ data: z.array(inner) });
 
 export { id, iso, named, Tier, Scope, CapabilityEnum, Labels, Label, ResolvedLabelsSchema, DecidedBy };

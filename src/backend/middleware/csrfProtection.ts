@@ -1,10 +1,5 @@
-// Link 8. Exists BECAUSE of an auth decision, not despite one: a bearer token would have
-// made it unnecessary, cookies make it mandatory. That trade is the honest answer to why
-// it is in the chain (DEC-014).
-//
-// Double-submit cookie: a readable `endur.csrf` cookie the SPA echoes in `X-CSRF-Token`.
-// Chosen over a synchroniser token because it needs no server-side state and no
-// token-fetch round trip at boot.
+// Link 8. CSRF protection, needed because the staff session is a cookie a browser sends on its own.
+// Double-submit: a readable endur.csrf cookie that the SPA echoes back in the X-CSRF-Token header.
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { RequestHandler, Response } from 'express';
 import { AppError } from '../lib/errors.js';
@@ -13,19 +8,14 @@ import { config, isProd } from '../lib/config.js';
 export const CSRF_COOKIE = 'endur.csrf';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-/**
- * Deliberately NOT httpOnly — the SPA has to read it to echo it back.
- *
- * The lifetime MUST match the session cookie's. D-009: it used to have none, making it a
- * browser-session cookie beside a 7-day session — so closing the browser left you signed
- * in with no token, and every mutation failed permanently.
- */
+// Issues a fresh CSRF token. Not httpOnly, because the SPA must read it, and it lasts as long as the session.
 export function issueCsrfToken(res: Response): string {
   const token = randomBytes(32).toString('base64url');
   setCsrfCookie(res, token);
   return token;
 }
 
+// Writes the CSRF cookie with the same lifetime as the session.
 function setCsrfCookie(res: Response, token: string): void {
   res.cookie(CSRF_COOKIE, token, {
     httpOnly: false,
@@ -36,16 +26,13 @@ function setCsrfCookie(res: Response, token: string): void {
   });
 }
 
+// The middleware: safe methods pass through, anything that changes state must echo the token back.
 export const csrfProtection: RequestHandler = (req, res, next) => {
   const cookies = req.cookies as Record<string, string> | undefined;
   const fromCookie = cookies?.[CSRF_COOKIE];
 
   if (SAFE_METHODS.has(req.method)) {
-    // Self-heal, and slide. A cookie principal with no token is a dead end otherwise: the
-    // error tells you to reload, and a reload is all GETs, so nothing would re-issue it
-    // (only login and register did). Re-setting an EXISTING token rather than rotating it
-    // keeps the expiry in step with the rolling session without breaking a mutation that
-    // is already in flight holding the old value.
+    // On a safe request, re-set or issue the cookie, so its expiry slides along with the rolling session.
     if (req.ctx.principal?.kind === 'user') {
       if (fromCookie) setCsrfCookie(res, fromCookie);
       else issueCsrfToken(res);
@@ -53,23 +40,20 @@ export const csrfProtection: RequestHandler = (req, res, next) => {
     return next();
   }
 
-  // Scope it precisely, or it breaks the two surfaces that must stay open:
-  //   apiKey     — a header is never attached automatically by a browser
-  //   respondent — no cookie, no ambient authority, and a QR scan from any origin must work
-  // Only a cookie principal is exposed, because only a cookie is sent unbidden.
+  // Only cookie users are checked: an API key header and a respondent token are never sent by a browser by itself.
   if (req.ctx.principal && req.ctx.principal.kind !== 'user') return next();
-  if (!req.ctx.principal) return next(); // nothing to forge yet; auth guards handle it
+  if (!req.ctx.principal) return next(); // nobody is signed in, so there is nothing to forge
 
   const fromHeader = req.get('x-csrf-token');
 
   if (!fromCookie || !fromHeader || !equal(fromCookie, fromHeader)) {
-    // Distinct from an authorisation 403 so the two are separable in logs (13 §5).
+    // Its own error code, kept separate from a permission 403 so the two are easy to tell apart in logs.
     throw new AppError('CSRF_FAILED', 'Your session token was missing or invalid. Reload and try again.');
   }
   next();
 };
 
-/** Constant-time: a length-independent early return would leak the token a byte at a time. */
+// Constant-time compare, so a wrong token cannot be guessed one byte at a time.
 function equal(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);

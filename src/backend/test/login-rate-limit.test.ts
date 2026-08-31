@@ -1,15 +1,9 @@
-// T-031 — login is limited per IP AND per email. 15 § Rate limiting, 12 §4.12, 30 § Acceptance.
-//
-// `15` has specified the pair since the first revision; the implementation was per-IP only
-// until T-031, and that gap is invisible until the day it matters. Per-IP alone fails in
-// both directions on a campus: behind one NAT, ten normal sign-ins exhaust the bucket and
-// the eleventh person — who did nothing wrong — is locked out mid-demo; raise the ceiling
-// to fix that and a stuffing run against a thousand addresses from the same NAT walks
-// straight through.
-//
-// These tests share ONE in-memory bucket store with the rest of the suite, so every email
-// below is unique per run. A test that reuses an address would poison the next one for
-// fifteen minutes.
+// Login is limited per IP AND per email.
+// Per-IP alone fails in both directions on a campus: behind one shared address ten normal sign-ins
+// exhaust the bucket and the eleventh person is locked out mid-demo, while raising the ceiling lets a
+// credential-stuffing run against a thousand addresses walk straight through.
+// These tests share one in-memory bucket with the rest of the suite, so every email here is unique
+// per run - reusing one would poison the next test for fifteen minutes.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app, unique } from './helpers.js';
@@ -22,7 +16,7 @@ const attempt = (email: string) =>
 const exhaust = async (email: string) => {
   for (let i = 0; i < LIMIT; i += 1) {
     const res = await attempt(email);
-    // Every one of these is a normal failed sign-in, not a limit yet.
+    // Every one of these is an ordinary failed sign-in, not the limit yet.
     expect(res.status, `attempt ${i + 1}`).toBe(401);
   }
 };
@@ -44,8 +38,8 @@ describe('POST /auth/login rate limit — 15 § Rate limiting', () => {
     await exhaust(victim);
     expect((await attempt(victim)).status).toBe(429);
 
-    // Same IP, different account. Per-IP-only would have made this a 429, and the person
-    // it belongs to would have no idea why.
+    // Same IP, different account: per-IP only would answer 429 here, and the person it belongs to
+    // would have no idea why.
     const other = await attempt(bystander);
     expect(other.status).toBe(401);
   });
@@ -66,7 +60,7 @@ describe('POST /auth/login rate limit — 15 § Rate limiting', () => {
     expect(over.status).toBe(429);
     expect(over.body).toHaveProperty('error.requestId');
     expect(over.body).toHaveProperty('error.message');
-    // draft-7 headers, which is what the client reads to say "try again in N minutes".
+    // Standard rate-limit headers, which is what the client reads to say "try again in N minutes".
     expect(over.headers['ratelimit']).toMatch(/reset=\d+/);
   });
 });

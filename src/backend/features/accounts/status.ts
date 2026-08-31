@@ -1,47 +1,23 @@
-// `AccountStatus` — the four states, derived in ONE place. 57 § States.
-//
-// It lives here rather than in people/service.ts because both the list and the detail read
-// it, and because the ORDER of the four tests is a product decision rather than a mapping
-// detail. Two copies would eventually order them differently, and the symptom would be a
-// row that says one thing in the table and another in the panel.
+// The four account states, worked out in one place, so the list and the detail panel can never disagree.
+// active - can sign in · invited - has a live link · disabled - was revoked · none - never had a sign-in
 import type { AccountStatus } from '@endur/shared';
 
 export type AccountFacts = {
-  /** Reduced to a boolean by the caller. The hash itself never travels. */
+  // Already reduced to a boolean by the caller: the password hash itself never travels.
   hasPassword: boolean;
   status: string;
   lastLoginAt: Date | null;
   disabledAt: Date | null;
-  /** The unaccepted invite, if there is one. At most one exists — a partial unique index. */
+  // The unaccepted invite, if there is one. At most one can exist.
   liveInvite: { expiresAt: Date; createdAt: Date } | null;
 };
 
-/**
- * THE ORDER IS THE DECISION, and each step is picked so the answer cannot be a lie.
- *
- * 1 · A password beats everything. `account.reset` on an ACTIVE account (somebody who
- *     forgot theirs) mints a live invite while the old password still works — it is not
- *     replaced until activation. Reporting `invited` there would tell an administrator
- *     that a colleague cannot sign in when they can. The load-bearing fact is "this
- *     account opens the door", so it is tested first.
- *
- * 2 · A live invite beats `disabled`. Re-issuing on a revoked account is exactly how 57
- *     says re-enabling works; between the re-issue and the activation the truthful state
- *     is "waiting for them", not "revoked". Both states mean the same thing about access
- *     — the hash is null and nobody can sign in — so nothing is hidden by preferring the
- *     one that says what happens next.
- *
- * 3 · `disabled` is what is left when somebody was revoked and nobody re-invited them.
- *
- * 4 · `none` is the ordinary case for most of the graph: a person exists, has positions,
- *     and has never been given a key. `createPerson()` writes their `users` row with a
- *     null hash, so this is a state the product is full of, not an error.
- *
- * An EXPIRED live invite still reports `invited`, carrying its past `expiresAt`. The union
- * has no fifth state and does not need one: the date is in the payload and the screen can
- * read it, where a server-side `expired` state would have to be recomputed on every render
- * anyway to stay true.
- */
+// The ORDER of these tests is the decision:
+// 1. A working password wins, so a reset link on an active account never reads as "cannot sign in".
+// 2. A live invite beats disabled, because re-inviting is how a revoked account is re-enabled.
+// 3. disabled is what is left after a revoke with no new invite.
+// 4. none is the ordinary case: a person who has never been given a key.
+// An expired invite still reports invited and carries its date, so the screen can say so.
 export function accountStatusOf(facts: AccountFacts): AccountStatus {
   if (facts.hasPassword) {
     return { state: 'active', lastLoginAt: facts.lastLoginAt?.toISOString() ?? null };

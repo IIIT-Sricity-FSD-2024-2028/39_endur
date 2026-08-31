@@ -1,8 +1,5 @@
-// Results routes. 13, 40, 52 §2.
-//
-// Mounted under /campaigns, because these read a campaign's results — but kept in their own
-// feature folder, because the k-anonymity gate is the thing they are actually about and it
-// should be somewhere a reviewer can find in one look.
+// Results routes. Mounted under /campaigns because they read a campaign's results,
+// but kept in their own folder, because the anonymity gate is what they are really about.
 import { Router } from 'express';
 import { tenantChain } from '../../middleware/chains.js';
 import { ExportDto, ResponsesDto, ResultsDto } from '@endur/shared';
@@ -16,8 +13,7 @@ import { exportResults, readResponses, readResults } from './service.js';
 
 export const resultsRouter: Router = Router();
 
-// Links 6-8, router-level (12 §2). tenantResolver → authenticate → csrfProtection,
-// applied to every route below without any of them having to ask.
+// Links 6 to 8 for every route below: resolve the org, attach the principal, check CSRF.
 resultsRouter.use(tenantChain);
 
 const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): string => {
@@ -28,6 +24,7 @@ const userOf = (req: { ctx: { principal?: { kind: string; id?: string } } }): st
 
 const version = (req: { ctx: { authzVersion?: number } }) => req.ctx.authzVersion ?? 0;
 
+// The aggregated results for a campaign.
 resultsRouter.get(
   '/:id/results',
   authenticate,
@@ -44,9 +41,9 @@ resultsRouter.get(
   },
 );
 
-// A different capability from the aggregates, on purpose. Seeing that the average is 4.3
-// and reading what an individual wrote are different levels of access, and a head of
-// department may reasonably have the first without the second (40).
+// A different capability from the aggregates: seeing that the average is 4.3 and reading what one person
+// wrote are different levels of access.
+// The individual written responses.
 resultsRouter.get(
   '/:id/responses',
   authenticate,
@@ -63,6 +60,7 @@ resultsRouter.get(
   },
 );
 
+// The CSV export.
 resultsRouter.get(
   '/:id/export',
   authenticate,

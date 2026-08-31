@@ -1,20 +1,7 @@
-// The rotating log files, read safely. 72 § "The file name is the whole attack surface".
-//
-// `:file` becomes a filesystem read, and that is the one dangerous thing this module does.
-// Guarded three ways, not one — rule 1 is what actually stops a bad name, rules 2 and 3 exist
-// because rule 1 is a regex somebody will one day relax:
-//
-//   1 · ALLOWLIST BY PATTERN, never sanitise. `isAllowedName` reuses `filePattern` from
-//       `lib/logFile.ts` — the exact regex the WRITER names files with — rather than a
-//       second regex that can drift from it.
-//   2 · RESOLVE AND COMPARE. `path.resolve(logDir, name)` must still sit inside `logDir`.
-//   3 · NEVER A DIRECTORY LISTING FROM USER INPUT. `listLogFiles()` is the only thing that
-//       reads `logDir`'s contents; a caller can only ever request a name that came from it.
-//
-// Reading is BOUNDED and BACKWARDS: the interesting line is the most recent one, so a page
-// is built by reading fixed-size chunks from the end of the file, never the whole thing —
-// this is what makes the acceptance line "a 10 MB file returns its most recent page without
-// reading the whole file" true rather than aspirational.
+// Reads the rotating log files for the operator console.
+// The file name is the whole attack surface, so a name must match the writer's own pattern, must resolve
+// inside the log folder, and can only ever come from our own directory listing.
+// Reading is bounded and backwards: a page is built from chunks at the END of the file, never the whole file.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { LogFileMeta, LogLine } from '@endur/shared';
@@ -26,16 +13,13 @@ import { parseLogLine } from './parser.js';
 const APP_PATTERN = filePattern('app');
 const ERROR_PATTERN = filePattern('error');
 
-/** Files above this size are not line-counted for the file list — counting is a full read
- *  and the list must stay cheap for the case (an incident) where somebody actually opens it. */
+// Files above this size are not line-counted in the listing, because counting means reading all of it.
 const LINE_COUNT_THRESHOLD_BYTES = 2 * 1024 * 1024;
 
-/** Read in 64 KB chunks from the end. */
+// Read in 64 KB chunks, from the end.
 const CHUNK_BYTES = 64 * 1024;
 
-/** A hard ceiling per call — not "never slurped" defeated by an unlucky filter, but bounded
- *  so one request cannot block the event loop scanning a whole large file synchronously. A
- *  filter that matches nothing in this window still returns a cursor; the client pages again. */
+// A hard ceiling per call, so one request cannot scan a whole large file; the client simply pages again.
 const MAX_BYTES_PER_CALL = 8 * 1024 * 1024;
 
 export type LogFilters = {
@@ -68,11 +52,7 @@ function countLines(fullPath: string): number {
   return content.split('\n').filter((line) => line.length > 0).length;
 }
 
-/**
- * `72` § Interactions — grouped by stream, newest first, `error-*.log` listed first: finding
- * an error must not mean grepping megabytes of `200 OK`. Reads `logDir` itself, once; nothing
- * downstream of this ever turns a client-supplied name into a directory scan.
- */
+// Lists the log files, grouped by stream and newest first, with the error files first.
 export function listLogFiles(): LogFileMeta[] {
   if (!logToFile || !fs.existsSync(logDir)) return [];
 
@@ -118,8 +98,7 @@ function decodeCursor(cursor: string): number | null {
 }
 
 function matchesFilters(line: LogLine, raw: string, filters: LogFilters): boolean {
-  // Threshold, not equality: "level >= 40" is the useful question ("show me warnings and
-  // worse"), the same convention every level-based log viewer uses.
+  // A threshold, not an equality: "level >= 40" means "warnings and worse".
   if (filters.level !== undefined && line.level < filters.level) return false;
   if (filters.status !== undefined && line.status !== filters.status) return false;
   if (filters.path !== undefined && !(line.path ?? '').startsWith(filters.path)) return false;
@@ -130,25 +109,8 @@ function matchesFilters(line: LogLine, raw: string, filters: LogFilters): boolea
   return true;
 }
 
-/**
- * Reads one page from the end of `fullPath`, backwards, applying `filters` server-side as it
- * goes.
- *
- * `cursor` IS THE BYTE OFFSET OF A LINE START — specifically, of the OLDEST LINE THE PREVIOUS
- * PAGE RETURNED — and D-036 is the whole reason that sentence has to be this exact. It used
- * to be the offset of the CHUNK the previous page stopped in, on the reasoning that a
- * partly-used chunk would simply be re-read from the same offset next time. It is not
- * re-read: the reader walks BACKWARDS, so resuming at the chunk's start reads the chunk
- * BELOW it and every line the page limit left unreturned in between is skipped, silently.
- * Measured on a 1,500-line file at limit 50: three pages returned 150 lines and lost 1,350,
- * and every page after the first opened on the truncated half of whatever line straddled the
- * boundary. A chunk offset is not a line offset, and only one of the two can be a cursor.
- *
- * `hasMore` therefore reads off the same number, not off `position`. A file SMALLER THAN ONE
- * CHUNK made that difference visible: one read takes `position` to 0 while the limit is still
- * capping the page, so the reader answered "50 lines, that is all of them" to a 220-line
- * file. That is not an edge case — it is every log file for the first hours of its day.
- */
+// Reads one page from the end of a file, applying the filters as it goes.
+// The cursor is the byte offset of the OLDEST LINE the previous page returned - a line start, never a chunk start.
 function tailRead(
   fullPath: string,
   filters: LogFilters,
@@ -159,9 +121,7 @@ function tailRead(
   const size = fs.statSync(fullPath).size;
   const startPosition = cursor === undefined ? size : decodeCursor(cursor);
   if (startPosition === null || startPosition > size) {
-    // A cursor pointing past the file's current size means the file was rotated or
-    // truncated since the page it came from — the same "gone" the caller sees for a name
-    // that no longer exists at all.
+    // A cursor past the end of the file means the file has rotated or been truncated since.
     throw new NotFoundError('That file has rotated away.');
   }
 
@@ -171,9 +131,7 @@ function tailRead(
     let leftover = '';
     let bytesRead = 0;
     const matched: LogLine[] = [];
-    // Byte offset of the oldest line RETURNED, which is what the next cursor is made of.
-    // Null until something matches — a filter that matches nothing in the window has no line
-    // to resume from, and the scan boundary below answers for that case instead.
+    // Byte offset of the oldest line returned, which is what the next cursor is built from.
     let oldestReturned: number | null = null;
 
     while (position > 0 && matched.length < limit && bytesRead < MAX_BYTES_PER_CALL) {
@@ -182,17 +140,13 @@ function tailRead(
       const buf = Buffer.alloc(readSize);
       fs.readSync(fd, buf, 0, readSize, start);
       bytesRead += readSize;
-      // `buf` is EARLIER in the file than `leftover` (the previous chunk's still-incomplete
-      // first line), so `buf`'s text comes first when the two are joined.
+      // buf comes earlier in the file than leftover, so its text goes first when the two are joined.
       const text = buf.toString('utf8') + leftover;
       const rows = text.split('\n');
       leftover = rows.shift() ?? ''; // still possibly incomplete unless start === 0
       position = start;
 
-      // Where each complete line STARTS in the file. `leftover` begins at `position`, so the
-      // first complete line begins one byte past the newline that ends it. Measured in BYTES
-      // (`Buffer.byteLength`, never `.length`) — a cursor built from character counts walks
-      // off a line boundary the first time somebody logs a name with an accent in it.
+      // Where each complete line starts, measured in BYTES, so an accented character cannot shift the cursor.
       const offsets: number[] = [];
       let at = position + Buffer.byteLength(leftover, 'utf8') + 1;
       for (const row of rows) {
@@ -220,12 +174,7 @@ function tailRead(
       leftover = '';
     }
 
-    // Everything at or above this offset has been ANSWERED FOR — either returned, or read and
-    // rejected by a filter. Two ways to arrive here and they resume from different places:
-    // a full page stops at the oldest line it returned, while a window exhausted without
-    // filling the page (the MAX_BYTES_PER_CALL ceiling, or a filter matching little) has
-    // considered every complete line it read and resumes at the oldest of those. Both are
-    // LINE starts, which is the property the cursor needs and `position` never had.
+    // Everything at or above this offset has been dealt with: either returned, or read and filtered out.
     const boundary =
       matched.length >= limit && oldestReturned !== null
         ? oldestReturned
@@ -240,15 +189,7 @@ function tailRead(
   }
 }
 
-/**
- * `72` § Interactions — "click a `requestId` and the view collapses to that one request,
- * across both files." A request's app-line and any warn-or-above line it produced share a
- * `requestId` but live in different files of the SAME day, so this reads every rotation of
- * both streams for that date in full rather than paginating — the files are size-bounded per
- * rotation and there are normally one to a few per stream per day, so this stays small even
- * though it is a deliberate exception to "never slurped" (72 § "The file name is the whole
- * attack surface").
- */
+// Reads every file for one date and keeps the lines with one requestId, so a request can be followed across both streams.
 function crossStreamRequestRead(date: string, requestId: string): LogLine[] {
   if (!fs.existsSync(logDir)) return [];
   const names = fs.readdirSync(logDir).filter((name) => streamAndDateOf(name)?.date === date).sort();
@@ -277,22 +218,16 @@ export type LogReadOptions = LogFilters & {
   limit: number;
 };
 
-/**
- * The three guards, in one place, for every entry point that turns a client-supplied name
- * into a filesystem read. `readLogFile` and `exportLogFile` both call THIS rather than each
- * carrying a copy — a second implementation of an allowlist is how an allowlist drifts.
- */
+// The three name guards, in one place, used by every entry point that opens a file.
 function assertReadableName(fileName: string): { resolved: string; stream: 'app' | 'error'; date: string } {
   if (!isAllowedName(fileName)) throw new NotFoundError('That file has rotated away.');
 
   const resolved = path.resolve(logDir, fileName);
   const resolvedDir = path.resolve(logDir);
-  // Rule 1 already makes this unreachable — it stays as the belt to rule 1's braces.
+  // Rule 1 already makes this impossible; it stays as a second check.
   if (resolved !== path.join(resolvedDir, fileName)) throw new NotFoundError('That file has rotated away.');
 
-  // `lstat`, not `stat` — a symlink at an otherwise-allowed name would pass every check
-  // above and then read whatever it actually points to. `lstat` sees the link itself, and a
-  // plain file is the only thing `isFile()` is true for there.
+  // lstat, not stat, so a symlink at an allowed name is seen as a link and refused.
   let lstat: fs.Stats;
   try {
     lstat = fs.lstatSync(resolved);
@@ -318,14 +253,9 @@ export function readLogFile(fileName: string, opts: LogReadOptions): LogReadResu
   return tailRead(resolved, opts, opts.cursor, opts.limit, date);
 }
 
-// ---------------------------------------------------------------------------
-// Export — DEC-074, 72 § Interactions
-// ---------------------------------------------------------------------------
+// Export - downloading a log file as ndjson or csv.
 
-/** A hard ceiling on one export. 18 §5 caps a rotation at LOG_MAX_SIZE_MB (10 MB default),
- *  which at ~200 bytes a line is ~50k lines — so this is the whole of a normal file and a
- *  bound on an abnormal one. A capped export SAYS SO in a trailing marker rather than
- *  ending silently: a diagnostic file that quietly lost its tail is worse than no file. */
+// A hard ceiling on one export. A capped export says so in a trailing marker rather than ending silently.
 export const EXPORT_MAX_LINES = 50_000;
 
 export type LogExportOptions = LogFilters & { format: 'ndjson' | 'csv' };
@@ -338,9 +268,7 @@ export type LogExportResult = {
   truncated: boolean;
 };
 
-/** 72 § Interactions — csv is a FIXED column set, and `extra` is deliberately not one of
- *  them. A spreadsheet cannot carry an open-ended key set, so ndjson is the lossless export
- *  and csv is the one you hand to somebody who will open it in Excel. */
+// CSV has a fixed column set; the open-ended extra fields appear only in the ndjson export.
 const CSV_COLUMNS = [
   'at', 'level', 'msg', 'requestId', 'method', 'path', 'status', 'durationMs',
   'orgId', 'principal', 'err.type', 'err.message',
@@ -348,14 +276,12 @@ const CSV_COLUMNS = [
 
 function csvCell(value: unknown): string {
   if (value === undefined || value === null) return '';
-  // A csv cell is a scalar by construction — CSV_COLUMNS names only scalar fields, and
-  // `extra` is deliberately not one of them (72 § Interactions). Anything else is stringified
-  // as JSON rather than as `[object Object]`, so a column that changes shape is still legible.
+  // Anything that is not a scalar is written as JSON, not as [object Object].
   const text =
     typeof value === 'string' ? value
     : typeof value === 'number' || typeof value === 'boolean' ? String(value)
     : JSON.stringify(value);
-  // Quote when it could otherwise change the shape of the row, and double any inner quote.
+  // Quote when the value could change the shape of the row, and double any quote inside it.
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -367,11 +293,8 @@ function csvRow(line: LogLine): string {
   }).join(',');
 }
 
-/**
- * Reads `fullPath` FORWARD, oldest line first — the opposite of `tailRead`, and the
- * difference is the point (`DEC-074`). A page on a screen wants the newest line at the top;
- * a file handed to somebody else is read top to bottom.
- */
+// Reads the file FORWARD, oldest line first - the opposite of the viewer's page.
+// A page on a screen wants the newest line at the top; a file handed to somebody else reads top to bottom.
 function forwardRead(
   fullPath: string,
   filters: LogFilters,
@@ -418,13 +341,9 @@ function forwardRead(
   }
 }
 
-/**
- * `DEC-074`. The same file, the same filters, chronological, as a download.
- *
- * Reuses `readLogFile`'s guards by calling `assertReadableName` — the name allowlist is the
- * one dangerous thing this module does (`72` § "The file name is the whole attack surface")
- * and a second entry point that re-implemented it would be the way the guard drifts.
- */
+// The same file and the same filters, in order, as a download.
+// It reuses the read route's name guard by calling the same function: a second entry point that
+// re-implemented the allowlist is exactly how a guard drifts.
 export function exportLogFile(fileName: string, opts: LogExportOptions): LogExportResult {
   const { resolved, date } = assertReadableName(fileName);
   const { lines, truncated } = forwardRead(resolved, opts, date);

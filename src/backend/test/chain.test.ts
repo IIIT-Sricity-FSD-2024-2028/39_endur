@@ -1,12 +1,6 @@
-// Chain integration tests. 12 §7, 51 §4.
-// Every error type produces the envelope; no route can produce a body outside it.
-//
-// These used to run against a temporary `/api/v1/_echo` probe. It was deleted when the
-// first real router mounted (T-015), so they run against `/api/v1/auth/register` instead —
-// the one real route that carries `validate()` and needs no session, which makes it the
-// honest place to prove the pipe. The unknown-key test got stronger in the move: instead
-// of reading a stripped key back out of an echo, it now asserts that a forged `orgId`
-// produced an organisation with a different id (INV-010).
+// Tests for the middleware chain: every kind of error comes back in the same envelope,
+// and no route can answer with a body outside it.
+// They run against the real /auth/register route, which carries validation and needs no session.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
@@ -15,21 +9,13 @@ const app = createApp();
 
 const REGISTER = '/api/v1/auth/register';
 
-/** Registration refuses a duplicate address, so each test that writes needs its own. */
+// Registration refuses a duplicate address, so each test that writes needs its own.
 const freshEmail = (tag: string) =>
   `chain-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/**
- * The ORG NAME has to be fresh too, and it took twenty runs to find out.
- *
- * `uniqueSlug()` derives a slug from the name and tries twenty variants before giving up
- * with a 409. This test used the fixed name "Strip Test Org", and because the suite writes
- * into the DEV database and never cleans up (`D-004`), the twenty-first run of the suite
- * failed — on a test about stripping unknown keys, with a conflict about slugs.
- *
- * A test that depends on how many times it has been run before is not a test. Fixed here;
- * `D-004` is the real repair and is now demonstrably not optional.
- */
+// The organisation NAME has to be fresh too: the slug generator gives up after twenty variants,
+// so a fixed name made the twenty-first run of the suite fail with an unrelated conflict.
+// A test that depends on how many times it has been run before is not a test.
 const freshOrgName = (tag: string) => `Chain ${tag} ${Date.now()}${Math.floor(Math.random() * 1e4)}`;
 
 describe('the error envelope', () => {
@@ -68,7 +54,7 @@ describe('the error envelope', () => {
       orgName: freshOrgName('strip'),
       industry: 'custom',
       tier: 'bronze',
-      // The forgery INV-010 exists for. If it were merged rather than stripped, the new
+      // The forged field this rule exists for: if it were merged rather than stripped, the new
       // organisation would carry an id somebody else chose.
       orgId: '00000000-0000-0000-0000-0000000000ff',
     });
