@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": false,
+    "outDir": "./dist-config",
+    "emitDeclarationOnly": true
+  },
+  // Tests import from the app, so this project must see both. Typecheck + typed linting
+  // only; it emits declarations and nothing else.
+  "include": ["*.config.ts", "database/seed/**/*.ts", "test/**/*.ts",
+              "*.ts", "auth/**/*.ts", "authz/**/*.ts", "billing/**/*.ts", "db/**/*.ts",
+              "features/**/*.ts", "lib/**/*.ts", "middleware/**/*.ts", "openapi/**/*.ts",
+              "platform/**/*.ts", "presets/**/*.ts"],
+  "exclude": ["dist", "dist-config", "node_modules"]
+}

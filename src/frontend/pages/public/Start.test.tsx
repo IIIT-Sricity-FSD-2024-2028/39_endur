@@ -1,0 +1,367 @@
+// T-031 — create an organization. 30 § Create organization, CONF-011.
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
+import { renderWithProviders } from '../../test-utils.js';
+import { ApiError } from '../../lib/api.js';
+import Start from './Start.js';
+
+const registerOrg = vi.fn();
+vi.mock('../../lib/auth.js', () => ({
+  useRegister: () => registerOrg,
+  useSignIn: () => vi.fn(),
+}));
+
+const mount = () =>
+  renderWithProviders(
+    <Routes>
+      <Route path="/start" element={<Start />} />
+      <Route path="/app/setup" element={<p>WIZARD</p>} />
+      <Route path="/login" element={<p>SIGN IN</p>} />
+    </Routes>,
+    { signedOut: true, path: '/start' },
+  );
+
+const fill = (email = 'amara@northfield.test') => {
+  fireEvent.change(screen.getByLabelText('Organization name'), {
+    target: { value: '  Northfield University  ' },
+  });
+  fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Amara Rao' } });
+  fireEvent.change(screen.getByLabelText('Work email'), { target: { value: email } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-long-enough-one' } });
+};
+
+/** Step 1 → step 2. The button says `Continue`; only the last one says `Continue to setup`. */
+const advance = () => fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+/**
+ * One tier's radio, BY VALUE.
+ *
+ * Not by accessible name: a card's name is its whole contents, and the feature bullets say
+ * "Everything in Bronze" on Silver and "Everything in Silver" on Gold, so `{ name: /Silver/ }`
+ * matches two cards. The `value` attribute is the tier and is the only unambiguous handle.
+ */
+const radio = (tier: string): HTMLInputElement =>
+  screen
+    .getAllByRole<HTMLInputElement>('radio')
+    .find((input) => input.value === tier) as HTMLInputElement;
+
+/** Pick a tier on step 2. */
+const pick = (tier = 'gold') => fireEvent.click(radio(tier));
+
+/** Step 2 → the checkout. DEC-080: this button opens <PaymentDialog>, it does not POST. */
+const submit = () =>
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
+
+/**
+ * Press Pay, then wait out the dialog's own sequence — a deliberate ~700ms simulated capture
+ * and a ~1500ms success overlay (PaymentDialog.tsx). Real timers rather than fake ones:
+ * `waitFor` and fake timers fight each other, and the whole flow is ~2.2s.
+ */
+const pay = () => fireEvent.click(screen.getByRole('button', { name: /^Pay ₹/ }));
+
+// ~2.2s of that sequence is real wall clock, and 4000 left only 1.7s of slack — which a
+// jsdom run across 68 files in parallel eats. D-041: raised with the project's test timeout,
+// and still well under it so a dialog that never resolves fails HERE, naming the wait, rather
+// than as an anonymous test timeout.
+const PAID = { timeout: 12_000 };
+
+/** The whole happy path: fill the fields, advance, pick a tier, open the checkout, pay. */
+const register = (email?: string, tier?: string) => {
+  fill(email);
+  advance();
+  pick(tier);
+  submit();
+  pay();
+};
+
+// Braces are load-bearing. `mockReset()` returns the mock, and vitest treats a function
+// returned from a hook as a teardown callback — so the concise-arrow form registers the
+// rejecting mock itself to be CALLED after every test, and the unhandled rejection is
+// reported against whichever test created the error. Cost an hour on 19 Aug.
+beforeEach(() => {
+  registerOrg.mockReset();
+});
+
+describe('create organization — 30 §3.3', () => {
+  it('asks for four things and nothing else — no industry picker (CONF-011)', () => {
+    mount();
+    expect(screen.getAllByRole('textbox')).toHaveLength(3); // org, name, email
+    expect(screen.getByLabelText('Password')).toBeTruthy();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    expect(document.body.textContent).not.toContain('Industry');
+  });
+
+  it('defaults industry to custom, because step 1 of the wizard asks properly', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    mount();
+    register();
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled(), PAID);
+    expect(registerOrg.mock.calls[0]?.[0]).toEqual({
+      orgName: 'Northfield University',
+      name: 'Amara Rao',
+      email: 'amara@northfield.test',
+      password: 'a-long-enough-one',
+      industry: 'custom',
+      tier: 'gold',
+      // DEC-080. A LABEL for the capture the checkout simulated, not an amount and not a
+      // proof — the server prices the tier and writes the ledger row either way.
+      paymentRef: expect.stringMatching(/^endur_/) as string,
+    });
+  });
+
+  it('never drops a new org at an empty console — it always lands on the wizard', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    mount();
+    register();
+    await waitFor(() => expect(screen.getByText('WIZARD')).toBeTruthy(), PAID);
+  });
+
+  it('states the real minimum, 10, and states it before the server has to', () => {
+    mount();
+    expect(screen.getByText(/At least 10 characters/)).toBeTruthy();
+    expect(screen.getByLabelText('Password').getAttribute('minLength')).toBe('10');
+  });
+
+  it('names the field on 409 — choosing an identity is not the same as proving one', async () => {
+    registerOrg.mockRejectedValue(
+      new ApiError({
+        code: 'CONFLICT', status: 409, requestId: 'r1',
+        message: 'That email address is already registered.',
+      }),
+    );
+    mount();
+    register();
+
+    await waitFor(() => expect(screen.getByText(/already registered/)).toBeTruthy(), PAID);
+    expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
+    // Offered a way out, not just a wall.
+    expect(screen.getByRole('link', { name: 'Sign in instead' })).toBeTruthy();
+    // And not ALSO shouted above the button.
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('puts a 422 under the field it belongs to', async () => {
+    registerOrg.mockRejectedValue(
+      new ApiError({
+        code: 'VALIDATION_FAILED', status: 422, requestId: 'r1', message: 'Invalid',
+        details: { fields: [{ path: 'body.password', message: 'Too short.' }] },
+      }),
+    );
+    mount();
+    register();
+    await waitFor(() => expect(screen.getByText('Too short.')).toBeTruthy(), PAID);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows anything else once, above the button', async () => {
+    registerOrg.mockRejectedValue(
+      new ApiError({ code: 'INTERNAL', status: 500, requestId: 'r1', message: 'Server exploded.' }),
+    );
+    mount();
+    register();
+    expect((await screen.findByRole('alert', {}, PAID)).textContent).toBe('Server exploded.');
+  });
+});
+
+/**
+ * T-088 — the tier picker. DEC-048, 49 § Interactions.
+ *
+ * The owner asked for this one by name: *"pick between option / rn, no pricing, just pick the
+ * option (bronze, silver and gold) and you get assigned that."* Every assertion below is one
+ * clause of that sentence.
+ */
+describe('choose a plan — DEC-048', () => {
+  it('does not ask until the details are in', () => {
+    mount();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    fill();
+    advance();
+    expect(screen.getByRole('radiogroup')).toBeTruthy();
+    expect(screen.getByText('Choose a plan')).toBeTruthy();
+  });
+
+  it('offers three tiers and not four — Enterprise is a sales conversation (16 §4)', () => {
+    mount();
+    fill();
+    advance();
+    const names = screen.getAllByRole('radio').map((radio) => radio.getAttribute('value'));
+    expect(names).toEqual(['bronze', 'silver', 'gold']);
+    expect(document.body.textContent).not.toContain('Enterprise');
+  });
+
+  /** NO PRE-SELECTED DEFAULT. A default here is D-012 wearing a nicer coat. */
+  it('pre-selects nothing and will not submit until something is chosen', () => {
+    mount();
+    fill();
+    advance();
+    expect(screen.getAllByRole<HTMLInputElement>('radio').some((radio) => radio.checked)).toBe(false);
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).hasAttribute('disabled')).toBe(true);
+    pick('bronze');
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('sends the tier that was pressed, not the first one', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    mount();
+    register(undefined, 'silver');
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled(), PAID);
+    expect((registerOrg.mock.calls[0]?.[0] as { tier: string }).tier).toBe('silver');
+    // The checkout's reference rides along as a LABEL (DEC-080) — the server prices the tier.
+    expect((registerOrg.mock.calls[0]?.[0] as { paymentRef?: string }).paymentRef)
+      .toMatch(/^endur_/);
+  });
+
+  /**
+   * DEC-080 REVERSED DEC-035, so the assertion reverses with it: the prices must be ON the
+   * cards, and the things the product still does not have — a monthly plan, a free trial —
+   * must still be absent. The second half is the half that quietly rots, which is why it is
+   * asserted rather than left to review.
+   */
+  it('prices every tier it offers', () => {
+    mount();
+    fill();
+    advance();
+    expect(document.body.textContent).toContain('₹99');
+    expect(document.body.textContent).toContain('₹499');
+    expect(document.body.textContent).toContain('₹999');
+    expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month|free trial|14 days/i);
+  });
+
+  /**
+   * THE CHECKOUT IS A STEP, NOT A COMMIT. Opening it must not POST — registration and the
+   * ledger row are one transaction on the server, and an organisation created before the
+   * reader pressed Pay would be an organisation they never agreed to pay for.
+   */
+  it('opens the checkout without registering anything', () => {
+    mount();
+    fill();
+    advance();
+    pick('gold');
+    submit();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(registerOrg).not.toHaveBeenCalled();
+  });
+
+  it('lets the checkout be cancelled with the tier still chosen', () => {
+    mount();
+    fill();
+    advance();
+    pick('gold');
+    submit();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(radio('gold').checked).toBe(true);
+    expect(registerOrg).not.toHaveBeenCalled();
+  });
+
+  it('goes back without losing the answers', () => {
+    mount();
+    fill();
+    advance();
+    pick('gold');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Work email').value).toBe('amara@northfield.test');
+    advance();
+    expect(radio('gold').checked).toBe(true);
+  });
+
+  /**
+   * THE ERROR HAS TO REACH THE FIELD IT IS ABOUT. Every failure this POST can return names a
+   * field on step 1 — 409 the address, 422 a field — and the POST happens from step 2. Left
+   * alone, the person reads "that address is already registered" beside three tier cards with
+   * no input in sight.
+   */
+  it('returns to the details when the server rejects one of them', async () => {
+    registerOrg.mockRejectedValue(
+      new ApiError({
+        code: 'CONFLICT', status: 409, requestId: 'r1',
+        message: 'That email address is already registered.',
+      }),
+    );
+    mount();
+    register();
+    await waitFor(() => expect(screen.getByLabelText('Work email')).toBeTruthy(), PAID);
+    expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
+    // The tier survives the trip. Being told your address is taken is not a reason to
+    // re-answer a question you already answered.
+    advance();
+    expect(radio('gold').checked).toBe(true);
+  });
+});
+
+/**
+ * BAD DATA MUST NOT REACH THE CHECKOUT — `DEC-110`, and this is the bug the owner reported:
+ * *"when creating any org if there is any invalid data entered then I am able to proceed to the
+ * plan selection and payment step, payment is done and then I am denied access."*
+ *
+ * Registration and the capture are ONE transaction, so nothing was ever created and nothing was
+ * ever charged — `/ops/earnings` correctly did not move, which the owner also noticed. But the
+ * reader had no way to know that: the product walked them through a payment screen in order to
+ * reject them, and the 422 arrived after the money question rather than before it.
+ *
+ * THE ASSERTIONS ARE THAT THE SECOND STEP IS NEVER REACHED, not that a message appeared. A
+ * message with the plan cards behind it would be the same bug wearing an error.
+ */
+describe('the details are checked before the plan step — DEC-110', () => {
+  const badDetails = (name: string, orgName = 'Northfield') => {
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: orgName } });
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: name } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'a@b.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-long-enough-one' } });
+  };
+
+  it('refuses a digits-only name and stays on step 1', () => {
+    mount();
+    badDetails('12345');
+    advance();
+
+    // STILL ON THE FIELDS. No tier cards, so no way to reach the checkout.
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByLabelText('Your name')).toBeTruthy();
+    expect(screen.getByText(/at least one letter/i)).toBeTruthy();
+  });
+
+  it('refuses a whitespace-only organisation name', () => {
+    mount();
+    badDetails('Anitha Rao', '   ');
+    advance();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  it('refuses a short password and a malformed address before any money question', () => {
+    mount();
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Northfield' } });
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Anitha Rao' } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'not-an-address' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
+    advance();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  /**
+   * THE MESSAGE CLEARS AS THE READER FIXES IT. An error that sits under an input somebody has
+   * visibly just corrected is the screen contradicting itself.
+   */
+  it('clears the message on the next keystroke, and then lets them through', () => {
+    mount();
+    badDetails('12345');
+    advance();
+    expect(screen.getByText(/at least one letter/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Anitha Rao' } });
+    expect(screen.queryByText(/at least one letter/i)).toBeNull();
+
+    advance();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+
+  /** And the ordinary path is untouched — nothing here may make a valid sign-up harder. */
+  it('still lets a good registration reach the checkout', () => {
+    mount();
+    fill();
+    advance();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+});
+

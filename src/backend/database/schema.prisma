@@ -1,0 +1,1253 @@
+// The data model. Authoritative spec: architecture/10-DATA-MODEL.md.
+//
+// Two halves, deliberately different in character:
+//   - the ORG GRAPH (nodes, edges, grants) — three generic primitives that never grow.
+//     A new organisation type is data, never a migration.
+//   - the FEEDBACK DOMAIN (subjects, templates, questions, campaigns, responses, answers)
+//     — ordinary relational tables, concrete because the shapes genuinely are concrete.
+//
+// What Prisma CANNOT express, and so lives in hand-written SQL appended to the migrations:
+//   CHECK constraints · partial indexes · INCLUDE indexes · GIN indexes ·
+//   DEFERRABLE unique · the anonymity trigger · the `sessions` table (owned by
+//   connect-pg-simple, DEC-014) · recursive CTEs (db/graph.ts, DEC-007).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, pgcrypto]
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// `position` is a deliberate fifth kind: the role-at-unit thing an assignment points at.
+/// Naming it is what makes INV-005 expressible — the unit is a COLUMN on the position,
+/// not a lookup through the person.
+enum NodeKind {
+  role
+  unit
+  group
+  person
+  position
+
+  @@map("node_kind")
+}
+
+enum EdgeType {
+  reports
+  contains
+  member
+  delegates
+
+  @@map("edge_type")
+}
+
+enum GrantScope {
+  self
+  own_unit
+  subtree
+  all
+
+  @@map("grant_scope")
+}
+
+enum GrantEffect {
+  allow
+  deny
+
+  @@map("grant_effect")
+}
+
+/// Six kinds, frozen (DEC-010). A poll is a one-question template; there is no poll entity.
+enum QuestionKind {
+  rating
+  single
+  multi
+  text
+  yesno
+  nps
+
+  @@map("question_kind")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy and identity
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name     String
+  slug     String @unique
+  /// university | hotel | hospital | company | custom
+  industry String
+
+  /// The vocabulary system and the visible product claim (INV-001, doc 22).
+  labels   Json
+  /// incl. authzVersion (11 §7), paramMode (11 §5)
+  settings Json @default("{}")
+
+  logoFileId String? @map("logo_file_id") @db.Uuid
+  logo       File?   @relation("OrganizationLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
+
+  /// 19 §6, 70 § Interactions. Set by `platform.org.suspend`, owner only. It stops the
+  /// customer's STAFF signing in and NOTHING ELSE: campaigns keep running and the
+  /// respondent surface keeps answering, because a QR code on a wall belongs to people who
+  /// did not choose the plan and must not be punished for it (16 §6).
+  suspendedAt DateTime? @map("suspended_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users           User[]
+  nodes           Node[]
+  edges           Edge[]
+  grants          Grant[]
+  subjects        Subject[]
+  templates       Template[]
+  campaigns       Campaign[]
+  files           File[]           @relation("FileOrganization")
+  auditLog        AuditLog[]
+  apiKeys         ApiKey[]
+  idempotencyKeys IdempotencyKey[]
+  accountInvites  AccountInvite[]
+  inboxState      InboxState[]
+  reflections     Reflection[]
+  actionPlans     ActionPlan[]
+  checkins        Checkin[]
+  subscription    Subscription?
+  payments        Payment[]
+  platformAudit   PlatformAuditLog[]
+  announcements   Announcement[]
+  bookables       Bookable[]
+  notifications      Notification[]
+  enterpriseRequests EnterpriseRequest[]
+  supportSessions    SupportSession[]
+
+  @@map("organizations")
+}
+
+/// Staff. **Respondents are NOT users** (DEC-009) — that is a privacy decision first and a
+/// billing one second: a college with 4,000 respondents has perhaps 200 rows here.
+model User {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// Case-insensitive: nobody should fail to sign in over a capital letter.
+  email        String  @db.Citext
+  /// NULL for invited-not-yet-activated.
+  passwordHash String? @map("password_hash")
+  name         String
+  /// active | invited | disabled
+  status       String  @default("active")
+
+  avatarFileId String? @map("avatar_file_id") @db.Uuid
+  avatar       File?   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+  /// Set by account.revoke, CLEARED on activation (57). A re-enabled account is not a
+  /// disabled one carrying a stale date.
+  disabledAt  DateTime? @map("disabled_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  personNodes      Node[]
+  grantsCreated    Grant[]               @relation("GrantCreatedBy")
+  subjectsLinked   Subject[]             @relation("SubjectLinkedUser")
+  campaignsCreated Campaign[]            @relation("CampaignCreatedBy")
+  participations   CampaignParticipant[]
+  filesUploaded    File[]                @relation("FileCreatedBy")
+  auditEntries     AuditLog[]
+  accountInvites   AccountInvite[]       @relation("AccountInviteUser")
+  invitesSent      AccountInvite[]       @relation("AccountInviteCreatedBy")
+  inboxState       InboxState[]
+  reflections      Reflection[]          @relation("ReflectionAuthor")
+  checkinsHeld     Checkin[]             @relation("CheckinSupervisor")
+  announcementsWritten Announcement[]        @relation("AnnouncementCreatedBy")
+  announcementReceipts AnnouncementReceipt[] @relation("AnnouncementRecipient")
+  bookingsMade         Booking[]             @relation("BookingUser")
+  notifications        Notification[]
+  enterpriseRequests   EnterpriseRequest[]
+  /// DEC-114. Present only on the synthetic rows `db/support.ts` mints — one per operator
+  /// per organisation, `status = 'support'`, no password hash and no person node.
+  supportSessions      SupportSession[]
+
+  @@unique([orgId, email])
+  @@map("users")
+}
+
+/// Account provisioning. DEC-038, spec 57, 10 §5.
+///
+/// The one-time LINK, not the account. A `users` row already exists for every person in the
+/// graph, written by createPerson() with `status = 'invited'` and a NULL passwordHash — the
+/// state that cannot be signed in to. This row is the key that lets them set the password
+/// themselves; nobody else ever chooses it, because an administrator who can set a dean's
+/// password can sign in as the dean and every audit row from that session names the dean.
+///
+/// ONE INDEX IS NOT DECLARED HERE and that is deliberate, not an omission. Prisma cannot
+/// express a PARTIAL unique index, and the rule "one LIVE invite per person" is partial by
+/// nature — accepted rows are history and one person accumulates many over the years. It
+/// lives in the migration as
+///   CREATE UNIQUE INDEX account_invites_one_live_per_user ON account_invites (user_id)
+///     WHERE accepted_at IS NULL
+/// which is the same posture the `sessions` table already takes (10 §5): the database owns
+/// a constraint the ORM has no vocabulary for, and the migration is its documentation.
+model AccountInvite {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("AccountInviteUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the token, hex. The plaintext is NEVER stored — we can mint a new link,
+  /// never recover one, which is what makes "shown once" true rather than decorative.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
+
+  /// SetNull, not Cascade: when the administrator who sent an invite leaves, the invite is
+  /// still a fact that happened (10 §9).
+  createdById String? @map("created_by") @db.Uuid
+  createdBy   User?   @relation("AccountInviteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orgId])
+  @@map("account_invites")
+}
+
+// ---------------------------------------------------------------------------
+// The org graph — three primitives, and the whole generality of the product
+// ---------------------------------------------------------------------------
+
+model Node {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  kind NodeKind
+  name String
+
+  /// Roles only. 1 = highest. **Ordering only, nothing else** — the level rule is a
+  /// seeded default (§2.4, CONF-002), never the enforcement mechanism.
+  level Int?
+
+  roleId String? @map("role_id") @db.Uuid
+  role   Node?   @relation("PositionRole", fields: [roleId], references: [id], onDelete: Cascade)
+  unitId String? @map("unit_id") @db.Uuid
+  unit   Node?   @relation("PositionUnit", fields: [unitId], references: [id], onDelete: Cascade)
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Units: children get end dates, so nobody has to remember to revoke anything (§9).
+  isTemporary Boolean   @default(false) @map("is_temporary")
+  endsAt      DateTime? @map("ends_at") @db.Timestamptz(6)
+
+  /// Generated from a placement rule. ~10 declared answers produce ~200 stored rows,
+  /// and that ratio is why setup takes minutes rather than days.
+  derived Boolean @default(false)
+  meta    Json    @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  positionsWithRole Node[] @relation("PositionRole")
+  positionsInUnit   Node[] @relation("PositionUnit")
+
+  edgesAsParent  Edge[]    @relation("EdgeParent")
+  edgesAsChild   Edge[]    @relation("EdgeChild")
+  grants         Grant[]   @relation("GrantSubject")
+  subjectsInUnit Subject[] @relation("SubjectUnit")
+
+  @@index([orgId, kind])
+  @@map("nodes")
+}
+
+/// **There is never one global tree.** Each dimension is its own tree; within a dimension a
+/// node has one parent, across dimensions it may have many. That is what lets a head of
+/// department report to the dean academically and the registrar administratively.
+model Edge {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// 'academic', 'reporting', 'project', …
+  dimension String   @default("primary")
+  type      EdgeType
+
+  parentId String @map("parent_id") @db.Uuid
+  parent   Node   @relation("EdgeParent", fields: [parentId], references: [id], onDelete: Cascade)
+  childId  String @map("child_id") @db.Uuid
+  child    Node   @relation("EdgeChild", fields: [childId], references: [id], onDelete: Cascade)
+
+  /// For a person's main position.
+  isPrimary Boolean   @default(false) @map("is_primary")
+  validFrom DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  /// NULL = open ended. History is retained, so access expires without the row vanishing.
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+  derived   Boolean   @default(false)
+  /// Delegation recurrence lives here.
+  meta      Json      @default("{}")
+
+  @@unique([orgId, dimension, type, parentId, childId])
+  @@index([orgId, dimension, type])
+  @@map("edges")
+}
+
+/// Resolution semantics — deny-beats-allow (INV-004), narrower-scope-wins — are specified
+/// in 11 §5. They are NOT re-stated here: this table only stores.
+model Grant {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// A role, position, group or person node. Role grants are the common case.
+  subjectId String @map("subject_id") @db.Uuid
+  subject   Node   @relation("GrantSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  /// From the catalogue in packages/shared/src/capabilities.ts (11 §3).
+  capability String
+  scope      GrantScope  @default(own_unit)
+  effect     GrantEffect @default(allow)
+  /// { "maxAmount": 25000 } — one capability at different strengths, instead of
+  /// inventing five artificial roles to encode limits.
+  params     Json        @default("{}")
+
+  validFrom DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+
+  /// Editing a derived grant CLEARS this flag, so the next regeneration cannot silently
+  /// revert an administrator's change (§9).
+  derived Boolean @default(false)
+
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("GrantCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([orgId, subjectId, capability, scope, effect])
+  @@index([orgId, capability])
+  @@map("grants")
+}
+
+// ---------------------------------------------------------------------------
+// The feedback domain
+// ---------------------------------------------------------------------------
+
+/// The single biggest unlock in the model. A course, a restaurant, a ward, a bus route.
+/// `linkedUserId` turns "review the thing" into "review the person" with no second code path.
+model Subject {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  unitId String? @map("unit_id") @db.Uuid
+  unit   Node?   @relation("SubjectUnit", fields: [unitId], references: [id], onDelete: SetNull)
+
+  name String
+  type String @default("general")
+
+  linkedUserId String? @map("linked_user_id") @db.Uuid
+  linkedUser   User?   @relation("SubjectLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  meta       Json      @default("{}")
+  /// Archived, never hard-deleted while responses exist (§9).
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  campaigns   CampaignSubject[]
+  responses   Response[]
+  reflections Reflection[]
+  bookables   Bookable[]
+
+  @@map("subjects")
+}
+
+model Template {
+  id    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// NULL = library template, cloned into orgs on demand.
+  orgId String?       @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name        String
+  category    String
+  industry    String?
+  description String?
+
+  clonedFromId String?    @map("cloned_from_id") @db.Uuid
+  clonedFrom   Template?  @relation("TemplateClone", fields: [clonedFromId], references: [id], onDelete: SetNull)
+  clones       Template[] @relation("TemplateClone")
+
+  /// DERIVED from the questions, never entered by hand.
+  estimatedSeconds Int       @default(0) @map("estimated_seconds")
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  questions Question[]
+  campaigns Campaign[]
+
+  @@map("templates")
+}
+
+model Question {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  kind     QuestionKind
+  text     String
+  /// Shape per kind is a discriminated Zod union (14 §4) — that is what stops this
+  /// column from becoming an untyped bag.
+  config   Json         @default("{}")
+  required Boolean      @default(false)
+  /// DEFERRABLE unique on (template_id, position), added in SQL: a reorder is then one
+  /// UPDATE inside a transaction rather than a shuffle through a temporary value.
+  position Int
+
+  answers Answer[]
+
+  @@map("questions")
+}
+
+model Campaign {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  templateId String   @map("template_id") @db.Uuid
+  template   Template @relation(fields: [templateId], references: [id])
+
+  name         String
+  /// { unitId, includeSubtree, roleIds[] }
+  audienceRule Json   @default("{}") @map("audience_rule")
+
+  startsAt DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt   DateTime? @map("ends_at") @db.Timestamptz(6)
+
+  /// **Immutable once status leaves draft**, enforced by a trigger and not only in the
+  /// service layer. Respondents were promised anonymity at submission time (INV-006).
+  anonymous Boolean @default(true)
+
+  /// WHO GETS IN — 'public' | 'organization' (DEC-037). A SECOND AXIS, not a kind of
+  /// audienceRule: audienceRule says who is EXPECTED and is a denominator, `access` says
+  /// who gets in and is a gate. Immutable after launch, by the SAME trigger and for the
+  /// same reason as `anonymous` — both are promises made when the QR code was printed.
+  access String @default("public")
+
+  /// The /r/:token link. NULL until launched; minting it is irreversible — and it is what
+  /// "has left draft" means, now that status is derived (DEC-016). 8 characters from an
+  /// unambiguous alphabet (DEC-017).
+  publicToken String? @unique @map("public_token")
+
+  /// The ONLY stored status transition. Everything else about status is read off the dates
+  /// by features/campaigns/status.ts; a scheduler is a failure mode we chose not to have.
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
+
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subjects     CampaignSubject[]
+  responses    Response[]
+  invitations  Invitation[]
+  participants CampaignParticipant[]
+  reflections  Reflection[]
+
+  @@index([orgId, startsAt, endsAt])
+  @@map("campaigns")
+}
+
+model CampaignSubject {
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subjectId  String   @map("subject_id") @db.Uuid
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, subjectId])
+  @@map("campaign_subjects")
+}
+
+/// **There is no respondent column here, and there never will be one** (INV-006). Not a
+/// user id, not a hashed email, not an IP. The table cannot identify a respondent because
+/// it has nothing to identify them with — anonymity is a property of the schema, not a
+/// setting the application respects.
+model Response {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  subjectId String?  @map("subject_id") @db.Uuid
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  submittedAt DateTime @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  /// link | qr | kiosk | api
+  channel     String   @default("link")
+  durationMs  Int?     @map("duration_ms")
+  /// NEVER identity.
+  meta        Json     @default("{}")
+
+  answers    Answer[]
+  inboxState InboxState[]
+
+  @@index([campaignId, submittedAt(sort: Desc)])
+  @@map("responses")
+}
+
+/// Per-caller inbox triage (58, 10 §5).
+///
+/// Keyed by USER, not by org: read state is a READER'S, not the organisation's, so two
+/// administrators triaging one campaign never mark each other's queue. That is also why
+/// there is no `inbox.*` capability in 11 §3 — a capability would imply a shared queue
+/// somebody can be excluded from, and there is no such thing here.
+///
+/// It holds no response CONTENT — no comment, no score, no question. So it is not a second
+/// path to a response and cannot become one by accident (INV-006). Everything the inbox
+/// SHOWS comes from features/results/service.ts, which owns the k-anonymity gate.
+model InboxState {
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  responseId String   @map("response_id") @db.Uuid
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  /// Both nullable and both a TIMESTAMP rather than a boolean: "when did you read this"
+  /// answers a question "have you read this" cannot, and costs the same column.
+  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@id([userId, responseId])
+  @@index([userId, orgId])
+  @@map("inbox_state")
+}
+
+model Answer {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  responseId String   @map("response_id") @db.Uuid
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId String   @map("question_id") @db.Uuid
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  /// Typed by question kind (14 §4).
+  value        Json
+  /// Denormalised for rating/NPS aggregation. Written by the service layer alongside
+  /// `value`, never independently — `(value->>'n')::numeric` on every row is the
+  /// difference between a fast results page and a slow one.
+  numericValue Decimal? @map("numeric_value") @db.Decimal
+
+  @@unique([responseId, questionId])
+  @@map("answers")
+}
+
+/// Records **that** a token was used. `responses` records **what** was said. Nothing joins
+/// them — so the system can report "312 of 400 responded" and still not know whose is whose.
+/// This separation is the entire privacy architecture.
+/// The `organization`-access counterpart to Invitation, and deliberately the SAME SHAPE:
+/// it records THAT a member responded, never WHAT they said (10 §4.4, INV-006, 52 §1).
+///
+/// There is no responseId here and there never will be — it is the one field that would
+/// undo INV-006 in a single migration. The composite key prevents a second submission; the
+/// absence of a third field is what keeps the first one anonymous.
+model CampaignParticipant {
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id") @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
+
+  @@id([campaignId, userId])
+  @@map("campaign_participants")
+}
+
+model Invitation {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  token  String    @unique
+  usedAt DateTime? @map("used_at") @db.Timestamptz(6)
+  meta   Json      @default("{}")
+
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Cross-cutting
+// ---------------------------------------------------------------------------
+
+/// Uploaded binaries: org logos and user avatars only (48). Bytes live on disk; this row
+/// is the metadata and the id in the URL.
+model File {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation("FileOrganization", fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// 'logo' | 'avatar'
+  kind   String
+  /// Always the RE-ENCODED type, never the uploaded one — re-encoding is what strips
+  /// metadata such as EXIF GPS (48, INV-006).
+  mime   String
+  bytes  Int
+  width  Int?
+  height Int?
+
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("FileCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organizationLogos Organization[] @relation("OrganizationLogo")
+  userAvatars       User[]         @relation("UserAvatar")
+
+  @@index([orgId, kind])
+  @@map("files")
+}
+
+/// 13 §7. The first response to a keyed request, replayed for 24 h. The respondent submit
+/// is the case that matters: a phone on a flaky venue network retries, and a duplicate
+/// response corrupts the demo's numbers in front of the evaluator.
+model IdempotencyKey {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// NULL for respondent submits — a public caller has a campaign, not an organisation.
+  orgId String?       @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  key         String
+  endpoint    String
+  /// Same key, different body, is a client bug. Answering it with the cached response of a
+  /// different request would be worse than an error, so the hash is compared.
+  requestHash String @map("request_hash")
+
+  status Int
+  body   Json
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
+
+model AuditLog {
+  id    BigInt        @id @default(autoincrement())
+  orgId String?       @map("org_id") @db.Uuid
+  org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actor       User?   @relation(fields: [actorUserId], references: [id])
+
+  /// The capability string.
+  action     String
+  targetType String? @map("target_type")
+  targetId   String? @map("target_id") @db.Uuid
+
+  /// DEC-041. 'allowed' | 'denied'. A row used to mean SOMETHING HAPPENED, so the log
+  /// could only ever answer half of what an administrator asks it. Denials of MUTATING
+  /// capabilities only — a 403 on a GET is the permission system working correctly,
+  /// thousands of times a day, and writing all of them produces a table nobody reads.
+  outcome String @default("allowed")
+
+  /// WHICH GRANT decided it (INV-007). This is what turns "access denied" from an
+  /// assertion into evidence, and it is what the simulator replays (42).
+  /// On a DENIAL it is the most useful it ever is: the narrowest deny that stopped it,
+  /// which is the answer to "whom do I ask".
+  decidedBy Json?   @map("decided_by")
+  requestId String? @map("request_id")
+  ip        String? @db.Inet
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  /// The refusals-only toggle (56) runs on every visit and is the selective half.
+  @@index([orgId, outcome, createdAt(sort: Desc)])
+  @@map("audit_log")
+}
+
+/// A message from Endur to one of a customer's administrators. DEC-101, T-101, 58, 10 §5.
+///
+/// THE OPERATOR'S MESSAGE USED TO REACH NOBODY AND THE OPERATOR WAS TOLD OTHERWISE.
+/// `messageAdministrators` wrote one `platform_audit_log` row — THE OPERATOR'S OWN TABLE —
+/// and returned `{ sentTo: 3 }`. The customer's administrators had no route that read it and
+/// no screen that rendered it. This is the row they can actually reach.
+///
+/// NOT `63-FEATURE-NOTIFICATIONS`. That document is outbound multichannel delivery — email,
+/// SMS, a provider, retries, `17` — and is P3. Nothing here needs a channel: the recipient
+/// already visits `/app/inbox`, and a row in a table they already open is not that document's
+/// scope (CONF-006).
+///
+/// NO CAPABILITY GUARDS IT, and that is `58`'s own argument about inbox read state: the row
+/// NAMES A USER, so the reader is the addressee and there is nothing narrower to ask. No
+/// `notification.*` module goes in `11` §3.
+model Notification {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// WHO IT IS FOR. One row per recipient, not one row with a list — read state is the
+  /// reader's (`58`), and a shared row cannot be read by one administrator and unread by
+  /// another.
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// `platform_message` today. The column exists so the second kind is a VALUE rather than a
+  /// migration — and so the inbox tab can filter without learning a second table.
+  kind String
+
+  subject String
+  /// CAPTURED, never joined back to the audit row. The audit payload is the OPERATOR'S record
+  /// of what they sent; this is the CUSTOMER'S copy of what they were sent, and the two must
+  /// not be able to diverge silently behind one shared string.
+  body String
+
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// A customer asking to be SOLD Enterprise. DEC-100, T-100, 49, 70.
+///
+/// A WORK ITEM, NOT A NOTIFICATION, and `status` is the whole difference. The owner's
+/// instruction was *"send a notif on owner admin account"*, and the reflex is a bell — but a
+/// bell clears on read, and what has to survive is not "somebody was told", it is "somebody
+/// has to ring this customer back". `19` §4's operator model is already a support desk; this
+/// is the first row on it with a lifecycle.
+///
+/// NOT A FREE-TEXT SALES LEAD FORM. Who asked, which organisation, when, and one optional
+/// note. The conversation happens off-product, which is what "arranged with us" always meant.
+model EnterpriseRequest {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// The user row may be removed before anyone rings back, so the name and address are
+  /// CAPTURED beside it — `payments.payer_name`'s argument, on a row with a longer life.
+  askedBy    String? @map("asked_by") @db.Uuid
+  asker      User?   @relation(fields: [askedBy], references: [id], onDelete: SetNull)
+  askedName  String  @map("asked_name")
+  askedEmail String  @map("asked_email")
+
+  note String?
+
+  /// open | contacted | closed. Reading the queue changes none of them.
+  status String @default("open")
+
+  handledBy String?       @map("handled_by") @db.Uuid
+  handler   PlatformUser? @relation(fields: [handledBy], references: [id])
+  handledAt DateTime?     @map("handled_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  /// ONE OPEN ROW PER ORGANISATION, enforced by a PARTIAL UNIQUE INDEX in the migration
+  /// rather than by a check in the handler — a handler-side check loses to two simultaneous
+  /// clicks, and Prisma cannot express `WHERE status = 'open'` here. See the migration.
+  @@index([status, createdAt])
+  @@map("enterprise_requests")
+}
+
+model ApiKey {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name    String
+  /// The key itself is shown once and never stored.
+  keyHash String   @unique @map("key_hash")
+  /// First 8 chars, for display.
+  prefix  String
+  scopes  String[] @default([])
+
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("api_keys")
+}
+
+model Subscription {
+  orgId String       @id @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// bronze | silver | gold | enterprise
+  tier  String @default("bronze")
+  /// Reviewees + staff. **Never respondents** — that is what makes seat counting honest.
+  seats Int    @default(0)
+
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+
+  /// A DOWNGRADE THE CUSTOMER ASKED FOR AND HAS NOT HAD YET. DEC-098, 16 §7b.
+  ///
+  /// NULL means nothing is scheduled, which is the ordinary case. When it is set, the tier
+  /// above is still the one in force and still the one `requireEntitlement` decides with —
+  /// this column is read by exactly one writer, the one that retires it, and by nothing else.
+  /// `49` § Interactions requires that the tier the customer reads and the tier the gate
+  /// decides with are the same column, so a future-dated value must never become a second
+  /// answer to "what plan are they on".
+  ///
+  /// APPLIED ON READ, not by a scheduler. `17-BACKGROUND-JOBS.md` is unwritten and `OPEN-005`
+  /// says nothing owns a cron; the first request after `period_end` passes moves `tier` and
+  /// clears this. The accepted cost is stated rather than discovered: an organisation nobody
+  /// opens never transitions, which is harmless because a tier is only ever consulted when
+  /// somebody asks.
+  pendingTier String? @map("pending_tier")
+
+  /// THE TIER THIS ORGANISATION LOST WHEN THE LAST PERIOD ENDED WITHOUT A RENEWAL. DEC-113,
+  /// 16 §7d.
+  ///
+  /// NULL is the ordinary case and means the plan above is one the customer currently holds.
+  /// Non-null means the period ran out, nothing was renewed, and the row was moved down to
+  /// bronze — and the value is what it was moved down FROM, so the page can say *"your Gold
+  /// plan ended on 30 September"* instead of showing a bronze row with no account of where
+  /// the other one went. That sentence is the whole reason this column exists: the tier moves
+  /// on its own, and a move nobody can see is indistinguishable from the bug it fixes.
+  ///
+  /// IT IS NOT A SECOND ANSWER TO "WHAT PLAN ARE THEY ON" — the same rule `pending_tier`
+  /// lives under. `tier` is in force, `requireEntitlement` decides with it, and this is a
+  /// past-tense fact beside it. Nothing gates on it.
+  ///
+  /// IT LIVES EXACTLY ONE PERIOD. A join clears it (they have a plan again), an operator
+  /// override clears it, and the next roll of the bronze period clears it — a notice about
+  /// something that happened two months ago is furniture, not news.
+  ///
+  /// A SCHEDULED DOWNGRADE LEAVES IT NULL, and that distinction is the point of storing the
+  /// tier rather than a boolean. Silver arriving because the customer asked for Silver is not
+  /// something to apologise for; Bronze arriving because nobody renewed is.
+  lapsedFrom String? @map("lapsed_from")
+
+  status String @default("trialing")
+
+  @@map("subscriptions")
+}
+
+/// Every capture, as a LEDGER. DEC-080, T-058.
+///
+/// THE MONEY IS SIMULATED AND THIS TABLE SAYS SO BY WHAT IT DOES NOT HAVE: no gateway id,
+/// no payment-method id, no card fingerprint, no webhook payload, no `captured_at` distinct
+/// from `created_at`. There was no third party, so there is nothing a third party would have
+/// told us. `reference` is minted by us and is a LABEL — it matches a row to the dialog the
+/// customer saw, and nothing authorises on it.
+///
+/// APPEND ONLY, and never updated. A capture that was wrong is corrected by a second row,
+/// not by editing the first: the whole point of a ledger is that `/ops/earnings` can add it
+/// up without asking whether a total has moved since yesterday.
+///
+/// IT IS NOT AN ACCOUNTS SYSTEM. Nothing renews, nothing expires, nothing dunns, there are
+/// no refunds and no invoices — `subscriptions.period_end` still bills nothing when it
+/// passes, exactly as DEC-035 left it.
+model Payment {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// CAPTURED AT THE TIME, not joined at read time. The user row may be renamed, disabled
+  /// or gone by the time an owner reads the earnings page, and a receipt that changes its
+  /// mind about who paid is not a receipt. No FK for the same reason.
+  payerName  String @map("payer_name")
+  payerEmail String @map("payer_email")
+
+  /// bronze | silver | gold | enterprise — what was bought.
+  tier String
+  /// What they were on before. NULL on a signup: there was no plan before it.
+  fromTier String? @map("from_tier")
+  /// signup | change. Two write paths, and the earnings page asks a different question of
+  /// each — inferring `change` from a non-null `from_tier` would be inference where a
+  /// column will do.
+  kind String
+
+  /// MINOR UNITS (paise) AS AN INTEGER. 9900 = Rs 99.00. Never NUMERIC, never a float:
+  /// priced server-side from PLAN_OPTIONS on both write paths, so there is one integer to
+  /// carry and nothing to round.
+  amountMinor Int    @map("amount_minor")
+  currency    String @default("INR")
+  status      String @default("succeeded")
+  /// Ours, not a gateway's. Unique so a double-submitted dialog cannot bill twice.
+  reference   String @unique
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([orgId])
+  @@map("payments")
+}
+
+/// The improve loop. 44, T-083.
+///
+/// ONE REFLECTION PER (campaign, subject), and the unique constraint is the feature rather
+/// than hygiene: the whole mechanism is that the self-assessment is recorded ONCE, before
+/// the results are seen. A second row would be a rewrite after the fact, which is exactly
+/// what makes a gap meaningless.
+model Reflection {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subjectId  String   @map("subject_id") @db.Uuid
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  /// WHO WROTE IT, and it is not anonymous — the opposite of `responses`. A reflection is
+  /// the author's own statement about themselves; hiding the author would make the gap
+  /// unattributable and the record useless as evidence.
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation("ReflectionAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  /// The same AnswerValue union the campaign's own answers use (14 §4). Self and received
+  /// are the same shapes, which is what makes the gap arithmetic mean anything.
+  answers     Json
+  submittedAt DateTime @map("submitted_at") @db.Timestamptz(6)
+
+  plan ActionPlan?
+
+  @@unique([campaignId, subjectId])
+  @@index([orgId, authorUserId])
+  @@map("reflections")
+}
+
+model ActionPlan {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  reflectionId String     @unique @map("reflection_id") @db.Uuid
+  reflection   Reflection @relation(fields: [reflectionId], references: [id], onDelete: Cascade)
+
+  /// [{ text, dueAt, status }]
+  items Json
+
+  /// **Immutable once set**, enforced by a trigger and not by service discipline (44). A
+  /// record that can be rewritten after the conversation is not evidence.
+  finalisedAt DateTime? @map("finalised_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  checkins Checkin[]
+
+  @@map("action_plans")
+}
+
+model Checkin {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  actionPlanId String     @map("action_plan_id") @db.Uuid
+  actionPlan   ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  supervisorUserId String @map("supervisor_user_id") @db.Uuid
+  supervisor       User   @relation("CheckinSupervisor", fields: [supervisorUserId], references: [id], onDelete: Cascade)
+
+  notes       String?
+  heldAt      DateTime? @map("held_at") @db.Timestamptz(6)
+  finalisedAt DateTime? @map("finalised_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orgId, actionPlanId])
+  @@map("checkins")
+}
+
+// ---------------------------------------------------------------------------
+// THE PLATFORM SIDE. 19, T-059.
+//
+// Everything above this line describes the product A CUSTOMER uses, and every model above
+// carries `org_id` for that reason. The three models below are the only ones in the schema
+// that deliberately do not — they are Endur's own side of the product, and that ABSENCE is
+// the design (19 §10).
+//
+// DEC-033: an operator is a separate principal kind with a separate account table, a
+// separate authentication surface, a separate capability catalogue and a separate database
+// seam. It is never a `User`, never a `Grant` and never a flag — because `users` is
+// `@@unique([org_id, email])` with `org_id` NOT NULL, so an operator hosted there would
+// need a fake home organisation, and that fake org would then appear in the estate list,
+// the seat count and the revenue figures it exists to report on.
+// ---------------------------------------------------------------------------
+
+model PlatformUser {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Unique on EMAIL ALONE, unlike `users` — there is no tenant to disambiguate by, so
+  /// DEC-049's ambiguous-login problem cannot arise here and login needs no candidate window.
+  email        String @unique @db.Citext
+  passwordHash String @map("password_hash")
+  name         String
+
+  /// 'owner' | 'staff'. Two named roles, not a grid (19 §3) — a second GRANT engine for a
+  /// four-person internal team is over-engineering, and it invites confusion with the real one.
+  role   String
+  /// active | disabled
+  status String @default("active")
+
+  /// 19 §9. NOT NULL: every operator has one from the moment the account exists, so there
+  /// is no "MFA not set up yet" state for a login to fall through. Base32, TOTP.
+  mfaSecret String @map("mfa_secret")
+
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sessions   PlatformSession[]
+  supportSessions SupportSession[]
+  auditLog   PlatformAuditLog[]
+  enterpriseRequestsHandled EnterpriseRequest[]
+
+  @@map("platform_users")
+}
+
+/// The operator session store — NOT the `sessions` table, and not a second express-session.
+///
+/// DEC-072. `req.session` is single-valued: two express-session instances on one app fight
+/// over it, and whichever ran last wins. "One session, two meanings" is exactly the
+/// privilege confusion 19 §7 mounts a second cookie name to prevent, so mounting a second
+/// session middleware to achieve it would defeat the purpose. An opaque id in its own table
+/// cannot be confused for `endur.sid` by any code path, because nothing else reads it.
+model PlatformSession {
+  /// 32 random bytes, base64url. The id IS the credential — unguessable and server-side,
+  /// so there is nothing to sign and nothing a signature would add.
+  id String @id
+
+  operatorId String       @map("operator_id") @db.Uuid
+  operator   PlatformUser @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([operatorId])
+  @@map("platform_sessions")
+}
+
+/// SEPARATE from `audit_log`, whose `org_id` rows belong to the customer and are theirs to
+/// export. An operator's actions are OUR record; mixing them would put Endur's internal
+/// activity inside a customer's exportable audit trail (19 §10).
+model PlatformAuditLog {
+  id BigInt @id @default(autoincrement())
+
+  actorId String       @map("actor_id") @db.Uuid
+  actor   PlatformUser @relation(fields: [actorId], references: [id])
+
+  action String
+
+  /// Nullable: an estate-wide action — creating an operator, reading analytics — is about
+  /// no single organisation.
+  targetOrgId String?       @map("target_org_id") @db.Uuid
+  targetOrg   Organization? @relation(fields: [targetOrgId], references: [id], onDelete: SetNull)
+
+  /// The old and new tier, the suspension reason, the message subject and body (70).
+  payload   Json?
+  requestId String? @map("request_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([targetOrgId, createdAt(sort: Desc)])
+  @@map("platform_audit_log")
+}
+
+/// SUPPORT ACCESS — one operator, inside one customer's console, for one hour. DEC-114, 19 §15.
+///
+/// This row is the whole feature's memory. `19` §14 refused impersonation, and the thing it
+/// refused was an operator who could enter an account SILENTLY and read anything. What
+/// changed is not the appetite for the feature — that was always the argument for it — but
+/// that three properties now make it a different thing, and each of them is a column here:
+///
+///   `reason`     typed before the door opens, shown to the CUSTOMER in their own banner
+///   `expiresAt`  it stops on its own. "Remember to press Leave" is not a control
+///   `userId`     the synthetic org account every action inside is attributed to, so the
+///                customer's OWN audit log names the operator rather than showing a gap
+///
+/// What it does NOT contain is any power. The session confers nothing by existing: powers
+/// are minted as `deny`/`allow` grants in `authz/collect.ts` and resolved by the ordinary
+/// engine, minus `SUPPORT_DENIED_CAPABILITIES`. Delete this row and the operator is refused
+/// on the next request, by `authenticate`, because there is nothing left to resolve against.
+///
+/// It is a PLATFORM table (no `org_id` scoping through `db/tenant.ts`) even though it names
+/// an organisation, for the same reason `platform_audit_log` is: the register is OURS. A
+/// customer reads their own support history through their audit log, which is the tenant-side
+/// record of the same events.
+model SupportSession {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  operatorId String       @map("operator_id") @db.Uuid
+  operator   PlatformUser @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// The synthetic `users` row this session acts as. NOT the operator: `platform_users` and
+  /// `users` are different tables on purpose (DEC-033), and an audit row inside a tenant can
+  /// only point at the second one.
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Why they came in, in the operator's own words. Shown to the customer verbatim.
+  reason String
+
+  /// The express-session id this support session is bound to. A support session that is not
+  /// the one the cookie belongs to cannot be resurrected by replaying an old cookie: ending
+  /// one ends it for the browser that started it and no other.
+  sessionId String @map("session_id")
+
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  /// Set by Leave, and by a second entry into the same organisation. NULL = still open,
+  /// which is only half of "active" — see `expiresAt`.
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  @@index([orgId, startedAt(sort: Desc)])
+  @@index([operatorId, startedAt(sort: Desc)])
+  @@map("support_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Announcements — 13 § Announcements, T-094
+// ---------------------------------------------------------------------------
+
+/// One-way, in-product notices. The SECOND surface built on `AudienceRule` and deliberately
+/// on the same one: "everyone in Housekeeping" must mean the same set here as it does on a
+/// campaign, and two resolvers is how it stops meaning the same thing.
+model Announcement {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  title String
+  /// Plain text. No HTML, so there is no sanitiser to get wrong and no way for one
+  /// coordinator's notice to run script on everybody else's home page.
+  body  String
+
+  /// Reuses AudienceRule verbatim — 'anyone' | 'unit' | 'role'.
+  audienceRule Json @default("{}") @map("audience_rule")
+
+  /// NULL until published. Publishing is irreversible in the same sense a launch is: the
+  /// audience is snapshotted into receipts and the body goes read-only.
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+
+  /// SetNull, not Cascade: when the person who wrote a notice leaves, the notice everybody
+  /// read is still a fact that happened (10 §9).
+  createdById String?  @map("created_by") @db.Uuid
+  createdBy   User?    @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  receipts AnnouncementReceipt[]
+
+  @@index([orgId, publishedAt(sort: Desc)])
+  @@map("announcements")
+}
+
+/// WHO HAS READ WHAT. Identified on purpose and with no privacy tension: these are staff
+/// `users` rows, not respondents. INV-006 is about `responses`, and nothing here touches
+/// them — there is no campaignId, no responseId, and no join that could produce one.
+///
+/// **Written at publish time, one row per resolved recipient, `read_at` NULL** — never
+/// lazily on first read. "12 of 40 have read this" needs a denominator, and a row that only
+/// exists once somebody reads cannot supply one.
+model AnnouncementReceipt {
+  announcementId String       @map("announcement_id") @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id") @db.Uuid
+  user           User         @relation("AnnouncementRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  readAt DateTime? @map("read_at") @db.Timestamptz(6)
+
+  @@id([announcementId, userId])
+  @@index([userId, readAt])
+  @@map("announcement_receipts")
+}
+
+
+/// BOOKING — T-095, DEC-090. Three tables, and the third one is a DIFFERENT PRIVACY CONTRACT
+/// from everything else in this schema. Read `Booking`'s comment before touching any of them.
+model Bookable {
+  id    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  /// Optional. A bookable often IS a subject — a room, a machine, a person — and linking it
+  /// means the console can show what is booked beside that subject's feedback. SetNull, not
+  /// Cascade: archiving a subject must not delete appointments people are expecting.
+  subjectId String?  @map("subject_id") @db.Uuid
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  /// The `/book/:token` link. NULL until opened, and minted by the SAME generator campaigns
+  /// use (`features/campaigns/token.ts` — there is not a second one). Opening is irreversible
+  /// in the sense a launch is: the token, once printed on a card, is out of the product's
+  /// hands, so it is never re-minted and never cleared.
+  publicToken String? @unique @map("public_token")
+
+  /// Closing stops the link, and NOTHING ELSE. The bookings already taken stay, because they
+  /// are appointments somebody is expecting to be honoured.
+  closedAt  DateTime? @map("closed_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  slots Slot[]
+
+  @@index([orgId])
+  @@map("bookables")
+}
+
+model Slot {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookableId String   @map("bookable_id") @db.Uuid
+  bookable   Bookable @relation(fields: [bookableId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt   DateTime @map("ends_at") @db.Timestamptz(6)
+
+  /// How many people fit. THERE IS NO `taken` COLUMN AND THERE MUST NOT BE ONE: remaining is
+  /// derived by counting live bookings, because a stored counter is a second source of truth
+  /// and it drifts the first time somebody cancels.
+  capacity Int @default(1)
+
+  bookings Booking[]
+
+  @@index([bookableId, startsAt])
+  @@map("slots")
+}
+
+/// IDENTIFIED, AND THAT IS THE POINT — DEC-090.
+///
+/// A booking names a person, because a booking that cannot be honoured is not a booking.
+/// This is a DIFFERENT privacy contract from `responses`, which names nobody and never will
+/// (INV-006). The two must never join: there is no responseId here, no bookingId there, no
+/// shared table, and no query in `features/booking/` that reads the responses table — which
+/// is asserted by a test rather than left to review.
+///
+/// Routing bookings through `responses` to reuse the respondent plumbing would be one
+/// migration away from undoing the entire privacy architecture. This table exists so that
+/// nobody is ever tempted.
+model Booking {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slotId String @map("slot_id") @db.Uuid
+  slot   Slot   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  name  String
+  email String
+
+  /// Set when a signed-in member books; NULL for a public booking. SetNull on delete, so a
+  /// departed member's appointment is still a fact that happened (10 §9).
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation("BookingUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Given to the booker so they can cancel WITHOUT AN ACCOUNT. Opaque, 8 characters, the
+  /// same alphabet and the same generator campaigns use (DEC-017). It is the authorisation
+  /// for exactly one row, which is why cancelling with your own token is not
+  /// `booking.cancel` — that verb is for reaching into somebody else's.
+  cancelToken String @unique @map("cancel_token")
+
+  /// Cancelled, never deleted: the slot frees immediately (the count ignores this row) and
+  /// the fact that somebody had booked and withdrew is still history.
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([slotId])
+  @@map("bookings")
+}

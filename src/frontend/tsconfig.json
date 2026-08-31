@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "rootDir": "./",
+    "outDir": "./dist-types",
+    "noEmit": false
+  },
+  "include": ["*.ts", "*.tsx", "components/**/*", "design-system/**/*", "lib/**/*",
+              "pages/**/*", "router/**/*", "store/**/*"],
+  "exclude": ["dist", "dist-types", "dist-config", "node_modules", "*.config.ts"],
+  "references": [{ "path": "../../packages/shared" }, { "path": "./tsconfig.node.json" }]
+}
