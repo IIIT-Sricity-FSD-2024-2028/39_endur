@@ -1,16 +1,20 @@
 // The organisation's own plan. 13 § Billing, 49.
 //
 // Two operations and one rule between them: the tier the customer reads and the tier the
-// entitlement gate decides with are THE SAME ROW. There is no cache, no `pending`, no
-// `effectiveFrom` in the future — a join is written and the next request is answered
-// differently (49 § Interactions).
+// entitlement gate decides with are THE SAME ANSWER. There is no cache and no `effectiveFrom`
+// in the future — a join is written and the next request is answered differently
+// (49 § Interactions).
 //
-// `pending_tier` DOES NOT BREAK THAT RULE, AND THE CARE IS IN WHERE IT IS READ — DEC-098.
-// It is written by `scheduleDowngrade`, cleared by `cancelDowngrade` and by `joinTier`, and
-// read by exactly ONE thing: `applyExpiredDowngrade` below, the write that retires it.
-// `requireEntitlement` never sees it, `view()` passes it to the page as a sentence and
-// nothing branches on it. A future-dated tier that anything else consulted would be the
-// second answer this file's opening rule exists to forbid.
+// THAT RULE USED TO SAY "THE SAME ROW", AND DEC-113 IS WHY IT NO LONGER CAN. A row alone stops
+// answering the moment `period_end` passes: the column still said `gold` and the organisation
+// had not paid for a month of it. Both sides now ask `billing/effective.ts` `effectiveTier()`
+// — the gate reads it and does not write, `readBilling` reads it and persists it — so there is
+// still exactly one answer, computed once, rather than one column two readers trusted.
+//
+// `pending_tier` LIVES UNDER THE SAME RULE — DEC-098. It is written by `scheduleDowngrade`,
+// cleared by `cancelDowngrade` and by `joinTier`, and interpreted by exactly one function.
+// `view()` passes it to the page as a sentence and nothing branches on it. `lapsed_from` is
+// the same shape pointed backwards: a past-tense fact beside the tier, and nothing gates on it.
 //
 // THE PAYMENT IS A CONSEQUENCE OF THE JOIN, NEVER A CONDITION OF IT — DEC-080. The dialog
 // the customer clicked through lives entirely in the client; this route does what it always
@@ -30,6 +34,7 @@ import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction } from '../../db/tx.js';
 import { recordPayment } from '../../billing/payments.js';
+import { effectiveTier } from '../../billing/effective.js';
 import { newPeriod, periodHasEnded } from '../../billing/period.js';
 import { ConflictError, NotFoundError, UnauthenticatedError } from '../../lib/errors.js';
 
@@ -59,6 +64,7 @@ type Row = {
   periodStart: Date;
   periodEnd: Date;
   pendingTier: string | null;
+  lapsedFrom: string | null;
 };
 
 const view = (row: Row, seatBreakdown: BillingSummary['seatBreakdown']): BillingSummary => ({
@@ -67,28 +73,44 @@ const view = (row: Row, seatBreakdown: BillingSummary['seatBreakdown']): Billing
   periodStart: row.periodStart.toISOString(),
   periodEnd: row.periodEnd.toISOString(),
   pendingTier: (row.pendingTier as Tier | null) ?? null,
+  lapsedFrom: (row.lapsedFrom as Tier | null) ?? null,
   seats: seatBreakdown.activeUsers + seatBreakdown.nonPersonSubjects,
   seatBreakdown,
 });
 
 /**
- * THE SCHEDULED DOWNGRADE FIRING — DEC-098, 16 §7b. Returns the row as it now stands, which
- * is the unchanged row on every ordinary call.
+ * THE PERIOD HAS ENDED — DEC-098 for the scheduled half, DEC-113 for the rest. Returns the row
+ * as it now stands, which is the unchanged row on every ordinary call.
  *
- * THIS IS THE ONLY READER OF `pending_tier` THAT ACTS ON IT, and it is deliberately the write
- * that retires it rather than a check anybody else makes. `requireEntitlement` reads `tier`
- * and only `tier`; if a second place learned to interpret a pending value, the product would
- * have two answers to what plan an organisation is on and they would disagree for exactly as
- * long as nobody opened this page (49 § Interactions).
+ * THIS USED TO FIRE ONLY FOR A DOWNGRADE THE CUSTOMER HAD ALREADY ASKED FOR. Its first line
+ * was `if (!pending || !periodHasEnded(...)) return row` — so an organisation that simply let
+ * its month run out kept the plan, with `period_end` stuck in the past, for as long as it
+ * cared to. `DEC-080` had scoped that out in as many words (*"nothing renews, nothing
+ * expires"*) while `16` §7 said *"expiry moves the org to Bronze"*, and the two sat in the
+ * docs contradicting each other until the owner met the consequence: Gold, free, forever.
  *
- * THREE WRITES, ONE TRANSACTION, and each is a different kind of record:
+ * THREE OUTCOMES, AND WHICH ONE IS `effectiveTier()`'s ANSWER, NOT THIS FUNCTION'S. The gate
+ * asks the same question on every request and must not be able to disagree with what gets
+ * written here, so the decision is made in one place and this is the half that persists it.
  *
- *   1 · the SUBSCRIPTION moves and the column is cleared — the state.
- *   2 · a `payments` row of `kind: 'expiry'`, Rs 0 — the MOVE. `payments` is the one table that
- *       records plan changes with a from and a to, and `/ops/analytics` counts downgrades out
- *       of it (DEC-102). A tier that changed with no row anywhere is a hole in an append-only
- *       ledger, which is worse than a zero somebody asks about.
- *   3 · an AUDIT row with NO ACTOR — the authority, which in this case is nobody's.
+ *   1 · A SCHEDULED MOVE DOWN applies. `kind: 'expiry'`, `lapsed_from` stays null, and the
+ *       page says nothing about it beyond the new tier — the customer asked for this.
+ *   2 · NOBODY RENEWED and the organisation drops to bronze. `kind: 'lapse'`, and
+ *       `lapsed_from` records what they came down from so the page can name it. A move
+ *       nobody can see is indistinguishable from the bug this whole mechanism fixes.
+ *   3 · ALREADY ON BRONZE — the floor, so there is nowhere to fall. The period rolls forward
+ *       and NOTHING ELSE IS WRITTEN: no ledger row, because no plan moved, and an
+ *       append-only ledger of moves must not fill with rows recording that nothing happened.
+ *       This is also where a stale `lapsed_from` is cleared, which is what keeps the notice
+ *       to one period. Bronze rolls FREE — `16` §7d, the owner's call: there is no card on
+ *       file, so a capture nobody clicked would be an invention, and taking bronze away
+ *       would be the zero access `16` §7 has always forbidden.
+ *
+ * ENTERPRISE LAPSES LIKE EVERYTHING ELSE, and that is deliberate rather than overlooked. It
+ * is the tier with no self-serve way back (`joinTier` refuses it, `16` §4), so a lapsed
+ * enterprise customer has to be sold again — which is the correct amount of friction for an
+ * arrangement that is a conversation, and the alternative is the exact bug being fixed here
+ * wearing the most expensive tier in the catalogue.
  *
  * WHY THE AUDIT ROW IS WRITTEN HERE AND NOT PUSHED TO `req.ctx.audit`. The intent queue is
  * flushed by `db/tx.ts`, which attributes the row to the CURRENT PRINCIPAL. This transition is
@@ -96,30 +118,41 @@ const view = (row: Row, seatBreakdown: BillingSummary['seatBreakdown']): Billing
  * page next — and stamping their name on it would put a person's id against a change they did
  * not make, in the one table the product offers as evidence (`56`).
  *
- * THE PERIOD ROLLS FORWARD. Leaving `period_end` in the past would leave the row permanently
- * expired, so the next scheduled downgrade would fire the instant it was asked for. Nothing is
- * billed for the new period and nothing ever has been — `16` §8 has always said `period_end`
- * bills nothing when it passes, and this change does not make it start.
+ * THE PERIOD ROLLS FORWARD in all three. Leaving `period_end` in the past would leave the row
+ * permanently expired, so the transition would fire again on the next read, and a lapse that
+ * fired every request would write a ledger row every request.
  */
-async function applyExpiredDowngrade(row: Row & { orgId: string }, requestId?: string) {
-  const pending = row.pendingTier as Tier | null;
-  if (!pending || !periodHasEnded(row.periodEnd)) return row;
+async function applyExpiredPeriod(row: Row & { orgId: string }, requestId?: string) {
+  if (!periodHasEnded(row.periodEnd)) return row;
 
-  // A pending tier that is no longer BELOW the current one is stale intent, not a downgrade:
-  // `joinTier` clears the column on the way up, so this only fires if something wrote the row
-  // another way. It is retired silently rather than applied — moving an organisation UP for
-  // free because of a months-old request is the one outcome nobody asked for.
-  if (tierRank(pending) >= tierRank(row.tier as Tier)) {
+  const from = row.tier as Tier;
+  const next = effectiveTier(row);
+
+  // Outcome 3. Also the only path that clears `lapsed_from`, so a notice about a plan that
+  // ran out survives exactly the one period it is news for.
+  if (next === from) {
     return prisma.subscription.update({
       where: { orgId: row.orgId },
-      data: { pendingTier: null },
+      data: { pendingTier: null, lapsedFrom: null, ...newPeriod() },
     });
   }
+
+  // Outcome 1 and outcome 2 differ in three fields and in nothing else. `scheduled` asks
+  // whether the destination is the one the customer NAMED — not merely whether a pending
+  // value exists, because a stale one that `effectiveTier` declined to honour is not a
+  // downgrade anybody asked for and must be recorded as the lapse it actually is.
+  const scheduled = row.pendingTier !== null && next === row.pendingTier;
 
   return prisma.$transaction(async (tx) => {
     const moved = await tx.subscription.update({
       where: { orgId: row.orgId },
-      data: { tier: pending, pendingTier: null, status: 'active', ...newPeriod() },
+      data: {
+        tier: next,
+        pendingTier: null,
+        lapsedFrom: scheduled ? null : from,
+        status: 'active',
+        ...newPeriod(),
+      },
     });
 
     // Rs 0, and `changeCostMinor` arrives at that on its own — the clamp DEC-097 called
@@ -128,9 +161,14 @@ async function applyExpiredDowngrade(row: Row & { orgId: string }, requestId?: s
     // refund, and this product has never had one.
     await recordPayment(tx, {
       orgId: row.orgId,
-      tier: pending,
-      fromTier: row.tier as Tier,
-      kind: 'expiry',
+      tier: next,
+      fromTier: from,
+      // TWO KINDS FOR ONE SHAPE — DEC-113. Identical rows, opposite facts about the business:
+      // one customer asked to spend less, the other stopped paying. `/ops/earnings` excludes
+      // both and `/ops/analytics` counts both as downgrades, so nothing downstream changes
+      // today — what changes is that "how many organisations lapsed last month" is answerable
+      // at all, from the one table that records plan moves.
+      kind: scheduled ? 'expiry' : 'lapse',
       // Nobody paid, and nobody is named. The columns are captured strings rather than joins
       // (`10` §), so there is no user row this could quietly point at instead.
       payerName: 'Endur',
@@ -141,7 +179,7 @@ async function applyExpiredDowngrade(row: Row & { orgId: string }, requestId?: s
       data: {
         orgId: row.orgId,
         actorUserId: null,
-        action: 'billing.expire',
+        action: scheduled ? 'billing.expire' : 'billing.lapse',
         targetType: 'subscription',
         targetId: row.orgId,
         ...(requestId ? { requestId } : {}),
@@ -162,16 +200,22 @@ async function applyExpiredDowngrade(row: Row & { orgId: string }, requestId?: s
  * entitlement gate and this page agree from the next request onward instead of the page
  * inventing a default the gate has never heard of.
  *
- * A SCHEDULED DOWNGRADE FIRES BY THE SAME TRICK — DEC-098. There is no scheduler in this
- * product (`OPEN-005`, and `17` is unwritten), so the transition happens on the first read
- * after the date passes, for the reason the repair above gives: the write happens on the read
- * so that the gate and the page agree from the next request onward.
+ * A SCHEDULED DOWNGRADE FIRES BY THE SAME TRICK — DEC-098 — AND SO DOES AN EXPIRY NOBODY
+ * SCHEDULED — DEC-113. There is no scheduler in this product (`OPEN-005`, and `17` is
+ * unwritten), so both transitions happen on the first read after the date passes, for the
+ * reason the repair above gives: the write happens on the read so that the gate and the page
+ * agree from the next request onward.
  *
- * THE COST IS STATED RATHER THAN DISCOVERED. An organisation nobody opens never transitions,
- * and it keeps the higher tier until somebody does. That is harmless because a tier is only
- * ever consulted when somebody asks, and it fails in the customer's favour — the alternative
- * failure, taking a plan away from an organisation nobody was using, is the one that produces
- * a support call.
+ * THE COST DEC-098 STATED IS NOW MUCH SMALLER THAN IT WAS, and the difference is worth reading
+ * twice. *"An organisation nobody opens never transitions"* was written when the only
+ * transition was a downgrade the customer had asked for — harmless, and it failed in the
+ * customer's favour. Once expiry moves a tier the customer did NOT ask to lose, the same
+ * sentence describes a hole: an organisation that never opens this page but hammers the gated
+ * routes would keep a plan it stopped paying for, which is precisely the reported bug.
+ *
+ * SO THE GATE DOES NOT WAIT FOR THIS FUNCTION. `requireEntitlement` derives the same answer
+ * from the same row on every request without writing (`billing/effective.ts`). What is left of
+ * the accepted cost is only bookkeeping: the ROW catches up late, the DECISION never does.
  */
 export async function readBilling(orgId: string, requestId?: string): Promise<BillingSummary> {
   const [existing, seatBreakdown] = await Promise.all([
@@ -179,7 +223,7 @@ export async function readBilling(orgId: string, requestId?: string): Promise<Bi
     seatsFor(orgId),
   ]);
   if (existing) {
-    return view(await applyExpiredDowngrade({ ...existing, orgId }, requestId), seatBreakdown);
+    return view(await applyExpiredPeriod({ ...existing, orgId }, requestId), seatBreakdown);
   }
 
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
@@ -281,7 +325,10 @@ export async function joinTier(
       // leaving the column set would drop them to the tier they abandoned at the end of the
       // period they just bought, silently, weeks later. `pending_tier` carries no history and
       // is not meant to: it is one fact about the future, and this is a new one.
-      data: { tier, status: 'active', pendingTier: null },
+      //
+      // AND IT CLEARS THE LAPSE NOTICE — DEC-113. `lapsed_from` says "your Gold plan ran out";
+      // a customer who has just paid for Gold again is not somebody to keep telling that.
+      data: { tier, status: 'active', pendingTier: null, lapsedFrom: null },
     });
 
     // THE CAPTURE — DEC-080 — in the same transaction as the tier it pays for, for the
@@ -292,6 +339,14 @@ export async function joinTier(
     // and does the subtraction itself; there is still no amount on any request, and this
     // call passes one no more than it did before.
     //
+    // UNLESS THE PLAN LAPSED, IN WHICH CASE IT IS THE FULL PRICE — DEC-113. The difference
+    // rule credits the customer for the tier they are leaving BECAUSE THEY PAID FOR IT. After
+    // a lapse they did not: `applyExpiredPeriod` put them on a bronze period nobody bought, so
+    // crediting ₹99 against a rejoin would charge ₹900 for a ₹999 plan — every month, and
+    // reliably cheaper than never letting it lapse at all. `pricedFrom: null` says the price is
+    // measured against nothing; `fromTier` still records what actually moved, so
+    // `/ops/analytics` still sees the upgrade.
+    //
     // THIS ROW RECORDS THE FROM-TIER, and the audit row still does not. The gap noted below
     // is unchanged and is still `AuditIntent`'s to close; what has changed is that a plan
     // MOVE is now legible somewhere — `/ops/earnings` reads `from_tier` and `kind` to show
@@ -301,6 +356,7 @@ export async function joinTier(
       orgId,
       tier,
       fromTier: before.tier,
+      pricedFrom: before.lapsedFrom ? null : before.tier,
       kind: 'change',
       payerName: payer?.name ?? 'Unknown',
       payerEmail: payer?.email ?? '',

@@ -1650,11 +1650,17 @@ DEC-080  ACTIVE  2026-08-29  origin:user  supersedes:DEC-035  task:T-058
            GET /api/v1/platform/earnings, pages/platform/Earnings/,
            <RevenueChart> <TierDonut> <TierTrendChart> in components/platform/,
            the --tier-{bronze,silver,gold}-* ramp in tokens.css.
-  not      NOT a subscription lifecycle. nothing renews, nothing expires, nothing dunns,
+  not      NOT a subscription lifecycle. ~~nothing renews, nothing expires~~, nothing dunns,
            there are no refunds and no invoices -- `periodEnd` still bills nothing when it
            passes, exactly as DEC-035 left it, and the unbuilt scheduler is still
            OPEN-005's. `payments` is an append-only LEDGER OF CAPTURES, not an accounts
            system.
+           **"NOTHING EXPIRES" SUPERSEDED BY DEC-113 (2026-08-31).** it sat in this file
+           contradicting 16 §7's *"expiry moves the org to Bronze"* for two days, and the
+           contradiction is what shipped: a Gold organisation past its period kept Gold, free,
+           indefinitely. a period that ends now moves the org to bronze on read AND on the
+           gate. THE REST OF THIS LINE HOLDS -- nothing renews itself, nothing dunns, and
+           `period_end` still BILLS nothing when it passes. what it now DOES is move a tier.
   see      DEC-035, DEC-034, DEC-048, 16 §2 §4, 19 §4, 49, 71, 13 § Platform
 
 DEC-081  AMENDED-BY-DEC-082  2026-08-29  origin:user  amends:32 § The tree, 24 §4  task:T-033
@@ -2088,8 +2094,14 @@ DEC-098  BUILT   2026-08-31  origin:U  task:T-098
   not      NOT a cron job, and NOT a `pending`/`effective_from` pair on the read path. `49`
            § Interactions is explicit that the tier the customer reads and the tier the gate
            decides with are THE SAME ROW, with no cache and no future-dated value. this keeps
-           that: `pending_tier` is never consulted by `requireEntitlement`, only by the write
-           that retires it.
+           that: ~~`pending_tier` is never consulted by `requireEntitlement`~~, only by the
+           write that retires it.
+           **AMENDED BY DEC-113 (2026-08-31).** the gate consults it now, through
+           `billing/effective.ts` `effectiveTier()` -- and the property this sentence was
+           protecting is STRONGER for it, not weaker. "the same ROW" stopped being enough the
+           moment expiry could move a tier the customer did not ask to lose: two readers
+           trusting one column reach different conclusions as soon as the column is stale.
+           both now compute the same ANSWER from one function, so they cannot disagree.
   not      NOT a refund. a scheduled downgrade captures nothing at schedule time and nothing
            at apply time. it writes a `payments` row of `kind: 'expiry'` with
            `amount_minor: 0` -- see DEC-102 for why that row has to exist.
@@ -2694,6 +2706,223 @@ DEC-109  ACTIVE  2026-08-30  origin:claude  task:N-071
            second unit resolves to nothing is SKIPPED and reported rather than half-imported.
   see      INV-005, INV-012, 34, packages/shared/src/dto/person.ts `ImportRow`,
            src/backend/features/people/service.ts `commitImport`
+```
+
+```
+DEC-110  BUILT   2026-08-31  origin:U  task:T-107
+  decision A NAME IS A NAME, AND IT IS ONE DEFINITION. `nameField(max)` in
+           `packages/shared/src/dto/common.ts` -- trimmed, at least one letter, bounded --
+           replaces the twenty-odd hand-written `z.string().min(1).max(n)` copies. AND THE
+           CLIENT RUNS THE SAME SCHEMA before it advances a step, through
+           `src/frontend/lib/validate.ts`.
+  why      owner report, and the two halves are one fault. *"when creating any org if there is
+           any invalid data entered then I am able to proceed to the plan selection and payment
+           step, payment is done and then I am denied access."* AND *"there is no form
+           validation at all, I am able to enter numbers in place of name and this problem is
+           everywhere."*
+           `/start` STEP 1 DID `setStep('plan')` UNCONDITIONALLY. so digits in every field
+           advanced, chose a plan, ran the checkout, and met a 422 afterwards. registration and
+           the capture are ONE transaction, so nothing was created and nothing was charged --
+           the owner noticed that too ("the earnings is not increased"), and it is the system
+           working. what was wrong is that the product walked somebody through a payment screen
+           IN ORDER TO REJECT THEM.
+           AND THE SERVER WAS LETTING IT THROUGH ANYWAY. `min(1)` accepts `"12345"` and it
+           accepts `"   "`, in every DTO that spelled it out -- so this was never only a
+           client-side gap, and fixing only the client would have left `POST /people` happy to
+           create a person called `404`.
+  not      NOT a second set of rules in React. the client runs `RegisterBody.pick(...)` --
+           literally the schema the server parses. a copy is how `packages/shared`'s
+           one-source-of-truth stops being true: the copy drifts, the server stays right, and
+           the difference shows up as a field the UI swears is fine and the API refuses.
+  not      NOT A CHARACTER ALLOWLIST. `O'Brien`, `Ram-Kumar`, `Nguyen`, `3M` are names. the bar
+           is "contains something a human reads as a word", tested with `\p{L}` and the `u`
+           flag -- EVERY ALPHABET, not `[A-Za-z]`, because a product that is generic across
+           organisation types (INV-002) has no business being English-only about people's names.
+  not      NOT COMPOSITION RULES ON THE PASSWORD, and the owner asked. `Credentials` says it in
+           its own comment: *"Long minimum, no composition rules. Length beats character
+           classes, and a rule that forces a symbol mostly produces Password1! everywhere."*
+           that is the current consensus and it is kept. what the password DID gain is the
+           `maxLength` the DTO always had and the input never showed.
+  not      NOT `nameField` ON EVERY STRING. a poll option of `"2025"` is legitimate, a note of
+           `"+91 98765 43210"` is legitimate, and a password must not be trimmed. `textField`
+           is the trimmed-and-bounded one for free text; passwords, ids and capability strings
+           keep plain `z.string()`. a first pass applied the rule by regex and reached all
+           three -- the test that a numeric poll option still saves is what stops the next one.
+  not      NOT VALIDATION ON EVERY KEYSTROKE. a name is invalid for as long as it takes to type
+           the first letter of it. `useFormValidation` checks on SUBMIT and clears a field's
+           message on the next change (`26` § Forms).
+  where    packages/shared/src/dto/common.ts (`nameField`, `textField`) and every DTO that
+           spelled a name out; src/frontend/lib/validate.ts; pages/public/Start.tsx;
+           People/PersonForm, Subjects/SubjectForm, Templates/BlankFormDialog.
+  see      INV-003, DEC-048, 14 §1, T-107
+```
+
+```
+DEC-111  BUILT   2026-08-31  origin:U  task:T-107
+  decision APPROVING AN ENTERPRISE REQUEST IS A SALE. `POST
+           /platform/enterprise-requests/:id/approve` sets the tier, WRITES THE `payments` ROW
+           and closes the request, in one transaction.
+  decision THIS SUPERSEDES DEC-100's line that *"the queue tracks the conversation, it does not
+           perform the sale"*, and 70 § The Enterprise queue's closing sentence with it.
+  why      owner report: *"I am unable to approve as the owner for enterprise account. If the
+           intended workflow is that client will request and then owner will just set plan to
+           enterprise, there is no payment flow involved and ENDUR IS NOT MAKING ANY MONEY."*
+           EXACTLY RIGHT, AND IT IS A NUMBER THAT WAS ALWAYS ZERO. the owner worked a request
+           to `closed`, went to the org's page and set the tier through
+           `platform.plan.override` -- and `overridePlan` deliberately writes NO `payments`
+           row. so the one tier the product charges Rs 4,999 for earned nothing, and every
+           Enterprise customer was invisible to `/ops/earnings`.
+  not      NOT a reopening of "an operator could invent revenue", which is why `OverridePlan`'s
+           DTO still has no amount field. THIS NAMES NO AMOUNT EITHER. the price comes from
+           `PLAN_OPTIONS` through `recordPayment`, server-side, exactly as it does on the
+           customer's own join -- the operator supplies a request id and nothing else. that is
+           also what makes adding `Payment` to `platform/db.ts`'s write allowlist safe: the
+           only number an operator can put in that table is the one the catalogue says.
+  not      NOT `overridePlan` LEARNING TO CHARGE. moving a customer's tier because support
+           asked is not a sale, and if it started writing ledger rows an operator fixing a
+           mistake would invent revenue every time. two verbs, and a test pins that the plain
+           override still writes nothing.
+  not      NOT the full Rs 4,999 when they already hold a plan. DEC-097's difference rule
+           applies: a Gold organisation approved to Enterprise contributes Rs 4,000.
+  where    features/platform/service.ts `approveEnterpriseRequest`; platform/db.ts
+           WRITABLE_MODELS (+ `Payment`); billing/payments.ts (`Tx` is now structural, the
+           pattern platform/audit.ts already carries); <EnterpriseQueue>; 70; 49; 16 §2.
+  see      DEC-100, DEC-097, DEC-080, INV-011, T-107
+```
+
+```
+DEC-112  BUILT   2026-08-31  origin:U  task:T-107
+  decision THE MATRIX'S FOUR ROWS ARE POSITIONS IN THE FEEDBACK LOOP, NOT POSITIONS IN THE
+           LIST. `levelForRole(index, roleCount)`: four roles or fewer is unchanged; above
+           four, the top three keep 1/2/3, THE BOTTOM ROLE TAKES 4, and the middle takes 3.
+  why      owner report: *"logging with professor Kavya Reddy, nothing is coming on her
+           account, similarly for assistant professor and student. permission issues?"* -- and
+           the mate's own run doc had already found it twice, as F4 and F2.
+           IT WAS `Math.min(index + 1, 4)`. a ten-role college -- Director, Dean, HoD,
+           Professor, Assistant Professor, Hostel Manager, Mess Manager, Sports Officer,
+           Support Staff, Student -- put SIX ROLES ON THE LEVEL-4 ROW, which is the
+           RESPONDENT's row: `org.read`, `subject.read own_unit`, `announcement.read`, and the
+           two universal self-grants. FIVE CAPABILITIES. so a Professor signed in to an empty
+           console and a 403 on campaigns.
+           THE MATRIX SAID SO ALL ALONG. its own comments read *"L3 is the REVIEWEE (the person
+           feedback is about)"* and *"L4 is the RESPONDENT-level role (the person who gives
+           it)"*. counting from the top lands those two labels on whoever happens to sit fourth
+           and fifth, which in any real ladder is a Professor and an Assistant Professor --
+           both reviewees, both handed the respondent's row.
+  built    IT ALSO CLOSES F2 WITHOUT TOUCHING EITHER RULE F2 NAMED. `reflection.*` and
+           `actionplan.*` are `self` at levels 1-3 and ABSENT at 4, so the whole Gold
+           improvement loop was unreachable for any organisation whose reviewee sat fifth or
+           lower -- and UNGRANTABLE, because the no-escalation guard needs a granter holding
+           the capability at `all` and nobody ever holds these at `all`. putting the middle of
+           the ladder on level 3 hands it back.
+  not      NOT a proportional spread (`ceil(i / n * 4)`). it reads neatly and puts a Dean on
+           level 1, which carries `org.delete`, `role.create` and `grant.update` -- the whole
+           organisation, to somebody two steps down. level 3 is `own_unit` almost everywhere,
+           so being generous there costs a Sports Officer who can run a campaign in their own
+           unit. THAT IS THE JOB. being generous at level 1 costs the organisation.
+  not      NOT a change for anybody who has four roles or fewer. every seeded preset has
+           exactly four, so no existing organisation moves and `50` §1's table still describes
+           what it describes. a test pins that.
+  not      NOT the bottom of the ladder gaining anything. a Student who could read every
+           response in their unit would be a worse bug than the one being fixed, and the test
+           asserts the absences as hard as the presences.
+  where    presets/grant-matrix.ts `levelForRole`; features/org/service.ts;
+           database/seed/demo.ts; features/roles/service.ts (the `thin_starter_row` warning now
+           ASKS THE SAME FUNCTION rather than inferring from the level number -- inferring
+           answered "is this last", which is true under any mapping and so kept passing while
+           the warning named one role out of the six that were actually thin).
+  see      D-048, DEC-107, 50 §1, 33, T-107
+```
+
+```
+DEC-113  BUILT   2026-08-31  origin:U  task:T-108
+         SUPERSEDES: DEC-080's "nothing expires" · DEC-098's "pending_tier is never consulted
+         by requireEntitlement" · 16 §8's "no renewal" (on expiry only, not on billing)
+  decision A PERIOD THAT ENDS WITH NOBODY RENEWING MOVES THE ORGANISATION TO BRONZE, and the
+           way back is the join that already exists. no scheduler, no dunning, no new endpoint.
+           BRONZE IS THE FLOOR and rolls forward FREE -- there is no card on file, so a capture
+           nobody clicked would be an invention, and 16 §7 has always forbidden zero access.
+  why      owner report: *"on plan expiration, nothing happens for the client, they are able to
+           continue to use the features granted by the plan, and there is no option to change
+           the plan on expiration. the entire possibility of plan expiration is not designed at
+           all for both client and admin."* every word of it was true.
+           TWO CAUSES, NOT ONE, AND ONLY FIXING BOTH CLOSES IT.
+             1. `applyExpiredDowngrade` returned early unless a downgrade had been SCHEDULED,
+                so an org that simply let the month run out kept the tier with `period_end`
+                frozen in the past, indefinitely.
+             2. `requireEntitlement` selected `tier` ALONE. even a correct row would not have
+                helped an organisation that never opens /app/plan -- which is most of them --
+                because the gate is what an ordinary user meets.
+           THE DOCS ALREADY CONTRADICTED THEMSELVES ABOUT IT. `16` §7 said *"expiry moves the
+           org to Bronze, never to zero access"* and `DEC-080` said *"nothing renews, nothing
+           expires"*, and the two sat there disagreeing until somebody met the consequence:
+           Gold, free, forever. this entry resolves it in §7's favour, which is the one that
+           was written as a rule rather than as a scope note.
+  what     `effectiveTier(row)` in src/backend/billing/effective.ts is the ONE decision, asked
+           by three readers: the gate (reads, never writes), `readBilling` (reads and
+           persists), and the operator estate list (reads, so /ops does not show a tier the API
+           has stopped serving). the old property was "the gate and the page read the same
+           COLUMN"; a column stops answering the moment a date passes, so it is now "they
+           compute the same ANSWER" -- which is stronger, and is what 49 § Interactions was
+           actually protecting.
+  what     `subscriptions.lapsed_from` -- the tier that ran out, null in the ordinary case. it
+           is what lets the page say *"your Gold plan has ended"* instead of showing a bronze
+           row with no account of where Gold went. A MOVE NOBODY CAN SEE IS INDISTINGUISHABLE
+           FROM THE BUG BEING FIXED. cleared by a join, by an operator override, and by the
+           next bronze roll-over, so the notice lives exactly one period.
+  what     `kind: 'lapse'` is a FOURTH PAYMENT KIND beside `expiry`. identical rows -- Rs 0,
+           same from and to -- and opposite facts: one customer asked to spend less, the other
+           stopped paying. folding them together makes *"how many organisations lapsed last
+           month"* unanswerable from the only table that records plan moves. /ops/earnings
+           excludes both; /ops/analytics counts both as downgrades.
+  money    THE REVENUE HOLE THE FIX WOULD OTHERWISE HAVE OPENED, and it is the part worth
+           reading twice. DEC-097 charges the DIFFERENCE because the customer already paid for
+           the tier they are leaving. after a lapse they did not -- the bronze is free -- so
+           bronze -> gold would have billed Rs 900 for a Rs 999 plan, EVERY MONTH, making a
+           deliberate lapse permanently cheaper than staying on the plan. `recordPayment` grew
+           `pricedFrom`, which splits the two jobs `fromTier` was doing: the MOVE is still
+           bronze -> gold, the PRICE is measured against nothing. still no amount on any
+           request.
+  not      NOT a `past_due` status with the gate reading two columns. the tier the page shows
+           and the tier the gate enforces would stop being one answer, which DEC-098 and 49
+           § Interactions both forbid in as many words. the tier MOVES instead.
+  not      NOT auto-renew. there is no processor, no card and no scheduler; a capture fired off
+           whoever happened to load a page would be charging money the product cannot take.
+  not      NOT a new endpoint. rejoining IS `POST /billing/tier` -- the picker already carries
+           a Join on every tier above the current one, and after a lapse that is all of them.
+           a `/billing/renew` would have been a second name for a route that already exists.
+  not      NOT dunning bronze. the owner chose the free roll-over over a permanent "Rs 99 is
+           due" banner, and the consequence is stated rather than discovered: BRONZE EARNS
+           Rs 99 ONCE, NOT Rs 99 A MONTH. revisit if bronze ever needs to recur.
+  cost     ENTERPRISE LAPSES TOO, deliberately. it is the tier with no self-serve way back
+           (`joinTier` refuses it, 16 §4), so a lapsed enterprise customer must be sold again
+           -- correct friction for an arrangement that is a conversation, and the alternative
+           is this same bug wearing the most expensive tier in the catalogue.
+  cost     THE ROW STILL CATCHES UP LATE. with no scheduler the write happens on the first read
+           of /billing. what changed is that the DECISION never lags: the gate derives it on
+           every request. DEC-098's *"an organisation nobody opens never transitions"* was
+           harmless when the only transition was one the customer asked for; it would have been
+           the whole hole here.
+  built    2026-08-31, T-108. seven tests in test/lapse.test.ts, and FIVE OF THEM FAIL AGAINST
+           THE OLD RULE -- checked by reverting `effectiveTier` and re-running. the two that
+           pass both ways are the deliberate guards: bronze is never taken away, and an
+           ordinary upgrade still pays the difference.
+           `<PlanNoticeBanner>` in <AppShell> is the client half, and it is the half the report
+           was actually about: the end date had been printed on /app/plan since T-058 and the
+           owner still met *"nothing happens"*, because A FACT NOBODY NAVIGATES TO IS A FACT
+           NOBODY HAS. seven days, warm ink; the lapsed state names the tier and carries no
+           date, since `period_start` is when the lapse was NOTICED and not when the plan ran
+           out.
+           THE OPERATOR HALF: the estate row shows the EFFECTIVE tier with Lapsed / Ending soon
+           chips, and /ops/orgs/:id prints the period end above the picker. an operator looking
+           at a list that says Gold about an organisation the API treats as Bronze cannot do
+           their job.
+  where    src/backend/billing/effective.ts (new); middleware/requireEntitlement.ts;
+           features/billing/service.ts `applyExpiredPeriod`; billing/payments.ts `pricedFrom`;
+           features/platform/service.ts (estate + override + enterprise approve);
+           schema.prisma `Subscription.lapsedFrom`; components/billing/PlanNoticeBanner.tsx;
+           components/platform/OrgRow.tsx; 16 §7 §7d §8, 49, 70, 10 §.
+  see      DEC-098, DEC-097, DEC-096, DEC-080, OPEN-005, 16 §7, T-108
 ```
 
 ---
@@ -3881,6 +4110,11 @@ MAP        packages/shared/src/platform-capabilities.ts -> 19 §4 (T-059).
            assignable row in the powers grid. two tests say so.
 MAP        packages/shared/src/dto/platform.ts -> 19 §11 (T-059)
 MAP        src/backend/database/seed/operators.ts, ops-code.ts -> 19 §3, 50 (T-059)
+MAP        src/backend/billing/effective.ts    -> 16 §7d (T-108). the ONE expiry decision.
+                                    three readers -- requireEntitlement, readBilling, the
+                                    estate list -- and none of them may re-derive it.
+MAP        src/frontend/components/billing/PlanNoticeBanner.tsx -> 24 §2, 16 §7d (T-108).
+                                    rendered by <AppShell>, not by a page.
 CONTESTED  src/backend/middleware/tenantResolver.ts is 12's. DEC-073 changes its RETURN
            SHAPE (`{ orgId, via }`) so suspension can distinguish a staff session from a
            respondent token. 19 owns the suspension rule; 12 owns the file.
@@ -4855,4 +5089,22 @@ N-072  A PENDING MIGRATION AND A STALE PRISMA CLIENT ARE TWO FAULTS AND BOTH NOW
        symptom before this: `GET /inbox/messages` answered
        `500 -- Cannot read properties of undefined (reading 'findMany')` on correct code,
        because `prisma.notification` did not exist in a client generated before the model did.
+N-073  `npm run db:migrate` RAN `prisma migrate dev`, WHICH IS THE ONE COMMAND N-013 WARNS
+       ABOUT. found 2026-08-31 by the owner running the documented step after T-108. 03 §5 has
+       said "`migrate deploy`, never `migrate dev`" since the suite was written, but scoped the
+       sentence to the TEST run; the everyday script said `dev` and nobody reread it.
+       WHAT IT DID. schema.prisma is permanently drifted from the database BY DESIGN -- N-013's
+       ~90 lines of hand-written SQL are things prisma cannot express -- so `migrate dev` diffed
+       the two, called the difference a mistake, and generated a migration to drop the three
+       GIN/partial indexes, the DEFERRABLE unique on questions(template_id, position), five
+       foreign keys, and `DROP TABLE sessions`, the store connect-pg-simple owns (DEC-014).
+       IT WAS STOPPED BY LUCK, NOT BY DESIGN. postgres refuses to drop an index a constraint
+       needs, so `DROP INDEX questions_template_id_position_key` errored and the transaction
+       rolled the whole file back -- 0 steps applied, every object verified still present. had
+       that constraint been declared any other way the file would have committed and, exactly as
+       N-013 says, the app would still have run.
+       RESOLUTION. `db:migrate` is `prisma migrate deploy && prisma generate`. migrations here
+       are HAND-WRITTEN, so there was never a job for `dev` to do. the failed row was cleared
+       with `migrate resolve --rolled-back`; a failed row blocks every later migration until it
+       is. see N-013, which predicted this in full, and 03 §5.
 ```

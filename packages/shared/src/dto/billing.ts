@@ -43,6 +43,22 @@ export type BillingSummary = {
    * same column.
    */
   pendingTier: Tier | null;
+  /**
+   * THE PLAN THAT RAN OUT — `DEC-113`, `16` §7d. `null` is the ordinary case.
+   *
+   * Non-null means the last period ended, nothing was renewed, and `tier` above is `bronze`
+   * because of it. The value is what the organisation came DOWN from, so the page can name
+   * it: *"Your Gold plan ended on 30 September."* A bronze row with no account of where Gold
+   * went is the bug this whole mechanism exists to fix, and a boolean could not have said it.
+   *
+   * A SCHEDULED DOWNGRADE LEAVES THIS NULL even though it moves the tier the same way. Silver
+   * arriving because the customer asked for Silver needs no explanation; Bronze arriving
+   * because nobody renewed does.
+   *
+   * NOTHING GATES ON IT, the same rule `pendingTier` lives under. It is a past-tense fact
+   * beside the tier, never a second answer to which plan is in force.
+   */
+  lapsedFrom: Tier | null;
   seats: number;
   /** What the meter counts, in its parts. `16` §5: a plan's size must never be a surprise. */
   seatBreakdown: { activeUsers: number; nonPersonSubjects: number };
@@ -66,8 +82,20 @@ export type BillingSummary = {
  * worse than one with a ₹0 line somebody asks about. `/ops/earnings` excludes this kind from
  * its window for the opposite reason: counting it as a payment would drag the average down
  * with events where no money moved.
+ *
+ * `lapse` IS A FOURTH KIND AND IT IS THE SAME SHAPE FOR A DIFFERENT REASON — `DEC-113`. It is
+ * written when a period ends and NOBODY RENEWED, moving the organisation to bronze at ₹0.
+ *
+ * WHY IT IS NOT JUST ANOTHER `expiry`. The two are indistinguishable in the row — same ₹0,
+ * same from-tier and to-tier — and completely different as facts about the business. One is a
+ * customer who asked to spend less and got what they asked for; the other is a customer who
+ * stopped paying. Folding them together would make *"how many organisations lapsed last
+ * month"* unanswerable from the one table that records plan moves, which is the question the
+ * owner of a product with no renewals most needs to be able to ask. `/ops/analytics` counts
+ * both as downgrades (it wants the movement); `/ops/earnings` excludes both (neither took
+ * money).
  */
-export type PaymentKind = 'signup' | 'change' | 'expiry';
+export type PaymentKind = 'signup' | 'change' | 'expiry' | 'lapse';
 
 export type PaymentRecord = {
   id: string;

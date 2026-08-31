@@ -73,8 +73,15 @@ type BillingSummary = {
   tier: Tier; status: 'trialing' | 'active' | 'cancelled';
   periodStart: string; periodEnd: string;
   trialEndsAt: string | null;
+  pendingTier: Tier | null;   // a move down asked for and not yet had — DEC-098
+  lapsedFrom: Tier | null;    // the plan that ran out, null in the ordinary case — DEC-113
   // No price field. There is no price — DEC-035.
 };
+
+// `pendingTier` and `lapsedFrom` are the SAME SHAPE POINTED IN OPPOSITE DIRECTIONS: one is a
+// dated intention about the next period, the other a past-tense fact about the last. NEITHER
+// IS A SECOND ANSWER TO "WHAT PLAN ARE THEY ON" — `tier` is in force, the entitlement gate
+// decides with it, and nothing in either app branches on these two beyond a sentence.
 
 type PlanOption = {
   tier: Tier;
@@ -136,6 +143,7 @@ model follows the product thesis. Say it on the page.
 | `<PlanPicker>` | **new**, shared with `70` | The four tiers, what each includes, current one marked, a **Join** button on each of the others |
 | `<StatCard>` `<BarRow>` `<ResponsiveTable>` `<ConfirmDialog>` | existing | Usage figures and the downgrade confirmation |
 | `<OverLimitBanner>` | **new** | Persistent, in `<AppShell>`, with the exact number over |
+| `<PlanNoticeBanner>` | **BUILT `T-108`** | Persistent, in `<AppShell>`. The plan ends in ≤7 days, or it already lapsed — `16` §7d, `DEC-113` |
 
 `<PlanPicker>` is one component used by two worlds — the customer choosing and the operator
 overriding. Same information, different verb. Two implementations would drift within a month,
@@ -237,6 +245,27 @@ request id. With no invoice and no receipt, `audit_log` is the *only* record tha
 happened, which makes it more load-bearing here than it is on a route that also produces a
 document.
 
+### When the period runs out  ·  **BUILT 2026-08-31 (`DEC-113` — `T-108`)**
+
+Two surfaces, and the one that matters is not this page.
+
+**`<PlanNoticeBanner>` in `<AppShell>`, on every console page.** In the last seven days of a paid
+period it says the plan ends on the date and offers Renew; once it has lapsed it says so in the
+past tense, **naming the tier that was lost**, and offers Choose a plan. Both link here. This
+page has printed the period's end date since `T-058` and the owner still met *"nothing happens
+for the client"* — a fact nobody navigates to is a fact nobody has.
+
+**On this page, one line under the current plan**, in the same place and shape as `DEC-098`'s
+scheduled-move line, because it answers the same kind of question about the same period: what
+happened when it ended. It is shown to every reader with `billing.read`, unlike the schedule
+block beside it — what happened to the plan is not an action, and a reader who cannot change the
+plan still needs to know why the analysis pages stopped opening.
+
+**There is no Renew button, and there should not be.** After a lapse the organisation is on
+Bronze, so the picker below already carries a Join on every tier — rejoining *is* the join
+(`13` § Billing). What differs is the price: the full tier price, not `DEC-097`'s difference,
+because the Bronze being left was never bought.
+
 ### Asking for Enterprise  ·  **BUILT 2026-08-31 (`DEC-099`, `DEC-100` — `T-099`, `T-100`)**
 
 Enterprise's card stops being a dead disabled button. It prints **₹4,999 / month** like every
@@ -327,6 +356,18 @@ The other half of what was asked for — *"can assign leveled roles"* — **exis
       `payments` row is written, and the entitlement gate answers exactly as it did
 - [x] **The first read after `period_end` applies a `pending_tier`** and clears the column, and
       the read that applies it returns the new tier — `DEC-098`
+- [x] **The first read after `period_end` with NOTHING scheduled moves the org to Bronze**,
+      records `kind: 'lapse'` at ₹0 and an audit row with no actor, and sets `lapsed_from` to
+      the tier that was lost — `DEC-113`
+- [x] **A Gold surface `402`s the moment the period ends, with no read of `/billing` first.**
+      The load-bearing one: `requireEntitlement` derives the tier rather than reading the
+      column, so a customer who never opens `/app/plan` cannot go on using a plan that ran out
+- [x] **Bronze is never taken away.** Its period rolls forward, free, with no `payments` row
+      and no notice — `16` §7 has always forbidden zero access
+- [x] **Rejoining after a lapse captures the FULL price, not the difference** — the Bronze it
+      leaves was never bought, and crediting it would make a deliberate lapse permanently
+      cheaper than staying on the plan (`DEC-113`)
+- [x] **An ordinary upgrade still captures the difference** — the guard on the line above
 - [x] **`POST /billing/enterprise-request` writes one `open` row and does not touch
       `subscriptions`**; a second while one is open is `409`
 - [x] **Enterprise's card prints ₹4,999 and its verb is `Request`, not `Join`** — and no page
@@ -341,9 +382,10 @@ The other half of what was asked for — *"can assign leveled roles"* — **exis
       `DEC-048`**: sign-up writes the chosen tier, `status: 'active'`. Nothing has ever written
       `trialing` on this path, which is what made `/ops/analytics`' trial counters unable to
       move (`DEC-102`)
-- [ ] ~~An expired trial moves to Bronze, never to zero access~~ — no trial exists to expire.
-      The line that survives is `16` §7's, about **expiry**, and `DEC-098` is what finally makes
-      `period_end` mean something
+- [x] ~~An expired trial moves to Bronze, never to zero access~~ — no trial exists to expire.
+      The line that survives is `16` §7's, about **expiry**, and ~~`DEC-098`~~ **`DEC-113`** is
+      what finally makes `period_end` mean something. `DEC-098` only ever fired for a downgrade
+      the customer had already asked for; **BUILT 2026-08-31 (`T-108`)**
 - [ ] Response counts appear with an explicit statement that they are not billed
 - [ ] Every user-facing noun on this page resolves through `useLabels()` — this is a customer
       surface and INV-001 applies in full, unlike `70` and `71` (`19` §12)

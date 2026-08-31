@@ -13,6 +13,7 @@
 import type { RequestHandler } from 'express';
 import type { Capability } from '@endur/shared';
 import { lowestTierFor, tierIncludes, type Tier } from '../billing/entitlements.js';
+import { effectiveTier } from '../billing/effective.js';
 import { AppError, UnauthenticatedError } from '../lib/errors.js';
 
 export const requireEntitlement =
@@ -30,7 +31,18 @@ async function check(
 ): Promise<void> {
   if (!orgId) throw new UnauthenticatedError();
 
-  const subscription = await db.subscription.findFirst({ select: { tier: true } });
+  // THREE COLUMNS, ONE ANSWER — DEC-113. This selected `tier` alone until 2026-08-31, and the
+  // hole that left is the one the owner reported: a period ended, `tier` still said `gold`,
+  // and the gate went on opening Gold surfaces for an organisation whose month had run out.
+  // `period_end` was already on the row and nothing read it.
+  //
+  // THE GATE DOES NOT WRITE. `readBilling` is the one writer, and it moves the row the next
+  // time anybody opens the plan page. Until then the two agree anyway, because both ask
+  // `effectiveTier()` — deriving the answer is what keeps `49` § Interactions' rule true now
+  // that a column alone cannot.
+  const subscription = await db.subscription.findFirst({
+    select: { tier: true, pendingTier: true, periodEnd: true },
+  });
   // NO ROW MEANS BRONZE, AND THIS IS NOW A BACKSTOP RATHER THAN THE NORMAL PATH (DEC-048).
   //
   // It used to be the only path. Nothing wrote a `Subscription` — not register, not setup,
@@ -45,7 +57,7 @@ async function check(
   // any future path that creates an org without one. Failing open to the lowest tier is the
   // right direction: a missing billing row is our bookkeeping problem, and locking a customer
   // out of a product they are inside is a worse answer to it than giving them the floor.
-  const tier = (subscription?.tier ?? 'bronze') as Tier;
+  const tier: Tier = subscription ? effectiveTier(subscription) : 'bronze';
 
   if (tierIncludes(tier, capability)) return;
 

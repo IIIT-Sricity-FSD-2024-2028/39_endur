@@ -1,6 +1,6 @@
 // Auth DTOs. No Refresh — staff auth is a cookie session (DEC-014).
 import { z } from 'zod';
-import { dto } from './common.js';
+import { dto, nameField } from './common.js';
 import type { HeldCapabilities } from '../capabilities.js';
 import { SIGNUP_TIERS } from '../tiers.js';
 
@@ -50,8 +50,8 @@ export type AmbiguousAccounts = { organizations: Array<{ id: string; name: strin
  * Nobody answers `industry` twice; everybody answers `tier` once.
  */
 export const RegisterBody = Credentials.extend({
-  name: z.string().min(1).max(120),
-  orgName: z.string().min(1).max(120),
+  name: nameField(120),
+  orgName: nameField(120),
   industry: z.enum(['university', 'hotel', 'hospital', 'company', 'custom']).default('custom'),
   /** Bronze, Silver or Gold. Enterprise is operator-assigned and not on the picker (16 §4). */
   tier: z.enum(SIGNUP_TIERS),

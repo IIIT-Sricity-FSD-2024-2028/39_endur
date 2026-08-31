@@ -7,7 +7,7 @@ import { estimateSeconds } from '@endur/shared';
 import type { QuestionKind } from '@endur/shared';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { hashPassword } from '../../auth/password.js';
-import { grantsForLevel, presetFor, type Level } from '../../presets/index.js';
+import { grantsForLevel, levelForRole, presetFor } from '../../presets/index.js';
 import { mintToken } from '../../features/campaigns/token.js';
 import { newPeriod } from '../../billing/period.js';
 import { poolFor, type Tone } from './comments.js';
@@ -356,7 +356,7 @@ export async function seedOrg(
     });
     roleIds.push(created.id);
     await prisma.grant.createMany({
-      data: grantsForLevel(Math.min(index + 1, 4) as Level).map((grant) => ({
+      data: grantsForLevel(levelForRole(index, preset.roles.length)).map((grant) => ({
         orgId,
         subjectId: created.id,
         capability: grant.capability,

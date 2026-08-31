@@ -48,6 +48,11 @@ directive. "Priced individually" was true as a sales posture and false as a prod
 it forced `priceMinor: 0` as a sentinel, a `selectable: false` special case in every reader,
 and two strings of apology copy on the card. A number deletes all three.
 
+**And since `DEC-111` it is actually CAPTURED.** Approving a request on `/ops` writes the
+`payments` row — the difference from whatever they already hold, per `DEC-097` — so Enterprise
+finally reaches `/ops/earnings`. Until then the tier was granted by `platform.plan.override`,
+which writes no ledger row, and the estate's most expensive plan earned ₹0.
+
 **A price is not a checkout.** Enterprise stays off `SIGNUP_TIERS` and off the join path;
 `selectable: false` survives and now means exactly one thing — *the customer cannot assign this
 to themselves*. The card's verb is **Request** (`DEC-100`), and an operator can still set the
@@ -176,7 +181,9 @@ the plan.
   re-upgrade restores access to history. Deleting a customer's data on downgrade is how you
   lose a re-upgrade. **Unchanged and load-bearing** — everything below narrows *when* a
   downgrade happens, never what it destroys, which is nothing.
-- Expiry moves the org to Bronze, never to zero access.
+- Expiry moves the org to Bronze, never to zero access. **BUILT 2026-08-31 (`T-108`,
+  `DEC-113`) — and it had been a sentence with nothing behind it since this doc was written.**
+  See §7d.
 
 ### 7a. The ladder is one-way while a period is running — `DEC-096`, 2026-08-31
 
@@ -223,6 +230,66 @@ with are the same row, with no cache and no future-dated value, and this keeps t
 
 **Known and accepted:** an organisation nobody opens never transitions. A tier is only ever
 consulted when somebody asks, so an org with no requests has nothing being gated.
+
+### 7d. A period that ends with nobody renewing — `DEC-113`
+
+**BUILT 2026-08-31 (`T-108`). Owner report:** *"On plan expiration, nothing happens for the
+client, they are able to continue to use the features granted by the plan, and there is no
+option to change the plan on expiration. The entire possibility of plan expiration is not
+designed at all for both client and admin."* Every word of it was true.
+
+**Two causes, and only fixing both closes it.** `readBilling` returned early unless a downgrade
+had been **scheduled**, so an organisation that simply let the month run out kept its tier with
+`period_end` frozen in the past. And `requireEntitlement` selected `tier` alone — so even a
+correct row would not have helped an organisation that never opens `/app/plan`, which is most
+of them, because the gate is what an ordinary user actually meets.
+
+**§7 above and `DEC-080` had been contradicting each other in writing.** *"Expiry moves the org
+to Bronze"* against *"nothing renews, nothing expires"*. This resolves it in §7's favour: §7 was
+written as a rule, `DEC-080` as a scope note, and the scope note is what shipped.
+
+| At `period_end` | What happens |
+|---|---|
+| A downgrade was **scheduled** | It applies. `kind: 'expiry'`, no notice — the customer asked for this (§7b) |
+| **Nobody renewed**, paid tier | Moves to **Bronze**. `kind: 'lapse'`, ₹0, `lapsed_from` records what was lost |
+| **Nobody renewed**, already Bronze | The period rolls forward, **free**, and nothing else is written |
+
+**Bronze is the floor and it rolls free.** There is no card on file, so a capture nobody clicked
+would be an invention, and taking Bronze away would be the zero access this section forbids.
+The consequence is stated rather than discovered: **Bronze earns ₹99 once, not ₹99 a month.**
+
+**There is no renew endpoint, because rejoining *is* the join.** After a lapse the picker
+carries a Join on every tier above Bronze — which is all of them — and `POST /billing/tier`
+already captures, audits and moves the row. A `/billing/renew` would have been a second name
+for a route that exists.
+
+**But the price is the full price, not the difference.** `DEC-097` credits the tier a customer
+is leaving *because they paid for it*; after a lapse they did not. Pricing a rejoin as
+Bronze → Gold would bill ₹900 for a ₹999 plan, every month, making a deliberate lapse
+permanently cheaper than staying on the plan. `recordPayment` takes `pricedFrom` — the move is
+still recorded as Bronze → Gold, only the price is measured against nothing. **There is still no
+amount on any request.**
+
+**The customer is warned for the last seven days**, in `<PlanNoticeBanner>`, on **every** console
+page — the same argument `<OverLimitBanner>` is in `<AppShell>` for (§6). The end date had been
+printed on `/app/plan` since `T-058` and the owner still met *"nothing happens"*, because a fact
+nobody navigates to is a fact nobody has. Seven days: a fortnight early is furniture, the morning
+of is not a warning.
+
+**Enterprise lapses like everything else**, deliberately. It is the tier with no self-serve way
+back (§4), so a lapsed Enterprise customer has to be sold again — correct friction for an
+arrangement that is a conversation, and the alternative is this same bug wearing the most
+expensive tier in the catalogue.
+
+**The operator sees it too.** The estate row shows the **effective** tier with `Lapsed` /
+`Ending soon` chips, and `/ops/orgs/:id` prints the period end above the picker. An operator
+looking at a list that says Gold about an organisation the API is treating as Bronze cannot do
+their job.
+
+**Still no scheduler** (`OPEN-005`). The *row* catches up on the first read of `/billing`; the
+*decision* never lags, because the gate derives it on every request from `effectiveTier()`.
+`DEC-098`'s accepted cost — *"an organisation nobody opens never transitions"* — was harmless
+when the only transition was one the customer asked for. It would have been the whole hole here.
 
 ### 7c. The period is one calendar month — `DEC-096`
 
@@ -298,8 +365,10 @@ cost of a **second money formula and a rounding rule** in a system that has exac
 until it does, "the rest of the period" is a quantity nothing else in the product reads.
 
 **What is still absent, and deliberately:** no payment processor, no webhook surface, no card
-data, no invoices, no refunds, no renewal — `subscriptions.period_end` still bills nothing when
-it passes, and `DEC-098` does not change that. What it does now is **fire a scheduled
+data, no invoices, no refunds, no **automatic** renewal — `subscriptions.period_end` still bills
+nothing when it passes, and neither `DEC-098` nor `DEC-113` changes that. **What `DEC-113` changed
+is that it now MOVES A TIER when it passes** (§7d), and renewal is a thing the customer does with
+the join button rather than a thing that happens to their card. What it does now is **fire a scheduled
 downgrade** the first time somebody reads the row after it, and start a new period so the row is
 not left permanently expired. `payments` is an append-only ledger of captures, not an accounts system, and the UI
 says "Endur demo checkout · no card details are collected" where a real one would take a card.

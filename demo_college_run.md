@@ -358,6 +358,13 @@ and the analysis corpus — all quick polls and all suggestion boxes.
 
 ### F2 — Blocker · The Gold improvement loop is unreachable for any organisation whose reviewee role sits below level 3, and cannot be granted
 
+> **FIXED 31 Aug** — `DEC-112`, `T-107`, as a consequence of `F4`'s fix rather than by touching
+> either rule below. Both are still exactly as written: `reflection.*` is still `self` at levels
+> 1–3 and absent at 4, and the no-escalation guard still requires the granter to hold a
+> capability at `all`. **What changed is which role lands on which row.** A ladder longer than
+> four now puts its middle — the reviewees — on level 3, so `reflection.create` is there to be
+> held, and nobody has to grant what nobody can grant.
+
 > **FIXED 30 Aug** — `D-047`, `DEC-107`. Cause 2 was the real one and it is the one that
 > changed: a grid cell whose scope is `self` claims no unit, so it is now bounded by whether the
 > saver HOLDS the capability rather than by whether they hold it everywhere. Cause 1 — the
@@ -428,7 +435,16 @@ dev server is running. The server has to be stopped first.
 
 ### F4 — Major · A ten-role college leaves six roles with almost no powers, and nothing says so
 
-> **PARTLY FIXED 30 Aug** — `D-048`. The first of the three suggestions below is the one taken:
+> **FIXED 31 Aug** — `DEC-112`, `T-107`. **The third suggestion below is the one taken**, after
+> the owner met the same thing from the other end: *"logging with professor Kavya Reddy, nothing
+> is coming on her account."* `levelForRole()` maps the BOTTOM role to the respondent row and
+> the middle of the ladder to the reviewee row, so a ten-role college now gets one thin role
+> instead of six. Four-role organisations are byte-for-byte unchanged. **This also closes `F2`**
+> — `reflection.*` is `self` at levels 1–3 and absent at 4, so putting the middle of the ladder
+> on level 3 hands the Gold loop back without touching either rule `F2` named.
+>
+> The 30 Aug note, kept because it is still true and still shipped: `D-048`. The first of the
+> three suggestions below was taken first:
 > `GET /grants/warnings` returns a `thin_starter_row` warning naming every role clamped to the
 > level-4 row, so the grid says what the wizard did not. The DEFAULTS are unchanged — they are
 > right for a four-role organisation — and a longer preset ladder for the industries whose real

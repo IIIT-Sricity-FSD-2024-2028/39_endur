@@ -13,7 +13,7 @@ import type {
   PlatformOrgDetail,
   PlatformOrgSummary,
 } from '@endur/shared';
-import { OpsError, opsGet, opsPatch } from './ops.js';
+import { OpsError, opsGet, opsPatch, opsPost } from './ops.js';
 
 export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
 
@@ -160,41 +160,98 @@ export function useOrgDetail(id: string | undefined): Loadable<PlatformOrgDetail
 export function useEnterpriseQueue(enabled: boolean): {
   rows: EnterpriseRequestRow[];
   loading: boolean;
+  /** The last failure, for the page to render. NEVER swallowed — see below. */
+  error: string | null;
   update: (id: string, status: EnterpriseStatus) => Promise<void>;
+  approve: (id: string) => Promise<void>;
 } {
   const [rows, setRows] = useState<EnterpriseRequestRow[]>([]);
   const [loading, setLoading] = useState(enabled);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!enabled) {
       setLoading(false);
       return;
     }
-    let cancelled = false;
-    void opsGet<{ data: EnterpriseRequestRow[] }>('/enterprise-requests?status=open')
-      .then((response) => {
-        if (!cancelled) setRows(response.data);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      // OPEN **AND** CONTACTED. The queue is what is outstanding, and a customer somebody has
+      // rung once is still outstanding until the sale is made or dropped. Fetching only `open`
+      // is what made "Contacted" look like it did nothing: the row vanished, which reads as a
+      // failed click rather than as progress.
+      const [open, contacted] = await Promise.all([
+        opsGet<{ data: EnterpriseRequestRow[] }>('/enterprise-requests?status=open'),
+        opsGet<{ data: EnterpriseRequestRow[] }>('/enterprise-requests?status=contacted'),
+      ]);
+      setRows([...open.data, ...contacted.data].sort((a, b) => a.at.localeCompare(b.at)));
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof OpsError ? caught.message : 'Could not load the queue.');
+    } finally {
+      setLoading(false);
+    }
   }, [enabled]);
 
-  const update = useCallback(async (id: string, status: EnterpriseStatus) => {
-    await opsPatch<{ status: EnterpriseStatus }, { data: EnterpriseRequestRow }>(
-      `/enterprise-requests/${id}`,
-      { status },
-    );
-    // DROPPED FROM THE LIST, not re-rendered with a new label. This list is the OPEN queue;
-    // a row that has been contacted or closed is not open, and leaving it visible with a
-    // changed chip would make "what is left to do" a thing the operator has to read for.
-    setRows((current) => current.filter((row) => row.id !== id));
-  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  return { rows, loading, update };
+  /**
+   * THE FAILURE IS KEPT, and that is the fix for the bug this shipped with.
+   *
+   * Every one of these used to `await` a request whose rejection nobody caught — the page
+   * called `void queue.update(...).finally(...)` with no `.catch`, so a 403, a 409 or a 500
+   * produced an unhandled promise rejection and **nothing at all on screen**. The operator
+   * pressed Contacted and the row sat there. A write that can fail silently is worse than one
+   * that fails loudly, because the second kind gets reported.
+   */
+  const run = useCallback(
+    async (work: () => Promise<void>) => {
+      setError(null);
+      try {
+        await work();
+      } catch (caught) {
+        setError(caught instanceof OpsError ? caught.message : 'That did not go through.');
+        // Re-read rather than guess. A refused write leaves the server's rows where they were,
+        // and a local list patched on the assumption it succeeded is a list that lies.
+        await load();
+      }
+    },
+    [load],
+  );
+
+  const update = useCallback(
+    (id: string, status: EnterpriseStatus) =>
+      run(async () => {
+        const response = await opsPatch<{ status: EnterpriseStatus }, { data: EnterpriseRequestRow }>(
+          `/enterprise-requests/${id}`,
+          { status },
+        );
+        // `closed` LEAVES THE QUEUE; `contacted` STAYS IN IT WITH ITS NEW STATE. The queue is
+        // outstanding work, and the whole point of the Contacted verb is to record progress on
+        // something still outstanding — dropping the row would make the two buttons do the
+        // same visible thing.
+        setRows((current) =>
+          response.data.status === 'closed'
+            ? current.filter((row) => row.id !== id)
+            : current.map((row) => (row.id === id ? response.data : row)),
+        );
+      }),
+    [run],
+  );
+
+  const approve = useCallback(
+    (id: string) =>
+      run(async () => {
+        await opsPost<undefined, { data: EnterpriseRequestRow }>(
+          `/enterprise-requests/${id}/approve`,
+        );
+        // Approving closes the request AND moves the plan, so the row leaves the queue.
+        setRows((current) => current.filter((row) => row.id !== id));
+      }),
+    [run],
+  );
+
+  return { rows, loading, error, update, approve };
 }
 

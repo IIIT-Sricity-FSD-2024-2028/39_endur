@@ -6,7 +6,7 @@ import { urlFor } from '../files/service.js';
 import { prisma } from '../../db/client.js';
 import { runInTransaction, type Tx } from '../../db/tx.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
-import { grantsForLevel, presetFor, type Level } from '../../presets/index.js';
+import { grantsForLevel, levelForRole, presetFor } from '../../presets/index.js';
 import { clearGrantCache } from '../../authz/index.js';
 
 export async function readOrg(orgId: string): Promise<OrgView> {
@@ -123,11 +123,13 @@ export async function setupOrg(
       roleIds.push(created.id);
     }
 
-    // 3 · the derived grant matrix (50 §1). A preset may define more than four roles;
-    // everything below the fourth gets the level-4 row rather than nothing, because a role
-    // with no grants at all reads as a broken org rather than a deliberate one.
+    // 3 · the derived grant matrix (50 §1). The four rows are POSITIONS IN THE FEEDBACK LOOP,
+    // not positions in the list — L3 is the reviewee and L4 the respondent — so a ladder
+    // longer than four maps its BOTTOM role to 4 and its middle to 3 (`DEC-112`). Counting
+    // from the top put six roles of a ten-role college on the respondent row and left a
+    // Professor with five capabilities.
     for (const [index, roleId] of roleIds.entries()) {
-      const level = Math.min(index + 1, 4) as Level;
+      const level = levelForRole(index, roleIds.length);
       await tx.grant.createMany({
         data: grantsForLevel(level).map((grant) => ({
           orgId,

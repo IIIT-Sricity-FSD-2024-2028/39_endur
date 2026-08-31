@@ -882,12 +882,42 @@ everywhere, not to discover it when they next visit settings.
 
 `noun` comes from `useLabels()`: a hotel is over on *properties*, not on "subjects" (INV-001).
 
+### `<PlanNoticeBanner>`  ·  **BUILT 2026-08-31 (`T-108`)**
+```ts
+{}   // it fetches its own summary — see below
+```
+The plan is about to run out, or it already did (`16` §7d, `DEC-113`). Rendered by `<AppShell>`
+beside `<OverLimitBanner>` and for the identical reason: an expiry a customer only meets by
+navigating to `/app/plan` is an expiry they meet as an unexplained `402` on a screen they were
+using. **The end date had been printed on `/app/plan` since `T-058` and the owner still reported
+*"nothing happens"*.**
+
+**No props, which is the exception worth justifying.** Every other component in this catalogue
+takes its data. This one is chrome the shell renders on every console page, and threading a
+billing summary through `<AppShell>` would put a billing fetch in the layout for the benefit of
+one strip — including for the readers who cannot see billing at all. It fetches its own, once,
+**only when the caller holds `billing.read`**, and renders nothing on failure: a console that
+cannot load a plan summary must still show the page the reader asked for.
+
+**Two states, two kinds of sentence.** *Ending* — the last seven days of a paid period, warm ink,
+a date and an action. *Lapsed* — past tense, and it **names the tier that was lost**, which is
+the whole reason `lapsed_from` is a column and not a boolean. It carries **no date**: the row's
+`period_start` is when the lapse was *noticed*, not when the plan ran out.
+
+`noticeFor()` and `daysUntil()` ship beside it and are exported, for `unreadFor()`'s reason —
+the rules are boundary conditions (the day itself, the day after, one day outside the window)
+and are worth asserting without rendering a shell.
+
 ### `<OrgRow>`  ·  **BUILT 2026-08-26 (`T-066`)**
 ```ts
 { org: PlatformOrgSummary;
   onOpen: (id: string) => void;
-  chips?: ('quiet' | 'overSeats')[] }
+  chips?: OrgChip[] }              // 'quiet' | 'overSeats' | 'lapsed' | 'endingSoon'
 ```
+**`lapsed` and `endingSoon` joined at `T-108` (`DEC-113`).** The tier printed on the row is the
+**effective** one, so a lapsed organisation reads as `bronze` — correct, and on its own
+indistinguishable from a customer who *chose* Bronze. The chip is that difference, and the
+difference is the whole of what an operator wants from the estate list after an expiry.
 One organisation in `70`'s estate list. **`PlatformOrgSummary` carries counts only** — the
 prop type is where INV-011 is enforced for this component, since a row that cannot receive
 response content cannot render it.

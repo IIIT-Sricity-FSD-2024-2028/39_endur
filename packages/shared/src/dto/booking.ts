@@ -12,14 +12,14 @@
 //      booking — and a response is anonymous forever (INV-006). DEC-090 keeps the two apart
 //      at every layer, and this file is the layer a client can see.
 import { z } from 'zod';
-import { dto, Id } from './common.js';
+import { Id, dto, nameField } from './common.js';
 
 /** The public token in a `/book/:token` link, and the booker's own cancel key. Both are
  *  8 characters of the campaign alphabet (DEC-017), so both validate the same way. */
 export const BookingToken = z.string().min(6).max(64);
 
 export const CreateBookableBody = z.object({
-  name: z.string().min(1).max(140),
+  name: nameField(140),
   description: z.string().max(2000).optional(),
   /** A bookable often IS a subject — a room, a machine, a person. Optional, never required:
    *  plenty of bookable things are nobody's reviewee. */
@@ -70,7 +70,7 @@ export type PutSlotsBody = z.infer<typeof PutSlotsBody>;
  */
 export const CreateBookingBody = z.object({
   slotId: Id,
-  name: z.string().min(1).max(140),
+  name: nameField(140),
   email: z.string().email().max(200),
 });
 export type CreateBookingBody = z.infer<typeof CreateBookingBody>;

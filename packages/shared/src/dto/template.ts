@@ -4,7 +4,7 @@
 // entity and there never will be. Adding a seventh kind means touching both unions below
 // plus six editors and six inputs — which is exactly the friction DEC-010 intends.
 import { z } from 'zod';
-import { dto, Id, PageQuery, SearchQuery } from './common.js';
+import { Id, PageQuery, SearchQuery, dto, nameField, textField } from './common.js';
 
 export const QuestionKind = z.enum(['rating', 'single', 'multi', 'text', 'yesno', 'nps']);
 export type QuestionKind = z.infer<typeof QuestionKind>;
@@ -23,12 +23,12 @@ export const QuestionConfig = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('single'),
-    options: z.array(z.string().min(1).max(120)).min(2).max(10),
+    options: z.array(textField(120).min(1)).min(2).max(10),
     allowOther: z.boolean().default(false),
   }),
   z.object({
     kind: z.literal('multi'),
-    options: z.array(z.string().min(1).max(120)).min(2).max(10),
+    options: z.array(textField(120).min(1)).min(2).max(10),
     maxSelections: z.number().int().positive().optional(),
   }),
   z.object({
@@ -51,15 +51,15 @@ export type QuestionConfig = z.infer<typeof QuestionConfig>;
 export const QuestionInput = z.object({
   id: Id.optional(),
   kind: QuestionKind,
-  text: z.string().min(1).max(300),
+  text: nameField(300),
   config: QuestionConfig,
   required: z.boolean().default(false),
 });
 export type QuestionInput = z.infer<typeof QuestionInput>;
 
 export const CreateTemplateBody = z.object({
-  name: z.string().min(1).max(120),
-  category: z.string().min(1).max(60),
+  name: nameField(120),
+  category: nameField(60),
   description: z.string().max(400).optional(),
 });
 export type CreateTemplateBody = z.infer<typeof CreateTemplateBody>;

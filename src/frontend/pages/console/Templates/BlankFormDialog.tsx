@@ -5,7 +5,9 @@
 // both are the problem the library exists to prevent — but refusing it outright would be
 // the product telling somebody who knows exactly what they want that they may not have it.
 import { useState } from 'react';
+import { nameField } from '@endur/shared';
 import type { CreateTemplateBody } from '@endur/shared';
+import { isValid } from '../../../lib/validate.js';
 
 export function BlankFormDialog({
   onCreate,
@@ -19,7 +21,7 @@ export function BlankFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ready = name.trim().length > 0 && category.trim().length > 0;
+  const ready = isValid(nameField(120), name) && isValid(nameField(60), category);
 
   return (
     <div className="dialog-backdrop" onMouseDown={onCancel}>

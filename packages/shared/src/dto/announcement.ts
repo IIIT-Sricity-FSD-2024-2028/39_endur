@@ -5,13 +5,13 @@
 // recipients, "everyone in Housekeeping" becomes a snapshot somebody has to maintain by
 // hand, and the org graph stops being the answer to who anything reaches.
 import { z } from 'zod';
-import { dto, Id } from './common.js';
+import { Id, dto, nameField, textField } from './common.js';
 import { AudienceRule } from './campaign.js';
 
 export const CreateAnnouncementBody = z.object({
-  title: z.string().min(1).max(140),
+  title: nameField(140),
   /** Plain text, never HTML — see the schema comment. Long enough for a real notice. */
-  body: z.string().min(1).max(5000),
+  body: textField(5000).min(1),
   audience: AudienceRule,
 });
 export type CreateAnnouncementBody = z.infer<typeof CreateAnnouncementBody>;

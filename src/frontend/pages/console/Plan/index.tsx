@@ -296,6 +296,27 @@ export default function Plan(): JSX.Element {
               {labels.subject.one.toLowerCase()} counts once.
             </p>
 
+            {/* THE PLAN THAT RAN OUT — DEC-113, `16` §7d.
+                Above the scheduled-move block and below the period, because it is a fact about
+                the period that just ended. It is shown to EVERY reader with `billing.read`,
+                unlike the block beneath it: what happened to the plan is not an action, and a
+                reader who cannot change the plan still needs to know why the analysis pages
+                stopped opening. The remedy it points at is the picker below, which already
+                carries a Join on every tier above bronze — there is no separate renew button,
+                because rejoining IS the join (`POST /billing/tier`, DEC-113). */}
+            {summary.lapsedFrom && (
+              <p className="plan-lapsed" role="status">
+                <Icon name="plan" size={16} />
+                <span>
+                  Your <strong>{tierName(catalogue.find((plan) => plan.tier === summary.lapsedFrom))}</strong>{' '}
+                  plan ended and this organisation moved to{' '}
+                  <strong>{tierName(catalogue.find((plan) => plan.tier === summary.tier))}</strong>.
+                  Nothing you have collected has been deleted — choose a plan below to get those
+                  screens back.
+                </span>
+              </p>
+            )}
+
             {/* THE SCHEDULED MOVE DOWN — DEC-098, 49 § Interactions.
                 It sits here, under the period it depends on, rather than on a card in the
                 picker below: what it changes is not which plan you may buy, it is what happens

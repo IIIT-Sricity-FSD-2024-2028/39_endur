@@ -1,11 +1,11 @@
 // Role DTOs. 13 § Roles and powers, 33.
 import { z } from 'zod';
-import { dto, Id } from './common.js';
+import { Id, dto, nameField } from './common.js';
 
-export const CreateRoleBody = z.object({ name: z.string().min(1).max(60) });
+export const CreateRoleBody = z.object({ name: nameField(60) });
 export type CreateRoleBody = z.infer<typeof CreateRoleBody>;
 
-export const UpdateRoleBody = z.object({ name: z.string().min(1).max(60) });
+export const UpdateRoleBody = z.object({ name: nameField(60) });
 export type UpdateRoleBody = z.infer<typeof UpdateRoleBody>;
 
 /**

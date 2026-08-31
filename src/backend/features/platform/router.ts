@@ -56,6 +56,7 @@ import {
   createOperator,
   estate,
   exportOperatorLogFile,
+  approveEnterpriseRequest,
   readEnterpriseQueue,
   updateEnterpriseRequest,
   listOperators,
@@ -369,6 +370,25 @@ platformRouter.patch(
       body: { status: EnterpriseStatus };
     };
     void updateEnterpriseRequest(req, params.id, body.status)
+      .then((row) => res.json({ data: row }))
+      .catch(next);
+  },
+);
+
+/**
+ * APPROVE — grant Enterprise and record the sale in one transaction. DEC-111, T-106.
+ *
+ * `platform.enterprise.update`, not `platform.plan.override`: this is the queue's own verb, and
+ * the two are deliberately different actions. An override is a support action that takes no
+ * money; an approval is a sale at the catalogue price. Holding one should not imply the other.
+ */
+platformRouter.post(
+  '/enterprise-requests/:id/approve',
+  validate(PlatformOrgDto),
+  requirePlatform('platform.enterprise.update'),
+  (req, res, next) => {
+    const { params } = req.data as { params: { id: string } };
+    void approveEnterpriseRequest(req, params.id)
       .then((row) => res.json({ data: row }))
       .catch(next);
   },

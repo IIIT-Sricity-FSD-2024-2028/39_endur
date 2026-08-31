@@ -10,6 +10,28 @@ Source: `design_specs/BUILD_PLAN_EVAL1.md` §3, §6, §7
 
 ## 1. Industry presets
 
+
+### Which row a role starts from — `DEC-112`, amended 2026-08-31
+
+**The four rows are positions in the feedback loop, not positions in the list.** L3 is the
+reviewee — the person feedback is about — and L4 is the respondent who gives it. The mapping was
+`Math.min(index + 1, 4)`, which reads those two labels off whoever happens to sit fourth and
+fifth; in a ten-role college that is a Professor and an Assistant Professor, **both reviewees,
+both handed the respondent's row**. Six of ten roles came out of the wizard with five
+capabilities.
+
+`levelForRole(index, roleCount)` in `presets/grant-matrix.ts`:
+
+| Roles | Mapping |
+|---|---|
+| **4 or fewer** | `index + 1` — unchanged, so every preset below and every existing organisation is exactly where it was |
+| **more than 4** | top three keep 1, 2, 3 · **the bottom role takes 4** · everything between takes 3 |
+
+**Not a proportional spread.** `ceil(i / n * 4)` reads neatly and puts a Dean on level 1, which
+carries `org.delete`, `role.create` and `grant.update`. Level 3 is `own_unit` almost everywhere,
+so being generous there costs a Sports Officer who can run a campaign in their own unit — that
+is the job. Being generous at level 1 costs the organisation.
+
 A from-scratch wizard takes ten minutes on stage. That is too slow, and silence kills a demo.
 Presets pre-fill roles, unit structure, labels and starter templates — all still editable — so
 live creation becomes ~90 seconds and customizability is still fully demonstrated, because you
@@ -269,6 +291,17 @@ npm run db:reset           drop → migrate → seed
 npm run ops:code           a live operator TOTP, so MFA is a feature and not an obstacle
 npm run demo:contention    N phones, one slot — the capacity proof, run live (§5, step 10)
 ```
+
+**A DATABASE SEEDED MORE THAN A MONTH AGO NOW LAPSES — `DEC-113`, and it is worth knowing before
+a rehearsal.** The seed writes `newPeriod()`, which is one calendar month (`DEC-096`), so
+Northfield's Gold period ends a month after the day you seeded. Since `T-108` that is no longer
+a date nothing reads: the first request after it moves the organisation to Bronze, and the Gold
+demo surfaces start `402`ing — which is the product working, and exactly the wrong thing to
+discover live.
+
+**The fix is the one already rehearsed:** `npm run db:reset` before a demo, which is what `§`
+above asks for anyway. The seed is deliberately **not** given a longer period — a demo running on
+a period the product does not sell would be a demo of something else.
 
 `demo:contention` takes `--n` (default 40), `--capacity` (default 10) and `--keep`. It needs
 the API running. It registers a throwaway organisation at gold, opens one slot through the

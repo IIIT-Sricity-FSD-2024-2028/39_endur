@@ -1,6 +1,6 @@
 // Campaign DTOs. 13 § Campaigns, 38, 14 §1, DEC-016.
 import { z } from 'zod';
-import { dto, Id, PageQuery } from './common.js';
+import { Id, PageQuery, dto, nameField, textField } from './common.js';
 
 /**
  * Status is DERIVED, never stored (DEC-016). These are the four values that derivation can
@@ -41,7 +41,7 @@ export type CampaignAccess = z.infer<typeof CampaignAccess>;
 
 export const CreateCampaignBody = z
   .object({
-    name: z.string().min(1).max(120),
+    name: nameField(120),
     templateId: Id,
     subjectIds: z.array(Id).min(1).max(200),
     audience: AudienceRule,
@@ -97,13 +97,13 @@ export type QuickCampaignPurpose = z.infer<typeof QuickCampaignPurpose>;
 export const QuickCampaignBody = z
   .object({
     purpose: QuickCampaignPurpose,
-    name: z.string().min(1).max(120),
+    name: nameField(120),
     /**
      * Poll only. The same 2-10 bound `QuestionConfig`'s `single` kind already enforces —
      * restated here so the request is refused at the edge with a field path, rather than
      * deeper in where the error would name a question the caller never sent.
      */
-    options: z.array(z.string().min(1).max(120)).min(2).max(10).optional(),
+    options: z.array(textField(120).min(1)).min(2).max(10).optional(),
     endsAt: z.coerce.date().optional(),
   })
   .refine((body) => body.purpose !== 'poll' || (body.options?.length ?? 0) >= 2, {

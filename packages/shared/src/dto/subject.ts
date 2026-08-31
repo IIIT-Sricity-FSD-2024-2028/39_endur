@@ -4,11 +4,11 @@
 // bus route. `linkedUserId` turns "review the thing" into "review the person" with no
 // second code path — which is why there is no separate reviewee entity anywhere.
 import { z } from 'zod';
-import { dto, Id, PageQuery, SearchQuery } from './common.js';
+import { Id, PageQuery, SearchQuery, dto, nameField } from './common.js';
 import type { CampaignStatus } from './campaign.js';
 
 export const CreateSubjectBody = z.object({
-  name: z.string().min(1).max(120),
+  name: nameField(120),
   unitId: Id,
   type: z.string().max(40).default('general'),
   /** Set it and the subject IS a person, for review purposes. Nothing else changes. */

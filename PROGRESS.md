@@ -5,7 +5,117 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
-UPDATED   2026-08-31  (STAGE 11 COMPLETE -- ALL NINE TASKS BUILT, T-097 THROUGH T-105.
+UPDATED   2026-08-31  (T-108 -- A PLAN THAT RUNS OUT NOW ACTUALLY RUNS OUT. DEC-113.
+                       ROOT RUNNER: 1577/1577 across 120 files. typecheck 0, lint 0, build
+                       passes, drift + vocab clean. ONE MIGRATION -- run `npm run db:migrate`
+                       after pulling, or the API 500s on a column Prisma knows about and the
+                       database does not.
+                       !! `db:migrate` IS `migrate deploy` AS OF TODAY, not `migrate dev`.
+                       running the step above on the old script generated a migration that
+                       would have dropped the GIN indexes, the DEFERRABLE unique and the
+                       `sessions` table -- everything N-013 warns about. it failed on one
+                       DROP INDEX and rolled back whole; nothing was lost. N-073, 03 §5.
+                       !! THE REPORT: *"on plan expiration, nothing happens for the client,
+                       they are able to continue to use the features granted by the plan,
+                       and there is no option to change the plan on expiration. the entire
+                       possibility of plan expiration is not designed at all for both client
+                       and admin."* every word true.
+                       !! TWO CAUSES, AND ONLY FIXING BOTH CLOSES IT. `applyExpiredDowngrade`
+                       returned early unless a downgrade had been SCHEDULED, so an org that
+                       let the month run out kept its tier with period_end frozen in the
+                       past, indefinitely. AND `requireEntitlement` selected `tier` ALONE --
+                       so even a correct row would not have helped an organisation that
+                       never opens /app/plan, which is most of them, because the gate is
+                       what an ordinary user meets. the load-bearing test is the one that
+                       402s a Gold surface with no read of /billing first.
+                       !! THE DOCS HAD BEEN CONTRADICTING THEMSELVES. 16 §7: *"expiry moves
+                       the org to Bronze, never to zero access."* DEC-080: *"nothing renews,
+                       nothing expires."* the scope note is what shipped. DEC-113 resolves it
+                       in §7's favour and supersedes both that line and DEC-098's *"pending
+                       _tier is never consulted by requireEntitlement"* -- the gate consults
+                       it now, through ONE function both readers share, which is STRONGER
+                       than two readers trusting one column that goes stale.
+                       !! AND IT WOULD HAVE OPENED A REVENUE HOLE. DEC-097 charges the
+                       DIFFERENCE because the customer already paid for the tier they are
+                       leaving; after a lapse they did not, so bronze -> gold would bill
+                       Rs 900 for a Rs 999 plan EVERY MONTH -- making a deliberate lapse
+                       permanently cheaper than staying on the plan. `pricedFrom` splits the
+                       two jobs `fromTier` was doing: the MOVE is still bronze -> gold, the
+                       PRICE is measured against nothing. still no amount on any request.
+                       !! OWNER DECISIONS, TAKEN 31 AUG: lapse to Bronze and rejoin with the
+                       existing join button (no /billing/renew); BRONZE ROLLS FREE, so it
+                       earns Rs 99 ONCE and not Rs 99 a month; a seven-day warning banner
+                       rather than a grace period.
+                       !! THE BANNER IS THE POINT. /app/plan has printed the period's end
+                       date since T-058 and the owner still met "nothing happens" -- a fact
+                       nobody navigates to is a fact nobody has. <PlanNoticeBanner> is in
+                       <AppShell>, on every console page, gated on billing.read so it never
+                       fires a request that would 403.
+                       5 of the 7 new tests FAIL against the old rule -- checked by reverting
+                       effectiveTier and re-running. the 2 that pass both ways are the
+                       deliberate guards: bronze is never taken away, and an ordinary upgrade
+                       still pays the difference.)
+
+UPDATED   2026-08-31  (T-107 -- FOUR BUGS FROM THE OWNER, AFTER PULLING THE MATE'S BRANCH.
+                       ROOT RUNNER: 1561/1561 across 118 files. typecheck 0, lint 0, build
+                       passes, drift + vocab clean. DEC-110, DEC-111, DEC-112.
+                       !! 1. THE SIGN-UP FORM WALKED PEOPLE THROUGH A PAYMENT SCREEN IN
+                       ORDER TO REJECT THEM. `/start` step 1 did setStep('plan')
+                       UNCONDITIONALLY, so digits in every field advanced, chose a plan,
+                       ran the checkout, and met a 422 afterwards. registration and the
+                       capture are ONE transaction, so nothing was created and nothing was
+                       charged -- the owner noticed earnings did not move, and that half
+                       was the system WORKING. the client now runs
+                       RegisterBody.pick(...), which is LITERALLY the schema the server
+                       parses, not a copy of it.
+                       !! 2. AND THE SERVER WAS LETTING IT THROUGH ANYWAY. `min(1)` accepts
+                       "12345" and accepts "   ", in each of the twenty-odd DTOs that
+                       spelled it out -- so this was never only a client gap, and fixing
+                       only the client would have left POST /people happy to create a
+                       person called `404`. one `nameField(max)`: trimmed, at least one
+                       LETTER (\p{L} with the u flag -- every alphabet, not [A-Za-z]),
+                       bounded.
+                       A FIRST PASS APPLIED IT BY REGEX AND REACHED THREE THINGS IT MUST
+                       NOT: passwords (must not be trimmed, and composition rules are
+                       deliberately refused -- Credentials' own comment), poll options
+                       ("2025" is a legitimate option) and machine ids. `textField` is the
+                       trimmed-and-bounded one for free text; a test that a numeric poll
+                       option still saves is what stops the next tidy-up.
+                       !! 3. ENDUR WAS NOT CHARGING FOR ENTERPRISE, AND THE NUMBER WAS
+                       ALWAYS ZERO. the queue could only record a conversation: the owner
+                       closed a request, went to the org's page and set the tier through
+                       platform.plan.override -- WHICH DELIBERATELY WRITES NO payments ROW.
+                       so the one tier the product charges Rs 4,999 for earned nothing and
+                       every Enterprise customer was invisible to /ops/earnings. Approve
+                       now grants the tier AND captures, in one transaction. it NAMES NO
+                       AMOUNT -- the price comes from PLAN_OPTIONS server-side -- which is
+                       why it does not reopen "an operator could invent revenue", and why
+                       adding Payment to platform/db.ts's write allowlist is safe.
+                       overridePlan STAYS money-free and a test pins that.
+                       AND THE "nothing happens" WAS LITERAL: the page called
+                       `void queue.update(...).finally(...)` with NO .catch, so a 403 or a
+                       409 produced an unhandled rejection and nothing on screen. it also
+                       fetched only `open`, so Contacted made the row VANISH -- which reads
+                       as a failed click rather than as progress.
+                       !! 4. KAVYA REDDY'S EMPTY CONSOLE WAS A ONE-LINE MAPPING. the grant
+                       matrix's four rows are POSITIONS IN THE FEEDBACK LOOP, not positions
+                       in the list -- its own comments say L3 is the REVIEWEE and L4 the
+                       RESPONDENT -- and the code read `Math.min(index + 1, 4)`. a ten-role
+                       college put SIX ROLES on the respondent row: five capabilities, 403
+                       on campaigns. levelForRole() gives the BOTTOM role 4 and the middle
+                       3. four-role orgs are byte-for-byte unchanged (a test pins it).
+                       THIS ALSO CLOSES F2 WITHOUT TOUCHING EITHER RULE F2 NAMED -- the
+                       Gold loop was unreachable AND ungrantable for a reviewee below the
+                       fourth; it is reachable now because the reviewee is on level 3.
+                       THE mate's OWN RUN DOC HAD FOUND BOTH (F4, F2) AND ONLY WARNED.
+                       !! A WARNING WAS PASSING FOR THE WRONG REASON. thin_starter_row
+                       filtered on "is this the highest level number", which is true of the
+                       bottom role under ANY mapping -- so it kept passing while naming one
+                       role out of the six that were actually thin. it asks levelForRole()
+                       now, the same function that assigns the grants.
+                       NOTE the mate's branch was pulled onto Stage 11; nothing was lost.
+                       NEXT: T-045 IS STILL UNRUN AND IS STILL THE LARGEST RISK ON THE DAY.
+                       Earlier: STAGE 11 COMPLETE -- ALL NINE TASKS BUILT, T-097 THROUGH T-105.
                        ROOT RUNNER: 1524/1524 across 115 files. typecheck 0, lint 0, build
                        passes, drift + vocab clean.
                        !! DEC-102 HAD TO BE CORRECTED AGAINST ITSELF, and this is the one
@@ -2080,6 +2190,18 @@ middleware first.
                 Announcements and booking stayed on their existing tier gates on purpose
                 (D-012's one-org-per-tier demo of the 402 wall still needs Riverside on
                 bronze and The Grand Palace on silver to lack the paid ones)
+[x] T-108  A  A PLAN THAT RUNS OUT ACTUALLY RUNS OUT (DEC-113)
+              ← owner: "on plan expiration nothing happens for the client, they are able to
+                continue to use the features granted by the plan, and there is no option to
+                change the plan on expiration." TWO CAUSES: readBilling returned early
+                unless a downgrade had been SCHEDULED, and requireEntitlement selected
+                `tier` alone and never read the date — so an org that never opens /app/plan
+                kept a plan it stopped paying for. one effectiveTier() shared by the gate,
+                readBilling and the estate list; subscriptions.lapsed_from so the page can
+                NAME what was lost; kind: 'lapse' beside 'expiry'; pricedFrom so a rejoin
+                pays ₹999 and not ₹900. <PlanNoticeBanner> in <AppShell> — the end date was
+                already on /app/plan and it still read as "nothing happens".
+                ONE MIGRATION: 20260831140000_plan_lapse
 ```
 
 ### Why is that item still greyed? — one row per "Soon"
@@ -2276,7 +2398,49 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-31 (latest) · five UI reports — the booking screens and the modal layer
+### 2026-08-31 (latest) · `npm run db:migrate` was the one command N-013 warns about
+
+**Found by the owner running the step `T-108` told them to run.** `npm run db:migrate` ran
+`prisma migrate dev`. It prompted for a migration name, generated one, and failed applying it:
+
+```
+Database error code: 2BP01
+ERROR: cannot drop index questions_template_id_position_key because constraint
+       questions_template_id_position_key on table questions requires it
+```
+
+**Nothing was lost, and that was luck rather than design.** The generated migration would have
+dropped `answers_question_numeric`, `campaigns_audience_rule_gin`, `nodes_meta_gin`, the
+DEFERRABLE unique on `questions(template_id, position)`, five foreign keys, and
+`DROP TABLE sessions` — the store connect-pg-simple owns (DEC-014). Postgres refuses to drop an
+index a constraint needs, so the fourth statement errored and Prisma rolled the file back whole:
+`applied_steps_count` 0, and all four objects verified still present afterwards. **N-013 is the
+note that says if that file had committed, the app would still have run.** The one statement that
+happened to be illegal is the whole reason this is a report and not a recovery.
+
+**Cause: schema.prisma is drifted from the database permanently and on purpose.** ~90 lines of
+hand-written SQL in the init migration are things Prisma cannot express. `migrate dev` diffs the
+schema against the database and offers to erase the difference. `03` §5 has said
+*"`migrate deploy`, never `migrate dev`"* since the suite was written — but it scoped the sentence
+to the **test** run, so the everyday script kept saying `dev` and nobody reread it.
+
+**Fixed:** `db:migrate` is now `prisma migrate deploy && prisma generate` (the `generate` half
+keeps the ergonomics `dev` had, and N-072's stale-client fault with it). Migrations here are
+hand-written, so `dev` never had a job `deploy` does not do.
+
+- the failed row was cleared with `prisma migrate resolve --rolled-back` — **a failed row blocks
+  every later migration until it is**, which is the part worth remembering
+- `20260831140000_plan_lapse` was already applied last session; the step in the `T-108` header
+  was a no-op, and running it is what surfaced this
+- verified from empty against a scratch database, not the owner's: 17 migrations apply clean and
+  the sessions table, all three special indexes, the deferrable unique and all four triggers are
+  present afterwards. Scratch database dropped.
+- `10` §11's acceptance item said *"`prisma migrate dev` runs clean from an empty database"* — it
+  now says `db:reset`, since the old wording asked for the command that breaks it
+
+**Ledger:** N-073. `03` §5's rule widened past the test run and told why the scoping mattered.
+
+### 2026-08-31 · five UI reports — the booking screens and the modal layer
 
 Five screenshots from the owner, and four of the five turned out to be the same class of
 fault: a layout that was written correctly and then never took effect.
@@ -2391,6 +2555,140 @@ working. `N3` is a naming observation about `POST /authz/simulate`, no change.
 the full parallel run exhausts argon2's memory on this machine and dies with
 `Memory allocation error`, unrelated to these changes). `router/boundaries.test.tsx` fails on
 the frontend before and after these changes — pre-existing, an undici/AbortSignal mismatch.
+
+### 2026-08-31 · `T-108` — plan expiry, which had never been designed
+
+**Owner report, and it was entirely right:** *"On plan expiration, nothing happens for the
+client, they are able to continue to use the features granted by the plan, and there is no
+option to change the plan on expiration. The entire possibility of plan expiration is not
+designed at all for both client and admin."*
+
+**It was scoped out on purpose and then contradicted in writing.** `DEC-080` said *"nothing
+renews, nothing expires, nothing dunns"*; `16` §7 said *"expiry moves the org to Bronze, never
+to zero access"*. The scope note is what shipped, and the rule sat there unbuilt for a week.
+`DEC-113` resolves it in §7's favour.
+
+**Two causes, and fixing either alone would have left the bug in place.**
+
+1. `applyExpiredDowngrade` returned early unless a downgrade had been *scheduled* — one line,
+   `if (!pending || !periodHasEnded(...)) return row`. An organisation that simply let the
+   month run out kept its tier with `period_end` frozen in the past, indefinitely.
+2. `requireEntitlement` selected `tier` **alone**. Even a corrected row would not have closed
+   it for an organisation that never opens `/app/plan` — which is most of them — because the
+   gate is what an ordinary user actually meets. **This is the load-bearing test in
+   `lapse.test.ts`:** a Gold surface `402`s the moment the period ends, with no read of
+   `/billing` first, and the row is *not* written by that request.
+
+**One decision, three readers.** `billing/effective.ts` `effectiveTier(row)` — the gate reads
+it and never writes; `readBilling` reads it and persists it; the operator estate reads it so
+`/ops` never shows a tier the API has stopped serving. `DEC-098`'s property was *"the gate and
+the page read the same COLUMN"*, and a column stops answering the moment a date passes. It is
+now *"they compute the same ANSWER"*, which is what `49` § Interactions was protecting.
+
+**The revenue hole this would have opened, caught before it shipped.** `DEC-097` charges the
+*difference* because the customer already paid for the tier they are leaving. After a lapse
+they have not — the Bronze is free — so a rejoin priced Bronze → Gold bills **₹900 for a ₹999
+plan, every month**, making a deliberate lapse permanently cheaper than staying on the plan.
+`recordPayment` grew `pricedFrom`: the move is still recorded as Bronze → Gold, only the price
+is measured against nothing. Two tests, one for the fix and one guarding that ordinary upgrades
+still pay the difference.
+
+**Owner decisions taken this session** (all three recorded in `DEC-113`): lapse to Bronze and
+rejoin through the join button that already exists — no `/billing/renew`; **Bronze rolls free**,
+so it earns ₹99 once rather than ₹99 a month; a seven-day warning banner rather than a grace
+period.
+
+**The banner is the actual answer to the report.** `/app/plan` has printed the period's end date
+since `T-058` and the owner still met *"nothing happens"* — a fact nobody navigates to is a fact
+nobody has. `<PlanNoticeBanner>` renders in `<AppShell>` on every console page, gated on
+`billing.read` so a reader who cannot see billing is neither shown it nor made to fire a request
+that would `403`.
+
+**Operator half:** the estate row shows the effective tier with `Lapsed` / `Ending soon` chips,
+and `/ops/orgs/:id` prints the period end above the picker. An override now clears the lapse and
+starts a fresh period — without that, granting a tier onto an expired row would lapse it again
+on the very next read, undoing the support action within the second.
+
+**Also fixed on the way:** `/ops/earnings` excluded `kind: 'expiry'` with a `not`, which would
+have silently counted every ₹0 lapse as revenue the day this landed. It is a `notIn` list now,
+so the next zero-amount kind is a name added to one array.
+
+**Two existing tests changed, both correctly.** `downgrade.test.ts`'s *"is cancelled by paying to
+move up"* asserted the tier was still Gold after expiry — that was only ever evidence because
+nothing happened at expiry. It now asserts the plan lapsed **from Gold**, with `kind: 'lapse'`
+and no `expiry` row, which is only true if the abandoned pending Bronze was genuinely gone.
+`platform.test.ts`'s INV-011 field-by-field list gained `periodEnd` and `lapsedFrom` — a date and
+a tier, neither able to carry a word a respondent wrote.
+
+**Verified:** 1577 tests across 120 files, typecheck 0, lint 0, `npm run build` passes, drift and
+vocab clean. **5 of the 7 new tests fail against the old rule**, checked by reverting
+`effectiveTier` and re-running.
+
+**One migration** — `20260831140000_plan_lapse`. Pulling this branch without `npm run db:migrate`
+gives a Prisma client that knows about `lapsed_from` and a database that does not.
+
+### 2026-08-31 · `T-107` — four bugs the owner found on the merged branch
+
+**`1561/1561` across `118` files**; typecheck 0, lint 0, build passes, both audits clean.
+`DEC-110`, `DEC-111`, `DEC-112`.
+
+**The sign-up form walked people through a payment screen in order to reject them.** `/start`
+step 1 was `setStep('plan')` with no check at all, so digits in every field advanced, chose a
+plan, ran the checkout, and met a 422 afterwards. Registration and the capture are one
+transaction, so nothing was created and nothing was charged — the owner noticed earnings did not
+move, and that half was the system working correctly.
+
+**And the server was letting it through anyway**, which is the part that matters more. `min(1)`
+accepts `"12345"` and accepts `"   "`, in each of the twenty-odd DTOs that spelled it out. Fixing
+only the client would have left `POST /people` happy to create a person called `404`. One
+`nameField(max)` now: trimmed, at least one letter, bounded. The letter test is `\p{L}` with the
+`u` flag — every alphabet, not `[A-Za-z]` — because a product that is generic across
+organisation types has no business being English-only about people's names.
+
+**A first pass applied that rule by regex and reached three things it must not.** Passwords
+(which must not be trimmed, and whose lack of composition rules is a deliberate decision the DTO
+argues for in its own comment), poll options (`"2025"` is a legitimate thing to choose between),
+and machine identifiers. `textField` is the trimmed-and-bounded one for free text, and a test
+that a numeric poll option still saves is what stops the next tidy-up doing it again.
+
+**Endur was not charging for Enterprise, and the number was always zero.** The queue could only
+record a conversation: the owner closed a request, went to the organisation's page, and set the
+tier through `platform.plan.override` — which deliberately writes no `payments` row. So the one
+tier the product charges ₹4,999 for earned nothing, and every Enterprise customer was invisible
+to `/ops/earnings`. **Approve** now grants the tier and captures in one transaction. It names no
+amount — the price is read from `PLAN_OPTIONS` server-side — which is why it does not reopen the
+"an operator could invent revenue" objection, and why adding `Payment` to `platform/db.ts`'s
+write allowlist is safe. `overridePlan` stays money-free and a test pins that.
+
+**And "clicking Contacted does nothing" was literal.** The page called
+`void queue.update(...).finally(...)` with **no `.catch`**, so any refusal became an unhandled
+rejection and produced nothing on screen. It also fetched only `open`, so a successful Contacted
+made the row vanish — which reads as a failed click rather than as progress. The queue now shows
+contacted rows with a chip, and keeps every failure.
+
+**Kavya Reddy's empty console was a one-line mapping.** The grant matrix's four rows are
+positions in the **feedback loop**, not positions in the list — its own comments say L3 is the
+reviewee and L4 the respondent — and the code read `Math.min(index + 1, 4)`. A ten-role college
+put **six roles on the respondent row**: five capabilities, 403 on the campaigns list.
+`levelForRole()` gives the bottom role 4 and the middle 3. Four-role organisations are
+byte-for-byte unchanged, and a test pins that.
+
+**That also closes `F2` without touching either rule `F2` named.** `reflection.*` is `self` at
+levels 1–3 and absent at 4, and the no-escalation guard still requires a granter holding the
+capability at `all` — so the Gold loop was unreachable *and* ungrantable for any reviewee below
+the fourth. Putting the middle of the ladder on level 3 hands it back. **The mate's own run doc
+had found both (`F4`, `F2`) and only warned about them.**
+
+**A warning was passing for the wrong reason.** `thin_starter_row` filtered on "is this the
+highest level number", which is true of the bottom role under *any* mapping — so it went on
+passing while naming one role out of the six that were actually thin. It asks `levelForRole()`
+now, the same function that assigns the grants, so the two cannot drift.
+
+**One flake of my own:** the Enterprise earnings test asserted an estate-wide lifetime total,
+passed alone and failed in the full parallel run because other files register organisations the
+whole time. It asserts this organisation's row on the page instead.
+
+---
 
 ### 2026-08-31 · `T-098`…`T-105` — the rest of Stage 11, in one pass
 

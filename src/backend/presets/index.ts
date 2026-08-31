@@ -50,5 +50,5 @@ export const estimateFor = (preset: Preset, templateName: string): number => {
 };
 
 export type { Preset, TemplateSeed, UnitSeed } from './types.js';
-export { GRANT_MATRIX, UNIVERSAL_SELF_GRANTS, grantsForLevel } from './grant-matrix.js';
+export { GRANT_MATRIX, UNIVERSAL_SELF_GRANTS, grantsForLevel, levelForRole } from './grant-matrix.js';
 export type { GrantSeed, Level } from './grant-matrix.js';

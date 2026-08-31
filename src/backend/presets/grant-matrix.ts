@@ -181,6 +181,52 @@ export const UNIVERSAL_SELF_GRANTS: GrantSeed[] = [
   { capability: 'person.update', scope: 'self' },
 ];
 
+/**
+ * WHICH MATRIX ROW A ROLE STARTS FROM, given its position and how many roles there are.
+ * `DEC-112`, `T-107`, `50` §1.
+ *
+ * IT USED TO BE `Math.min(index + 1, 4)`, AND THAT IS THE BUG. `GRANT_MATRIX` describes four
+ * levels; a ten-role college — Director, Dean, HoD, Professor, Assistant Professor, Hostel
+ * Manager, Mess Manager, Sports Officer, Support Staff, Student — put **six roles onto the
+ * level-4 row**, which is the RESPONDENT row: `org.read`, `subject.read own_unit`,
+ * `announcement.read`, and the two universal self-grants. Five capabilities.
+ *
+ * So a Professor signed in and got an empty console. The demo run recorded it as F4 —
+ * *"the Professor gets 403 on the campaigns list and holds only 5 capabilities; a Student also
+ * holds 5"* — and it was recovered by hand with thirty grant cells.
+ *
+ * THE FOUR LEVELS WERE NEVER POSITIONS, THEY WERE ROLES IN THE FEEDBACK LOOP, and the matrix
+ * says so all the way down: L3 is *"the REVIEWEE (the person feedback is about)"* and L4 is
+ * *"the RESPONDENT-level role (the person who gives it)"*. Counting from the top makes those
+ * two labels land on whoever happens to sit fourth and fifth, which in a real ladder is a
+ * Professor and an Assistant Professor — both reviewees, both handed the respondent's row.
+ *
+ * SO THE LAST ROLE IS THE RESPONDENT AND THE MIDDLE IS THE REVIEWEE:
+ *
+ *   · four roles or fewer — unchanged, `index + 1`. Every seeded preset has exactly four, so
+ *     no existing organisation moves and `50` §1's table still describes what it describes.
+ *   · more than four — the top three keep levels 1, 2 and 3, THE BOTTOM ROLE GETS 4, and
+ *     everything between gets 3.
+ *
+ * WHY THE MIDDLE GETS 3 RATHER THAN A SPREAD. A proportional map (`ceil(i / n * 4)`) reads
+ * neatly and puts a Dean on level 1, which carries `org.delete`, `role.create` and
+ * `grant.update` — the whole organisation, to somebody two steps down. Level 3 is `own_unit`
+ * almost everywhere, so the failure mode of being generous here is a Sports Officer who can
+ * run a campaign in their own unit. That is the job. The failure mode of being generous at
+ * level 1 is somebody deleting the organisation.
+ *
+ * IT ALSO REACHES `F2`. `reflection.*` and `actionplan.*` are `self` at levels 1–3 and absent
+ * at 4, so the entire Gold improvement loop was unreachable for any organisation whose
+ * reviewee sat fifth or lower — and ungrantable, because the no-escalation guard needs a
+ * granter holding the capability at `all` and nobody ever holds these at `all`. Putting the
+ * middle of the ladder on level 3 hands it back without touching either rule.
+ */
+export function levelForRole(index: number, roleCount: number): Level {
+  if (roleCount <= 4) return Math.min(index + 1, 4) as Level;
+  if (index < 3) return (index + 1) as Level;
+  return index === roleCount - 1 ? 4 : 3;
+}
+
 export function grantsForLevel(level: Level): GrantSeed[] {
   const rows = Object.entries(GRANT_MATRIX).flatMap(([capability, row]) => {
     const scope = row?.[level];

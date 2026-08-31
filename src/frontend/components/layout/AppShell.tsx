@@ -7,6 +7,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
 import { AmbientBackground } from '../AmbientBackground.js';
+import { PlanNoticeBanner } from '../billing/PlanNoticeBanner.js';
 import { useAppSelector } from '../../store/index.js';
 
 /** Industries the vibe system has a colour pair for (`endur.css` "the switch"). `custom`
@@ -92,6 +93,16 @@ export function AppShell({
         )}
 
         <main id="main" className="shell-content">
+          {/* THE PLAN NOTICE, ON EVERY CONSOLE PAGE — DEC-113, `16` §7d, and the same argument
+              `<OverLimitBanner>` is in this file for (`16` §6). An expiry the customer only
+              meets by navigating to `/app/plan` is an expiry they meet as an unexplained 402
+              on a screen they were using. It renders nothing in the ordinary case and nothing
+              at all without `billing.read`.
+
+              OUTSIDE the keyed wrapper below: it is not part of the page, and remounting it on
+              every navigation would refetch the summary each time and flash the strip. */}
+          {!focused && <PlanNoticeBanner />}
+
           {/* `key` on the pathname is what makes this an ENTER animation rather than a
               one-off on first mount: React tears the wrapper down and builds a new one per
               route, so the keyframe restarts. One animated element per navigation — the

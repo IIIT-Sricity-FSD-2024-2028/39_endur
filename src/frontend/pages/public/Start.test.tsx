@@ -289,3 +289,79 @@ describe('choose a plan — DEC-048', () => {
     expect(radio('gold').checked).toBe(true);
   });
 });
+
+/**
+ * BAD DATA MUST NOT REACH THE CHECKOUT — `DEC-110`, and this is the bug the owner reported:
+ * *"when creating any org if there is any invalid data entered then I am able to proceed to the
+ * plan selection and payment step, payment is done and then I am denied access."*
+ *
+ * Registration and the capture are ONE transaction, so nothing was ever created and nothing was
+ * ever charged — `/ops/earnings` correctly did not move, which the owner also noticed. But the
+ * reader had no way to know that: the product walked them through a payment screen in order to
+ * reject them, and the 422 arrived after the money question rather than before it.
+ *
+ * THE ASSERTIONS ARE THAT THE SECOND STEP IS NEVER REACHED, not that a message appeared. A
+ * message with the plan cards behind it would be the same bug wearing an error.
+ */
+describe('the details are checked before the plan step — DEC-110', () => {
+  const badDetails = (name: string, orgName = 'Northfield') => {
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: orgName } });
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: name } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'a@b.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-long-enough-one' } });
+  };
+
+  it('refuses a digits-only name and stays on step 1', () => {
+    mount();
+    badDetails('12345');
+    advance();
+
+    // STILL ON THE FIELDS. No tier cards, so no way to reach the checkout.
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByLabelText('Your name')).toBeTruthy();
+    expect(screen.getByText(/at least one letter/i)).toBeTruthy();
+  });
+
+  it('refuses a whitespace-only organisation name', () => {
+    mount();
+    badDetails('Anitha Rao', '   ');
+    advance();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  it('refuses a short password and a malformed address before any money question', () => {
+    mount();
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Northfield' } });
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Anitha Rao' } });
+    fireEvent.change(screen.getByLabelText('Work email'), { target: { value: 'not-an-address' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
+    advance();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  /**
+   * THE MESSAGE CLEARS AS THE READER FIXES IT. An error that sits under an input somebody has
+   * visibly just corrected is the screen contradicting itself.
+   */
+  it('clears the message on the next keystroke, and then lets them through', () => {
+    mount();
+    badDetails('12345');
+    advance();
+    expect(screen.getByText(/at least one letter/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Anitha Rao' } });
+    expect(screen.queryByText(/at least one letter/i)).toBeNull();
+
+    advance();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+
+  /** And the ordinary path is untouched — nothing here may make a valid sign-up harder. */
+  it('still lets a good registration reach the checkout', () => {
+    mount();
+    fill();
+    advance();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+});
+

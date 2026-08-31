@@ -144,6 +144,21 @@ export default function OrgDetail(): JSX.Element {
             box than every other plan grid on the product. */}
         <section className="ops-plan-section">
           <h3>Plan</h3>
+          {/* WHEN IT RUNS OUT — DEC-113. The picker below says which tier; this says how long
+              it lasts, which the operator console had no way to show at all until expiry
+              became real. `70` § Data contract: the estate answers what the operator can act
+              on, and "this one lapses on Thursday" is the most actionable fact about a plan.
+
+              THE LAPSE LINE IS PAST TENSE AND NAMES THE OLD TIER. The picker already shows
+              `bronze` as current, and an operator ringing a customer needs to know it is
+              bronze BECAUSE Gold ran out, not because they chose it. */}
+          <p className="text-meta ops-plan-period">
+            {org.lapsedFrom
+              ? `${org.lapsedFrom} ended without a renewal — this organisation fell to ${org.tier}.`
+              : org.periodEnd
+                ? `Current period ends ${new Date(org.periodEnd).toLocaleDateString()}.`
+                : 'No subscription row — reads as bronze everywhere.'}
+          </p>
           <PlanPicker
             plans={PLAN_OPTIONS}
             current={org.tier}

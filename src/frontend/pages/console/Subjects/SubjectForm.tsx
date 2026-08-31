@@ -9,9 +9,11 @@
 // The unit is chosen from `<UnitTree>` in `mode="select"` — the third placement of the one
 // tree (INV-009), and the reason that mode exists.
 import { useState } from 'react';
+import { nameField } from '@endur/shared';
 import type { PersonSummary, ResolvedLabels, UnitNode } from '@endur/shared';
 import { UnitTree } from '../../../components/org/UnitTree.js';
 import { usePeopleSearch } from '../../../lib/people.js';
+import { isValid } from '../../../lib/validate.js';
 
 export type SubjectDraft = {
   name: string;
@@ -51,7 +53,7 @@ export function SubjectForm({
   const people = usePeopleSearch(term);
 
   const unitName = findUnit(units, draft.unitId)?.name ?? '';
-  const ready = draft.name.trim().length > 0 && draft.unitId !== '';
+  const ready = isValid(nameField(120), draft.name) && draft.unitId !== '';
 
   return (
     <div className="dialog-backdrop" onMouseDown={onCancel}>
@@ -76,6 +78,7 @@ export function SubjectForm({
             <input
               id="subject-name"
               className="input"
+              maxLength={120}
               autoFocus
               value={draft.name}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}

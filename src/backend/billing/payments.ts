@@ -21,15 +21,34 @@
 // revenue for an organisation that does not exist.
 import { randomBytes } from 'node:crypto';
 import { changeCostMinor, type Tier } from '@endur/shared';
-import type { Tx } from '../db/tx.js';
+import type { Prisma } from '@prisma/client';
+
+/**
+ * The transaction handle, STRUCTURALLY — naming the one model this file writes and nothing
+ * else. It was `Prisma.TransactionClient`, which is the base client's handle; an EXTENDED
+ * client's is a different type, and `platform/db.ts` wraps every operator write so the seam's
+ * rules apply to them too. `platform/audit.ts` already carries this exact pattern and the same
+ * reasoning — approving an Enterprise request (`DEC-111`) is the third caller and the first
+ * one to come from the platform side.
+ *
+ * It also narrows rather than loosens: this module can now touch `payment` and nothing else,
+ * which is a better statement of what it does than "any transaction".
+ */
+type Tx = {
+  payment: {
+    create(args: { data: Prisma.PaymentUncheckedCreateInput }): Promise<{ amountMinor: number }>;
+  };
+};
 
 /**
  * `signup` is written by registration; `change` by `POST /billing/tier`; `expiry` by the
- * scheduled downgrade firing on read (`DEC-098`) — which is the one kind that captures NO
- * money and is written anyway, because `payments` is the only table that records a plan MOVE
- * with a from and a to on it. Shared with the client as `@endur/shared`'s `PaymentKind`.
+ * scheduled downgrade firing on read (`DEC-098`); `lapse` by a period ending with nobody
+ * renewing (`DEC-113`). The last two capture NO money and are written anyway, because
+ * `payments` is the only table that records a plan MOVE with a from and a to on it — and they
+ * are two kinds rather than one because *"asked to spend less"* and *"stopped paying"* are the
+ * same row and opposite facts. Shared with the client as `@endur/shared`'s `PaymentKind`.
  */
-export type PaymentKind = 'signup' | 'change' | 'expiry';
+export type PaymentKind = 'signup' | 'change' | 'expiry' | 'lapse';
 
 /**
  * A reference, minted by us.
@@ -48,6 +67,17 @@ export const paymentReference = (): string => `endur_${randomBytes(9).toString('
  * absence and not an unknown, and the earnings page reads `kind` rather than inferring the
  * difference from this column. Since DEC-097 it is also an INPUT TO THE PRICE, so passing it
  * wrongly no longer just mislabels a row: it bills the wrong amount.
+ *
+ * `pricedFrom` SPLITS THE TWO JOBS `fromTier` HAD BEEN DOING — `DEC-113`. It defaults to
+ * `fromTier` and only one caller passes it, so the difference rule is untouched everywhere
+ * else.
+ *
+ * WHY IT HAD TO EXIST. `DEC-097` charges the difference because the customer ALREADY PAID for
+ * the tier they are leaving. A lapse breaks that assumption: an organisation that let Gold run
+ * out sits on a bronze period nobody bought, so pricing their rejoin as bronze → gold would
+ * charge ₹900 for a ₹999 plan — and would keep doing it, which makes letting the plan lapse
+ * every month cheaper than staying on it. The move is still recorded as bronze → gold, because
+ * that is what moved; what is measured against nothing is the PRICE.
  */
 export async function recordPayment(
   tx: Tx,
@@ -55,6 +85,8 @@ export async function recordPayment(
     orgId: string;
     tier: Tier;
     fromTier?: Tier | null;
+    /** What the price is measured against. Defaults to `fromTier`; `null` means full price. */
+    pricedFrom?: Tier | null;
     kind: PaymentKind;
     payerName: string;
     payerEmail: string;
@@ -73,7 +105,10 @@ export async function recordPayment(
       // PRICED SERVER-SIDE. The one line this module exists for — and since DEC-097 it
       // prices the MOVE rather than the destination, which is also what stops
       // `/ops/earnings` overstating every customer who has ever upgraded.
-      amountMinor: changeCostMinor(input.fromTier ?? null, input.tier),
+      amountMinor: changeCostMinor(
+        input.pricedFrom === undefined ? (input.fromTier ?? null) : input.pricedFrom,
+        input.tier,
+      ),
       currency: 'INR',
       status: 'succeeded',
       reference: input.reference?.trim() || paymentReference(),

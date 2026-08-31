@@ -4797,6 +4797,60 @@ html:active-view-transition * {
    still break like prose on a narrow screen.
    It is separated by a rule rather than by a card: it belongs to the period
    above it, and a second surface here would read as a second subject. */
+/* THE PLAN NOTICE — 16 §7d, DEC-113. Chrome in <AppShell>, above every console page.
+
+   A STRIP, NOT A CARD, and that is the whole visual argument. It sits on top of somebody
+   else's page and must read as the frame speaking rather than as the page's own first
+   element — so it is one line of text with one action, full width, and it takes the height
+   of a sentence. The two tones are the status ramp already in tokens.css: warn for a plan
+   with days left, danger for one that has gone. Nothing here invents a colour. */
+.plan-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.plan-notice-ending {
+  background: var(--status-warn-100);
+  border-color: var(--status-warn-500);
+  color: var(--status-warn-800);
+}
+
+.plan-notice-lapsed {
+  background: var(--status-bad-100);
+  border-color: var(--status-bad-500);
+  color: var(--status-bad-800);
+}
+
+/* The action keeps the strip's ink rather than the button's, so a secondary button does not
+   sit in a coloured band looking like it belongs to the page underneath. */
+.plan-notice .btn { flex: none; }
+
+/* The lapse line on /app/plan. Same shape as `.plan-schedule-line` — icon, sentence, no
+   card — because it answers the same kind of question about the same period. It carries the
+   bad-status ink rather than muted text: a plan that ran out is not a footnote. */
+.plan-lapsed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  max-width: 78ch;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--status-bad-800);
+}
+
+.plan-lapsed > svg { align-self: center; flex: none; }
+
 .plan-schedule {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
@@ -5442,6 +5496,8 @@ html:active-view-transition * {
 }
 
 .enterprise-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* The name and its state on one line — the chip is about the row, not about a field in it. */
+.enterprise-title { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .enterprise-org { font-weight: 600; }
 .enterprise-who .text-meta { display: inline-flex; align-items: center; gap: 6px; }
 

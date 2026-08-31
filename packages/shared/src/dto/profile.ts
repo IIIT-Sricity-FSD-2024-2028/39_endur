@@ -6,7 +6,7 @@
 // same writes exist on `/people/:id` for an administrator acting on somebody else, and
 // there they DO take an id and a wider scope — two questions, two routes.
 import { z } from 'zod';
-import { dto } from './common.js';
+import { dto, nameField } from './common.js';
 import type { PersonSummary, PowersAtPlace } from './person.js';
 
 /**
@@ -18,7 +18,7 @@ import type { PersonSummary, PowersAtPlace } from './person.js';
  * name against it. A self-service email change has neither.
  */
 export const UpdateProfileBody = z.object({
-  name: z.string().min(1).max(120),
+  name: nameField(120),
 });
 export type UpdateProfileBody = z.infer<typeof UpdateProfileBody>;
 

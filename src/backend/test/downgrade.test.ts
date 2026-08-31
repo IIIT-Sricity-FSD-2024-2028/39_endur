@@ -210,7 +210,21 @@ describe('the first read after the period ends applies it — DEC-098', () => {
     expect(up.body.data.tier).toBe('gold');
     expect(up.body.data.pendingTier).toBeNull();
 
+    // AND WHAT THE END OF THE PERIOD PROVES CHANGED WITH DEC-113. It used to be enough to
+    // assert the tier was still `gold` — nothing happened at expiry, so surviving it was the
+    // evidence the column had been cleared. Expiry is real now: the plan falls to bronze
+    // either way, and what separates "the abandoned schedule fired" from "the period simply
+    // ran out" is HOW it fell. A scheduled move leaves `lapsedFrom` null and writes
+    // `kind: 'expiry'`; this is a lapse from GOLD, which is only true if the pending bronze
+    // was genuinely gone.
     await expirePeriod(founder.orgId);
-    expect((await read(founder)).body.data.tier).toBe('gold');
+    const after = (await read(founder)).body.data;
+    expect(after.tier).toBe('bronze');
+    expect(after.lapsedFrom).toBe('gold');
+    expect(after.pendingTier).toBeNull();
+
+    const kinds = (await paymentsOf(founder.orgId)).map((row) => row.kind);
+    expect(kinds).toContain('lapse');
+    expect(kinds).not.toContain('expiry');
   });
 });
