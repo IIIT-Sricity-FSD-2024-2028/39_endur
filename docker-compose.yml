@@ -1,0 +1,21 @@
+# Postgres only. The apps run on the host so the edit loop stays fast (03 §10).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: endur-db
+    environment:
+      POSTGRES_USER: endur
+      POSTGRES_PASSWORD: endur
+      POSTGRES_DB: endur
+    ports:
+      - '5432:5432'
+    volumes:
+      - endur-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U endur -d endur']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  endur-db:

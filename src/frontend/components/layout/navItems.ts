@@ -1,0 +1,171 @@
+// The sidebar's items. design_specs/design/02 §3 for the grouping and the order.
+//
+// The labels are a FUNCTION of the vocabulary, not constants — a hotel's sidebar reads
+// "Restaurants", not "Subjects" (INV-001). Only Endur's own furniture stays literal:
+// Home, Structure, Roles, People, Templates, Settings describe the product, not the
+// customer's world (22 §1).
+import type { ResolvedLabels } from '@endur/shared';
+import type { Capability, Scope } from '@endur/shared';
+import type { IconName } from '../Icon.js';
+
+export type NavGroup = 'organize' | 'collect' | 'understand' | 'system';
+
+export type NavItem = {
+  to: string;
+  label: string;
+  icon: IconName;
+  group: NavGroup;
+  /** Renders greyed with a "Soon" tag and never navigates. Set it for anything not built
+   *  yet, P3 or P2 — an item that navigates to "Not built yet" is a worse answer than one
+   *  that visibly does not navigate (design_specs/design/02 §7). */
+  disabled?: boolean;
+  /** One line of what the screen will do, shown on hover. Required when disabled — a
+   *  greyed item with no explanation is just a broken link. */
+  soonHint?: string;
+  /** Hides the item when the caller does not hold it. Usability, never enforcement. */
+  needs?: Capability;
+  /**
+   * How far `needs` has to REACH before the item is worth showing — T-087, and it defaults
+   * to `self`, which is what every item meant before.
+   *
+   * A nav item is a promise that a PAGE is worth opening, which is a stronger claim than
+   * "you hold this verb somewhere". `person.read` is seeded to every role at `self` so
+   * `/app/profile` opens (`50` §1), so People passed its gate for **every account in the
+   * product** and then rendered a list of exactly one person: the reader (`D-027`). The
+   * minimum scope is how an item says "and not only about yourself".
+   *
+   * Set it only where a NARROW hold genuinely means an empty page. Most items need no
+   * minimum: `campaign.read: own_unit` is a real campaigns list, just a short one.
+   */
+  minScope?: Scope;
+};
+
+export const GROUP_LABELS: Record<NavGroup, string | null> = {
+  organize: 'Organize',
+  collect: 'Collect',
+  understand: 'Understand',
+  // System items sit below the groups with no heading — Settings does not need one.
+  system: null,
+};
+
+export function navItems(labels: ResolvedLabels): NavItem[] {
+  return [
+    { to: '/app', label: 'Home', icon: 'home', group: 'system' },
+
+    { to: '/app/structure', label: 'Structure', icon: 'structure', group: 'organize',
+      needs: 'unit.read' },
+    // Un-disabled by T-052, which is the LAST edit of that task. It was MISSED when the
+    // page shipped on 24 Aug: the ladder and the powers grid were live at /app/roles and
+    // the only way to reach them was to type the address. A built page behind a "Soon" tag
+    // is the mirror image of the mistake 02 §7 warns about, and just as invisible.
+    { to: '/app/roles', label: 'Roles', icon: 'role', group: 'organize', needs: 'role.read' },
+    // Un-disabled by T-050. It is the LAST edit of that task and not a task of its own:
+    // an item that navigates to a half-built page is the one thing 02 §7 forbids.
+    //
+    // `own_unit` MINIMUM SINCE T-087 (DEC-051). `person.read: self` is the universal seeded
+    // grant, so the bare verb showed this item to everybody and the page then listed one
+    // person: the reader. Above `self` the list is real — L3 holds `own_unit` and sees
+    // their own section's roster, which the owner confirmed is right for that level.
+    { to: '/app/people', label: 'People', icon: 'people', group: 'organize',
+      needs: 'person.read', minScope: 'own_unit' },
+    { to: '/app/subjects', label: labels.subject.many, icon: 'subject', group: 'organize',
+      needs: 'subject.read' },
+
+    // T-093. FIRST in the group and gated on nothing: the gallery is five cards that each
+    // gate themselves, and the one screen where the whole product is visible at once must
+    // not be the one screen somebody has to be told about.
+    { to: '/app/start', label: 'Start', icon: 'start', group: 'collect' },
+    { to: '/app/templates', label: 'Templates', icon: 'template', group: 'collect',
+      needs: 'template.read' },
+    { to: '/app/campaigns', label: labels.campaign.many, icon: 'campaign', group: 'collect',
+      needs: 'campaign.read' },
+
+    // T-096, and both items are in `collect` for the reason `/app/start` puts all five lanes
+    // on one screen: they are ways of asking a group for something. An announcement asks for
+    // attention and a bookable asks for a commitment, and neither belongs in Organize (which
+    // is the org graph) or Understand (which is what came back).
+    //
+    // `announcement.read` IS SEEDED TO EVERY LEVEL (`50` §1), so this item appears for
+    // everybody — deliberately. Being sent a notice is not a permission anybody should have
+    // to be given, and the page shows what was sent to the reader whether or not they can
+    // write one. No `minScope`: the matrix grants it at `all` or not at all.
+    { to: '/app/announcements', label: 'Announcements', icon: 'announcement', group: 'collect',
+      needs: 'announcement.read' },
+    // `booking.read`, and NOT GATED ON THE TIER — the same posture Analysis takes one group
+    // down, and for the same two reasons. A Gold-only surface shown to a Bronze organisation
+    // lands on a page with a 402 and an upgrade card, which is the demonstration `43` exists
+    // for; hiding the item would replace that with an absence nobody can ask a question
+    // about. And the client is the wrong place to decide an entitlement at all — it never
+    // receives the map (`packages/shared/src/tiers.ts`).
+    //
+    // No `minScope`: `booking.read` is seeded `all` at L1-L3 and nothing at L4 (`50` §1), so
+    // there is no narrow hold that would open an empty page (`DEC-051`).
+    { to: '/app/booking', label: 'Booking', icon: 'booking', group: 'collect',
+      needs: 'booking.read' },
+
+    // Un-disabled by T-082 — the last edit of that task, never a task of its own.
+    //
+    // `analysis.read` AND NO MINIMUM SCOPE. The seeded matrix gives it at `subtree` to the
+    // top two levels and `own_unit` to the third (`50` §1, `D-033`), and a narrow hold here
+    // is a real analysis of a real corpus, not the list-of-one that made People need a
+    // minimum (`DEC-051`). L4 holds it nowhere and does not see the item.
+    //
+    // NOT GATED ON THE TIER, and that is deliberate rather than an omission. A Bronze
+    // organisation's administrators hold the capability and get a 402 with an upgrade card,
+    // which is the demonstration `43` exists for; hiding the item would replace it with an
+    // absence nobody can ask a question about. The client is also the wrong place to decide
+    // an entitlement — it never receives the map (`packages/shared/src/tiers.ts`).
+    { to: '/app/analysis', label: 'Analysis', icon: 'results', group: 'understand',
+      needs: 'analysis.read' },
+    // Un-disabled by T-080 — the last edit of that task, never a task of its own.
+    //
+    // `response.read` and NOT a minimum scope (DEC-051): unlike People, a narrow hold here
+    // is a real queue and not a list of one. `own_unit` on `response.read` means the
+    // comments from your own section's campaigns, which is exactly what a section head
+    // should open this page to read.
+    { to: '/app/inbox', label: 'Inbox', icon: 'inbox', group: 'understand',
+      needs: 'response.read' },
+    // Un-disabled by T-084 — THE LAST "Soon" TAG IN THE SIDEBAR. Every item now goes
+    // somewhere real.
+    //
+    // `reflection.read`, seeded `self` at L1-L3 and nothing at L4 (`50` §1): L3 is the
+    // REVIEWEE and L4 is the respondent-level role, and somebody nobody reviews has nothing
+    // to reflect on. No `minScope` — `self` IS the scope this surface has, and a minimum
+    // above it would hide the item from everybody.
+    { to: '/app/reflect', label: 'Reflect', icon: 'reflect', group: 'understand',
+      needs: 'reflection.read' },
+
+    // `org.update`, NOT `org.read` AT A WIDER SCOPE — T-087, and this one is not a scope
+    // problem at all. `org.read` is genuinely `all` at every level including the lowest,
+    // seeded that way so the vocabulary loads on first paint (`50` §1), so no minimum scope
+    // could ever hide this item. It was simply gated on the wrong capability: this page
+    // exists to EDIT the organisation, `55` § Stage 8 puts it at L1, and `org.update` is
+    // L1. <VocabularyChips> already gates its link here on `org.update` — the chip row
+    // reached this answer first and the sidebar was the half that had not caught up.
+    //
+    // The ROUTE guard stays `org.read` on purpose: the page renders read-only without
+    // `org.update` already, and a directly-typed URL showing a read-only page is a better
+    // answer than a 403 to something the caller may in fact read.
+    { to: '/app/settings', label: 'Settings', icon: 'settings', group: 'system',
+      needs: 'org.update' },
+    // T-076. `56` § Route & access puts it here by name: system group, under Settings,
+    // HIDDEN without `audit.read`.
+    //
+    // No `minScope`. `audit.read` is seeded at L1 and nowhere else (`50` §1), so the item
+    // is already rare — and where an organisation grants it narrower, a scoped log is a
+    // real log of a real subtree, not the list-of-one that made People need a minimum
+    // (`DEC-051`).
+    { to: '/app/logs', label: 'Activity log', icon: 'log', group: 'system',
+      needs: 'audit.read' },
+    // `49` PUTS THIS PAGE IN SETTINGS, NOT IN THE SIDEBAR — "billing is looked at monthly,
+    // and a fourth group holding one item is a worse answer than a tab". The owner asked
+    // for a sidebar item, so it is one, and it sits in `system` for the reason that
+    // argument gives: it is not something anybody DOES daily, so it belongs with the
+    // furniture rather than in Organize / Collect / Understand.
+    //
+    // `billing.read`, and NO `minScope`: the seeded matrix grants it at `all` or not at all
+    // (11 §8), so an organisation that has given somebody this capability has given them
+    // the whole page. It is seeded to administrators only, so the item is already rare.
+    { to: '/app/plan', label: 'Plan', icon: 'plan', group: 'system', needs: 'billing.read' },
+  ];
+}

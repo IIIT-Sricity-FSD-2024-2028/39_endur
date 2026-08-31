@@ -1,0 +1,225 @@
+// T-038 — /app/campaigns. 38, design_specs/design/06 §6.1.
+//
+// **Share is a top-level action on the card, never inside a `⋯` menu.** On demo day, going
+// from this list to a projected QR code must be ONE click, and a menu is a second one plus
+// a hunt.
+import { useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import type { CampaignStatus, CampaignSummary, QuickCampaignPurpose } from '@endur/shared';
+import { PageHeader } from '../../../components/layout/PageHeader.js';
+import { EmptyState } from '../../../components/feedback/EmptyState.js';
+import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
+import { Icon } from '../../../components/Icon.js';
+import { useLabels } from '../../../lib/labels.js';
+import { useCan } from '../../../lib/capabilities.js';
+import { ApiError } from '../../../lib/api.js';
+import { pluralise } from '../../../lib/format.js';
+import { useCampaignList } from '../../../lib/campaigns.js';
+import { QUICK_CATEGORIES, STATUS_TAG, suppressionNote, timing } from './card.js';
+import { QuickDialog } from './QuickDialog.js';
+
+/** The four values the derivation can produce (DEC-016), plus "everything". */
+const FILTERS: Array<{ key: CampaignStatus | 'all'; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'open', label: 'Collecting' },
+  { key: 'scheduled', label: 'Scheduled' },
+  { key: 'draft', label: 'Draft' },
+  { key: 'closed', label: 'Closed' },
+];
+
+export default function Campaigns(): JSX.Element {
+  const labels = useLabels();
+  const can = useCan();
+  const [params, setParams] = useSearchParams();
+  const status = params.get('status') as CampaignStatus | null;
+
+  const navigate = useNavigate();
+
+  const list = useCampaignList({ ...(status ? { status } : {}) });
+  const [sharing, setSharing] = useState<CampaignSummary | null>(null);
+  /**
+   * The poll and suggestion-box surfaces (`T-091`, `DEC-088`). They live beside the wizard
+   * rather than inside it: the wizard's three steps are the right questions for a feedback
+   * round and the wrong ones for a question asked of a room that is already waiting.
+   */
+  const [quick, setQuick] = useState<QuickCampaignPurpose | null>(null);
+
+  const rows = list.data?.data ?? [];
+  const total = list.data?.meta.total ?? 0;
+
+  const setFilter = (key: CampaignStatus | 'all'): void => {
+    const next = new URLSearchParams(params);
+    if (key === 'all') next.delete('status');
+    else next.set('status', key);
+    next.delete('cursor');
+    setParams(next);
+  };
+
+  return (
+    <>
+      <PageHeader
+        title={labels.campaign.many}
+        subtitle={total > 0 ? pluralise(total, labels.campaign.one, labels.campaign.many) : undefined}
+        action={
+          can('campaign.create') && !(rows.length === 0 && !status) ? (
+            <div className="header-actions">
+              {/* Gated on `campaign.launch`, not `campaign.create`: the quick path launches
+                  in the same call, so offering it to somebody who may only draft would be
+                  offering a button the API is going to refuse (DEC-089, INV-003). */}
+              {can('campaign.launch') && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setQuick('poll')}
+                  >
+                    <Icon name="add" size={18} /> Poll
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setQuick('suggestion')}
+                  >
+                    <Icon name="add" size={18} /> Suggestion box
+                  </button>
+                </>
+              )}
+              <Link className="btn btn-primary" to="/app/campaigns/new">
+                <Icon name="add" size={18} /> New {labels.campaign.one.toLowerCase()}
+              </Link>
+            </div>
+          ) : undefined
+        }
+      />
+
+      {quick && (
+        <QuickDialog
+          purpose={quick}
+          onCancel={() => setQuick(null)}
+          // Straight to the detail page, which already shows the QR code and the public
+          // link (`T-089`, `DEC-086`). That screen is the point of the whole surface.
+          onCreated={(campaign) => {
+            setQuick(null);
+            navigate(`/app/campaigns/${campaign.id}`);
+          }}
+        />
+      )}
+
+      <div className="segmented" role="radiogroup" aria-label="Status">
+        {FILTERS.map((filter) => (
+          <label className={`segment${(status ?? 'all') === filter.key ? ' is-active' : ''}`} key={filter.key}>
+            <input
+              type="radio"
+              name="status"
+              checked={(status ?? 'all') === filter.key}
+              onChange={() => setFilter(filter.key)}
+            />
+            <span>{filter.label}</span>
+          </label>
+        ))}
+      </div>
+
+      {list.error && (
+        <p className="form-error" role="alert">
+          {list.error instanceof ApiError ? list.error.message : 'Could not load those.'}{' '}
+          <button type="button" className="btn btn-ghost" onClick={() => void list.reload()}>
+            Try again
+          </button>
+        </p>
+      )}
+
+      {list.loading && !list.data ? (
+        <div className="cgrid" aria-hidden="true">
+          {[0, 1].map((index) => (
+            <div className="card ccard" key={index}>
+              <span className="skeleton-row" />
+              <span className="skeleton-row wide" />
+            </div>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon="campaign"
+          title={status ? `No ${labels.campaign.many} there` : `No ${labels.campaign.many} yet`}
+          body={
+            status
+              ? 'Nothing has that status yet. Clearing the filter brings the rest back.'
+              : `A ${labels.campaign.one.toLowerCase()} is a form, some ${labels.subject.many.toLowerCase()}, an audience and a window. Creating one takes three steps and ends with a code people can scan.`
+          }
+          action={
+            status ? (
+              <button type="button" className="btn btn-secondary" onClick={() => setFilter('all')}>
+                Clear filter
+              </button>
+            ) : can('campaign.create') ? (
+              <Link className="btn btn-primary" to="/app/campaigns/new">
+                Create a {labels.campaign.one.toLowerCase()}
+              </Link>
+            ) : undefined
+          }
+        />
+      ) : (
+        <div className="cgrid">
+          {rows.map((campaign) => {
+            const tag = STATUS_TAG[campaign.status];
+            const when = timing(campaign);
+            const note = suppressionNote(campaign);
+            // Structural product words, literal on purpose (`DEC-087`) — a hotel renames
+            // its departments, never Endur's own furniture.
+            const quick = QUICK_CATEGORIES.includes(campaign.templateCategory)
+              ? campaign.templateCategory
+              : null;
+            return (
+              <article className="card ccard" key={campaign.id}>
+                <div className="ccard-top">
+                  <span className={tag.className}>{tag.label}</span>
+                  {quick && <span className="tag tag-outline">{quick}</span>}
+                  {when && <span className="text-meta">{when}</span>}
+                </div>
+                <h4 className="ccard-name">
+                  <Link to={`/app/campaigns/${campaign.id}`}>{campaign.name}</Link>
+                </h4>
+                <p className="ccard-meta text-meta">
+                  {campaign.templateName} · {pluralise(campaign.subjectCount, labels.subject.one, labels.subject.many)}
+                  {campaign.anonymous && ' · anonymous'}
+                </p>
+                <p className="ccard-count">
+                  {pluralise(campaign.responseCount, 'response', 'responses')}
+                </p>
+                {/* Said here rather than discovered on an empty Results page (`T-092`). */}
+                {note && <p className="ccard-note text-meta">{note}</p>}
+                <div className="ccard-actions">
+                  {/* One click from list to projected QR. A draft has no token and no
+                      reachable URL, so it has nothing to share yet (38 § States). */}
+                  {campaign.url && (
+                    <button type="button" className="btn btn-primary" onClick={() => setSharing(campaign)}>
+                      <Icon name="share" size={16} /> Share
+                    </button>
+                  )}
+                  {campaign.status !== 'draft' && (
+                    <Link className="btn btn-secondary" to={`/app/campaigns/${campaign.id}/results`}>
+                      Results
+                    </Link>
+                  )}
+                  <Link className="btn btn-ghost" to={`/app/campaigns/${campaign.id}`}>Open</Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {sharing?.url && (
+        <ShareSheet
+          url={sharing.url}
+          campaignName={sharing.name}
+          status={sharing.status}
+          endsAt={sharing.endsAt}
+          anonymous={sharing.anonymous}
+          access={sharing.access}
+          onClose={() => setSharing(null)}
+        />
+      )}
+    </>
+  );
+}

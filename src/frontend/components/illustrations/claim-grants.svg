@@ -1,0 +1,12 @@
+<svg id="cg-root" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+<style><![CDATA[
+#cg1 {animation: cg1_s_do 1000ms linear 1 normal forwards}@keyframes cg1_s_do { 0% {stroke-dashoffset: 339;animation-timing-function: cubic-bezier(0.2,0.8,0.25,1)} 55% {stroke-dashoffset: 0} 100% {stroke-dashoffset: 0}}
+#cg2 {animation-name: cg2_f_o, cg2_s_do;animation-duration: 1000ms;animation-fill-mode: forwards;animation-timing-function: linear;animation-iteration-count: 1;}@keyframes cg2_f_o { 0% {fill-opacity: 0;animation-timing-function: cubic-bezier(0.4,0,0.2,1)} 25% {fill-opacity: 0} 45% {fill-opacity: 1} 100% {fill-opacity: 1}}@keyframes cg2_s_do { 0% {stroke-dashoffset: 88} 15% {stroke-dashoffset: 88;animation-timing-function: cubic-bezier(0.2,0.8,0.25,1)} 50% {stroke-dashoffset: 0} 100% {stroke-dashoffset: 0}}
+#cg3 {animation: cg3_s_do 1000ms linear 1 normal forwards}@keyframes cg3_s_do { 0% {stroke-dashoffset: 21} 60% {stroke-dashoffset: 21;animation-timing-function: cubic-bezier(0.2,0.8,0.25,1)} 75% {stroke-dashoffset: 0} 100% {stroke-dashoffset: 0}}
+#cg4 {animation: cg4_s_do 1000ms linear 1 normal forwards}@keyframes cg4_s_do { 0% {stroke-dashoffset: 51} 70% {stroke-dashoffset: 51;animation-timing-function: cubic-bezier(0.2,0.8,0.25,1)} 90% {stroke-dashoffset: 0} 100% {stroke-dashoffset: 0}}
+]]></style>
+<path id="cg1" d="M80,25l50,20v45l-50,50l-50,-50v-45z" fill="var(--illus-paper)" stroke="var(--illus-blue)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dashoffset="339" stroke-dasharray="339"/>
+<circle id="cg2" r="14" transform="translate(118 40)" fill="var(--illus-blue)" fill-opacity="0" stroke="var(--illus-ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dashoffset="88" stroke-dasharray="88"/>
+<line id="cg3" x1="58" y1="85" x2="72" y2="100" fill="none" stroke="var(--illus-teal)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dashoffset="21" stroke-dasharray="21"/>
+<line id="cg4" x1="72" y1="100" x2="102" y2="60" fill="none" stroke="var(--illus-teal)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dashoffset="51" stroke-dasharray="51"/>
+</svg>

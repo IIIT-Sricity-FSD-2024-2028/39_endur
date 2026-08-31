@@ -1,0 +1,15 @@
+-- `users.disabled_at`. 57 § States, 10 §2.
+--
+-- WHY A COLUMN RATHER THAN A LOOKUP. 57's account panel shows a disabled account "greyed
+-- with the date", and the only other place that date exists is the `account.revoke` audit
+-- row. Reading it from there means one audit query per person in a list of two hundred, to
+-- render one line — and it would break the moment a revocation happened by any route that
+-- did not write that exact action.
+--
+-- WHY NOT DERIVE IT FROM `status`. `status` says WHETHER, and a state with no date is a
+-- state the panel cannot narrate: "disabled" and "disabled on 12 August, by the head of
+-- department who is standing in front of you" are different amounts of accountability.
+--
+-- NULL for every account that has never been disabled, and cleared again on activation —
+-- a re-enabled account is not a disabled one with a stale date on it.
+ALTER TABLE "users" ADD COLUMN "disabled_at" TIMESTAMPTZ(6);

@@ -1,0 +1,51 @@
+{
+  "name": "@endur/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "//predev": "D-049. The Prisma client is generated, not committed, so pulling a branch that adds a MODEL leaves a client with no delegate for it and the route 500s with `Cannot read properties of undefined`. postinstall covers a fresh install and covered nothing else. This runs BEFORE the watcher starts, which is also the only order that works on Windows: tsx holds the query-engine DLL open and `prisma generate` fails on the file lock while the dev server is running.",
+    "predev": "prisma generate",
+    "dev": "tsx watch server.ts",
+    "build": "tsc -b",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "//db:migrate": "N-013, and 03 \u00a75 has said `migrate deploy`, never `migrate dev` since the suite was written \u2014 this script said `dev` anyway until 2026-08-31, when it bit. MIGRATIONS ARE HAND-WRITTEN HERE. schema.prisma cannot express the CHECK constraints, partial and GIN indexes, the DEFERRABLE unique on questions(template_id, position), the anonymity trigger, or the `sessions` table connect-pg-simple owns (DEC-014), so the database is PERMANENTLY drifted from it by design. `migrate dev` diffs the two and offers to \u0022fix\u0022 the difference: the migration it generated dropped all four of those objects and the sessions table with them. It failed on one DROP INDEX by luck \u2014 Postgres refuses to drop an index a constraint needs \u2014 and N-013 is precisely the note saying that had it succeeded, the app would still have run. Author migrations by hand and apply them with this.",
+    "db:migrate": "prisma migrate deploy && prisma generate",
+    "db:generate": "prisma generate",
+    "db:seed": "tsx database/seed/index.ts",
+    "db:reset": "prisma migrate reset --force",
+    "ops:code": "tsx database/seed/ops-code.ts",
+    "demo:contention": "tsx database/seed/contention.ts"
+  },
+  "dependencies": {
+    "@endur/shared": "*",
+    "@prisma/client": "^6.14.0",
+    "argon2": "^0.44.0",
+    "connect-pg-simple": "^10.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "pino": "^9.7.0",
+    "pino-http": "^10.5.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@esbuild/win32-x64": "^0.28.2",
+    "@types/connect-pg-simple": "^7.0.3",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/express-session": "^1.18.2",
+    "@types/node": "^22.15.3",
+    "@types/supertest": "^6.0.3",
+    "prisma": "^6.14.0",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.4",
+    "vitest": "^3.2.4"
+  }
+}

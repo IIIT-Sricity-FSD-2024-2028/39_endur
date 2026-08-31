@@ -1,0 +1,5 @@
+node_modules
+dist
+src/backend/storage
+src/backend/database/migrations
+design_specs

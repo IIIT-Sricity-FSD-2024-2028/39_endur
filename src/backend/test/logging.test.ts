@@ -1,0 +1,195 @@
+// Logs and error information on disk.
+// These tests are about the FILES: that they appear, that they rotate by day and by size, that old
+// ones are removed, that the split between the app log and the error log holds, and that a broken
+// log directory cannot take the application down.
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pino, multistream } from 'pino';
+import { createRotatingStream, dateKey } from '../lib/logFile.js';
+import { createLogStreams, loggerOptions } from '../lib/logger.js';
+
+let dir = '';
+
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'endur-logs-'));
+});
+afterEach(() => {
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+const read = (name: string) => fs.readFileSync(path.join(dir, name), 'utf8');
+const today = dateKey();
+
+describe('rotating log file', () => {
+  it('writes to <prefix>-<date>.log and creates the directory', () => {
+    const nested = path.join(dir, 'deep', 'logs');
+    const stream = createRotatingStream({
+      dir: nested,
+      prefix: 'app',
+      maxBytes: 1024,
+      retentionDays: 14,
+    });
+    stream.write('hello\n');
+    stream.close();
+
+    expect(fs.readFileSync(path.join(nested, `app-${today}.log`), 'utf8')).toBe('hello\n');
+  });
+
+  it('rotates within the day at maxBytes', () => {
+    const stream = createRotatingStream({ dir, prefix: 'app', maxBytes: 16, retentionDays: 14 });
+    stream.write('0123456789\n'); // 11 bytes
+    stream.write('0123456789\n'); // would take it to 22 — new file
+    stream.close();
+
+    expect(read(`app-${today}.log`)).toBe('0123456789\n');
+    expect(read(`app-${today}.1.log`)).toBe('0123456789\n');
+  });
+
+  it('appends to the day file rather than truncating it on restart', () => {
+    const first = createRotatingStream({ dir, prefix: 'app', maxBytes: 1024, retentionDays: 14 });
+    first.write('before restart\n');
+    first.close();
+
+    const second = createRotatingStream({ dir, prefix: 'app', maxBytes: 1024, retentionDays: 14 });
+    second.write('after restart\n');
+    second.close();
+
+    expect(read(`app-${today}.log`)).toBe('before restart\nafter restart\n');
+  });
+
+  it('removes files older than the retention window and keeps the rest', () => {
+    const old = `app-${dateKey(new Date(Date.now() - 20 * 86_400_000))}.log`;
+    const recent = `app-${dateKey(new Date(Date.now() - 2 * 86_400_000))}.log`;
+    const foreign = 'notes.txt';
+    for (const name of [old, recent, foreign]) fs.writeFileSync(path.join(dir, name), 'x');
+
+    // Old files are removed when a file is opened, which is the cheapest honest moment for a daily scan.
+    createRotatingStream({ dir, prefix: 'app', maxBytes: 1024, retentionDays: 14 }).close();
+
+    expect(fs.existsSync(path.join(dir, old))).toBe(false);
+    expect(fs.existsSync(path.join(dir, recent))).toBe(true);
+    // A file that is not one of ours is not ours to delete.
+    expect(fs.existsSync(path.join(dir, foreign))).toBe(true);
+  });
+
+  it('retains by the DATE IN THE NAME, not by mtime', () => {
+    const old = `app-${dateKey(new Date(Date.now() - 20 * 86_400_000))}.log`;
+    fs.writeFileSync(path.join(dir, old), 'x');
+    fs.utimesSync(path.join(dir, old), new Date(), new Date()); // touched just now
+
+    createRotatingStream({ dir, prefix: 'app', maxBytes: 1024, retentionDays: 14 }).close();
+    expect(fs.existsSync(path.join(dir, old))).toBe(false);
+  });
+
+  it('fails OFF rather than throwing when the directory cannot be used', () => {
+    // A file where the directory should be: creating it fails, and so would every write.
+    const blocked = path.join(dir, 'blocked');
+    fs.writeFileSync(blocked, 'not a directory');
+
+    const stream = createRotatingStream({
+      dir: blocked,
+      prefix: 'app',
+      maxBytes: 1024,
+      retentionDays: 14,
+    });
+    expect(() => stream.write('still serving\n')).not.toThrow();
+    expect(stream.currentPath()).toBeNull();
+  });
+});
+
+describe('the two streams', () => {
+  // The real wiring from logger.ts, pointed at a temp directory.
+  const build = () =>
+    pino(
+      loggerOptions,
+      multistream(
+        createLogStreams({
+          dir,
+          level: 'info',
+          maxBytes: 1024 * 1024,
+          retentionDays: 14,
+          toFile: true,
+          stdout: { write: () => {} },
+        }),
+        { dedupe: false },
+      ),
+    );
+
+  it('sends info to app only, and warn and error to BOTH', () => {
+    const log = build();
+    log.info({ requestId: 'r1' }, 'request');
+    log.warn({ requestId: 'r2' }, 'FORBIDDEN');
+    log.error({ requestId: 'r3' }, 'INTERNAL');
+
+    const app = read(`app-${today}.log`);
+    const err = read(`error-${today}.log`);
+
+    expect(app).toContain('req=r1');
+    expect(app).toContain('req=r2');
+    expect(app).toContain('req=r3');
+
+    // The point of a second file: no successful requests in it.
+    expect(err).not.toContain('req=r1');
+    expect(err).toContain('req=r2');
+    expect(err).toContain('req=r3');
+  });
+
+  it('writes the bracketed line to disk and JSON to stdout, from ONE record', () => {
+    const out: string[] = [];
+    const log = pino(
+      loggerOptions,
+      multistream(
+        createLogStreams({
+          dir,
+          level: 'info',
+          maxBytes: 1024 * 1024,
+          retentionDays: 14,
+          toFile: true,
+          stdout: { write: (chunk: string) => void out.push(chunk) },
+        }),
+        { dedupe: false },
+      ),
+    );
+    log.info(
+      { requestId: 'r9', method: 'GET', path: '/api/v1/roles', status: 200, durationMs: 27 },
+      'request',
+    );
+
+    // The pipeline's own rendering is unchanged; only the file's reader is a person.
+    expect(out[0]).toContain('"requestId":"r9"');
+
+    const line = read(`app-${today}.log`).trim();
+    expect(line).toMatch(
+      /^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC[+-]\d{2}:\d{2}\] \[\d+\] \[INFO\] \[HTTP\] /,
+    );
+    expect(line).toContain('GET /api/v1/roles 200 27ms');
+    expect(line).toContain('req=r9');
+    expect(line).not.toContain('{');
+  });
+
+  it('redacts credentials before they reach disk', () => {
+    const log = build();
+    log.info({ password: 'hunter2', passwordHash: '$argon2id$abc' }, 'login');
+
+    const app = read(`app-${today}.log`);
+    expect(app).not.toContain('hunter2');
+    expect(app).not.toContain('argon2id');
+    // Removed outright, so the key is ABSENT rather than present and starred out.
+    expect(app).not.toContain('password');
+  });
+
+  it('writes no files at all when file logging is off', () => {
+    const streams = createLogStreams({
+      dir,
+      level: 'info',
+      maxBytes: 1024,
+      retentionDays: 14,
+      toFile: false,
+      stdout: { write: () => {} },
+    });
+    expect(streams).toHaveLength(1);
+    expect(fs.readdirSync(dir)).toHaveLength(0);
+  });
+});

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Endur</title>
+    <!--
+      The theme has to be on <html> BEFORE the first paint, or the page renders light and
+      then flips — which on a dark-mode machine is a white flash in a dark room. This runs
+      synchronously in <head>, ahead of the stylesheets, and is the reason it is inline
+      rather than a module: a deferred script is already too late.
+
+      The key and the fallback logic mirror lib/theme.ts. The two exist to agree.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('endur.theme');
+          var dark =
+            stored === 'dark' ||
+            (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+    <!-- Both faces are used above the fold on every screen, so they are worth the two
+         early connections. Only the latin subsets — latin-ext loads on demand. -->
+    <link rel="preload" href="/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>
