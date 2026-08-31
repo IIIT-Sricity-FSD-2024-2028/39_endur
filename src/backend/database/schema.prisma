@@ -796,6 +796,29 @@ model Subscription {
   /// somebody asks.
   pendingTier String? @map("pending_tier")
 
+  /// THE TIER THIS ORGANISATION LOST WHEN THE LAST PERIOD ENDED WITHOUT A RENEWAL. DEC-113,
+  /// 16 §7d.
+  ///
+  /// NULL is the ordinary case and means the plan above is one the customer currently holds.
+  /// Non-null means the period ran out, nothing was renewed, and the row was moved down to
+  /// bronze — and the value is what it was moved down FROM, so the page can say *"your Gold
+  /// plan ended on 30 September"* instead of showing a bronze row with no account of where
+  /// the other one went. That sentence is the whole reason this column exists: the tier moves
+  /// on its own, and a move nobody can see is indistinguishable from the bug it fixes.
+  ///
+  /// IT IS NOT A SECOND ANSWER TO "WHAT PLAN ARE THEY ON" — the same rule `pending_tier`
+  /// lives under. `tier` is in force, `requireEntitlement` decides with it, and this is a
+  /// past-tense fact beside it. Nothing gates on it.
+  ///
+  /// IT LIVES EXACTLY ONE PERIOD. A join clears it (they have a plan again), an operator
+  /// override clears it, and the next roll of the bronze period clears it — a notice about
+  /// something that happened two months ago is furniture, not news.
+  ///
+  /// A SCHEDULED DOWNGRADE LEAVES IT NULL, and that distinction is the point of storing the
+  /// tier rather than a boolean. Silver arriving because the customer asked for Silver is not
+  /// something to apologise for; Bronze arriving because nobody renewed is.
+  lapsedFrom String? @map("lapsed_from")
+
   status String @default("trialing")
 
   @@map("subscriptions")

@@ -174,6 +174,10 @@ describe('the estate', () => {
     expect(Object.keys(detail).sort()).toEqual(
       [
         'activeCampaigns', 'administrators', 'counts', 'createdAt', 'id', 'industry',
+        // DEC-113. Two dates-and-enums about the PLAN, added when expiry became real. They
+        // pass the same bar as everything else on this list: `periodEnd` is a date and
+        // `lapsedFrom` is a tier, and neither can carry a word a respondent wrote.
+        'lapsedFrom', 'periodEnd',
         'lastActivityAt', 'name', 'planHistory', 'responsesLast30d', 'seatLimit', 'seats',
         'slug', 'subscriptionStatus', 'suspendedAt', 'tier',
       ].sort(),

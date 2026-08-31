@@ -5,7 +5,7 @@
 // for "the received scores on their own". A client that ignores the lock has nothing to
 // ask for.
 import { z } from 'zod';
-import { dto } from './common.js';
+import { dto, nameField } from './common.js';
 import { Id } from './common.js';
 import { SubmittedAnswer } from './response.js';
 import type { AnswerValue } from './response.js';
@@ -21,7 +21,7 @@ export const SubmitReflectionBody = z.object({
 export type SubmitReflectionBody = z.infer<typeof SubmitReflectionBody>;
 
 export const PlanItem = z.object({
-  text: z.string().min(1).max(500),
+  text: nameField(500),
   dueAt: z.string().date().optional(),
   status: z.enum(['open', 'done']).default('open'),
 });

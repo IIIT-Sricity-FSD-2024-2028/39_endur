@@ -10,6 +10,7 @@
 // return value would have passed throughout.
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { changeCostMinor } from '@endur/shared';
 import { app, registerOrg, setUpOrg, unique, withCsrf, type Session } from './helpers.js';
 import { prisma } from '../db/client.js';
 import { hashPassword } from '../auth/password.js';
@@ -36,6 +37,9 @@ async function makeOperator(role: 'owner' | 'staff') {
   expect(login.status).toBe(200);
   return agent;
 }
+
+const paymentsOf = (orgId: string) =>
+  prisma.payment.findMany({ where: { orgId }, orderBy: { createdAt: 'asc' } });
 
 const ask = (session: Session, note?: string) =>
   withCsrf(session, 'post', '/api/v1/billing/enterprise-request').send(note ? { note } : {});
@@ -209,3 +213,124 @@ describe('a message from Endur reaches the customer — DEC-101', () => {
     expect(theirs.body.data).toHaveLength(0);
   });
 });
+
+describe('approving an Enterprise request is a SALE — DEC-111', () => {
+  /**
+   * THE BUG THIS CLOSES IS A NUMBER THAT WAS ALWAYS ZERO. The owner worked a request to
+   * `closed`, went to the organisation's page and set the tier by hand through
+   * `platform.plan.override` — and `overridePlan` deliberately writes NO `payments` row. So
+   * the one tier the product charges ₹4,999 for earned nothing, and every Enterprise customer
+   * was invisible to `/ops/earnings`.
+   *
+   * THE ASSERTION IS ON THE OWNER'S EARNINGS TOTAL, before and after, because that is the
+   * number that was wrong. Asserting the `payments` row alone would pass against a ledger the
+   * earnings page filters back out.
+   */
+  it('moves the tier AND moves the money', async () => {
+    const founder = await registerOrg('custom', 'gold');
+    expect((await ask(founder, 'we are ready')).status).toBe(201);
+    const owner = await makeOperator('owner');
+
+    const queue = await owner.get('/api/v1/platform/enterprise-requests');
+    const row = (queue.body.data as Array<{ id: string; org: { id: string } }>)
+      .find((entry) => entry.org.id === founder.orgId);
+    expect(row).toBeTruthy();
+
+    const approved = await owner.post(`/api/v1/platform/enterprise-requests/${row!.id}/approve`);
+    expect(approved.status).toBe(200);
+    expect(approved.body.data.status).toBe('closed');
+
+    // THE PLAN MOVED.
+    const subscription = await prisma.subscription.findUnique({ where: { orgId: founder.orgId } });
+    expect(subscription?.tier).toBe('enterprise');
+    expect(subscription?.status).toBe('active');
+
+    // THE DIFFERENCE WAS CAPTURED — DEC-097, not the full ₹4,999. They already hold Gold for
+    // this period, and charging the whole new price would bill the overlap twice.
+    const payments = await paymentsOf(founder.orgId);
+    const sale = payments[payments.length - 1];
+    expect(sale?.kind).toBe('change');
+    expect(sale?.tier).toBe('enterprise');
+    expect(sale?.fromTier).toBe('gold');
+    expect(sale?.amountMinor).toBe(changeCostMinor('gold', 'enterprise'));
+    expect(sale?.amountMinor).toBe(499900 - 99900);
+    // WHO BOUGHT IT IS THE PERSON WHO ASKED, off the request row — the operator did not buy it.
+    expect(sale?.payerName).toBe('Founder');
+
+    // AND IT REACHES THE PAGE THE OWNER READS.
+    //
+    // ASSERTED ON THIS ORGANISATION'S ROW, never on the estate total. The suite runs in
+    // parallel and other files are registering organisations the whole time, so a
+    // before-and-after on `lifetimeRevenueMinor` measures them too — it passed alone and
+    // failed in the full run, which is the flake this comment exists to stop somebody
+    // rewriting back in.
+    const after = await owner.get('/api/v1/platform/earnings');
+    expect(after.status).toBe(200);
+    const mine = (after.body.data.recent as Array<{ orgId: string; tier: string; amountMinor: number }>)
+      .find((entry) => entry.orgId === founder.orgId && entry.tier === 'enterprise');
+    expect(mine, 'the Enterprise sale must appear on /ops/earnings').toBeTruthy();
+    expect(mine?.amountMinor).toBe(changeCostMinor('gold', 'enterprise'));
+  });
+
+  /** A second approve is a 409, not a second capture. DEC-096's equal-rank rule, other door. */
+  it('refuses to approve an organisation that is already on Enterprise', async () => {
+    const founder = await registerOrg('custom', 'silver');
+    expect((await ask(founder)).status).toBe(201);
+    const owner = await makeOperator('owner');
+
+    const queue = await owner.get('/api/v1/platform/enterprise-requests');
+    const row = (queue.body.data as Array<{ id: string; org: { id: string } }>)
+      .find((entry) => entry.org.id === founder.orgId);
+    expect((await owner.post(`/api/v1/platform/enterprise-requests/${row!.id}/approve`)).status)
+      .toBe(200);
+
+    // Ask again (the closed request released the partial unique index), then approve again.
+    expect((await ask(founder)).status).toBe(201);
+    const second = await owner.get('/api/v1/platform/enterprise-requests');
+    const again = (second.body.data as Array<{ id: string; org: { id: string } }>)
+      .find((entry) => entry.org.id === founder.orgId);
+
+    const refused = await owner.post(`/api/v1/platform/enterprise-requests/${again!.id}/approve`);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.message).toMatch(/already on Enterprise/i);
+
+    // ONE capture, not two.
+    const captures = (await paymentsOf(founder.orgId))
+      .filter((payment) => payment.tier === 'enterprise');
+    expect(captures).toHaveLength(1);
+  });
+
+  /** Staff cannot approve. It is the queue's own owner-only verb, not `plan.override`. */
+  it('refuses staff and names the capability', async () => {
+    const founder = await registerOrg('custom', 'bronze');
+    expect((await ask(founder)).status).toBe(201);
+    const owner = await makeOperator('owner');
+    const queue = await owner.get('/api/v1/platform/enterprise-requests');
+    const row = (queue.body.data as Array<{ id: string; org: { id: string } }>)
+      .find((entry) => entry.org.id === founder.orgId);
+
+    const staff = await makeOperator('staff');
+    const res = await staff.post(`/api/v1/platform/enterprise-requests/${row!.id}/approve`);
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(res.body)).toContain('platform.enterprise.update');
+  });
+
+  /**
+   * `overridePlan` STAYS MONEY-FREE, and that split is the point rather than an oversight: a
+   * support action that moved a customer's tier is not a sale, and if it started writing
+   * ledger rows an operator fixing a mistake would invent revenue every time.
+   */
+  it('leaves the operator’s plain override writing no ledger row', async () => {
+    const founder = await registerOrg('custom', 'bronze');
+    const owner = await makeOperator('owner');
+    const before = (await paymentsOf(founder.orgId)).length;
+
+    const res = await owner
+      .post(`/api/v1/platform/orgs/${founder.orgId}/plan`)
+      .send({ tier: 'gold', reason: 'support' });
+    expect(res.status).toBe(200);
+
+    expect(await paymentsOf(founder.orgId)).toHaveLength(before);
+  });
+});
+

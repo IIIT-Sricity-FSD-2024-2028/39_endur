@@ -21,6 +21,8 @@ const SILVER: BillingSummary = {
   periodEnd: '2026-09-01T00:00:00.000Z',
   // Nothing scheduled, which is the ordinary state — DEC-098. The tests that care set it.
   pendingTier: null,
+  // Nothing ran out either — DEC-113. Same rule: the tests about it set it.
+  lapsedFrom: null,
   seats: 34,
   seatBreakdown: { activeUsers: 30, nonPersonSubjects: 4 },
 };

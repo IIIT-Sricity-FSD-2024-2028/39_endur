@@ -113,13 +113,25 @@ it. A newest-first sort would answer *"who signed up"*, which is `71`'s question
 
 Filters: tier, subscription status, industry, and a name search. Each is a URL param.
 
-Two derived flags render as chips because they are the two support-worthy states and neither
-is a column of its own:
+Four derived flags render as chips, because each is a support-worthy state and none is a column
+of its own:
 
 | Chip | Rule |
 |---|---|
 | **Quiet** | No response in 30 days, and the org has collected before. *Never* shown for an org that has never collected — that is onboarding, not churn, and conflating them wastes a support conversation |
 | **Over seats** | `seats > seatLimit` (`16` §6). The org still collects; it just cannot add people |
+| **Lapsed** | `lapsed_from` is set — the last period ended with nobody renewing (`16` §7d, `DEC-113`) |
+| **Ending soon** | A paid plan inside its last seven days. Never Bronze, which rolls forward free and would light most of the estate permanently |
+
+**The tier printed on the row is the EFFECTIVE tier — `DEC-113`.** The `subscriptions` column
+lags: it still says `gold` until the customer next opens their own plan page and `readBilling`
+writes the move. The estate derives what the entitlement gate derives, so an operator is never
+looking at a list that says Gold about an organisation the API is treating as Bronze.
+
+**Which is exactly why the Lapsed chip has to exist.** With the effective tier shown, a lapsed
+organisation reads as `bronze` — correct, and on its own indistinguishable from a customer who
+*chose* Bronze. The chip is that difference, and after an expiry the difference is the whole of
+what an operator wants from this list.
 
 ### Opening one organisation
 
@@ -128,6 +140,17 @@ comments, and no link that could reach any.** If an operator wants to know why a
 wrong, the answer is a conversation — `19` §5 states the trade and why it is the right one.
 
 ### Changing a plan
+
+**The period end is printed above the picker — `DEC-113`.** The picker says which tier; this says
+how long it lasts, and the operator console had no way to show that at all until expiry became
+real. A lapsed organisation gets the past-tense line instead, naming the tier it fell from: an
+operator ringing a customer needs to know it is Bronze *because Gold ran out*, not because they
+chose it.
+
+**An override clears the lapse and starts a fresh period.** It lands most often on an
+organisation that has just lapsed, and leaving the old dates would put the granted tier straight
+back onto an expired row — the very next read would lapse it again, undoing the support action
+within the second and writing a ledger row saying so.
 
 `<PlanPicker>` → a confirm dialog naming the organisation, the old tier and the new one → a
 `platform_audit_log` row.
@@ -193,8 +216,22 @@ retry semantics and `17`. **Nothing here needs a channel.** A row in a table the
 visits is not that document's scope, and blocking a two-table feature on an unwritten P3 spec
 would repeat the sequencing mistake `CONF-021` recorded.
 
-Granting the tier is still `platform.plan.override` on the org's own page — the queue tracks the
-conversation, it does not perform the sale.
+~~Granting the tier is still `platform.plan.override` on the org's own page — the queue tracks
+the conversation, it does not perform the sale.~~ **SUPERSEDED 2026-08-31 by `DEC-111`.**
+
+**The queue performs the sale, because nothing else was going to.** That sentence described a
+workflow where the owner closed a request, went to the organisation's page and set the tier by
+hand — and `overridePlan` deliberately writes **no `payments` row**. So the one tier the product
+charges ₹4,999 for earned nothing, and every Enterprise customer was invisible to
+`/ops/earnings`. The owner's words: *"there is no payment flow involved and Endur is not making
+any money."*
+
+**Approve** sets the tier, writes the capture and closes the request in one transaction, behind
+`platform.enterprise.update`. It **names no amount** — the price comes from `PLAN_OPTIONS`
+server-side through `recordPayment`, exactly as it does on a customer's own join — which is why
+this does not reopen the objection that keeps an amount field off `OverridePlan`. A plain
+override still writes no ledger row, and a test pins that: moving a tier because support asked
+is not a sale.
 
 ### Messaging the administrators  ·  **FIXED 2026-08-31 (`DEC-101`, `T-101`)**
 

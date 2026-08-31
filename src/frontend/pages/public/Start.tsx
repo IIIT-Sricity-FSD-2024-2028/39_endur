@@ -29,10 +29,11 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
+import { RegisterBody, SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
 import { PlanPicker } from '../../components/billing/PlanPicker.js';
 import { PaymentDialog } from '../../components/billing/PaymentDialog.js';
+import { useFormValidation } from '../../lib/validate.js';
 import { ApiError } from '../../lib/api.js';
 import { useRegister } from '../../lib/auth.js';
 import { AuthAside } from './AuthAside.js';
@@ -40,6 +41,21 @@ import { AuthAside } from './AuthAside.js';
 /** `Credentials` in packages/shared says min(10). Mirrored, never trusted — the server
  *  rejects a short password whatever this form believes (30 § Acceptance). */
 const MIN_PASSWORD = 10;
+
+/**
+ * THE FIRST STEP'S FIELDS, TAKEN OFF THE REGISTRATION DTO RATHER THAN RESTATED.
+ *
+ * `.pick()` keeps this honest: when `RegisterBody` gains a rule — a longer password, a name
+ * that must contain a letter — this screen enforces it the same day, with no second edit and
+ * no chance of the two disagreeing. `tier` and `industry` are deliberately not here; the tier
+ * belongs to step 2, and `industry` is answered properly by the setup wizard (CONF-011).
+ */
+const DETAILS_SCHEMA = RegisterBody.pick({
+  orgName: true,
+  name: true,
+  email: true,
+  password: true,
+});
 
 export default function Start(): JSX.Element {
   const navigate = useNavigate();
@@ -64,6 +80,33 @@ export default function Start(): JSX.Element {
   const [error, setError] = useState<ApiError | Error | null>(null);
 
   /**
+   * THE DETAILS STEP IS CHECKED BEFORE IT IS LEFT — and this is the whole of the bug it fixes.
+   *
+   * It used to be `setStep('plan')`, unconditionally. So a person could type digits into every
+   * field, press Continue, choose a plan, run the checkout, and only THEN meet a 422 telling
+   * them to go back and fix a name. Registration and the capture are ONE transaction
+   * (`features/auth/service.ts`), so nothing was created and nothing was charged — but the
+   * reader had no way to know that, and the product had just walked them through a payment
+   * screen in order to reject them.
+   *
+   * IT RUNS THE DTO, NOT A COPY OF IT. `RegisterBody.pick(...)` is literally the schema the
+   * server parses; a second set of rules written here is how `packages/shared`'s one-source-of
+   * -truth stops being true. `tier` is excluded because it has not been chosen yet — that is
+   * what the next step is for, and the button there is disabled until it has been.
+   *
+   * IT IS NOT THE RULE. `validate(RegisterDto)` still refuses the same request server-side
+   * (INV-003); this only decides whether to spend the reader's time.
+   */
+  const details = useFormValidation(DETAILS_SCHEMA);
+
+  const detailValues = (): Record<string, string> => ({
+    orgName: orgName.trim(),
+    name: name.trim(),
+    email: email.trim(),
+    password,
+  });
+
+  /**
    * ONE `onSubmit` FOR BOTH STEPS, so Enter means the same thing as the button under the
    * cursor. A second `<form>` would be tidier to read and would break that: Enter in the
    * password field on step 1 would submit a registration with no tier, which the server
@@ -72,6 +115,7 @@ export default function Start(): JSX.Element {
   function onFormSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (step === 'details') {
+      if (!details.check(detailValues())) return;
       setStep('plan');
       return;
     }
@@ -121,8 +165,15 @@ export default function Start(): JSX.Element {
   const chosenPlan = SIGNUP_PLAN_OPTIONS.find((plan) => plan.tier === tier) ?? null;
 
   const apiError = error instanceof ApiError ? error : null;
+  /**
+   * ONE MESSAGE PER FIELD, FROM EITHER SIDE. The client check runs first and catches almost
+   * everything; a 422 that still arrives is the server saying something the client could not
+   * know (`DEC-110`). They render identically on purpose — a reader does not care which half of
+   * the product noticed, and two different-looking errors under one input would suggest they do.
+   */
   const fieldError = (path: string): string | undefined =>
-    apiError?.status === 422 ? apiError.fieldError(path) : undefined;
+    details.errors[path] ??
+    (apiError?.status === 422 ? apiError.fieldError(path) : undefined);
   // 409 is the ONE case where naming the field is right. Registration is choosing an
   // identity, so "already registered" is information the person needs; login is proving
   // one, so the same fact there would be an enumeration oracle (auth/router.ts).
@@ -152,7 +203,7 @@ export default function Start(): JSX.Element {
                   required
                   maxLength={120}
                   value={orgName}
-                  onChange={(event) => setOrgName(event.target.value)}
+                  onChange={(event) => { setOrgName(event.target.value); details.clear('orgName'); }}
                   aria-describedby={fieldError('orgName') ? 'orgName-error' : undefined}
                 />
                 {fieldError('orgName') && (
@@ -170,7 +221,7 @@ export default function Start(): JSX.Element {
               required
               maxLength={120}
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => { setName(event.target.value); details.clear('name'); }}
               aria-describedby={fieldError('name') ? 'name-error' : undefined}
             />
             {fieldError('name') && (
@@ -187,8 +238,9 @@ export default function Start(): JSX.Element {
               name="email"
               autoComplete="username"
               required
+              maxLength={200}
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => { setEmail(event.target.value); details.clear('email'); }}
               aria-invalid={emailTaken || fieldError('email') ? true : undefined}
               aria-describedby={emailTaken || fieldError('email') ? 'email-error' : undefined}
             />
@@ -214,8 +266,9 @@ export default function Start(): JSX.Element {
                 autoComplete="new-password"
                 required
                 minLength={MIN_PASSWORD}
+                maxLength={200}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => { setPassword(event.target.value); details.clear('password'); }}
                 aria-describedby={fieldError('password') ? 'password-error' : 'password-help'}
               />
               <button

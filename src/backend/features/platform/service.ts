@@ -31,6 +31,8 @@ import { TIERS, isQuietOrg } from '@endur/shared';
 import type { PaymentKind } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
 import { newPeriod } from '../../billing/period.js';
+import { effectiveTier } from '../../billing/effective.js';
+import { recordPayment } from '../../billing/payments.js';
 import { writeAudit } from '../../platform/audit.js';
 import { hashPassword } from '../../auth/password.js';
 import { generateSecret, otpauthUrl } from '../../platform/totp.js';
@@ -66,7 +68,14 @@ type OrgRow = {
   industry: string;
   suspendedAt: Date | null;
   createdAt: Date;
-  subscription: { tier: string; status: string; seats: number } | null;
+  subscription: {
+    tier: string;
+    status: string;
+    seats: number;
+    periodEnd: Date;
+    pendingTier: string | null;
+    lapsedFrom: string | null;
+  } | null;
 };
 
 /**
@@ -168,8 +177,14 @@ async function summarise(rows: OrgRow[]): Promise<PlatformOrgSummary[]> {
     name: row.name,
     slug: row.slug,
     industry: row.industry,
-    tier: (row.subscription?.tier ?? 'bronze') as Tier,
+    // DERIVED, NOT READ — DEC-113. The column lags: an expired row keeps saying `gold` until
+    // the customer next opens their own plan page and `readBilling` writes the move. The gate
+    // does not wait for that and neither does this, so the estate shows the tier the product is
+    // actually serving rather than the one the table has not caught up to.
+    tier: row.subscription ? effectiveTier(row.subscription) : 'bronze',
     subscriptionStatus: row.subscription?.status ?? 'none',
+    periodEnd: row.subscription?.periodEnd.toISOString() ?? null,
+    lapsedFrom: (row.subscription?.lapsedFrom as Tier | null) ?? null,
     seats: seats.get(row.id) ?? 0,
     // `null` and not a number, because there is no seat LIMIT in the product: `16` §6
     // describes over-limit behaviour and `T-057` is what would set the ceiling. A zero
@@ -190,7 +205,19 @@ const ORG_SELECT = {
   industry: true,
   suspendedAt: true,
   createdAt: true,
-  subscription: { select: { tier: true, status: true, seats: true } },
+  subscription: {
+    select: {
+      tier: true,
+      status: true,
+      seats: true,
+      // DEC-113. `periodEnd` and `pendingTier` are what `effectiveTier()` needs; `lapsedFrom`
+      // is what the row prints. None of them is a count of anything a tenant owns, so the
+      // aggregate-only seam (INV-011, 19 §5) is untouched.
+      periodEnd: true,
+      pendingTier: true,
+      lapsedFrom: true,
+    },
+  },
 } as const;
 
 export async function estate(query: EstateQuery): Promise<Paged<PlatformOrgSummary>> {
@@ -671,15 +698,20 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
   const from = query.from ?? new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), 1));
   const granularity = query.granularity;
 
-  // `kind: { not: 'expiry' }` — DEC-098. An expiry row records a plan MOVE with no money on
-  // it (Rs 0), and this page is about money: counting it as a payment would leave the average
-  // capture dragged down by events where nothing was captured, and the count answering a
-  // different question from the sum beside it. `/ops/analytics` reads those rows for exactly
-  // the opposite reason — it wants the movement, not the money (DEC-102).
+  // `expiry` AND `lapse` ARE BOTH EXCLUDED — DEC-098, DEC-113. Both record a plan MOVE with no
+  // money on it (Rs 0), and this page is about money: counting either as a payment would leave
+  // the average capture dragged down by events where nothing was captured, and the count
+  // answering a different question from the sum beside it. `/ops/analytics` reads those rows
+  // for exactly the opposite reason — it wants the movement, not the money (DEC-102).
+  //
+  // WRITTEN AS A LIST, so the next zero-amount kind is a name added here rather than a second
+  // `not` somebody has to notice. `kind: { not: 'expiry' }` silently counted every lapse the
+  // day `DEC-113` landed, which is how a two-word predicate becomes a wrong revenue figure.
+  const UNPAID_KINDS = ['expiry', 'lapse'];
   const window = {
     createdAt: { gte: from, lte: to },
     status: 'succeeded',
-    kind: { not: 'expiry' },
+    kind: { notIn: UNPAID_KINDS },
   };
 
   const [inWindow, lifetime, tierRows, recentRows, changeRows] = await Promise.all([
@@ -688,7 +720,7 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
       select: { orgId: true, tier: true, amountMinor: true, createdAt: true },
     }),
     db.payment.aggregate({
-      where: { status: 'succeeded', kind: { not: 'expiry' } },
+      where: { status: 'succeeded', kind: { notIn: UNPAID_KINDS } },
       _sum: { amountMinor: true },
     }),
     // The CURRENT mix. A missing subscription row folds into bronze — the same convention
@@ -795,7 +827,13 @@ export async function overridePlan(
       // asked to put an organisation on a tier has settled the question, and a scheduled move
       // down surviving that would take the plan away weeks later with the support call
       // already closed. An override is the newest fact about the plan, so it wins.
-      update: { tier, status: 'active', pendingTier: null },
+      //
+      // `lapsedFrom: null` AND A FRESH PERIOD for the same reason, one step further — DEC-113.
+      // An override lands most often on an organisation that has just lapsed, and leaving the
+      // old dates would put the tier the operator granted straight back on an expired row: the
+      // very next read would lapse it again, undoing the support action inside a second and
+      // writing a ledger row saying so. A granted plan starts a period.
+      update: { tier, status: 'active', pendingTier: null, lapsedFrom: null, ...newPeriod() },
       create: {
         orgId,
         tier,
@@ -1241,6 +1279,114 @@ export async function updateEnterpriseRequest(
   // THE ROW THAT WAS UPDATED, re-read by its own id. Returning the first row of the new status
   // instead would hand the caller somebody else's request whenever two are in the same state,
   // and the page would show the wrong customer's name against the click.
+  const row = await db.enterpriseRequest.findUnique({ where: { id }, select: ENTERPRISE_SELECT });
+  if (!row) throw new NotFoundError();
+  return enterpriseView(row);
+}
+
+/**
+ * APPROVE AN ENTERPRISE REQUEST — grant the tier AND record the sale. `DEC-111`, `T-106`.
+ *
+ * THIS SUPERSEDES `DEC-100`'s LINE that *"the queue tracks the conversation, it does not
+ * perform the sale"*. That was right about a queue and wrong about the product: the owner
+ * worked a request to `closed`, went to the organisation's page, set the tier by hand through
+ * `platform.plan.override` — and `overridePlan` deliberately writes NO `payments` row, so
+ * **the one tier the product charges ₹4,999 for earned nothing**. Every Enterprise customer
+ * was invisible to `/ops/earnings`.
+ *
+ * THE "INVENT REVENUE" OBJECTION DOES NOT APPLY HERE, and it is worth saying why rather than
+ * quietly widening the seam. `OverridePlan`'s DTO refuses an amount because an operator who
+ * could name one could write any number into the ledger. **This names none.** The price comes
+ * from `PLAN_OPTIONS` through `recordPayment`, server-side, exactly as it does on the
+ * customer's own join — the operator supplies a request id and nothing else.
+ *
+ * `overridePlan` STAYS MONEY-FREE, and that split is the point. Moving a customer's tier
+ * because support asked is not a sale; approving a request they made at the catalogue price
+ * is. Two verbs, because the product needs to be able to do one without the other.
+ *
+ * THE CAPTURE IS THE DIFFERENCE (`DEC-097`), like every other move: a Gold organisation
+ * approved to Enterprise contributes ₹4,000, not ₹4,999, because they have already paid for
+ * this period once.
+ *
+ * WHO PAID IS THE PERSON WHO ASKED, read off the request row rather than from the operator's
+ * session — `payer_name` answers "who bought this", and the operator did not buy it.
+ */
+export async function approveEnterpriseRequest(
+  req: Request,
+  id: string,
+): Promise<EnterpriseRequestRow> {
+  const request = await db.enterpriseRequest.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      askedName: true,
+      askedEmail: true,
+      org: { select: { id: true, subscription: { select: { tier: true, lapsedFrom: true } } } },
+    },
+  });
+  if (!request) throw new NotFoundError();
+  if (request.status === 'closed') {
+    throw new ConflictError('That request is already closed. Reopen it before approving.');
+  }
+
+  const orgId = request.org.id;
+  const from = (request.org.subscription?.tier ?? 'bronze') as Tier;
+  if (from === 'enterprise') {
+    // Not an error worth a 500 and not a silent success either: the queue would otherwise
+    // capture a second time for a tier they already hold, which is DEC-096's equal-rank case
+    // arriving through a different door.
+    throw new ConflictError('That organisation is already on Enterprise.');
+  }
+
+  const operator = req.ctx.principal;
+  await db.$transaction(async (tx) => {
+    await tx.subscription.upsert({
+      where: { orgId },
+      // `pendingTier: null` for `joinTier`'s reason — a scheduled move down is stale the
+      // moment somebody buys their way up past it. `lapsedFrom: null` for DEC-113's: this is
+      // a plan they now hold, so the notice saying the last one ran out is spent.
+      update: {
+        tier: 'enterprise',
+        status: 'active',
+        pendingTier: null,
+        lapsedFrom: null,
+        ...newPeriod(),
+      },
+      create: { orgId, tier: 'enterprise', status: 'active', seats: 0, ...newPeriod() },
+    });
+
+    // THE SALE. Priced server-side from PLAN_OPTIONS, in the same transaction as the tier it
+    // pays for — INV-007's argument about audit rows, applied to money: a ledger that
+    // disagrees with the subscription table is worse than no ledger.
+    await recordPayment(tx, {
+      orgId,
+      tier: 'enterprise',
+      fromTier: from,
+      // FULL PRICE WHEN THE BRONZE THEY SIT ON WAS NEVER BOUGHT — DEC-113, the same rule
+      // `joinTier` follows. An organisation that lapsed and then asked to be sold Enterprise
+      // would otherwise be credited ₹99 it never paid.
+      pricedFrom: request.org.subscription?.lapsedFrom ? null : from,
+      kind: 'change',
+      payerName: request.askedName,
+      payerEmail: request.askedEmail,
+    });
+
+    await tx.enterpriseRequest.update({
+      where: { id },
+      data: {
+        status: 'closed',
+        handledAt: new Date(),
+        ...(operator?.kind === 'platform' ? { handledBy: operator.id } : {}),
+      },
+    });
+
+    // TWO ROWS, because two different things happened and an operator reading the log later
+    // needs both: the plan moved, and it moved because a request was approved.
+    await writeAudit(tx, req, 'plan.override', orgId, { from, to: 'enterprise', reason: 'enterprise request approved' });
+    await writeAudit(tx, req, 'enterprise.approve', orgId, { requestId: id });
+  });
+
   const row = await db.enterpriseRequest.findUnique({ where: { id }, select: ENTERPRISE_SELECT });
   if (!row) throw new NotFoundError();
   return enterpriseView(row);

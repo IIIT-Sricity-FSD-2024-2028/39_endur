@@ -6,7 +6,7 @@
 // decision somebody has to make on purpose, in this file, rather than a convenience that
 // slips into a select.
 import { z } from 'zod';
-import { dto, Id, PageQuery, SearchQuery } from './common.js';
+import { Id, PageQuery, SearchQuery, dto, nameField, textField } from './common.js';
 import { TIERS, type Currency, type Tier } from '../tiers.js';
 import type { PaymentRecord } from './billing.js';
 import type { PlatformCapability, PlatformRole } from '../platform-capabilities.js';
@@ -65,8 +65,8 @@ export const SuspendDto = dto({ params: OrgIdParam, body: Suspend });
  * operator who can typo a customer's plan details to a stranger.
  */
 export const OrgMessage = z.object({
-  subject: z.string().min(1).max(200),
-  body: z.string().min(1).max(5000),
+  subject: nameField(200),
+  body: textField(5000).min(1),
 });
 export const OrgMessageDto = dto({ params: OrgIdParam, body: OrgMessage });
 
@@ -78,7 +78,7 @@ export const PlatformAuditListDto = dto({ query: PlatformAuditQuery });
 
 export const CreateOperator = z.object({
   email: z.string().email().max(254),
-  name: z.string().min(1).max(120),
+  name: nameField(120),
   password: z.string().min(12).max(200),
   role: z.enum(['owner', 'staff']),
 });
@@ -171,8 +171,24 @@ export type PlatformOrgSummary = {
   name: string;
   slug: string;
   industry: string;
+  /**
+   * THE TIER IN FORCE, which is not always the column — `DEC-113`. Once `periodEnd` has passed
+   * the row still says `gold` until somebody opens the customer's own plan page and the write
+   * catches up, so the estate derives the same answer the entitlement gate derives and shows
+   * what the customer is actually being served. An operator looking at a list that says Gold
+   * about an organisation the API is treating as Bronze cannot do their job.
+   */
   tier: Tier;
   subscriptionStatus: string;
+  /**
+   * The last day of the current period, `null` for an organisation with no subscription row
+   * at all (`D-012`). `70` renders it beside the tier: with expiry now real, *when* a plan runs
+   * out is the fact the estate list was missing, and the owner has no other way to see who is
+   * about to lapse.
+   */
+  periodEnd: string | null;
+  /** What the plan WAS, when the last period ended and nobody renewed. `null` otherwise. */
+  lapsedFrom: Tier | null;
   seats: number;
   seatLimit: number | null;
   activeCampaigns: number;

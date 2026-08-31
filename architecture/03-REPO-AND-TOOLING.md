@@ -232,8 +232,16 @@ two are legitimately equal, and a guard comparing against the live value would r
 for the exact reason everything was correct. `test/test-database.test.ts` asserts both rules by
 their failure — a guard that never refuses anything is not a guard.
 
-`migrate deploy`, never `migrate dev`: `dev` would offer to GENERATE a migration from a drifted
-schema, and a test run is the last place that should be possible.
+`migrate deploy`, never `migrate dev` -- EVERYWHERE, not only here. `dev` offers to GENERATE a
+migration from a drifted schema, and this schema is drifted permanently and on purpose: the ~90
+lines of hand-written SQL in the init migration (CHECK constraints, partial and GIN indexes, the
+DEFERRABLE unique, the anonymity trigger) plus the `sessions` table connect-pg-simple owns are
+all things Prisma cannot express, so `dev` reads every one of them as a mistake to undo.
+
+This paragraph used to end at "a test run is the last place that should be possible", and the
+scoping is what let it happen anyway: `db:migrate` ran `migrate dev` until 2026-08-31, when it
+generated exactly that migration against a developer's database. N-073. Migrations here are
+hand-written, so `dev` has no job to do that `deploy` does not.
 
 ## 6. Lint and format
 

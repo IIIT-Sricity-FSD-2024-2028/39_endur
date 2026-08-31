@@ -351,12 +351,19 @@ Tenant routes, session auth, org capabilities. Specified in `49-PAGE-plan-and-bi
 
 | Method | Path | C | Notes |
 |---|---|---|---|
-| GET | `/billing` | `billing.read` | Current tier, status, period, price |
+| GET | `/billing` | `billing.read` | Current tier, status, period, price. **Also the one APPLIER of an ended period** — it moves the row and returns the result in the same call (`DEC-098`, `DEC-113`). Carries `lapsedFrom`: the tier that ran out, `null` in the ordinary case |
 | GET | `/billing/usage` | `billing.read` | `billable_seats` with its breakdown (`16` §5) |
 | GET | `/billing/plans` | `billing.read` | The four tiers and what each unlocks. **No prices** — DEC-035 |
 | POST | `/billing/tier` | `billing.update` | **Joins a HIGHER tier.** Writes `subscriptions.tier` and applies immediately. **409 on a lower or equal rank** — DEC-096. The capture is the *difference* — DEC-097 |
 | POST | `/billing/downgrade` | `billing.update` | **Schedules** a lower tier for the end of the period. Writes `subscriptions.pending_tier`, captures nothing, changes nothing today — DEC-098. `DELETE` cancels it |
 | POST | `/billing/enterprise-request` | `billing.update` | Asks for Enterprise. Writes an `enterprise_requests` row for the platform owner — DEC-099, DEC-100 |
+
+**There is no `/billing/renew`, and that is deliberate — `DEC-113`.** After a period lapses the
+organisation is on Bronze, so every tier above it is a `POST /billing/tier` away: the route
+already captures, audits and moves the row. A second name for it would be a second write path
+to keep in step. What the lapse changes is the **price** — a rejoin pays the full tier price
+rather than `DEC-097`'s difference, because the Bronze it is leaving was never bought
+(`16` §7d). Still no amount on the request.
 
 **`POST /billing/tier` refusing a downgrade is the rule; the missing button is not.** `49`
 removes the affordance from `/app/plan` and this route is what makes that true for anything
@@ -389,6 +396,7 @@ restated there rather than here because that document owns the surface.
 | GET | `/platform/logs` · `/platform/logs/:file` | `platform.logs.read` | `T-077` |
 | GET | `/platform/enterprise-requests` | `platform.enterprise.read` — **owner only** | `T-100` |
 | PATCH | `/platform/enterprise-requests/:id` | `platform.enterprise.update` — **owner only** | `T-100` |
+| POST | `/platform/enterprise-requests/:id/approve` | `platform.enterprise.update` — **owner only** | **Grants Enterprise AND records the sale**, in one transaction — `DEC-111`. Names no amount: the price is read from `PLAN_OPTIONS` server-side, so this does not become a way for an operator to invent revenue |
 
 **INV-011 constrains every payload above:** counts, names, dates and enums only. No route on
 this prefix may return a response body, an answer, a comment or a respondent identity.

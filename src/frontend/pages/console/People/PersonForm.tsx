@@ -10,6 +10,8 @@
 // A form that silently omits the question reads as unfinished; one that says the position
 // comes next reads as deliberate.
 import { useState } from 'react';
+import { isValid } from '../../../lib/validate.js';
+import { nameField } from '@endur/shared';
 
 export type PersonDraft = { name: string; email: string };
 
@@ -25,7 +27,10 @@ export function PersonForm({
   onCancel: () => void;
 }): JSX.Element {
   const [draft, setDraft] = useState<PersonDraft>({ name: '', email: '' });
-  const ready = draft.name.trim().length > 0 && draft.email.trim().length > 0;
+  // THE SAME RULE THE SERVER USES, so the button does not enable on `"12345"` and then meet a
+  // 422 (`DEC-110`). `isValid` runs `nameField(120)` — the field off `CreatePersonBody` — rather
+  // than a length check written here, which is how the two used to disagree.
+  const ready = isValid(nameField(120), draft.name) && draft.email.trim().length > 0;
 
   return (
     <div className="dialog-backdrop" onMouseDown={onCancel}>
@@ -52,6 +57,7 @@ export function PersonForm({
             <input
               id="person-name"
               className="input"
+              maxLength={120}
               autoFocus
               value={draft.name}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -64,6 +70,7 @@ export function PersonForm({
               id="person-email"
               className="input"
               type="email"
+              maxLength={254}
               value={draft.email}
               onChange={(event) => setDraft({ ...draft, email: event.target.value })}
             />

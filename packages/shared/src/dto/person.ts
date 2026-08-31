@@ -1,7 +1,7 @@
 // Person DTOs. 13 § People, 34, 14 §8.
 import { z } from 'zod';
 import type { AccountStatus } from './account.js';
-import { dto, Id, PageQuery, SearchQuery } from './common.js';
+import { Id, PageQuery, SearchQuery, dto, nameField } from './common.js';
 
 /**
  * **No create-person DTO accepts a role, a level or a capability** (`14` §8).
@@ -13,7 +13,7 @@ import { dto, Id, PageQuery, SearchQuery } from './common.js';
  * also make "who gave them that?" unanswerable for the most common way people get access.
  */
 export const CreatePersonBody = z.object({
-  name: z.string().min(1).max(120),
+  name: nameField(120),
   email: z.string().email().max(200),
 });
 export type CreatePersonBody = z.infer<typeof CreatePersonBody>;
@@ -66,7 +66,7 @@ export type PersonListQuery = z.infer<typeof PersonListQuery>;
 
 /** One CSV row, already mapped to fields by the client's column mapper. */
 export const ImportRow = z.object({
-  name: z.string().min(1).max(120),
+  name: nameField(120),
   email: z.string().email().max(200),
   roleName: z.string().max(60).optional(),
   unitName: z.string().max(80).optional(),

@@ -1,6 +1,6 @@
 // Organisation DTOs. 13 § Organisation, 31 § Data contract.
 import { z } from 'zod';
-import { dto } from './common.js';
+import { dto, nameField } from './common.js';
 import { LabelSet } from '../labels.js';
 
 export const Industry = z.enum(['university', 'hotel', 'hospital', 'company', 'custom']);
@@ -32,14 +32,14 @@ export type UpdateLabelsBody = z.infer<typeof UpdateLabelsBody>;
  */
 export const SetupUnit = z.object({
   tempId: z.string().min(1).max(64),
-  name: z.string().min(1).max(80),
+  name: nameField(80),
   parentTempId: z.string().min(1).max(64).nullable(),
 });
 export type SetupUnit = z.infer<typeof SetupUnit>;
 
 export const SetupOrgBody = z.object({
   industry: Industry,
-  roles: z.array(z.object({ name: z.string().min(1).max(60) })).min(2).max(12),
+  roles: z.array(z.object({ name: nameField(60) })).min(2).max(12),
   units: z.array(SetupUnit).min(1).max(200),
   labels: LabelSet,
   /** Copy the preset's starter templates in. Off is legitimate — an org may have its own. */

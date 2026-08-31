@@ -562,10 +562,22 @@ CREATE TABLE subscriptions (
                                                  -- days in three separate hardcoded places.
   pending_tier TEXT,                             -- DEC-098. A DOWNGRADE THE CUSTOMER ASKED
                                                  -- FOR, applied by the first read after
-                                                 -- period_end and cleared. NEVER consulted by
-                                                 -- requireEntitlement: the tier the customer
-                                                 -- reads and the tier the gate decides with
-                                                 -- stay the same column (49 § Interactions).
+                                                 -- period_end and cleared.
+  lapsed_from  TEXT,                             -- DEC-113. THE TIER THAT RAN OUT when a
+                                                 -- period ended with nobody renewing. NULL is
+                                                 -- the ordinary case. it is what lets the page
+                                                 -- say "your Gold plan has ended" rather than
+                                                 -- showing a bronze row with no account of
+                                                 -- where Gold went. cleared by a join, by an
+                                                 -- operator override, and by the next bronze
+                                                 -- roll-over, so it lives one period.
+                                                 -- NEITHER COLUMN IS A SECOND ANSWER TO WHICH
+                                                 -- PLAN IS IN FORCE. `tier` is, and since
+                                                 -- DEC-113 both requireEntitlement and
+                                                 -- readBilling derive it through ONE function,
+                                                 -- billing/effective.ts effectiveTier() --
+                                                 -- because a column alone stops answering the
+                                                 -- moment period_end passes (49 § Interactions).
   status       TEXT NOT NULL DEFAULT 'trialing'  -- and NOTHING WRITES 'trialing' on the
                                                  -- sign-up path since DEC-048, which is what
                                                  -- made /ops/analytics' trial counters unable
@@ -573,13 +585,20 @@ CREATE TABLE subscriptions (
 );
 ```
 
-**`pending_tier` is evaluate-on-read, and that is a deliberate choice over a scheduler.**
+**Expiry is evaluate-on-read, and that is a deliberate choice over a scheduler.**
 `17-BACKGROUND-JOBS.md` is unwritten and `OPEN-005` says nothing owns a cron; `readBilling`
 already repairs a missing subscription row on read (`D-012`) and its comment carries the
 argument — the write happens on the read so the entitlement gate and the page agree from the
-next request onward. The accepted cost is stated rather than discovered: **an organisation
-nobody opens never transitions**, which is harmless because a tier is only ever consulted when
-somebody asks.
+next request onward.
+
+**`DEC-098`'s accepted cost had to shrink for `DEC-113` to be safe**, and the difference is the
+most important thing on this table. *"An organisation nobody opens never transitions"* was
+harmless while the only transition was a downgrade the customer had **asked for**. Once a period
+ending takes away a tier nobody asked to lose, the same sentence describes the reported bug: an
+organisation that never opens `/app/plan` but hammers the gated routes would keep a plan it
+stopped paying for. So the **row** still catches up on the next read, and the **decision** does
+not wait for it — `requireEntitlement` derives the effective tier from these columns on every
+request, and writes nothing.
 
 `audit_log.decided_by` stores the decision trace from the resolver. It is what turns "access
 denied" from an assertion into evidence, and it is what the simulator replays (`42`).
@@ -799,7 +818,9 @@ detection is the highest-value of these (`customization.md` §6) and is specifie
 
 ## 11. Acceptance
 
-- [ ] `prisma migrate dev` runs clean from an empty database
+- [ ] `npm run db:reset` runs clean from an empty database. NOT `migrate dev` -- N-073. This
+      schema is drifted from the database by design (N-013), so `dev` reads the hand-written
+      SQL below as a mistake and offers to drop it.
 - [ ] Seed produces four orgs across industries, each with historical responses (`50`)
 - [ ] `unitSubtree` returns correct ids for a 4-level tree and terminates on a cycle
 - [x] `campaigns.access` cannot change once `public_token` is set — trigger test, alongside

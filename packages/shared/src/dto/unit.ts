@@ -1,6 +1,6 @@
 // Unit DTOs. 13 § Structure, 32.
 import { z } from 'zod';
-import { dto, Id } from './common.js';
+import { Id, dto, nameField } from './common.js';
 
 /** The cap, in units created per request. Shared so the client can say why before it asks. */
 export const MAX_REPEAT = 50;
@@ -87,7 +87,7 @@ export function expandUnitNames(name: string, repeat?: RepeatRange): string[] {
 }
 
 export const CreateUnitBody = z.object({
-  name: z.string().min(1).max(80),
+  name: nameField(80),
   /** null creates a second root, which is legitimate: there is never one global tree (10). */
   parentId: Id.nullable(),
   /** A temporary unit's children carry end dates, so nobody has to remember to revoke (10 §9). */

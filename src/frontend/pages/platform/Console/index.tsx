@@ -90,9 +90,16 @@ export default function Console(): JSX.Element {
       <EnterpriseQueue
         rows={queue.rows}
         busyId={queueBusy}
+        error={queue.error}
         onUpdate={(id, status) => {
           setQueueBusy(id);
+          // The hook catches and KEEPS the failure (`queue.error`), so there is nothing to
+          // catch here — what there must not be again is a rejection with nowhere to go.
           void queue.update(id, status).finally(() => setQueueBusy(null));
+        }}
+        onApprove={(id) => {
+          setQueueBusy(id);
+          void queue.approve(id).finally(() => setQueueBusy(null));
         }}
       />
 

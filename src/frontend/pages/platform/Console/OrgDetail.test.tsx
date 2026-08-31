@@ -22,6 +22,8 @@ const ORG: PlatformOrgDetail = {
   industry: 'university',
   tier: 'silver',
   subscriptionStatus: 'active',
+  periodEnd: '2026-09-01T00:00:00.000Z',
+  lapsedFrom: null,
   seats: 12,
   seatLimit: null,
   activeCampaigns: 2,

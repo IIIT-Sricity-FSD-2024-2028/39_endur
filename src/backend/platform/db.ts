@@ -65,8 +65,17 @@ const AGGREGATE_OPERATIONS = new Set(['count', 'aggregate', 'groupBy']);
  * `handled_at` on a row the CUSTOMER created. The queue would be unworkable otherwise, and
  * the alternative — a second table on our side mirroring theirs — is two records of one fact.
  *
- * NEITHER WIDENS THE READ SURFACE. `Answer` is still unreachable, `Response` is still
- * count-only, and neither new model has a relation that could reach either.
+ * `Payment` — `DEC-111`, and this is the one that deserves suspicion, so read the guard rather
+ * than the allowlist. Approving an Enterprise request is a SALE and has to reach the ledger, or
+ * the one tier the product charges ₹4,999 for earns nothing (which is exactly what was
+ * happening). What makes it safe is not this line: it is that `billing/payments.ts` takes a
+ * TIER and has no parameter for an amount, so the only number an operator can put in this table
+ * is the one `PLAN_OPTIONS` says. That is the same protection the customer's own join has, and
+ * it is why `OverridePlan`'s DTO still refuses an amount field — an operator who could name one
+ * could invent revenue, and none of them can.
+ *
+ * NONE OF THE THREE WIDENS THE READ SURFACE. `Answer` is still unreachable, `Response` is still
+ * count-only, and no new model has a relation that could reach either.
  */
 const WRITABLE_MODELS = new Set([
   'Organization',
@@ -75,6 +84,7 @@ const WRITABLE_MODELS = new Set([
   'PlatformUser',
   'Notification',
   'EnterpriseRequest',
+  'Payment',
 ]);
 const WRITES = new Set(['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany']);
 
