@@ -25,6 +25,7 @@
 import { useEffect, useState } from 'react';
 import type { SupportContext } from '@endur/shared';
 import { useAppSelector } from '../../store/index.js';
+import { Icon } from '../Icon.js';
 // THE OPS CLIENT, FROM A CONSOLE COMPONENT, and the layering smell is worth one comment. Leave
 // is a route under `/api/v1/platform`: it takes no CSRF token (the `endur.ops` cookie's
 // `sameSite: 'lax'` is the control there, `19` §9) and a 401 from it must not dispatch
@@ -100,32 +101,32 @@ function Strip({ support }: { support: SupportContext }): JSX.Element {
 
   return (
     <div className="support-banner" role="status">
-      <p className="support-banner-text">
+      {/* THE REASON, VISIBLE ON ITS OWN — THE ONE LINE THE VISIBLE-CHROME REQUEST KEPT. It is the
+          operator's own words, typed knowing the customer would read them; nothing else on the
+          strip needs to be sighted to do its job. */}
+      <p className="support-banner-reason">“{support.reason}”</p>
+      {/* THE REST OF THE SENTENCE STILL EXISTS FOR SCREEN READERS, EVEN THOUGH THE STRIP NO
+          LONGER PRINTS IT VISIBLY. `role="status"` announces this text on mount for assistive
+          tech; the disclosure this component exists to make is not allowed to become inaudible
+          just because it stopped being sighted. */}
+      <p className="sr-only">
         {operator ? (
           <>
-            <strong>Support session.</strong> You are signed in to this organisation as yourself,
-            and they can see that you are.
+            Support session. You are signed in to this organisation as yourself, and they can see
+            that you are.
           </>
         ) : (
-          <>
-            <strong>{support.operatorName}</strong> from Endur support is signed in to your
-            organisation.
-          </>
+          <>{support.operatorName} from Endur support is signed in to your organisation.</>
         )}{' '}
-        {/* THE REASON IS RENDERED VERBATIM, AND THE OPERATOR TYPED IT KNOWING IT WOULD BE. That
-            is what makes the field at the door a real control rather than a form to fill in: a
-            sentence nobody reads is a sentence anybody can write. */}
-        <span className="support-banner-reason">“{support.reason}”</span>
+        {operator
+          ? 'Responses, results and check-in notes are closed to you.'
+          : 'Responses, results and check-in notes stay closed to them.'}
       </p>
-      <p className="support-banner-meta">
-        {/* WHAT THEY CANNOT SEE, SAID ON THE STRIP. A customer's first question on reading this
-            is whether Endur can read their feedback, and the answer has to be here rather than
-            in a policy page — an assurance that requires navigation is not an assurance. It is
-            also literally true and enforced: those capabilities resolve as `deny` grants at
-            `all` scope, and a deny beats an allow unconditionally (INV-004). */}
-        {operator ? 'Responses, results and check-in notes are closed to you.' : 'Responses, results and check-in notes stay closed to them.'}{' '}
-        Access ends automatically in {remainingWords(minutes)}.
-      </p>
+      <span className="support-banner-countdown" title={`${remainingWords(minutes)} left`}>
+        <Icon name="countdown" size={16} />
+        <span aria-hidden="true">{remainingWords(minutes)} left</span>
+        <span className="sr-only">Access ends automatically in {remainingWords(minutes)}.</span>
+      </span>
       {/* ONLY THE OPERATOR GETS THE BUTTON, and a customer having no way to eject them is a
           deliberate limit rather than an oversight. Ending somebody else's session is an action
           with a target, which means it is a capability question — and inventing
@@ -133,7 +134,7 @@ function Strip({ support }: { support: SupportContext }): JSX.Element {
           person mid-fix, on the one screen where the fix is happening. The hour is the control
           the customer has, and it is on the strip beside this. */}
       {operator && (
-        <button type="button" className="btn btn-secondary btn-sm" onClick={leave} disabled={leaving}>
+        <button type="button" className="btn btn-secondary btn-sm support-banner-leave" onClick={leave} disabled={leaving}>
           {leaving ? 'Leaving…' : 'Leave'}
         </button>
       )}

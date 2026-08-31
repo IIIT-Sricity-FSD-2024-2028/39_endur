@@ -19,7 +19,7 @@ import {
   Link2, ListChecks, Menu, Network, Plus, QrCode, Send, Settings2, Shield, Sparkles, Sun,
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
   GraduationCap, Building, HeartPulse, Layers,
-  Rocket, Megaphone, CalendarClock,
+  Rocket, Megaphone, CalendarClock, Timer,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -101,6 +101,9 @@ const ICONS = {
   start: Rocket,
   announcement: Megaphone,
   booking: CalendarClock,
+  // The support banner's own countdown (`SupportBanner`) — NOT `booking`, which is a slot
+  // on a calendar. This is time running out on a session, a different concept.
+  countdown: Timer,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
