@@ -26,7 +26,7 @@ import type {
   SupportSessionRow,
   Tier,
 } from '@endur/shared';
-import { TIERS, isQuietOrg, SUPPORT_DENIED_CAPABILITIES } from '@endur/shared';
+import { TIERS, isQuietOrg, supportDeniedFor } from '@endur/shared';
 import type { PaymentKind } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
 import { newPeriod } from '../../billing/period.js';
@@ -1211,6 +1211,10 @@ export async function enterSupport(
   req.session.orgId = orgId;
   await save(req);
 
+  // Resolved once and used three times - the audit row, the response, and (via the same helper)
+  // the grants the resolver mints - so the three cannot disagree about the same session.
+  const denied = supportDeniedFor(operator.role);
+
   const session = await startSupportSession({
     operator: { id: profile.id, name: profile.name },
     orgId,
@@ -1232,8 +1236,11 @@ export async function enterSupport(
       sessionId: session.id,
       expiresAt: session.expiresAt.toISOString(),
       // Recorded on our side too, so the register can answer "what could they see" without anybody having
-      // to remember what the deny list said that day.
-      denied: [...SUPPORT_DENIED_CAPABILITIES],
+      // to remember what the deny list said that day - or, since DEC-115, what it said FOR THIS ROLE.
+      // The role is written alongside it for the same reason: an empty `denied` has to be legibly
+      // "the owner came in", not "somebody forgot to fill this in".
+      role: operator.role,
+      denied: [...denied],
     });
   });
 
@@ -1251,7 +1258,7 @@ export async function enterSupport(
     // A path, not a URL and not a token: a link that granted access would be a credential in a browser
     // history and in every proxy log on the way. The cookie already set is the credential, and it is httpOnly.
     redirectTo: '/app',
-    deniedCapabilities: [...SUPPORT_DENIED_CAPABILITIES],
+    deniedCapabilities: [...denied],
   };
 }
 

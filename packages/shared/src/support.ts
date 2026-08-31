@@ -22,6 +22,7 @@
 // and the operator holds it; the only capabilities they do not hold are the ones somebody
 // wrote down here, with a reason, in the file the reviewer opens.
 import type { Capability } from './capabilities.js';
+import type { PlatformRole } from './platform-capabilities.js';
 
 /**
  * WHAT AN ENDUR OPERATOR STILL CANNOT DO INSIDE A CUSTOMER'S CONSOLE.
@@ -66,10 +67,56 @@ export const SUPPORT_DENIED_CAPABILITIES: readonly Capability[] = [
   'billing.update',
 ];
 
+/**
+ * THE ENDUR OWNER IS NOT SUBJECT TO THE LIST ABOVE. DEC-115, superseding the "both roles,
+ * one deny list" half of DEC-114.
+ *
+ * The list above was written for ONE reader — a support operator answering "is this customer
+ * OK?", which `19` §3 says is answerable without opening anybody's feedback. It was applied
+ * to `owner` too, and that was the mistake: the owner is the party that is ACCOUNTABLE for
+ * the estate, and an accountable party that cannot open the page a customer is complaining
+ * about cannot do the job the accountability implies. Every reason for the list is a reason
+ * about the SUPPORT job, and none of them is a reason about ownership.
+ *
+ * WHAT DOES NOT CHANGE, and it is the part worth reading twice:
+ *
+ *   · The owner's powers are still GRANTS, not a bypass. `mintSupportGrants` still hands
+ *     candidates to the ordinary resolver, so INV-004 (a deny beats an allow) and INV-007
+ *     (the audit row names the deciding grant) apply to the owner exactly as before. There
+ *     is still no `if (support) return next()` anywhere.
+ *   · INV-005 is UNTOUCHED and is not this list's to relax. k-anonymity and the anonymous
+ *     seam are enforced in SQL underneath every reader; an owner holding `results.read` sees
+ *     the same suppressed cells any member with that capability sees.
+ *   · The platform seam (INV-011) is untouched. `platform/db.ts` is still aggregate-only.
+ *     This widens the SUPPORT door for one role, not the operator console's own reach.
+ *   · The customer is still told. `<SupportBanner>` cannot be dismissed, and the register
+ *     still records who entered, why, and — see `platform/service.ts` — what they could see.
+ */
+const OWNER_DENIED_CAPABILITIES: readonly Capability[] = [];
+
+/**
+ * What one platform role cannot do inside a customer's console.
+ *
+ * ROLE-AWARE RATHER THAN ONE ARRAY, because the two roles are answering different questions.
+ * Keep reading it as a deny list per role for the reason the original comment gives: ship a
+ * new capability and the holder holds it, and the only exceptions are the ones somebody
+ * wrote down here with a reason.
+ */
+export const supportDeniedFor = (role: PlatformRole): readonly Capability[] =>
+  role === 'owner' ? OWNER_DENIED_CAPABILITIES : SUPPORT_DENIED_CAPABILITIES;
+
 const DENIED = new Set<string>(SUPPORT_DENIED_CAPABILITIES);
 
-/** Used by the resolver's grant minter and by the banner's copy. One source, two readers. */
+/**
+ * Used by the banner's copy and by anything asking about the STAFF door, which is the
+ * conservative answer and the right default for a caller that does not know the role.
+ * The resolver's grant minter asks `supportDeniedFor` instead, because it does know.
+ */
 export const isSupportDenied = (capability: string): boolean => DENIED.has(capability);
+
+/** The same question, for a caller that knows which role is asking. */
+export const isSupportDeniedFor = (role: PlatformRole, capability: string): boolean =>
+  (supportDeniedFor(role) as readonly string[]).includes(capability);
 
 /**
  * HOW LONG A SUPPORT SESSION LASTS BEFORE IT STOPS BY ITSELF.
@@ -111,6 +158,14 @@ export type SupportContext = {
   viewer: 'operator' | 'member';
   operatorName: string;
   operatorEmail: string;
+  /**
+   * WHICH ENDUR ROLE IS INSIDE, and it is on the wire for one reason: the banner's disclosure
+   * has to be TRUE. DEC-115 gave the owner the capabilities the staff door still refuses, so
+   * "responses, results and check-in notes stay closed to them" became a sentence that is
+   * right for one role and a lie for the other. A promise the customer cannot rely on is worse
+   * than no promise, so the strip reads this and says the thing that is actually the case.
+   */
+  role: PlatformRole;
   /** Why they came in. Typed at the door, stored, and shown to the customer verbatim. */
   reason: string;
   startedAt: string;

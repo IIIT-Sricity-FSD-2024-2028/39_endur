@@ -19,6 +19,8 @@ const contextOf = (over: Partial<SupportContext> = {}): SupportContext => ({
   viewer: 'member',
   operatorName: 'Priya Raman',
   operatorEmail: 'priya@endur.test',
+  // The narrower door is the default fixture, because it is the one with a promise attached.
+  role: 'staff',
   reason: 'Ticket 418 — their campaign will not launch',
   startedAt: '2026-09-10T09:00:00.000Z',
   expiresAt: '2026-09-10T10:00:00.000Z',

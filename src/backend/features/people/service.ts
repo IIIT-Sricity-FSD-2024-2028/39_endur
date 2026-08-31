@@ -23,6 +23,7 @@ import { bumpVersion } from '../org/service.js';
 import { nameMaps, resolveRow } from './positions.js';
 import { assertPersonVisible as assertVisible, personScopeFilter } from './visibility.js';
 import { powersByPlace } from './powers.js';
+import { involvementFor } from './involvement.js';
 import { accountStatusOf } from '../accounts/status.js';
 
 // The list, already filtered to what this caller may see.
@@ -89,7 +90,24 @@ export async function readPerson(
   // One shared implementation with the profile page, so the two can never describe powers differently.
   const places = await powersByPlace(orgId, person.userId, summary.positions, authzVersion);
 
-  return { ...summary, powersByPlace: places };
+  // What they are being ASKED for, which for a respondent is the only thing on the page:
+  // they hold no account and therefore no powers, so before this the most populated people
+  // in the organisation had the emptiest page in it (N-079).
+  //
+  // 'self' is not a shortcut past INV-003. Reading somebody else's list is bounded by the
+  // caller's own campaign.read scope; reading your own is the `self` scope this route
+  // already resolves under, and gating that on an administrative capability would hide
+  // "what am I supposed to fill in" from everybody who is not an administrator.
+  const isSelf = person.userId !== null && person.userId === callerId;
+  const involvement = await involvementFor(
+    orgId,
+    { userId: person.userId, positions: summary.positions, canSignIn: summary.account.state === 'active' },
+    isSelf
+      ? 'self'
+      : await visibleUnits({ orgId, userId: callerId, capability: 'campaign.read', authzVersion }),
+  );
+
+  return { ...summary, powersByPlace: places, involvement };
 }
 
 // Creates a person, plus an invited account when an email was given.

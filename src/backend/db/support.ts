@@ -1,7 +1,7 @@
 // Support access: lets an Endur operator work inside a customer's organisation as a limited member of it.
 // The operator acts as themselves, on a clock, with a stated reason, through the ordinary permission chain.
 import { randomUUID } from 'node:crypto';
-import { SUPPORT_SESSION_MINUTES, type SupportContext } from '@endur/shared';
+import { SUPPORT_SESSION_MINUTES, type PlatformRole, type SupportContext } from '@endur/shared';
 import { prisma } from './client.js';
 
 // A fourth users.status beside active, invited and disabled, so seat counts and member queries skip it.
@@ -102,7 +102,7 @@ export async function loadSupportSession(sessionId: string): Promise<LiveSupport
       reason: true,
       startedAt: true,
       expiresAt: true,
-      operator: { select: { name: true, email: true, status: true } },
+      operator: { select: { name: true, email: true, status: true, role: true } },
     },
   });
   if (!row) return null;
@@ -118,6 +118,7 @@ export async function loadSupportSession(sessionId: string): Promise<LiveSupport
       viewer: 'operator',
       operatorName: row.operator.name,
       operatorEmail: row.operator.email,
+      role: asRole(row.operator.role),
       reason: row.reason,
       startedAt: row.startedAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
@@ -135,7 +136,7 @@ export async function activeSupportFor(orgId: string): Promise<SupportContext | 
       reason: true,
       startedAt: true,
       expiresAt: true,
-      operator: { select: { name: true, email: true, status: true } },
+      operator: { select: { name: true, email: true, status: true, role: true } },
     },
   });
   if (!row || row.operator.status !== 'active') return null;
@@ -143,6 +144,7 @@ export async function activeSupportFor(orgId: string): Promise<SupportContext | 
     viewer: 'member',
     operatorName: row.operator.name,
     operatorEmail: row.operator.email,
+    role: asRole(row.operator.role),
     reason: row.reason,
     startedAt: row.startedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
@@ -157,12 +159,21 @@ export async function endSupportSession(sessionId: string): Promise<void> {
   });
 }
 
-// How long a support principal's minted grants stay valid, or null when no live session exists.
+// `platform_users.role` is a free-text column (19 §3 keeps two named roles rather than an enum),
+// so every read of it narrows here, in one place, and anything unrecognised becomes the NARROWER
+// role. Being wrong towards 'staff' costs an operator a page; being wrong towards 'owner' would
+// widen a door on a typo.
+const asRole = (role: string): PlatformRole => (role === 'owner' ? 'owner' : 'staff');
+
+// How long a support principal's minted grants stay valid AND which platform role is behind
+// it, or null when no live session exists. The role rides along because DEC-115 makes the
+// deny list role-aware, and the resolver must not have to go and fetch it separately - two
+// queries would be two chances for them to disagree about the same session.
 export async function supportGrantWindow(
   orgId: string,
   userId: string,
   at: Date,
-): Promise<{ expiresAt: Date } | null> {
+): Promise<{ expiresAt: Date; role: PlatformRole } | null> {
   const row = await prisma.supportSession.findFirst({
     where: {
       orgId,
@@ -172,7 +183,10 @@ export async function supportGrantWindow(
       user: { status: SUPPORT_STATUS },
     },
     orderBy: { startedAt: 'desc' },
-    select: { expiresAt: true },
+    // The role comes off the OPERATOR row, not off the session: re-roling somebody takes
+    // effect on their next permission check rather than on their next sign-in.
+    select: { expiresAt: true, operator: { select: { role: true } } },
   });
-  return row ? { expiresAt: row.expiresAt } : null;
+  if (!row) return null;
+  return { expiresAt: row.expiresAt, role: asRole(row.operator.role) };
 }

@@ -42,6 +42,13 @@ const PERSON: PersonDetailView = {
       capabilities: [{ capability: 'results.read', scope: 'own_unit' }],
     },
   ],
+  involvement: [
+    {
+      id: 'c1', name: 'Kitchen poll', status: 'open', reason: 'audience',
+      via: 'Dean — Engineering', startsAt: null, endsAt: null,
+      anonymous: true, url: 'https://example.test/r/abcd1234',
+    },
+  ],
 };
 
 const units: UnitNode[] = [
@@ -84,10 +91,39 @@ const mount = (capabilities: Capability[] = ALL) =>
   );
 
 describe('/app/people/:id', () => {
-  it('shows identity, the account, positions and powers — in that order, payload last', () => {
+  it('shows identity, the account, positions, what they are asked for, and powers', () => {
     mount();
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(['Identity', 'Account', 'Positions', 'What they can do, and where']);
+    expect(headings).toEqual([
+      'Identity', 'Account', 'Positions',
+      // INV-001 — the noun is the ORGANISATION'S. An English "Campaigns" here would mean the
+      // page hardcoded one, and the fixture vocabulary is nonsense so that it cannot hide.
+      'Plithes they are part of',
+      'What they can do, and where',
+    ]);
+  });
+
+  /**
+   * N-079. Every block above this one is about POWER, and a respondent holds none by
+   * construction (DEC-009: no account, no grants) — so on the page of the thirty students in
+   * a college of forty-five, all of them are empty. This is the block that is not.
+   */
+  it('lists what the person is being asked for, with the position that put them there', () => {
+    mount();
+    const section = screen.getByRole('heading', { name: 'Plithes they are part of' })
+      .closest('.settings-card') as HTMLElement;
+    expect(within(section).getByText('Kitchen poll')).toBeTruthy();
+    expect(within(section).getByText('Dean — Engineering')).toBeTruthy();
+  });
+
+  it('drops the whole block when the API returned nothing for it', () => {
+    // [] is BOTH "nothing is open" and "this caller holds no campaign.read anywhere", and the
+    // server cannot tell them apart on the way out. A section that rendered an empty state
+    // would be asserting the first while the second was true — 46's rule is that a section a
+    // caller cannot read is absent, not greyed.
+    state = { data: { ...PERSON, involvement: [] }, loading: false, error: null };
+    mount();
+    expect(screen.queryByRole('heading', { name: 'Plithes they are part of' })).toBeNull();
   });
 
   it('PROVES INV-005 on the page — Engineering’s powers are absent from Mechanical', () => {

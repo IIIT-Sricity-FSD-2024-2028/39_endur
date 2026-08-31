@@ -1,7 +1,7 @@
 # 34 — People
 
 Phase: P2 · Milestone: — (cut-list item 7 — seed only if behind) · Related: `57` (accounts)
-Status: **LIST BUILT 2026-08-23 (`T-050`) · DETAIL PAGE BUILT 2026-08-24 (`T-051`) · CSV import + accounts BUILT 2026-08-25 (`T-050`/`T-073`)** — only the two-hat preset buttons remain unbuilt
+Status: **LIST BUILT 2026-08-23 (`T-050`) · DETAIL PAGE BUILT 2026-08-24 (`T-051`) · CSV import + accounts BUILT 2026-08-25 (`T-050`/`T-073`) · INVOLVEMENT BLOCK BUILT 2026-09-01 (`N-079`)** — only the two-hat preset buttons remain unbuilt
 Owns: `src/frontend/pages/console/People/**`, `src/frontend/lib/people.ts`
 Design ref: `design_specs/design/04` §4.4, `customization.md` §9 screen 9
 
@@ -30,12 +30,24 @@ where it becomes visible.
 subtree's people; others are absent, not greyed. `meta.total` counts what the caller may see
 (`13` §4).
 
+**`involvement` carries a SECOND scope on the same response — `N-079`.** Reading which
+campaigns somebody is part of is bounded by the reader's own `campaign.read`, not by
+`person.read`: a hostel caretaker who can see a student sees the hostel's campaigns against
+them and not the department's. It is the same `scopeToCampaigns` filter the campaigns list
+runs, so the two can never disagree. A reader holding `campaign.read` nowhere gets `[]`, and
+the page drops the whole block rather than rendering an empty state — `[]` cannot be told
+from *"nothing is open"* on the way out, and `46`'s rule is that a section a caller cannot
+read is absent, not greyed.
+
+No new capability. Inverting an audience rule the caller may already read discloses nothing
+the campaigns list does not.
+
 ## Data contract
 
 | Action | Endpoint | DTO |
 |---|---|---|
 | List | `GET /api/v1/people?cursor&limit&q&unitId&roleId` | → paginated `PersonSummary[]` |
-| Detail | `GET /api/v1/people/:id` | → `PersonDetail` incl. positions and effective powers |
+| Detail | `GET /api/v1/people/:id` | → `PersonDetail` incl. positions, effective powers and `involvement` |
 | Create | `POST /api/v1/people` | `CreatePersonBody { name, email, positions[] }` |
 | Update | `PATCH /api/v1/people/:id` | `UpdatePersonBody { name?, email? }` — **no `status`, see below** |
 | Add position | `POST /api/v1/people/:id/assignments` | `CreateAssignmentBody { roleId, unitId, isPrimary?, validFrom?, validTo? }` |
@@ -57,7 +69,17 @@ The CSV import wizard holds its mapping in local state across the preview → co
 ## Components
 
 `<PageHeader>` · `<ResponsiveTable>` · `<PersonChip>` · `<ConfirmDialog>` · `<EmptyState>` ·
-`<Toast>`.
+`<Toast>` · `<PowersByPlace>` · `<Involvement>` (`24` §4 — both shared with `47`).
+
+**THE DETAIL PAGE'S FIFTH BLOCK, AND THE ONE THAT MADE THE PAGE TRUE FOR MOST PEOPLE IN IT.**
+Identity, account, positions and powers are all about POWER, and a respondent has none by
+construction (`DEC-009` — no account, therefore no grants). Opening a student in a seeded
+college showed four blocks, three of them empty and the fourth saying *"they cannot sign in to
+anything"*, while five polls addressed to their role were collecting one screen away. The
+organisation's whole reason for holding that person was invisible on their page.
+`<Involvement>` answers it: what they are asked to answer, what is open to them, and what is
+being collected about them. It never says whether they answered — INV-006, and `13` § People
+has the argument.
 
 ## Interactions
 

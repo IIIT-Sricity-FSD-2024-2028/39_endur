@@ -51,6 +51,33 @@ function remainingWords(minutes: number): string {
   return `${minutes} minute${minutes === 1 ? '' : 's'}`;
 }
 
+/**
+ * WHAT THIS SESSION CAN ACTUALLY REACH, said in one sentence to whichever of the two people
+ * is reading it.
+ *
+ * THIS FUNCTION EXISTS BECAUSE DEC-115 MADE THE OLD SENTENCE FALSE FOR ONE ROLE. The strip
+ * used to say "responses, results and check-in notes stay closed to them" unconditionally,
+ * which was true while both Endur roles carried the same deny list and became a lie the moment
+ * the owner stopped carrying it. A disclosure the customer cannot rely on is worse than none —
+ * it is the same words doing the opposite job — so the sentence follows the powers.
+ *
+ * THE OWNER'S VERSION SAYS THE UNCOMFORTABLE THING PLAINLY, and deliberately does not reach for
+ * softer words. "Full access" is what it is; a customer reading "elevated access" and finding
+ * out later what that meant is the failure this whole component was built to prevent. The two
+ * facts that DO still limit it — the clock, and the register — are stated with it, because they
+ * are the ones the customer can actually hold Endur to.
+ */
+export function reachOf(role: SupportContext['role'], operator: boolean): string {
+  if (role === 'owner') {
+    return operator
+      ? 'As an Endur owner you have full access to this organisation, responses and results included. Every action is recorded in their audit log under your name.'
+      : 'As an Endur owner, they have full access to this organisation, responses and results included. Every action is recorded in your audit log under their name.';
+  }
+  return operator
+    ? 'Responses, results and check-in notes are closed to you.'
+    : 'Responses, results and check-in notes stay closed to them.';
+}
+
 export function SupportBanner(): JSX.Element | null {
   const support = useAppSelector((s) => s.auth.support);
   return support ? <Strip support={support} /> : null;
@@ -118,9 +145,7 @@ function Strip({ support }: { support: SupportContext }): JSX.Element {
         ) : (
           <>{support.operatorName} from Endur support is signed in to your organisation.</>
         )}{' '}
-        {operator
-          ? 'Responses, results and check-in notes are closed to you.'
-          : 'Responses, results and check-in notes stay closed to them.'}
+        {reachOf(support.role, operator)}
       </p>
       <span className="support-banner-countdown" title={`${remainingWords(minutes)} left`}>
         <Icon name="countdown" size={16} />

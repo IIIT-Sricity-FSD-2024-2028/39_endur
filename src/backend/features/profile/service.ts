@@ -48,6 +48,10 @@ export async function readProfile(
     },
     positions: person.positions,
     powersByPlace: person.powersByPlace,
+    // readPerson() recognises that the caller IS this person and hands back the unfiltered
+    // list. That recognition lives there rather than here for the usual reason: this page
+    // reads THROUGH the people page's function, never around it.
+    involvement: person.involvement,
   };
 }
 

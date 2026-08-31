@@ -467,6 +467,45 @@ department's results?"* is answered by the scope, not by the verb.
 because `42` is `T-054` and a link to a `<Placeholder>` is what `design_specs/design/02` §7
 forbids; the prop exists so that task is a wiring change rather than a redesign.
 
+### `<Involvement>`  ·  **BUILT 2026-09-01 (`N-079`)**
+```ts
+{ items: PersonCampaign[]; who: 'them' | 'you'; emptyHint: string;
+  canOpenCampaign?: boolean }
+```
+**The second one-block-two-placements pair, and it sits directly beneath the first** —
+`/app/people/:id` (`34`) and `/app/profile` (`47`), the same two screens `<PowersByPlace>`
+serves. `who` is the only word the two placements disagree about, which is why it is a prop
+rather than two components.
+
+**WHY IT EXISTS, which is the part worth keeping.** Every block on `/app/people/:id` was about
+POWER — identity, account, positions, and what those positions confer — and a respondent holds
+none of it by construction (`DEC-009`: no account, so no grants). The page for the thirty
+students in a college of forty-five was therefore the emptiest page in the product, while five
+polls addressed to their role were open one screen away. This block is the fourth question and,
+for most of an organisation, the only one with an answer.
+
+**Three groups, in a fixed order, and the order is an argument.** *About them* first, because
+being reviewed is what somebody most needs to know is happening; *asked to answer* second,
+because the organisation named them; *open to everyone* last, because it is true of every
+member of staff and says nothing about this person. Flattening them would claim two false
+things at once — that a poll for every student is personally about this one, and that a review
+*of* them is merely something they may answer.
+
+**`via` is printed and is not decoration.** *"Why am I on this list?"* is the only question a
+row raises, and the answer differs by rule kind: a role rule shows the ROLE alone (`Student`),
+because a poll for every student is not a departmental one; a unit rule shows the whole
+position (`Student — AIDS`), because there the place is exactly what makes it theirs. `null`
+for *open to everyone*, which names nobody.
+
+**The name is a link only when the reader may follow it.** `/app/campaigns/:id` needs
+`campaign.read`, an administrative capability that the people this block was built for do not
+hold — so `canOpenCampaign` false leaves the name as text. The respondent link is always
+offered, because that is the useful action on both screens: answer it, or send it to them.
+
+**No `responded` state, and the prop does not exist to pass one** — INV-006. See
+`PersonCampaign` in `dto/person.ts` for why the schema cannot answer it and why answering it
+for the non-anonymous rows alone would be worse than not answering it at all.
+
 ### `<PowersGrid>`
 ```ts
 { grid: GridController; editable: boolean; myRoleIds: string[] }
@@ -1249,7 +1288,7 @@ that has been misled about the one thing `52` promises them.
 
 | Track | Builds |
 |---|---|
-| **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersByPlace, PowersGrid, ResponsiveTable |
+| **B — Console** | AppShell, Sidebar, TopBar, PageHeader, VocabularyChips, UnitTree, WordsEditor, RoleRow, PersonChip, PowersByPlace, Involvement, PowersGrid, ResponsiveTable |
 | **C — Collection** | QuestionCard, 6 editors, 6 inputs, Toggle, ShareSheet, ProgressRail, StatCard, BarRow, StackedBar, ScoreBadge, TrendChip, FileUpload |
 
 `<ScoreBadge>` left lane C's *unbuilt* column at T-080 (`CONF-022`); `<TrendChip>` has not,

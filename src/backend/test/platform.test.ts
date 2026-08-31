@@ -8,7 +8,7 @@ import { app, registerOrg, setUpOrg, unique, withCsrf, type Session } from './he
 import { prisma } from '../db/client.js';
 import { hashPassword } from '../auth/password.js';
 import { platformClient, PlatformSeamViolation } from '../platform/db.js';
-import { currentCode, generateSecret, verifyCode } from '../platform/totp.js';
+import { codeAt, currentCode, generateSecret, verifyCode } from '../platform/totp.js';
 import { TIER_ENTITLEMENTS } from '../billing/entitlements.js';
 
 const PASSWORD = 'an-operator-password';
@@ -145,11 +145,30 @@ describe('operator login', () => {
     expect(ok.status).toBe(200);
   });
 
-  it('accepts a code one step either side of now and nothing further', () => {
+  it('accepts the code for THIS step and no other', () => {
+    // THIS TEST USED TO BE A LIE, AND THE LIE WAS TIME-SHAPED. It was written against the usual
+    // 30-second TOTP step and asserted in wall-clock seconds: "30s ago still works, 5 minutes ago
+    // does not". `totp.ts` then moved to a FIVE HOUR step to keep the seeded demo workable, and
+    // both offsets became rounding error - now, now-30s and now-5min are almost always the same
+    // counter. So the second assertion proved nothing and the third failed outright, except in
+    // the five-minute sliver right after a step boundary where it happened to pass. A test that
+    // is right for 1.7% of the day is worse than no test: it fails for reasons that have nothing
+    // to do with the change in front of whoever is reading the run.
+    //
+    // Now it counts in STEPS rather than in seconds, via `codeAt`, so it does not depend on what
+    // time it is and does not need editing again if the step length moves. The property it is
+    // actually about is WINDOW === 0: with a step this long, accepting a neighbour would double
+    // the life of a code, so neither neighbour may be accepted.
     const secret = generateSecret();
+    const now = Math.floor(Date.now() / 1000 / (5 * 60 * 60));
+
     expect(verifyCode(secret, currentCode(secret))).toBe(true);
-    expect(verifyCode(secret, currentCode(secret, new Date(Date.now() - 30_000)))).toBe(true);
-    expect(verifyCode(secret, currentCode(secret, new Date(Date.now() - 5 * 60_000)))).toBe(false);
+    expect(verifyCode(secret, codeAt(secret, now))).toBe(true);
+
+    // No drift allowance in either direction - the previous code is dead and the next is not born.
+    expect(verifyCode(secret, codeAt(secret, now - 1))).toBe(false);
+    expect(verifyCode(secret, codeAt(secret, now + 1))).toBe(false);
+    expect(verifyCode(secret, codeAt(secret, now - 10))).toBe(false);
   });
 });
 

@@ -14,9 +14,12 @@ import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { FileUpload } from '../../../components/form/FileUpload.js';
 import { InlineName } from '../../../components/org/InlineName.js';
 import { PowersByPlace } from '../../../components/org/PowersByPlace.js';
+import { Involvement } from '../../../components/org/Involvement.js';
 import { PositionChip } from '../People/PositionEditor.js';
 import { apiDelete, apiUpload, ApiError } from '../../../lib/api.js';
 import { useRefreshSession } from '../../../lib/auth.js';
+import { useCan } from '../../../lib/capabilities.js';
+import { useLabels } from '../../../lib/labels.js';
 import { useProfile } from '../../../lib/profile.js';
 import { formatDate, formatRelative } from '../../../lib/format.js';
 import { useAppSelector } from '../../../store/index.js';
@@ -28,6 +31,8 @@ export default function Profile(): JSX.Element {
   const sessionUser = useAppSelector((state) => state.auth.user);
   const refresh = useRefreshSession();
   const profile = useProfile();
+  const labels = useLabels();
+  const can = useCan();
   const [error, setError] = useState<string | null>(null);
 
   const user = profile.data?.user ?? null;
@@ -153,6 +158,31 @@ export default function Profile(): JSX.Element {
             <p className="field-help">
               Read-only. Nobody gives themselves a position — including you.
             </p>
+          </div>
+        </section>
+
+        {/* NOT GATED, AND NOT CONDITIONAL EITHER — the two differences from `/people/:id`.
+            The server does not filter this list by `campaign.read` when you are reading
+            your own profile (`47` § Capabilities), and the empty state is a real answer
+            here rather than a permission artefact: "nothing is waiting on you" is worth
+            saying to somebody who came looking. */}
+        <section className="settings-card" aria-labelledby="profile-involvement">
+          <h3 className="utility" id="profile-involvement">
+            {labels.campaign.many} you are part of
+          </h3>
+          <div className="card">
+            {profile.loading && !profile.data ? (
+              <div className="tree-skeleton" aria-hidden="true">
+                {[0, 1].map((row) => <span key={row} className="skeleton-row wide" />)}
+              </div>
+            ) : (
+              <Involvement
+                items={profile.data?.involvement ?? []}
+                who="you"
+                emptyHint="Nothing is open for you to answer right now."
+                canOpenCampaign={can('campaign.read')}
+              />
+            )}
           </div>
         </section>
 

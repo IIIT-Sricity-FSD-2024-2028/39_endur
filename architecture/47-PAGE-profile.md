@@ -1,7 +1,7 @@
 # 47 — My profile
 
 Phase: P2 · Milestone: — · Design ref: `design_specs/design/04-PAGE-ADMIN-CONSOLE.md` §4.4 (reuses the person-detail anatomy)
-Status: **BUILT 2026-08-24 (`T-051`)** — all four blocks. The `Why?` link waits on `42` (`T-054`)
+Status: **BUILT 2026-08-24 (`T-051`)** — all four blocks · **FIFTH BLOCK BUILT 2026-09-01 (`N-079`)**, what you are being asked for. The `Why?` link waits on `42` (`T-054`)
 Owns: `src/frontend/pages/console/Profile/**`, `src/frontend/lib/profile.ts`, `src/backend/features/profile/**`, `packages/shared/src/dto/profile.ts`
 
 ## Purpose
@@ -30,9 +30,18 @@ bar (`24` §2).
 | Change own password | — (session identity is the authorisation) | — |
 | Upload own avatar | `person.update` | `self` |
 | View own effective powers | `person.read` | `self` |
+| View what you are asked to answer | `person.read` | `self` — **and deliberately NOT `campaign.read`** |
 
 **Every role gets these `self` grants by default** (`11` §8). A profile page nobody can open
 is a bug, and it is the kind of bug a default-deny model produces if `self` is forgotten.
+
+**The last row is the one to read twice — `N-079`.** `/people/:id` filters `involvement` by
+the reader's `campaign.read` scope, because there the reader is an administrator looking at
+somebody else. Here it is not filtered at all, and gating it would be the `self`-forgotten bug
+in a new place: `campaign.read` is an ADMINISTRATIVE capability, so a gate on it would hide
+*"what am I supposed to fill in"* from every junior member of staff — the entire population
+that needs the answer. Which campaigns are addressed to you is a fact about you, and `self` is
+the scope for facts about yourself.
 
 Password change is deliberately **not** capability-gated: proving you are the session holder
 *is* the authorisation, and it additionally requires the current password (§Interactions).
@@ -54,6 +63,11 @@ export type ProfileView = {
   positions: Position[];
   /** `PowersAtPlace[]` — again the same type, scope included. */
   powersByPlace: PowersAtPlace[];
+  /**
+   * `PersonCampaign[]` — the same type again, and UNFILTERED here (`N-079`). See
+   * § Capabilities for why gating this on `campaign.read` would be the bug, not the fix.
+   */
+  involvement: PersonCampaign[];
 };
 ```
 
@@ -88,7 +102,16 @@ reflects it immediately without a reload.
 ## Components
 
 `<PageHeader>` · `<PersonChip>` · `<ConfirmDialog>` · `<Toast>` · `<FileUpload>` (`48`) ·
-`<EmptyState>`. No new components.
+`<EmptyState>` · `<PowersByPlace>` · `<Involvement>` (`24` §4, both shared with `34`).
+
+**`<Involvement>` renders the same shape here as on `34`, with one word changed** — "you"
+rather than "them" — and one behaviour changed: the empty state STAYS. On `34` an empty list
+is ambiguous (nothing open, or nothing the reader may see) so the block disappears; here
+nothing is filtered, so `[]` means `[]` and *"nothing is open for you to answer right now"* is
+a real answer worth giving somebody who came looking.
+
+This is the only page in the console a person with no administrative capability can open,
+which makes it the only place they can be told what is waiting on them.
 
 ## Interactions
 
