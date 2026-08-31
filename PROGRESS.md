@@ -2589,7 +2589,51 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-09-01 (latest) · `DEC-115` — the Endur owner can finally read the results it created
+### 2026-09-01 (latest) · the earnings page was right and the estate was the lie
+
+**Reported by the owner:** *"two enterprise estates yet only ₹500 earned — they must have paid
+sometime in the past, no?"* Yes, and they hadn't. `1647/1647`, typecheck 0, lint 0. **No
+migration, no new endpoint, no schema change.**
+
+**THE PAGE WAS NOT WRONG. `earnings()` WAS FAITHFULLY REPORTING A LEDGER WITH ONE ROW IN IT.**
+The dev estate held five organisations — two Enterprise, two Gold, one Bronze — and exactly one
+`payment`, a ₹500 silver→gold change somebody had made through the UI. Everything else on a
+paid tier had been put there for free.
+
+**!! THE SEED WAS THE ONLY WRITER IN THE PRODUCT THAT MOVED A TIER WITHOUT CHARGING FOR IT.**
+`auth/service.ts` writes a `signup` beside the subscription, `billing/service.ts` writes a
+`change`, and `approveEnterpriseRequest` was itself built (see its comment) because a plan
+override *"writes no payment row — so the one tier charged at the highest price earned nothing
+on the earnings page"*. `demo.ts` and `iiit.ts` then did precisely that, five times, and the
+estate they produced made the earnings page look broken to the one person who reads it.
+
+**The seed now seeds the JOURNEY, not the destination.** New `database/seed/billing-history.ts`:
+every org joins on Bronze ten months ago and upgrades four months ago, both rows priced by
+`changeCostMinor` through `recordPayment` — still the only place a price is worked out. So the
+lifetime figure is checkable by hand against the plan catalogue: Bronze ₹99, Silver ₹499, Gold
+₹999, Enterprise ₹4,999 each, ₹11,595 across the estate. **Enterprise never arrives as a
+`signup`**, because DEC-048/DEC-100 means no route sells it that way — it is a Bronze join plus
+a `change`, the shape `approveEnterpriseRequest` writes.
+
+**`recordPayment` gained an optional `at`.** Only the seed passes it; everything in the running
+product omits it and gets `now()` from the column default. It is on the ledger's single writer
+rather than in the seed on purpose — a seed writing its own rows to get a backdate would have
+been a second writer pricing its own history, and a hand-priced demo row is a number nobody can
+check.
+
+**Verified in a throwaway database, NOT by resetting the dev one.** The seed is idempotent per
+org, so `db:seed` will not backfill orgs that already exist — and `db:reset` would have thrown
+away the Grand Palace upgrade and the support sessions. `endur_seedcheck` was created, migrated,
+seeded, read, and dropped. **The dev DB still shows ₹500 and will until somebody resets it** —
+that is the one thing left, and it is the owner's call, not a code fix.
+
+**Three tests pin it** in `seed.test.ts`, all pure: each tier's history sums to that tier's list
+price, no `signup` ever lands above Bronze, and Bronze is charged exactly once (a second row
+would be the ₹0 capture `tiers.ts` warns about).
+
+**Next session:** run `npm run db:reset` when you want the dev estate's books to match.
+
+### 2026-09-01 · `DEC-115` — the Endur owner can finally read the results it created
 
 **Reported by the owner:** *"if the owner enters an estate via console it can create and
 control forms/polls fine but can't check results — it says no permission."* True, and it was

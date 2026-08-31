@@ -6,6 +6,7 @@ import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, levelForRole, presetFor } from '../../presets/index.js';
 import { mintToken } from '../../features/campaigns/token.js';
 import { newPeriod } from '../../billing/period.js';
+import { seedBillingHistory } from './billing-history.js';
 import { Rng } from './random.js';
 import { seedResponses } from './responses.js';
 import { ORGANISATION_SUBJECT } from '../../features/campaigns/visibility.js';
@@ -295,6 +296,7 @@ export async function seedOrg(
   const orgId = org.id;
 
   // The subscription row, so the org really is on its tier. One month from today, billing nothing.
+  // The payments that PUT it on that tier are written at 3b, once there is a payer to name.
   await prisma.subscription.create({
     data: { orgId, tier: spec.tier, status: 'active', ...newPeriod() },
   });
@@ -405,6 +407,16 @@ export async function seedOrg(
     }
   }
   if (!supervisorUserId) supervisorUserId = adminUserId;
+
+  // 3b. The billing past. AFTER the staff loop rather than beside the `Subscription` row above,
+  // because a capture names a payer and the admin who would have made it does not exist until
+  // here - the same order the real join flow has, where the person is created before they pay.
+  await seedBillingHistory(prisma, {
+    orgId,
+    tier: spec.tier,
+    payerName: adminName,
+    payerEmail: `admin@${spec.slug}.endur.test`,
+  });
 
   // 4. Templates, copied from the preset.
   const templateIds = new Map<string, string>();

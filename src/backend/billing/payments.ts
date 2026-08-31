@@ -31,6 +31,17 @@ export async function recordPayment(
     payerEmail: string;
     // Whatever reference the client says it captured. A label only.
     reference?: string | null;
+    /**
+     * WHEN THE MONEY MOVED, for the one caller that is describing the past rather than making
+     * it: the seed. Everything in the running product omits it and gets `now()` from the
+     * column default, which is the only correct answer for a capture that is happening.
+     *
+     * IT IS HERE RATHER THAN IN THE SEED because this file is "the only writer of the payment
+     * ledger, and the only place a price is worked out" - and the seed writing its own rows to
+     * get a date would have been a second writer that prices its own history. A backdated row
+     * priced by `changeCostMinor` is a demo; a hand-priced one is a number nobody can check.
+     */
+    at?: Date;
   },
 ) {
   return tx.payment.create({
@@ -49,6 +60,8 @@ export async function recordPayment(
       currency: 'INR',
       status: 'succeeded',
       reference: input.reference?.trim() || paymentReference(),
+      // Omitted in the product, so the column default stands and a capture is stamped when it happens.
+      ...(input.at ? { createdAt: input.at } : {}),
     },
   });
 }
