@@ -249,14 +249,14 @@ export default function OrgDetail(): JSX.Element {
             is held by both roles, so in practice this is present for everybody; the gate is
             here because the day it is narrowed, the card should vanish rather than mock. */}
         {can('platform.support.enter') && (
-          <section className="card">
+          <section className="card ops-support-card">
             <h3>Open this organisation’s console</h3>
             <p className="text-meta">
               You will be signed in to {org.name} as yourself, for {SUPPORT_SESSION_MINUTES}{' '}
               minutes, under a banner they cannot dismiss. Responses, results, analysis and
               check-in notes stay closed to you — those refuse with a trace, not silently.
             </p>
-            <label className="field">
+            <label className="field ops-support-field">
               <span className="field-label">Why are you going in?</span>
               {/* REQUIRED, AND THE DISABLED BUTTON IS THE GUARD RATHER THAN AN EARLY RETURN
                   (`D-043`). The customer reads this sentence verbatim on every page for the
@@ -279,7 +279,7 @@ export default function OrgDetail(): JSX.Element {
             </label>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary ops-support-submit"
               disabled={supportBusy || supportReason.trim().length < 10}
               onClick={enterConsole}
             >

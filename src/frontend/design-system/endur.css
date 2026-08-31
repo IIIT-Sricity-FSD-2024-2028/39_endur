@@ -741,7 +741,10 @@
    field keeps one silhouette and the layout does not shift when it appears. */
 .input-reveal { position: relative; display: block; }
 .input-reveal .input { padding-right: 40px; }
-.reveal-toggle {
+/* `.btn-icon` (below, later in this file) also sets width/height/padding at equal
+   specificity and would win on source order alone — `.input-reveal .reveal-toggle`
+   is scoped one level deeper so this button keeps its own size regardless. */
+.input-reveal .reveal-toggle {
   position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
   width: 30px; height: 30px; min-height: 0; padding: 0;
   background: none; border: 0; color: inherit;
@@ -4182,6 +4185,27 @@ html:active-view-transition * {
    other `.plan-grid` on the product gets. This section is deliberately NOT `.card`. */
 .ops-plan-section { display: flex; flex-direction: column; gap: var(--space-3); }
 
+/* "Open this organisation's console" — the support-entry card. Its own field, hint and
+   button ran together with no rhythm at all: `.field` has no base layout of its own (it is
+   whatever tag it is put on, unstyled), so the label span, the input and the hint span sat
+   in default inline flow — the hint span landing on the SAME LINE as the input's right edge
+   rather than below it. This scopes a real column layout to this one card rather than
+   touching bare `.field`, which other screens already lay out row-wise (`.booking-new`,
+   `.slot-editor-row`) and must not be disturbed. */
+.ops-support-card { gap: var(--space-4); }
+.ops-support-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+.ops-support-field .field-hint {
+  margin: 0;
+  font-size: var(--text-micro);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.ops-support-submit { align-self: flex-start; }
+
 /* <OrgRow> — referenced since `70`/`T-066` but never given a rule, so every row in the
    estate list rendered as a bare unstyled <button>: no card weight, no hover, the tier
    tag and the meta line stacked with no rhythm. `DEC-078` turned this up while giving
@@ -5737,21 +5761,41 @@ textarea.input {
   line-height: 1.5;
 }
 
-.support-banner-text { margin: 0; }
-
-/* The operator's own words, marked as quoted rather than merely italic — the customer needs
-   to see where the product stops speaking and a person starts. */
-.support-banner-reason { font-style: italic; }
-
-/* Lighter than the sentence above it, and it wraps to its own line on a phone rather than
-   being truncated: "what they cannot see" is the half a customer most needs, so it is the
-   half that must never be the one that gets cut. */
-.support-banner-meta {
-  margin: 0;
+/* THE COUNTDOWN PILL. Solid rather than tinted like the strip around it, so the one number
+   that is actually moving reads as a control rather than more of the sentence. Tabular
+   figures because "12 minutes" reflowing to "9 minutes" every thirty seconds must not also
+   reflow the pill's width. Pushed right with its own auto margin now that the sentence and
+   meta line that used to carry that margin are screen-reader only. */
+.support-banner-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
-  opacity: 0.85;
+  padding: 3px var(--space-2);
+  border-radius: 999px;
+  background: var(--status-bad-500);
+  color: var(--color-bg);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Outlined in the strip's own ink rather than the neutral secondary grey every other `Leave`
+   or `Cancel` button uses — this one button lives on an alarm-toned strip, and blending into
+   it read as disabled. Solid on hover, the same shift a destructive action gets elsewhere. */
+.support-banner-leave {
+  border-color: var(--status-bad-500);
+  color: var(--status-bad-800);
+  background: transparent;
+}
+.support-banner-leave:hover:not(:disabled) {
+  background: var(--status-bad-500);
+  color: var(--color-bg);
+  border-color: var(--status-bad-500);
 }
 
 @media (max-width: 40rem) {
-  .support-banner-meta { margin-left: 0; }
+  .support-banner-countdown { margin-left: 0; }
+  .support-banner { align-items: flex-start; }
 }
