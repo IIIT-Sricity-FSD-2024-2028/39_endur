@@ -7,6 +7,7 @@ import type { LoginBody, MeResponse, RegisterBody } from '@endur/shared';
 import { prisma } from '../../db/client.js';
 import { verifyPassword } from '../../auth/password.js';
 import { destroy, regenerate, save } from '../../auth/session.js';
+import { activeSupportFor, endSupportSession } from '../../db/support.js';
 import { issueCsrfToken } from '../../middleware/csrfProtection.js';
 import { validate } from '../../middleware/validate.js';
 import { scopedRateLimits } from '../../middleware/rateLimit.js';
@@ -89,6 +90,12 @@ authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res,
       where: {
         email: body.email,
         passwordHash: { not: null },
+        // DEC-114. The synthetic member a support session acts as is never a login. It
+        // already has no hash, so the line above excludes it — this one excludes it for a
+        // SECOND, independent reason, because the first is a property of a column somebody
+        // could set by hand one day and this is a property of what the row is. The account
+        // exists to be an audit actor inside a tenant and for nothing else (19 §15).
+        status: { not: 'support' },
         ...(body.orgId ? { orgId: body.orgId } : {}),
       },
       orderBy: { createdAt: 'asc' },
@@ -159,9 +166,19 @@ authRouter.post('/login', scopedRateLimits.login, validate(LoginDto), (req, res,
 });
 
 authRouter.post('/logout', (req, res, next) => {
+  // DEC-114. A SUPPORT SESSION IS ENDED BY SIGNING OUT, and the row is closed BEFORE the
+  // session record is destroyed.
+  //
+  // The row is what confers the powers — `authenticate` resolves it on every request — so
+  // ending it first means access is gone even if the destroy below fails. The other order
+  // would leave a browser with no cookie and a live row, which anybody replaying a captured
+  // cookie could still use. It also keeps the register honest: an operator who signs out
+  // instead of pressing Leave has still left, and the register should say when.
+  const sessionId = req.sessionID;
   // Destroy the record server-side. Clearing the cookie alone would leave a valid session
   // id alive for anyone who captured it.
-  void destroy(req)
+  void endSupportSession(sessionId)
+    .then(() => destroy(req))
     .then(() => {
       res.clearCookie('endur.sid', { path: '/' });
       res.clearCookie('endur.csrf', { path: '/' });
@@ -195,6 +212,27 @@ authRouter.get('/me', authenticate, (req, res, next) => {
       },
       labels: resolveLabels(user.org.labels as never),
       capabilities: await heldCapabilities(user.org.id, user.id),
+      // DEC-114. Present only inside a support session, and it rides on THIS response rather
+      // than a route of its own because `<AppShell>` must render the banner on its first
+      // paint. A second request would mean a customer's console looks ordinary for a frame
+      // and then admits it is being driven by somebody from Endur, which is the wrong order
+      // to learn that in.
+      //
+      // `capabilities` above is already correct for a support session without being told
+      // about one: `heldCapabilities` reads `collectGrants`, which is where the minted grants
+      // come from, so the sidebar hides Results for an operator for the same reason it hides
+      // it for anybody who has been denied it.
+      //
+      // TWO SOURCES, AND THE SECOND ONE IS THE DISCLOSURE. `principal.support` is the caller's
+      // own session and can only ever tell the OPERATOR something they already know. The
+      // customer is signed in to a different session and carries no support flag at all, so
+      // without the second branch their console would look exactly as it always does while
+      // somebody from Endur drove it — a promise legible only to the person being watched.
+      // One extra indexed lookup, once per boot, on a table that is empty for almost every
+      // organisation almost always.
+      ...(principal.support
+        ? { support: principal.support }
+        : await activeSupportFor(user.org.id).then((live) => (live ? { support: live } : {}))),
     };
     res.json(body);
   })().catch(next);

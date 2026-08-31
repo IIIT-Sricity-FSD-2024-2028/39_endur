@@ -6,7 +6,12 @@
 // carries no field that could.
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PLAN_OPTIONS, type Tier } from '@endur/shared';
+import {
+  PLAN_OPTIONS,
+  SUPPORT_SESSION_MINUTES,
+  type EnterSupportResponse,
+  type Tier,
+} from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { Toast } from '../../../components/feedback/Toast.js';
@@ -29,6 +34,8 @@ export default function OrgDetail(): JSX.Element {
   const [suspendConfirmText, setSuspendConfirmText] = useState('');
   const [suspendBusy, setSuspendBusy] = useState(false);
   const [messageSending, setMessageSending] = useState(false);
+  const [supportReason, setSupportReason] = useState('');
+  const [supportBusy, setSupportBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +100,33 @@ export default function OrgDetail(): JSX.Element {
       })
       .catch((err) => setError(err instanceof OpsError ? err.message : 'Could not change suspension.'))
       .finally(() => setSuspendBusy(false));
+  };
+
+  /**
+   * ENTER THE CUSTOMER'S OWN CONSOLE — DEC-114, `19` §15.
+   *
+   * A FULL PAGE NAVIGATION, DELIBERATELY, and not `navigate('/app')`. The response has just set
+   * a new session cookie for a different world: the ops store holds an operator, the auth store
+   * holds nothing, and a client-side route change would carry both across into a console that
+   * has never called `/auth/me`. Reloading is the honest thing — the SPA boots from scratch,
+   * reads the session it now has, and `<SupportBanner>` is on the first paint rather than
+   * appearing after a flash of an ordinary console.
+   */
+  const enterConsole = (): void => {
+    if (!id || supportReason.trim().length < 10) return;
+    setSupportBusy(true);
+    setError(null);
+    void opsPost<{ reason: string }, { data: EnterSupportResponse }>(
+      `/orgs/${id}/support-session`,
+      { reason: supportReason.trim() },
+    )
+      .then((response) => {
+        window.location.assign(response.data.redirectTo);
+      })
+      .catch((err) => {
+        setError(err instanceof OpsError ? err.message : 'Could not open a support session.');
+        setSupportBusy(false);
+      });
   };
 
   const sendMessage = async (subject: string, body: string): Promise<void> => {
@@ -206,6 +240,53 @@ export default function OrgDetail(): JSX.Element {
             </ul>
           )}
         </section>
+
+        {/* SUPPORT ACCESS — DEC-114, `19` §15, `70` § Support access.
+
+            ABSENT FOR AN OPERATOR WHO CANNOT USE IT, not disabled — the rule `DEC-104` set for
+            the suspend card and for the same reason: a permanently-dead control teaches a
+            support operator to distrust every greyed control they meet. `platform.support.enter`
+            is held by both roles, so in practice this is present for everybody; the gate is
+            here because the day it is narrowed, the card should vanish rather than mock. */}
+        {can('platform.support.enter') && (
+          <section className="card">
+            <h3>Open this organisation’s console</h3>
+            <p className="text-meta">
+              You will be signed in to {org.name} as yourself, for {SUPPORT_SESSION_MINUTES}{' '}
+              minutes, under a banner they cannot dismiss. Responses, results, analysis and
+              check-in notes stay closed to you — those refuse with a trace, not silently.
+            </p>
+            <label className="field">
+              <span className="field-label">Why are you going in?</span>
+              {/* REQUIRED, AND THE DISABLED BUTTON IS THE GUARD RATHER THAN AN EARLY RETURN
+                  (`D-043`). The customer reads this sentence verbatim on every page for the
+                  next hour, which is most of what separates this feature from the one `19` §14
+                  refused — so the field is not a formality and the server's DTO enforces the
+                  same minimum.
+
+                  NO `#` BEFORE THE TICKET NUMBER IN THE PLACEHOLDER, and that is DEC-012's lint
+                  rule earning its keep rather than a workaround: `#418` is a valid three-digit
+                  hex colour and the selector flagged it. A false positive here, and exactly the
+                  shape of the true positive it exists to catch. */}
+              <input
+                type="text"
+                value={supportReason}
+                onChange={(event) => setSupportReason(event.target.value)}
+                placeholder="Ticket 418 — their campaign will not launch"
+                maxLength={500}
+              />
+              <span className="field-hint">Shown to {org.name} on every page, in these words.</span>
+            </label>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={supportBusy || supportReason.trim().length < 10}
+              onClick={enterConsole}
+            >
+              {supportBusy ? 'Opening…' : 'Open console'}
+            </button>
+          </section>
+        )}
 
         <section className="card">
           <h3>Message the administrators</h3>

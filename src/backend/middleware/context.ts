@@ -8,13 +8,30 @@ import type { RequestHandler } from 'express';
 // authz/ existed; two definitions of the same shape is exactly the drift the DTO approach
 // is meant to prevent.
 import type { Decision } from '../authz/types.js';
-import type { PlatformRole, ResolvedLabels } from '@endur/shared';
+import type { PlatformRole, ResolvedLabels, SupportContext } from '@endur/shared';
 
 export type { Decision };
 
 /** Set by authenticate (T-007). Three kinds, so downstream links need not care which. */
 export type Principal =
-  | { kind: 'user'; id: string; orgId: string }
+  /**
+   * `support` — DEC-114, and it is a FIELD ON THE USER PRINCIPAL rather than a fifth kind.
+   *
+   * That placement was the design decision, and it was made by counting. Thirty-odd call
+   * sites across the codebase read `principal.kind !== 'user'` to mean *"is this somebody
+   * with an account in this organisation"*, and a fifth kind would have made every one of
+   * them wrong in a different way — some failing closed, some open, none obviously. A
+   * support principal genuinely IS a user of this organisation: it has a `users` row, it
+   * resolves grants, it appears in the audit log. The only thing that differs is where its
+   * grants came from and who is really typing, and those are two extra facts, not a
+   * different kind of thing.
+   *
+   * `id` is the SYNTHETIC MEMBER's id, never the operator's. `platform_users` and `users`
+   * are different tables on purpose (DEC-033), and a tenant's audit row can only point at
+   * the second — so this is what makes a support action attributable inside the customer's
+   * own log rather than showing up as an unexplained gap.
+   */
+  | { kind: 'user'; id: string; orgId: string; support?: SupportContext }
   | { kind: 'apiKey'; id: string; orgId: string; scopes: string[] }
   | { kind: 'respondent'; campaignId: string; orgId: string }
   /**

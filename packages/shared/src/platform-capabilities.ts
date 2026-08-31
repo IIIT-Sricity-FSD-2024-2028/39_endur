@@ -62,6 +62,14 @@ export const PLATFORM_CAPABILITY_CATALOGUE = {
     roles: OWNER_ONLY,
     note: 'Move a request to contacted or closed. Separate from the read for the reason every other pair here is: reading the queue changes nothing, and working it is the action that must be attributable',
   },
+  'platform.support.enter': {
+    roles: BOTH,
+    note: 'Open a customer’s OWN console as a time-boxed support principal (DEC-114, 19 §15). BOTH roles, because this is the support job as 19 §3 describes it — “is this customer OK?” is not answerable from an aggregate. The powers it confers inside the tenant are GRANTS resolved by the ordinary engine, minus SUPPORT_DENIED_CAPABILITIES, which is where INV-011 is restated for the wider door',
+  },
+  'platform.support.read': {
+    roles: BOTH,
+    note: 'The register of support sessions — who entered which organisation, why, and when they left. Split from platform.support.enter for the reason every other pair here is split: reading the register changes nothing, and entering is the action that must be attributable. Held by BOTH so an operator can see their own trail without an owner opening it for them',
+  },
   'platform.operator.manage': { roles: OWNER_ONLY, note: 'Create, disable and re-role operator accounts' },
 } as const satisfies Record<string, Entry>;
 

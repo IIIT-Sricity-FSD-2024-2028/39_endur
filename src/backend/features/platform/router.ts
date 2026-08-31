@@ -22,6 +22,8 @@ import {
   CreateOperatorDto,
   EnterpriseQueueDto,
   EnterpriseUpdateDto,
+  EnterSupportDto,
+  SupportSessionListDto,
   EstateListDto,
   LogExportDto,
   LogListDto,
@@ -57,6 +59,9 @@ import {
   estate,
   exportOperatorLogFile,
   approveEnterpriseRequest,
+  enterSupport,
+  leaveSupport,
+  listSupportSessions,
   readEnterpriseQueue,
   updateEnterpriseRequest,
   listOperators,
@@ -394,3 +399,77 @@ platformRouter.post(
   },
 );
 
+
+/**
+ * SUPPORT ACCESS — DEC-114, T-109, `19` §15, `70` § Support access.
+ *
+ * `19` §14 listed impersonation under "not building", and this supersedes that row rather
+ * than quietly diverging from it. What changed is not the appetite — that section already
+ * called it *"the single most useful support feature"* — but that the objection it raised is
+ * answerable, and the answer is three properties this route enforces at the door:
+ *
+ *   THE OPERATOR ACTS AS THEMSELVES. `19` §14's real objection was `01` §6: an Endur employee
+ *   reading a customer's feedback. Nothing here reads feedback — `SUPPORT_DENIED_CAPABILITIES`
+ *   resolves as `deny` grants at `all` scope, and INV-004 makes a deny unbeatable. And the
+ *   account they act as is a synthetic member under their OWN name, never a customer's, so no
+ *   real person's audit trail is ever made to say something they did not do.
+ *
+ *   THE CUSTOMER IS TOLD, AND CANNOT BE UNTOLD. `<SupportBanner>` is in `<AppShell>`, on every
+ *   console page, carrying the operator's name and the reason they typed. An operator working
+ *   invisibly inside somebody's account is a different feature and it is still not built.
+ *
+ *   IT STOPS BY ITSELF. One hour, in the row, checked in the query on every request. "Remember
+ *   to press Leave" is not a control, for the same reason a position carries `validTo`.
+ *
+ * THIS ROUTE CARRIES `requirePlatform` AND NEVER `requireCapability`, which keeps `19` §9's
+ * hardest rule intact — a route is a tenant route or a platform route, never both. That the
+ * response sets a TENANT session cookie does not make it a tenant route: the authorisation
+ * question this route answers is *"may this operator open a support session"*, and that is a
+ * platform question with a platform answer. Every question asked afterwards is asked on a
+ * different route, by `requireCapability`, exactly as it is for a customer's own staff.
+ */
+platformRouter.post(
+  '/orgs/:id/support-session',
+  validate(EnterSupportDto),
+  requirePlatform('platform.support.enter'),
+  (req, res, next) => {
+    const { params, body } = req.data as { params: { id: string }; body: { reason: string } };
+    void enterSupport(req, res, params.id, body.reason)
+      .then((data) => res.status(201).json({ data }))
+      .catch(next);
+  },
+);
+
+/**
+ * Leave. NO CAPABILITY, and that is deliberate rather than an omission.
+ *
+ * Ending your own session is the platform twin of `POST /auth/logout`: giving up access can
+ * never be the thing somebody is not permitted to do. Gating it on `platform.support.enter`
+ * would mean an operator whose role was changed mid-session could not close the session that
+ * role had opened — the one state where leaving matters most.
+ *
+ * It is reachable while the operator still holds `endur.ops`; the console's own banner calls
+ * it too, which is why it does not require the operator to be back on `/ops` first.
+ */
+platformRouter.post('/support-session/leave', (req, res, next) => {
+  void leaveSupport(req, res)
+    .then((data) => res.json({ data }))
+    .catch(next);
+});
+
+/**
+ * The register. `platform.support.read`, split from `.enter` for the reason every other pair
+ * on this surface is split: reading it changes nothing, and entering is the action that has
+ * to be attributable.
+ */
+platformRouter.get(
+  '/support-sessions',
+  validate(SupportSessionListDto),
+  requirePlatform('platform.support.read'),
+  (req, res, next) => {
+    const { query } = req.data as { query: Parameters<typeof listSupportSessions>[0] };
+    void listSupportSessions(query)
+      .then((data) => res.json({ data }))
+      .catch(next);
+  },
+);

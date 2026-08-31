@@ -14,6 +14,12 @@ not waited out — see `DEC-071`. What is still ahead is what was always behind 
 `T-066` (`/ops`), `T-067` (`/ops/analytics` and its endpoint), `T-077`/`T-078` (the log
 viewer)
 
+**AMENDED 2026-08-31 — `T-109`, `DEC-114`. §15 is new and it supersedes one row of §14.**
+An operator may now enter a customer's own console for an hour, under a banner the customer
+cannot dismiss, with their powers minted as ordinary grants minus `SUPPORT_DENIED_CAPABILITIES`.
+INV-011, DEC-033 and the aggregate seam are untouched — §15.3 is why that is true rather than
+merely claimed
+
 ---
 
 ## 1. Purpose
@@ -83,7 +89,11 @@ granted `platform.analytics.read`. That is not a hypothetical — it is exactly 
 hole `billing.update` has today (§8).
 
 Lives in code at `packages/shared/src/platform-capabilities.ts`. **Built as specified —
-all ten, with the same role columns.** Two tests hold the separation open: one asserts no
+sixteen now, with the same role columns.** (Ten when this was written; `DEC-074` added
+`logs.export`, `DEC-080` split `revenue.read` off `analytics.read`, `DEC-100` added the two
+Enterprise verbs, and `DEC-114` added the two support verbs. The count is stated so that a
+reader who finds a different number knows the table is what to trust, not this sentence.)
+Two tests hold the separation open: one asserts no
 `platform.` key is in `CAPABILITY_CATALOGUE`, and one asserts no tier in `TIER_ENTITLEMENTS`
 entitles one. The second is the one that matters, because the wildcard expansion is the
 mechanism that would sweep them up — an organisation could otherwise **buy** operator
@@ -104,6 +114,8 @@ access.
 | `platform.logs.export` | ✔ | ✔ | **A copy of a log file, filtered, as a download** (`72` § Interactions, `DEC-074`). Separate from `platform.logs.read` on purpose: a read is a page on a screen, an export is a file that outlives the session and the retention window, and one capability for both could not be separated later without a migration. Audited as `logs.export` with the file, format, filters and line count |
 | `platform.enterprise.read` | — | ✔ | **The Enterprise request queue. Owner only** (`DEC-100`). A customer asking to be sold to is a revenue event, and it is split from `platform.org.read` for the reason `platform.revenue.read` is split from `platform.analytics.read`: staff see every organisation and never need a pipeline |
 | `platform.enterprise.update` | — | ✔ | Move a request through `open` → `contacted` → `closed`. **A separate verb**, so the queue could later be shown to somebody who may not work it — the same split `platform.logs.read`/`platform.logs.export` makes |
+| `platform.support.enter` | ✔ | ✔ | **Open a customer's own console as a time-boxed support principal** (§15, `DEC-114`). BOTH roles, because this is the support job as §3 describes it — *"is this customer OK?"* cannot be answered from an aggregate. What it confers inside the tenant is decided by the org GRANT engine, not here: the session's powers are minted grants minus `SUPPORT_DENIED_CAPABILITIES` |
+| `platform.support.read` | ✔ | ✔ | **The register** — who entered which organisation, why, and when they left. Split from `.enter` for the reason every pair on this surface is split: reading changes nothing, entering is the action that must be attributable. Both roles, so an operator can see their own trail without an owner opening it for them |
 | `platform.operator.manage` | — | ✔ | Create, disable and re-role operator accounts |
 
 Naming rule matches `11` §3 — `platform.<object>.<verb>` — with the `platform.` prefix as the
@@ -414,7 +426,141 @@ check people learn to route around.
 | Not building | Why |
 |---|---|
 | A permission grid for operators | Two fixed roles. A second GRANT engine for a four-person team is the definition of over-engineering, and it invites confusion with the real one |
-| Operator impersonation ("log in as this customer") | The single most useful support feature and the single most dangerous. It is INV-011 with extra steps, and no amount of consent UI makes an Endur employee reading feedback compatible with what `01` §6 promises |
+| ~~Operator impersonation ("log in as this customer")~~ | **SUPERSEDED 2026-08-31 by `DEC-114`. See §15.** The row's objection was right and it was *narrow*: it refused an Endur employee **reading feedback**, not an operator entering. §15 builds the entering and removes the reading — `SUPPORT_DENIED_CAPABILITIES` resolves as `deny` grants that INV-004 makes unbeatable. It is also not impersonation: the operator acts **as themselves**, in a row under their own name, so no real person's audit trail is ever made to say something they did not do |
 | Payment processing | `16` §10 already rejects it and nothing here changes that. Prices, plans and revenue are recorded; money is not moved |
 | Self-serve operator signup | Operators are created by an `owner`. There is no public path in |
 | Prices, amounts, currency, per-customer pricing | **DEC-035 — there is no pricing in Endur at all.** A tier is joined with a button (`49`); nothing collects, stores or displays an amount |
+
+---
+
+## 15. Support access — an operator inside a customer's console
+
+Phase: **P2** · Task: **`T-109`** · Decision: **`DEC-114`** · Status: **BUILT 2026-08-31**
+
+> **A platform operator may open a time-boxed session inside a customer's own console. Their
+> powers there are GRANTS resolved by the ordinary engine — never a bypass — minus
+> `SUPPORT_DENIED_CAPABILITIES`, which is INV-011 restated for a much wider door.**
+
+### 15.1 Why this exists, given §14 said it would not
+
+§14's row refused *"log in as this customer"*, and the sentence it refused with is the one to
+read carefully:
+
+> *"no amount of consent UI makes an Endur employee **reading feedback** compatible with what
+> `01` §6 promises."*
+
+The objection is to **reading feedback**. It is not to entering. §5 had already conceded the
+consequence in words and named the workaround in the same breath:
+
+> *"when a customer reports 'the results page looks wrong', an operator cannot look at their
+> results. They ask the customer, or **the customer grants a time-boxed in-org account through
+> the normal `person.create` path**."*
+
+That workaround **is this feature, done by hand and done badly**. It is an account the customer
+has to create, that nobody remembers to revoke, that costs them a seat, that appears in their
+People list and in every audience built from it, and whose audit rows name a person rather than
+an Endur employee. Building it properly is strictly safer than the path §5 already sanctioned.
+
+The requirement that forced the question came from outside: **every workflow in the product must
+be reachable by the superuser.**
+
+### 15.2 The three properties that make it a different thing
+
+| Property | Mechanism | Why it is load-bearing |
+|---|---|---|
+| **The operator acts as themselves** | A synthetic `users` row per operator per organisation, under their own name, `status = 'support'`, no password hash, **no person node** | This is what makes it not impersonation. Acting as a named customer makes that person's audit trail a lie, and that is the half of "log in as" that can never be made safe |
+| **The customer is told, and cannot be untold** | `<SupportBanner>` in `<AppShell>`, above the top bar, undismissable, carrying the operator's name and their typed reason verbatim | An operator working invisibly inside somebody's account is a different feature and it is still not built |
+| **It stops by itself** | One hour, in the row, checked **in the query** on every request | *"Remember to press Leave"* is not a control, for the same reason a position carries `validTo` rather than a revocation reminder |
+
+### 15.3 The powers are grants, and that is the whole design
+
+The obvious implementation is four lines in `requireCapability`:
+
+```ts
+if (req.ctx.principal.support) return next();   // ← never written, on purpose
+```
+
+That is wrong twice. It is a **second permission model**, and a second permission model drifts
+from the first the moment either changes (`N-005`, one layer down). And it is silently **total**
+— every capability shipped afterwards would be held by an operator without anybody deciding
+that it should be.
+
+So the powers are expressed in the product's own vocabulary instead. `authz/support.ts` mints
+candidate grants; `authz/collect.ts` returns them on the **no-person-node branch**, which every
+real member of every organisation never reaches; `resolve()` runs unchanged. Every property the
+engine already has then applies for free:
+
+- **INV-004** — a deny beats an allow unconditionally, so the deny list is *inescapable* rather
+  than "checked in the places we remembered".
+- **INV-007** — the audit row records which grant decided it, so a customer's own log
+  distinguishes *"Endur support changed this"* from *"Endur support was refused this"*.
+- **`42`** — the simulator explains a support refusal in the same sentence shape it explains
+  every other refusal in the product.
+
+Both the allow **and** the deny are minted for a denied capability. Omitting the allow would
+refuse the request too, with `no_grant` — *"nobody gave you this at all"* — which is the wrong
+sentence: it sends an operator hunting a customer's powers grid for a row that must never exist.
+`explicit_deny` is the true and permanent answer.
+
+### 15.4 What an operator still cannot do — `SUPPORT_DENIED_CAPABILITIES`
+
+Ten capabilities, in `packages/shared/src/support.ts`, in three groups denied for three
+different reasons.
+
+| Group | Capabilities | Why |
+|---|---|---|
+| **Feedback content** | `response.read` · `response.export` · `results.read` · `results.export` · `analysis.read` | INV-011 restated for the console. This is the thing we sell |
+| **Personal content** | `reflection.read` · `actionplan.read` · `checkin.read` | `44` describes these as a private loop between two named people. *"Endur can read your 1:1 notes"* is the same broken promise wearing a different noun |
+| **Irreversible or financial** | `org.delete` · `billing.update` | Neither is a support action. The operator's own surface has the right verb for the second (`platform.plan.override`, which takes no money and writes no `payments` row), and there is no right verb for the first |
+
+**A DENY LIST, NOT AN ALLOW LIST**, and the direction is the decision. An allow list is a thing
+somebody forgets to add to: ship a capability, the operator silently does not hold it, that
+reads as a bug, and it gets "fixed" by widening. A deny list fails the other way — ship a
+capability and they hold it, and the only ones they do not hold are the ones somebody wrote
+down, with a reason, in the file a reviewer opens. **To widen it, delete a line.**
+
+### 15.5 What is deliberately not built
+
+| Not building | Why |
+|---|---|
+| A consent prompt the customer approves | The organisation that most needs help — suspended, locked out, nobody reading the email — is the one nobody could then reach. Disclosure after the fact, on every page, in an audited register, is both the stronger control and the reachable one |
+| A customer-side "eject this operator" button | Ending somebody else's session is an action with a target, so it is a capability question — and inventing `support.revoke` puts a customer's staff in the position of cutting the operator off mid-fix on the one screen where the fix is happening. **The hour is the control they have**, and it is printed on the strip beside the disclosure |
+| Widening `platform/db.ts` | `User` and `SupportSession` are **not** in `WRITABLE_MODELS`. The allowlist is not per-function: adding `User` there would make `user.create` reachable from every handler in a 900-line file forever. One operation, one file — `db/support.ts`, which says so at the top |
+| A support session that can answer a campaign | `requireMembership` refuses one explicitly. An operator's answers inside a customer's results would be permanent and, by INV-006, unidentifiable for removal |
+
+### 15.6 Routes
+
+| Route | Capability | Notes |
+|---|---|---|
+| `POST /platform/orgs/:id/support-session` | `platform.support.enter` | `reason` is **required, min 10 characters, no default**. Regenerates the session (fixation), sets `endur.sid` + `endur.csrf`, writes the row and the platform audit entry. Answers `{ session, redirectTo, deniedCapabilities }` — a **path**, never a token |
+| `POST /platform/support-session/leave` | *(none — see below)* | Ends the row **before** destroying the session, so the access is gone even if the destroy fails |
+| `GET /platform/support-sessions` | `platform.support.read` | The register. Still INV-011: names, dates and one sentence the operator typed |
+
+**Leave carries no capability**, and it is allowlisted in `routes.test.ts` with that reason:
+giving up access can never be the thing somebody is not permitted to do, and gating it on
+`platform.support.enter` would trap an operator whose role changed mid-session. It is the
+platform twin of `POST /auth/logout`, which is unguarded one surface over for the same reason.
+
+**No route here carries both guards.** §9's hardest rule is intact: the enter route is a
+platform route answering a platform question — *"may this operator open a session"* — and every
+question afterwards is asked on a different route by `requireCapability`, exactly as it is for
+the customer's own staff. That the response sets a tenant cookie does not make it a tenant route.
+
+### 15.7 Acceptance
+
+- [x] An operator inside the console can create a role, a unit, a person, a campaign — the
+      customer's own work · `support-access.test.ts`
+- [x] **And cannot read one line of their feedback.** The test walks
+      `SUPPORT_DENIED_CAPABILITIES` rather than a hardcoded route, so deleting an entry fails
+      here rather than quietly becoming readable
+- [x] A denied capability answers `explicit_deny` with `decidedBy.via === 'support'`, and the
+      trace shows the allow that lost — **INV-004, demonstrated**
+- [x] The **customer's own staff** are told, from a live row rather than from their session
+- [x] No seat, no person node, no audience membership, and no way to sign in through
+      `POST /auth/login`
+- [x] Leave takes effect on the **next request**; expiry needs no Leave
+- [x] The customer's own `audit_log` names the operator, with `decidedBy.via = 'support'`
+- [x] A support session reaches a **suspended** organisation, which the customer's own staff
+      cannot — the one carve-out in `tenantResolver`, because the moment a customer most needs
+      somebody from Endur is the moment they have been cut off
+- [x] `platform.support.*` is absent from `CAPABILITY_CATALOGUE`, so no tier can entitle it

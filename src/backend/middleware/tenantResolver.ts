@@ -77,7 +77,14 @@ export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
           // Checking here rather than at login is what makes a suspension take effect on
           // the next REQUEST rather than at the next sign-in — the same property permissions
           // get from being resolved per request instead of read from a session claim.
-          if (via === 'session' && tenant.suspendedAt) {
+          //
+          // DEC-114 CARVES ONE EXCEPTION, and it is the only one: a SUPPORT session gets in.
+          // A suspension is a commercial state, not a quarantine — and the moment a customer
+          // most needs somebody from Endur inside their console is the moment they have been
+          // cut off from it. Refusing the operator here would mean the one organisation
+          // nobody can help is the one that has a problem. The customer's own staff are still
+          // refused, which is what a suspension is for.
+          if (via === 'session' && tenant.suspendedAt && !isSupport(req)) {
             return next(
               new AppError('FORBIDDEN', 'This organization has been suspended. Contact Endur support.'),
             );
@@ -94,6 +101,19 @@ export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
       .catch(next);
   };
 }
+
+/**
+ * DEC-114. The session's own flag, read WITHOUT a database round trip.
+ *
+ * It is safe to trust for this one decision even though `authenticate` deliberately does not
+ * trust it for authorisation, and the difference is what the two decisions are about. Here it
+ * decides only whether to let the REQUEST CONTINUE past a suspension; a forged flag on an
+ * ordinary session buys nothing, because the next link resolves no support row, attaches no
+ * principal, and every console route then 401s. There is no state in which this flag alone
+ * lets somebody see anything.
+ */
+const isSupport = (req: Request): boolean =>
+  (req as { session?: { support?: boolean } }).session?.support === true;
 
 /**
  * The two tenant facts every later link needs, in ONE read.

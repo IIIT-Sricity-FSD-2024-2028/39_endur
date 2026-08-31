@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { dto, nameField } from './common.js';
 import type { HeldCapabilities } from '../capabilities.js';
+import type { SupportContext } from '../support.js';
 import { SIGNUP_TIERS } from '../tiers.js';
 
 export const Credentials = z.object({
@@ -94,4 +95,16 @@ export type MeResponse = {
    * reach past themselves"*. Keys are sorted, so a diff between two callers is readable.
    */
   capabilities: HeldCapabilities;
+  /**
+   * PRESENT ONLY INSIDE A SUPPORT SESSION — DEC-114, `19` §15.
+   *
+   * It rides on `/auth/me` rather than on a route of its own because the shell must render
+   * the banner on its FIRST paint. A second request would mean a customer's console appears
+   * normal for a frame and then admits it is being driven by somebody from Endur, which is
+   * the wrong order to learn that in.
+   *
+   * The customer's own session never carries it, so `support` being absent is the common
+   * case and `<SupportBanner>` renders nothing.
+   */
+  support?: SupportContext;
 };

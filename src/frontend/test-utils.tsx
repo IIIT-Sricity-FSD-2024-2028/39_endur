@@ -29,6 +29,14 @@ export type SessionFixture = {
   orgName?: string;
   signedOut?: boolean;
   path?: string;
+  /**
+   * DEC-114. A live support session, from the point of view of whoever this fixture is.
+   *
+   * `viewer: 'member'` is a customer being told somebody from Endur is inside; `'operator'` is
+   * the operator themselves. Both come down the same `/auth/me` field, which is what lets one
+   * component render both without a second store shape to fixture.
+   */
+  support?: MeResponse['support'];
 };
 
 /**
@@ -79,6 +87,10 @@ export function makeStore(session: SessionFixture = {}) {
       },
       labels: session.labels ?? {},
       capabilities: heldFrom(session.capabilities),
+      // Spread rather than assigned, so an ordinary fixture produces a payload with no
+      // `support` key at all — which is what the server actually sends, and the difference
+      // between testing the reducer's `?? null` and testing around it.
+      ...(session.support ? { support: session.support } : {}),
     };
     store.dispatch(signedIn(me));
     store.dispatch(labelsLoaded(session.labels));

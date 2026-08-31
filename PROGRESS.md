@@ -5,6 +5,51 @@ updates it before finishing. `architecture/55-BUILD-ORDER.md` is the plan; this 
 has actually happened.
 
 ```
+UPDATED   2026-08-31  (T-109 -- SUPPORT ACCESS. THE SUPERUSER CAN DRIVE EVERY WORKFLOW.
+                       DEC-114, which SUPERSEDES ONE ROW OF 19 §14 and nothing else.
+                       ROOT RUNNER: 1602/1602 across 122 files. typecheck 0, lint 0, build
+                       passes, drift + vocab clean. ONE MIGRATION -- run `npm run db:migrate`
+                       after pulling, or /ops 500s on a table Prisma knows about and the
+                       database does not.
+                       !! THE ASK: *"every functionality and workflow being usable by the
+                       superuser -- every single thing configurable by superuser and admin."*
+                       !! 19 §14 SAID DO NOT BUILD THIS, AND IT WAS RIGHT AND IT WAS NARROW.
+                       the row refused *"an Endur employee READING FEEDBACK"*, not an
+                       operator entering. so the reading is removed rather than the
+                       objection argued away -- and 19 §5 had ALREADY conceded the gap and
+                       named the workaround (*"the customer grants a time-boxed in-org
+                       account through the normal person.create path"*), which is this
+                       feature done by hand and badly: an account nobody revokes, that costs
+                       a seat and lands in their audiences.
+                       !! THE POWERS ARE GRANTS, NOT A BYPASS. the four-line version --
+                       `if (principal.support) return next()` in requireCapability -- was
+                       rejected twice over: a second permission model drifts from the first,
+                       and it is silently TOTAL, so every capability shipped afterwards
+                       would be held by an operator without anybody deciding it. instead
+                       authz/collect.ts mints candidates on the NO-PERSON-NODE branch, which
+                       no real member ever reaches, and resolve() is untouched.
+                       !! SO INV-004 IS WHAT ENFORCES INV-011 HERE. the operator holds the
+                       ALLOW and the DENY for results.read; the deny wins because a deny
+                       always wins, and the refusal is `explicit_deny` WITH the grant that
+                       decided it -- not `no_grant`, which means "go and ask somebody" when
+                       there is nobody to ask. A DENY LIST, NOT AN ALLOW LIST: an allow list
+                       is a thing somebody forgets to add to and then "fixes" by widening.
+                       !! THE BANNER WAS WRONG IN THE FIRST DRAFT. it rendered from the
+                       CALLER's own session, so the only person who ever saw the disclosure
+                       was the operator it was disclosing -- the customer is on a DIFFERENT
+                       session and carries no support flag. SupportContext.viewer plus one
+                       indexed lookup on /auth/me is the fix. A PROMISE LEGIBLE ONLY TO THE
+                       PERSON BEING WATCHED IS NOT A PROMISE.
+                       !! THE SEAM WAS NOT WIDENED. User and SupportSession are NOT in
+                       platform/db.ts's WRITABLE_MODELS; the two tenant writes live in
+                       db/support.ts with the base client, because the allowlist is not
+                       per-function and adding User there would make user.create reachable
+                       from every handler in a 900-line file forever.
+                       !! TO DEMO: npm run db:seed prints the operator logins -> /ops/login
+                       as owner@endur.test -> open an org -> Open console. THE STRONGEST
+                       THING TO SHOW IS THE REFUSAL: open Results inside the session and
+                       read the trace. same engine, same screen, deny beats allow.)
+
 UPDATED   2026-08-31  (T-108 -- A PLAN THAT RUNS OUT NOW ACTUALLY RUNS OUT. DEC-113.
                        ROOT RUNNER: 1577/1577 across 120 files. typecheck 0, lint 0, build
                        passes, drift + vocab clean. ONE MIGRATION -- run `npm run db:migrate`
@@ -2202,6 +2247,23 @@ middleware first.
                 pays ₹999 and not ₹900. <PlanNoticeBanner> in <AppShell> — the end date was
                 already on /app/plan and it still read as "nothing happens".
                 ONE MIGRATION: 20260831140000_plan_lapse
+[x] T-109  A  SUPPORT ACCESS — the superuser can drive every workflow (DEC-114)
+              ← "every functionality and workflow being usable by the superuser". an
+                operator opens a customer's OWN console for an hour from /ops/orgs/:id,
+                with a typed reason the customer reads verbatim on every page.
+                SUPERSEDES ONE ROW OF 19 §14 and nothing else — that row refused an Endur
+                employee READING FEEDBACK, not an operator entering, so the feature is
+                built with the reading removed rather than the objection argued away.
+                THE POWERS ARE GRANTS, NOT A BYPASS: authz/support.ts mints candidates and
+                authz/collect.ts returns them on the NO-PERSON-NODE branch, which no real
+                member ever reaches. resolve() is unchanged, so INV-004 is what enforces
+                the deny list — the operator holds the allow AND the deny for results.read
+                and the deny wins, with the trace to prove it.
+                <SupportBanner> above the top bar, undismissable, FOR BOTH AUDIENCES. the
+                first draft read the caller's own session and was therefore visible only
+                to the operator it was disclosing.
+                platform/db.ts NOT widened; the two tenant writes live in db/support.ts.
+                ONE MIGRATION: 20260831170000_support_sessions
 ```
 
 ### Why is that item still greyed? — one row per "Soon"
@@ -2398,7 +2460,116 @@ Shortcuts taken deliberately, to be repaid. Empty is good.
 Newest first. One entry per working session. Keep entries short — what moved, what was
 decided, what the next session should know.
 
-### 2026-08-31 (latest) · two owner reports — a phantom "invited" tag, and a 404 that meant 403
+### 2026-08-31 (latest) · `T-109` — support access: the superuser can drive every workflow
+
+**`DEC-114`. It supersedes exactly one row of `19` §14 and nothing else.** An operator opens a
+customer's own console for an hour, from `/ops/orgs/:id`, with a typed reason the customer reads
+verbatim on every page. `1602` tests green (629 backend across 51 files, 973 frontend across 71),
+typecheck 0, lint 0, build passes, drift + vocab clean. **ONE MIGRATION —
+`20260831170000_support_sessions`. Run `npm run db:migrate` after pulling.**
+
+**!! THE REQUIREMENT, FROM OUTSIDE:** *"every functionality and workflow being usable by the
+superuser — every single thing configurable by superuser and admin."*
+
+**!! `19` §14 SAID DO NOT BUILD THIS, AND IT WAS RIGHT AND IT WAS NARROW.** Read the row again:
+*"no amount of consent UI makes an Endur employee **reading feedback** compatible with what `01`
+§6 promises."* The objection is to reading feedback, not to entering. So the feature is built
+with the reading removed rather than with the objection argued away. `19` §5 had *already*
+conceded the gap in words and named the workaround — *"the customer grants a time-boxed in-org
+account through the normal `person.create` path"* — which **is this feature done by hand and
+badly**: an account the customer must create, nobody revokes, that costs a seat and appears in
+their audiences.
+
+**!! THE POWERS ARE GRANTS, NOT A BYPASS, AND THAT IS THE WHOLE DESIGN.** The four-line version
+(`if (principal.support) return next()` in `requireCapability`) was rejected: it is a second
+permission model that drifts from the first (N-005 one layer down), and it is silently TOTAL —
+every capability shipped afterwards held by an operator without anybody deciding it. Instead
+`authz/support.ts` mints candidate grants and `authz/collect.ts` returns them on the
+**no-person-node branch**, which every real member of every organisation never reaches. So
+`resolve`, `visibleUnits` and `heldCapabilities` all agree about what an operator holds without
+any of them being told operators exist.
+
+**!! INV-004 IS WHAT ENFORCES INV-011 HERE.** `SUPPORT_DENIED_CAPABILITIES` (10 capabilities:
+feedback content, personal content, `org.delete` + `billing.update`) is minted as `deny` at `all`
+scope **alongside** the allow. The deny wins because a deny always wins, and the refusal is
+`explicit_deny` with the grant that decided it — not `no_grant`, which would mean *"go and ask
+somebody"* when there is nobody to ask. **A deny list, not an allow list**, because an allow list
+is a thing somebody forgets to add to and then "fixes" by widening.
+
+**!! THE BANNER WAS WRONG IN THE FIRST DRAFT AND IT IS WORTH KNOWING WHY.** It rendered from the
+CALLER's own session — so the only person who ever saw the disclosure was the operator it was
+disclosing. The customer is signed in to a *different* session and carries no support flag at
+all. `SupportContext.viewer` plus one indexed lookup on `/auth/me` is the fix. **A promise
+legible only to the person being watched is not a promise.**
+
+**!! THE SEAM WAS NOT WIDENED.** `platform/db.ts` still refuses every write into a tenant:
+`User` and `SupportSession` are NOT in `WRITABLE_MODELS`. The two writes live in
+`src/backend/db/support.ts` with the base client, because the allowlist is not per-function —
+adding `User` there would make `user.create` reachable from every handler in a 900-line file
+forever. `Answer` is still unreachable and `Response` is still count-only.
+
+**!! WHAT ELSE HOLDS:** INV-003 (`requirePlatform` and `requireCapability` still never on one
+route — the enter route answers a *platform* question, and every question afterwards is asked
+elsewhere by `requireCapability`); INV-007 (the customer's own `audit_log` names the operator,
+`decidedBy.via = 'support'` — which is what the synthetic `users` row is FOR, since a tenant's
+audit row can only point at `users` and never at `platform_users`); INV-006 (a support session is
+refused by `requireMembership`, so it can never answer a campaign).
+
+**!! ONE CARVE-OUT IN `tenantResolver`:** a support session reaches a SUSPENDED organisation,
+which the customer's own staff cannot. The moment a customer most needs somebody from Endur
+inside their console is the moment they have been cut off from it.
+
+**TO DEMO IT:** `npm run db:seed` prints the operator logins → `/ops/login` as
+`owner@endur.test` → open any organisation → **Open console**. The strongest thing to show is
+the *refusal*: navigate to Results inside the session and read the trace — same engine, same
+screen, and the deny beats the allow.
+
+**COST, STATED:** one extra query per boot for every customer, to answer *"is somebody from
+Endur inside my organisation right now"*. There is no version of this feature worth having that
+would not pay it.
+
+### 2026-08-31 · `viva/` — an evaluation cram kit, no source touched
+
+**Docs only. No source file, test, migration or contract changed** — `git status` shows six new
+files under `viva/` and nothing else. Recorded here because the next session will find a new
+top-level directory that no `MAP` entry in `_MEMORY.md` owns, and should know it is deliberate
+and load-bearing for nothing.
+
+**Why.** The graded code walkthrough is tomorrow (2026-09-01) and the prof has been pointing at
+arbitrary features and asking the team to explain them. The codebase is ~100k lines across 730
+files with unusually dense comments, so the missing thing was never explanation — it was
+**navigation**: which of 730 files was just pointed at, and what it connects to.
+
+**What is in it.** `00-START-HERE.md` (the product, the stack, the repo shape, the one flow to
+memorise), `01-MIDDLEWARE-CHAIN.md` (all 16 links, the five chains from `middleware/chains.ts`,
+the four adjacencies that have to be defended), `02-PERMISSIONS.md` (grants, the resolver's seven
+steps, the 404/403 split, INV-012), `03-FILE-MAP.md` ("what is this file" plus all ~120 routes
+with their capabilities), `04-TRACES.md` (four flows click→DB→screen), `05-QUESTIONS.md` (a
+cover-and-recite drill sheet).
+
+**Two claims were corrected against the code rather than repeated from the docs**, because a
+cram sheet that is wrong under questioning is worse than none:
+
+  · `schema.prisma` has **35 models and 5 enums**, not 37 models.
+  · **k-anonymity is enforced in the query layer and in the DTO type, not by a SQL trigger.**
+    `features/results/service.ts` returns a body with no `questions` key at all below
+    `config.K_ANON_THRESHOLD`, and `comments` exists only on the `suppressed: false` branch so
+    the compiler refuses a caller who forgets to check. The triggers that do exist in the
+    migrations are immutability triggers — `campaigns_anonymous_immutable` is the relevant one,
+    and it stops a campaign being retroactively de-anonymised. The invariant's own wording
+    ("enforced in SQL, not in a view") is about INV-006, the absence of a respondent column,
+    which is separate and is exactly true.
+
+Both audits were re-run and pass (`vocab` 169 component files, `drift` 61 docs / 73
+capabilities), so either can be run live in front of the evaluator.
+
+Also published as a single browsable page for revising away from the laptop:
+https://claude.ai/code/artifact/3f10e14d-1b63-4f63-b6c0-9ebbdfd3ee2c
+
+**Next session:** nothing here blocks anything. `T-045` is still unrun and still the largest
+risk, and `F1` from the mate's run doc is still a Blocker.
+
+### 2026-08-31 · two owner reports — a phantom "invited" tag, and a 404 that meant 403
 
 **Both found on `/app/people`, and the owner named the contrast themselves:** the escalation
 refusal on that page is exemplary — *"That position includes 'org.update', which you do not hold

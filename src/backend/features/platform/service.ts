@@ -5,7 +5,7 @@
 // a handler here ever asks for content, the seam throws a `PlatformSeamViolation` — a
 // programming error, deliberately not a 403, because an INV-011 breach is a line to delete
 // rather than a refusal to render.
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import type {
   AnalyticsQuery,
   EarningsQuery,
@@ -25,9 +25,12 @@ import type {
   PlatformOrgDetail,
   PlatformOrgSummary,
   PlatformStats,
+  EnterSupportResponse,
+  SupportSessionListQuery,
+  SupportSessionRow,
   Tier,
 } from '@endur/shared';
-import { TIERS, isQuietOrg } from '@endur/shared';
+import { TIERS, isQuietOrg, SUPPORT_DENIED_CAPABILITIES } from '@endur/shared';
 import type { PaymentKind } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
 import { newPeriod } from '../../billing/period.js';
@@ -38,6 +41,15 @@ import { hashPassword } from '../../auth/password.js';
 import { generateSecret, otpauthUrl } from '../../platform/totp.js';
 import { listLogFiles, readLogFile, exportLogFile } from '../../platform/logs/index.js';
 import { logDir, logToFile } from '../../lib/logger.js';
+// DEC-114. The support seam, deliberately NOT `platformClient()` — see the note above
+// `enterSupport` for why widening the seam would have been the wrong fix.
+import {
+  endSupportSession,
+  loadSupportSession,
+  startSupportSession,
+} from '../../db/support.js';
+import { destroy, regenerate, save } from '../../auth/session.js';
+import { issueCsrfToken } from '../../middleware/csrfProtection.js';
 import { config } from '../../lib/config.js';
 import type { LogExportResult } from '../../platform/logs/index.js';
 import { ConflictError, NotFoundError, UnauthenticatedError } from '../../lib/errors.js';
@@ -1392,3 +1404,180 @@ export async function approveEnterpriseRequest(
   return enterpriseView(row);
 }
 
+
+// ---------------------------------------------------------------------------
+// Support access — DEC-114, T-109, 19 §15
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THE WRITES BELOW DO NOT GO THROUGH `db` (THE PLATFORM SEAM), AND MUST NOT.
+ *
+ * Every other function in this file runs through `platformClient()`, and rule 3 of that seam
+ * is *"an operator cannot write inside a tenant"*. Opening a support session writes two rows
+ * inside a tenant — the synthetic `users` member, and the `support_sessions` row that names
+ * it — so the obvious move is to add `User` and `SupportSession` to `WRITABLE_MODELS`.
+ *
+ * That would be the wrong fix, and the reason is the whole value of having a seam. The
+ * allowlist is not per-function: adding `User` there makes `user.create` reachable from every
+ * handler in this 900-line file, forever, including ones nobody has written yet. The
+ * exception belongs to ONE operation, so it lives in ONE file — `db/support.ts` — which uses
+ * the base client and says at the top why it is allowed to. The seam stays exactly as narrow
+ * as it was; the door is a named file a reviewer opens rather than a wider wall.
+ *
+ * `Answer` is still unreachable from here, `Response` is still count-only, and nothing below
+ * reads a tenant's content. INV-011 is untouched by this function — it is restated, for the
+ * far wider door the session itself opens, by `SUPPORT_DENIED_CAPABILITIES`.
+ */
+export async function enterSupport(
+  req: Request,
+  res: Response,
+  orgId: string,
+  reason: string,
+): Promise<EnterSupportResponse> {
+  const operator = req.ctx.principal;
+  if (operator?.kind !== 'platform') throw new UnauthenticatedError();
+
+  const org = await db.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true, name: true },
+  });
+  if (!org) throw new NotFoundError();
+
+  const profile = await db.platformUser.findUnique({
+    where: { id: operator.id },
+    select: { id: true, name: true, email: true },
+  });
+  if (!profile) throw new UnauthenticatedError();
+
+  // REGENERATE FIRST, for the reason `POST /auth/login` regenerates: session fixation. It
+  // matters more here, not less — whoever set a session id in this browser beforehand would
+  // otherwise hold a live id for a session that now has every capability in a customer's
+  // organisation attached to it.
+  //
+  // It also gives us the id the browser will actually carry, which is what the row is keyed
+  // on. Reading `req.sessionID` before this line would key the row to a session id that is
+  // about to be thrown away.
+  await regenerate(req);
+  req.session.support = true;
+  req.session.orgId = orgId;
+  await save(req);
+
+  const session = await startSupportSession({
+    operator: { id: profile.id, name: profile.name },
+    orgId,
+    reason,
+    sessionId: req.sessionID,
+  });
+
+  // `userId` is written AFTER the row exists, so a crash between the two leaves a session
+  // that resolves nothing rather than one pointing at a member with no mandate.
+  req.session.userId = session.userId;
+  await save(req);
+
+  // The console's chain includes `csrfProtection`, and its self-heal only fires on a GET by
+  // a caller who already has a principal. Issuing here means the operator's first mutation
+  // works rather than failing once and telling them to reload.
+  issueCsrfToken(res);
+
+  await db.$transaction(async (tx) => {
+    await writeAudit(tx, req, 'support.enter', orgId, {
+      reason,
+      sessionId: session.id,
+      expiresAt: session.expiresAt.toISOString(),
+      // Recorded on OUR side too, so the register answers "what could they see" without
+      // anybody having to know what the deny list said on the day.
+      denied: [...SUPPORT_DENIED_CAPABILITIES],
+    });
+  });
+
+  return {
+    session: {
+      id: session.id,
+      org: { id: org.id, name: org.name },
+      operator: { id: profile.id, name: profile.name, email: profile.email },
+      reason: session.reason,
+      startedAt: session.startedAt.toISOString(),
+      expiresAt: session.expiresAt.toISOString(),
+      endedAt: null,
+      active: true,
+    },
+    // A PATH, not a URL and not a token. A link that granted access would be a credential
+    // sitting in a browser history and in every proxy log between here and there; the cookie
+    // this response already set is the credential, and it is httpOnly.
+    redirectTo: '/app',
+    deniedCapabilities: [...SUPPORT_DENIED_CAPABILITIES],
+  };
+}
+
+/**
+ * Leave. Called from `/ops` while the operator still holds the org session cookie, and from
+ * the customer console's own banner.
+ *
+ * IT ENDS THE ROW BEFORE IT DESTROYS THE SESSION. The row is what confers everything —
+ * `authenticate` resolves it on every request — so ending it first means the access is gone
+ * even if the destroy fails. The other order would leave a browser with no cookie and a live
+ * row, which is a row anybody replaying a captured cookie could still use.
+ */
+export async function leaveSupport(req: Request, res: Response): Promise<{ ok: true }> {
+  const sessionId = req.sessionID;
+  const live = await loadSupportSession(sessionId);
+  await endSupportSession(sessionId);
+
+  if (live && req.ctx.principal?.kind === 'platform') {
+    await db.$transaction(async (tx) => {
+      await writeAudit(tx, req, 'support.leave', live.orgId, { sessionId: live.id });
+    });
+  }
+
+  await destroy(req);
+  res.clearCookie('endur.sid', { path: '/' });
+  res.clearCookie('endur.csrf', { path: '/' });
+  return { ok: true };
+}
+
+/**
+ * The register. `70` § Support access renders it under one organisation; `/ops/audit` reads
+ * the whole thing.
+ *
+ * STILL INV-011, and visibly so: an organisation's name, an operator's name and address, two
+ * timestamps and a sentence the operator typed. Not one field here came out of a tenant's
+ * data, which is the test every payload on this surface has to pass (13 §platform).
+ */
+export async function listSupportSessions(
+  query: SupportSessionListQuery,
+): Promise<SupportSessionRow[]> {
+  const now = new Date();
+  const rows = await db.supportSession.findMany({
+    where: {
+      ...(query.orgId ? { orgId: query.orgId } : {}),
+      // `active` is COMPUTED, not stored, so it cannot be filtered on a column — a session is
+      // over because somebody left OR because it ran out, and only the first writes a row.
+      // Storing a boolean would mean a row that is false in the database and true in fact for
+      // however long it took a job to notice, which is the bug `applyExpiredDowngrade` was.
+      ...(query.active === true ? { endedAt: null, expiresAt: { gt: now } } : {}),
+      ...(query.active === false ? { OR: [{ endedAt: { not: null } }, { expiresAt: { lte: now } }] } : {}),
+    },
+    orderBy: { startedAt: 'desc' },
+    take: 200,
+    select: {
+      id: true,
+      reason: true,
+      startedAt: true,
+      expiresAt: true,
+      endedAt: true,
+      org: { select: { id: true, name: true } },
+      operator: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    org: row.org,
+    operator: row.operator,
+    reason: row.reason,
+    startedAt: row.startedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    endedAt: row.endedAt ? row.endedAt.toISOString() : null,
+    active: row.endedAt === null && row.expiresAt > now,
+  }));
+}

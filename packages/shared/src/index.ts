@@ -12,6 +12,10 @@ export * from './platform-capabilities.js';
 // `71`'s decision 4 — one predicate, imported by both the estate row chip and the backend
 // analytics count, so "quiet" cannot drift between the two screens that show it.
 export * from './platform-quiet.js';
+// DEC-114, 19 §15. The deny list a support session resolves as `deny` grants at `all`
+// scope. Exported from the front door beside the two catalogues because it is the third
+// thing that decides what somebody may do, and hiding it would make it easy to widen.
+export * from './support.js';
 export * from './errors.js';
 export * from './labels.js';
 export * from './vocabularies.js';

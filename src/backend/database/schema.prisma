@@ -126,6 +126,7 @@ model Organization {
   bookables       Bookable[]
   notifications      Notification[]
   enterpriseRequests EnterpriseRequest[]
+  supportSessions    SupportSession[]
 
   @@map("organizations")
 }
@@ -171,6 +172,9 @@ model User {
   bookingsMade         Booking[]             @relation("BookingUser")
   notifications        Notification[]
   enterpriseRequests   EnterpriseRequest[]
+  /// DEC-114. Present only on the synthetic rows `db/support.ts` mints — one per operator
+  /// per organisation, `status = 'support'`, no password hash and no person node.
+  supportSessions      SupportSession[]
 
   @@unique([orgId, email])
   @@map("users")
@@ -989,6 +993,7 @@ model PlatformUser {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   sessions   PlatformSession[]
+  supportSessions SupportSession[]
   auditLog   PlatformAuditLog[]
   enterpriseRequestsHandled EnterpriseRequest[]
 
@@ -1042,6 +1047,61 @@ model PlatformAuditLog {
   @@index([createdAt(sort: Desc)])
   @@index([targetOrgId, createdAt(sort: Desc)])
   @@map("platform_audit_log")
+}
+
+/// SUPPORT ACCESS — one operator, inside one customer's console, for one hour. DEC-114, 19 §15.
+///
+/// This row is the whole feature's memory. `19` §14 refused impersonation, and the thing it
+/// refused was an operator who could enter an account SILENTLY and read anything. What
+/// changed is not the appetite for the feature — that was always the argument for it — but
+/// that three properties now make it a different thing, and each of them is a column here:
+///
+///   `reason`     typed before the door opens, shown to the CUSTOMER in their own banner
+///   `expiresAt`  it stops on its own. "Remember to press Leave" is not a control
+///   `userId`     the synthetic org account every action inside is attributed to, so the
+///                customer's OWN audit log names the operator rather than showing a gap
+///
+/// What it does NOT contain is any power. The session confers nothing by existing: powers
+/// are minted as `deny`/`allow` grants in `authz/collect.ts` and resolved by the ordinary
+/// engine, minus `SUPPORT_DENIED_CAPABILITIES`. Delete this row and the operator is refused
+/// on the next request, by `authenticate`, because there is nothing left to resolve against.
+///
+/// It is a PLATFORM table (no `org_id` scoping through `db/tenant.ts`) even though it names
+/// an organisation, for the same reason `platform_audit_log` is: the register is OURS. A
+/// customer reads their own support history through their audit log, which is the tenant-side
+/// record of the same events.
+model SupportSession {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  operatorId String       @map("operator_id") @db.Uuid
+  operator   PlatformUser @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// The synthetic `users` row this session acts as. NOT the operator: `platform_users` and
+  /// `users` are different tables on purpose (DEC-033), and an audit row inside a tenant can
+  /// only point at the second one.
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Why they came in, in the operator's own words. Shown to the customer verbatim.
+  reason String
+
+  /// The express-session id this support session is bound to. A support session that is not
+  /// the one the cookie belongs to cannot be resurrected by replaying an old cookie: ending
+  /// one ends it for the browser that started it and no other.
+  sessionId String @map("session_id")
+
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  /// Set by Leave, and by a second entry into the same organisation. NULL = still open,
+  /// which is only half of "active" — see `expiresAt`.
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  @@index([orgId, startedAt(sort: Desc)])
+  @@index([operatorId, startedAt(sort: Desc)])
+  @@map("support_sessions")
 }
 
 // ---------------------------------------------------------------------------

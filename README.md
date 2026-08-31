@@ -102,8 +102,3 @@ npm run audit:drift   # docs and code cannot silently disagree about a capabilit
 npm run audit:vocab   # no hardcoded domain noun in a component
 ```
 
-## 🟧 Team
-
-Three members. Work is tracked as stable task ids (`T-001`…) defined in
-[`architecture/55-BUILD-ORDER.md`](architecture/55-BUILD-ORDER.md) and referenced in commit
-messages.

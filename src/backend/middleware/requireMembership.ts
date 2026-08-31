@@ -35,6 +35,20 @@ export const requireMembership: RequestHandler = (req, _res, next) => {
   if (principal?.kind !== 'user') {
     return next(new SignInRequiredError(campaign.org.name));
   }
+  // DEC-114. AN ENDUR OPERATOR IS NOT ONE OF "OUR OWN PEOPLE", and this is the one place in
+  // the product where holding every capability is beside the point.
+  //
+  // A support session resolves as a member of this organisation for every other purpose,
+  // which is the whole design — but the question this gate asks is not "may you" and cannot
+  // be answered by a grant. It asks whether the caller is a person whose opinion this
+  // campaign was collecting, and an operator who came in to fix a bug is not. Letting one
+  // through would put an Endur employee's answers in a customer's results, permanently and
+  // anonymously, with no column anywhere that could ever identify them for removal (INV-006
+  // cuts both ways). It would also burn the one submission a real member is allowed, if the
+  // synthetic account were ever swept into an audience.
+  if (principal.support) {
+    return next(new NotAMemberError(campaign.org.name));
+  }
   if (principal.orgId !== campaign.orgId) {
     return next(new NotAMemberError(campaign.org.name));
   }

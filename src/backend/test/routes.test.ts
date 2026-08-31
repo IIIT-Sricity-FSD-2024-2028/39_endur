@@ -62,6 +62,28 @@ const PUBLIC_ROUTES: Array<{ pattern: RegExp; why: string }> = [
       '/me is gated by requirePlatformAuth rather than by a capability (19 §11)',
   },
   {
+    // T-109, DEC-114. LEAVING A SUPPORT SESSION, and it is uncapability-gated on purpose.
+    //
+    // `requirePlatformAuth()` is mounted on the whole router above it, so this 401s without
+    // the `endur.ops` cookie — what this list enumerates is "not capability-gated", exactly as
+    // it does for /auth/ and /platform/me.
+    //
+    // NOT `platform.support.enter`. Giving up access can never be the thing somebody is not
+    // permitted to do, and gating it on the capability that opened the session would mean an
+    // operator whose role changed mid-session could not close the session that role had
+    // opened — the one state where leaving matters most. `POST /auth/logout` is unguarded for
+    // the same reason one surface over.
+    //
+    // The route takes NO id: it ends the session the CALLER's cookie names and no other, so
+    // there is nothing an operator could send to close a colleague's.
+    pattern: /^\/api\/v1\/platform\/support-session\/leave$/,
+    why:
+      'ending your own support session is the platform twin of POST /auth/logout — giving up ' +
+      'access cannot require a permission, and gating it on platform.support.enter would trap ' +
+      'an operator whose role changed mid-session (DEC-114, 19 §15). requirePlatformAuth is ' +
+      'the real guard, and the route takes no id so it can only end the caller\'s own',
+  },
+  {
     // T-101, DEC-101. NOT UNAUTHENTICATED — `authenticate` runs and this 401s without a
     // session. It is uncapability-GATED, which is what this list enumerates.
     //
