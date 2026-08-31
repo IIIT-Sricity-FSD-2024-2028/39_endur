@@ -6,9 +6,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PRESET_LIST, presetFor } from '../presets/index.js';
+import { TIERS, changeCostMinor, priceOf } from '@endur/shared';
 import { DEMO_ORGS } from '../database/seed/demo.js';
 import { COMMENT_POOLS } from '../database/seed/comments.js';
 import { Rng, skewedRating } from '../database/seed/random.js';
+import { historyFor } from '../database/seed/billing-history.js';
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sharedRoot = path.resolve(backendRoot, '../../packages/shared/src');
@@ -195,5 +197,47 @@ describe('the seed is deterministic — 50 §8', () => {
     const poorMean = poor.reduce((sum, value) => sum + value, 0) / poor.length;
     // And the deliberately weak subject is unmistakably worse, or the results screen has nothing to show.
     expect(poorMean).toBeLessThan(mean - 1);
+  });
+});
+
+describe('the seeded estate has actually PAID for the tiers it sits on', () => {
+  // THE BUG THIS PINS. Every runtime path that moves an organisation onto a paid tier writes a
+  // payment beside it — join, plan change, Enterprise approval. The seeds wrote the
+  // `Subscription` row and nothing else, so a freshly seeded estate had two Enterprise
+  // customers, two more on paid tiers, and ONE payment row in the whole ledger. The earnings
+  // page read "₹500 lifetime" and was correct to; the data underneath it was the lie.
+
+  it('gives every tier a history that sums to exactly that tier’s list price', () => {
+    // The property worth pinning, because it is the one somebody can check by hand: an
+    // organisation on Gold has paid Gold's ₹999, whatever route it took to get there. It falls
+    // out of `changeCostMinor` rather than out of arithmetic in the seed, which is why a price
+    // change in the catalogue cannot silently make the demo estate's books wrong.
+    for (const tier of TIERS) {
+      const total = historyFor(tier).reduce(
+        (sum, step) => sum + changeCostMinor(step.fromTier, step.tier),
+        0,
+      );
+      expect(total, `an org on ${tier} should have paid ${priceOf(tier)}`).toBe(priceOf(tier));
+    }
+  });
+
+  it('never sells Enterprise through a signup, because no route does', () => {
+    // DEC-048 / DEC-100: Enterprise is operator-assigned. A `signup` row landing straight on it
+    // would describe a purchase the public join flow cannot make, and the estate page would be
+    // telling the owner about revenue that could not have happened.
+    for (const tier of TIERS) {
+      for (const step of historyFor(tier)) {
+        if (step.kind === 'signup') expect(step.tier).toBe('bronze');
+      }
+    }
+  });
+
+  it('charges a paying org more than once and a bronze org exactly once', () => {
+    // Bronze IS the join tier, so its whole history is the signup — a second row would be a
+    // zero-rupee change, which is the "₹0 row somebody will ask about" that `tiers.ts` warns of.
+    expect(historyFor('bronze')).toHaveLength(1);
+    for (const tier of TIERS.filter((candidate) => candidate !== 'bronze')) {
+      expect(historyFor(tier).length, `${tier} should have a signup AND an upgrade`).toBe(2);
+    }
   });
 });

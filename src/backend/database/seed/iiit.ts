@@ -32,6 +32,7 @@ import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, presetFor, type Level } from '../../presets/index.js';
 import { mintToken } from '../../features/campaigns/token.js';
 import { newPeriod } from '../../billing/period.js';
+import { seedBillingHistory } from './billing-history.js';
 import { ORGANISATION_SUBJECT } from '../../features/campaigns/visibility.js';
 import { Rng } from './random.js';
 import { seedResponses } from './responses.js';
@@ -342,6 +343,7 @@ export async function seedIiitSriCity(
 
   // The highest tier there is. Enterprise is operator-assigned rather than self-serve
   // (DEC-048 / DEC-100), which is why it is written here and not chosen at sign-up.
+  // The captures that paid for it are written at 5b, once the Director exists to be the payer.
   await prisma.subscription.create({
     data: { orgId, tier: 'enterprise', status: 'active', ...newPeriod() },
   });
@@ -522,6 +524,18 @@ export async function seedIiitSriCity(
   await prisma.user.createMany({ data: users });
   await prisma.node.createMany({ data: people });
   await prisma.edge.createMany({ data: members, skipDuplicates: true });
+
+  // 5b. The billing past, written once the Director exists to be named as the payer.
+  // ENTERPRISE IS NOT SELF-SERVE (DEC-048 / DEC-100), and the history says so: a Bronze signup
+  // through the public flow, then a `change` up to Enterprise — which is the shape
+  // `approveEnterpriseRequest` writes, priced from the tier they were actually on. Seeding a
+  // signup straight onto Enterprise would describe a purchase no route in the product allows.
+  await seedBillingHistory(prisma, {
+    orgId,
+    tier: 'enterprise',
+    payerName: director.name,
+    payerEmail: `admin@${IIIT_SLUG}.endur.test`,
+  });
 
   // 6. Templates. The preset's five are cloned the way the setup wizard clones them, and two
   //    more are written here because "How would you rate the study spaces?" is not a question
