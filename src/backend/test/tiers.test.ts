@@ -154,9 +154,9 @@ describe('register writes the subscription — D-012 repaid', () => {
       where: { orgId: res.body.organization.id as string },
     });
     expect(subscription?.tier).toBe(tier);
-    // No trial on this path.
+    // The ordinary paid path — DEC-116 — still writes 'active', never 'trialing', unless the
+    // request explicitly asks for a trial (covered separately below).
     expect(subscription?.status).toBe('active');
-    expect(subscription?.status).not.toBe('trialing');
 
     // One calendar month, asserted here because registration is one of the places that used to decide
     // the period length for itself. A range rather than an exact figure, because months differ in length.
@@ -176,6 +176,33 @@ describe('register writes the subscription — D-012 repaid', () => {
     expect(payments[0]?.fromTier).toBeNull();
     expect(payments[0]?.amountMinor).toBe(priceOf(tier));
     expect(payments[0]?.currency).toBe('INR');
+  });
+
+  // DEC-116 — a trial instead of paying. Covers the other half of what the test above's old
+  // comment used to assert ("no trial on this path"): there IS one now, on an explicit opt-in.
+  it.each([...SIGNUP_TIERS])('starts a %s trial instead of charging anything, when asked', async (tier) => {
+    const res = await registerWith({ tier, trial: true });
+    expect(res.status).toBe(201);
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { orgId: res.body.organization.id as string },
+    });
+    expect(subscription?.tier).toBe(tier);
+    expect(subscription?.status).toBe('trialing');
+
+    const days =
+      (subscription!.periodEnd.getTime() - subscription!.periodStart.getTime()) / 86_400_000;
+    expect(days).toBeCloseTo(14, 0);
+
+    const payments = await prisma.payment.findMany({
+      where: { orgId: res.body.organization.id as string },
+    });
+    expect(payments).toHaveLength(1);
+    expect(payments[0]?.kind).toBe('trial_signup');
+    expect(payments[0]?.tier).toBe(tier);
+    expect(payments[0]?.amountMinor).toBe(0);
+    // A trial captures nothing, so a client-sent paymentRef is dropped rather than recorded.
+    expect(payments[0]?.reference).toMatch(/^endur_/);
   });
 
   // A client-supplied amount is not an amount: anything but the reference is stripped by validation,
