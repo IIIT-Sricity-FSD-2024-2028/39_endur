@@ -76,6 +76,7 @@ export function PlanPicker({
   busyTier = null,
   requestedTier = null,
   disabled = false,
+  belowIsLive = false,
 }: {
   plans: readonly PlanOption[];
   /**
@@ -96,6 +97,14 @@ export function PlanPicker({
    */
   requestedTier?: Tier | null;
   disabled?: boolean;
+  /**
+   * DEC-116 — EXCEPT MID-TRIAL. A trial captured nothing, so unlike an ordinary `join`, a tier
+   * at or below the current one is a live choice too, not context with the button removed
+   * (DEC-096's reasoning does not apply: there is no "no refunds" to protect). The CALLER
+   * decides when this is true (`summary.status === 'trialing'`); this component just stops
+   * suppressing the action.
+   */
+  belowIsLive?: boolean;
 }): JSX.Element {
   return (
     <div
@@ -117,8 +126,10 @@ export function PlanPicker({
         // yet for a request to be about, and the page-level `disabled` flag.
         const unavailable = disabled || (mode === 'signup' && !plan.selectable);
         // DEC-096. `join` only: at sign-up there is nothing to be below, and an operator may
-        // move a plan in either direction.
+        // move a plan in either direction. `belowIsLive` (DEC-116) lifts this mid-trial, where
+        // there is nothing paid to protect.
         const below =
+          !belowIsLive &&
           mode === 'join' && current !== null && tierRank(plan.tier) < tierRank(current);
         // DEC-100. A customer cannot ASSIGN this tier; they can ASK for it.
         const requestable = mode === 'join' && !plan.selectable;
@@ -213,11 +224,19 @@ export function PlanPicker({
               <button
                 type="button"
                 className="btn btn-secondary plan-action"
-                disabled={unavailable || selected || requested || busyTier !== null}
+                disabled={unavailable || (selected && !belowIsLive) || requested || busyTier !== null}
                 onClick={() => onSelect(plan.tier)}
               >
                 {busyTier === plan.tier && <span className="spinner" aria-hidden="true" />}
-                {selected ? 'Current plan' : requested ? 'Requested' : requestable ? 'Request' : VERB[mode]}
+                {selected && !belowIsLive
+                  ? 'Current plan'
+                  : requested
+                    ? 'Requested'
+                    : requestable
+                      ? 'Request'
+                      : selected
+                        ? 'Convert to paid'
+                        : VERB[mode]}
               </button>
             )}
           </div>
