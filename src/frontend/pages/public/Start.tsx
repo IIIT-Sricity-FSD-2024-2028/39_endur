@@ -127,7 +127,7 @@ export default function Start(): JSX.Element {
     setPaying(true);
   }
 
-  async function submit(paymentRef?: string): Promise<void> {
+  async function submit(options: { paymentRef?: string; trial?: boolean } = {}): Promise<void> {
     if (busy || !tier) return;
     setBusy(true);
     setError(null);
@@ -142,7 +142,8 @@ export default function Start(): JSX.Element {
         tier,
         // A LABEL, not a proof (DEC-080). The server prices the tier itself and writes the
         // ledger row either way; this is what lets a human match that row to the dialog.
-        paymentRef,
+        paymentRef: options.paymentRef,
+        trial: options.trial ?? false,
       });
       navigate(landing, { replace: true });
     } catch (caught) {
@@ -324,6 +325,18 @@ export default function Start(): JSX.Element {
                   {busy && <span className="spinner" aria-hidden="true" />}
                   Continue to payment
                 </button>
+                {/* NO CHECKOUT FOR THIS PATH — DEC-116. A trial captures nothing, so there is
+                    nothing for <PaymentDialog> to simulate; the button submits directly, with
+                    `trial: true` and no paymentRef. */}
+                <button
+                  className="btn btn-secondary btn-block"
+                  type="button"
+                  disabled={busy || !tier}
+                  onClick={() => void submit({ trial: true })}
+                >
+                  {busy && <span className="spinner" aria-hidden="true" />}
+                  Start 14-day trial instead
+                </button>
                 <button
                   className="btn btn-ghost btn-block"
                   type="button"
@@ -344,7 +357,7 @@ export default function Start(): JSX.Element {
         <PaymentDialog
           plan={chosenPlan}
           mode="signup"
-          onPaid={(reference) => void submit(reference)}
+          onPaid={(reference) => void submit({ paymentRef: reference })}
           onCancel={() => setPaying(false)}
         />
       )}

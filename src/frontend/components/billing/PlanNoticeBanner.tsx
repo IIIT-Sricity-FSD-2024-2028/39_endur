@@ -75,6 +75,10 @@ export function noticeFor(
   now: Date = new Date(),
 ): { tone: 'lapsed' | 'ending'; text: string; action: string } | null {
   if (summary.lapsedFrom) {
+    // DEC-116. A trial that expired unconverted never had money flowing, so "ended" rather
+    // than "plan has ended" — the same distinction the plan page's own banner makes, read off
+    // the same field.
+    const noun = summary.lapsedFromTrial ? 'trial' : 'plan';
     return {
       tone: 'lapsed',
       // NO DATE ON THIS ONE, and the reason is worth writing down so nobody helpfully adds
@@ -83,17 +87,30 @@ export function noticeFor(
       // the old plan ran out. Printing it as "ended on" would state a date that is usually
       // wrong, and a wrong date on a billing notice is worse than no date.
       text:
-        `Your ${tierName(summary.lapsedFrom)} plan has ended and this organisation is now on ` +
+        `Your ${tierName(summary.lapsedFrom)} ${noun} has ended and this organisation is now on ` +
         `${tierName(summary.tier)}. Nothing you have collected has been deleted.`,
       action: 'Choose a plan',
     };
   }
 
-  // Bronze has no end to warn about — see the header.
-  if (summary.tier === 'bronze') return null;
+  // Bronze has no end to warn about — see the header. A bronze TRIAL still warns (below),
+  // because unlike a bronze plan it does have an end: the courtesy window, not a renewal.
+  if (summary.tier === 'bronze' && summary.status !== 'trialing') return null;
 
   const left = daysUntil(summary.periodEnd, now);
   if (left < 0 || left > NOTICE_WINDOW_DAYS) return null;
+
+  // DEC-116. A trial nearing its end gets its own sentence — "add payment", not "renew",
+  // because nothing has been paid yet for there to be a renewal of.
+  if (summary.status === 'trialing') {
+    return {
+      tone: 'ending',
+      text:
+        `Your ${tierName(summary.tier)} trial ends on ${formatDate(summary.periodEnd)}. ` +
+        `Add payment to keep it — otherwise this organisation moves to ${tierName('bronze')}.`,
+      action: 'Add payment',
+    };
+  }
 
   return {
     tone: 'ending',

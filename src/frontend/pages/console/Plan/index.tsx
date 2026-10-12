@@ -57,6 +57,7 @@ import {
   usePlans,
   useScheduleDowngrade,
 } from '../../../lib/billing.js';
+import { daysUntil } from '../../../components/billing/PlanNoticeBanner.js';
 
 /**
  * "Bronze — Measure" is the CARD's name; a sentence wants "Bronze". The em dash split is
@@ -151,7 +152,10 @@ export default function Plan(): JSX.Element {
       setAsking(true);
       return;
     }
-    if (tierRank(tier) <= tierRank(summary.tier)) return;
+    // DEC-116. Mid-trial, nothing has been paid for, so an equal-or-lower tier is a live
+    // first purchase, not a downgrade — mirrors the backend's `wasTrialing` branch in
+    // `joinTier` so client and server never disagree about what's offered (INV-003).
+    if (summary.status !== 'trialing' && tierRank(tier) <= tierRank(summary.tier)) return;
     setPaying(tier);
   };
 
@@ -248,6 +252,17 @@ export default function Plan(): JSX.Element {
               </span>
             </div>
 
+            {/* DEC-116. Days left is computed client-side from `periodEnd` with the same
+                UTC-midnight care `daysUntil` already takes for the shell's own ending notice,
+                rather than a second clock reading. */}
+            {summary.status === 'trialing' && (
+              <p className="text-meta plan-trial-days">
+                {Math.max(0, daysUntil(summary.periodEnd))} day
+                {Math.max(0, daysUntil(summary.periodEnd)) === 1 ? '' : 's'} left in your trial —
+                add payment any time below to keep it going.
+              </p>
+            )}
+
             {/* The ladder. Four tiers in order, the current one marked — so "what could we
                 move to, and in which direction" is answerable without reading four cards.
                 It is the same information the picker below carries and it is deliberately
@@ -309,7 +324,9 @@ export default function Plan(): JSX.Element {
                 <Icon name="plan" size={16} />
                 <span>
                   Your <strong>{tierName(catalogue.find((plan) => plan.tier === summary.lapsedFrom))}</strong>{' '}
-                  plan ended and this organisation moved to{' '}
+                  {/* DEC-116. "Your Gold TRIAL ended" vs "Your Gold PLAN ended" — a trial never
+                      had money flowing, so the paid-lapse sentence would misstate what happened. */}
+                  {summary.lapsedFromTrial ? 'trial' : 'plan'} ended and this organisation moved to{' '}
                   <strong>{tierName(catalogue.find((plan) => plan.tier === summary.tier))}</strong>.
                   Nothing you have collected has been deleted — choose a plan below to get those
                   screens back.
@@ -325,7 +342,11 @@ export default function Plan(): JSX.Element {
                 Hidden entirely without `billing.update`, unlike the picker — the picker still
                 answers "what are we on and what would the next one add", which is
                 `billing.read`'s question; a schedule is only ever an action. */}
-            {mayChange && (summary.pendingTier !== null || lowerTiers.length > 0) && (
+            {/* DEC-116. Not offered during a trial: nothing has been paid for, so there is
+                nothing to schedule a move down FROM — the server refuses it too (409), this
+                just never asks. */}
+            {mayChange && summary.status !== 'trialing' &&
+              (summary.pendingTier !== null || lowerTiers.length > 0) && (
               <div className="plan-schedule">
                 {summary.pendingTier ? (
                   <p className="plan-schedule-line text-meta">
@@ -393,6 +414,7 @@ export default function Plan(): JSX.Element {
             busyTier={busyTier}
             requestedTier={enterprise.requestedAt ? 'enterprise' : null}
             disabled={!mayChange}
+            belowIsLive={summary.status === 'trialing'}
             onSelect={choose}
           />
 
@@ -409,7 +431,10 @@ export default function Plan(): JSX.Element {
         <PaymentDialog
           plan={buying}
           mode="change"
-          fromTier={summary.tier}
+          // DEC-116. `null` mid-trial, same as a sign-up: nothing was paid for the trial tier,
+          // so `changeCostMinor` must price the FULL amount, not a diff — matching what
+          // `joinTier` actually charges server-side (`pricedFrom: wasTrialing ? null : ...`).
+          fromTier={summary.status === 'trialing' ? null : summary.tier}
           onPaid={(reference) => apply(buying.tier, reference)}
           onCancel={() => setPaying(null)}
         />
