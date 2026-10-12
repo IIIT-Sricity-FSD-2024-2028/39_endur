@@ -322,13 +322,34 @@ describe('analytics — `71`, `T-067`', () => {
     expect(gold).toBeTruthy();
   });
 
-  // The trial figures are gone from the RESPONSE, not just from the page: they could never move, so the
-  // old assertion pinned a figure that was permanently correct and permanently still.
-  it('prints no trial figures at all, because nothing can ever write one', async () => {
+  // DEC-116 narrows this rather than reverses it: trial figures ARE real again, but there is
+  // still no top-level `trials` object with a "conversion rate" in it — that still has no
+  // honest source. What exists now lives at `movement[].trialStarted`, asserted below.
+  it('still prints no top-level trial figures — conversion rate has no honest source', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.agent.get('/api/v1/platform/analytics');
     expect(res.status).toBe(200);
     expect(res.body.data).not.toHaveProperty('trials');
+  });
+
+  // DEC-116. Reached through the REAL path this time (register with trial: true), not a raw
+  // Prisma write — proving the mechanical count above now has a live producer.
+  it('counts a trial signup in movement.trialStarted, from the real registration path', async () => {
+    const owner = await makeOperator('owner');
+    const before = await owner.agent.get('/api/v1/platform/analytics');
+    const beforeStarted = (before.body.data.movement as Array<{ trialStarted: number }>).reduce(
+      (sum, row) => sum + row.trialStarted,
+      0,
+    );
+
+    await registerOrg('custom', 'gold', true);
+
+    const after = await owner.agent.get('/api/v1/platform/analytics');
+    const afterStarted = (after.body.data.movement as Array<{ trialStarted: number }>).reduce(
+      (sum, row) => sum + row.trialStarted,
+      0,
+    );
+    expect(afterStarted).toBe(beforeStarted + 1);
   });
 
   // No seats anywhere on this page: the product prices per organisation, and the stored seat column has
