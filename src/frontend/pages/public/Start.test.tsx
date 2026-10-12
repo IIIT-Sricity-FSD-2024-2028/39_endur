@@ -107,6 +107,8 @@ describe('create organization — 30 §3.3', () => {
       // DEC-080. A LABEL for the capture the checkout simulated, not an amount and not a
       // proof — the server prices the tier and writes the ledger row either way.
       paymentRef: expect.stringMatching(/^endur_/) as string,
+      // DEC-116. false on the paid path — the field exists so the trial button can set it true.
+      trial: false,
     });
   });
 
@@ -214,9 +216,9 @@ describe('choose a plan — DEC-048', () => {
 
   /**
    * DEC-080 REVERSED DEC-035, so the assertion reverses with it: the prices must be ON the
-   * cards, and the things the product still does not have — a monthly plan, a free trial —
-   * must still be absent. The second half is the half that quietly rots, which is why it is
-   * asserted rather than left to review.
+   * cards, and the thing the product still does not have — a plan priced in any currency but
+   * INR — must still be absent. The second half is the half that quietly rots, which is why it
+   * is asserted rather than left to review.
    */
   it('prices every tier it offers', () => {
     mount();
@@ -225,7 +227,29 @@ describe('choose a plan — DEC-048', () => {
     expect(document.body.textContent).toContain('₹99');
     expect(document.body.textContent).toContain('₹499');
     expect(document.body.textContent).toContain('₹999');
-    expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month|free trial|14 days/i);
+    expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month/i);
+  });
+
+  /**
+   * DEC-116 REVERSED PART OF DEC-102: there IS a free trial now, offered once a tier is
+   * picked, and it must register with `trial: true` and no `paymentRef` — the whole point is
+   * that `<PaymentDialog>` is never opened for this path, since nothing is captured.
+   */
+  it('offers a 14-day trial that registers with no payment captured', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    mount();
+    fill();
+    advance();
+    pick('gold');
+    fireEvent.click(screen.getByRole('button', { name: /start 14-day trial instead/i }));
+
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled());
+    expect(registerOrg.mock.calls[0]?.[0]).toMatchObject({ tier: 'gold', trial: true });
+    expect(
+      (registerOrg.mock.calls[0]?.[0] as { paymentRef?: string }).paymentRef,
+    ).toBeUndefined();
+    // No checkout was ever shown for this path.
+    expect(screen.queryByText(/endur demo checkout/i)).toBeNull();
   });
 
   /**
