@@ -66,6 +66,17 @@ export const RegisterBody = Credentials.extend({
    * reference when the client sent none.
    */
   paymentRef: z.string().max(64).optional(),
+  /**
+   * START A TRIAL INSTEAD OF PAYING — DEC-116. Optional, default false, and deliberately no
+   * `.default()` for the same reason `tier` has none: an absent field must mean "the ordinary
+   * paid path", never a silent trial nobody asked for.
+   *
+   * MUTUALLY MEANINGFUL WITH `paymentRef`, NOT VALIDATED AGAINST IT — the same posture this
+   * DTO already takes on `paymentRef` being a label nothing authorises on. The SERVICE decides
+   * what `trial: true` means for pricing (nothing is charged; a `paymentRef` sent alongside it
+   * is a label on a payment that never happened, and is dropped).
+   */
+  trial: z.boolean().default(false),
 });
 export type RegisterBody = z.infer<typeof RegisterBody>;
 

@@ -11,8 +11,11 @@ type Tx = {
   };
 };
 
-// Kinds of row: a signup, a plan change, an expiry downgrade, or a lapse when nobody renewed.
-export type PaymentKind = 'signup' | 'change' | 'expiry' | 'lapse';
+// Kinds of row: a signup, a trial signup, a plan change, an expiry downgrade, a lapse when
+// nobody renewed, or a trial that expired unconverted — DEC-116. Mirrors the shared
+// `PaymentKind` in packages/shared/src/dto/billing.ts; see that file for why each kind is its
+// own value rather than folded into a sibling.
+export type PaymentKind = 'signup' | 'trial_signup' | 'change' | 'expiry' | 'lapse' | 'trial_expired';
 
 // Mints our own reference, such as endur_ab12cd, for when the client sent none.
 export const paymentReference = (): string => `endur_${randomBytes(9).toString('hex')}`;
@@ -31,6 +34,16 @@ export async function recordPayment(
     payerEmail: string;
     // Whatever reference the client says it captured. A label only.
     reference?: string | null;
+    /**
+     * ONLY EVER `0`, AND ONLY EVER FOR A KIND THAT CAPTURES NOTHING — DEC-116. `trial_signup`
+     * and `trial_expired` move to/from a REAL priced tier, so `changeCostMinor` would compute a
+     * real nonzero amount for them unless told not to; this skips that computation entirely
+     * rather than computing a price and discarding it, which is exactly the kind of silent
+     * inference this file's own header comment warns against. NOT a general override — a
+     * general one would let a future caller invent its own price, which is the whole thing
+     * this file exists to prevent.
+     */
+    amountMinor?: 0;
     /**
      * WHEN THE MONEY MOVED, for the one caller that is describing the past rather than making
      * it: the seed. Everything in the running product omits it and gets `now()` from the
@@ -53,10 +66,15 @@ export async function recordPayment(
       payerName: input.payerName,
       payerEmail: input.payerEmail,
       // Priced here on the server, from the move itself - the one line this module exists for.
-      amountMinor: changeCostMinor(
-        input.pricedFrom === undefined ? (input.fromTier ?? null) : input.pricedFrom,
-        input.tier,
-      ),
+      // Unless the caller explicitly says the capture is 0 (a trial signup or a trial expiry),
+      // in which case there is no move to price - see `amountMinor` above.
+      amountMinor:
+        input.amountMinor === 0
+          ? 0
+          : changeCostMinor(
+              input.pricedFrom === undefined ? (input.fromTier ?? null) : input.pricedFrom,
+              input.tier,
+            ),
       currency: 'INR',
       status: 'succeeded',
       reference: input.reference?.trim() || paymentReference(),
