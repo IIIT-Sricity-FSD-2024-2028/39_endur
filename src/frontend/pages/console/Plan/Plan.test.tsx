@@ -23,6 +23,7 @@ const SILVER: BillingSummary = {
   pendingTier: null,
   // Nothing ran out either — DEC-113. Same rule: the tests about it set it.
   lapsedFrom: null,
+  lapsedFromTrial: null,
   seats: 34,
   seatBreakdown: { activeUsers: 30, nonPersonSubjects: 4 },
 };

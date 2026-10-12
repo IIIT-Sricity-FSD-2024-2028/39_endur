@@ -23,6 +23,7 @@ const summaryOf = (over: Partial<BillingSummary> = {}): BillingSummary => ({
   periodEnd: '2026-09-20T00:00:00.000Z',
   pendingTier: null,
   lapsedFrom: null,
+  lapsedFromTrial: null,
   seats: 12,
   seatBreakdown: { activeUsers: 10, nonPersonSubjects: 2 },
   ...over,
