@@ -1,6 +1,3 @@
-// The acceptance criterion these exist for (20 §9): "a signed-in user reloading
-// /app/campaigns never sees a login flash". That bug is invisible in development, where
-// /auth/me answers in 2ms, and glaring on a venue network. It is only catchable here.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -11,7 +8,6 @@ import { authReducer, signedIn, signedOut } from '../store/authSlice.js';
 import { vocabularyReducer } from '../store/vocabularySlice.js';
 import { RedirectIfSignedIn, RequireCapability, RequireSession } from './guards.js';
 
-/** `all`, because these tests are about the GUARD, never about how far a scope reaches. */
 const held = (capabilities: Capability[]): HeldCapabilities => {
   const map: HeldCapabilities = {};
   for (const capability of capabilities) map[capability] = 'all';
@@ -68,8 +64,6 @@ describe('RequireCapability', () => {
     expect(screen.getByText('Campaigns')).toBeTruthy();
   });
 
-  // The ONE place a permission produces a full-page state. Everywhere else out-of-scope
-  // data is absent rather than greyed out (design_specs/design/02 §5).
   it('shows a full-page state for a directly-navigated URL it cannot open', () => {
     mount(<RequireCapability capability="campaign.read"><p>Campaigns</p></RequireCapability>,
       'in', ['subject.read']);
@@ -78,11 +72,6 @@ describe('RequireCapability', () => {
   });
 });
 
-/**
- * The mirror case, added at T-031. `/` and `/login` are the two screens where the WRONG
- * flash is the sign-in form: someone who is already signed in should never watch a login
- * card appear and then vanish (30 § Acceptance).
- */
 describe('RedirectIfSignedIn', () => {
   const mountPublic = (session?: 'in' | 'out') => {
     const store = configureStore({ reducer: { auth: authReducer, vocabulary: vocabularyReducer } });

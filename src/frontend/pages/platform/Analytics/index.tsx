@@ -1,9 +1,3 @@
-// `/ops/analytics` — `71` § Interactions. The whole estate at once, for the owner.
-//
-// OWNER ONLY (`71` § Route & access): the nav item is absent for `staff` (`OpsLayout`), and a
-// direct visit here still gets a full-page 403 naming the capability rather than an empty
-// screen that looks broken — the route itself refuses with `platform.analytics.read` in the
-// message (`router.ts`).
 import { Link, useSearchParams } from 'react-router-dom';
 import { TIERS } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -70,8 +64,6 @@ export default function Analytics(): JSX.Element {
   const movementColumns: Column<MovementRow>[] = [
     { key: 'period', header: 'Period', primary: true, render: (row) => row.period },
     { key: 'new', header: 'New', render: (row) => row.new },
-    // DEC-116. Beside 'New' rather than folded into it — a trial starting and a paid signup
-    // are both an organisation being created, and only this column tells them apart.
     { key: 'trialStarted', header: 'Trials started', render: (row) => row.trialStarted },
     { key: 'upgraded', header: 'Upgraded', render: (row) => row.upgraded },
     { key: 'downgraded', header: 'Downgraded', render: (row) => row.downgraded },

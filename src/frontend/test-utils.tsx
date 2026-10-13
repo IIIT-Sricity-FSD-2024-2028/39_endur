@@ -1,9 +1,3 @@
-// Shared mount helper. 28 § "write this when" — its trigger was three component test
-// files with visible setup duplication, which T-030 reached.
-//
-// Deliberately small: a store, a router, and a session. Fixture BUILDERS for questions,
-// campaigns and org trees are not here, because inventing helpers for tests nobody has
-// written yet is how test infrastructure ends up fitting nothing.
 import { render, type RenderResult } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,36 +8,15 @@ import { authReducer, signedIn, signedOut } from './store/authSlice.js';
 import { labelsLoaded, vocabularyReducer } from './store/vocabularySlice.js';
 
 export type SessionFixture = {
-  /**
-   * Absent means signed out. `undefined` status is what boot-in-flight looks like.
-   *
-   * AN ARRAY STILL WORKS AND MEANS `all` — T-086 turned the capability set into a scoped
-   * map, and the array form is kept because most component tests are asking "does this
-   * button render", for which the widest scope is the right fixture and the scope is
-   * noise. Pass the map form when the SCOPE is the thing under test, which is what the
-   * per-tier sidebar tests need (`T-087`).
-   */
   capabilities?: readonly Capability[] | HeldCapabilities;
   labels?: LabelSet;
   name?: string;
   orgName?: string;
   signedOut?: boolean;
   path?: string;
-  /**
-   * DEC-114. A live support session, from the point of view of whoever this fixture is.
-   *
-   * `viewer: 'member'` is a customer being told somebody from Endur is inside; `'operator'` is
-   * the operator themselves. Both come down the same `/auth/me` field, which is what lets one
-   * component render both without a second store shape to fixture.
-   */
   support?: MeResponse['support'];
 };
 
-/**
- * The nonsense-label fixture that makes INV-001 testable at component level rather than
- * only by the manual walk (22 §5). If a component renders one of these strings, it read
- * the vocabulary; if it renders an English noun, it hardcoded one.
- */
 export const NONSENSE_LABELS: LabelSet = {
   unit: { one: 'Zblorn', many: 'Zblorns' },
   subject: { one: 'Quaxel', many: 'Quaxels' },
@@ -56,8 +29,6 @@ const heldFrom = (
   capabilities: readonly Capability[] | HeldCapabilities | undefined,
 ): HeldCapabilities => {
   if (!capabilities) return {};
-  // `Array.isArray` does not narrow a READONLY array out of a union, so the branch is
-  // written positively and the map form is the fall-through.
   if (Array.isArray(capabilities)) {
     const held: HeldCapabilities = {};
     for (const capability of capabilities as readonly Capability[]) held[capability] = 'all';
@@ -87,9 +58,6 @@ export function makeStore(session: SessionFixture = {}) {
       },
       labels: session.labels ?? {},
       capabilities: heldFrom(session.capabilities),
-      // Spread rather than assigned, so an ordinary fixture produces a payload with no
-      // `support` key at all — which is what the server actually sends, and the difference
-      // between testing the reducer's `?? null` and testing around it.
       ...(session.support ? { support: session.support } : {}),
     };
     store.dispatch(signedIn(me));

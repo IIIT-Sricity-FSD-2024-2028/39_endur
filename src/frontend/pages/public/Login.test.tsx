@@ -1,9 +1,3 @@
-// T-031 — sign in. 30 § States, § Acceptance.
-//
-// The interesting assertions here are all about what the page REFUSES to say. A form that
-// helpfully distinguishes "no such account" from "wrong password" hands an attacker a way
-// to enumerate real addresses, and the server's uniform failure is worthless if the client
-// decorates it back into two messages.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -27,7 +21,6 @@ const apiError = (status: number, extra: Record<string, unknown> = {}) =>
     ...extra,
   });
 
-/** For the two cases that need `location.state`, which a bare path cannot carry. */
 const mountAt = (entry: { pathname: string; state?: unknown }) =>
   render(
     <Provider store={makeStore({ signedOut: true })}>
@@ -108,8 +101,6 @@ describe('sign in — 30 §3.2', () => {
   });
 
   it('sends them to the wizard even when a deep link was pending', async () => {
-    // The org has no roles yet, so `/app/people` would render an empty page and look
-    // broken. Losing their place is the lesser harm (30 § Interactions).
     signIn.mockResolvedValue('/app/setup');
     mountAt({ pathname: '/login', state: { from: '/app/people' } });
     fill();
@@ -125,7 +116,6 @@ describe('sign in — 30 §3.2', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe("That email and password don't match.");
-    // The two fields must be indistinguishable in the DOM as well as in the copy.
     expect(screen.getByLabelText('Email').getAttribute('aria-invalid')).toBeNull();
     expect(screen.getByLabelText('Password').getAttribute('aria-invalid')).toBeNull();
     expect(document.body.textContent).not.toContain('server wording');
@@ -185,9 +175,6 @@ describe('sign in — 30 §3.2', () => {
     const button = screen.getByRole('button', { name: 'Sign in' });
     await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true));
     expect(button.textContent).toBe('Sign in');
-    // Settle inside act() — leaving a promise resolving after the test ends is what
-    // produces the "update not wrapped in act" warning, and a warning nobody can silence
-    // is a warning everybody stops reading.
     await act(async () => {
       release('/app');
       await Promise.resolve();
@@ -207,14 +194,6 @@ describe('sign in — 30 §3.2', () => {
   });
 });
 
-/**
- * DEC-049 — one address, two organisations. The narrowest question the product asks.
- *
- * It can only be reached by somebody who holds an activated account in more than one
- * organisation AND uses the same password for them: with different passwords the server
- * signs them straight in, and with one account it never comes up. No seeded organisation
- * shares an address, so this screen is rarely reached.
- */
 const AMBIGUOUS = () =>
   new ApiError({
     code: 'ACCOUNT_AMBIGUOUS',
@@ -239,7 +218,6 @@ describe('one address, two organisations — DEC-049', () => {
     await waitFor(() => expect(screen.getByText('Which organization?')).toBeTruthy());
     expect(screen.getByRole('button', { name: 'Aster Health Partners' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Borden Institute' })).toBeTruthy();
-    // NOT an error. The credentials were right; one more fact is missing.
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -254,7 +232,6 @@ describe('one address, two organisations — DEC-049', () => {
 
     await waitFor(() => expect(screen.getByText('CONSOLE')).toBeTruthy());
     expect(signIn).toHaveBeenCalledTimes(2);
-    // The SAME credentials, plus the answer. The password never left component state.
     expect(signIn.mock.calls[1]?.[0]).toEqual({
       email: 'admin@northfield.endur.test',
       password: 'endur-demo-password',
@@ -262,7 +239,6 @@ describe('one address, two organisations — DEC-049', () => {
     });
   });
 
-  /** `orgId` is an answer, never an unprompted hint — an ordinary sign-in sends two fields. */
   it('never sends an orgId on the first attempt', async () => {
     signIn.mockResolvedValue('/app');
     mount();
