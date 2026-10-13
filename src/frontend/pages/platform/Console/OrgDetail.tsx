@@ -1,9 +1,3 @@
-// `/ops/orgs/:id` — `70` § Interactions "Opening one organisation", "Changing a plan",
-// "Suspending an organisation", "Messaging the administrators".
-//
-// Metadata, the six counts, plan history, and the administrator list. NO RESULTS, NO
-// RESPONSES, NO COMMENTS, and no link that could reach any (INV-011). `PlatformOrgDetail`
-// carries no field that could.
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -71,21 +65,6 @@ export default function OrgDetail(): JSX.Element {
       .finally(() => setPlanBusy(false));
   };
 
-  /**
-   * SUSPEND AND REINSTATE, AND ONE OF THEM WAS DEAD — `D-043`.
-   *
-   * This guard used to read `if (!id || suspendConfirmText !== org.name) return;`, unqualified,
-   * for BOTH verbs. The reinstate dialog is a plain `<ConfirmDialog>` with no name field, so
-   * `suspendConfirmText` was always `''` — the handler RETURNED BEFORE MAKING ANY REQUEST. No
-   * call, no error, no toast, the dialog left open. Reinstate had never worked, which is also
-   * the likeliest reading of the second report in the same breath: nothing could be brought
-   * back, so suspensions accumulated and looked like suspending everything (`N-067`).
-   *
-   * THE TYPED NAME BELONGS TO SUSPEND, AND THE DISABLED BUTTON IS THE GUARD. An early return
-   * must never be the thing a user meets: it is indistinguishable from a broken app, because
-   * it IS one. The check stays, scoped to the direction that has a field to check, so the
-   * handler cannot be driven past the button by anything else.
-   */
   const confirmSuspend = (): void => {
     if (!id) return;
     if (!suspended && suspendConfirmText !== org.name) return;
@@ -102,16 +81,6 @@ export default function OrgDetail(): JSX.Element {
       .finally(() => setSuspendBusy(false));
   };
 
-  /**
-   * ENTER THE CUSTOMER'S OWN CONSOLE — DEC-114, `19` §15.
-   *
-   * A FULL PAGE NAVIGATION, DELIBERATELY, and not `navigate('/app')`. The response has just set
-   * a new session cookie for a different world: the ops store holds an operator, the auth store
-   * holds nothing, and a client-side route change would carry both across into a console that
-   * has never called `/auth/me`. Reloading is the honest thing — the SPA boots from scratch,
-   * reads the session it now has, and `<SupportBanner>` is on the first paint rather than
-   * appearing after a flash of an ordinary console.
-   */
   const enterConsole = (): void => {
     if (!id || supportReason.trim().length < 10) return;
     setSupportBusy(true);

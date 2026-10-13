@@ -1,25 +1,11 @@
-// T-031 — the landing page. 30 § Landing.
-//
-// The one thing here that is not decoration is the vocabulary switcher, and this version
-// promotes it from a card halfway down the page to the mechanism the whole hero runs on:
-// pick the kind of organisation you run and the HEADLINE changes into your words. The
-// product's entire claim is "the organisation is data, not code", and a sentence in 62px
-// type that rewrites itself is that claim demonstrated rather than asserted.
-//
-// Every domain noun below comes from `PRESET_VOCABULARIES` (INV-001). There is no
-// organisation on `/`, so `useLabels()` has nothing to resolve; the presets are the only
-// place these words may live, and `audit:vocab` fails the build if one is typed into JSX.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PITCH_KEYS, PRESET_VOCABULARIES } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
 import { Illustration, type IllustrationName } from '../../components/illustrations/Illustration.js';
 
-/** Long enough to read four words, short enough that nobody waits for it. */
 const DWELL_MS = 3500;
 
-/** The generic name of each role, which is what the schema actually calls it. Shown beside
- *  the organisation's own word so the substitution is legible rather than magic. */
 const ROLE_CAPTION = {
   unit: 'Unit',
   subject: 'Subject',
@@ -34,14 +20,9 @@ const prefersReducedMotion = (): boolean =>
 
 export default function Landing(): JSX.Element {
   const [index, setIndex] = useState(0);
-  // Auto-advance stops FOR GOOD at the first click, not for one cycle. Someone who has
-  // taken hold of a control and then watches it move on its own has been overruled by a
-  // timer, and on a projector that reads as a bug in the demo.
   const [engaged, setEngaged] = useState(false);
 
   useEffect(() => {
-    // Content that changes on a timer is a WCAG 2.2.2 concern before it is a taste
-    // question, so reduced-motion does not get a slower carousel — it gets none.
     if (engaged || prefersReducedMotion()) return;
     const timer = window.setInterval(
       () => setIndex((current) => (current + 1) % PRESET_VOCABULARIES.length),
@@ -52,10 +33,6 @@ export default function Landing(): JSX.Element {
 
   const active = PRESET_VOCABULARIES[index] ?? PRESET_VOCABULARIES[0];
 
-  // The ambient background lives outside this component's own DOM subtree (it is a sibling
-  // in PublicLayout, painted behind the nav and the page), so the only shared ancestor the
-  // switcher can reach it through is <html>. Cleared on unmount — the vibe belongs to this
-  // page, not to whatever the visitor opens next.
   useEffect(() => {
     document.documentElement.dataset.vibe = active?.key ?? 'university';
     return () => {

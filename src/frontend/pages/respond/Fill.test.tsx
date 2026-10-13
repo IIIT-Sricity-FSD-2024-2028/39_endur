@@ -1,9 +1,3 @@
-// T-039 — /r/:token, the hero screen. 39, design_specs/design/07 §7.1–§7.4.
-//
-// The most load-bearing assertion in this file is the mount itself: **there is no Redux
-// <Provider> anywhere below**. The respond world mounts no store (39 § State), so a page
-// that reached for `useLabels()` would throw here — which is what makes "the vocabulary
-// comes from the payload" a property rather than an intention.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -62,13 +56,11 @@ const ready = (over: Partial<PublicCampaign> = {}) => ({
   error: null, reload,
 });
 
-/** DEC-037. The token WORKED; the gate refused. Never reachable with a bad token. */
 const gated = (kind: 'signIn' | 'notMember', organizationName = 'Northfield') => ({
   campaign: null, loading: false, unavailable: false, error: null, reload,
   gate: { kind, organizationName },
 });
 
-/** Reads back what the form handed the thank-you page, since that is the only carrier. */
 function DoneProbe(): JSX.Element {
   const state = useLocation().state as { responseCount?: number; subjectName?: string } | null;
   return <p>DONE {state?.responseCount} {state?.subjectName}</p>;
@@ -76,7 +68,6 @@ function DoneProbe(): JSX.Element {
 
 const mount = () =>
   render(
-    // No <Provider>. That is the test.
     <MemoryRouter initialEntries={['/r/K4M9X2PQ']}>
       <Routes>
         <Route path="/r/:token" element={<Fill />} />
@@ -85,7 +76,6 @@ const mount = () =>
     </MemoryRouter>,
   );
 
-/** Answer both required questions. */
 const answerAll = (): void => {
   fireEvent.click(screen.getByRole('radio', { name: '4' }));
   fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
@@ -103,7 +93,6 @@ describe('the header tells them the cost before they scroll', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Mid-term feedback' })).toBeTruthy();
     expect(screen.getByText('Data Structures')).toBeTruthy();
-    // Rule 1. The estimate is computed from question types server-side, never typed.
     expect(screen.getByText('3 questions · about 2 minutes · anonymous')).toBeTruthy();
   });
 
@@ -146,7 +135,6 @@ describe('nothing is validated until Submit is pressed (rule 4, § Validation)',
   it('shows no error and no count on an untouched form', () => {
     mount();
     expect(screen.queryByRole('alert')).toBeNull();
-    // Inline red as you go is hostile on a form somebody is filling in as a favour.
     expect(screen.getByRole('button', { name: 'Submit' })).toBeTruthy();
   });
 
@@ -171,8 +159,6 @@ describe('nothing is validated until Submit is pressed (rule 4, § Validation)',
   it('leaves the optional question alone', () => {
     mount();
     answerAll();
-    // A form that demanded the free-text answer would be a form most people abandon at the
-    // last question.
     expect(screen.getByRole('button', { name: 'Submit' })).toBeTruthy();
   });
 });
@@ -187,7 +173,6 @@ describe('submitting', () => {
     expect(submitResponse).toHaveBeenCalledWith(
       'K4M9X2PQ',
       {
-        // q3 was never touched and is absent — not sent as an empty string.
         answers: [
           { questionId: 'q1', value: { kind: 'rating', n: 4 } },
           { questionId: 'q2', value: { kind: 'yesno', yes: true } },
@@ -205,7 +190,6 @@ describe('submitting', () => {
     answerAll();
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-    // Carried, not refetched: the count is not in PublicCampaign at all (13 §6).
     await waitFor(() => expect(screen.getByText(/DONE 613 Data Structures/)).toBeTruthy());
     expect(markResponded).toHaveBeenCalledWith('K4M9X2PQ');
   });
@@ -219,8 +203,6 @@ describe('submitting', () => {
     const button = screen.getByRole('button', { name: 'Submit' });
     fireEvent.click(button);
     fireEvent.click(button);
-    // A duplicate response corrupts the demo's numbers in front of the evaluator, and the
-    // idempotency key only covers the retry a button cannot.
     expect(submitResponse).toHaveBeenCalledTimes(1);
 
     release({ responseCount: 613 });
@@ -234,8 +216,6 @@ describe('submitting', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/still here/));
-    // 39 § States: answers preserved, retry available. Somebody who has just filled in eight
-    // questions will not do it twice.
     expect(screen.getByRole<HTMLInputElement>('radio', { name: '4' }).checked).toBe(true);
     expect(screen.getByRole('button', { name: 'Submit' })).toBeTruthy();
   });
@@ -249,8 +229,6 @@ describe('submitting', () => {
     answerAll();
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-    // The index is into what WE sent — q3 was skipped, so index 1 is q2, not q3. Server-side
-    // validation is authoritative (14 §4) and arrives in the same shape as any other 422.
     await waitFor(() => expect(screen.getByText(/does not match the question/)).toBeTruthy());
     const card = screen.getByText(/does not match the question/).closest('fieldset');
     expect(within(card as HTMLElement).getByRole('radio', { name: 'Yes' })).toBeTruthy();
@@ -264,8 +242,6 @@ describe('submitting', () => {
     answerAll();
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-    // A conflict on this fill's own key means the first attempt landed and its reply was
-    // lost on the way back. Telling them to press again would produce a second response.
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/already recorded/));
   });
 });
@@ -278,8 +254,6 @@ describe('the campaign with more than one subject', () => {
   it('asks which one, in the org\'s own word (INV-001)', () => {
     usePublicCampaign.mockReturnValue(TWO);
     mount();
-    // Neither 39 nor design_specs/design/07 draws this; the server 422s on body.subjectId
-    // without it, so the form has to ask.
     expect(screen.getByText(/Which Quaxel is this about\?/)).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'Thermodynamics' })).toBeTruthy();
   });
@@ -308,7 +282,6 @@ describe('the campaign with more than one subject', () => {
 
   it('does not ask when there is only one', () => {
     mount();
-    // Asking somebody to pick from a list of one is noise, and the server resolves it.
     expect(screen.queryByText(/is this about\?/)).toBeNull();
   });
 });
@@ -319,9 +292,6 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
       campaign: null, loading: false, unavailable: true, error: null, reload,
     });
     mount();
-    // CONF-015: the server returns the SAME 404 for a wrong token, a campaign that has not
-    // opened and one that has closed, because a difference between them is an existence
-    // oracle. "This link doesn't work" would be a lie in two of the three cases.
     expect(screen.getByRole('heading', { name: "This link isn't active" })).toBeTruthy();
     expect(screen.getByText(/may have closed.*not have opened yet.*code may be wrong/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
@@ -332,8 +302,6 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
       campaign: null, loading: false, unavailable: false, error: new Error('offline'), reload,
     });
     mount();
-    // A phone on a venue network is the stated risk of this page. Rendering that as "this
-    // link isn't active" would send somebody away from a form that is fine.
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(reload).toHaveBeenCalledTimes(1);
   });
@@ -342,7 +310,6 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
     responded = true;
     mount();
     expect(screen.getByRole('heading', { name: "You've already responded" })).toBeTruthy();
-    // Best-effort (39 § State), and it costs no round trip: the answer is already local.
     expect(usePublicCampaign).toHaveBeenCalledWith(undefined);
   });
 
@@ -351,8 +318,6 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
       campaign: null, loading: true, unavailable: false, error: null, reload,
     });
     const { container } = mount();
-    // The form arrives in a single payload, so there is no moment where part of it is
-    // known — a per-question skeleton would be an animation pretending to be progress.
     expect(container.querySelectorAll('.rf-skeleton')).toHaveLength(1);
   });
 });
@@ -363,8 +328,6 @@ describe('the two access dead ends — DEC-037, 39 § States', () => {
     mount();
 
     expect(screen.getByRole('heading', { name: 'Sign in to answer' })).toBeTruthy();
-    // "Sign in" with no `which` is not an instruction anybody can follow. The person was
-    // handed this code; they should be told whose it is.
     expect(screen.getByText('Only people in Northfield University can answer this one.')).toBeTruthy();
   });
 
@@ -373,8 +336,6 @@ describe('the two access dead ends — DEC-037, 39 § States', () => {
     mount();
 
     const link = screen.getByRole<HTMLAnchorElement>('link', { name: 'Sign in' });
-    // Without `next`, a respondent who signs in lands on a console dashboard — sent away
-    // from the form somebody asked them to fill in, with no way back to it.
     expect(link.getAttribute('href')).toBe('/login?next=%2Fr%2FK4M9X2PQ');
   });
 
@@ -383,8 +344,6 @@ describe('the two access dead ends — DEC-037, 39 § States', () => {
     mount();
 
     expect(screen.getByRole('heading', { name: "This isn't your organization's link" })).toBeTruthy();
-    // 39 § States: telling them to sign out and try again is a worse suggestion than
-    // asking whoever sent them the link. So there is deliberately nothing to press.
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
@@ -396,9 +355,6 @@ describe('the two access dead ends — DEC-037, 39 § States', () => {
   });
 
   it('a BAD TOKEN still lands on the plain dead end, never on a gate', () => {
-    // The property the whole ordering exists for, asserted from the client side. The server
-    // resolves before it gates, so an invalid token 404s and can never surface as
-    // "this campaign is restricted" — which is what would turn it into an existence oracle.
     usePublicCampaign.mockReturnValue({
       campaign: null, loading: false, unavailable: true, gate: null, error: null, reload,
     });
