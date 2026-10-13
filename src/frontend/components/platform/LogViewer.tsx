@@ -1,13 +1,3 @@
-// `<LogViewer>` — `24` §6c, `72`. Internal-only, like `<GrowthChart>`.
-//
-// A file picker, a level/status/path filter, and a monospace pane of PARSED JSON lines with
-// the `requestId` clickable to collapse to that one request — `18` §6's workflow made into a
-// screen instead of a `grep` to remember.
-//
-// It renders parsed fields into columns, never a raw blob (`24` §6c). A viewer that printed
-// whatever is on the line would render a line that should never have been written as though
-// it were fine; mapping known fields is what makes an unexpected key visible AS an unexpected
-// key — `extra` is rendered explicitly, below the line, rather than folded into the row.
 import { useState } from 'react';
 import type { LogFileMeta, LogLine } from '@endur/shared';
 import { formatDateTime } from '../../lib/format.js';
@@ -36,8 +26,6 @@ function FilePicker({
   selected: string;
   onSelect: (file: string) => void;
 }): JSX.Element {
-  // `error-*.log` first (`72` § Interactions) — finding an error must not mean grepping
-  // megabytes of `200 OK`.
   const errors = files.filter((f) => f.stream === 'error');
   const apps = files.filter((f) => f.stream === 'app');
 
@@ -116,9 +104,6 @@ function FilterBar({
         onChange={(e) => onFilter({ ...filter, q: e.target.value || undefined })}
       />
       {filter.requestId && (
-        // The requestId collapse, undone. Distinct control so "clear filters" and "leave
-        // this one request" stay two different actions (`72` § States: filter-matches-
-        // nothing gets its own clear action, and this is the same idea one level up).
         <button
           type="button"
           className="btn btn-secondary"
@@ -160,8 +145,6 @@ function LineRow({ line, onRequestId }: { line: LogLine; onRequestId: (id: strin
       </div>
       {open && line.err?.stack && <pre className="log-line-stack">{line.err.stack}</pre>}
       {line.extra && Object.keys(line.extra).length > 0 && (
-        // Rendered explicitly, never folded into the row — an unexpected field must look
-        // unexpected, not like it always belonged (`72` § Data contract).
         <div className="log-line-extra">
           {Object.entries(line.extra).map(([key, value]) => (
             <span key={key} className="log-line-extra-field">
@@ -198,8 +181,6 @@ export function LogViewer({
         <FilterBar filter={filter} onFilter={onFilter} />
         <div className={`log-lines${loading ? ' is-dimmed' : ''}`}>
           {lines.map((line, i) => (
-            // No stable id on a log line — `at` plus its position on this page is enough,
-            // and the list never reorders under the reader (no polling, `72` § Out of scope).
             <LineRow key={`${line.at}-${i}`} line={line} onRequestId={(id) => onFilter({ ...filter, requestId: id })} />
           ))}
         </div>

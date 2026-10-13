@@ -1,24 +1,6 @@
-// "What can this person do, and where?" — 24 §4, one implementation, two placements.
-//
-// `/app/profile` (47) and `/app/people/:id` (34) both specify this block, in the same words,
-// down to the sample output. It is the INV-009 rule: the second placement extends, it never
-// forks. The only thing the two screens disagree about is the closing sentence, which is why
-// `emptyHint` is a prop.
-//
-// **This is INV-005 made visible.** The whole scoping model — that powers are boxed to the
-// place the position sits, so Director-of-Project-A gets nothing on Project B — is a
-// paragraph of documentation everywhere else in the product and a rendered fact here.
 import type { PowersAtPlace } from '@endur/shared';
 import { CAPABILITY_CATALOGUE, isCapability } from '@endur/shared';
 
-/**
- * The catalogue's own grouping, read straight from `packages/shared` — no fetch, and no
- * second opinion about which module a capability belongs to.
- *
- * An unknown key falls into "Other" rather than being dropped. The client and server ship
- * from one repository so it should never happen; if it ever does, a capability the caller
- * genuinely holds must not vanish off the one screen built to enumerate them.
- */
 const moduleOf = (capability: string): string =>
   isCapability(capability) ? CAPABILITY_CATALOGUE[capability].module : 'Other';
 
@@ -28,7 +10,6 @@ export function PowersByPlace({
   onWhy,
 }: {
   places: PowersAtPlace[];
-  /** The closing line. See below — it is a sentence, not a row. */
   emptyHint: string;
   onWhy?: ((capability: string, unitId: string) => void) | undefined;
 }): JSX.Element {
@@ -46,9 +27,6 @@ export function PowersByPlace({
           </header>
 
           {place.capabilities.length === 0 ? (
-            // A position that grants nothing is a real and confusing state — somebody was
-            // given a role whose powers were all revoked — and an empty area under a heading
-            // would read as a loading fault rather than an answer.
             <p className="text-meta">No powers here.</p>
           ) : (
             <dl className="powers-modules">
@@ -95,8 +73,6 @@ export function PowersByPlace({
   );
 }
 
-/** Catalogue order within a module, catalogue order between them. Stable, so two people's
- *  powers can be compared by eye without the rows moving. */
 function group(place: PowersAtPlace): Array<[string, PowersAtPlace['capabilities']]> {
   const modules = new Map<string, PowersAtPlace['capabilities']>();
   for (const entry of place.capabilities) {

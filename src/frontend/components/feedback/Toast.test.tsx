@@ -1,4 +1,3 @@
-// <Toast> — 24 §6, design_specs/design/10 §4.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { Toast } from './Toast.js';
@@ -9,8 +8,6 @@ afterEach(() => vi.useRealTimers());
 describe('a toast is a success, announced politely and then gone', () => {
   it('is a status, never an alert', () => {
     render(<Toast message="Deleted." onDismiss={vi.fn()} />);
-    // An alert interrupts a screen reader mid-sentence, and interrupting somebody to tell
-    // them a thing went RIGHT is a strange thing to do.
     expect(screen.getByRole('status').textContent).toContain('Deleted.');
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -33,8 +30,6 @@ describe('a toast is a success, announced politely and then gone', () => {
 
   it('offers Undo only when there is something to undo', () => {
     const plain = render(<Toast message="Deleted." onDismiss={vi.fn()} />);
-    // An undo button that cannot undo is worse than no undo at all — the template library
-    // has no restore endpoint, so it passes nothing here.
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
     plain.unmount();
 
@@ -51,7 +46,6 @@ describe('a toast is a success, announced politely and then gone', () => {
 
     view.rerender(<Toast message="Second." onDismiss={onDismiss} />);
     act(() => void vi.advanceTimersByTime(3000));
-    // Without the reset the second message would vanish after one second.
     expect(onDismiss).not.toHaveBeenCalled();
 
     act(() => void vi.advanceTimersByTime(1000));

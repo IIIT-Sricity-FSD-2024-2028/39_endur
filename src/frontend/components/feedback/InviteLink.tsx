@@ -1,17 +1,6 @@
-// <InviteLink> — 24 §6c, 57 § Interactions.
-//
-// A ONE-TIME CREDENTIAL. The URL is in this payload and in no table — only `sha256(token)`
-// is stored server-side, so a second read of the provisioning route cannot return it and
-// neither can a database dump. This component is the only place it is ever shown.
-//
-// NO SILENT DISMISS. No backdrop click, no Escape — against the house rule for dialogs
-// (`ConfirmDialog`, `ShareSheet`) — because closing this one discards a credential that
-// cannot be recovered, only replaced. `onClose` is a deliberate button press and nothing
-// else reaches it.
 import { useState } from 'react';
 import { formatRelative } from '../../lib/format.js';
 
-/** Copied-label dwell, same value `<ShareSheet>` uses (24 §6). */
 const COPIED_MS = 1500;
 
 export function InviteLink({
@@ -23,12 +12,7 @@ export function InviteLink({
 }: {
   url: string;
   expiresAt: string;
-  /** What was invited — a person's name, most often (57 § Interactions). */
   label: string;
-  /**
-   * Absent where re-issuing is a separate audited capability the caller does not hold
-   * (`account.reset`). Absent means no regenerate affordance at all, never a disabled one.
-   */
   onRegenerate?: (() => Promise<void>) | undefined;
   onClose: () => void;
 }): JSX.Element {
@@ -54,7 +38,6 @@ export function InviteLink({
   };
 
   return (
-    // No `onMouseDown={onClose}` on the backdrop, on purpose — see the file header.
     <div className="dialog-backdrop">
       <div
         className="dialog invite-link"

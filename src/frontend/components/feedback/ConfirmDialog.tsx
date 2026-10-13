@@ -1,9 +1,3 @@
-// <ConfirmDialog> — 24 §6.
-//
-// `consequence` is REQUIRED, and that is a copy rule enforced by the type system on
-// purpose: "Are you sure?" tells the reader nothing they did not already know, and it is
-// what reappears the moment the rule lives only in a style guide. The prop is the only
-// thing that reliably keeps real numbers in the sentence.
 import { useEffect, useRef } from 'react';
 
 export function ConfirmDialog({
@@ -19,13 +13,6 @@ export function ConfirmDialog({
   consequence: string;
   verb: string;
   destructive?: boolean;
-  /**
-   * Added by T-033. The delete dialog opens while `GET /units/:id/impact` is still in
-   * flight, and 32 requires that confirming a destructive action whose consequence is
-   * unknown be IMPOSSIBLE — not merely discouraged. So the sentence above can say "still
-   * checking" or "could not check", and this keeps the button from being pressable in
-   * either case.
-   */
   confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -34,10 +21,6 @@ export function ConfirmDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Focus the CONFIRM button, not the dialog: the reader has already decided, and the
-    // sentence above is what changes their mind, not where the focus ring sits. When it is
-    // disabled, focus Cancel instead — `focus()` on a disabled button is a no-op, and a
-    // modal that opens with focus still on the page behind it traps nobody.
     if (confirmDisabled) cancelRef.current?.focus();
     else confirmRef.current?.focus();
     const onKey = (event: KeyboardEvent): void => {

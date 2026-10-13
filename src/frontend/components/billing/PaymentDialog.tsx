@@ -1,40 +1,7 @@
-// <PaymentDialog> — DEC-080, 49 § Interactions.
-//
-// THE CHECKOUT DEC-035 DELETED, REBUILT AND HONEST ABOUT ITSELF. There is no gateway, no
-// card field and no secret key: the dialog runs a short, deliberate wait, mints a reference,
-// and hands it to whichever caller opened it. It says so on screen — "Endur demo checkout ·
-// no card details are collected" — because a fake checkout that pretends to be a real one is
-// the one version of this that would be dishonest.
-//
-// IT DECIDES NOTHING. `onPaid` is what the caller does next, and the server does that thing
-// whether or not a reference arrives (`JoinTierBody.paymentRef` is optional and is a label,
-// not a proof). Gating a tier on a value React invented would be INV-003 inverted.
-//
-// TWO CALLERS, ONE COMPONENT: `/start`'s plan step, where the organisation does not exist
-// yet, and `/app/plan`, where it does. `mode` changes one sentence — what is being bought
-// versus what it is being changed FROM — and, since DEC-097, THE AMOUNT.
-//
-// IN `change` MODE THE PRICE IS THE DIFFERENCE. The customer has already paid for this
-// period; charging the full new price bills the overlap twice. `fromTier` was already a prop
-// and was only feeding a sentence — it feeds the number now, through `changeCostMinor`, which
-// is the SAME function `recordPayment` prices the ledger row with.
-//
-// WHAT THIS DIALOG PRINTS IS NOT WHAT THE LEDGER RECORDS, and that is deliberate rather than
-// sloppy: the server subtracts again, server-side, inside the transaction that writes the tier
-// (DEC-080). A client that renders the wrong figure renders a wrong figure and nothing more.
-//
-// MOTION. Rare-tier interaction: a person sees this once at sign-up and rarely again, which
-// is the tier where a delight budget is allowed to exist at all. The panel rises 8px and
-// scales from .97 on `--ease` over `--dur-base`; the value bullets stagger by `--stagger`,
-// clamped at five beats so a long plan does not trail. The success overlay is the one
-// flourish and it is spent in one place. Reduced motion is honoured GLOBALLY (endur.css
-// top), and the advance to `onPaid` is a TIMER rather than an `animationend`, so a reader
-// whose animations are collapsed to nothing still gets moved on.
 import { useEffect, useRef, useState } from 'react';
 import { changeCostMinor, formatMoney, type PlanOption, type Tier } from '@endur/shared';
 import { Icon } from '../Icon.js';
 
-/** The simulated capture, and then the overlay. Both are deliberate, both are visible. */
 const CAPTURE_MS = 700;
 const SUCCESS_MS = 1500;
 
@@ -45,7 +12,6 @@ const TIER_LABEL: Record<Tier, string> = {
   enterprise: 'Enterprise',
 };
 
-/** Ours, and it looks like ours. Nothing here impersonates a gateway's id format. */
 const mintReference = (): string =>
   `endur_${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 6)}`;
 
@@ -58,7 +24,6 @@ export function PaymentDialog({
 }: {
   plan: PlanOption;
   mode: 'signup' | 'change';
-  /** What they are on now. `null` at sign-up — there is no plan to move from. */
   fromTier?: Tier | null;
   onPaid: (reference: string) => void;
   onCancel: () => void;
@@ -67,8 +32,6 @@ export function PaymentDialog({
   const payRef = useRef<HTMLButtonElement>(null);
   const timers = useRef<number[]>([]);
 
-  // Escape and backdrop dismissal stop the moment the capture starts. A dialog that can be
-  // dismissed mid-write is a dialog that leaves the reader unsure whether it happened.
   const dismissable = phase === 'idle';
 
   useEffect(() => {
@@ -80,8 +43,6 @@ export function PaymentDialog({
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, dismissable]);
 
-  // Every timer is cleared on unmount. A caller that navigates away on `onPaid` unmounts
-  // this component mid-sequence, and a stray callback afterwards would fire a second join.
   useEffect(
     () => () => {
       for (const id of timers.current) window.clearTimeout(id);
@@ -101,9 +62,6 @@ export function PaymentDialog({
     );
   }
 
-  // DEC-097. `fromTier` is null at sign-up, and `changeCostMinor` answers the full price for
-  // that case — the branch lives in the formula rather than here, so the client and the server
-  // cannot come to different conclusions about what a signup costs.
   const chargeMinor = changeCostMinor(mode === 'change' ? fromTier : null, plan.tier);
   const amount = formatMoney(chargeMinor, plan.currency);
   const fullAmount = formatMoney(plan.priceMinor, plan.currency);
@@ -184,8 +142,6 @@ export function PaymentDialog({
                 <li
                   className="pay-feature"
                   key={feature}
-                  // Clamped at five beats, the same rule `.page-enter` uses: past that the
-                  // last bullet arrives after the reader has finished reading the first.
                   style={{ animationDelay: `calc(var(--stagger) * ${Math.min(index, 4)})` }}
                 >
                   <Icon name="check" size={16} />

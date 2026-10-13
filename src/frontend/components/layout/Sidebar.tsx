@@ -1,9 +1,3 @@
-// 232px of chrome, grouped, with the roadmap visible and inert. design_specs/design/02 §3.
-//
-// The disabled items are the interesting part. They never navigate, always carry the
-// "Soon" tag, and explain themselves on hover — and there is deliberately no page behind
-// them. A dead link that renders something is worse than one that visibly does not move
-// (design_specs/design/02 §7, 20 §2).
 import { NavLink } from 'react-router-dom';
 import { Icon } from '../Icon.js';
 import { useLabels } from '../../lib/labels.js';
@@ -16,9 +10,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: (() => void) | undefined 
   const labels = useLabels();
   const can = useCan();
 
-  // Out-of-scope navigation is ABSENT, not greyed out — greying it out would be a list of
-  // everything the caller cannot do (design_specs/design/02 §5). "Soon" is a different
-  // thing entirely: it means nobody can do it yet.
   const items = navItems(labels).filter(
     (item) => !item.needs || can(item.needs, item.minScope),
   );
@@ -49,8 +40,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: (() => void) | undefined 
 
 function Item({ item, onNavigate }: { item: NavItem; onNavigate?: (() => void) | undefined }): JSX.Element {
   if (item.disabled) {
-    // A <span>, not a disabled <a>. There is no href to follow and nothing to focus, which
-    // is exactly the behaviour required — and it cannot be tabbed into by accident.
     return (
       <span className="sidebar-item is-soon" title={item.soonHint} aria-disabled="true">
         <Icon name={item.icon} size={20} />
@@ -63,8 +52,6 @@ function Item({ item, onNavigate }: { item: NavItem; onNavigate?: (() => void) |
   return (
     <NavLink
       to={item.to}
-      // `end` on Home only: without it, /app matches every child route and Home stays lit
-      // on every page in the console.
       end={item.to === '/app'}
       className={({ isActive }) => `sidebar-item${isActive ? ' is-active' : ''}`}
       onClick={onNavigate}

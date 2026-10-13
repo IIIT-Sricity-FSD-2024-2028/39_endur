@@ -1,8 +1,3 @@
-// T-036 — <QuestionCard>. 24 §5, 05 §5.2, 37 § Interactions.
-//
-// Two things here are contracts rather than styling: expansion is owned by the PARENT (so
-// "exactly one open at a time" is possible at all), and a type change that would drop
-// options is warned about BEFORE it happens, not undone afterwards.
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
@@ -67,19 +62,15 @@ describe('collapsed is a row; expansion is the parent\'s decision', () => {
     mount(draft(), { expanded: false });
     expect(screen.getByText('How often did you attend?')).toBeTruthy();
     expect(screen.getByText('Single choice')).toBeTruthy();
-    // The whole point of collapsing: a ten-question form stays scannable.
     expect(screen.queryByRole('textbox', { name: 'Option 1' })).toBeNull();
   });
 
   it('falls back to its position when the question has no text yet', () => {
     mount(draft({ text: '   ' }), { expanded: false });
-    // A blank row with nothing on it is unreachable by name — for a reader and for a test.
     expect(screen.getByText('Question 1')).toBeTruthy();
   });
 
   it('asks the parent to expand — it never expands itself', () => {
-    // Owning its own expansion would make "exactly one open at a time" impossible: a card
-    // cannot know about its siblings.
     const onExpand = vi.fn();
     render(
       <QuestionCard
@@ -89,7 +80,6 @@ describe('collapsed is a row; expansion is the parent\'s decision', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /How often/ }));
     expect(onExpand).toHaveBeenCalledTimes(1);
-    // Still collapsed: the parent decides, and it has not said yes yet.
     expect(screen.queryByRole('textbox', { name: 'Option 1' })).toBeNull();
   });
 
@@ -101,14 +91,9 @@ describe('collapsed is a row; expansion is the parent\'s decision', () => {
         onMove={vi.fn()}
       />,
     );
-    // The row itself must NOT be the button: it carries the reorder controls, and a button
-    // containing buttons is invalid ARIA — assistive tech collapses it into one control
-    // whose name is every label inside concatenated. Found by a test that could not tell
-    // the row from its own Move button.
     const control = screen.getByRole('button', { name: 'How often did you attend?' });
     expect(control.tagName).toBe('BUTTON');
     expect(control.getAttribute('aria-expanded')).toBe('false');
-    // Enter and Space come free from the platform, which is the point of using one.
     expect(control.closest('.qcard')?.getAttribute('role')).toBeNull();
   });
 });
@@ -124,7 +109,6 @@ describe('expanded carries the text, the type select and the editor', () => {
 
   it('offers exactly six types, grouped', () => {
     mount();
-    // SIX. NOT SEVEN (DEC-010). Six ungrouped options read as a list of unrelated things.
     const select = screen.getByRole('combobox', { name: /Type of question/ });
     expect(within(select).getAllByRole('option')).toHaveLength(6);
     expect([...select.querySelectorAll('optgroup')].map((group) => group.label)).toEqual([
@@ -149,8 +133,6 @@ describe('expanded carries the text, the type select and the editor', () => {
     fireEvent.click(screen.getByRole('button', { name: /Duplicate/ }));
     expect(view.onDuplicate).toHaveBeenCalledTimes(1);
 
-    // Immediate, with no dialog. A confirmation per question would make authoring
-    // miserable; undo is the right answer for a cheap reversible action (37).
     fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
     expect(view.onDelete).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('alertdialog')).toBeNull();
@@ -163,7 +145,6 @@ describe('changing type warns BEFORE it costs anything', () => {
     fireEvent.change(screen.getByRole('combobox', { name: /Type of question/ }), {
       target: { value: 'multi' },
     });
-    // Single -> multi keeps the options, so there is nothing to warn about.
     expect(screen.queryByRole('alert')).toBeNull();
     expect(view.latest().kind).toBe('multi');
     expect(optionsOf(view.latest().config)).toEqual(['Always', 'Sometimes', 'Never']);
@@ -175,7 +156,6 @@ describe('changing type warns BEFORE it costs anything', () => {
       target: { value: 'text' },
     });
     expect(screen.getByRole('alert').textContent).toContain('removes the 3 options');
-    // After the change the options are gone and an apology is not a warning.
     expect(view.onChange).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: 'Option 1' })).toBeTruthy();
   });
@@ -200,8 +180,6 @@ describe('changing type warns BEFORE it costs anything', () => {
 
     expect(view.onChange).toHaveBeenCalledTimes(1);
     expect(view.latest().kind).toBe('text');
-    // The text is the part somebody thought about; losing it for picking the wrong control
-    // first would make the select a thing people avoid.
     expect(view.latest().text).toBe('How often did you attend?');
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -209,8 +187,6 @@ describe('changing type warns BEFORE it costs anything', () => {
 
 describe('readOnly is the launched-campaign case', () => {
   it('disables the text, the type select and the editor rather than hiding the card', () => {
-    // 37 § States: a banner plus read-only editors, never controls that silently do
-    // nothing. The banner is the builder's job; this is its half.
     mount(draft(), { readOnly: true });
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Question 1' }).disabled).toBe(true);
     expect(screen.getByRole<HTMLSelectElement>('combobox', { name: /Type of question/ }).disabled).toBe(true);

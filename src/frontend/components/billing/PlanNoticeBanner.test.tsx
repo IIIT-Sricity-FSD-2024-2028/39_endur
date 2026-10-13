@@ -1,13 +1,3 @@
-// T-108 — the plan notice. DEC-113, 16 §7d.
-//
-// `noticeFor()` IS TESTED WITHOUT RENDERING ANYTHING, on purpose. What decides whether a
-// customer is warned is three rules and a date comparison, and the interesting cases are all
-// boundaries — the day itself, the day after, one day outside the window. Driving those
-// through a component render would test React and assert the rule by accident.
-//
-// The component test that follows is about the one thing the function cannot say: that this
-// appears on a page the customer did not navigate to, and stays absent for a reader who
-// cannot see billing at all.
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { BillingSummary, Tier } from '@endur/shared';
@@ -42,18 +32,9 @@ describe('when the notice appears — 16 §7d', () => {
 
   it('warns on the first day inside the window, and on the last day of the plan', () => {
     expect(noticeFor(endingIn(NOTICE_WINDOW_DAYS), NOW)?.tone).toBe('ending');
-    // THE DAY ITSELF IS STILL A DAY THEY HOLD THE PLAN — `periodHasEnded` is inclusive of it
-    // on the server, and a client that warned in the past tense a day early would contradict
-    // the gate that is still opening the screens.
     expect(noticeFor(endingIn(0), NOW)?.tone).toBe('ending');
   });
 
-  /**
-   * A DATE IN THE PAST WITH NOTHING LAPSED IS SILENCE, not a stale warning. It is a real
-   * state and it is brief: the server moves the row on the first read, so this is the window
-   * between the date passing and `readBilling` catching up. Saying *"your plan ends on 3
-   * September"* on 10 September would be the product reading its own row wrong out loud.
-   */
   it('says nothing about a date that has already gone', () => {
     expect(noticeFor(endingIn(-1), NOW)).toBeNull();
   });
@@ -62,14 +43,11 @@ describe('when the notice appears — 16 §7d', () => {
     expect(noticeFor(endingIn(1, 'bronze'), NOW)).toBeNull();
   });
 
-  /** The lapse notice NAMES THE TIER, which is the entire reason `lapsedFrom` is not a flag. */
   it('names what was lost once the plan has gone', () => {
     const notice = noticeFor(summaryOf({ tier: 'bronze', lapsedFrom: 'gold' }), NOW);
     expect(notice?.tone).toBe('lapsed');
     expect(notice?.text).toContain('Gold');
     expect(notice?.text).toContain('Bronze');
-    // NO DATE. `periodStart` is when the lapse was NOTICED, not when the plan ran out, and
-    // printing it as "ended on" would state a date that is usually wrong.
     expect(notice?.text).not.toMatch(/\d{4}/);
   });
 
@@ -102,11 +80,6 @@ describe('the banner in the console shell', () => {
     );
   });
 
-  /**
-   * WITHOUT `billing.read` IT IS ABSENT AND IT DOES NOT ASK. Two properties in one assertion,
-   * and the second is the one worth having: a reader who cannot see billing must not make the
-   * console fire a request that 403s on every page they open.
-   */
   it('is silent, and makes no request, for a reader who cannot see billing', () => {
     apiGet.mockClear();
     renderWithProviders(<PlanNoticeBanner />, { capabilities: ['campaign.read'] });

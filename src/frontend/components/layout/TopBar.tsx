@@ -1,4 +1,3 @@
-// 56px, sticky. design_specs/design/02 §3.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -10,8 +9,6 @@ import { signOut } from '../../lib/session.js';
 export function TopBar({
   onOpenMenu,
 }: {
-  /** Absent means there is no navigation to open — the setup wizard's focused shell. A
-   *  hamburger that opens an empty drawer is worse than no hamburger. */
   onOpenMenu?: (() => void) | undefined;
 }): JSX.Element {
   const user = useAppSelector((s) => s.auth.user);
@@ -93,14 +90,6 @@ function UserChip({ name, email }: { name: string; email: string }): JSX.Element
   );
 }
 
-/**
- * Open/close with the two dismissals people actually expect: click away, and Escape.
- *
- * The panel renders through a portal into `document.body` — see the §1 note above — so it
- * is no longer a DOM descendant of the anchor. Outside-click detection has to check both
- * the anchor and the (separately ref'd) panel; the anchor's bounding rect is recomputed on
- * open, resize and scroll so the panel tracks it.
- */
 function useMenu() {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
