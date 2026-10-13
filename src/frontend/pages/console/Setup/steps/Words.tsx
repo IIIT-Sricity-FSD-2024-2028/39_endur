@@ -1,8 +1,3 @@
-// Step 4 — words, and the live preview that is the point of the step.
-// 31 § Interactions, design_specs/design/03 §3.4.
-//
-// The fields and the preview moved to <WordsEditor> at T-046 so the settings page could use
-// the same ones (41 § Interactions, 24 §4). What is left here is the step's framing.
 import type { LabelKey, ResolvedLabels } from '@endur/shared';
 import { WordsEditor } from '../../../../components/org/WordsEditor.js';
 import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';

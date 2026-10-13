@@ -1,18 +1,3 @@
-// T-032 — the setup wizard. 31, design_specs/design/03 §3.4-3.5.
-//
-// **The screen the evaluation is actually about.** 02 §2 lists four things that are never
-// cut and this is the first. Target: 90 seconds from an evaluator saying "a gym" to a
-// working organisation, and every decision below serves that number.
-//
-// Three properties are load-bearing and easy to lose:
-//
-//   1. ONE REQUEST. Five steps, one atomic POST /org/setup. A wizard that writes per step
-//      leaves half-built organisations behind every time somebody closes the tab, and an
-//      org with roles and no structure looks finished from the outside.
-//   2. NOTHING IS LOST BY NAVIGATING. All state lives in one object above the steps, so
-//      Back is free and a rename made three steps earlier survives. A wizard that forgets
-//      a rename is a wizard that dies on stage.
-//   3. THE STEP IS IN THE URL. Back works, and a step is linkable during a rehearsal.
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { PresetView } from '@endur/shared';
@@ -32,8 +17,6 @@ import {
   STEPS, hasEdits, labelsForWire, stepIndex, useWizard, type WizardState,
 } from './useWizard.js';
 
-/** Minimally valid, per step. Continue is enabled the moment it is — never gated on
- *  optional polish (design_specs/design/03 §3.5). */
 function canContinue(state: WizardState, step: number): boolean {
   if (step === 0) return state.industry !== null;
   if (step === 1) {
@@ -46,23 +29,6 @@ function canContinue(state: WizardState, step: number): boolean {
   return true;
 }
 
-/**
- * Does this element take text? `DEC-105`, `31` § Interactions.
- *
- * THE EXEMPTION LIST USED TO BE `['BUTTON', 'TEXTAREA']` AND `INPUT` FELL THROUGH IT, so
- * naming a unit on step 3 advanced the wizard instead of finishing the row — and step 3's `+`
- * button ADDS A CHILD AND FOCUSES ITS NAME INPUT IMMEDIATELY, so the screen handed the user a
- * text field and then treated the natural key for "done with this one" as the key for leaving.
- * Step 2 has the same shape.
- *
- * The old handler's own comment already knew the rule and applied it to one tag: a button
- * *"has its own meaning for Enter"*. So does a text field.
- *
- * IT ASKS A QUESTION RATHER THAN LISTING TAGS. `contenteditable` is here for the same reason —
- * a list of tag names is a list somebody has to remember to extend, and this one was already
- * one element short. The button-like `<input>` types are excluded because Enter on them is
- * the button's meaning again, not the field's, and the wizard should still advance.
- */
 const NON_TEXT_INPUTS = new Set([
   'button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file', 'image',
 ]);
@@ -72,8 +38,6 @@ function takesText(element: HTMLElement | null): boolean {
   if (element.isContentEditable) return true;
   if (element.tagName === 'BUTTON' || element.tagName === 'TEXTAREA') return true;
   if (element.tagName !== 'INPUT') return false;
-  // `type` defaults to "text" when the attribute is absent, which is how most of the wizard's
-  // fields are written — reading `.type` rather than the attribute gets that for free.
   return !NON_TEXT_INPUTS.has((element as HTMLInputElement).type);
 }
 
@@ -101,15 +65,9 @@ export default function Setup(): JSX.Element {
     [presets.data, state.industry],
   );
 
-  // Esc NEVER closes the wizard — far too destructive when everything is unsaved. Enter
-  // advances, from anywhere that is not a button and not a text field (both have their own
-  // meaning for Enter).
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter') return;
-      // A modal owns the keyboard while it is up. Without this the wizard advanced a step
-      // BEHIND the confirm dialog — the dialog stayed open over a screen that was no
-      // longer the one it was asking about.
       if (pendingPreset) return;
       const target = event.target as HTMLElement | null;
       if (takesText(target)) return;
@@ -120,8 +78,6 @@ export default function Setup(): JSX.Element {
   });
 
   const choose = (preset: PresetView): void => {
-    // Changing industry after later steps were edited would silently throw that work away.
-    // Ask — and only when there is something to lose.
     if (state.industry && state.industry !== preset.key && hasEdits(state, current)) {
       setPendingPreset(preset);
       return;
@@ -143,23 +99,14 @@ export default function Setup(): JSX.Element {
         labels: labelsForWire(state.labels),
         includeTemplates: state.includeTemplates,
       });
-      // The org's vocabulary just changed under every screen in the console. Re-read the
-      // session before navigating, or /app renders the words the wizard replaced.
       await refreshSession();
       navigate('/app?setup=done', { replace: true });
     } catch (caught) {
-      // Keep every field. 31 § States: "Never lose the typed input."
       setError(caught as Error);
       setSaving(false);
     }
   }
 
-  /**
-   * The emergency exit, and IT MUST WORK. If the wizard breaks on stage this drops into a
-   * usable console with the Custom preset applied — which is a real commit, not a
-   * navigation, because a console with no roles is exactly the empty screen the wizard
-   * exists to prevent.
-   */
   async function skip(): Promise<void> {
     const custom = presets.data?.find((preset) => preset.key === 'custom');
     if (!custom || saving) return;
@@ -181,8 +128,6 @@ export default function Setup(): JSX.Element {
     }
   }
 
-  // The presets load BEFORE step 1 renders — 31 § States. A grid that pops in after a beat
-  // is the first thing an evaluator sees, and it reads as a page that is not ready.
   if (presets.loading) {
     return <p className="text-muted" aria-live="polite">Loading…</p>;
   }

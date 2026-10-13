@@ -1,13 +1,3 @@
-// T-035 — /app/templates. 36, design_specs/design/05 §5.1.
-//
-// **Never start from a blank form.** That is the whole job of this screen, and it is why
-// the empty state's primary action is "Browse the library" and the blank-form button is a
-// quiet secondary in the header. A blank start is the enemy: it is where a customer either
-// gives up or writes forty questions.
-//
-// Two lists on one page, and they are genuinely two things — the shared library
-// (`orgId IS NULL`, one copy for everybody) and the org's own. The library is fetched once
-// and filtered in the browser; the org's own is paginated by the server. See lib/templates.
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PRESET_VOCABULARIES, type TemplateSummary } from '@endur/shared';
@@ -26,15 +16,8 @@ import { PreviewDialog } from './PreviewDialog.js';
 import { deleteConsequence } from './consequence.js';
 import { BlankFormDialog } from './BlankFormDialog.js';
 
-/** `all` is a real choice the reader makes, distinct from "no choice made yet". */
 const ALL = 'all';
 
-/**
- * Endur's own name for a preset. NOT a domain noun — the customer never renames "Hotel",
- * it is the name of a starting point we ship. `PRESET_VOCABULARIES` is the shared data
- * behind the landing page's switcher, so the two cannot drift; anything it does not carry
- * (`custom`) falls back to the key itself.
- */
 function industryName(key: string): string {
   const preset = PRESET_VOCABULARIES.find((entry) => entry.key === key);
   return preset?.displayName ?? key.charAt(0).toUpperCase() + key.slice(1);
@@ -49,10 +32,6 @@ export default function Templates(): JSX.Element {
 
   const q = params.get('q') ?? '';
   const category = params.get('category') ?? '';
-  // 36 § State: the filter DEFAULTS to the org's own industry — a hotel should not have to
-  // filter past university templates to find theirs — but every other industry stays one
-  // click away rather than hidden. An absent param means "not chosen yet", which is why
-  // the default is applied here and not written into the URL behind the reader's back.
   const industry = params.get('industry') ?? orgIndustry;
 
   const library = useTemplateLibrary();
@@ -61,7 +40,6 @@ export default function Templates(): JSX.Element {
   const [term, setTerm] = useState(q);
   const [blank, setBlank] = useState(false);
   const [pending, setPending] = useState<TemplateSummary | null>(null);
-  /** The template being looked at in the quick-look dialog, if any. */
   const [preview, setPreview] = useState<TemplateSummary | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cardError, setCardError] = useState<{ id: string; text: string } | null>(null);
@@ -91,7 +69,6 @@ export default function Templates(): JSX.Element {
     });
   }, [library.data, industry, category, q]);
 
-  /** Every category present in the library, so a chip never leads to an empty grid. */
   const categories = useMemo(() => {
     const present = new Set((library.data ?? []).map((row) => row.category));
     return [...present].sort();
@@ -107,7 +84,6 @@ export default function Templates(): JSX.Element {
   const ownRows = own.data?.data ?? [];
   const filtered = Boolean(q || category || (industry && industry !== ALL));
 
-  /** Clone, then land in the builder. One action, no intermediate confirmation (36). */
   const use = (template: TemplateSummary): void => {
     setBusyId(template.id);
     setCardError(null);
@@ -214,8 +190,6 @@ export default function Templates(): JSX.Element {
             icon="template"
             title="No forms yet"
             body={
-              // Not "create a blank one". A blank form is where somebody either gives up or
-              // writes forty questions, and both are the problem this product exists for.
               'Every form here starts as a copy of one below. Pick the closest one and change it — that is faster than starting from nothing, and it is shorter.'
             }
             action={
@@ -315,8 +289,6 @@ export default function Templates(): JSX.Element {
               .remove(template.id)
               .then(() => setToast(`${template.name} deleted.`))
               .catch((error: unknown) => {
-                // Reachable even with the count in hand: a campaign created in another tab
-                // between the load and the press makes the server the only authority.
                 setCardError({ id: template.id, text: message(error, 'That could not be deleted.') });
               });
           }}
@@ -329,7 +301,6 @@ export default function Templates(): JSX.Element {
   );
 }
 
-/** Card skeletons, at the grid's shape — 36 § States. Never a centred spinner. */
 function CardSkeletons(): JSX.Element {
   return (
     <div className="tgrid" aria-hidden="true">

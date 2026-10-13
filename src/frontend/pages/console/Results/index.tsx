@@ -1,18 +1,3 @@
-// T-040 — /app/campaigns/:id/results. 40, design_specs/design/08 §8.1.
-//
-// The second half of the demo's decisive beat: the evaluator scans, submits, and their
-// response appears here. The number moving is the whole point, which is why it polls AND
-// carries a Refresh button — auto-refresh is the thing most likely to be flaky on venue
-// wifi, and a demo cannot depend on a timer nobody can see (40 § State).
-//
-// Two lines govern everything on this page:
-//
-//   1. RESULTS STATE WHAT HAPPENED; THEY DO NOT JUDGE IT. Distribution bars are one colour.
-//      The single exception is NPS, where promoter and detractor are the instrument's own
-//      words rather than an inference (CONF-004). <ScoreBadge> is catalogued in 24 and
-//      deliberately NOT BUILT for exactly this reason — CONF-016.
-//   2. THE GATE IS THE SERVER'S. Below the k-anonymity threshold the body carries no
-//      `questions` key at all, so there is nothing here that could render one (52 §2).
 import { useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -39,8 +24,6 @@ export default function Results(): JSX.Element {
   const can = useCan();
   const [params, setParams] = useSearchParams();
 
-  // Filters live in the URL so a filtered view is linkable (40 § State) — "look at Section
-  // A's numbers" is a link somebody pastes into a message, not a sequence of clicks.
   const subjectId = params.get('subjectId') ?? undefined;
   const unitId = params.get('unitId') ?? undefined;
 
@@ -49,8 +32,6 @@ export default function Results(): JSX.Element {
     ...(subjectId ? { subjectId } : {}),
     ...(unitId ? { unitId } : {}),
   });
-  // Asked for only when the capability is held. A 403 would be handled anyway, but a
-  // request nobody may answer is a request not worth making.
   const responses = useResponses(id, can('response.read'));
   const units = useUnits();
 
@@ -58,13 +39,6 @@ export default function Results(): JSX.Element {
   const [exportError, setExportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  /**
-   * The moment the page opened, captured once.
-   *
-   * Anything after it arrived while the reader was watching and gets the flash. Without
-   * this, opening a campaign with 287 comments would flash all 287 (`21` §7) — which reads
-   * as a rendering bug rather than as news.
-   */
   const openedAt = useRef<string | null>(null);
   if (openedAt.current === null && responses.data) {
     openedAt.current = responses.data.data[0]?.submittedAt ?? new Date(0).toISOString();
@@ -88,8 +62,6 @@ export default function Results(): JSX.Element {
       const { csv } = await fetchExport(id);
       saveCsv(`${campaign.data?.name ?? 'campaign'}-results.csv`, csv);
     } catch (error) {
-      // A 402 here is not a bug — export is a Silver feature (16 §3) — and the message the
-      // server sends is the one worth showing, because it names the remedy.
       setExportError(error instanceof ApiError ? error.message : 'That did not download.');
     } finally {
       setExporting(false);
@@ -164,8 +136,6 @@ export default function Results(): JSX.Element {
 
       {exportError && <p className="form-error" role="alert">{exportError}</p>}
       {results.error && view && (
-        // The last good data stays on screen (40 § States). A failed poll must not blank a
-        // page somebody is presenting from.
         <p className="form-error" role="alert">
           Could not refresh just now. These numbers are from the last successful check.
         </p>
@@ -212,10 +182,6 @@ export default function Results(): JSX.Element {
           body={`Nobody has answered this ${labels.campaign.one.toLowerCase()} yet. Share the link or the code and they will land here.`}
           action={
             detail?.url ? (
-              /* NOT also called "Share". The header carries a Share button in every state,
-                 and two buttons whose accessible name is the same word are two things a
-                 screen reader cannot tell apart — the N-036 lesson in miniature. This one
-                 says what it does; the header one stays the persistent affordance. */
               <button type="button" className="btn btn-primary" onClick={() => setSharing(true)}>
                 <Icon name="qr" size={16} /> Share the link
               </button>

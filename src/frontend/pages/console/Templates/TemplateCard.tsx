@@ -1,13 +1,3 @@
-// One card in the library grid. 36 § Interactions, design_specs/design/05 §5.1.
-//
-// Page-local and deliberately NOT a catalogue component: it is a card grid, which `24` §10
-// rules out as an abstraction ("four forms, all different"), and its two variants differ in
-// what they can DO rather than in how they look.
-//
-// The count and the completion time are on every card, always — that is the commercial
-// constraint the product rests on (`01` §5). Competitors ship 40-question templates;
-// putting the cost in the reader's eye before the name is what makes "deliberately short"
-// a promise rather than a claim in a pitch deck.
 import type { TemplateSummary } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
@@ -24,18 +14,10 @@ export function TemplateCard({
   error,
 }: {
   template: TemplateSummary;
-  /**
-   * The org's own word for a campaign — "Feedback cycle / Feedback cycles", "Guest survey /
-   * Guest surveys" (INV-001). BOTH forms, never derived: "Faculty" pluralises to "Faculty",
-   * and stripping an `s` to make a singular is the same mistake pointing the other way.
-   */
   campaign: { one: string; many: string };
   busy?: boolean;
-  /** Opens the quick-look dialog. The full page is still reachable from inside it. */
   onPreview: () => void;
-  /** Clone into the org. Absent without `template.clone`. */
   onUse?: (() => void) | undefined;
-  /** The org's own templates only: straight into the builder. */
   onOpen?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
   error?: string | undefined;

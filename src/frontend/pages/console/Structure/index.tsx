@@ -1,17 +1,3 @@
-// T-033 — /app/structure. 32, design_specs/design/04 §4.2.
-//
-// The unit tree is the substrate everything else scopes against, so every destructive
-// action here states its real consequence in numbers before it happens.
-//
-// Three things are worth knowing before editing this file:
-//
-//   1. THE TREE IS `<UnitTree>` — the same component as wizard step 3 and, later, the
-//      campaign audience picker (INV-009). T-033 extended it; it did not write a second
-//      one. See _MEMORY.md N-025.
-//   2. THE API DECIDES WHAT IS VISIBLE. `GET /units` returns the caller's subtree, rooted
-//      at their own unit. Nothing here filters for permission reasons (INV-003), and
-//      `useCan()` only decides which BUTTONS exist — never what data appears.
-//   3. RENAME IS OPTIMISTIC, MOVE IS NOT. `lib/units.ts` explains why.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MAX_REPEAT,
@@ -36,7 +22,6 @@ import { DetailPanel } from './DetailPanel.js';
 import { Overview } from './Overview.js';
 import { checkingConsequence, deleteConsequence, unknownConsequence } from './consequence.js';
 
-/** A row that exists only in the browser, waiting for a name. `+` creates one. */
 const DRAFT = 'draft:';
 const isDraft = (id: string): boolean => id.startsWith(DRAFT);
 
@@ -57,7 +42,6 @@ const countUnits = (nodes: UnitNode[]): number =>
 const depthOf = (nodes: UnitNode[]): number =>
   nodes.reduce((deepest, node) => Math.max(deepest, 1 + depthOf(node.children)), 0);
 
-/** The tree as rendered: the API's tree plus the unnamed row `+` just added, if any. */
 function withDraft(nodes: UnitNode[], draft: Draft | null, placeholder: string): UnitNode[] {
   if (!draft) return nodes;
   const row: UnitNode = {
@@ -95,8 +79,6 @@ export default function Structure(): JSX.Element {
   const tree = useMemo(() => withDraft(data, draft, addLabel), [data, draft, addLabel]);
   const selected = selectedId ? findById(data, selectedId) : undefined;
 
-  // The impact call runs when the dialog opens, and the dialog is not actionable until it
-  // answers (32). Deleting with unknown consequences is the thing this prevents.
   useEffect(() => {
     if (!pending) return;
     let cancelled = false;
@@ -127,13 +109,10 @@ export default function Structure(): JSX.Element {
   const failure = (error: unknown, fallback: string): string =>
     error instanceof ApiError ? error.message : fallback;
 
-  /** The draft row committed. `Floor 1..8` here is eight units, in one request. */
   const createFrom = async (name: string, parentId: string | null, rowId: string): Promise<void> => {
     const parsed = parseUnitRange(name);
     const count = parsed.repeat ? repeatCount(parsed.repeat) : 1;
     if (count > MAX_REPEAT) {
-      // Refused before the request, so the reader gets a number rather than a validation
-      // envelope. The server refuses it too — that is the check that actually counts (32).
       setRowMessage({
         id: rowId,
         text: `That would create ${pluralise(count, labels.unit.one, labels.unit.many)}. The most in one go is ${MAX_REPEAT}.`,
@@ -163,7 +142,6 @@ export default function Structure(): JSX.Element {
     }
     setRowMessage(undefined);
     void units.rename(id, name).catch((error: unknown) => {
-      // The optimistic name has already been put back by `lib/units.ts`; this says why.
       setRowMessage({ id, text: failure(error, 'That name could not be saved.') });
     });
   };
@@ -179,8 +157,6 @@ export default function Structure(): JSX.Element {
     if (!pending || !impact.data) return;
     const node = pending;
     setPending(null);
-    // Children go to the parent. Without somewhere to put them the server refuses, which
-    // is why the dialog only offers delete for a node whose parent is visible.
     const reassign = node.children.length > 0 ? (node.parentId ?? undefined) : undefined;
     void units
       .remove(node.id, reassign)
@@ -205,8 +181,6 @@ export default function Structure(): JSX.Element {
             ? `${pluralise(total, labels.unit.one, labels.unit.many)}, ${depth} ${depth === 1 ? 'level' : 'levels'} deep`
             : undefined
         }
-        // Fixed, not a dropdown: what the reader can see is decided by the API, and
-        // offering a switcher here would suggest otherwise (OPEN-006).
         scope={{ label: roots.length === 1 ? (roots[0] ?? '') : 'Everything you can see' }}
         action={
           can('unit.create') && total > 0 ? (

@@ -1,9 +1,3 @@
-// T-046 — /app/settings. 41 § Acceptance.
-//
-// The assertion that carries this page is the last one: saving words must change the STORE,
-// because that is what makes every other open screen re-render without a reload. A test
-// that only checked the request would pass while the sidebar kept the old nouns, which is
-// the exact failure 41 § State exists to prevent.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -18,8 +12,6 @@ const ORG: OrgView = {
     subject: { one: 'Quaxel', many: 'Quaxels' },
     respondent: { one: 'Frimble', many: 'Frimbles' },
     reviewee: { one: 'Vandor', many: 'Vandors' },
-    // Deliberately NOT the derived plural. The page has to read this back as an override
-    // or the hotel's "Staff / Staff" silently reverts on the next edit.
     campaign: { one: 'Plithe', many: 'Plithe' },
   },
   configured: true,
@@ -46,8 +38,6 @@ vi.mock('../../lib/org.js', async () => {
     usePresets: () => ({ data: PRESETS, loading: false, error: null }),
     useUpdateOrg: () => updateOrg,
     useUpdateLabels: () => updateLabels,
-    // 48 / T-062. Mocked rather than exercised: the logo card has its own tests in
-    // components/form/FileUpload.test.tsx, and this file is about the words card.
     useUploadLogo: () => uploadLogo,
     useRemoveLogo: () => removeLogo,
   };
@@ -84,7 +74,6 @@ describe('the words card', () => {
 
   it('reads a saved plural that differs from the derived one as an override', () => {
     mount();
-    // "Plithe / Plithe" — derivePlural would say "Plithes", so this one was chosen.
     const hints = screen.getAllByText(/your plural/);
     expect(hints).toHaveLength(1);
   });
@@ -100,7 +89,6 @@ describe('the words card', () => {
     fireEvent.change(screen.getByLabelText('A part of the organization'), {
       target: { value: 'Wingg' },
     });
-    // Taken over, so it stays put rather than becoming "Winggs".
     expect(screen.getByLabelText<HTMLInputElement>('Plural of Wingg').value).toBe('Wing');
   });
 
@@ -114,7 +102,6 @@ describe('the words card', () => {
       .toBe(true);
   });
 
-  // 41 § State, and the reason this page is in M0 at all.
   it('updates every open screen on save, without a reload', async () => {
     updateLabels.mockResolvedValue({
       ...ORG,
@@ -165,8 +152,6 @@ describe('the organization card', () => {
   });
 });
 
-// INV-003. Read-only rather than absent: the words are what the rest of the console is
-// speaking, so hiding them would hide the explanation.
 describe('a caller who can read but not update', () => {
   it('sees the words and no way to change them', () => {
     mount(['org.read']);

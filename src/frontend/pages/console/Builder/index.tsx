@@ -1,16 +1,3 @@
-// T-037 — /app/forms/:id/build. 37, design_specs/design/05 §5.2.
-//
-// The largest single piece of UI in the build, and its layout is settled: header card, a
-// stack of question cards with exactly ONE expanded, a tool rail pinned right.
-//
-// TWO THINGS THIS PAGE DOES NOT HAVE, both deliberate and both recorded as `CONF-014`:
-// there is no **Publish** button and there are no **Responses / Settings** tabs. The design
-// mockup draws all three; architecture has no publish endpoint, no published/draft rule that
-// any campaign consults, and exactly two routes for this screen. Building them would mean
-// inventing a contract, and the lock design attributes to Publish already exists for real —
-// a template used by a LAUNCHED campaign is read-only, enforced server-side.
-//
-// There is no Save button either, and that part IS the design: the only commit is autosave.
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -34,9 +21,7 @@ export default function Builder(): JSX.Element {
   const builder = useBuilder(id);
   const templates = useTemplates();
 
-  /** Exactly one card is open, and the stack is what knows which (37 § State). */
   const [openAt, setOpenAt] = useState<number | null>(0);
-  /** The last delete, kept whole so undo is a restore rather than a re-creation. */
   const [undo, setUndo] = useState<{ question: QuestionDraft; at: number } | null>(null);
   const [cloning, setCloning] = useState(false);
 
@@ -50,8 +35,6 @@ export default function Builder(): JSX.Element {
     const source = draft.questions[at];
     if (!source) return;
     const questions = [...draft.questions];
-    // The copy has NO id. It is a new row, and carrying the source's id would make the
-    // bulk PUT rewrite the original instead of adding one.
     const { id: _drop, ...rest } = source;
     questions.splice(at + 1, 0, { ...rest, config: { ...source.config } });
     builder.setQuestions(questions);
@@ -62,8 +45,6 @@ export default function Builder(): JSX.Element {
     const question = draft.questions[at];
     if (!question) return;
     builder.setQuestions(draft.questions.filter((_, index) => index !== at));
-    // Immediate, with undo. A confirmation per question would make authoring miserable,
-    // and undo is the better answer for a cheap reversible action (37).
     setUndo({ question, at });
     setOpenAt(null);
   };
@@ -136,9 +117,6 @@ export default function Builder(): JSX.Element {
         }
         filters={[
           {
-            // The live cost of the form, and the whole argument against a forty-question
-            // one: watching this climb past two minutes is more persuasive than an error
-            // message (37 § Interactions).
             label: `${pluralise(draft.questions.length, 'question', 'questions')}${time ? ` · ${time}` : ''}`,
           },
         ]}
@@ -207,8 +185,6 @@ export default function Builder(): JSX.Element {
           ))}
 
           {draft.questions.length === 0 && (
-            // Inline inside the stack, not a full-page empty state: the builder chrome is
-            // the point, and a form with no questions is a form mid-authoring (37 § States).
             <button type="button" className="builder-first" onClick={builder.addQuestion} disabled={!editable}>
               <Icon name="add" size={20} /> Add your first question
             </button>

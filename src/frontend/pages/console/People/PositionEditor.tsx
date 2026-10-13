@@ -1,10 +1,3 @@
-// The two inline dropdowns. 34 § Interactions: "Adding a position is two inline dropdowns,
-// never a modal."
-//
-// A position is `Role — Unit`, and the UNIT HALF IS NEVER ABBREVIATED AWAY. It is what
-// boxes the powers to the right place (INV-005), so a chip reading just "Dean" would hide
-// the single most important behavioural detail in the model on the screen where somebody
-// is deciding it.
 import { useState } from 'react';
 import type { ResolvedLabels, RoleView } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
@@ -27,17 +20,12 @@ export function PositionEditor({
   labels: ResolvedLabels;
   busy: boolean;
   error: string | null;
-  /** Drives the primary checkbox's default — the first position is primary by definition. */
   hasPositions: boolean;
   onAdd: (draft: PositionDraft) => void;
   onCancel: () => void;
 }): JSX.Element {
   const [roleId, setRoleId] = useState('');
   const [unitId, setUnitId] = useState('');
-  // DEC-044 made this consequential rather than cosmetic: a per-person grant anchors at the
-  // primary position's unit, and with two positions and none flagged there is no anchor at
-  // all. So the first position a person gets is primary by default, and the checkbox is
-  // visible from the second onwards rather than hidden as an advanced option.
   const [isPrimary, setIsPrimary] = useState(!hasPositions);
 
   const ready = roleId !== '' && unitId !== '';
@@ -100,29 +88,12 @@ export function PositionEditor({
       </button>
 
       {error && (
-        // Inline, never a toast (24 §6). A refusal here is usually INV-012's
-        // `WOULD_ESCALATE`, whose whole value is the sentence naming the capability — a
-        // toast would take it away after four seconds.
         <p className="field-error position-error" role="alert">{error}</p>
       )}
     </form>
   );
 }
 
-/**
- * `Role — Unit`, the only rendering of a position anywhere. 34 § Interactions.
- *
- * EXTENDED BY T-051, not forked (INV-009). `47` § Interactions asks for a position "with the
- * level and any expiry date", and `24`'s `<PersonChip>` rule is that a role's level is
- * visible so the hierarchy is inspectable exactly when it gets probed. Both are OPTIONAL
- * props: the detail pages pass them because the question there is *what does this position
- * confer*, and the list does not because its Positions column answers the narrower *where do
- * they sit* — a level badge on every chip in a table cell is noise the detail page has room
- * for and the row does not.
- *
- * The level is ORDERING ONLY (DEC-002, CONF-002). Nothing anywhere compares two of them to
- * decide anything; the server decides from grants (`11` §5b).
- */
 export function PositionChip({
   roleName,
   roleLevel,
@@ -135,8 +106,6 @@ export function PositionChip({
   roleLevel?: number | null | undefined;
   unitName: string;
   isPrimary: boolean;
-  /** ISO, or null for open ended. An expiring position is the difference between "they
-   *  have this" and "they have this until March", and it is invisible without saying so. */
   validTo?: string | null | undefined;
   onRemove?: (() => void) | undefined;
 }): JSX.Element {
