@@ -3,12 +3,23 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-// The step is 5 hours rather than the usual 30 seconds, to keep the seed and demo flow workable.
-const STEP_SECONDS = 5 * 60 * 60;
+/**
+ * RFC 6238's 30 seconds, and it stays 30 seconds — `DEC-084`.
+ *
+ * This was briefly widened to 6 hours so a demo would not have to re-read a code, which is
+ * a real convenience and the wrong place to buy it. A second factor valid for a full shift
+ * is close to a static secret: it survives a shoulder-glance, a screenshot and a scrollback
+ * for the rest of the day, which leaves the password as very nearly the only factor — and
+ * the whole argument for building MFA at all is that one stolen operator password exposes
+ * every tenant's plan and revenue data at once. `npm run ops:code -w @endur/api` prints a
+ * live code in one command, so the convenience was already bought somewhere cheaper.
+ */
+const STEP_SECONDS = 30;
 const DIGITS = 6;
 
-// No drift allowance: with a 5-hour step, accepting the neighbouring steps would extend validity again.
-const WINDOW = 0;
+// ±1 step of clock drift. One step each way is 30 seconds of slack for an unsynchronised
+// laptop clock; it is not a validity extension.
+const WINDOW = 1;
 
 // Makes a new base32 secret for an operator.
 export function generateSecret(): string {
