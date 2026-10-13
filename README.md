@@ -70,18 +70,25 @@ scripts/            invariant audits that run in CI
 Requires **Node 20+** and **PostgreSQL 16**.
 
 ```bash
+cp .env.example .env                     # then set SESSION_SECRET (32+ chars)
+
 npm install
+# If this fails with EBADPLATFORM (an esbuild optional dependency for a
+# different OS), it's an npm issue unrelated to this project — retry with:
+#   npm install --force
 
 # Postgres — either one, they produce an identical database:
 sudo bash scripts/install-postgres.sh    # native install (Linux / WSL)
 npm run db:up                            # docker compose, if you have Docker
 
-cp .env.example .env                     # then set SESSION_SECRET (32+ chars)
 npm run db:migrate
 npm run db:seed
 
 npm run dev                              # api :4000 · web :5173
 ```
+
+`.env` has to exist **before** `npm install` — its `postinstall` hook runs
+`prisma generate`, which needs `DATABASE_URL` to already be set.
 
 On WSL, services do not start at boot: `sudo service postgresql start` after a restart.
 
