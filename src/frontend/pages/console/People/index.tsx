@@ -1,15 +1,3 @@
-// T-050 — /app/people. 34, design_specs/design/04 §4.4.
-//
-// **This is the screen that made a cold start possible.** The API has had nine people
-// endpoints and CSV import since T-018; the console had two read-only hooks. So an
-// organisation created from `/start` could build a structure, add subjects and launch a
-// campaign — and could not add a second human being. Everything below is in service of
-// that one gap.
-//
-// The multi-position model is the thing to look at: a person is a name and an email plus
-// one or more `Role — Unit` pairs, which is what makes a dean who is also a professor
-// representable without a special case. The unit half of every chip is load-bearing
-// (INV-005) and is never abbreviated away.
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { AccountInvite, CreateAssignmentBody, PersonSummary } from '@endur/shared';
@@ -53,11 +41,9 @@ export default function People(): JSX.Element {
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState<PersonSummary | null>(null);
   const [rowError, setRowError] = useState<{ id: string; text: string } | null>(null);
-  /** Which row has its two dropdowns open. One at a time — never a modal (34). */
   const [assigning, setAssigning] = useState<string | null>(null);
   const [assignBusy, setAssignBusy] = useState(false);
   const [importing, setImporting] = useState(false);
-  /** The one-time credential from `POST /people/:id/account`. Shown once, in `<InviteLink>`. */
   const [invite, setInvite] = useState<{ person: PersonSummary; data: AccountInvite } | null>(null);
   const [invitingId, setInvitingId] = useState<string | null>(null);
 
@@ -65,7 +51,6 @@ export default function People(): JSX.Element {
   const rows = list.data?.data ?? [];
   const total = list.data?.meta.total ?? 0;
 
-  /** Any filter change starts paging again — a cursor from the old query means nothing. */
   const setFilter = (patch: Record<string, string | null>): void => {
     const next = new URLSearchParams(params);
     for (const [key, value] of Object.entries(patch)) {
@@ -118,10 +103,6 @@ export default function People(): JSX.Element {
       .assign(person.id, body)
       .then(() => setAssigning(null))
       .catch((error: unknown) => {
-        // Usually INV-012's `WOULD_ESCALATE`, and its message names the capability that
-        // would have been handed out. Kept inline and kept verbatim: the server's sentence
-        // is the actionable one, and a generic replacement would throw away the only part
-        // that tells the administrator what to do (34 § States).
         setRowError({ id: person.id, text: message(error, 'That position could not be added.') });
       })
       .finally(() => setAssignBusy(false));
@@ -164,8 +145,6 @@ export default function People(): JSX.Element {
       render: (row) => (
         <div className="person-positions">
           {row.positions.length === 0 && assigning !== row.id && (
-            // Not an empty cell. Somebody with no position can do nothing at all, and that
-            // is the single most likely reason an administrator is on this screen.
             <span className="text-meta">No position — cannot sign in to anything</span>
           )}
           {row.positions.map((position) => (
@@ -234,8 +213,6 @@ export default function People(): JSX.Element {
     {
       key: 'account',
       header: 'Account',
-      // 34 § States, 57 § States. The list only ever offers `Invite` — re-issue and revoke
-      // live on the detail page, where there is room to say what they do (34 § Interactions).
       render: (row) => {
         if (row.account.state === 'active') return <span className="tag tag-good">Active</span>;
         if (row.account.state === 'invited') {
@@ -293,8 +270,6 @@ export default function People(): JSX.Element {
             : []),
         ]}
         action={
-          // Hidden while the empty state shows its own copy — two identical primary actions
-          // on one screen is the reader wondering which is the real one.
           can('person.create') && !(rows.length === 0 && !filtered) ? (
             <>
               {can('person.import') && (
@@ -383,8 +358,6 @@ export default function People(): JSX.Element {
           rowKey={(row) => row.id}
           caption="People"
           empty={
-            // The two empties differ, and the difference is the whole point: one is an
-            // organisation with nobody in it, the other is a query with nothing in it (34).
             filtered ? (
               <EmptyState
                 icon="people"
@@ -493,12 +466,6 @@ export default function People(): JSX.Element {
   );
 }
 
-/**
- * `<ConfirmDialog>` requires a `consequence` (24 §6), and the honest one here depends on
- * what the person actually holds: removing somebody with three positions takes three
- * permission grants with them, and that is worth saying before it happens rather than
- * after.
- */
 function removeConsequence(person: PersonSummary): string {
   const held = person.positions.length;
   if (held === 0) {

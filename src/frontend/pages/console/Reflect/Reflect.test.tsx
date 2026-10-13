@@ -1,8 +1,3 @@
-// T-084 — /app/reflect. 44 § Acceptance, the page half.
-//
-// Short on purpose. The gates and the ordering constraint are the SERVER's and
-// `test/improve.test.ts` owns them; what matters here is that the page renders what it is
-// told rather than deciding anything, and that the copy does not turn a gap into a grade.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type { Capability, GapView, ReflectionCycle, ReflectionForm } from '@endur/shared';
@@ -38,9 +33,6 @@ const form: ReflectionForm = {
   answers: null,
 };
 
-/** `Omit<…, 'rows'>` because the suppressed fixture has to say `rows: undefined` EXPLICITLY
- *  — `exactOptionalPropertyTypes` is on, and that is the point of the fixture: the
- *  suppressed body carries no rows key at all. */
 const gap = (over: Partial<Omit<GapView, 'rows'>> & { rows?: GapView['rows'] } = {}): GapView => ({
   campaignId: 'c-1', campaignName: 'Autumn round', subjectId: 's-1', subjectName: 'North wing',
   reflectedAt: '2026-09-01T10:00:00.000Z',
@@ -110,13 +102,9 @@ describe('/app/reflect', () => {
 
   it('opens the FORM while the gap is locked, and says why the order matters', async () => {
     mount(ALL, '/app/reflect?campaign=c-1');
-    // The 404 on the gap is the ordering constraint, not a missing page.
     expect(await screen.findByText(/Your own assessment/)).toBeTruthy();
     expect(screen.getByText(/before you see anyone else/i)).toBeTruthy();
-    // INV-008: the campaign's own question, through the shared input set.
     expect(screen.getByText('How clear was it?')).toBeTruthy();
-    // A <fieldset> of real radios, which is what <QuestionInput> renders for a rating —
-    // the same control the respondent saw, not a second implementation.
     expect(screen.getByRole('group', { name: /How clear was it/ })).toBeTruthy();
     expect(screen.getAllByRole('radio').length).toBe(5);
   });
@@ -140,8 +128,6 @@ describe('/app/reflect', () => {
     mount(ALL, '/app/reflect?campaign=c-1');
 
     expect(await screen.findByText(/You rated yourself 2 higher than others did/)).toBeTruthy();
-    // 44 § The gap view: a gap view that reads as an accusation guarantees the next
-    // reflection is gamed. No grade, no status ramp on the bars.
     expect(screen.queryByText(/blind spot is bad|poor|underperform/i)).toBeNull();
     for (const node of document.querySelectorAll('.gap-fill')) {
       expect(node.className).not.toMatch(/fill-(good|bad)/);
@@ -154,7 +140,6 @@ describe('/app/reflect', () => {
 
     expect(await screen.findByText(/Not enough responses yet/)).toBeTruthy();
     expect(screen.queryByText('How clear was it?')).toBeNull();
-    // Their own record is still theirs; it is the others' answers being withheld.
     expect(screen.getByText(/Your assessment, recorded/)).toBeTruthy();
   });
 

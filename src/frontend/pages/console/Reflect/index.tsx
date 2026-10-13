@@ -1,13 +1,3 @@
-// T-084 — /app/reflect. 44.
-//
-// THE ORDER IS THE PRODUCT. You record your own assessment first, then you are shown what
-// everybody else said, then you write a plan. The lock is the API's (`GET .../gap` 404s
-// until the reflection exists), so this page cannot open the gap early even if it tried —
-// and it does not try: the locked state says plainly what unlocks it, because `44` § States
-// forbids a bare empty screen here.
-//
-// One route with three views, chosen by the URL. `?campaign=` is which cycle; everything
-// else follows from what the server says about it.
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { AnswerValue, PlanItem } from '@endur/shared';
@@ -61,8 +51,6 @@ export default function Reflect(): JSX.Element {
     />
   );
 
-  // 403 — the account. L4 holds none of this and the sidebar item is hidden for them, so
-  // anybody here typed the address.
   if (!can('reflection.read') || cycles.forbidden) {
     return (
       <div className="page reflect-page">
@@ -76,7 +64,6 @@ export default function Reflect(): JSX.Element {
     );
   }
 
-  // 402 — the organisation. Not an error page, and never the sentence above (DEC-011).
   const upgrade = cycles.upgrade ?? form.upgrade ?? gap.upgrade;
   if (upgrade) {
     return (
@@ -134,10 +121,6 @@ export default function Reflect(): JSX.Element {
           {rows.map((cycle) => {
             const tag = STATUS[cycle.status] ?? STATUS['due'];
             return (
-              // Title and state on one line, the facts about the cycle on the next. Every
-              // part was a sibling of every other before, so a flex row wrapped the tag
-              // and the two meta spans into a centred stack that read as three unrelated
-              // captions under a link.
               <li key={`${cycle.campaignId}:${cycle.subjectId}`} className="card cycle-row">
                 <button type="button" className="cycle-open" onClick={() => select(cycle.campaignId)}>
                   {cycle.campaignName}
@@ -159,8 +142,6 @@ export default function Reflect(): JSX.Element {
     </div>
   );
 }
-
-/* ------------------------------------------------------------ step 1: the reflection */
 
 function ReflectionForm({
   campaignId,
@@ -233,8 +214,6 @@ function ReflectionForm({
   );
 }
 
-/* ------------------------------------------------- steps 2 and 3: the gap, then the plan */
-
 function GapPanel({
   campaignId,
   gap,
@@ -291,9 +270,6 @@ function GapPanel({
         </p>
 
         {view.suppressed ? (
-          // The same gate as everywhere, and worded as the promise it is rather than as a
-          // failure. Their own reflection is still theirs; it is the others' answers that
-          // are withheld (52 §2).
           <>
             <h4>Not enough responses yet</h4>
             <p className="text-muted">

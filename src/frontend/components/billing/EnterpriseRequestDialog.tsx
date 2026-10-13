@@ -1,17 +1,3 @@
-// <EnterpriseRequestDialog> — 24, 49 § Asking for Enterprise, DEC-100, T-100.
-//
-// NOT <PaymentDialog>, AND THE DIFFERENCE IS THE WHOLE POINT. The checkout takes (simulated)
-// money and hands back a reference; this takes nothing. Nothing is captured, no subscription
-// row moves, and the customer is not on Enterprise when it closes. A price is not a checkout
-// (`16` §2) — what happens is that a work item opens for Endur's owner, who rings them back.
-//
-// SO THE DIALOG SAYS THAT, in the sentence a customer would otherwise ask support. A confirm
-// that says only "Request Enterprise?" leaves the reader wondering whether they have just
-// been billed ₹4,999.
-//
-// ONE OPTIONAL NOTE, AND NOTHING ELSE. `DEC-100` is explicit that this is not a sales lead
-// form: who asked, which organisation, when. Every field a form like this grows is a field
-// somebody has to read before they can ring, and the ring is the product.
 import { useEffect, useRef, useState } from 'react';
 import { formatMoney, type PlanOption } from '@endur/shared';
 

@@ -1,21 +1,3 @@
-// /app/people/:id — one person. 34 § Interactions, design_specs/design/04 §4.4.
-//
-// Blocks in this order and for this reason: **identity, account, positions, then what those
-// positions actually confer.** The last is the payload. Everywhere else in the product the
-// scoping model is a paragraph of documentation; here it is a rendered fact — the same
-// person, two units, different powers, which is INV-005 without the paragraph.
-//
-// SINCE N-079 THERE IS ONE MORE, and it is the payload for a different reader. Every block
-// above is about POWER, and a respondent has none by construction (DEC-009: no account, no
-// grants) — so on the page of a student, a guest or a patient, all of them are empty and
-// the page said nothing at all about the person whose feedback the organisation runs on.
-// `<Involvement>` answers the question they are actually in the system for.
-//
-// It shares that block with `/app/profile` (47) rather than owning a copy: `<PowersByPlace>`,
-// one implementation, two placements (24 §4). What differs is who is reading. Here it is an
-// administrator looking at somebody else, and the read is scope-filtered by the API — a
-// person outside the caller's scope 404s rather than 403ing, so ids cannot be probed to map
-// the org chart (13 §5).
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { AccountInvite, AccountStatus, CreateAssignmentBody } from '@endur/shared';
@@ -61,8 +43,6 @@ export default function PersonDetail(): JSX.Element {
   const message = (caught: unknown, fallback: string): string =>
     caught instanceof ApiError ? caught.message : fallback;
 
-  // A 404 here is out-of-scope OR nonexistent, deliberately indistinguishable (13 §5). The
-  // copy has to be true for both, so it says neither.
   if (person.error instanceof ApiError && person.error.status === 404) {
     return (
       <>
@@ -90,9 +70,6 @@ export default function PersonDetail(): JSX.Element {
       .assign(body)
       .then(() => setAssigning(false))
       .catch((caught: unknown) => {
-        // Usually INV-012's `WOULD_ESCALATE`, and its message names the capability that
-        // would have been handed out. Verbatim and inline: the server's sentence is the
-        // actionable one, and a generic replacement throws away the only useful part.
         setAssignError(message(caught, 'That position could not be added.'));
       })
       .finally(() => setAssignBusy(false));
@@ -105,8 +82,6 @@ export default function PersonDetail(): JSX.Element {
     void call(id)
       .then((result) => setInvite(result))
       .catch((caught: unknown) => {
-        // Usually INV-012's `WOULD_ESCALATE` — named and verbatim, same reasoning as the
-        // position editor's error above (34 § States).
         setAccountError(message(caught, 'That link could not be created.'));
       })
       .finally(() => setAccountBusy(false));
@@ -119,8 +94,6 @@ export default function PersonDetail(): JSX.Element {
     void revokeAccount(id)
       .then(() => person.reload())
       .catch((caught: unknown) => {
-        // The lockout guard's 409 ("Sign out instead.") lands here too, and it is the
-        // caller's own sentence — 57 § Revocation.
         setAccountError(message(caught, 'That account could not be revoked.'));
       })
       .finally(() => setAccountBusy(false));
@@ -248,8 +221,6 @@ export default function PersonDetail(): JSX.Element {
             <h3 className="utility" id="person-positions">Positions</h3>
             <div className="card">
               {positions.length === 0 && !assigning && (
-                // Not an empty area. Somebody with no position can do nothing at all, and
-                // that is the single most likely reason anyone is on this page (34).
                 <p className="text-muted">
                   No position — they cannot sign in to anything yet. A position is a role at
                   a {labels.unit.one.toLowerCase()}, and it is what grants every power below.
@@ -351,9 +322,6 @@ export default function PersonDetail(): JSX.Element {
       {pending && (
         <ConfirmDialog
           title={`Remove ${pending.label}?`}
-          // `<ConfirmDialog>` requires a consequence (24 §6), and the honest one is about
-          // POWERS rather than about a chip disappearing: the powers below this position
-          // go with it, and they are listed on this very page.
           consequence={`Everything ${data?.name ?? 'they'} could do at ${pending.label.split(' — ')[1] ?? 'that place'} goes with it. They keep their account and any other positions.`}
           verb="Remove"
           destructive
@@ -394,7 +362,6 @@ export default function PersonDetail(): JSX.Element {
   );
 }
 
-/** 57 § States, in the order the doc tests them (`features/accounts/status.ts`). */
 function AccountPanel({
   account,
   busy,
@@ -465,7 +432,6 @@ function AccountPanel({
     );
   }
 
-  // 'disabled'
   return (
     <div className="account-panel-row">
       <p>

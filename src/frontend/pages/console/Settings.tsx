@@ -1,18 +1,3 @@
-// T-046 — /app/settings. 41, design_specs/design/04 §4.6.
-//
-// THE WORDS CARD IS THE WHOLE REASON THIS PAGE EXISTS BEFORE M0. `design_specs/design/11`
-// §1 cuts every other card on this screen and keeps this one, because editing the vocabulary
-// outside the wizard is the answer to the question an evaluator actually asks: "fine, but can
-// you change it AFTER setup?" Saving dispatches into `vocabularySlice`, so the sidebar and
-// the chip row change under them with no reload — 41 § State, 22 §3.
-//
-// <VocabularyChips> links here with #words from EVERY console page, so the anchor is a
-// contract, not a nicety (41 § Route & access).
-//
-// Billing and the danger zone are specified in 41 and deliberately absent: they are the
-// cut-list, not an oversight. THE LOGO UPLOAD IS NO LONGER ON IT — file upload became a
-// mandatory evaluation criterion on 23 Aug, `48` was re-tagged P1 (CONF-018), and this is
-// one of the two places `<FileUpload>` is mounted (T-062).
 import { useEffect, useMemo, useState } from 'react';
 import {
   Industry, LabelKey, resolveLabels,
@@ -31,12 +16,6 @@ import {
 } from '../../lib/org.js';
 import { labelsLoaded, useAppDispatch } from '../../store/index.js';
 
-/**
- * Which plurals the org has taken over. There is no server-side flag for it and there should
- * not be — a saved plural that differs from the derived one IS the override. This is what
- * makes "Staff / Staff" survive a reload and keep saying "your plural" rather than silently
- * reverting to "Staffs" the next time somebody edits the singular.
- */
 const overridesOf = (labels: ResolvedLabels): LabelKey[] =>
   LabelKey.options.filter((key) => labels[key].many !== derivePlural(labels[key].one));
 
@@ -59,14 +38,10 @@ export default function Settings(): JSX.Element {
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingWords, setSavingWords] = useState(false);
-  // Per card, never shared: 41 § States requires a failure in one card to leave the other
-  // usable, and one error string for the page cannot express that.
   const [profileError, setProfileError] = useState<string | null>(null);
   const [wordsError, setWordsError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  /** Seed the editors once the org lands. Re-seeded on every load, so a save that returns
-   *  merged labels leaves the fields showing what the server actually stored. */
   const loaded = org.data;
   useEffect(() => {
     if (!loaded) return;
@@ -78,8 +53,6 @@ export default function Settings(): JSX.Element {
     setIndustry(parsed.success ? parsed.data : 'custom');
   }, [loaded]);
 
-  /** The #words anchor. React Router does not scroll to a hash on its own, and the chip
-   *  row's Edit link is useless if it lands at the top of the page. */
   useEffect(() => {
     if (!draft || window.location.hash !== '#words') return;
     document.getElementById('words')?.scrollIntoView({ block: 'start' });
@@ -95,7 +68,6 @@ export default function Settings(): JSX.Element {
 
   const applied = (updated: OrgView): void => {
     org.set(updated);
-    // Every open screen re-renders from here. This is the ten-second proof (41 § State).
     dispatch(labelsLoaded(updated.labels as LabelSet));
   };
 
@@ -130,8 +102,6 @@ export default function Settings(): JSX.Element {
       current
         ? {
             ...current,
-            // The plural follows the singular until somebody takes it over, and then it
-            // never moves again — "Staff / Staff" must survive editing "Staff".
             [key]: {
               one,
               many: overrides.includes(key) ? current[key].many : derivePlural(one),
@@ -152,8 +122,6 @@ export default function Settings(): JSX.Element {
     setOverrides((current) => current.filter((entry) => entry !== key));
   };
 
-  /** A blank or over-long label renders `undefined` across every screen, so the button is
-   *  the wrong place to find that out. Mirrors the server rule in 22 §2. */
   const blank = draft
     ? LabelKey.options.find((key) => !draft[key].one.trim() || !draft[key].many.trim())
     : undefined;

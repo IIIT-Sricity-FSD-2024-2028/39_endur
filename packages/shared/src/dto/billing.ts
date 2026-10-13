@@ -57,8 +57,22 @@ export type BillingSummary = {
    *
    * NOTHING GATES ON IT, the same rule `pendingTier` lives under. It is a past-tense fact
    * beside the tier, never a second answer to which plan is in force.
+   *
+   * A TRIAL THAT EXPIRED UNCONVERTED ALSO SETS THIS — `DEC-116`. The two cases read the same
+   * here (a tier that ran out, moved to bronze) and are told apart by `lapsedFromTrial` below,
+   * because "your Gold plan ended" and "your Gold trial ended" are different sentences and one
+   * of them implies money was once flowing.
    */
   lapsedFrom: Tier | null;
+  /**
+   * WAS `lapsedFrom` A TRIAL RATHER THAN A PAID PLAN — `DEC-116`. `null` exactly when
+   * `lapsedFrom` is `null`; otherwise `true` for a trial that ran out unconverted, `false` for
+   * a paid plan nobody renewed. A second boolean rather than folding this into `lapsedFrom`
+   * itself (e.g. a sentinel tier) because it is a fact about the PAYMENT EVENT behind the
+   * lapse, not about the tier — derived, on read, from the ledger row's `kind` (`trial_expired`
+   * vs `lapse`), not stored on the subscription.
+   */
+  lapsedFromTrial: boolean | null;
   seats: number;
   /** What the meter counts, in its parts. `16` §5: a plan's size must never be a surprise. */
   seatBreakdown: { activeUsers: number; nonPersonSubjects: number };
@@ -94,8 +108,23 @@ export type BillingSummary = {
  * owner of a product with no renewals most needs to be able to ask. `/ops/analytics` counts
  * both as downgrades (it wants the movement); `/ops/earnings` excludes both (neither took
  * money).
+ *
+ * `trial_signup` IS A FIFTH KIND — `DEC-116`. Written by registration when the customer starts
+ * a trial instead of paying, `amountMinor: 0`. Kept distinct from `signup` because `/ops/
+ * earnings` reads `signup` as "money captured on registration" (`DEC-080`); a ₹0 trial row
+ * folded into it would put a non-receipt in a column everybody else reads as one. It is also
+ * what `/ops/analytics`' "trials started" figure counts, the same way `movement` already
+ * counts plan changes from this table.
+ *
+ * `trial_expired` IS A SIXTH KIND AND IS `lapse`'s PAIR FOR A TRIAL — `DEC-116`. Written when a
+ * trial's period ends with nothing converted, moving the organisation to bronze at ₹0. Kept
+ * distinct from `lapse` for the same reason `lapse` is kept distinct from `expiry`: "a paid
+ * plan nobody renewed" and "a trial nobody converted" are different facts about the business,
+ * and the plan page's copy (`lapsedFromTrial`, above) depends on being able to tell them apart
+ * without guessing from `amountMinor === 0`, which is already true of all four non-capture
+ * kinds.
  */
-export type PaymentKind = 'signup' | 'change' | 'expiry' | 'lapse';
+export type PaymentKind = 'signup' | 'trial_signup' | 'change' | 'expiry' | 'lapse' | 'trial_expired';
 
 export type PaymentRecord = {
   id: string;

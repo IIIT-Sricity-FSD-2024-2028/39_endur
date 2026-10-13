@@ -1,12 +1,3 @@
-// `/ops/login` — Step 0.7, `Mithil/plan.md`. `19` §9, `70` § Route & access.
-//
-// Three fields, ONE error message for all three failures — the server already refuses with
-// one message (`REFUSED` in `features/platform/router.ts`) and the client must not add a
-// second, more specific one; that would be the user-enumeration oracle the server just
-// avoided, reintroduced one layer up.
-//
-// Development aid, not on screen: `npm run ops:code -w @endur/api` prints the current TOTP
-// code for each seeded operator.
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { PlatformMeResponse } from '@endur/shared';
@@ -28,9 +19,6 @@ export default function Login(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // The mirror of `RedirectIfSignedIn` (30 § Acceptance): declarative, so an already-signed-
-  // -in operator never sees the form flash before leaving. `navigate()` mid-render is the
-  // thing to avoid here — this is the `<Navigate>` element instead.
   if (status === 'authenticated') {
     const from = (location.state as { from?: string } | null)?.from ?? '/ops';
     return <Navigate to={from} replace />;
@@ -48,7 +36,6 @@ export default function Login(): JSX.Element {
         const from = (location.state as { from?: string } | null)?.from ?? '/ops';
         navigate(from, { replace: true });
       } catch (err) {
-        // One message for every failure — bad email, bad password, bad code alike.
         setError(
           err instanceof OpsError ? err.message : 'Something went wrong. Please try again.',
         );

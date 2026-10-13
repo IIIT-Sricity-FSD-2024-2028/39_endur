@@ -1,9 +1,3 @@
-// <SlotGrid> — T-095. The three things this component decides, and nothing else.
-//
-// It is the ONE grid on both sides of the product (24 § SlotGrid), so the assertions worth
-// having are the ones a picker and an editor would otherwise disagree about: what "full"
-// looks like, whether a full slot can be pressed at all, and whether the editor's affordance
-// leaks into the read-only render the respondent gets.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SlotGrid, remainingLabel } from './SlotGrid.js';
@@ -18,15 +12,12 @@ const slot = (over: Partial<{ id: string; remaining: number; capacity: number }>
 
 describe('remainingLabel', () => {
   it('calls out the last place on its own', () => {
-    // The state the capacity work exists to produce, and the one a booker has to act on.
     expect(remainingLabel(1)).toBe('1 left');
     expect(remainingLabel(2)).toBe('2 left');
   });
 
   it('says Full rather than "0 left"', () => {
     expect(remainingLabel(0)).toBe('Full');
-    // Capacity can be lowered under bookings that already exist. A negative number on a card
-    // reads as a bug; the service clamps and this agrees with it.
     expect(remainingLabel(-2)).toBe('Full');
   });
 });
@@ -54,7 +45,6 @@ describe('SlotGrid', () => {
 
   it('names the time and the count for a screen reader, not just the count', () => {
     render(<SlotGrid slots={[slot({ remaining: 1 })]} onSelect={vi.fn()} />);
-    // The visible text is a time and two words; the accessible name is the whole sentence.
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('1 left');
   });
 

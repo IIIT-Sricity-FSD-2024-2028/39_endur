@@ -1,16 +1,3 @@
-// Quick look at a template, without leaving the library. 36 § Interactions.
-//
-// The card's "Preview" used to navigate to /app/templates/:id, which meant losing the
-// grid, the filters and the scroll position to answer one question — "what does this
-// actually ask?" — and then pressing back. That is the wrong shape for a decision made
-// twelve times in a row while comparing.
-//
-// So this is a look, not a page: it fetches the real questions, shows them, and offers the
-// two things a reader wants next — take a copy, or open the full page. The full page is
-// still there and still linkable; nothing was removed.
-//
-// The questions are REAL. `TemplatePreview` draws neutral strips when it has not been told
-// the kinds, and here it has been, so what is drawn is what the form asks.
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { TemplateSummary } from '@endur/shared';
@@ -19,8 +6,6 @@ import { useTemplate } from '../../../lib/templates.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
 import { TemplatePreview } from './TemplatePreview.js';
 
-/** What each kind is called on screen. Structural words — a question kind is Endur's own
- *  vocabulary and is never renamed by an organisation, so these are not domain nouns. */
 const KIND_LABEL: Record<string, string> = {
   rating: 'Rating',
   nps: 'Score out of 10',
@@ -46,14 +31,6 @@ export function PreviewDialog({
   const detail = useTemplate(template.id);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  // Escape closes, and focus starts inside the dialog rather than wherever the grid left
-  // it — otherwise the first Tab walks back into the page behind.
-  //
-  // AND IT GOES BACK where it came from on close. This preview is opened twelve times in a
-  // row while comparing templates, and a keyboard reader who lands back on <body> every
-  // time has to tab through the whole grid again to reach the next card. `ConfirmDialog`
-  // and `ShareSheet` do not restore focus either; they are opened once, which is why
-  // nobody noticed.
   useEffect(() => {
     const opener = document.activeElement;
     closeRef.current?.focus();
@@ -71,9 +48,6 @@ export function PreviewDialog({
   const time = approxDuration(template.estimatedSeconds);
 
   return (
-    /* onMouseDown, not onClick, and it matches `ConfirmDialog` for a reason: with a click
-       handler, selecting a question's text and releasing the mouse past the dialog's edge
-       fires a click on the BACKDROP and throws the preview away mid-read. */
     <div className="dialog-backdrop tpv-backdrop" onMouseDown={onClose}>
       <div
         className="tpv glass glass-strong glass-lit"

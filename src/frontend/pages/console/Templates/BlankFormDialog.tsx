@@ -1,9 +1,3 @@
-// The blank-form escape hatch. 36 § Interactions.
-//
-// Deliberately a SECONDARY action behind a small dialog, never the empty state's primary
-// one. A blank form is where a customer either gives up or writes forty questions, and
-// both are the problem the library exists to prevent — but refusing it outright would be
-// the product telling somebody who knows exactly what they want that they may not have it.
 import { useState } from 'react';
 import { nameField } from '@endur/shared';
 import type { CreateTemplateBody } from '@endur/shared';

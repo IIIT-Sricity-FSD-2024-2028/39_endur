@@ -1,18 +1,3 @@
-// <TierDonut> — `71` § Revenue, DEC-080. The plan mix, right now.
-//
-// SAME TECHNIQUE AS THE SENTIMENT DONUT (`pages/console/Analysis/Sentiment.tsx`): a
-// `conic-gradient` whose stops are DATA and live inline, over the `.donut` mask that owns
-// the ring's thickness. No library, no `<path>` arc arithmetic, and one place in the product
-// where a ring's proportions are decided.
-//
-// NEVER COLOUR ALONE (21 §8). The legend carries the count, the share and what each tier
-// EARNED, because that is what gets quoted out of this card — the ring is the shape of the
-// answer and the list is the answer.
-//
-// TWO NUMBERS THAT ARE NOT THE SAME NUMBER. The ring draws `orgsOnTier`, which is today; the
-// revenue column is the window. They are labelled as such on the page, because "Gold: 4"
-// beside "Gold: ₹3,996" invites reading the second as the first times a price, and a tier an
-// organisation moved OFF still earned money inside the window.
 import { formatMoney, type Tier } from '@endur/shared';
 
 export type TierSlice = {
@@ -29,7 +14,6 @@ const TIER_LABEL: Record<Tier, string> = {
   enterprise: 'Enterprise',
 };
 
-/** The metals, from `tokens.css`. Enterprise is not a metal and takes the neutral. */
 const TOKEN: Record<Tier, string> = {
   bronze: 'var(--tier-bronze-500)',
   silver: 'var(--tier-silver-500)',

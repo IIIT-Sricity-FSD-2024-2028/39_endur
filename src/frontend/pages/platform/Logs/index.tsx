@@ -1,6 +1,3 @@
-// `/ops/logs` — `72` § Interactions, `T-078`. The rotating log files, on a screen, for the
-// four people who run Endur. Filters and the selected file live in the URL (`72` § State) —
-// an operator pastes a link into a support thread and the other person sees the same lines.
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -51,9 +48,6 @@ export default function Logs(): JSX.Element {
 
   const filtered = FILTER_KEYS.some((key) => params.get(key));
 
-  // `18` §2 — every request is written to disk automatically and rotated; saying WHERE, and
-  // for how long, is the difference between a screen of lines and a screen somebody can act
-  // on when the answer is "go and get the file off the box".
   const store = files.store;
   const subtitle = store
     ? `Written automatically to ${store.dir} — rotated daily and at ${store.maxSizeMb} MB, kept ${store.retentionDays} days.`
@@ -61,8 +55,6 @@ export default function Logs(): JSX.Element {
 
   const header = <PageHeader title="Logs" subtitle={subtitle} vocabulary={false} />;
 
-  // `72` § States — a `platform.logs.read` refusal is a full-page refusal on direct
-  // navigation; the nav item is already absent for anyone who lacks it (`OpsLayout`).
   if (files.forbidden) {
     return (
       <div className="page">
@@ -86,8 +78,6 @@ export default function Logs(): JSX.Element {
   }
 
   if (!selected && files.data && files.data.length > 0) {
-    // First real load with no `?file=` yet — pick the newest file rather than showing a
-    // blank pane. `error-*.log` first, same ordering `<LogViewer>` groups by.
     const first = files.data.find((f) => f.stream === 'error') ?? files.data[0];
     if (first) setFile(first.name);
   }

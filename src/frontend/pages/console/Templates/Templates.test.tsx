@@ -1,9 +1,3 @@
-// T-035 — /app/templates. 36.
-//
-// Two lists on one screen, and most of what can go wrong here is a filter quietly hiding
-// something. The industry default is the sharpest case: it has to be applied (a hotel
-// should not scroll past university forms) AND it has to be escapable (36 § Acceptance:
-// "library templates from other industries are visible but not defaulted to").
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -43,9 +37,6 @@ let library: { data: TemplateSummary[] | null; loading: boolean; error: Error | 
 let list: { data: Page<TemplateSummary> | null; loading: boolean; error: Error | null };
 
 vi.mock('../../../lib/templates.js', () => ({
-  // `cloneKey` is stubbed to something recognisable rather than spread in from the real
-  // module: what this page owns is passing the template's own key through to the clone
-  // call, and the key's FORMAT is lib/templates.test.ts's business.
   cloneKey: (id: string) => `key-for-${id}`,
   librarySearch: () => '',
   useTemplateLibrary: () => ({ ...library, reload }),
@@ -63,7 +54,6 @@ const mount = (capabilities: Capability[] = ALL, path = '/app/templates') =>
     { capabilities, labels: NONSENSE_LABELS, path },
   );
 
-/** The org's own section, so a name appearing in both lists is never ambiguous. */
 const section = (heading: string): HTMLElement =>
   screen.getByRole('heading', { name: heading }).closest('section') as HTMLElement;
 
@@ -86,8 +76,6 @@ describe('the two lists are visibly two different things', () => {
 
   it('puts the cost on every card, always — count and time', () => {
     mount();
-    // The commercial constraint the product rests on (01 §5): competitors ship
-    // forty-question templates, so the cost goes in the reader's eye before the name does.
     expect(within(section('Library')).getByText(/3 questions · ~40 sec/)).toBeTruthy();
     expect(within(section('Library')).getAllByText(/8 questions · ~110 sec/).length).toBeGreaterThan(0);
   });
@@ -104,8 +92,6 @@ describe('the two lists are visibly two different things', () => {
     const mine = within(section('Your templates'));
     expect(mine.getByText('Used in 2 plithes')).toBeTruthy();
     expect(mine.getByText('Never used')).toBeTruthy();
-    // A library template's usage would be every customer's combined — a number this org
-    // cannot act on.
     expect(within(section('Library')).queryByText(/Used in|Never used/)).toBeNull();
   });
 });
@@ -115,8 +101,6 @@ describe('the industry filter defaults to the org, and every other one stays rea
     mount();
     const shelf = within(section('Library'));
     expect(shelf.getByText('Semester review')).toBeTruthy();
-    // The fixture org is a university. Hotel and hospital forms are filtered OUT by
-    // default — that is the point — but the segment to reach them is right there.
     expect(shelf.queryByText('Stay experience')).toBeNull();
     expect(screen.getByRole('radio', { name: 'Hotel' })).toBeTruthy();
   });
@@ -148,8 +132,6 @@ describe('the industry filter defaults to the org, and every other one stays rea
 
   it('search filters the library in the browser and the org\'s own on the server', () => {
     mount(ALL, '/app/templates?industry=all&q=pulse');
-    // One fetch of twenty cards, then filter here: switching a segment is instant and
-    // "show me everything" costs no request (lib/templates).
     expect(within(section('Library')).getByText('Facilities pulse')).toBeTruthy();
     expect(within(section('Library')).queryByText('Semester review')).toBeNull();
   });
@@ -159,8 +141,6 @@ describe('the empty states differ, and neither one offers a blank page', () => {
   it('sends somebody with no forms to the library, not to a blank one', () => {
     list = { data: own([]), loading: false, error: null };
     mount();
-    // 36 § States is explicit about this: a blank start is the enemy. It is where a
-    // customer either gives up or writes forty questions.
     const empty = within(section('Your templates'));
     expect(empty.getByText('No forms yet')).toBeTruthy();
     expect(empty.getByRole('link', { name: 'Browse the library' })).toBeTruthy();
@@ -187,8 +167,6 @@ describe('clone is one action and lands in the builder', () => {
   it('copies and navigates, with no intermediate confirmation', async () => {
     mount();
     fireEvent.click(within(section('Library')).getAllByRole('button', { name: 'Use' })[0] as HTMLElement);
-    // Cloning is cheap and reversible; a confirmation step here is friction on the demo
-    // path (36 § Interactions).
     expect(screen.queryByRole('alertdialog')).toBeNull();
     await waitFor(() => expect(screen.getByText('BUILDER')).toBeTruthy());
     expect(clone).toHaveBeenCalledTimes(1);
@@ -211,8 +189,6 @@ describe('clone is one action and lands in the builder', () => {
   it('sends an idempotency key, which is what covers the retry the button cannot', async () => {
     mount();
     fireEvent.click(within(section('Library')).getAllByRole('button', { name: 'Use' })[0] as HTMLElement);
-    // A phone on venue wifi retries a request whose response never arrived. The server
-    // returns the FIRST response for a repeated key (13 §7).
     expect(clone.mock.calls[0]?.[1]).toBe('key-for-l1');
     await waitFor(() => expect(screen.getByText('BUILDER')).toBeTruthy());
   });
@@ -244,8 +220,6 @@ describe('delete states its consequence, and refuses when the server would', () 
     fireEvent.click(within(used).getByRole('button', { name: /Delete My course form/ }));
 
     const dialog = within(screen.getByRole('alertdialog'));
-    // The reader asked what would happen, so the sentence is the answer — but pressing a
-    // destructive button whose outcome is a 409 is not something to let them do (32).
     expect(dialog.getByText(/2 plithes use My course form/)).toBeTruthy();
     expect(dialog.getByRole<HTMLButtonElement>('button', { name: 'Delete' }).disabled).toBe(true);
     expect(remove).not.toHaveBeenCalled();
@@ -258,8 +232,6 @@ describe('delete states its consequence, and refuses when the server would', () 
     fireEvent.click(within(draft).getByRole('button', { name: /Delete Draft form/ }));
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 
-    // A campaign created in another tab between the load and the press makes the server
-    // the only authority.
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/could not be deleted/));
   });
 
@@ -280,13 +252,9 @@ describe('capabilities decide what is offered, never what is enforced', () => {
     expect(screen.queryByRole('button', { name: 'Use' })).toBeNull();
     expect(screen.queryByRole('img', { name: /^Delete / })).toBeNull();
     expect(screen.queryByRole('button', { name: /Blank form/ })).toBeNull();
-    // Browsing still works without any of them (36 § States).
     expect(within(section('Library')).getByText('Semester review')).toBeTruthy();
   });
 
-  // A button rather than a link since T-035's quick look: preview opens a dialog over the
-  // grid instead of navigating away from it. The full page is still linked from inside the
-  // dialog, so nothing became unreachable — only the first step changed.
   it('leaves Preview available to everybody who can read', () => {
     mount(['template.read']);
     expect(

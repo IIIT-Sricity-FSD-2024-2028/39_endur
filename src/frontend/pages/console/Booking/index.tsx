@@ -1,18 +1,3 @@
-// T-095 — /app/booking. The list of bookable things.
-//
-// "Booking" and "Slot" are STRUCTURAL PRODUCT WORDS and stay literal (`DEC-087`), in the
-// same class as Save, Settings and Question. Every noun that belongs to the CUSTOMER — what
-// they call the thing being booked — still comes from useLabels(), and `npm run audit:vocab`
-// walks this directory with no exclusion.
-//
-// TWO REFUSALS AND THEY ARE NOT THE SAME REFUSAL, which is why this page renders both itself
-// rather than sitting behind a route guard (`DEC-011`, and `Analysis` reached it first):
-//
-//   403  the READER may not. Nothing to buy, nothing to press — ask an administrator.
-//   402  the ORGANISATION is below Gold. Something to buy, and the page says what and where.
-//
-// A guard that knows nothing about entitlements would answer the second with "you do not
-// have access", which is the one answer that is both wrong and unhelpful.
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { BookableSummary } from '@endur/shared';
@@ -24,7 +9,6 @@ import { useCan } from '../../../lib/capabilities.js';
 import { formatDate, pluralise } from '../../../lib/format.js';
 import { createBookable, useBookables } from '../../../lib/booking.js';
 
-/** The one line a row owes its reader, and the three cases are genuinely different. */
 export function stateLine(bookable: BookableSummary): string {
   if (bookable.closedAt) return `Closed ${formatDate(bookable.closedAt)}`;
   if (!bookable.publicToken) {
@@ -33,8 +17,6 @@ export function stateLine(bookable: BookableSummary): string {
       : `Not open — ${pluralise(bookable.slots.length, 'time', 'times')} ready`;
   }
   const places = bookable.slots.reduce((total, slot) => total + slot.remaining, 0);
-  // The number a reader actually wants at a glance is how many places are LEFT, not how many
-  // there were: a page full of "12 places" tells nobody whether to add more.
   return `Open — ${bookable.booked} booked, ${places} left`;
 }
 

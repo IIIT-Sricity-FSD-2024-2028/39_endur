@@ -1,13 +1,3 @@
-// T-035 — /app/templates/:id. 36 § Interactions, design_specs/design/05 §5.1 and §5.4.
-//
-// **The preview renders through `<FormPreview>`, which renders through `<QuestionInput>`**
-// (INV-008). That is the entire point of this screen: "preview a template exactly as
-// respondents will see it" is either true or it is marketing, and it is only true while
-// there is one implementation.
-//
-// T-035 wrote that preview inline here. T-037 lifted it into a component because the builder
-// previews the same thing at `/app/forms/:id/preview`, and two previews of one form is the
-// drift INV-008 exists to prevent, one level up.
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -36,11 +26,6 @@ export default function TemplateDetail(): JSX.Element {
 
   const detail = template.data;
 
-  /**
-   * "Related templates are suggested on the preview" (36). Same category first, then the
-   * same industry — no extra request, because the library is already loaded and twenty
-   * cards is not a search problem.
-   */
   const related = useMemo(() => {
     if (!detail) return [];
     const rows = (library.data ?? []).filter((row) => row.id !== detail.id);

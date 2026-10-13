@@ -1,15 +1,3 @@
-// One question's numbers. 40 § Interactions, design_specs/design/08 §8.1.
-//
-// The rule this file exists to hold: **single-colour fill, always, with one exception.**
-// Colouring rating 1 red and rating 5 green is interpretation, and interpretation is the
-// Analyze layer (`43`, P3). Results states what happened; it does not judge it.
-//
-// The exception is NPS, and it is an exception because the instrument itself defines a 0–6
-// as a detractor — the colour repeats a definition rather than making an inference. That is
-// why `valence` arrives in the DTO (CONF-004) and is never derived from a number here.
-//
-// Named QuestionResult, not QuestionCard, because `components/form/QuestionCard.tsx` is a
-// different thing entirely and two files with one name is how the wrong one gets imported.
 import type { QuestionSummary } from '@endur/shared';
 import { BarRow } from '../../../components/data/BarRow.js';
 import { StackedBar } from '../../../components/data/StackedBar.js';
@@ -25,9 +13,6 @@ export function QuestionResult({
   responseCount: number;
 }): JSX.Element {
   const distribution = question.distribution ?? [];
-  // `Rating 1–5` rather than the builder's generic `Rating scale`: the distribution's own
-  // length carries the max, so the label can say what was actually asked without the
-  // results DTO having to carry the config.
   const type =
     question.kind === 'rating' && distribution.length > 0
       ? `Rating 1–${distribution.length}`
@@ -83,8 +68,6 @@ export function QuestionResult({
       )}
 
       {question.kind === 'text' && (
-        // Free text has no distribution and never will. The words themselves are behind
-        // `response.read`, a different capability, and live in the comments section below.
         <p className="text-meta qr-empty">
           {question.answered === 0
             ? 'Nobody has written anything here yet.'

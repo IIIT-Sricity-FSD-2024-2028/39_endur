@@ -32,7 +32,11 @@ export const withCsrf = (session: Session, method: 'post' | 'patch' | 'put' | 'd
 // Registers an organisation and signs in as its founder.
 // The tier defaults to bronze, which is what these fixtures have always effectively been - now as a row
 // somebody chose rather than a fallback nobody noticed. A test that needs a paid surface asks for one.
-export async function registerOrg(industry = 'custom', tier: SignupTier = 'bronze'): Promise<Session> {
+export async function registerOrg(
+  industry = 'custom',
+  tier: SignupTier = 'bronze',
+  trial = false,
+): Promise<Session> {
   const agent = request.agent(app);
   const email = `${unique('founder')}@example.test`;
   const password = 'a-long-enough-password';
@@ -43,6 +47,7 @@ export async function registerOrg(industry = 'custom', tier: SignupTier = 'bronz
     orgName: `Org ${unique('n')}`,
     industry,
     tier,
+    trial,
   });
   expect(res.status).toBe(201);
   const csrf = await agent.get('/api/v1/auth/csrf');

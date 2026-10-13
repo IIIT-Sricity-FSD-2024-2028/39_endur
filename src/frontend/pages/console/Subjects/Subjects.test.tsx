@@ -1,9 +1,3 @@
-// T-034 — /app/subjects. 35 § Acceptance.
-//
-// This is the vocabulary showcase, so half of these tests are really one test asked in
-// different places: does a word on this screen come from `useLabels()`? The fixture labels
-// are nonsense on purpose — if an English noun appears in an assertion below, the component
-// hardcoded it (22 §5, INV-001).
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes, useLocation } from 'react-router-dom';
@@ -110,7 +104,6 @@ describe('the vocabulary showcase (INV-001)', () => {
     mount();
     const row = screen.getByDisplayValue('Data Structures').closest('tr');
     expect(within(row as HTMLElement).getByText('612')).toBeTruthy();
-    // Text, not a link — same call as the structure panel, for the same reason.
     expect(screen.getByText('Vikram Shah')).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Vikram Shah' })).toBeNull();
   });
@@ -123,7 +116,6 @@ describe('filters live in the URL', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     expect(where()).toContain('q=thermo');
-    // A cursor from the old query means nothing against the new one.
     expect(where()).not.toContain('cursor');
   });
 
@@ -210,7 +202,6 @@ describe('archiving states what is KEPT', () => {
 
     const row = screen.getByText('Old one').closest('tr');
     expect(within(row as HTMLElement).getByText('Archived')).toBeTruthy();
-    // An archived subject is not renameable — there is nothing to rename it for.
     expect(screen.queryByDisplayValue('Old one')).toBeNull();
   });
 });
@@ -222,7 +213,6 @@ describe('creating', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Add a Quaxel' });
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Fluid Mechanics' } });
-    // The unit comes from <UnitTree mode="select"> — the tree's third placement (INV-009).
     fireEvent.click(within(dialog).getByRole('button', { name: 'Engineering' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
 
@@ -248,8 +238,6 @@ describe('the empty states differ, and that is the point', () => {
     mount();
 
     expect(screen.getByText('No Quaxels yet')).toBeTruthy();
-    // Exactly one Add button on this screen — the empty state's. The header hides its own
-    // rather than showing the same primary action twice.
     expect(screen.getAllByRole('button', { name: 'Add a Quaxel' })).toHaveLength(1);
   });
 

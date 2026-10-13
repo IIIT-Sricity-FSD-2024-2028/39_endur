@@ -1,8 +1,3 @@
-// T-031 — the landing page's vocabulary switcher. 30 § Landing, INV-001.
-//
-// The switcher is the only thing on `/` that is not filler, and it is the one place in the
-// product where domain nouns appear without an organisation behind them. These tests exist
-// to prove that is still DATA and not a hardcoded row of English words.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import { PRESET_VOCABULARIES } from '@endur/shared';
@@ -33,9 +28,6 @@ describe('landing — 30 § Landing', () => {
     }
   });
 
-  // Each noun now appears more than once — the row, the tile grid, and for two of them the
-  // headline — so these count occurrences rather than demanding exactly one. What is being
-  // proven is unchanged: every one of them came out of the preset data.
   it('shows the first preset\'s four nouns before anything is clicked', () => {
     reducedMotion(true);
     mount();
@@ -56,7 +48,6 @@ describe('landing — 30 § Landing', () => {
 
     expect(screen.getAllByText(hotel!.labels.unit.one).length).toBeGreaterThan(0);
     expect(screen.getAllByText(hotel!.labels.reviewee.one).length).toBeGreaterThan(0);
-    // And the previous vocabulary is gone, not merely covered.
     expect(screen.queryByText(PRESET_VOCABULARIES[0]!.labels.unit.one)).toBeNull();
   });
 
@@ -67,8 +58,6 @@ describe('landing — 30 § Landing', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: hospital!.displayName }));
 
-    // The headline is the demonstration, so it is the one place the swap must be proven
-    // rather than assumed. Lowercased in the sentence, as the copy sets it.
     const title = container.querySelector('.landing-title')?.textContent ?? '';
     expect(title).toContain(hospital!.labels.respondent.one.toLowerCase());
     expect(title).toContain(hospital!.labels.subject.one.toLowerCase());
@@ -77,8 +66,6 @@ describe('landing — 30 § Landing', () => {
   it('renders the row as the data says, in the data\'s order', () => {
     reducedMotion(true);
     const { container } = mount();
-    // If somebody hardcodes a row, this fails the moment a preset is renamed — which is
-    // otherwise the only way the landing page can start lying without anyone noticing.
     const expected = (['unit', 'subject', 'respondent', 'reviewee'] as const)
       .map((key) => PRESET_VOCABULARIES[0]!.labels[key].one)
       .join(' · ');
@@ -104,8 +91,6 @@ describe('landing — 30 § Landing', () => {
     fireEvent.click(screen.getByRole('radio', { name: hospital!.displayName }));
     act(() => { vi.advanceTimersByTime(3500 * 4); });
 
-    // Still on the one they chose. A control that moves after you have used it reads as
-    // a bug on a projector.
     expect(screen.getAllByText(hospital!.labels.unit.one).length).toBeGreaterThan(0);
   });
 
@@ -122,9 +107,6 @@ describe('landing — 30 § Landing', () => {
   it('sends the primary action to /start and the secondary to /login', () => {
     reducedMotion(true);
     mount();
-    // The page opens and closes with the same action, so there are two of them. Both must
-    // lead to the same place — a closing call that goes somewhere else is the kind of thing
-    // nobody notices until a demo.
     const create = screen.getAllByRole('link', { name: 'Create your organization' });
     expect(create.length).toBe(2);
     for (const link of create) expect(link.getAttribute('href')).toBe('/start');

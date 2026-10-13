@@ -1,17 +1,6 @@
-// <FileUpload> — 24 §5, 48 § Components.
-//
-// A real `<input type="file">` underneath, with the drop zone as an enhancement rather than
-// the only path. Same reasoning as <Toggle>: everything a file input already does — keyboard
-// access, the picker, the accessibility tree — costs nothing to keep and is expensive to
-// rebuild badly.
-//
-// The client-side checks here MIRROR the server's and never replace them (48, 14 §7). They
-// exist so a 4 MB photo fails instantly instead of after a 4 MB round trip; the request is
-// still refused server-side if someone skips them.
 import { useId, useRef, useState } from 'react';
 import { ApiError } from '../../lib/api.js';
 
-/** The three the server accepts, and the reason a fourth cannot be added here alone. */
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp'];
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -25,7 +14,6 @@ export function FileUpload({
   maxBytes = DEFAULT_MAX_BYTES,
   disabled = false,
 }: {
-  /** The image already stored, as a URL, or null. */
   current: string | null;
   onUpload: (file: File) => Promise<void>;
   onRemove: () => Promise<void>;
@@ -40,7 +28,6 @@ export function FileUpload({
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** A local preview so the image appears at once. Revoked as soon as the real URL lands. */
   const [preview, setPreview] = useState<string | null>(null);
 
   const megabytes = Math.round((maxBytes / 1024 / 1024) * 10) / 10;
@@ -54,7 +41,6 @@ export function FileUpload({
       return;
     }
     if (file.size > maxBytes) {
-      // The number, not "too large". A limit you cannot see is a limit you cannot meet.
       const size = Math.round((file.size / 1024 / 1024) * 10) / 10;
       setError(`That file is ${size} MB. The limit is ${megabytes} MB.`);
       return;
@@ -66,8 +52,6 @@ export function FileUpload({
     try {
       await onUpload(file);
     } catch (err) {
-      // The server's message is the specific one — which rule failed, and what to do about
-      // it — so it is shown rather than replaced with a generic string (48 § Validation).
       setError(err instanceof ApiError ? err.message : 'That upload did not work. Try again.');
       setPreview(null);
     } finally {
@@ -115,7 +99,6 @@ export function FileUpload({
         {shown ? (
           <img src={shown} alt="" className={`file-preview shape-${shape}`} />
         ) : (
-          // Never a broken-image icon (48 § States).
           <span className={`file-placeholder shape-${shape}`} aria-hidden="true" />
         )}
 
