@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "//build": "tsc -b (used by typecheck) silently emits ZERO .js for this project when built alongside tsconfig.node.json: two composite projects both claim the same source files (app.ts, server.ts, etc. via overlapping include globs), and tsc's project-reference consistency check drops emit with no error, exit code 0. Reproduced in isolation outside this repo. tsconfig.build.json is a non-composite, reference-free copy used only for the production build, so this actually emits.",
     "//predev": "D-049. The Prisma client is generated, not committed, so pulling a branch that adds a MODEL leaves a client with no delegate for it and the route 500s with `Cannot read properties of undefined`. postinstall covers a fresh install and covered nothing else. This runs BEFORE the watcher starts, which is also the only order that works on Windows: tsx holds the query-engine DLL open and `prisma generate` fails on the file lock while the dev server is running.",
     "predev": "prisma generate",
     "dev": "tsx watch server.ts",
-    "build": "tsc -b",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -b",
     "test": "vitest run",
