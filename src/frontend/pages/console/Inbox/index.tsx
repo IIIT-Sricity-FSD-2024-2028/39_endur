@@ -1,21 +1,3 @@
-// T-080 — /app/inbox. 58, design_specs/design/08 §8.3.
-//
-// The only screen in the product with a TRIAGE shape rather than a reporting shape, and
-// that is its whole reason to exist. `40` answers *what do the numbers say*. This answers
-// *what did people actually write*, one comment at a time, in a queue you can work through
-// and mark off. An administrator opening it twice a week wants to know what is new since
-// last time — not to re-read four hundred.
-//
-// Two things this page does NOT do, both deliberate:
-//
-//   1. NO ANALYSIS TAGS. The mockup draws sentiment, emotion, intent and topic on every
-//      card; all four need the Analyze layer (43, P3). <ResponseCard> has no prop for them
-//      so nobody can stub one in, and a stubbed sentiment chip is a confident wrong answer
-//      printed beside somebody's words.
-//   2. NO SUPPRESSED PLACEHOLDER. A campaign below the k-anonymity threshold contributes no
-//      rows at all — not greyed, not counted, not "3 hidden". The server sends nothing, so
-//      the empty queue here is INDISTINGUISHABLE from an org with no comments, which is the
-//      point (52 §2).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { InboxMessage, InboxState } from '@endur/shared';
@@ -44,19 +26,6 @@ const TABS: Array<{ id: InboxState; label: string }> = [
 const isState = (value: string | null): value is InboxState =>
   value === 'all' || value === 'unread' || value === 'read' || value === 'archived';
 
-/**
- * FROM ENDUR — DEC-101, T-101, 58 § From Endur.
- *
- * A FIFTH TAB THAT IS NOT A FIFTH FILTER. The four above narrow one stream; this one switches
- * to a DIFFERENT stream, from a different table, with a different card. It sits in the same
- * row because that is where a reader looks for "the other thing in my inbox" — but the page
- * branches on it before the filters, the keyboard queue and the campaign selector, none of
- * which mean anything about a message from your vendor.
- *
- * NOT MERGED INTO THE COMMENT QUEUE. A comment and a message from the company you buy from
- * are triaged for different reasons, and one interleaved queue would make the message the
- * thing you scroll past. `DEC-101` is explicit: a tab, with its own count.
- */
 const MESSAGES_TAB = 'endur';
 
 export default function Inbox(): JSX.Element {
@@ -64,8 +33,6 @@ export default function Inbox(): JSX.Element {
   const can = useCan();
   const [params, setParams] = useSearchParams();
 
-  // Everything that shapes the queue lives in the URL, so a filtered queue is a link
-  // somebody can paste — the same rule as 40's filters (58 § State).
   const raw = params.get('state');
   const showingMessages = raw === MESSAGES_TAB;
   const state: InboxState = isState(raw) ? raw : 'unread';
@@ -73,8 +40,6 @@ export default function Inbox(): JSX.Element {
   const subjectId = params.get('subjectId') ?? undefined;
   const filtered = Boolean(campaignId ?? subjectId);
 
-  // Not asked for at all without the capability. A 403 is handled anyway, but a request
-  // nobody may answer is a request not worth making (the same rule as 40's comments).
   const inbox = useInbox(
     {
       state,
@@ -84,23 +49,15 @@ export default function Inbox(): JSX.Element {
     can('response.read') && !showingMessages,
   );
 
-  // NO CAPABILITY GATE. `response.read` scopes which units' responses you may see and has
-  // nothing to say about a message addressed to you by name — gating on it would mean an
-  // administrator with no response scope could be sent a message they could never open
-  // (`DEC-101`). The server scopes every row by the session's user id, which is where that is
-  // decided; this hook only chooses when to ask.
   const messages = useMessages(showingMessages);
   const messageRows = messages.data?.data ?? [];
   const unreadMessages = messageRows.filter((row) => !row.read).length;
-  // The filter dropdowns are themselves scope-filtered by their own endpoints, so a
-  // filter cannot reach past the scope the queue already applied (INV-003, 40).
   const campaigns = useCampaignList();
   const subjects = useSubjectList({});
 
   const cards = useMemo(() => inbox.data?.data ?? [], [inbox.data]);
 
   const [expanded, setExpanded] = useState<string | null>(null);
-  /** Which card j/k is sitting on. An index, because the list re-orders under it. */
   const [cursor, setCursor] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -126,15 +83,9 @@ export default function Inbox(): JSX.Element {
     void inbox.mark(responseId, action, { keep });
   };
 
-  /**
-   * j/k/e/u. A queue worked with a mouse is a queue nobody works through (58 §
-   * Interactions) — and every one of these is ALSO a button on the card, so the page is
-   * not two products.
-   */
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null;
-      // Never steal a keystroke from something being typed into.
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
@@ -165,8 +116,6 @@ export default function Inbox(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  // The absent capability is a full-page 403, not an empty queue. The sidebar item is
-  // hidden without `response.read`, so anybody here typed the address (58 § States).
   if (!can('response.read') || inbox.forbidden) {
     return (
       <div className="page">
@@ -297,10 +246,6 @@ export default function Inbox(): JSX.Element {
                 const key = `${card.id}:${card.questionId}`;
                 setExpanded((current) => (current === key ? null : key));
                 setCursor(index);
-                // Expanding marks read. Scrolling does not — a fast scroll that silently
-                // emptied the queue would empty the whole feature (58 § State).
-                // `keep`: reading is not triaging. The card stays where it is until the
-                // reader ticks or archives it — see lib/inbox.ts.
                 if (!card.read) mark(card.id, 'read', true);
               }}
               onToggleRead={() => mark(card.id, card.read ? 'unread' : 'read')}
@@ -328,14 +273,6 @@ export default function Inbox(): JSX.Element {
   );
 }
 
-/**
- * The From Endur stream. DEC-101, 58 § From Endur.
- *
- * ITS EMPTY STATE IS THE GOOD ONE and says so plainly. `<Empty>` below distinguishes three
- * cases because a comment queue can be empty for three different reasons; there is exactly
- * one reason this is empty — nobody has written to you — and dressing that as a problem would
- * be the product apologising for the ordinary case.
- */
 function MessageStream({
   messages,
   rows,
@@ -385,10 +322,6 @@ function MessageStream({
   );
 }
 
-/**
- * Three different empties, because they mean three different things and the one people see
- * most is the good one (58 § States).
- */
 function Empty({
   state,
   filtered,
@@ -398,7 +331,6 @@ function Empty({
   state: InboxState;
   filtered: boolean;
   onClear: () => void;
-  /** Passed in, not read from useLabels() here — a hotel's is "Guest surveys" (INV-001). */
   campaignWord: string;
 }): JSX.Element {
   if (filtered) {
@@ -417,9 +349,6 @@ function Empty({
   if (state === 'archived') {
     return <EmptyState icon="archive" title="Nothing archived" body="Archived comments are kept, not deleted. They land here." />;
   }
-  // The no-comments-anywhere case AND the everything-below-threshold case, and they are the
-  // same screen on purpose. A different message for the second would announce that
-  // suppressed data exists (52 §2).
   return (
     <EmptyState
       icon="inbox"

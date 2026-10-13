@@ -1,13 +1,3 @@
-// The announcement composer — T-094, 61, 24 § Announcements.
-//
-// THERE IS NO RECIPIENT FIELD, and there must not be one. The audience is an
-// `AudienceRule` — the campaign's own — so "everyone in Housekeeping" is a question put to
-// the org graph every time it is asked, rather than a list of names somebody has to keep in
-// step by hand. The count under the picker comes from the server for the same reason: it is
-// the number of receipts publishing will write, not an estimate computed a second way.
-//
-// "Announcement" is a STRUCTURAL product word and stays literal (`DEC-087`). The nouns
-// inside it — the unit an announcement reaches — come from useLabels().
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { AnnouncementSummary, AudienceRule } from '@endur/shared';
@@ -27,7 +17,6 @@ export function Composer({
   onSaved,
   onCancel,
 }: {
-  /** A draft being edited, or null for a new one. A published row never reaches here. */
   editing: AnnouncementSummary | null;
   onSaved: (announcement: AnnouncementSummary) => void;
   onCancel: () => void;
@@ -40,11 +29,6 @@ export function Composer({
   const [audience, setAudience] = useState<AudienceRule>(editing?.audience ?? { kind: 'anyone' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /**
-   * A 402 is a DIFFERENT ANSWER from a failure and gets a different sentence (DEC-011).
-   * "That could not be saved" in front of a customer who simply has not bought the tier
-   * hides the one thing they can do about it.
-   */
   const [upgrade, setUpgrade] = useState(false);
 
   const recipients = useRecipientPreview(audience);

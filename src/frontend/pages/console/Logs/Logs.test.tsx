@@ -1,10 +1,3 @@
-// T-076 — /app/logs. 56 § Acceptance, the page half.
-//
-// Short on purpose. The scope filtering, the refusal rows and the absent `ip` are the
-// SERVER's and `test/audit.test.ts` owns them. What matters here is that the page renders
-// what it is told without deciding anything, and that the three rows most likely to be got
-// wrong are got right: a submission that names nobody, a target that has been deleted, and
-// the trace — which is the same component `42` renders (INV-009).
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import type { AuditEntry, Capability, Page } from '@endur/shared';
@@ -74,20 +67,16 @@ describe('/app/logs', () => {
   it('renders the access screen without audit.read, and asks nothing', async () => {
     mount([]);
     expect(await screen.findByText(/do not have access/i)).toBeTruthy();
-    // A request nobody may answer is a request not worth making.
     expect(requested.length).toBe(0);
   });
 
   it('says WHY, not only what — the trace expands to the full sentence', async () => {
     mount();
     expect(await screen.findByText(/change .* structure|unit\.update|rename/i)).toBeTruthy();
-    // Compact in the row: the deciding grant and where it was anchored.
     const expand = screen.getByRole('button', { expanded: false });
     expect(expand.textContent).toContain('Dean');
 
     fireEvent.click(expand);
-    // The full form spells out the SCOPE in words. `own_unit` on screen is a leaked
-    // column name; "that thing and everything under it" is INV-005 in the past tense.
     expect(screen.getByText(/and everything under it/)).toBeTruthy();
     expect(screen.getByText(/req-1/)).toBeTruthy();
   });
@@ -95,19 +84,14 @@ describe('/app/logs', () => {
   it('shows a response submission as the row that names nobody', async () => {
     rows = [row({ actor: null, action: 'response.submit', target: { type: 'campaign', id: 'c-1', name: 'Autumn round' }, decidedBy: null })];
     mount();
-    // 56 § Anonymity rule 3, and the sentence is said out loud rather than left as a blank
-    // cell somebody reads as a bug.
     expect(await screen.findByText(/not a signed-in person/i)).toBeTruthy();
     expect(screen.queryByText('Priya Nair')).toBeNull();
-    // No trace to render, and that is not an error state either.
     expect(screen.getByText(/no grant was recorded/i)).toBeTruthy();
   });
 
   it('still renders a row whose target has been deleted', async () => {
     rows = [row({ target: { type: 'unit', id: 'abcdef12-0000-0000-0000-000000000000', name: null } })];
     mount();
-    // NEVER hidden. A record that drops the rows whose subjects are gone is a record that
-    // can be edited by deleting things.
     expect(await screen.findByText(/\(deleted\)/)).toBeTruthy();
   });
 
@@ -116,7 +100,6 @@ describe('/app/logs', () => {
     await screen.findByRole('button', { expanded: false });
     fireEvent.click(screen.getByLabelText(/show refusals only/i));
 
-    // The whole reason the filters live in the URL: "here is the row I mean", pasted.
     expect(requested.some((path) => path.includes('outcome=denied'))).toBe(true);
   });
 

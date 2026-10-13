@@ -1,25 +1,11 @@
-// A drawing of the form, at a glance. 36 § Interactions.
-//
-// The library grid used to be twelve cards of identical text, and the only way to tell a
-// four-question check-in from a twelve-question review was to read the count. A template is
-// a SHAPE — how long it is, what kind of answers it asks for — and a shape is the one thing
-// text is bad at.
-//
-// HONESTY RULE. A card knows only how many questions a template has, never what kind they
-// are, so the card's drawing shows neutral answer strips: "a form, this long". The dialog
-// has fetched the real questions, so it draws the real widgets. Nothing here ever guesses a
-// question kind and draws it as though it knew — a thumbnail full of rating scales on a
-// template made of free text is a lie told in pictures.
 import type { QuestionKind } from '@endur/shared';
 
 const W = 260;
 const ROW_H = 30;
 const PAD = 16;
 const HEAD = 34;
-/** Past six the rows stop being legible at thumbnail size and become texture. */
 const MAX_ROWS = 6;
 
-/** Each kind gets a mark that matches how it is actually answered. */
 function widget(kind: QuestionKind, y: number): JSX.Element {
   switch (kind) {
     case 'rating':
@@ -84,7 +70,6 @@ export function TemplatePreview({
   className,
 }: {
   questionCount: number;
-  /** The real question kinds, when they are known. Absent on a card. */
   kinds?: QuestionKind[] | undefined;
   className?: string;
 }): JSX.Element {
@@ -125,8 +110,6 @@ export function TemplatePreview({
             {kind ? (
               widget(kind, top + 17)
             ) : (
-              // No kinds known: a neutral answer strip. It says "something is answered
-              // here" and does not pretend to know what.
               <rect className="tp-strip" x={PAD} y={top + 12} width={W - PAD * 2} height={9} rx={4.5} />
             )}
           </g>

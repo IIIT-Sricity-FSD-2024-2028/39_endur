@@ -1,9 +1,3 @@
-// T-093 — the start gallery's FOUR REASONS a lane cannot be pressed, which are the whole of
-// what this page decides. Everything else on it is copy.
-//
-// The order of the two gates is the one assertion worth having twice: capability first,
-// tier second, matching the middleware chain (`app.ts:108-113`). Offering an upgrade to
-// somebody who would be refused anyway sells them a fix for the wrong problem.
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { BillingSummary, Capability, Tier } from '@endur/shared';
@@ -36,15 +30,6 @@ const show = (capabilities: Capability[]): void => {
   renderWithProviders(<Start />, { capabilities, labels: NONSENSE_LABELS });
 };
 
-/**
- * What an L1 administrator holds for all five lanes — T-096, when the last two stopped being
- * `soon` cards and started being gated on real verbs.
- *
- * It is written out rather than "everything", because the point of the tier tests below is
- * that a lane with the CAPABILITY and without the TIER sells the tier. Before the two
- * features landed those lanes had no capability to hold, so the same tests passed for a
- * reason that no longer exists.
- */
 const ALL_FIVE: Capability[] = [
   'campaign.launch',
   'template.read',
@@ -64,15 +49,12 @@ describe('tierReaches — the ladder, compared by ORDER', () => {
   });
 
   it('reaches nothing at all when the tier is not known yet', () => {
-    // Loading, or a failed request. Guessing Bronze would sell somebody what they own.
     expect(tierReaches(null, 'silver')).toBe(false);
   });
 });
 
 describe('laneState — capability first, tier second', () => {
   it('answers the capability before the tier, like the middleware chain does', () => {
-    // A reader who may not do this at all is told THAT, not told to buy an upgrade for
-    // something they would still be refused (403 outranks 402).
     expect(laneState({ allowed: false, built: true, needsTier: 'gold', heldTier: 'bronze' }))
       .toBe('capability');
   });
@@ -118,7 +100,6 @@ describe('the gallery', () => {
     tier = 'bronze';
     show(ALL_FIVE);
     const plan = screen.getAllByRole('link', { name: 'See the plan' });
-    // Announcement (silver) and Booking (gold), both above Bronze.
     expect(plan).toHaveLength(2);
     expect(plan[0]?.getAttribute('href')).toBe('/app/plan');
   });
@@ -130,18 +111,11 @@ describe('the gallery', () => {
   });
 
   it('sells nothing while the tier is unknown, and does not guess', () => {
-    // A Gold customer shown an upgrade card for one paint is being sold what they own.
     tier = null;
     show(ALL_FIVE);
     expect(screen.queryByRole('link', { name: 'See the plan' })).toBeNull();
   });
 
-  /**
-   * T-096, and the assertion the two new lanes exist to make on this page: the CAPABILITY is
-   * answered before the tier. A Gold organisation whose reader cannot write announcements is
-   * told they cannot write announcements — not sold an upgrade for a verb they would still
-   * be refused (403 outranks 402, `app.ts` links 10-11).
-   */
   it('disables a paid lane the READER may not use, even on a tier that buys it', () => {
     tier = 'enterprise';
     show(['campaign.launch', 'template.read']);

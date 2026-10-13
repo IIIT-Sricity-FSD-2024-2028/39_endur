@@ -1,13 +1,3 @@
-// T-037 — /app/forms/:id/preview. 37 § Interactions, design_specs/design/05 §5.4.
-//
-// The same `<FormPreview>` the template library uses, which renders through the same
-// `<QuestionInput>` set the respondent form will use (INV-008). Three components deep, one
-// implementation at every level — that chain is what makes "exactly as respondents see it"
-// a fact rather than a claim.
-//
-// It reads the SAVED template rather than the builder's draft, and that is the honest thing
-// to show: a preview of unsaved work would answer a question nobody asked. Autosave is
-// 800ms, so in practice the two are the same thing a moment later.
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { FormPreview } from '../../../components/form/FormPreview.js';

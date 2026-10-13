@@ -1,13 +1,3 @@
-// Create / edit a subject. 35 § Interactions.
-//
-// Three fields, and the third one is the interesting one: linking a person is what turns
-// "review the thing" into "review the person" with no second code path. The form says what
-// that means for the bill rather than hiding it — and says it CORRECTLY, which is not what
-// a first reading of 35 suggests: per `16` §5 a linked subject is already a user and costs
-// nothing extra, while an unlinked one is a seat.
-//
-// The unit is chosen from `<UnitTree>` in `mode="select"` — the third placement of the one
-// tree (INV-009), and the reason that mode exists.
 import { useState } from 'react';
 import { nameField } from '@endur/shared';
 import type { PersonSummary, ResolvedLabels, UnitNode } from '@endur/shared';
@@ -41,7 +31,6 @@ export function SubjectForm({
   initial?: SubjectDraft | undefined;
   saving: boolean;
   error: string | null;
-  /** Without `person.read` the picker is absent rather than empty (INV-003). */
   canLinkPeople: boolean;
   onSubmit: (draft: SubjectDraft) => void;
   onCancel: () => void;

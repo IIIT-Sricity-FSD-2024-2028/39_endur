@@ -1,19 +1,8 @@
-// The band above the map: four counts, and the shape of the tree as a chart. 32.
-//
-// Every number here is derived from the tree the API already returned — nothing is fetched,
-// and nothing is computed that the page could not have counted anyway. It exists because a
-// nine-row indented list does not answer "how big is this and how deep does it go" without
-// the reader doing the counting themselves.
-//
-// The bars are units-per-level. That is the one fact about an organisation's shape that the
-// list genuinely hides: a flat structure of nine and a chain of nine look identical until
-// you count the indents.
 import { useEffect, useRef, useState } from 'react';
 import type { UnitNode } from '@endur/shared';
 import type { ResolvedLabels } from '@endur/shared';
 import { forestTotals, type Totals } from '../../../lib/unitTotals.js';
 
-/** Counts every unit at each depth, so index 0 is the roots. */
 function perLevel(nodes: UnitNode[], depth = 0, into: number[] = []): number[] {
   nodes.forEach((node) => {
     into[depth] = (into[depth] ?? 0) + 1;
@@ -22,26 +11,6 @@ function perLevel(nodes: UnitNode[], depth = 0, into: number[] = []): number[] {
   return into;
 }
 
-// The band's totals were a second implementation of the same walk until DEC-081 gave the
-// map and the tree the same need. `forestTotals` is now the one — INV-009's rule applied
-// to a function rather than a component, and for the same reason: two of them drift.
-//
-// People and subjects arrive on the response envelope rather than being summed from the
-// roots (DEC-082): a person placed under two roots of a scope-filtered tree is one person,
-// and adding the roots would count them twice in the one number on the page that claims to
-// describe the whole organisation.
-
-/**
- * Counts up to `value` once, on mount.
- *
- * A number that lands by ticking up reads as a number that was just measured. It is 500ms
- * and it never re-runs on a data change — a count that re-animates every time a unit is
- * renamed is a distraction sitting on top of the thing you are editing.
- *
- * Under reduced-motion it returns the final value immediately. That is the same rule the
- * CSS follows, but `prefers-reduced-motion` cannot reach a JS interpolation, so it is
- * checked here as well.
- */
 function useCountUp(value: number, duration = 520): number {
   const [shown, setShown] = useState(value);
   const done = useRef(false);
@@ -65,7 +34,6 @@ function useCountUp(value: number, duration = 520): number {
     const started = performance.now();
     const tick = (now: number): void => {
       const progress = Math.min(1, (now - started) / duration);
-      // Ease-out cubic: fast first, settling. Linear counting looks like a stopwatch.
       setShown(Math.round(value * (1 - Math.pow(1 - progress, 3))));
       if (progress < 1) frame = requestAnimationFrame(tick);
     };

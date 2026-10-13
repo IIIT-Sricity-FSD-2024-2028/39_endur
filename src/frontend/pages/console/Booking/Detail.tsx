@@ -1,16 +1,3 @@
-// T-095 — /app/booking/:id. The slot editor, the bookings table, and the QR code.
-//
-// THE SLOT EDITOR REPLACES THE WHOLE SET, because the API does (`PUT /bookables/:id/slots`,
-// the same shape `PUT /templates/:id/questions` takes). A partial patch protocol would need
-// both sides to agree about a diff, and the set is small enough to send whole.
-//
-// SLOTS WITH BOOKINGS ON THEM CANNOT BE EDITED AWAY, and the server refuses with 409 rather
-// than cascading. This page says so before the press instead of only afterwards: the person
-// whose appointment would vanish is not in the room to object.
-//
-// The QR is <ShareSheet>, the same component the campaign detail page uses. One QR
-// implementation in the product — a second one is a second thing to get wrong at 280px on a
-// projector (`24` § ShareSheet, N-004).
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { SlotInput } from '@endur/shared';
@@ -33,10 +20,8 @@ import {
   useBookable,
 } from '../../../lib/booking.js';
 
-/** A local, editable slot. `id` is present only for the ones the server already knows. */
 type Draft = { id: string; startsAt: string; endsAt: string; capacity: number; remaining: number };
 
-/** `2026-08-30T14:00` — what `<input type="datetime-local">` reads and writes. */
 export function toLocalInput(iso: string): string {
   const date = new Date(iso);
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -45,7 +30,6 @@ export function toLocalInput(iso: string): string {
   )}:${pad(date.getMinutes())}`;
 }
 
-/** The next round hour, so adding a slot never starts by fixing a date somebody did not pick. */
 function nextHour(after?: string): Date {
   const base = after ? new Date(after) : new Date();
   const next = new Date(base.getTime() + 60 * 60 * 1000);
@@ -72,9 +56,6 @@ export default function BookingDetail(): JSX.Element {
   const [removing, setRemoving] = useState(false);
   const [cancelling, setCancelling] = useState<{ id: string; name: string } | null>(null);
 
-  // The server's slots are the source of truth; the drafts are a copy somebody is editing.
-  // Re-seeded whenever the server answers, and NOT while `dirty`, so a reload triggered by
-  // some other action cannot silently discard half-typed times.
   useEffect(() => {
     if (!bookable || dirty) return;
     setDrafts(
@@ -202,8 +183,6 @@ export default function BookingDetail(): JSX.Element {
                 type="button"
                 className="btn btn-primary"
                 disabled={busy || drafts.length === 0 || dirty}
-                // Idempotent: this mints the public token, and a double-click on stage must
-                // not produce two links.
                 onClick={() => id && act(openBookable(id, openKey(id)))}
               >
                 Open for booking
@@ -227,8 +206,6 @@ export default function BookingDetail(): JSX.Element {
       <section className="card booking-panel">
         <h2 className="section-title">Times</h2>
         {anyBooked && canUpdate && (
-          // Said BEFORE the press. The 409 is the real enforcement; this is so nobody
-          // reaches it by surprise.
           <p className="text-meta">
             Somebody has booked here, so the times are locked. Cancel those bookings first if
             you need to change them.
@@ -300,8 +277,6 @@ export default function BookingDetail(): JSX.Element {
             </div>
           </>
         ) : (
-          // Read-only: no `onSelect`, no `onRemove`. The same grid the picker draws, which
-          // is the whole reason it is one component.
           <SlotGrid slots={bookable.slots} />
         )}
       </section>
@@ -402,8 +377,6 @@ export default function BookingDetail(): JSX.Element {
       {cancelling && (
         <ConfirmDialog
           title={`Cancel ${cancelling.name}'s booking?`}
-          // `booking.cancel` exists as its own verb precisely because this reaches into a
-          // decision somebody else made, so the dialog says whose.
           consequence="The place goes back into the slot straight away. Nobody is told — there is no mail transport in this product."
           verb="Cancel it"
           destructive
