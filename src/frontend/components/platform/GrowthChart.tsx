@@ -1,21 +1,3 @@
-// <GrowthChart> — `24` §6b, `71` § Components. Organisations moving, over time.
-//
-// NO CHARTING LIBRARY (DEC-064) — the same inline-SVG-polyline move `<TrendLine>` made at
-// `T-082`, and this is a third placement of the same primitives rather than a second
-// approach: shared `.trend-line*` classes, one shared scale across every line, an
-// `aria-hidden` `<svg>` paired with a real `<table>` underneath.
-//
-// PLOTS `movement`, NOT a per-period tier mix. The catalogue placeholder this was built from
-// drew `{ period, byTier }[]` — organisations-by-tier over time — but nothing in the product
-// records what tier an organisation was on in a PAST period: `subscriptions` holds only the
-// CURRENT tier (no history, no `updatedAt` — `schema.prisma:677`, `service.ts` analytics()
-// comment) and `platform_audit_log`'s `plan.override` rows are the only tier-change record
-// there is. Reconstructing "Gold orgs in March" would mean re-projecting today's audit trail
-// backwards onto a month it does not describe, which is precisely what `71`'s own rule
-// forbids ("historic figures must not move retroactively"). `movement` — new, upgraded,
-// downgraded, churned per period — is what the estate's actual history supports, and
-// plotting it here keeps decision 2 intact: four lines, never netted into a growth curve
-// that implies a single trend.
 export type GrowthChartPoint = {
   period: string;
   new: number;
@@ -46,8 +28,6 @@ export function GrowthChart({
     return <p className="text-muted">No periods in this window yet.</p>;
   }
 
-  // ONE SHARED SCALE ACROSS ALL FOUR LINES — the same reason `<TrendLine>` gives: scaling
-  // each line to its own maximum would draw a single churn as tall as a busy month of signups.
   const peak = Math.max(1, ...series.flatMap((point) => SERIES.map((line) => point[line.key])));
 
   const x = (index: number): number =>

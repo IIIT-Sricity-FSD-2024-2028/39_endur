@@ -1,8 +1,3 @@
-// T-038 — /app/campaigns. 38, design_specs/design/06 §6.1.
-//
-// **Share is a top-level action on the card, never inside a `⋯` menu.** On demo day, going
-// from this list to a projected QR code must be ONE click, and a menu is a second one plus
-// a hunt.
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CampaignStatus, CampaignSummary, QuickCampaignPurpose } from '@endur/shared';
@@ -18,7 +13,6 @@ import { useCampaignList } from '../../../lib/campaigns.js';
 import { QUICK_CATEGORIES, STATUS_TAG, suppressionNote, timing } from './card.js';
 import { QuickDialog } from './QuickDialog.js';
 
-/** The four values the derivation can produce (DEC-016), plus "everything". */
 const FILTERS: Array<{ key: CampaignStatus | 'all'; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'open', label: 'Collecting' },
@@ -37,11 +31,6 @@ export default function Campaigns(): JSX.Element {
 
   const list = useCampaignList({ ...(status ? { status } : {}) });
   const [sharing, setSharing] = useState<CampaignSummary | null>(null);
-  /**
-   * The poll and suggestion-box surfaces (`T-091`, `DEC-088`). They live beside the wizard
-   * rather than inside it: the wizard's three steps are the right questions for a feedback
-   * round and the wrong ones for a question asked of a room that is already waiting.
-   */
   const [quick, setQuick] = useState<QuickCampaignPurpose | null>(null);
 
   const rows = list.data?.data ?? [];
@@ -96,8 +85,6 @@ export default function Campaigns(): JSX.Element {
         <QuickDialog
           purpose={quick}
           onCancel={() => setQuick(null)}
-          // Straight to the detail page, which already shows the QR code and the public
-          // link (`T-089`, `DEC-086`). That screen is the point of the whole surface.
           onCreated={(campaign) => {
             setQuick(null);
             navigate(`/app/campaigns/${campaign.id}`);
@@ -164,8 +151,6 @@ export default function Campaigns(): JSX.Element {
             const tag = STATUS_TAG[campaign.status];
             const when = timing(campaign);
             const note = suppressionNote(campaign);
-            // Structural product words, literal on purpose (`DEC-087`) — a hotel renames
-            // its departments, never Endur's own furniture.
             const quick = QUICK_CATEGORIES.includes(campaign.templateCategory)
               ? campaign.templateCategory
               : null;

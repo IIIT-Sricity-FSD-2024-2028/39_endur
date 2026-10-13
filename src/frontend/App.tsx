@@ -1,7 +1,3 @@
-// The three worlds — public / console / respond — are wired in router/ (20 §1).
-//
-// This component does exactly two things: hold the store, and run the one boot call.
-// Everything else is a route.
 import { Provider } from 'react-redux';
 import { RouterProvider } from 'react-router-dom';
 import { store } from './store/index.js';

@@ -22,3 +22,18 @@ export function periodHasEnded(periodEnd: Date, now: Date = new Date()): boolean
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   return periodEnd.getTime() < today;
 }
+
+// How long a trial lasts, in days rather than calendar months — DEC-114. A trial is a fixed
+// courtesy window, not a billing period that happens to carry no charge, so it is not expressed
+// in BILLING_PERIOD_MONTHS: changing how long a PAID month is must never accidentally change how
+// long a TRIAL is, and a shared constant would make that true by accident.
+export const TRIAL_DAYS = 14;
+
+// A fresh trial window starting now. Mirrors newPeriod()'s one-clock-reading rule, for the same
+// reason: periodStart and periodEnd must come from one Date so they cannot straddle midnight.
+export function trialPeriod(): { periodStart: Date; periodEnd: Date } {
+  const periodStart = new Date();
+  const periodEnd = new Date(periodStart.getTime());
+  periodEnd.setUTCDate(periodEnd.getUTCDate() + TRIAL_DAYS);
+  return { periodStart, periodEnd };
+}

@@ -1,7 +1,3 @@
-// Step 5 — review. 31 § Interactions, design_specs/design/03 §3.4.
-//
-// Four summary cards, each with a pencil back to its step. The cards state NUMBERS, not
-// reassurance: "5 units, 3 deep" is checkable at a glance, "your structure is ready" is not.
 import type { PresetView, ResolvedLabels } from '@endur/shared';
 import { Icon } from '../../../../components/Icon.js';
 import { Toggle } from '../../../../components/form/Toggle.js';

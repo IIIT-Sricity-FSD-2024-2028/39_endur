@@ -1,12 +1,3 @@
-// T-051 — /app/people/:id. 34 § Acceptance.
-//
-// The fixture labels are NONSENSE on purpose (22 §5). If an English domain noun turns up in
-// an assertion, the component hardcoded one and INV-001 is false on this screen.
-//
-// The two lines this file exists for are 34's own unticked acceptance items: powers come
-// from the shared resolver, and powers on unit A do not appear under unit B. The second is
-// asserted here as well as in the component's own test, because the page is where the two
-// places could be flattened by a wrong prop long after the component was proved right.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -78,8 +69,6 @@ beforeEach(() => {
   for (const fn of [rename, setEmail, assign, unassign, reload]) fn.mockResolvedValue(undefined);
 });
 
-/** The vocabulary fixture is a Partial, so the noun is pinned once here rather than
- *  asserted non-null at each call site. */
 const UNIT_NOUN = NONSENSE_LABELS.unit?.one ?? '';
 
 const ALL: Capability[] = ['person.read', 'person.update', 'assignment.create', 'assignment.delete'];
@@ -96,18 +85,11 @@ describe('/app/people/:id', () => {
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual([
       'Identity', 'Account', 'Positions',
-      // INV-001 — the noun is the ORGANISATION'S. An English "Campaigns" here would mean the
-      // page hardcoded one, and the fixture vocabulary is nonsense so that it cannot hide.
       'Plithes they are part of',
       'What they can do, and where',
     ]);
   });
 
-  /**
-   * N-079. Every block above this one is about POWER, and a respondent holds none by
-   * construction (DEC-009: no account, no grants) — so on the page of the thirty students in
-   * a college of forty-five, all of them are empty. This is the block that is not.
-   */
   it('lists what the person is being asked for, with the position that put them there', () => {
     mount();
     const section = screen.getByRole('heading', { name: 'Plithes they are part of' })
@@ -117,10 +99,6 @@ describe('/app/people/:id', () => {
   });
 
   it('drops the whole block when the API returned nothing for it', () => {
-    // [] is BOTH "nothing is open" and "this caller holds no campaign.read anywhere", and the
-    // server cannot tell them apart on the way out. A section that rendered an empty state
-    // would be asserting the first while the second was true — 46's rule is that a section a
-    // caller cannot read is absent, not greyed.
     state = { data: { ...PERSON, involvement: [] }, loading: false, error: null };
     mount();
     expect(screen.queryByRole('heading', { name: 'Plithes they are part of' })).toBeNull();
@@ -130,8 +108,6 @@ describe('/app/people/:id', () => {
     mount();
     const mechanical = screen.getByRole('heading', { name: 'Mechanical' }).closest('.powers-place');
     expect(within(mechanical as HTMLElement).getByText('results.read')).toBeTruthy();
-    // Absent under the other place, not greyed out there. Two places must stay two places:
-    // a page that flattened them would look tidy and assert the opposite of the model.
     expect(within(mechanical as HTMLElement).queryByText('campaign.launch')).toBeNull();
     expect(document.querySelectorAll('.powers-place')).toHaveLength(2);
   });
@@ -143,7 +119,6 @@ describe('/app/people/:id', () => {
     for (const chip of chips) {
       expect(chip.querySelector('.position-unit')?.textContent).toBeTruthy();
     }
-    // And the level and the expiry, which is what 47 asks for and the list deliberately omits.
     expect(screen.getByText('L1')).toBeTruthy();
     expect(screen.getByText(/^Until /)).toBeTruthy();
   });
@@ -162,7 +137,6 @@ describe('/app/people/:id', () => {
     expect(screen.queryByRole('button', { name: /Change/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Position/ })).toBeNull();
     expect(document.querySelectorAll('.position-remove')).toHaveLength(0);
-    // The powers still render. Reading what somebody can do is the read, not a write.
     expect(screen.getByText('campaign.launch')).toBeTruthy();
   });
 
@@ -192,8 +166,6 @@ describe('/app/people/:id', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     const alert = await screen.findByRole('alert');
-    // Verbatim. Replacing it with generic copy throws away the only actionable part — the
-    // caller can perform this on most rows, so a bare refusal reads as a bug (34 § States).
     expect(alert.textContent).toBe('That role can launch campaigns, and you cannot do that at Engineering.');
   });
 
@@ -202,7 +174,6 @@ describe('/app/people/:id', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove Dean — Engineering' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(within(dialog).getByText(/Everything Meera Iyer could do at Engineering goes with it/)).toBeTruthy();
-    // The account survives. Positions are the powers; the account is the key (34).
     expect(within(dialog).getByText(/keep their account/)).toBeTruthy();
   });
 
@@ -215,7 +186,6 @@ describe('/app/people/:id', () => {
     };
     mount();
     expect(screen.getByText('No such person here')).toBeTruthy();
-    // The copy must be true for both cases, so it says neither — and says so out loud.
     expect(screen.getByText(/Both look the same from here/)).toBeTruthy();
   });
 

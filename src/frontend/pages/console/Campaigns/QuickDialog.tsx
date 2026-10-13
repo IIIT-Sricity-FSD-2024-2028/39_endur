@@ -1,14 +1,3 @@
-// <QuickDialog> — T-091, 24 §6. A poll or a suggestion box, in one dialog and one call.
-//
-// The three-step wizard next door (`New.tsx`) is right for a feedback round: the form, the
-// subjects and the dates are all real decisions there. A poll has none of them. It is one
-// question asked of a room already sitting in front of you, so everything the wizard asks
-// is either implied (anyone with the link, anonymous, public) or composed by the server in
-// one transaction (`DEC-088`, `DEC-089`).
-//
-// "Poll" and "Suggestion box" are STRUCTURAL words and stay literal (`DEC-087`, INV-001 §
-// exempt) — they name Endur's own furniture the way Save and Settings do. The nouns inside
-// still come from useLabels().
 import { useEffect, useState } from 'react';
 import type { CampaignDetail, QuickCampaignPurpose } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
@@ -56,8 +45,6 @@ export function QuickDialog({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      // Not while it is in flight: this request mints a public token, and dismissing the
-      // dialog mid-write would hide a campaign that is about to exist.
       if (event.key === 'Escape' && !busy) onCancel();
     };
     window.addEventListener('keydown', onKey);
@@ -65,8 +52,6 @@ export function QuickDialog({
   }, [onCancel, busy]);
 
   const filled = options.map((option) => option.trim()).filter(Boolean);
-  // The same bound the server enforces, restated only so the button can explain itself
-  // before it is pressed. The gate is the API's (INV-003).
   const ready = name.trim() !== '' && (purpose === 'suggestion' || filled.length >= 2);
 
   const setOption = (index: number, value: string): void =>
@@ -83,8 +68,6 @@ export function QuickDialog({
     })
       .then(onCreated)
       .catch((cause: unknown) => {
-        // Nothing was created — one transaction, so there is no half-made poll to clear up
-        // and the reader can fix the sentence and press again (`DEC-089`).
         setError(cause instanceof ApiError ? cause.message : 'That could not be created.');
         setBusy(false);
       });
@@ -133,8 +116,6 @@ export function QuickDialog({
               <fieldset className="field">
                 <legend>Options</legend>
                 {options.map((option, index) => (
-                  // Index as key, deliberately: these rows have no identity until they are
-                  // saved, and nothing here reorders them.
                   <div className="quick-option" key={index}>
                     <input
                       className="input"

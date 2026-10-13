@@ -1,17 +1,3 @@
-// CSV import. 34 § Interactions, T-050.
-//
-// THREE STEPS: pick a file, resolve what the server could not match, commit. The server
-// (`features/people/service.ts`, `previewImport`/`commitImport`) does all the CSV reading —
-// this file never guesses a column meaning the backend would disagree with, because a
-// second parser that occasionally disagrees with the first is worse than one parser used
-// twice. `parseCsvRows` below mirrors the backend's header-synonym table on purpose, for
-// the reason its own comment gives: the preview only ever returns five sample rows, and the
-// commit needs every row the file contains, so the full parse has to happen somewhere the
-// server does not hand back.
-//
-// **It never fails silently** (34). A file with unmatched role or unit names resolves in
-// one dropdown per name, and a row still unresolved at commit time is SKIPPED and reported
-// by name, never imported half-done.
 import { useMemo, useState } from 'react';
 import type { ImportPeopleBody, ImportPreview, ImportRow } from '@endur/shared';
 import { apiPost, ApiError } from '../../../lib/api.js';
@@ -58,8 +44,6 @@ export function ImportWizard({
         .then(({ data }) => setStep({ kind: 'review', csv, preview: data, error: null }))
         .catch((error: unknown) => {
           setStep({ kind: 'pick' });
-          // Nowhere else to put this — the dialog has no field to attach it to, since the
-          // failure is about the whole file (usually CSV_MAX_CHARS, 14 §8).
           window.alert(message(error, 'That file could not be read.'));
         });
     };
@@ -86,8 +70,6 @@ export function ImportWizard({
   };
 
   if (!can('person.import')) {
-    // Reachable only if the capability was withdrawn mid-session — the header action that
-    // opens this dialog already checks it.
     return (
       <div className="dialog-backdrop" onMouseDown={onClose}>
         <div className="dialog" role="dialog" aria-modal="true" aria-label="Import" onMouseDown={(e) => e.stopPropagation()}>
@@ -212,9 +194,6 @@ function ReviewStep({
   onBack: () => void;
   onCommit: () => void;
 }): JSX.Element {
-  // Every unmatched name has to resolve to something before a commit is worth pressing —
-  // an unresolved row is silently skipped server-side, and requiring the choice first is
-  // what keeps that from being the surprise (34 § Interactions: "it never fails silently").
   const unresolved =
     preview.unmatchedRoles.some((name) => !roleMapping[name]) ||
     preview.unmatchedUnits.some((name) => !unitMapping[name]);
@@ -312,11 +291,6 @@ function ReviewStep({
   );
 }
 
-/**
- * A deliberately stable key: the same file committed twice must hit the SAME idempotency
- * key, or the server's replay guard (12 §4.15) never gets to do its job. The file's own
- * bytes are the only thing available twice without asking the operator to remember one.
- */
 function importKey(csv: string): string {
   let hash = 0;
   for (let i = 0; i < csv.length; i += 1) {
@@ -325,11 +299,6 @@ function importKey(csv: string): string {
   return `import-${csv.length}-${hash}`;
 }
 
-/**
- * MIRRORS `parseCsv` in `features/people/service.ts`, header synonym list and all. The
- * commit route needs every row the file contains and the preview route only ever returns
- * five — so the full parse has to happen twice, and it must not drift from the server's.
- */
 function parseCsvRows(csv: string): ImportRow[] {
   const lines = csv.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length === 0) return [];

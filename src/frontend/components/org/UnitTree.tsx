@@ -1,22 +1,3 @@
-// <UnitTree> — 24 §4, design_specs/design/03 §3.3, 32.
-//
-// ONE COMPONENT, THREE PLACEMENTS (INV-009): wizard step 3, /app/structure, and the
-// campaign audience picker. `mode` is what makes that possible, and forking it is how the
-// three quietly stop agreeing about what a unit is.
-//
-// It takes the LEAST it needs — id, name, children — so the API's `UnitNode` satisfies it
-// without adaptation and the wizard's draft satisfies it without inventing counts it does
-// not have yet.
-//
-// HTML5 drag is NOT the only way to re-parent. It does not exist on touch at all, and 31 §
-// Acceptance requires the tree to be usable there, so every row also has a Move control
-// that works by click and by keyboard: press Move, then choose the new parent. The drag
-// path and the move path call the same `onReparent`.
-//
-// T-033 EXTENDED this component rather than writing a second one (N-025). Everything the
-// structure page needed — the temporary badge, counts with the caller's vocabulary, an
-// inline refusal message, a placeholder row for "+ then type" — is optional, so the
-// wizard's call site did not change at all.
 import { useEffect, useState } from 'react';
 import type { Label } from '@endur/shared';
 import { Icon } from '../Icon.js';
@@ -30,55 +11,34 @@ export type UnitTreeNode = {
   children: UnitTreeNode[];
   peopleCount?: number;
   subjectCount?: number;
-  /** This unit AND everything under it, counted by the server (DEC-082). The row prints
-   *  these; the two `*Count` fields above are the unit's own share and are not shown here.
-   *  Absent on the wizard's draft, which has no counts at all and renders none. */
   peopleTotal?: number;
   subjectTotal?: number;
   isTemporary?: boolean;
-  /** ISO date. Within 30 days the row says so, because expiry is silent otherwise (10 §9). */
   endsAt?: string | null;
-  /** Shown when the name is empty — the row `+` just created, waiting for two words. */
   placeholder?: string;
 };
 
 export type UnitTreeMode = 'browse' | 'edit' | 'select';
 
-/**
- * An action asked for from outside the tree — the detail panel's Rename and Move buttons
- * (design_specs/design/04 §4.2). `nonce` is what makes asking twice for the same row work;
- * without it the second click on an unchanged id would be a no-op.
- */
 export type UnitTreeRequest = { id: string; action: 'rename' | 'move'; nonce: number };
 
 type Props = {
   nodes: UnitTreeNode[];
   mode: UnitTreeMode;
   selectedId?: string | undefined;
-  /** Label for the add-child button, e.g. "Add a Department". Vocabulary, from the caller. */
   addLabel?: string | undefined;
-  /**
-   * The subject noun, singular AND plural, e.g. `{ one: 'Course', many: 'Courses' }`.
-   * Absent means subject counts stay hidden — better than inventing "Subjects".
-   *
-   * The plural alone until DEC-081, which printed "1 Courses" on every row holding one.
-   */
   subjectWord?: Label | undefined;
-  /** Focus this row's name input on mount — the "+ then type" beat of the demo. */
   focusId?: string | undefined;
   request?: UnitTreeRequest | undefined;
-  /** A refusal from the server, shown under the row it belongs to rather than in a dialog. */
   rowMessage?: { id: string; text: string } | undefined;
   onSelect?: ((id: string) => void) | undefined;
   onRename?: ((id: string, name: string) => void) | undefined;
-  /** Escape, or a blur with the field empty. The structure page drops its placeholder row. */
   onCancelEdit?: ((id: string) => void) | undefined;
   onAddChild?: ((parentId: string) => void) | undefined;
   onDelete?: ((id: string) => void) | undefined;
   onReparent?: ((id: string, newParentId: string) => void) | undefined;
 };
 
-/** Every id at or below `node` — the set a node may not be moved into. */
 function subtreeIds(node: UnitTreeNode, into: Set<string> = new Set()): Set<string> {
   into.add(node.id);
   for (const child of node.children) subtreeIds(child, into);
@@ -96,7 +56,6 @@ const findNode = (nodes: UnitTreeNode[], id: string): UnitTreeNode | undefined =
 
 const DAY = 86_400_000;
 
-/** Days until an end date, or null when there is none. Negative means it has passed. */
 export function daysUntil(endsAt: string | null | undefined, now = Date.now()): number | null {
   if (!endsAt) return null;
   const time = new Date(endsAt).getTime();
@@ -109,11 +68,8 @@ export function UnitTree(props: Props): JSX.Element {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  /** The row waiting for a destination, when Move was pressed instead of dragged. */
   const [movingId, setMovingId] = useState<string | null>(null);
-  /** Asked for by the detail panel; merged with `focusId` so the wizard is unaffected. */
   const [focusRow, setFocusRow] = useState<string | null>(null);
-  /** "That would put it inside itself" — the tree's own refusal, not the server's. */
   const [refusal, setRefusal] = useState<{ id: string; text: string } | null>(null);
 
   useEffect(() => {
@@ -125,8 +81,6 @@ export function UnitTree(props: Props): JSX.Element {
   }, [request?.nonce, request?.id, request?.action]);
 
   const active = movingId ?? dragId;
-  // A node cannot become its own descendant's child. Computed once per drag rather than
-  // per row, because the answer is the same for every row it passes over.
   const activeNode = active ? findNode(nodes, active) : undefined;
   const forbidden = active
     ? subtreeIds(activeNode ?? { id: active, name: '', children: [] })
@@ -149,8 +103,6 @@ export function UnitTree(props: Props): JSX.Element {
   const complete = (targetId: string): void => {
     if (!active) return;
     if (forbidden.has(targetId)) {
-      // Refused inline, on the row being moved, and never as a dialog: the reader is
-      // mid-gesture and a modal would make them lose their place (32 § Interactions).
       setRefusal({
         id: active,
         text: `${activeNode?.name ?? 'That'} cannot go inside itself.`,
@@ -166,13 +118,8 @@ export function UnitTree(props: Props): JSX.Element {
   const render = (node: UnitTreeNode, depth: number): JSX.Element => {
     const hasChildren = node.children.length > 0;
     const isOpen = !collapsed.has(node.id);
-    // The root is the organisation. It cannot be deleted or moved, in any mode — deleting
-    // it would leave an org with nowhere to put anything.
     const isRoot = depth === 0;
     const canDrop = active !== null && active !== node.id && !forbidden.has(node.id);
-    // While a move is in flight every row accepts the drop event, including the ones that
-    // may not have it. Refusing at `dragover` would swallow the drop silently, and the
-    // reader would be left wondering whether the gesture registered at all.
     const dropTarget = active !== null && active !== node.id;
     const message =
       props.rowMessage?.id === node.id
@@ -315,13 +262,6 @@ export function UnitTree(props: Props): JSX.Element {
   );
 }
 
-/**
- * "64 people · 7 Courses". The subject noun is the caller's; "people" is structural.
- *
- * The counts are the ROW'S WHOLE BRANCH, not the unit alone — DEC-081. The map beside this
- * tree shows the same units, so the two disagreeing about what "Surgery" contains is worse
- * than either rule on its own.
- */
 function Counts({ total, subjectWord }: { total: Totals; subjectWord?: Label | undefined }): JSX.Element | null {
   const parts: string[] = [];
   if (total.people) parts.push(pluralise(total.people, 'person', 'people'));

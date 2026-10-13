@@ -1,17 +1,3 @@
-// <ResponseCard> — 24 §6c, 58, design_specs/design/08 §8.3.
-//
-// One free-text response in the inbox: the score badge, the comment, the subject tag, and
-// the read state. Expanding shows the question that drew the comment and the campaign it
-// came from.
-//
-// WHAT IS NOT A PROP HERE, AND WILL NOT BE UNTIL 43 EXISTS: sentiment, emotion, intent,
-// topic. The mockup draws all four; all four need the Analyze layer. A component with four
-// props nothing can fill is a component that invites a stub, and a stubbed sentiment chip
-// is a confident wrong answer printed next to somebody's words.
-//
-// `subjectWord` is passed in rather than read from useLabels() inside — the same rule as
-// <UnitTree> (INV-001, 24 §6c): a presentation component that reaches for a context is one
-// that cannot be rendered in a test or a preview.
 import type { InboxResponse } from '@endur/shared';
 import { ScoreBadge } from '../data/ScoreBadge.js';
 import { Icon } from '../Icon.js';
@@ -37,9 +23,7 @@ export function ResponseCard({
   onToggleRead: () => void;
   onArchive: () => void;
   subjectWord: string;
-  /** Keyboard focus, for j/k. Visual only — it does not mark anything. */
   selected?: boolean;
-  /** An optimistic mark that failed, shown ON the card. Never a toast (58 § States). */
   error?: string | undefined;
 }): JSX.Element {
   const classes = [

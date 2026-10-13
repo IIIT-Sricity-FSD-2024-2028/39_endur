@@ -1,21 +1,3 @@
-// T-041 — /app. 46, design_specs/design/04 §4.1.
-//
-// The first screen after sign-in and the screen the org switcher lands on, which makes it
-// the ten-second proof (22 §4): the same code renders Departments/Courses for a university
-// and Wards/Services for a hospital, and the chips at the top change before anything else.
-//
-// Three rules govern it:
-//
-//   1. IT IS A HUB, NOT A DASHBOARD. Everything on it is a link to somewhere that does the
-//      real work. Charts, trends and sentiment are `43`, and `43` is P3 — which is also why
-//      <TrendChip> is not on the "today" card (CONF-017).
-//   2. A SECTION THE CALLER CANNOT READ IS ABSENT (INV-003). The server omits the KEY, so
-//      this file distinguishes "no permission" from "nothing yet" by asking whether the key
-//      is there — not by inspecting a length. That distinction is the whole reason the two
-//      empty states below can say different things.
-//   3. EVERY NUMBER IS ALREADY GATED. The k-anonymity threshold is applied on the server to
-//      the stats and to the comments both, so home cannot become a way to read a suppressed
-//      campaign one aggregate at a time (46 § Acceptance).
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { StatWindows, type HomeView, type StatWindow } from '@endur/shared';
@@ -40,21 +22,10 @@ export default function Home(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
   const org = useAppSelector((state) => state.auth.org);
-  // 30 days, not all time — DEC-031. The first thing anybody sees after signing in should
-  // be recent activity; a lifetime total only goes up and asks nobody to do anything.
   const [range, setRange] = useState<StatWindow>('30d');
   const home = useHome(range);
   const [sharing, setSharing] = useState<Campaign | null>(null);
-  /**
-   * T-094. Unread announcements, at the top of the first screen after sign-in — which is
-   * where a notice has to be if it is going to be read at all.
-   *
-   * Fetched only when the reader holds `announcement.read`. It is seeded to every role
-   * (50 §1), so this is about an explicit deny rather than the ordinary case; the hook
-   * treats a 403 as an empty list either way.
-   */
   const announcements = useAnnouncements(can('announcement.read'));
-  /** Dismissed optimistically: the receipt write is a 204 with nothing to wait for. */
   const [dismissed, setDismissed] = useState<string[]>([]);
 
   const view = home.data;
@@ -77,19 +48,11 @@ export default function Home(): JSX.Element {
     );
   }
 
-  // An unconfigured org's home is empty and confusing, so it is never shown (46 § States).
-  // The wizard is the only useful thing there is to do, so it is where they go.
   if (!view.configured) return <Navigate to="/app/setup" replace />;
 
   const campaigns = view.activeCampaigns;
   const comments = view.recentComments;
-  // Absent, not empty. `undefined` means the server withheld the section; `[]` means the
-  // section is theirs and holds nothing yet. Those are two different sentences.
   const readsNothing = campaigns === undefined && comments === undefined;
-  // `responsesEver`, NOT the windowed count — DEC-031. "This organisation has never
-  // collected anything" and "nothing arrived in the last 30 days" are different sentences,
-  // and reading the windowed number here would show a two-year-old organisation the
-  // welcome screen — with its range control hidden — every quiet month.
   const isNew =
     !readsNothing && view.stats.responsesEver === 0 && (campaigns?.length ?? 0) === 0;
 
@@ -111,7 +74,6 @@ export default function Home(): JSX.Element {
       />
 
       {home.error && (
-        // The rest of the shell stays usable and the numbers on screen stay on screen.
         <p className="form-error" role="alert">
           Could not refresh just now. These numbers are from the last successful load.
         </p>
@@ -123,9 +85,6 @@ export default function Home(): JSX.Element {
         items={unreadFor(announcements.rows.filter((row) => !dismissed.includes(row.id)))}
         onDismiss={(id) => {
           setDismissed((current) => [...current, id]);
-          // Swallowed: the banner is already gone, and an error toast for a receipt the
-          // reader did not ask to write would report our problem as theirs. It comes back
-          // on the next load if the write really failed.
           void markAnnouncementRead(id).catch(() => undefined);
         }}
       />
@@ -134,13 +93,9 @@ export default function Home(): JSX.Element {
         <EmptyState
           icon="home"
           title="Nothing assigned to you yet"
-          // A legitimate state for a junior role, and it must not look like an error: no
-          // action, no explanation of what they are missing, no locks (46 § States).
           body="When you are given something to look after, it will show up here."
         />
       ) : isNew ? (
-        // NOT four zeroed cards. Zeroes look broken; an empty state looks intentional, and
-        // it carries the one next action instead of four numbers that all say nothing.
         <EmptyState
           icon="inbox"
           title={first?.title ?? `Add a ${labels.subject.one.toLowerCase()}`}
@@ -257,9 +212,6 @@ export default function Home(): JSX.Element {
         <ShareSheet
           url={sharing.url}
           campaignName={sharing.name}
-          // Every campaign on this page is open by definition — the server asks for that
-          // status and nothing else — so the sheet is told so rather than the payload
-          // carrying a field with one possible value.
           status="open"
           endsAt={sharing.endsAt}
           anonymous={sharing.anonymous}
@@ -271,7 +223,6 @@ export default function Home(): JSX.Element {
   );
 }
 
-/** Skeletons at the real layout, so the page does not jump when the numbers land. */
 function Skeleton({ title }: { title: string }): JSX.Element {
   return (
     <>

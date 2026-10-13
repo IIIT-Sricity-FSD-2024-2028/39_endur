@@ -1,26 +1,3 @@
-// T-082 — /app/analysis. 43, design_specs/design/08 §8.2.
-//
-// The Analyze layer's screen. `40` says WHAT HAPPENED; this says WHAT IT MEANS — and every
-// number on it is arithmetic over text that never left the process (DEC-042: stop-words,
-// stemming, document frequency, a sentiment lexicon, a Pearson correlation over
-// `numeric_value`). No model, no key, no outbound request.
-//
-// FOUR RULES GOVERN EVERYTHING HERE, and three of them are about being honest:
-//
-//  1. TWO FAILURES, TWO SCREENS (DEC-011). 403 is "your account may not" — an
-//     administrator's problem, nothing to buy. 402 is "your organisation is below Silver" —
-//     a plan's problem, and the account is fine. `43` names this page as the place that
-//     split is worth demonstrating, and collapsing them here would undo it.
-//  2. THE CLIENT NEVER INFERS GOOD OR BAD FROM A NUMBER'S SIGN (CONF-004). Every valence on
-//     this page arrives stated. What the server may state and this page may not is a
-//     definition: a lexicon DEFINES which words are bad, the same way NPS defines a
-//     detractor.
-//  3. RELIABILITY IS SHOWN WITH EVERY HEADLINE NUMBER, not filed. A 4.6 from 8 responses
-//     and a 4.6 from 800 are different facts, and presenting them identically is the most
-//     common way a feedback dashboard lies.
-//  4. THE GATE IS THE SERVER'S. Below the k-anonymity threshold the body carries no
-//     analysis fields AT ALL — not zeroed, not empty arrays — so there is nothing here that
-//     could render one (52 §2, INV-007).
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -49,8 +26,6 @@ export default function Analysis(): JSX.Element {
   const can = useCan();
   const [params, setParams] = useSearchParams();
 
-  // Filters live in the URL, so a filtered analysis is a link somebody pastes into a
-  // message — the same rule as `40`'s and `58`'s.
   const filters = useMemo(
     () =>
       Object.fromEntries(
@@ -62,17 +37,11 @@ export default function Analysis(): JSX.Element {
     [params],
   );
   const filtered = FILTER_KEYS.some((key) => params.get(key));
-  // `theme` is a filter too, in the sense that matters: it is part of what this address
-  // shows, so an opened theme survives a reload and can be sent to somebody.
   const openTheme = params.get('theme');
 
-  // Not requested at all without the capability. The 403 is handled either way, but a
-  // request nobody may answer is a request not worth making.
   const analysis = useAnalysis(filters, can('analysis.read'));
   const theme = useThemeDetail(openTheme, filters);
 
-  // Every filter list is itself scope-filtered by its own endpoint, so a filter cannot
-  // reach past the scope the analysis already applied (INV-003).
   const campaigns = useCampaignList();
   const subjects = useSubjectList({});
   const units = useUnits();
@@ -82,9 +51,6 @@ export default function Analysis(): JSX.Element {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
-    // Opening a theme and then changing the window would ask for a theme that may not
-    // exist in the new one, and the server answers that with a 404. Closing it is the
-    // honest response to "you changed what we are looking at".
     next.delete('theme');
     setParams(next, { replace: true });
   };
@@ -123,9 +89,6 @@ export default function Analysis(): JSX.Element {
     />
   );
 
-  // 403 — THE ACCOUNT. A full page, because somebody here typed the address: the sidebar
-  // item is hidden without the capability, and telling them nothing would just look broken
-  // (20 §6). No mention of plans: they are not being sold anything.
   if (!can('analysis.read') || analysis.forbidden) {
     return (
       <div className="page">
@@ -139,8 +102,6 @@ export default function Analysis(): JSX.Element {
     );
   }
 
-  // 402 — THE ORGANISATION. Not an error page, and never the sentence above: the account is
-  // fine, the permissions are fine, and the remedy is a plan (43 § States, DEC-011).
   if (analysis.upgrade) {
     return (
       <div className="page">
@@ -261,8 +222,6 @@ export default function Analysis(): JSX.Element {
       />
 
       {analysis.error && (
-        // The last good analysis stays on screen. A failed refresh must not blank a page
-        // somebody is presenting from (43 § States, the same rule as 40's poll).
         <p className="form-error" role="alert">
           Could not refresh just now. These numbers are from the last successful read.
         </p>
@@ -280,11 +239,6 @@ export default function Analysis(): JSX.Element {
           }
         />
       ) : view.suppressed ? (
-        // SUPPRESSED, IDENTICALLY TO `40`. The body carried no themes, no sentiment and no
-        // trend — the fields are absent, not empty — so this branch has nothing to hide and
-        // nothing it could accidentally render. It is not an error and is worded so it does
-        // not read as one: this is the anonymity promise being kept when it is inconvenient,
-        // which is the only time such a promise means anything (52 §2).
         <div className="card results-suppressed">
           <h3>Not enough responses yet</h3>
           <p className="text-muted">
@@ -398,8 +352,6 @@ export default function Analysis(): JSX.Element {
   );
 }
 
-/** The three lines, on one shared scale. Named for the ramp, never for the accent — blue is
- *  the product and cannot also mean unhappy (CONF-004). */
 function seriesOf(
   trend: Array<{ date: string; positive: number; neutral: number; negative: number }>,
 ): TrendSeries[] {

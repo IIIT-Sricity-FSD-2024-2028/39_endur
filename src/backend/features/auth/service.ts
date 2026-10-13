@@ -8,7 +8,7 @@ import { hashPassword } from '../../auth/password.js';
 import { grantsForLevel, presetFor } from '../../presets/index.js';
 import { ConflictError } from '../../lib/errors.js';
 import { recordPayment } from '../../billing/payments.js';
-import { newPeriod } from '../../billing/period.js';
+import { newPeriod, trialPeriod } from '../../billing/period.js';
 import type { RegisterBody } from '@endur/shared';
 
 // How many times to retry when two people register the same organisation name at the same moment.
@@ -78,20 +78,34 @@ function createOrganisation(input: RegisterBody, passwordHash: string, slug: str
               isPrimary: true },
     });
 
+    // DEC-116 — a trial is chosen instead of paying, not in addition to it: the button that
+    // starts one never opens <PaymentDialog>, so `trial` and `paymentRef` never meaningfully
+    // arrive together, and if they did the service still decides what `trial: true` means for
+    // pricing (nothing is charged) rather than trusting the client's reference.
+    const trial = input.trial === true;
+
     // The subscription row, in the same transaction: an org without one is half-created, and the missing
-    // half is what every plan check reads. Active from the first request, for one calendar month.
+    // half is what every plan check reads. Active from the first request, for one calendar month -
+    // or, for a trial, trialing from the first request, for TRIAL_DAYS.
     await tx.subscription.create({
-      data: { orgId: org.id, tier: input.tier, status: 'active', ...newPeriod() },
+      data: {
+        orgId: org.id,
+        tier: input.tier,
+        status: trial ? 'trialing' : 'active',
+        ...(trial ? trialPeriod() : newPeriod()),
+      },
     });
 
-    // The payment, also in the same transaction. The amount is priced on the server; the client's reference is only a label.
+    // The payment, also in the same transaction. The amount is priced on the server; the client's
+    // reference is only a label - and a trial captures nothing, so there is no reference to keep.
     await recordPayment(tx, {
       orgId: org.id,
       tier: input.tier,
-      kind: 'signup',
+      kind: trial ? 'trial_signup' : 'signup',
       payerName: input.name,
       payerEmail: input.email,
-      reference: input.paymentRef ?? null,
+      reference: trial ? null : (input.paymentRef ?? null),
+      ...(trial ? { amountMinor: 0 as const } : {}),
     });
 
     // The level-1 grants, placed on the ROLE. The unit comes from the position at the time the permission is checked.

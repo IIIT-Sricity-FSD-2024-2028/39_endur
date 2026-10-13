@@ -1,15 +1,8 @@
-// Every console page opens with this, which is what makes differently-shaped screens feel
-// like one product. design_specs/design/02 §3, 24 §2.
 import type { ReactNode } from 'react';
 import { VocabularyChips } from './VocabularyChips.js';
 
 export type FilterChip = { label: string; onClear?: () => void };
 
-/**
- * The unit-scope chip. A DROPDOWN for a top-level role, a plain non-interactive tag for a
- * constrained one — so the constraint is legible rather than mysterious
- * (design_specs/design/02 §5). `options` absent means fixed.
- */
 export type ScopeChip = {
   label: string;
   options?: Array<{ id: string; label: string }>;
@@ -27,8 +20,6 @@ export function PageHeader({
 }: {
   title: string;
   subtitle?: string | undefined;
-  /** The chip row is on by default. Turn it off only where it would be noise — the
-   *  wizard, which is teaching the vocabulary rather than reporting it. */
   vocabulary?: boolean;
   filters?: FilterChip[];
   scope?: ScopeChip;
@@ -68,8 +59,6 @@ export function PageHeader({
 }
 
 function Scope({ label, options, onChange, value }: ScopeChip): JSX.Element {
-  // Fixed scope: a tag, visibly NOT a control. Rendering a disabled dropdown would suggest
-  // the choice exists and is being withheld, which is the opposite of legible.
   if (!options || options.length === 0) {
     return <span className="tag tag-neutral">Scope: {label}</span>;
   }

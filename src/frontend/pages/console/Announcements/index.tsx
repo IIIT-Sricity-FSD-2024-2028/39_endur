@@ -1,15 +1,3 @@
-// T-094 — /app/announcements. 61, 13 § Announcements.
-//
-// Two states of one row, and the difference between them is the whole feature:
-//
-//   DRAFT      — editable, deletable, sent to nobody. Both counts are zero because it has
-//                been sent to nobody, not because nobody has read it.
-//   PUBLISHED  — frozen, and carrying a fraction. "12 of 40 have read this" is only
-//                meaningful because the 40 was taken when the notice was SENT: the receipts
-//                are written at publish time, one per resolved recipient (13 § Announcements).
-//
-// What is NOT here is a recipient list. The audience is a rule, resolved by the server, and
-// the only names this screen ever prints are the author's.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { AnnouncementSummary } from '@endur/shared';
@@ -28,12 +16,9 @@ import {
 } from '../../../lib/announcements.js';
 import { Composer } from './Composer.js';
 
-/** The sentence a published row owes its author, and the one a draft owes instead. */
 export function readLine(announcement: AnnouncementSummary): string {
   if (!announcement.publishedAt) return 'Draft — sent to nobody yet';
   if (announcement.recipients === 0) {
-    // An audience that resolved to nobody. Worth saying plainly: it is almost always a rule
-    // pointed at a unit whose people have no sign-ins, and a silent "0 of 0" reads as a bug.
     return 'Published, but it reached nobody — that audience has no accounts in it';
   }
   return `${announcement.read} of ${announcement.recipients} have read this`;
@@ -237,8 +222,6 @@ export default function Announcements(): JSX.Element {
       {publishing && (
         <ConfirmDialog
           title="Publish this announcement?"
-          // The COUNT, in the sentence. Publishing is not undoable, and "Are you sure?"
-          // tells the reader nothing they did not already know (24 §6).
           consequence={`It goes to everyone that audience resolves to right now, and the wording is frozen afterwards. ${publishing.title}`}
           verb="Publish"
           onCancel={() => setPublishing(null)}

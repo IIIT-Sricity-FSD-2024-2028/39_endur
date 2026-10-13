@@ -1,9 +1,3 @@
-// `/ops/analytics` — `71` § Interactions. The whole estate at once, for the owner.
-//
-// OWNER ONLY (`71` § Route & access): the nav item is absent for `staff` (`OpsLayout`), and a
-// direct visit here still gets a full-page 403 naming the capability rather than an empty
-// screen that looks broken — the route itself refuses with `platform.analytics.read` in the
-// message (`router.ts`).
 import { Link, useSearchParams } from 'react-router-dom';
 import { TIERS } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -20,7 +14,14 @@ const TIER_LABEL: Record<string, string> = {
   enterprise: 'Enterprise',
 };
 
-type MovementRow = { period: string; new: number; upgraded: number; downgraded: number; churned: number };
+type MovementRow = {
+  period: string;
+  new: number;
+  trialStarted: number;
+  upgraded: number;
+  downgraded: number;
+  churned: number;
+};
 
 function readWindow(params: URLSearchParams): AnalyticsWindow {
   const granularity = params.get('granularity');
@@ -63,6 +64,7 @@ export default function Analytics(): JSX.Element {
   const movementColumns: Column<MovementRow>[] = [
     { key: 'period', header: 'Period', primary: true, render: (row) => row.period },
     { key: 'new', header: 'New', render: (row) => row.new },
+    { key: 'trialStarted', header: 'Trials started', render: (row) => row.trialStarted },
     { key: 'upgraded', header: 'Upgraded', render: (row) => row.upgraded },
     { key: 'downgraded', header: 'Downgraded', render: (row) => row.downgraded },
     { key: 'churned', header: 'Churned', render: (row) => row.churned },
@@ -117,13 +119,15 @@ export default function Analytics(): JSX.Element {
                 value={data.orgs.joined}
                 context={`${data.orgs.total} total · excludes ${data.orgs.trialing} trialing and ${data.orgs.cancelled} cancelled`}
               />
-              {/* TRIALS STARTED AND CONVERSION RATE ARE GONE — DEC-102. Not moved, not
-                  reworded: removed, because neither could ever move. `DEC-048` made
-                  registration write `status: 'active'`, so nothing is ever trialing, and
-                  `converted` was a hardcoded 0 under a comment saying it had no source. The
-                  honest thing to do with a metric that has no source is not to print it, and
-                  two of six headline cards that cannot change teach a reader to stop
-                  believing the other four. */}
+              {/* "TRIALS STARTED" IS BACK, AS A MOVEMENT COLUMN RATHER THAN A HEADLINE CARD —
+                  DEC-116, superseding part of DEC-102. Registration can write `status:
+                  'trialing'` again on an explicit opt-in, so the count has a real source —
+                  it lives in the windowed Movement table below (`trialStarted`), the same
+                  place `new` does, rather than as a headline card up here, because like `new`
+                  it is only meaningful FOR A PERIOD.
+                  "CONVERSION RATE" STAYS GONE. A count has an honest source now; a RATE still
+                  needs a time-bounded definition of "converted" that is a product decision
+                  nobody has made — printing a wrong number would be worse than printing none. */}
               <StatCard
                 kicker="Gone quiet"
                 value={data.adoption.orgsQuiet30d}

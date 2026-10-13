@@ -1,12 +1,3 @@
-// T-038 — /app/campaigns/new. 38 § Interactions, design_specs/design/06 §6.2.
-//
-// Three steps holding ONE draft, committed at the end — the same shape as the setup wizard
-// (`31`), so the pattern is learned once and nobody has to work out a second one.
-//
-// It commits in two calls rather than one, and that is the contract's shape, not a shortcut:
-// `POST /campaigns` creates the draft, `POST /:id/launch` mints the token. Launch is the
-// irreversible act and it is idempotent by key, because a double-click on stage must not
-// produce two links — the QR already on screen would then point at the wrong one.
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type {
@@ -34,7 +25,6 @@ const STEPS = [
   { key: 'when', label: 'When' },
 ];
 
-/** `{Template name} — {current month}`. Pre-filling removes a typing beat from the demo. */
 export function autoName(templateName: string, now = new Date()): string {
   const month = now.toLocaleString(undefined, { month: 'long', year: 'numeric' });
   return `${templateName} — ${month}`;
@@ -43,7 +33,6 @@ export function autoName(templateName: string, now = new Date()): string {
 export default function CampaignNew(): JSX.Element {
   const labels = useLabels();
   const navigate = useNavigate();
-  /** The org's own name, so the restricted option names it rather than saying "your org". */
   const orgName = useAppSelector((state) => state.auth.org?.name ?? '');
 
   const templates = useTemplates();
@@ -59,31 +48,20 @@ export default function CampaignNew(): JSX.Element {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [anonymous, setAnonymous] = useState(true);
-  /**
-   * DEC-037, and `public` is the default on purpose: it is the demo path, and it is the only
-   * mode where a respondent needs nothing at all. Immutable after launch, so it is asked
-   * BEFORE the irreversible button and restated on the summary card.
-   */
   const [access, setAccess] = useState<CampaignAccess>('public');
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** The launched campaign, which opens the share sheet immediately (38). */
   const [launched, setLaunched] = useState<{ campaign: CampaignDetail; url: string } | null>(null);
 
   const templateRows = templates.data?.data ?? [];
   const subjectRows = subjects.data?.data ?? [];
   const template = templateRows.find((row) => row.id === templateId);
 
-  // The audience preview needs a campaign id, which does not exist until step 3 commits.
-  // Before then the count is computed from what IS known: "anyone" is uncountable by
-  // definition, and the other two rules are answerable from the org graph already loaded.
   const audienceLine = useAudienceLine(audience, units.data ?? [], labels.respondent);
 
   const chooseTemplate = (id: string, templateName: string): void => {
     setTemplateId(id);
-    // Only auto-fill an untouched name: overwriting something typed is the kind of small
-    // theft that makes a form feel hostile.
     if (!name.trim()) setName(autoName(templateName));
   };
 
@@ -112,8 +90,6 @@ export default function CampaignNew(): JSX.Element {
         setLaunched({ campaign, url: result.url });
       })
       .catch((cause: unknown) => {
-        // The draft is preserved and no token is minted (38 § States) — the reader can fix
-        // the dates and press again rather than starting over.
         setError(cause instanceof ApiError ? cause.message : 'That could not be launched.');
       })
       .finally(() => setBusy(false));
@@ -131,8 +107,6 @@ export default function CampaignNew(): JSX.Element {
         startsAt: startsAt || null,
         endsAt: endsAt || null,
         anonymous,
-        // On the last card anybody reads before the irreversible action, because it is one
-        // of the two things launch makes permanent (10 §4.3).
         access,
       }),
     [name, template, subjectIds.length, labels.subject, startsAt, endsAt, anonymous, access],
@@ -412,7 +386,6 @@ export default function CampaignNew(): JSX.Element {
             Continue
           </button>
         ) : (
-          // The org's own word, never "Submit" or "Finish" (38 § Interactions).
           <button type="button" className="btn btn-primary" disabled={busy || !ready[2]} onClick={launch}>
             {busy ? 'Launching…' : `Launch ${labels.campaign.one.toLowerCase()}`}
           </button>
@@ -422,7 +395,6 @@ export default function CampaignNew(): JSX.Element {
       </div>
 
       {launched && (
-        // No intermediate success page. The QR is on screen the moment the call returns.
         <ShareSheet
           url={launched.url}
           campaignName={launched.campaign.name}
@@ -437,13 +409,6 @@ export default function CampaignNew(): JSX.Element {
   );
 }
 
-/**
- * The audience sentence before a campaign exists.
- *
- * `GET /:id/audience` needs an id, and there is none until step 3 commits — so the count
- * shown here is computed from the org tree already in memory. It is labelled as an
- * estimate, and the authoritative number is the one the API returns afterwards.
- */
 function useAudienceLine(rule: AudienceRule, units: UnitNode[], respondent: Label): string {
   return useMemo(() => {
     if (rule.kind === 'anyone') return `Anyone holding the link can respond.`;
@@ -451,10 +416,6 @@ function useAudienceLine(rule: AudienceRule, units: UnitNode[], respondent: Labe
     const node = find(units, rule.unitId);
     if (!node) return 'Choose where.';
     const count = countPeople(node);
-    // BOTH forms, from the label set. This passed the plural twice until T-044 and read
-    // "About 1 guests can respond." — the agreement failure 22 §5 names, and the reason
-    // the two forms are stored rather than derived (a derived one would have said
-    // "Facultys" instead).
     return `About ${pluralise(count, respondent.one.toLowerCase(), respondent.many.toLowerCase())} can respond.`;
   }, [rule, units, respondent]);
 }
@@ -468,12 +429,4 @@ function find(nodes: UnitNode[], id: string): UnitNode | undefined {
   return undefined;
 }
 
-/**
- * The audience a unit stands for, straight off the node — DEC-082.
- *
- * This was a third rollup, summing `peopleCount` down the tree, and it was wrong twice
- * over: `peopleCount` counted role SLOTS rather than people, and summing double-counts
- * anybody holding a post in two units of the branch. Both matter more here than on the
- * map — this number tells somebody how many people a campaign is about to reach.
- */
 const countPeople = (node: UnitNode): number => node.peopleTotal ?? 0;

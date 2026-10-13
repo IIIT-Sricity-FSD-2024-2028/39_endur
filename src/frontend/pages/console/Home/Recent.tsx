@@ -1,9 +1,3 @@
-// The recent-response strip. 46 § Interactions, design_specs/design/04 §4.1.
-//
-// ABSENT without `response.read` — the caller never receives the key, so there is nothing
-// here to hide. Everything in it has already passed the k-anonymity gate on the server: a
-// comment from a three-response campaign never reaches this component, because reading one
-// here would defeat the gate on `40` one dashboard at a time.
 import type { HomeView } from '@endur/shared';
 import { formatRelative } from '../../../lib/format.js';
 

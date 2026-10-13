@@ -1,9 +1,3 @@
-// `/ops` — the estate list. `70` § Interactions "The estate list — the default view".
-//
-// Sorted by LAST ACTIVITY, ASCENDING — the quiet organisation is the one support needs.
-// The server paginates on `createdAt` (a cursor cannot paginate on an aggregate of another
-// table — `service.ts:191`), so THE CLIENT SORTS THE PAGE IT WAS GIVEN. Do not "fix" this
-// by changing the cursor; it is a deliberate trade stated in the plan, not a bug.
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -30,14 +24,9 @@ export default function Console(): JSX.Element {
   const filters = readFilters(params);
   const estate = useEstate(filters);
   const can = useOpsCan();
-  // OWNER ONLY. Staff never see this and never ask for it — `platform.enterprise.read` is a
-  // REVENUE queue, and `19` §4 gives revenue to the owner for the same reason it gives them
-  // `/ops/earnings` (DEC-100).
   const queue = useEnterpriseQueue(can('platform.enterprise.read'));
   const [queueBusy, setQueueBusy] = useState<string | null>(null);
 
-  // The server's page is by `createdAt`; the screen's promise is last-activity-ascending.
-  // Sorted here, on the page in hand — never re-requested for it.
   const sorted = useMemo(() => {
     const rows = [...estate.rows];
     rows.sort((a, b) => {
@@ -93,8 +82,6 @@ export default function Console(): JSX.Element {
         error={queue.error}
         onUpdate={(id, status) => {
           setQueueBusy(id);
-          // The hook catches and KEEPS the failure (`queue.error`), so there is nothing to
-          // catch here — what there must not be again is a rejection with nowhere to go.
           void queue.update(id, status).finally(() => setQueueBusy(null));
         }}
         onApprove={(id) => {

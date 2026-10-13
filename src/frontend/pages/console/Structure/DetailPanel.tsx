@@ -1,9 +1,3 @@
-// The right half of /app/structure — design_specs/design/04 §4.2.
-//
-// The tree answers "what is the shape"; this answers "what is actually in there", which is
-// the question somebody asks right before they move or delete something. It is also the
-// touch-friendly home for the three row actions, since the row's own icon buttons are
-// hover-revealed on a pointer device.
 import type { ResolvedLabels, UnitNode } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { usePeopleIn } from '../../../lib/people.js';
@@ -34,23 +28,10 @@ export function DetailPanel({
   onMove: () => void;
   onDelete: () => void;
 }): JSX.Element {
-  // Only asked for when the reader may see people at all. A list they cannot have is not
-  // rendered empty and apologetic — it is absent (INV-003, design_specs/design/02 §5).
   const people = usePeopleIn(canReadPeople ? node.id : null);
-  // WHO the People stat is made of — DEC-083. Asked for whenever the stat is shown, which
-  // is not the same gate as the name list below: a breakdown is counts, not identities.
   const composition = useUnitComposition(node.id);
   const inside = node.children.length;
 
-  // The map and the tree print the BRANCH (DEC-081) because a box has room for one number.
-  // This panel has room for two, and it is the only surface that shows both — a reader who
-  // clicks Surgery after seeing "9 people" on the map is owed the sentence that says three
-  // of them are placed on Surgery itself. Without it the two views simply disagree.
-  //
-  // Both figures are the server's now (DEC-082). "People" here means DISTINCT PEOPLE, not
-  // positions: a ward with a Head, a Nurse post held by two and a Patient post held by
-  // three used to print "People 3" — the number of role slots — directly above a list of
-  // five names, which is what made the panel unreadable rather than merely wrong.
   const branch = branchOf(node);
 
   return (
@@ -147,19 +128,6 @@ export function DetailPanel({
   );
 }
 
-/**
- * What the People stat is made of — `DEC-083`.
- *
- * The number was honest and unusable: a hospital whose root reads "30 people" means STAFF,
- * and sixteen of those thirty are Patients. The bar is what makes that graspable without
- * reading three figures — "is this mostly patients" is answered by its width, and the count
- * is there for anyone who wants the number.
- *
- * The rows may sum HIGHER than the total, because somebody who is both a Nurse and a Head
- * of Department is honestly in both. The bars are therefore scaled to the LARGEST ROW and
- * never stacked to fill the width — a stacked bar would claim a partition that this is not,
- * and would silently overflow on exactly the org where the claim is wrong.
- */
 function RoleMix({
   rows,
   total,
@@ -167,7 +135,6 @@ function RoleMix({
   rows: Array<{ roleId: string; roleName: string; count: number }>;
   total: number;
 }): JSX.Element | null {
-  // One role is not a mix — it is the stat above restated, in a taller shape.
   if (rows.length < 2) return null;
   const widest = Math.max(...rows.map((row) => row.count), 1);
   const oversubscribed = rows.reduce((sum, row) => sum + row.count, 0) > total;
@@ -187,8 +154,6 @@ function RoleMix({
         ))}
       </ol>
       {oversubscribed && (
-        // Said out loud rather than left to be discovered by adding the column up. Without
-        // it the panel looks like it has lost count of its own people.
         <p className="text-meta">
           Somebody holding two roles is counted under both, so these add up past {total}.
         </p>
@@ -197,12 +162,6 @@ function RoleMix({
   );
 }
 
-/**
- * "4 here · 60 below", and nothing at all when there is no split to explain.
- *
- * Inside the `<dd>` rather than beside it: `<dl> > <div>` may contain `<dt>` and `<dd>` and
- * nothing else, so a sibling paragraph here would be invalid HTML that happens to render.
- */
 function Split({ own, branch }: { own: number; branch: number }): JSX.Element | null {
   if (branch === own) return null;
   return (
