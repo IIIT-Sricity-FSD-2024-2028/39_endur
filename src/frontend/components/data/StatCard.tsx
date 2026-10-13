@@ -1,8 +1,3 @@
-// <StatCard> — 24 §3.
-//
-// One number, said once, with the words that make it mean something. `context` is where
-// "of 214" or "since March" goes; `delta` is a change with a direction, and it only ever
-// appears where a direction is real.
 import type { Valence } from '@endur/shared';
 import { BarRow, type BarRowProps } from './BarRow.js';
 

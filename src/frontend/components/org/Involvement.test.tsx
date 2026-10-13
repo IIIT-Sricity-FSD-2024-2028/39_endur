@@ -1,17 +1,3 @@
-// N-079 — `<Involvement>`. 34 § Interactions, 47 § Interactions.
-//
-// The component is small and three of its properties are invisible when they break, which is
-// what these tests are for:
-//
-//   1. the three reasons stay three groups. A renderer that flattened them would look tidier
-//      and would say the wrong thing twice over — that a poll addressed to every student is
-//      personally about this one, and that a review OF them is merely something they may
-//      answer;
-//   2. the campaign name is a link ONLY for a reader who may open `/app/campaigns/:id`. The
-//      people this block was built for hold no `campaign.read`, and a link that 403s is
-//      worse than no link;
-//   3. `via` is printed. "Why am I on this list?" is the only question the row raises, and
-//      the position that answers it is the one part a tidy-up would drop first.
 import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import type { PersonCampaign } from '@endur/shared';
@@ -44,7 +30,6 @@ describe('<Involvement>', () => {
     const anyone = groupOf('Open to everyone');
 
     expect(within(about).getByText('Mid-semester review')).toBeTruthy();
-    // Absent from the other groups, not merely listed once and repeated.
     expect(within(asked).queryByText('Mid-semester review')).toBeNull();
     expect(within(asked).getByText('Tuesday dinner poll')).toBeTruthy();
     expect(within(anyone).getByText('Suggestion box')).toBeTruthy();
@@ -62,7 +47,6 @@ describe('<Involvement>', () => {
   it('prints the position that put them there, and nothing where there is none', () => {
     renderWithProviders(<Involvement items={[ASKED, ANYONE]} who="them" emptyHint="—" />);
     expect(within(groupOf('They are asked to answer')).getByText('Learner')).toBeTruthy();
-    // "Open to everyone" names nobody, so there is no position to claim for it.
     expect(within(groupOf('Open to everyone')).queryByText('Learner')).toBeNull();
   });
 
@@ -74,7 +58,6 @@ describe('<Involvement>', () => {
     unmount();
 
     renderWithProviders(<Involvement items={[ASKED]} who="them" emptyHint="—" />);
-    // The name is still there; it is simply not a door into a page they cannot open.
     expect(screen.getByText('Tuesday dinner poll')).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Tuesday dinner poll' })).toBeNull();
   });

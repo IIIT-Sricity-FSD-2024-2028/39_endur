@@ -1,7 +1,3 @@
-// Top bar + sidebar + content well. Console world ONLY (20 §1). 24 §2.
-//
-// Built before any page and handed from lane B to lane C — everything in Stage 4 renders
-// inside this, so it shipping late blocks two people rather than one.
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
@@ -11,8 +7,6 @@ import { PlanNoticeBanner } from '../billing/PlanNoticeBanner.js';
 import { SupportBanner } from './SupportBanner.js';
 import { useAppSelector } from '../../store/index.js';
 
-/** Industries the vibe system has a colour pair for (`endur.css` "the switch"). `custom`
- *  and anything else fall through to the base blue accent — same rule Landing.tsx follows. */
 const VIBE_INDUSTRIES = new Set(['university', 'hotel', 'hospital', 'company']);
 
 export function AppShell({
@@ -20,26 +14,14 @@ export function AppShell({
   focused = false,
 }: {
   children: ReactNode;
-  /**
-   * No sidebar, no drawer, no hamburger — the frame design_specs/design/03 §3.4 draws for
-   * the setup wizard. During setup every sidebar item leads to a page that is empty
-   * *because setup has not happened yet*, so offering them invites the one click that
-   * makes the product look broken. It is still the console: same session, same top bar,
-   * same capability gate.
-   */
   focused?: boolean;
 }): JSX.Element {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const industry = useAppSelector((s) => s.auth.org?.industry ?? null);
 
-  // Navigating closes the drawer. Without this, tapping an item on a phone leaves the
-  // drawer covering the page it just opened.
   useEffect(() => setDrawerOpen(false), [location.pathname]);
 
-  // Same mechanism Landing.tsx uses for the demo switcher, aimed at the signed-in org
-  // instead of whichever preset a visitor is previewing: the accent the org picked at
-  // setup follows them into the console, not just the marketing page they signed up from.
   useEffect(() => {
     if (industry && VIBE_INDUSTRIES.has(industry)) {
       document.documentElement.dataset.vibe = industry;

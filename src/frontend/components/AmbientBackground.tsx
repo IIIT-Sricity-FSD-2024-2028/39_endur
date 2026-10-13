@@ -1,15 +1,7 @@
-// The ambient layer (DEC-029). 24 §2.
-//
-// Every surface in the product is translucent, and a blur with nothing behind it is just a
-// grey rectangle. This gives the glass a static field of colour to refract instead.
-//
-// It is `aria-hidden` and `pointer-events: none`: it is wallpaper, not content.
 
 export function AmbientBackground({
   variant = 'default',
 }: {
-  /** `hero` turns the colour fields up for the landing page, where the ambient layer is
-   *  part of the composition rather than something the console sits quietly on top of. */
   variant?: 'default' | 'hero';
 }): JSX.Element {
   return (

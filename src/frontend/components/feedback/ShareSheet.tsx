@@ -1,21 +1,3 @@
-// <ShareSheet> — 24 §6, design_specs/design/06 §6.3, 38 § The share sheet.
-//
-// **THE DEMO MOMENT, and the highest-risk component in the build** (`_MEMORY.md` N-004).
-// Everything here is tuned for being seen from the back of a room, and every rule below is
-// non-negotiable rather than stylistic:
-//
-//   1. 280px minimum, error correction M, PURE dark on PURE white. Not tinted, no logo in
-//      the middle, no rounded modules. A stylised QR that fails on one evaluator's phone
-//      loses the demo outright.
-//   2. A 24px white quiet zone. The single most common cause of scan failure.
-//   3. The URL is readable aloud, because somebody at the back will type it instead of
-//      scanning. That is why the token is 8 characters from an unambiguous alphabet
-//      (DEC-017) and not a UUID.
-//   4. `Full` is what goes on the projector. Escape exits.
-//   5. Copy gives feedback IN PLACE. No toast — the dialog is already the focus.
-//
-// The QR is rendered locally, on canvas. An external image service would fail exactly when
-// the network does, which on demo day is the moment it matters.
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { CampaignAccess, CampaignStatus } from '@endur/shared';
@@ -24,9 +6,6 @@ import { formatDateTime } from '../../lib/format.js';
 import { useLabels } from '../../lib/labels.js';
 import { useAppSelector } from '../../store/index.js';
 
-/** The share sheet's own three-way status tag — narrower than campaigns' four-value
- *  STATUS_TAG (which distinguishes draft from open): here "collecting" covers both,
- *  because a share link works identically for either. */
 const SHARE_STATUS: Record<CampaignStatus, { label: string; tag: string }> = {
   open: { label: 'Collecting', tag: 'tag-good' },
   draft: { label: 'Collecting', tag: 'tag-good' },
@@ -34,37 +13,15 @@ const SHARE_STATUS: Record<CampaignStatus, { label: string; tag: string }> = {
   closed: { label: 'Closed', tag: 'tag-muted' },
 };
 
-/**
- * The only literal colours outside `design-system/`, and DEC-012 is right to have flagged
- * them — so here is why they stay.
- *
- * These are not brand colours; they are a MACHINE-READABILITY requirement. A QR is decoded
- * by thresholding luminance, and the margin a phone camera has to work with under a
- * projector, at an angle, in a lit room, is exactly the contrast between these two values.
- * Reading them from a token would mean the code changes colour when somebody re-themes the
- * product — which is the correct behaviour for every other pixel in this file and the wrong
- * behaviour for these two. `design_specs/design/06` §6.3 specifies both literally for the
- * same reason. Recorded as `N-037`.
- */
-// eslint-disable-next-line no-restricted-syntax -- see above: scanability, not brand.
+// eslint-disable-next-line no-restricted-syntax -- scanability, not brand (N-037).
 const DARK = '#17232e';
-// eslint-disable-next-line no-restricted-syntax -- see above: scanability, not brand.
+// eslint-disable-next-line no-restricted-syntax -- scanability, not brand (N-037).
 const LIGHT = '#ffffff';
 const QR_SIZE = 300;
-/** In QR modules, not pixels — `qrcode` scales it with the code. 4 is the spec's 24px. */
 const QUIET_ZONE = 4;
 
-/** Copied-label dwell. Long enough to read, short enough not to look stuck. */
 const COPIED_MS = 1500;
 
-/**
- * Does this URL stand a chance of being scanned?
- *
- * `PUBLIC_BASE_URL` ships defaulted to `http://localhost:5173`, and a QR encoding
- * `localhost` resolves to the PHONE, not to the laptop — so it fails silently and looks
- * like a broken product rather than a misconfiguration. `OPEN-002` has carried this as a
- * checklist item since revision one; a checklist item is not what catches it at 9am.
- */
 export function isUnscannable(url: string): boolean {
   try {
     const host = new URL(url).hostname;
@@ -88,10 +45,6 @@ export function ShareSheet({
   status: CampaignStatus;
   endsAt?: string | null | undefined;
   anonymous?: boolean | undefined;
-  /**
-   * DEC-037. Changes ONE line of the footer and nothing else about the sheet — but it is the
-   * line that would otherwise be false. See below.
-   */
   access?: CampaignAccess | undefined;
   onClose: () => void;
 }): JSX.Element {
@@ -104,8 +57,6 @@ export function ShareSheet({
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
-      // Escape leaves presentation mode first, and closes the sheet only from the sheet.
-      // One key, two levels, and the reader is never dumped two screens back.
       if (presenting) setPresenting(false);
       else onClose();
     };
@@ -119,8 +70,6 @@ export function ShareSheet({
         setCopied(true);
         window.setTimeout(() => setCopied(false), COPIED_MS);
       },
-      // Clipboard access can be refused. Saying nothing would leave the reader thinking it
-      // worked; the URL is on screen and selectable either way.
       () => setFailed(true),
     );
   };
@@ -237,17 +186,8 @@ export function ShareSheet({
   );
 }
 
-/** Strips the scheme so the line reads as an address rather than as a URL. */
 const display = (url: string): string => url.replace(/^https?:\/\//, '');
 
-/**
- * The code itself, drawn to a canvas.
- *
- * A canvas rather than an `<img>` with a data URL: the download path needs a data URL
- * anyway, but the on-screen one should not wait for a second encode, and a canvas cannot
- * 404. If the encode fails the URL is still on screen and still typeable — the sheet
- * degrades to its own fallback rather than to a blank square.
- */
 function Qr({ url, size, className }: { url: string; size: number; className?: string }): JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState(false);

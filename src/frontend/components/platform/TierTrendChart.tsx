@@ -1,18 +1,3 @@
-// <TierTrendChart> — `71` § Revenue, DEC-080. Which plans people are buying, over time.
-//
-// IT PLOTS PURCHASES, NOT A TIER CENSUS, and the distinction is load-bearing. `subscriptions`
-// holds only the CURRENT tier with no history — `<GrowthChart>`'s header records the same
-// limit at length — so "how many organisations were on Gold in March" cannot be answered
-// without re-projecting today's rows onto a month they do not describe, which `71`'s own rule
-// ("historic figures must not move retroactively") forbids. What the ledger genuinely knows
-// is what was BOUGHT, and when. The caption says so, in those words, on the page.
-//
-// THREE LINES, NOT FOUR. Enterprise is never purchased — `16` §4 prices it individually and
-// `joinTier` refuses it — so a fourth line would be structurally flat at zero forever, which
-// reads as "nobody wants it" rather than "it is not on sale".
-//
-// ONE SHARED SCALE, the same reason `<GrowthChart>` gives: scaling each line to its own
-// maximum would draw one bronze signup as tall as a busy month of gold.
 const SERIES = [
   { key: 'bronze', label: 'Bronze' },
   { key: 'silver', label: 'Silver' },
