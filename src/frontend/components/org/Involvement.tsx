@@ -1,28 +1,8 @@
-// "What is this person actually being asked for?" — 24 §4, one implementation, two
-// placements, exactly like its neighbour `<PowersByPlace>`.
-//
-// **WHY IT EXISTS.** `/app/people/:id` answered three questions about a person — who they
-// are, where they sit, what they can do — and every one of them is about POWER. A
-// respondent holds none: no account, no grants (DEC-009), so the page for the thirty
-// students in an organisation of forty-five was the emptiest page in it, while five polls
-// addressed to them by role sat one screen away. This block is the fourth question, and for
-// most of an organisation it is the only one with an answer.
-//
-// It renders `/profile`'s copy too, and the two differ in one word — "them" or "you" —
-// which is why the headings are props rather than literals.
 import { Link } from 'react-router-dom';
 import type { PersonCampaign } from '@endur/shared';
 import { Icon } from '../Icon.js';
 import { STATUS_TAG, timing } from '../../pages/console/Campaigns/card.js';
 
-/**
- * The three groups, in this order, and the order is an argument about importance.
- *
- * "About them" first because being reviewed is the thing somebody most needs to know is
- * happening. "Asked" second because the organisation named them. "Open to everyone" last
- * because it is true of every member of staff and says nothing about this person — it is
- * on the page so the list is complete, not because it is about them.
- */
 const GROUPS: Array<{ reason: PersonCampaign['reason']; heading: (subject: string) => string }> = [
   { reason: 'subject', heading: (who) => `About ${who}` },
   { reason: 'audience', heading: (who) => `${who === 'you' ? 'You are' : 'They are'} asked to answer` },
@@ -31,7 +11,6 @@ const GROUPS: Array<{ reason: PersonCampaign['reason']; heading: (subject: strin
 
 export function Involvement({
   items,
-  /** "them" or "you" — the only thing the two placements disagree about. */
   who,
   emptyHint,
   canOpenCampaign = false,
@@ -39,7 +18,6 @@ export function Involvement({
   items: PersonCampaign[];
   who: 'them' | 'you';
   emptyHint: string;
-  /** Whether the name links to the campaign's own page. See the row below. */
   canOpenCampaign?: boolean;
 }): JSX.Element {
   if (items.length === 0) {

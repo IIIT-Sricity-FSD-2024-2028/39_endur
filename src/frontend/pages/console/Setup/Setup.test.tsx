@@ -1,8 +1,3 @@
-// T-032 — the wizard, end to end in jsdom. 31 § Acceptance.
-//
-// The acceptance criteria that can be checked without a stopwatch are all here. The two
-// that cannot — "under 100 seconds with a stopwatch" and "rehearsed three times" — are
-// `T-045`, and no test can stand in for them.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -101,16 +96,6 @@ describe('step 1 — industry', () => {
     expect(screen.queryByRole('radiogroup')).toBeNull();
   });
 
-  // DEC-085 MOVED THIS, and moved it knowingly. `31` § step 1 put the role chain and the
-  // vocabulary pair on EVERY card so four different organisations were legible side by
-  // side before a single click — the presenter's ten-second beat. The split pane shows one
-  // preset at a time and shows strictly MORE of it: all four roles as a chart, plus both
-  // terms in a full sentence, none of which fits on a card in a five-card grid.
-  //
-  // WHAT IS ASSERTED HERE IS THE PROPERTY, NOT THE PLACEMENT: step 1 tells you what a
-  // preset would actually do to your organisation, in this organisation's own words,
-  // BEFORE you commit to it. That was the point of the original and it still holds. The
-  // cost is real and is recorded in DEC-085: you now compare presets serially.
   it('shows the role chain and the vocabulary pair for the preset under consideration', () => {
     mount();
     pick('University');
@@ -122,8 +107,6 @@ describe('step 1 — industry', () => {
   });
 
   it('says nothing about roles or words until a preset is under consideration', () => {
-    // The other half of the same decision: the aside is the ONLY place this now lives, so
-    // an empty aside must read as "pick one", never as "this preset has nothing in it".
     mount();
     expect(screen.queryByText('Dean')).toBeNull();
     expect(screen.getByText(/Select an organization type/)).toBeTruthy();
@@ -160,12 +143,10 @@ describe('step 2 — roles', () => {
 
   it('renumbers and re-describes live when a row moves', () => {
     toRoles();
-    // Move "Head" (level 2) up. It becomes level 1 and its description becomes the top one.
     clickButton('Move Head up');
 
     const rows = screen.getAllByLabelText<HTMLInputElement>('Role name');
     expect(rows.map((row) => row.value)).toEqual(['Head', 'Dean', 'Tutor', 'Learner']);
-    // The text is generated from position, so nothing had to be re-entered.
     expect(screen.getByText('Sees everything')).toBeTruthy();
   });
 
@@ -204,7 +185,6 @@ describe('step 3 — structure', () => {
 
   it('labels the add button from the DRAFT vocabulary, not the saved one (INV-001)', () => {
     toStructure();
-    // The store still holds NONSENSE_LABELS; the button must read the wizard's draft.
     expect(screen.getAllByRole('button', { name: 'Add a Zblorn' }).length).toBeGreaterThan(0);
   });
 
@@ -214,7 +194,6 @@ describe('step 3 — structure', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Add a Zblorn' })[0]!);
     const after = screen.getAllByLabelText<HTMLInputElement>('Name');
     expect(after).toHaveLength(before + 1);
-    // Two clicks and two words: the next keystroke is the name.
     expect(document.activeElement).toBe(after[after.length - 1]);
   });
 
@@ -234,13 +213,8 @@ describe('step 3 — structure', () => {
     clickButton('Move Physics');
     expect(screen.getByRole('status').textContent).toContain('Physics');
 
-    // Every legal destination offers itself, and its own subtree does not — that is the
-    // cycle guard, visible in the UI rather than only in the reducer.
     const destinations = screen.getAllByRole('button', { name: 'Move here' });
     expect(destinations).toHaveLength(2); // Northfield and Engineering, not Physics
-    // Every destination must be VISIBLE without hovering it, or the keyboard and touch
-    // path is decorative. `.unit-actions` is opacity:0 until hover, and a child cannot
-    // out-opacity a zero parent — so the tree carries the override, not the button.
     expect(container.querySelector('.unit-tree')?.className).toContain('is-relocating');
     fireEvent.click(destinations[1]!);
 
@@ -269,7 +243,6 @@ describe('step 4 — words, and the preview that proves the claim', () => {
       target: { value: 'Studio' },
     });
 
-    // No save, no request — the point of the step is that it is instant.
     expect(preview()).toContain('Studios');
     expect(preview()).not.toContain('Quaxels');
     expect(commit).not.toHaveBeenCalled();
@@ -312,7 +285,6 @@ describe('the whole wizard', () => {
     continueOn();
     continueOn();
     continueOn();
-    // Step 5 shows it, and going back shows it still in the field.
     expect(screen.getByText(/Provost → Head → Tutor → Learner/)).toBeTruthy();
 
     clickButton('Back');
@@ -350,8 +322,6 @@ describe('the whole wizard', () => {
       labels: university.labels,
       includeTemplates: true,
     });
-    // The vocabulary changed under every console screen; the session must be re-read
-    // before navigating or /app renders the words the wizard just replaced.
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
@@ -361,7 +331,6 @@ describe('the whole wizard', () => {
     clickButton('Finish setup');
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not save');
-    // Still on review, still holding everything.
     expect(screen.getByText('4 levels')).toBeTruthy();
     expect(screen.queryByText('CONSOLE')).toBeNull();
   });
@@ -377,11 +346,9 @@ describe('the whole wizard', () => {
 
     pick('Hotel');
     const dialog = screen.getByRole('alertdialog');
-    // Real numbers, never "Are you sure?" (24 §6).
     expect(within(dialog).getByText(/4 roles, 2 units/)).toBeTruthy();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    // Cancelling keeps the edited draft, and the industry it belongs to.
     expect(screen.getByRole<HTMLInputElement>('radio', { name: /University/ }).checked).toBe(true);
     expect(screen.getByRole<HTMLInputElement>('radio', { name: /Hotel/ }).checked).toBe(false);
     continueOn();
@@ -389,9 +356,6 @@ describe('the whole wizard', () => {
   });
 
   it('does not advance the step BEHIND the confirm dialog when Enter is pressed', () => {
-    // Found by reading, 19 Aug: the wizard's global Enter handler kept working while the
-    // modal was up, so the dialog stayed open over a screen that was no longer the one it
-    // was asking about. A modal owns the keyboard.
     mount();
     pick('University');
     continueOn();
@@ -408,19 +372,6 @@ describe('the whole wizard', () => {
     expect(screen.queryByText('Sees everything')).toBeNull();
   });
 
-  /**
-   * ENTER INSIDE A TEXT FIELD BELONGS TO THE FIELD — `DEC-105`, and this is the owner's
-   * report: *"clicking enter goes to next page when I am just trying to form the team."*
-   *
-   * The handler exempted `BUTTON` and `TEXTAREA` and nothing else, so `INPUT` fell through to
-   * "advance the step" — on the two steps built entirely around typing into inputs. Step 3's
-   * `+` ADDS A CHILD UNIT AND FOCUSES ITS NAME INPUT, so the wizard handed the user a text
-   * field and then read the natural key for finishing a row as the key for leaving the screen.
-   *
-   * The event is dispatched FROM THE INPUT, not from `document.body`, because the whole bug
-   * was about which element the key came from — a `body`-sourced event would pass against the
-   * broken handler too.
-   */
   it('does not advance the step when Enter is pressed inside a text field', () => {
     mount();
     pick('University');
@@ -430,15 +381,9 @@ describe('the whole wizard', () => {
 
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    // Still on the roles step. `Sees everything` is step 2's copy and it is gone on step 3.
     expect(screen.getByText('Sees everything')).toBeTruthy();
   });
 
-  /**
-   * AND ENTER STILL ADVANCES WHERE THERE IS NOTHING TO TYPE — `DEC-105`'s `not` clause. The
-   * fix that would have been easiest is deleting the handler; step 1 is a radio grid, and the
-   * key that means "yes, that one" is the one this test presses.
-   */
   it('still advances on Enter from outside a text field', () => {
     mount();
     pick('University');
@@ -464,8 +409,6 @@ describe('the whole wizard', () => {
       industry: 'custom',
       roles: [{ name: 'Owner' }, { name: 'Member' }],
     });
-    // A navigation would have left an org with no roles — the exact empty console the
-    // wizard exists to prevent. It is a real commit.
     await waitFor(() => expect(screen.getByText('CONSOLE')).toBeTruthy());
   });
 });

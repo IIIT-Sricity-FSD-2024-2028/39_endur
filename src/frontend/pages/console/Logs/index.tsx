@@ -1,25 +1,3 @@
-// T-076 — /app/logs. 56, design_specs/design/04 §4.
-//
-// THE ORGANISATION'S OWN RECORD OF WHAT HAPPENED INSIDE IT, AND WHICH RULE ALLOWED IT.
-//
-// `audit_log` has been written on every state change since `T-013` and had never once been
-// read. That is a whole invariant's worth of evidence — INV-007, the transaction-bound row
-// carrying `decided_by` — sitting in a table with no reader. This is the reader.
-//
-// Three things it must keep straight, all of them from `56`:
-//
-//  1. NO `ip`, EVER. It is not in `AuditEntry` and it is not fetched. `DEC-040` fixed the
-//     writer because a fix at the reader protects one screen; this screen is the belt to
-//     that brace, and a `response.submit` row here is deliberately the least informative
-//     row in the table — the action, the campaign, the time, no actor.
-//  2. THE REFUSALS ARE THE POINT (`DEC-041`). *Show refusals only* is a toggle and not a
-//     buried dropdown, because it is what turns this page from a business record into a
-//     security screen: three refusals of `grant.update` by the same person in a minute is
-//     a conversation to have today.
-//  3. WHY, NOT ONLY WHAT. Every row carries `<DecisionTrace>` — the same component `42`
-//     renders, in the other tense (`24` §6c, INV-009).
-//
-// No polling and no live tail. This is a record; `72` is the monitor.
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { describeCapability } from '@endur/shared';
@@ -36,10 +14,6 @@ import { useAudit, type AuditFilters } from '../../../lib/audit.js';
 
 const FILTER_KEYS = ['action', 'targetType', 'outcome', 'from', 'to'] as const;
 
-/**
- * The target types a row can carry. Not a catalogue — it is the list `db/tx.ts` actually
- * writes, and the filter offers what exists rather than what might.
- */
 const TARGET_TYPES = ['unit', 'person', 'user', 'role', 'subject', 'campaign', 'template', 'organization'];
 
 export default function Logs(): JSX.Element {
@@ -48,8 +22,6 @@ export default function Logs(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Every filter in the URL. A filtered log is linkable, and *"here is the row I mean"*
-  // pasted into a chat is the whole reason anybody opens this page with somebody else.
   const filters: AuditFilters = useMemo(
     () => ({
       action: params.get('action') ?? undefined,
@@ -68,8 +40,6 @@ export default function Logs(): JSX.Element {
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
-    // A filter change re-queries from the top, so an expanded row would be pointing at a
-    // row that is no longer on screen.
     setOpenId(null);
   };
 
@@ -82,8 +52,6 @@ export default function Logs(): JSX.Element {
     />
   );
 
-  // 403 — THE ACCOUNT. The sidebar item is absent without `audit.read`, so this is the
-  // directly-typed address, and it must not read as an empty log.
   if (!can('audit.read') || log.forbidden) {
     return (
       <div className="page">
@@ -110,8 +78,6 @@ export default function Logs(): JSX.Element {
         row.actor ? (
           <span className="logs-actor">{row.actor.name}</span>
         ) : (
-          // `56` § Anonymity rule 3. A respondent submission names nobody, and saying so
-          // out loud is better than an empty cell somebody reads as a bug.
           <span className="text-meta">Not a signed-in person</span>
         ),
     },
@@ -135,8 +101,6 @@ export default function Logs(): JSX.Element {
         row.target ? (
           <span className="logs-target">
             {row.target.name ?? (
-              // NEVER hidden. A record that quietly drops the rows whose subjects are gone
-              // is a record that can be edited by deleting things (56 § States).
               <span className="text-meta">
                 {row.target.id?.slice(0, 8) ?? row.target.type} (deleted)
               </span>
@@ -150,7 +114,6 @@ export default function Logs(): JSX.Element {
       key: 'outcome',
       header: 'Outcome',
       render: (row) => (
-        // Never colour alone (21 §8) — the word is the answer and the tint is decoration.
         <span className={`tag ${row.outcome === 'denied' ? 'tag-bad' : 'tag-good'}`}>
           {row.outcome === 'denied' ? 'Refused' : 'Allowed'}
         </span>
@@ -253,8 +216,6 @@ export default function Logs(): JSX.Element {
           rowKey={(row) => row.id}
           empty={
             filtered ? (
-              // Different copy AND a way out, because the two empties mean opposite things
-              // — one is "nothing happened", the other is "your filter is too narrow" (34).
               <EmptyState
                 icon="log"
                 title="Nothing matches those filters"

@@ -56,20 +56,12 @@ responded" and still not know whose answer is whose.
 | Database | PostgreSQL 16 · Prisma, with a raw-SQL seam for recursive graph queries |
 | Auth | Cookie sessions for staff · opaque tokens for respondents, who never hold accounts |
 
-Documentation lives in [`architecture/`](architecture/) — 53 documents covering the data
-model, the permission engine, the middleware chain, every page and every feature. Start with
-[`architecture/README.md`](architecture/README.md).
-
-The live build state is in [`PROGRESS.md`](PROGRESS.md).
-
 ## 🟪 Repository
 
 ```
-src/backend/           Express + Prisma. The middleware chain is src/app.ts
-src/frontend/           React SPA
+src/backend/        Express + Prisma. The middleware chain is src/app.ts
+src/frontend/        React SPA
 packages/shared/    Zod DTOs, the capability catalogue, error codes, labels
-architecture/       contracts: schema, routes, capabilities, acceptance criteria
-design_specs/       visual authority: tokens, type, colour, component anatomy
 scripts/            invariant audits that run in CI
 ```
 
@@ -78,18 +70,25 @@ scripts/            invariant audits that run in CI
 Requires **Node 20+** and **PostgreSQL 16**.
 
 ```bash
+cp .env.example .env                     # then set SESSION_SECRET (32+ chars)
+
 npm install
+# If this fails with EBADPLATFORM (an esbuild optional dependency for a
+# different OS), it's an npm issue unrelated to this project — retry with:
+#   npm install --force
 
 # Postgres — either one, they produce an identical database:
 sudo bash scripts/install-postgres.sh    # native install (Linux / WSL)
 npm run db:up                            # docker compose, if you have Docker
 
-cp .env.example .env                     # then set SESSION_SECRET (32+ chars)
 npm run db:migrate
 npm run db:seed
 
 npm run dev                              # api :4000 · web :5173
 ```
+
+`.env` has to exist **before** `npm install` — its `postinstall` hook runs
+`prisma generate`, which needs `DATABASE_URL` to already be set.
 
 On WSL, services do not start at boot: `sudo service postgresql start` after a restart.
 
@@ -98,7 +97,22 @@ Useful checks:
 ```bash
 npm run typecheck
 npm run lint          # includes rules enforcing the project's invariants
-npm run audit:drift   # docs and code cannot silently disagree about a capability
 npm run audit:vocab   # no hardcoded domain noun in a component
 ```
+
+## 🟦 Testing
+
+```bash
+npm run test                 # every workspace that has tests — @endur/api and @endur/web
+npm run test -w @endur/api   # backend only (Vitest + Supertest against the real database)
+npm run test -w @endur/web   # frontend only (Vitest + React Testing Library)
+
+npm run test -w @endur/api -- tiers.test.ts   # a single backend test file
+npm run test -w @endur/web -- Start           # frontend tests matching a name/path
+```
+
+The backend tests run against a real database (`TEST_DATABASE_URL` in `.env.example`, a
+separate `endur_test` database) rather than mocks — `test/globalSetup.ts` creates and
+migrates it automatically on the first run, so no manual setup is needed beyond Postgres
+itself being up.
 

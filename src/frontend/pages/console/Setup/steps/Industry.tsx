@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 import type { PresetView } from '@endur/shared';
 import { Icon, type IconName } from '../../../../components/Icon.js';
 
-// Typed to the union, not to `string`: `IconName` is the agreed vocabulary (24 §1), and a
-// `Record<string, string>` here is what let a name that does not exist compile.
 const PRESET_ICONS: Record<string, IconName> = {
   university: 'university',
   hotel: 'hotel',
@@ -12,8 +10,6 @@ const PRESET_ICONS: Record<string, IconName> = {
   custom: 'settings',
 };
 
-/** Industries the vibe system has a colour pair for (`endur.css` "the switch"). Matches
- *  `AppShell.tsx`'s set — `custom` has no swatch and stays the base blue accent. */
 const VIBE_INDUSTRIES = new Set(['university', 'hotel', 'hospital', 'company']);
 
 export function IndustryStep({
@@ -29,9 +25,6 @@ export function IndustryStep({
 }): JSX.Element {
   const selectedPreset = presets.find((p) => p.key === selected);
 
-  // Preview the theme live as the org type is picked — same mechanism Landing.tsx's demo
-  // switcher uses. `AppShell` takes over from `organization.industry` once setup finishes;
-  // this just lets the pick double as a "choose your colour" control before that exists.
   useEffect(() => {
     if (selected && VIBE_INDUSTRIES.has(selected)) {
       document.documentElement.dataset.vibe = selected;

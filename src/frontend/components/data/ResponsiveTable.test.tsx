@@ -1,10 +1,3 @@
-// <ResponsiveTable> — 24 §3, §9.
-//
-// The acceptance item is "collapses correctly for all four tables at 390px", and jsdom has
-// no layout, so what can honestly be tested here is the CONTRACT the collapse rests on: one
-// DOM, every cell labelled by its header, the primary column marked, and the hide-below
-// columns carrying the class the media query keys on. The pixel behaviour is a device
-// check, and it is listed as one.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { ResponsiveTable, type Column } from './ResponsiveTable.js';

@@ -1,6 +1,3 @@
-// Two things worth locking down. The chip row is the demo's ten-second proof (N-003), and
-// the scope chip has to make a CONSTRAINT legible — a disabled dropdown would imply the
-// choice exists and is being withheld, which is the opposite of what it must say.
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { PageHeader } from './PageHeader.js';
@@ -16,7 +13,6 @@ describe('VocabularyChips', () => {
   });
 
   it('falls back to generic words rather than rendering nothing', () => {
-    // A brand-new org has no labels at all. It must still read as a product.
     renderWithProviders(<VocabularyChips />, {});
     expect(screen.getByText('Unit')).toBeTruthy();
     expect(screen.getByText('Subject')).toBeTruthy();

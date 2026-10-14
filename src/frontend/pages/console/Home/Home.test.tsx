@@ -1,10 +1,3 @@
-// T-041 — /app. 46, design_specs/design/04 §4.1.
-//
-// The assertions that carry weight here are about what the page does with ABSENCE. A
-// section the caller cannot read arrives as a missing KEY, not as an empty array, and this
-// page is the one place in the product where telling those two apart changes what the
-// reader is told: "nothing assigned to you yet" and "add your first one" are different
-// sentences for different people, and only the payload knows which is which.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -18,7 +11,6 @@ vi.mock('qrcode', () => ({
 
 const reload = vi.fn();
 let home: { data: HomeView | null; loading: boolean; error: Error | null };
-/** Every range the page has asked the hook for, in order — DEC-031. */
 const ranges: string[] = [];
 
 vi.mock('../../../lib/home.js', () => ({
@@ -28,17 +20,8 @@ vi.mock('../../../lib/home.js', () => ({
   },
 }));
 
-/**
- * Six days out, always.
- *
- * This was the literal `'2026-08-26T23:59:00.000Z'` and it worked until 26 August, when the
- * assertion below started reading "ended 3 days ago" and failing for no reason anyone had
- * changed. A fixture pinned to a wall-clock date is a test with an expiry printed on it —
- * and the one thing this test is about is a RELATIVE phrase.
- */
 const inSixDays = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
 
-/** Same rule for the comment feed, which renders "3 minutes ago" from these. */
 const hoursAgo = (n: number): string => new Date(Date.now() - n * 60 * 60 * 1000).toISOString();
 
 const FULL: HomeView = {
@@ -112,8 +95,6 @@ describe('the page as a whole', () => {
 
 describe('what the caller may not read is ABSENT — INV-003', () => {
   it('renders a coherent page, not an error, when every section is withheld', () => {
-    // A junior role. Both keys are missing from the payload, which is the server saying
-    // "not yours" — and the page must not look broken because of it (46 § States).
     home = {
       data: { stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 }, prompts: [], configured: true },
       loading: false, error: null,
@@ -121,8 +102,6 @@ describe('what the caller may not read is ABSENT — INV-003', () => {
     mount(['org.read']);
 
     expect(screen.getByText('Nothing assigned to you yet')).toBeTruthy();
-    // No actions at all: offering a next step to somebody who cannot take one is worse
-    // than saying nothing.
     expect(screen.queryByRole('link', { name: /add/i })).toBeNull();
     expect(screen.queryByText('Response rate')).toBeNull();
   });
@@ -134,7 +113,6 @@ describe('what the caller may not read is ABSENT — INV-003', () => {
     mount(['org.read', 'campaign.read', 'results.read']);
 
     expect(screen.getByText('Spring check')).toBeTruthy();
-    // Absent, not greyed. There is no "you don't have permission" ghost on this page.
     expect(screen.queryByText('Recent responses')).toBeNull();
   });
 });
@@ -155,8 +133,6 @@ describe('a brand-new organisation', () => {
 
   it('shows a next action, NEVER four zeroes', () => {
     mount();
-    // Four cards reading 0 look like a product that is broken; an empty state looks like
-    // a product that is waiting for you (46 § States).
     expect(screen.queryByText('Response rate')).toBeNull();
     expect(screen.getByText('Add a quaxel')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Add a Quaxel' })).toBeTruthy();
@@ -166,8 +142,6 @@ describe('a brand-new organisation', () => {
 describe('the range control — DEC-031', () => {
   it('opens on 30 days rather than all time', () => {
     mount();
-    // The complaint this exists to answer: an all-time total only goes up, and nobody
-    // acts on it. The first thing after sign-in is recent activity.
     expect(ranges[0]).toBe('30d');
     expect(screen.getByRole<HTMLInputElement>('radio', { name: '30 days' }).checked).toBe(true);
   });
@@ -175,17 +149,12 @@ describe('the range control — DEC-031', () => {
   it('refetches rather than filtering what it already has', () => {
     mount();
     fireEvent.click(screen.getByRole('radio', { name: 'Today' }));
-    // Server-side, and it must stay server-side: the k-anon gate and the response rate's
-    // denominator are both decided there. A client slicing all-time rows would be holding
-    // the rows the gate exists to withhold.
     expect(ranges.at(-1)).toBe('today');
   });
 
   it('keeps the previous numbers on screen while the new range loads', () => {
     home = { data: FULL, loading: true, error: null };
     const { container } = mount();
-    // Not four skeletons. A range change that blanks the band makes the page jump more
-    // than the data moves — the old figures dim and are replaced in place.
     expect(container.querySelectorAll('.home-skeleton')).toHaveLength(0);
     expect(screen.getByText((1057).toLocaleString())).toBeTruthy();
     expect(container.querySelector('.stat-row')?.getAttribute('aria-busy')).toBe('true');
@@ -206,9 +175,6 @@ describe('the range control — DEC-031', () => {
   });
 
   it('stays visible for an org that has collected before but is quiet now', () => {
-    // The distinction `responsesEver` exists for: nothing arrived in 30 days, but this is
-    // not a new organisation, and hiding the control would strand them on an empty band
-    // with no way to widen the range.
     home = {
       data: {
         ...FULL,
@@ -236,8 +202,6 @@ describe('the active campaigns', () => {
     const card = screen.getByText('Spring check').closest('li') as HTMLElement;
     fireEvent.click(within(card).getByRole('button', { name: /Share/ }));
 
-    // The URL travels in the home payload precisely so this click costs nothing on venue
-    // wifi — during a demo the code is the most common thing anybody wants from here.
     expect(container.querySelector('.share-url')?.textContent)
       .toBe('feedback.example.test/r/K4M9X2PQ');
   });
@@ -247,8 +211,6 @@ describe('the active campaigns', () => {
     const card = screen.getByText('Spring check').closest('li') as HTMLElement;
     expect(within(card).getByText('612')).toBeTruthy();
     expect(within(card).getByText(/ends in/)).toBeTruthy();
-    // design_specs/design/04 §4.1 draws `612 / 800`. That denominator is the one T-040 and
-    // T-041 both had to remove — an open link has no roll to be a fraction of (N-046).
     expect(container.querySelector('.bar-fill')).toBeNull();
   });
 
@@ -276,8 +238,6 @@ describe('the prompts', () => {
     };
     const { container } = mount();
 
-    // Two is the server's cap (46 § Interactions) and the page does not second-guess it in
-    // either direction — it renders the list it was handed.
     expect(container.querySelectorAll('.home-prompt')).toHaveLength(2);
     expect(screen.getByText('Start a plithe')).toBeTruthy();
     expect(screen.getByText('More people than seats')).toBeTruthy();

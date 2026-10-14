@@ -1,8 +1,3 @@
-// <MessageComposer> — `24` §6b, `70` § Interactions. Contact an org's administrators.
-//
-// NO RECIPIENT FIELD, and its absence is the acceptance criterion: recipients are resolved
-// server-side from who holds `org.update` and shown here only for confirmation. An operator
-// typing an address is an operator who can typo a customer's plan details to a stranger.
 import { useState } from 'react';
 
 export function MessageComposer({

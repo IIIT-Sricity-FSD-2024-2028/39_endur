@@ -1,9 +1,3 @@
-// <UnitTree> — the T-033 extensions. 32, 24 §4.
-//
-// The wizard's use of this component is covered by Setup.test.tsx; what is here is
-// everything /app/structure added, and the reason it is a separate file is INV-009: there
-// is ONE tree, and the next page to need it (the campaign audience picker) should find its
-// behaviour already described rather than guess.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { UnitTree, daysUntil, type UnitTreeNode } from './UnitTree.js';
@@ -17,9 +11,6 @@ const tree = (over: Partial<UnitTreeNode> = {}): UnitTreeNode[] => [
         id: 'eng',
         name: 'Engineering',
         children: [{ id: 'cs', name: 'Computer Science', children: [] }],
-        // A row prints its BRANCH, and the server sends it (DEC-082). Nothing under
-        // Engineering carries a count in this fixture, so its branch is its own — stated
-        // rather than derived, because deriving it here would test the fixture.
         peopleTotal: over.peopleCount ?? 0, subjectTotal: over.subjectCount ?? 0,
         ...over,
       },
@@ -49,8 +40,6 @@ describe('<UnitTree> — counts and badges', () => {
   });
 
   it('hides subject counts when the caller has no word for them', () => {
-    // Better to say nothing than to invent "7 Subjects" for an organisation that calls
-    // them something else.
     render(<UnitTree nodes={tree({ peopleCount: 64, subjectCount: 7 })} mode="edit" onRename={vi.fn()} />);
     expect(within(rowFor('Engineering')).getByText('64 people')).toBeTruthy();
   });
@@ -61,8 +50,6 @@ describe('<UnitTree> — counts and badges', () => {
   });
 
   it('counts ONE subject in the singular too — DEC-081', () => {
-    // This row said "1 Quaxels" from T-033 until DEC-081, and a test asserting the plural
-    // form of a count of one is how it survived three revisions unnoticed.
     render(
       <UnitTree
         nodes={tree({ subjectCount: 1 })}
@@ -75,12 +62,6 @@ describe('<UnitTree> — counts and badges', () => {
   });
 
   it('prints the branch the server counted, not the row’s own share — DEC-081', () => {
-    // The tree sits beside the map on /app/structure. The two showing different numbers for
-    // the same unit would be worse than either rule on its own, so they read one field.
-    //
-    // The walk itself is the server's (DEC-082) and is tested in `test/units.test.ts`;
-    // what this asserts is that the row reads `peopleTotal` and not `peopleCount`, which
-    // is the whole of the component's responsibility here.
     const nested: UnitTreeNode[] = [
       {
         id: 'root',
@@ -140,8 +121,6 @@ describe('<UnitTree> — refusing a move into your own descendant', () => {
     render(<UnitTree nodes={tree()} mode="edit" onRename={vi.fn()} onReparent={onReparent} />);
 
     fireEvent.click(screen.getByLabelText('Move Engineering'));
-    // Computer Science is inside Engineering, so it cannot become its parent. It offers no
-    // "Move here" — the refusal below is what a DRAG onto it produces.
     fireEvent.drop(rowFor('Computer Science'));
 
     expect(onReparent).not.toHaveBeenCalled();
@@ -190,8 +169,6 @@ describe('<UnitTree> — asked to act from outside', () => {
       <UnitTree {...props} request={{ id: 'cs', action: 'move', nonce: 1 }} />,
     );
 
-    // Cancel it, then ask for exactly the same thing again. Without the nonce the second
-    // click on Move would be a no-op, because nothing about the request changed.
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
     expect(screen.queryByRole('status')).toBeNull();
 

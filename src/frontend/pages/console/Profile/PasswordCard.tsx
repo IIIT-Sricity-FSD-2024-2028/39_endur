@@ -1,15 +1,7 @@
-// Change your own password. 47 § Interactions, 15 § Password handling.
-//
-// The current-password field is the whole reason this is a card rather than a link to a
-// reset email. Three reasons, and the first is the one that matters: **an unattended
-// logged-in session must not be enough to lock the real owner out.** Ninety seconds at
-// somebody else's desk would otherwise take their account for good.
 import { useState } from 'react';
 import type { ChangePasswordBody } from '@endur/shared';
 import { ApiError } from '../../../lib/api.js';
 
-/** Kept in step with `ChangePasswordBody`'s floor. 15 § Password handling: length, no
- *  composition rules — a mandated symbol mostly produces "Password1!". */
 const MIN = 10;
 
 export function PasswordCard({
@@ -21,9 +13,6 @@ export function PasswordCard({
   const [newPassword, setNew] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  /** Keyed BY FIELD, because 47 § States says a mismatch is inline on the current-password
-   *  field and not a toast — a toast takes the only actionable sentence away after four
-   *  seconds, and the server's field path is what says which input it belongs under. */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -39,8 +28,6 @@ export function PasswordCard({
     void onSubmit({ currentPassword, newPassword })
       .then(() => {
         setDone(true);
-        // Both cleared. Leaving a password in an input after it has been used is leaving a
-        // credential on screen for the next person who walks past.
         setCurrent('');
         setNew('');
       })
@@ -50,7 +37,6 @@ export function PasswordCard({
           for (const field of caught.fields) next[field.path] = field.message;
           setFieldErrors(next);
         } else if (caught instanceof ApiError) {
-          // Nothing landed on a field, so the summary is the only thing there is to show.
           setError(caught.message);
         } else {
           setError(caught instanceof Error ? caught.message : 'That did not work.');

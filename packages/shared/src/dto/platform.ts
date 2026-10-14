@@ -281,8 +281,22 @@ export type PlatformAnalytics = {
    * customer cannot move down at all, so the only downgrades are an operator override and the
    * scheduled expiry of `DEC-098` — which is why that transition writes a `payments` row of
    * `kind: 'expiry'`.
+   *
+   * `trialStarted` IS A FIFTH COUNT — `DEC-116`, superseding part of `DEC-102`. Read the same
+   * way `new` is, from `payments` rows of `kind: 'trial_signup'` rather than
+   * `organization.createdAt`, because a trial start and a paid signup both create an
+   * organisation and only the ledger tells them apart. Counted beside `new`, never folded into
+   * it — the number this change exists to show would disappear into "new organisations"
+   * otherwise.
    */
-  movement: { period: string; new: number; upgraded: number; downgraded: number; churned: number }[];
+  movement: {
+    period: string;
+    new: number;
+    upgraded: number;
+    downgraded: number;
+    churned: number;
+    trialStarted: number;
+  }[];
 
   /** AS OF TODAY — `DEC-103`. Adoption is a state of the estate, not an event in a window. */
   adoption: {

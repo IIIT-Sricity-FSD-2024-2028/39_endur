@@ -1,5 +1,3 @@
-// A user belongs to exactly ONE organisation (10), so the top bar names it as plain text —
-// there is nothing to switch between. See OPEN-006.
 import { describe, expect, it } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { TopBar } from './TopBar.js';

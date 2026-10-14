@@ -1,14 +1,3 @@
-// Add a person. 34 § Interactions, 14 §8.
-//
-// **Two fields, and deliberately no role.** `CreatePersonBody` does not accept a role, a
-// level or a capability, and this form must not pretend otherwise — granting a position is
-// a permission change and gets its own audited call. The person is created here and given
-// a position on the row afterwards, which is two steps and is meant to be.
-//
-// It is worth saying WHY on the screen rather than only in the DTO, because an
-// administrator's expectation from every other product is that "add user" asks for a role.
-// A form that silently omits the question reads as unfinished; one that says the position
-// comes next reads as deliberate.
 import { useState } from 'react';
 import { isValid } from '../../../lib/validate.js';
 import { nameField } from '@endur/shared';
@@ -27,9 +16,6 @@ export function PersonForm({
   onCancel: () => void;
 }): JSX.Element {
   const [draft, setDraft] = useState<PersonDraft>({ name: '', email: '' });
-  // THE SAME RULE THE SERVER USES, so the button does not enable on `"12345"` and then meet a
-  // 422 (`DEC-110`). `isValid` runs `nameField(120)` — the field off `CreatePersonBody` — rather
-  // than a length check written here, which is how the two used to disagree.
   const ready = isValid(nameField(120), draft.name) && draft.email.trim().length > 0;
 
   return (

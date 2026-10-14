@@ -1,13 +1,3 @@
-// T-034 — /app/subjects/:id. 35 § Interactions, design_specs/design/04 §4.5.
-//
-// Identity, where it sits, who it is — and then the history: every cycle this subject went
-// through and what came back. 35 calls that "the first hint of the Improve layer", and it
-// is worth having now even though the loop is P3, because a falling response count across
-// three cycles is a story somebody can read straight off the screen.
-//
-// There are no SCORES here on purpose. Aggregates live behind the results endpoints where
-// the k-anonymity gate is (INV-007); an average on this page would be a second path to the
-// same numbers with nothing in front of it.
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { SubjectCycle } from '@endur/shared';
@@ -26,10 +16,6 @@ import { formatDate, formatRelative, pluralise } from '../../../lib/format.js';
 import { SubjectForm, type SubjectDraft } from './SubjectForm.js';
 import { archiveConsequence } from './index.js';
 
-/**
- * The change between the last two cycles. Two is enough to say "more" or "fewer", and
- * anything cleverer than that would be a chart pretending to be an analysis (43 is P3).
- */
 export function trendOf(cycles: SubjectCycle[]): { value: number; valence: 'positive' | 'negative' | 'neutral' } | undefined {
   const done = cycles.filter((cycle) => cycle.responseCount > 0);
   if (done.length < 2) return undefined;
@@ -46,8 +32,6 @@ export default function SubjectDetail(): JSX.Element {
   const navigate = useNavigate();
   const subject = useSubject(id);
   const units = useUnits();
-  // The list controller is the one place that knows how to write a subject; the detail
-  // page borrows its mutations rather than growing a second set (23 §3).
   const writes = useSubjectList({});
 
   const [editing, setEditing] = useState(false);
@@ -86,8 +70,6 @@ export default function SubjectDetail(): JSX.Element {
       .update(data.id, {
         name: draft.name,
         unitId: draft.unitId,
-        // `null` is a real value here — it is how a link is REMOVED, and `undefined` would
-        // silently leave it in place.
         linkedUserId: draft.linkedUserId,
       })
       .then(() => {

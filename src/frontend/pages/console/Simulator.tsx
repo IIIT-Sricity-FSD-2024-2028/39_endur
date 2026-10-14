@@ -1,12 +1,3 @@
-// T-054 — /app/simulator. 42.
-//
-// THE SENTENCE MUST NEVER BE ABLE TO ASK AN INVALID QUESTION. Every blank is a dropdown
-// populated from real objects in this organisation, so "Test" always sends a query the
-// server can actually answer — there is no free-text principal, capability, or target id
-// anywhere on this screen.
-//
-// `<DecisionTrace>` is EXTENDED here, not forked (`T-076`, INV-009, `24` §6c) — it is the
-// same component `56`'s activity log renders, in the present tense instead of the past.
 import { useMemo, useState } from 'react';
 import type { Capability, PersonSummary, SimulateBody, SimulateTarget } from '@endur/shared';
 import { isCapability } from '@endur/shared';
@@ -24,9 +15,6 @@ import { useCapabilityCatalogue, useSimulator, type SimulationRecord } from '../
 
 type TargetKind = SimulateTarget['kind'];
 
-/** A blocked decision rejected ONLY by scope is the counterfactual `42` calls the most
- *  valuable line on the screen — everything else (a hard block, an expired grant, no grant
- *  at all) teaches a different lesson and gets its own line instead. */
 function counterfactual(record: SimulationRecord): string | null {
   const { decision } = record;
   if (decision.allowed || decision.reason !== 'out_of_scope') return null;
@@ -105,9 +93,6 @@ export default function Simulator(): JSX.Element {
   const sim = useSimulator();
 
   const [principal, setPrincipal] = useState<{ userId: string; name: string } | null>(null);
-  // `Capability | ''`, not `string`. The file's own rule is that this sentence cannot ask
-  // an invalid question; since the DTO started validating against the catalogue that rule
-  // is the compiler's to keep rather than a comment's. `''` is the unchosen blank.
   const [capability, setCapability] = useState<Capability | ''>('');
   const [targetKind, setTargetKind] = useState<TargetKind>('org');
   const [targetUnitId, setTargetUnitId] = useState('');
@@ -120,8 +105,6 @@ export default function Simulator(): JSX.Element {
   const subjects = useSubjectList({ q: subjectTerm || undefined });
   const campaigns = useCampaignList();
 
-  // 403 — THE ACCOUNT. The sidebar item is absent without `simulator.run`, so this is the
-  // directly-typed address, and it must not read as a broken sentence.
   if (!can('simulator.run')) {
     return (
       <div className="page">
@@ -164,8 +147,6 @@ export default function Simulator(): JSX.Element {
     catalogue.data?.find((c) => c.key === capability)?.label ?? capability;
 
   const runTest = (): void => {
-    // `ready` already asserts `capability !== ''`, and TypeScript narrows through the
-    // alias — so `capability` is a `Capability` from here down with nothing restated.
     if (!ready || !principal) return;
     let target: SimulateTarget;
     if (targetKind === 'org') target = { kind: 'org' };
@@ -202,8 +183,6 @@ export default function Simulator(): JSX.Element {
               value={capability}
               onChange={(event) => {
                 const next = event.target.value;
-                // Every option but the placeholder came from the catalogue, so anything
-                // that is not a capability IS the placeholder. Checked rather than cast.
                 setCapability(isCapability(next) ? next : '');
               }}
               disabled={catalogue.loading}
@@ -339,10 +318,6 @@ export default function Simulator(): JSX.Element {
           <DecisionTrace
             decision={{
               decidedBy: latest.decision.decidedBy ?? null,
-              // Omitted rather than passed as undefined: `<DecisionTrace>` treats an
-              // ABSENT `considered` as "this response carried no candidate list" and
-              // drops the section, which is exactly a production 403 (`11` §10). An
-              // explicit undefined would mean the same at runtime and fail the type.
               ...(latest.decision.considered ? { considered: latest.decision.considered } : {}),
               tense: 'present',
             }}

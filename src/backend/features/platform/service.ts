@@ -417,6 +417,7 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
     planChanges,
     planOverrides,
     suspensions,
+    trialSignups,
   ] =
     await Promise.all([
       db.organization.count(),
@@ -446,6 +447,14 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
         where: { action: 'org.suspend', createdAt: { gte: from, lte: windowEnd } },
         select: { createdAt: true },
       }),
+      // DEC-116. Its own query rather than widening `movementNew` (which reads
+      // `organization.createdAt` and would count a trial signup AND a paid signup as the same
+      // thing): a trial started is only distinguishable from an ordinary signup by the ledger
+      // row registration wrote alongside it.
+      db.payment.findMany({
+        where: { createdAt: { gte: from, lte: windowEnd }, kind: 'trial_signup' },
+        select: { createdAt: true },
+      }),
     ]);
 
   const joined = organizations - trialing - cancelled;
@@ -461,11 +470,18 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
 
   const periods = periodsBetween(from, to, granularity);
   const movementMap = new Map(
-    periods.map((period) => [period, { new: 0, upgraded: 0, downgraded: 0, churned: 0 }]),
+    periods.map((period) => [period, { new: 0, upgraded: 0, downgraded: 0, churned: 0, trialStarted: 0 }]),
   );
   for (const row of movementNew) {
     const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
     if (bucket) bucket.new += 1;
+  }
+  // DEC-116. Counted alongside `new` rather than folded into it: a trial starting is real
+  // movement worth seeing on its own line, and conflating it with a paid signup would hide the
+  // one number this reintroduction exists to show.
+  for (const row of trialSignups) {
+    const bucket = movementMap.get(periodKeyOf(row.createdAt, granularity));
+    if (bucket) bucket.trialStarted += 1;
   }
   // One rule for both sources: the previous plan against the one that replaced it. It says nothing
   // about who caused the move, because a rule that named a cause would need extending for each new one.
@@ -495,9 +511,15 @@ export async function analytics(query: AnalyticsQuery): Promise<PlatformAnalytic
   }
   const movement = periods.map((period) => ({ period, ...movementMap.get(period)! }));
 
-// The trial counters are gone, because they could never move: registration writes an active status,
-// so nothing is ever trialing, and the conversion rate had no source at all.
-// The honest thing to do with a metric that has no source is not to print it.
+// DEC-116 SUPERSEDES PART OF DEC-102. "Trials started" has a real source again — registration can
+// write status 'trialing' once more, on an explicit opt-in — and `movement[].trialStarted` above is
+// it, read the same way `movement[].new` already is, from the ledger.
+//
+// "CONVERSION RATE" STAYS GONE, DELIBERATELY. Unlike a count, a rate needs a time-bounded
+// definition of "converted" (within the trial? within 30 days of it ending? ever?) that is a
+// product decision nobody has made, not a number this change can compute honestly. Printing one
+// anyway would just move the old problem — a figure with no real source — from "doesn't exist" to
+// "exists and is wrong," which is worse.
 
   const [orgsWithACampaign, orgsWithAResponse, allOrgIds] = await Promise.all([
     db.organization.count({ where: { campaigns: { some: {} } } }),

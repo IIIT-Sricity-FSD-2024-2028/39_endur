@@ -1,15 +1,3 @@
-// The drill-through. 43 § Interactions, 43 § The drill-through needs a second capability.
-//
-// *"Each theme drills into its source comments, which is what stops a theme from being an
-// unfalsifiable label."* This panel is that sentence. Everything above it on the page is a
-// number the engine produced; this is the text the number came from, unedited.
-//
-// IT CAN 403 ON ITS OWN, AND THAT IS THE POINT. The route carries `response.read` as well
-// as `analysis.read`, because verbatim comments are what `40` already priced: *"seeing that
-// the average is 4.3 and reading what one person wrote are different levels of access."*
-// Somebody who can read this page and not this panel is not a bug — they are the split
-// working. So the denial is rendered HERE, inside the panel, with the analysis still on
-// screen behind it, exactly as `40` keeps its aggregates when the comments are refused.
 import type { ThemeDetail, Valence } from '@endur/shared';
 import { ScoreBadge } from '../../../components/data/ScoreBadge.js';
 import { Icon } from '../../../components/Icon.js';
@@ -40,8 +28,6 @@ export function ThemePanel({
   forbidden: boolean;
   error: Error | null;
   onClose: () => void;
-  /** Passed in rather than read from useLabels() here, matching <ResponseCard> — a hotel
-   *  calls them something else and this panel must not decide what (INV-001). */
   subjectWord: string;
   campaignWord: string;
 }): JSX.Element {

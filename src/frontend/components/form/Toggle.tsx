@@ -1,8 +1,3 @@
-// <Toggle> — 24 §5. `label` is REQUIRED; an unlabelled toggle is inaccessible.
-//
-// A real checkbox underneath, visually hidden rather than replaced. Everything a checkbox
-// already does — space to toggle, form participation, the accessibility tree, forced-colours
-// mode — costs nothing to keep and is expensive to rebuild badly.
 export function Toggle({
   checked,
   onChange,

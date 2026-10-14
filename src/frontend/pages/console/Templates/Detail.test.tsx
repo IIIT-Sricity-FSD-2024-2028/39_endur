@@ -1,8 +1,3 @@
-// T-035 — /app/templates/:id, the preview. 36 § Interactions, 05 §5.4.
-//
-// The load-bearing assertion in this file is that the preview renders through
-// `<QuestionInput>` — the same six components the respondent form will use (INV-008).
-// Everything else on this screen is arrangement; that one is the claim.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -41,9 +36,6 @@ let template: { data: TemplateDetail | null; loading: boolean; error: Error | nu
 let library: TemplateSummary[];
 
 vi.mock('../../../lib/templates.js', () => ({
-  // `cloneKey` is stubbed to something recognisable rather than spread in from the real
-  // module: what this page owns is passing the template's own key through to the clone
-  // call, and the key's FORMAT is lib/templates.test.ts's business.
   cloneKey: (id: string) => `key-for-${id}`,
   librarySearch: () => '',
   useTemplate: () => ({ ...template, reload }),
@@ -81,8 +73,6 @@ beforeEach(() => {
 describe('the preview IS the respondent form (INV-008)', () => {
   it('renders every question through <QuestionInput>, not a read-only lookalike', () => {
     mount();
-    // A rating arriving as a radiogroup with its anchors on the end points is the shape
-    // <QuestionInput> produces and nothing else in the codebase does.
     const rating = screen.getByRole('group', { name: /How clear was it\?/ });
     expect(within(rating).getAllByRole('radio')).toHaveLength(5);
     expect(screen.getByRole('radio', { name: '1 — Poor' })).toBeTruthy();
@@ -101,15 +91,12 @@ describe('the preview IS the respondent form (INV-008)', () => {
 
   it('says plainly that nothing is saved, and in the org\'s own word for a respondent', () => {
     mount();
-    // INV-001 reaches even here: a hotel's preview says "guest", a hospital's "patient".
     expect(screen.getByText(/Preview — nothing is saved/)).toBeTruthy();
     expect(screen.getByText(/frimble sees/)).toBeTruthy();
   });
 
   it('keeps a disabled Submit rather than dropping it', () => {
     mount();
-    // Removing it would make the preview shorter than the real form and hide the one
-    // control every respondent has to find.
     const submit = screen.getByRole<HTMLButtonElement>('button', { name: 'Submit' });
     expect(submit.disabled).toBe(true);
   });
@@ -118,8 +105,6 @@ describe('the preview IS the respondent form (INV-008)', () => {
 describe('the three widths', () => {
   it('offers phone, tablet and desktop, and opens on desktop', () => {
     const { container } = mount();
-    // Desktop-first: it is the frame most people compare templates in, and the widest
-    // one — phone and tablet are checks, not the starting point.
     expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Desktop' }).checked).toBe(true);
     expect(container.querySelector('.preview-frame.is-phone')).toBeFalsy();
     expect(screen.getByRole('radio', { name: 'Tablet' })).toBeTruthy();
@@ -187,7 +172,6 @@ describe('related templates, and the two states that are not a form', () => {
     const related = screen.getByRole('heading', { name: 'Related' }).closest('section') as HTMLElement;
     expect(within(related).getByRole('link', { name: 'Semester review' })).toBeTruthy();
     expect(within(related).queryByRole('link', { name: 'Course feedback' })).toBeNull();
-    // Ward round shares neither category nor industry, so it is not related to anything.
     expect(within(related).queryByRole('link', { name: 'Ward round' })).toBeNull();
   });
 

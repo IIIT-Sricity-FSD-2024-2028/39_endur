@@ -1,9 +1,3 @@
-// T-050 — /app/people. 34 § Acceptance.
-//
-// The fixture labels are NONSENSE on purpose (22 §5). If an English domain noun appears in
-// an assertion below, the component hardcoded it and INV-001 is false on this screen.
-// "People", "Name", "Email", "Position" are structural product words and correctly stay
-// literal (22 §1) — the unit noun is not, and is asserted through the fixture.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes, useLocation } from 'react-router-dom';
@@ -69,7 +63,6 @@ const ALL: Capability[] = [
   'assignment.create', 'assignment.delete',
 ];
 
-/** The fixture's unit noun, narrowed once — `LabelSet`'s keys are optional by type. */
 const UNIT_ONE = NONSENSE_LABELS.unit?.one ?? '';
 
 function Where(): JSX.Element {
@@ -89,9 +82,6 @@ const where = (): string => screen.getByTestId('where').textContent ?? '';
 beforeEach(() => {
   vi.clearAllMocks();
   seen = [];
-  // The real `create` reloads the list before resolving, so the new row exists by the time
-  // the page reacts. The mock has to do the same or the position editor has no row to open
-  // on — and the test would fail for a reason the product does not have.
   create.mockImplementation(() => {
     const added = person({ id: 'p9', name: 'Kofi Mensah' });
     list = { ...list, data: page([...(list.data?.data ?? []), added]) };
@@ -120,14 +110,10 @@ beforeEach(() => {
 describe('the list', () => {
   it('renders a person once per row, whatever their hat count', () => {
     mount();
-    // The name is an <InlineName> input when the caller may rename, so it is a VALUE.
     expect(screen.getByDisplayValue('Asha Rao')).toBeTruthy();
     expect(screen.getByDisplayValue('Bo Chen')).toBeTruthy();
   });
 
-  // 34 § Acceptance: "A person can hold two positions at different units, shown as two
-  // chips." This is the multi-position model made visible, and it is the reason a dean who
-  // is also a professor needs no special case.
   it('shows a two-hat person as TWO chips, each naming its own place', () => {
     mount();
     const row = screen.getByDisplayValue('Asha Rao').closest('tr') as HTMLElement;
@@ -137,8 +123,6 @@ describe('the list', () => {
     expect(row.textContent).toContain('Computer Science');
   });
 
-  // INV-005 lives in the unit half. A chip reading only "Dean" would hide the single most
-  // important behavioural detail in the model on the screen where somebody is setting it.
   it('never renders a position without its place', () => {
     mount();
     const chips = document.querySelectorAll('.position-chip');
@@ -149,43 +133,18 @@ describe('the list', () => {
     }
   });
 
-  // Somebody with no position can do nothing at all — the commonest reason an
-  // administrator is on this screen. An empty cell would say nothing about it.
   it('says so, in words, when a person holds no position', () => {
     mount();
     const row = screen.getByDisplayValue('Bo Chen').closest('tr') as HTMLElement;
     expect(row.textContent).toContain('No position');
   });
 
-  /**
-   * REPORTED: a person added on this screen showed "invited" the moment they appeared, and
-   * nobody had invited them.
-   *
-   * `POST /people` writes `users.status = 'invited'` with a null password hash — the state
-   * that says "this account cannot open the door" (`10` §2) — and the row printed that
-   * column raw. The string is a DATABASE state about a hash, and it was being read on
-   * screen as a SENTENCE about an email nobody had sent.
-   *
-   * `account` is the field that answers the question, derived server-side in one place
-   * (`features/accounts/status.ts`, `57` § States) and precise where the raw column cannot
-   * be: `invited` and `none` are the SAME `users.status` and the same null hash, and the
-   * only thing that separates "we are waiting for them" from "nobody has asked them" is
-   * whether an unaccepted `account_invites` row exists. The Account column already reads
-   * it, and already renders the right thing here — the `Invite` button.
-   *
-   * `PersonSummary.status` is GONE rather than merely unread, so the first guard on this is
-   * the type system and this test is the second. It is worth having both: the assertion is
-   * true of the screen however the account state is plumbed, and the reason the field was
-   * wrong here is a product reason, not a typing one.
-   */
   it('does not say "invited" about somebody nobody has invited', () => {
-    // What `POST /people` returns for somebody just added: no account, and no invite.
     const fresh = person({ id: 'p3', name: 'Kim Ali', account: { state: 'none' } });
     list = { ...list, data: page([fresh]) };
     mount([...ALL, 'account.create']);
     const row = screen.getByDisplayValue('Kim Ali').closest('tr') as HTMLElement;
     expect(row.textContent?.toLowerCase()).not.toContain('invited');
-    // And the column that IS about the account says the true thing: ask them.
     expect(within(row).getByRole('button', { name: 'Invite' })).toBeTruthy();
   });
 });
@@ -205,8 +164,6 @@ describe('filters', () => {
     await waitFor(() => expect(where()).not.toContain('cursor'));
   });
 
-  // The two empties differ, and showing the wrong one is a small daily frustration: one
-  // needs an add action, the other needs a clear-filters action (34 § States).
   it('distinguishes an empty organization from an empty query', () => {
     list = { data: page([]), loading: false, error: null };
     const view = mount();
@@ -221,13 +178,9 @@ describe('filters', () => {
 });
 
 describe('adding a person', () => {
-  // 14 §8 / 34: the create DTO carries no role, level or capability. A form that offered
-  // one would be promising something the API refuses.
   it('asks for a name and an email and NOTHING about permissions', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: /Add a person/ }));
-    // Scoped to the dialog: "Name" and "Email" are also column headers on the table behind
-    // it, and an unscoped query would pass on the wrong element.
     const dialog = within(screen.getByRole('dialog'));
     expect(dialog.getByLabelText('Name')).toBeTruthy();
     expect(dialog.getByLabelText('Email')).toBeTruthy();
@@ -245,8 +198,6 @@ describe('adding a person', () => {
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({ name: 'Kofi Mensah', email: 'kofi@example.test' }),
     );
-    // Creating somebody grants them nothing. Leaving the administrator on a list with a new
-    // row that can do nothing is leaving the job half done (34 § Interactions).
     await waitFor(() => expect(document.querySelector('.position-editor')).toBeTruthy());
   });
 });
@@ -267,13 +218,10 @@ describe('positions', () => {
     );
   });
 
-  // DEC-044 made this consequential: a per-person grant anchors at the PRIMARY position's
-  // unit, and two positions with none flagged leaves no anchor at all.
   it('makes a first position primary by default, and asks from the second onwards', () => {
     mount();
     const bo = screen.getByDisplayValue('Bo Chen').closest('tr') as HTMLElement;
     fireEvent.click(bo.querySelector('.btn-tiny') as HTMLElement);
-    // No checkbox: with no positions yet, primary is not a question worth asking.
     expect(screen.queryByLabelText('Primary')).toBeNull();
 
     const asha = screen.getByDisplayValue('Asha Rao').closest('tr') as HTMLElement;
@@ -281,9 +229,6 @@ describe('positions', () => {
     expect(screen.getByLabelText('Primary')).toBeTruthy();
   });
 
-  // 34 § States. The refusal here is usually INV-012's, and its whole value is the sentence
-  // naming the capability that would have been handed out. A generic message throws away
-  // the only actionable part; a toast takes it away after four seconds (24 §6).
   it('shows a refusal INLINE and verbatim, never a toast', async () => {
     assign.mockRejectedValue(
       new ApiError({
@@ -316,15 +261,11 @@ describe('positions', () => {
 });
 
 describe('permissions are the API’s job, not this screen’s', () => {
-  // INV-003: out-of-scope actions are ABSENT, not disabled. A greyed row would be a list of
-  // everything the caller cannot do (design_specs/design/02 §5).
   it('omits every write action without the capability for it', () => {
     mount(['person.read']);
     expect(screen.queryByRole('button', { name: /Add a person/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
     expect(document.querySelector('.btn-tiny')).toBeNull();
-    // …and the list itself still renders. Hiding actions is not hiding data.
-    // No `person.update` here, so the name is plain text rather than an input.
     expect(screen.getByText('Asha Rao')).toBeTruthy();
   });
 
@@ -335,8 +276,6 @@ describe('permissions are the API’s job, not this screen’s', () => {
 });
 
 describe('removing a person', () => {
-  // <ConfirmDialog> requires a consequence (24 §6), and the honest one depends on what they
-  // hold: removing somebody with two positions takes two permission grants with them.
   it('names how many positions go with them', () => {
     mount();
     const row = screen.getByDisplayValue('Asha Rao').closest('tr') as HTMLElement;

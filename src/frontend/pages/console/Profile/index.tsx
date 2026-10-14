@@ -1,14 +1,3 @@
-// /app/profile — the signed-in user's own account. 47.
-//
-// **The page earns its place with the last block, not the first.** Name, email and photo are
-// housekeeping; "what you can actually do, and where" is INV-005 made personal, and it is the
-// one screen in the product where somebody can answer *"why can't I see the other
-// department's results?"* for themselves rather than opening a ticket.
-//
-// Distinct from `/app/people/:id`, which is an administrator looking at somebody else. Same
-// three blocks, same component for the third — and a completely different capability path:
-// this one resolves under `self`, so a person with no administrative permission at all can
-// open it. That makes it the cleanest demonstration of the `self` scope in `11` §4.
 import { useState } from 'react';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { FileUpload } from '../../../components/form/FileUpload.js';
@@ -26,8 +15,6 @@ import { useAppSelector } from '../../../store/index.js';
 import { PasswordCard } from './PasswordCard.js';
 
 export default function Profile(): JSX.Element {
-  // The store for the shell's copy of the user, the profile call for everything else. They
-  // are the same person; `refresh()` is what keeps them the same person after a write.
   const sessionUser = useAppSelector((state) => state.auth.user);
   const refresh = useRefreshSession();
   const profile = useProfile();
@@ -102,8 +89,6 @@ export default function Profile(): JSX.Element {
               onUpload={async (file) => {
                 setError(null);
                 await apiUpload<{ data: unknown }>('/profile/avatar', file);
-                // Re-read the session rather than patching the slice: the avatar shows in
-                // the shell too, and one source of truth is why it updates there as well.
                 await refresh();
                 await profile.reload();
               }}
@@ -132,8 +117,6 @@ export default function Profile(): JSX.Element {
           <h3 className="utility" id="profile-positions">Your positions</h3>
           <div className="card">
             {positions.length === 0 ? (
-              // A real state for somebody just invited, and it must not read as an error
-              // (47 § States). The second sentence is the actionable half.
               <p className="text-muted">
                 You don&apos;t hold any positions yet. Whoever set up your account can give
                 you one — until then you can sign in and see this page, and nothing else.

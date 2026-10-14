@@ -145,29 +145,25 @@ describe('operator login', () => {
     expect(ok.status).toBe(200);
   });
 
-  it('accepts the code for THIS step and no other', () => {
-    // THIS TEST USED TO BE A LIE, AND THE LIE WAS TIME-SHAPED. It was written against the usual
-    // 30-second TOTP step and asserted in wall-clock seconds: "30s ago still works, 5 minutes ago
-    // does not". `totp.ts` then moved to a FIVE HOUR step to keep the seeded demo workable, and
-    // both offsets became rounding error - now, now-30s and now-5min are almost always the same
-    // counter. So the second assertion proved nothing and the third failed outright, except in
-    // the five-minute sliver right after a step boundary where it happened to pass. A test that
-    // is right for 1.7% of the day is worse than no test: it fails for reasons that have nothing
-    // to do with the change in front of whoever is reading the run.
-    //
-    // Now it counts in STEPS rather than in seconds, via `codeAt`, so it does not depend on what
-    // time it is and does not need editing again if the step length moves. The property it is
-    // actually about is WINDOW === 0: with a step this long, accepting a neighbour would double
-    // the life of a code, so neither neighbour may be accepted.
+  it('accepts the code for this step and one step of drift either way — DEC-084', () => {
+    // Counts in STEPS rather than in seconds, via `codeAt`, so it does not depend on what time
+    // it is and does not need editing again if the step length moves. The property this is
+    // actually about is WINDOW === 1 at a 30-second STEP_SECONDS (DEC-084): a code is valid for
+    // its own step plus one step of clock drift either way — 30 seconds of slack for an
+    // unsynchronised laptop clock, not a meaningful validity extension — and nothing wider.
     const secret = generateSecret();
-    const now = Math.floor(Date.now() / 1000 / (5 * 60 * 60));
+    const now = Math.floor(Date.now() / 1000 / 30);
 
     expect(verifyCode(secret, currentCode(secret))).toBe(true);
     expect(verifyCode(secret, codeAt(secret, now))).toBe(true);
 
-    // No drift allowance in either direction - the previous code is dead and the next is not born.
-    expect(verifyCode(secret, codeAt(secret, now - 1))).toBe(false);
-    expect(verifyCode(secret, codeAt(secret, now + 1))).toBe(false);
+    // ±1 step of drift is accepted.
+    expect(verifyCode(secret, codeAt(secret, now - 1))).toBe(true);
+    expect(verifyCode(secret, codeAt(secret, now + 1))).toBe(true);
+
+    // ±2 steps and beyond is not - the window does not stretch further than DEC-084 allows.
+    expect(verifyCode(secret, codeAt(secret, now - 2))).toBe(false);
+    expect(verifyCode(secret, codeAt(secret, now + 2))).toBe(false);
     expect(verifyCode(secret, codeAt(secret, now - 10))).toBe(false);
   });
 });
@@ -322,13 +318,34 @@ describe('analytics — `71`, `T-067`', () => {
     expect(gold).toBeTruthy();
   });
 
-  // The trial figures are gone from the RESPONSE, not just from the page: they could never move, so the
-  // old assertion pinned a figure that was permanently correct and permanently still.
-  it('prints no trial figures at all, because nothing can ever write one', async () => {
+  // DEC-116 narrows this rather than reverses it: trial figures ARE real again, but there is
+  // still no top-level `trials` object with a "conversion rate" in it — that still has no
+  // honest source. What exists now lives at `movement[].trialStarted`, asserted below.
+  it('still prints no top-level trial figures — conversion rate has no honest source', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.agent.get('/api/v1/platform/analytics');
     expect(res.status).toBe(200);
     expect(res.body.data).not.toHaveProperty('trials');
+  });
+
+  // DEC-116. Reached through the REAL path this time (register with trial: true), not a raw
+  // Prisma write — proving the mechanical count above now has a live producer.
+  it('counts a trial signup in movement.trialStarted, from the real registration path', async () => {
+    const owner = await makeOperator('owner');
+    const before = await owner.agent.get('/api/v1/platform/analytics');
+    const beforeStarted = (before.body.data.movement as Array<{ trialStarted: number }>).reduce(
+      (sum, row) => sum + row.trialStarted,
+      0,
+    );
+
+    await registerOrg('custom', 'gold', true);
+
+    const after = await owner.agent.get('/api/v1/platform/analytics');
+    const afterStarted = (after.body.data.movement as Array<{ trialStarted: number }>).reduce(
+      (sum, row) => sum + row.trialStarted,
+      0,
+    );
+    expect(afterStarted).toBe(beforeStarted + 1);
   });
 
   // No seats anywhere on this page: the product prices per organisation, and the stored seat column has

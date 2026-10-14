@@ -865,6 +865,7 @@ export const BillingSummarySchema = mirrors<BillingSummary>()(
     periodEnd: iso(),
     pendingTier: Tier.nullable(),
     lapsedFrom: Tier.nullable(),
+    lapsedFromTrial: z.boolean().nullable(),
     seats: z.number(),
     seatBreakdown: z.object({ activeUsers: z.number(), nonPersonSubjects: z.number() }),
   }),
@@ -1071,6 +1072,7 @@ export const PlatformAnalyticsSchema = mirrors<PlatformAnalytics>()(
         upgraded: z.number(),
         downgraded: z.number(),
         churned: z.number(),
+        trialStarted: z.number(),
       }),
     ),
     adoption: z.object({
