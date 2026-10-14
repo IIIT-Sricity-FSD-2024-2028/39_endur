@@ -1,8 +1,3 @@
-// T-034 — /app/subjects/:id. 35 § Interactions.
-//
-// The history is the reason this page exists rather than a modal: "did anything actually
-// change?" is the product's whole question, and cycles with response counts are the
-// cheapest honest answer to it before the Improve loop lands in P3.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -99,15 +94,11 @@ describe('the page', () => {
     expect(screen.getByRole('heading', { name: 'Data Structures' })).toBeTruthy();
     expect(screen.getByText('Quaxel · in Engineering')).toBeTruthy();
     expect(screen.getByText('Active Plithes')).toBeTruthy();
-    // The line under that kicker said "2 cycles so far" until T-044 — "cycle" is the DTO's
-    // word for a campaign this subject appeared in, and a hotel would not recognise it.
     expect(screen.getByText('2 plithes so far')).toBeTruthy();
   });
 
   it('shows the history oldest first, with per-cycle counts', () => {
     const { container } = mount();
-    // Scoped to the history list: the page header's vocabulary chips are list items too,
-    // and an unscoped getAllByRole('listitem') picks those up first.
     const cycles = Array.from(container.querySelectorAll('.cycle'));
     expect(cycles).toHaveLength(2);
     expect(within(cycles[0] as HTMLElement).getByRole('link', { name: 'Spring cycle' })).toBeTruthy();
@@ -134,8 +125,6 @@ describe('the page', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove link' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-    // null, not undefined: undefined would leave the link in place, which is the bug this
-    // assertion exists to catch.
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith('s1', {
         name: 'Data Structures', unitId: 'u1', linkedUserId: null,

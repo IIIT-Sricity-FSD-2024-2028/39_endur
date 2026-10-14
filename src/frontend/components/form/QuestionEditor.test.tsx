@@ -1,12 +1,3 @@
-// T-036 — the six editors. 24 §5, 05 §5.3, 37 § The six types.
-//
-// Driven through the `<QuestionEditor>` dispatcher rather than the six renderers directly,
-// for the same reason the input tests are: reaching past it would pass happily on the day
-// somebody adds a second dispatcher beside this one.
-//
-// The constraints being asserted are the DTO's — two options minimum, ten maximum, an
-// optional `maxSelections`, no placeholder key rather than an empty one. A control that
-// lets somebody build a config the server rejects is a trap, not a convenience.
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -18,14 +9,6 @@ const draft = (config: QuestionConfig): QuestionDraft => ({
   kind: config.kind, text: 'How did it go?', config, required: false,
 });
 
-/**
- * A CONTROLLED harness, not a fixed prop.
- *
- * The editor is controlled — it reports a config and renders whatever it is handed back —
- * so a test that never feeds the change back cannot see anything that appears AS A RESULT
- * of a change, like the "At most" field arriving when the limit is switched on. Holding
- * the state here is how the builder will hold it.
- */
 function Harness({
   initial, readOnly, onChange,
 }: { initial: QuestionDraft; readOnly: boolean; onChange: (q: QuestionDraft) => void }): JSX.Element {
@@ -44,7 +27,6 @@ const mount = (config: QuestionConfig, readOnly = false) => {
   const result = render(
     <Harness initial={draft(config)} readOnly={readOnly} onChange={onChange} />,
   );
-  /** The config the editor last asked for. */
   const config_ = (): QuestionConfig => (onChange.mock.calls.at(-1)?.[0] as QuestionDraft).config;
   return { onChange, config: config_, ...result };
 };
@@ -74,15 +56,12 @@ describe('rating — a scale and both of its ends', () => {
 describe('the two kinds with nothing to configure say so, and never render an empty body', () => {
   it('yes / no uses the copy 24 §5 fixes', () => {
     const view = mount({ kind: 'yesno' });
-    // An empty body reads as a control that failed to render.
     expect(screen.getByText('No settings for this type.')).toBeTruthy();
     view.unmount();
   });
 
   it('NPS says WHAT is fixed and why, rather than "no settings"', () => {
     mount({ kind: 'nps' });
-    // 0-10 with those anchors is what makes a score comparable to anybody else's; an
-    // editable one would be a rating scale wearing the name (DEC-010).
     expect(screen.getByText(/Fixed 0 – 10/)).toBeTruthy();
     expect(screen.getByText(/use a rating scale if you want your own wording/)).toBeTruthy();
   });
@@ -119,8 +98,6 @@ describe('single and multi choice share one option list', () => {
   });
 
   it('gives multi choice the square dot and single the round one', () => {
-    // 05 §5.3: identical controls, one difference. The dot is that difference, and it is
-    // the same class the respondent form uses — the author sees what they are building.
     const single = mount(CHOICE);
     expect(document.querySelectorAll('.q-dot.q-dot-square')).toHaveLength(0);
     expect(document.querySelectorAll('.q-dot').length).toBeGreaterThan(0);
@@ -150,7 +127,6 @@ describe('the two config flags that only one kind each has', () => {
   it('turning the limit off removes the key rather than setting it to zero', () => {
     const view = mount({ kind: 'multi', options: ['A', 'B'], maxSelections: 2 });
     fireEvent.click(screen.getByLabelText(/Limit how many/));
-    // `maxSelections: 0` would mean "choose none", which is not what "no limit" means.
     expect('maxSelections' in view.config()).toBe(false);
   });
 
@@ -173,8 +149,6 @@ describe('free text', () => {
   it('drops the placeholder key when it is emptied, keeping the "Your answer" fallback', () => {
     const view = mount({ kind: 'text', multiline: false, placeholder: 'One thing' });
     fireEvent.change(screen.getByLabelText(/Placeholder/), { target: { value: '' } });
-    // Storing "" would silently remove the respondent input's fallback rather than
-    // restoring it.
     expect('placeholder' in view.config()).toBe(false);
   });
 
@@ -187,8 +161,6 @@ describe('free text', () => {
 
 describe('readOnly is the locked-template case', () => {
   it('disables every control in every kind rather than hiding them', () => {
-    // 37 § States: a locked template shows a banner and read-only editors, never controls
-    // that silently do nothing.
     const configs: QuestionConfig[] = [
       { kind: 'rating', max: 5, lowLabel: 'Poor', highLabel: 'Great' },
       CHOICE,
@@ -200,7 +172,6 @@ describe('readOnly is the locked-template case', () => {
       const fields = screen.queryAllByRole('textbox').concat(screen.queryAllByRole('combobox'));
       expect(fields.length).toBeGreaterThan(0);
       expect(fields.every((field) => (field as HTMLInputElement).disabled)).toBe(true);
-      // And no way to grow the list past what is already saved.
       expect(screen.queryByRole('button', { name: 'Add option' })).toBeNull();
       view.unmount();
     }

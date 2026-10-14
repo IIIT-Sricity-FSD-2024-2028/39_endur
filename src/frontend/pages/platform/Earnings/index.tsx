@@ -1,17 +1,3 @@
-// `/ops/earnings` — DEC-080, `71` § Revenue. What the estate has paid.
-//
-// OWNER ONLY, and behind its OWN capability. `platform.revenue.read` and
-// `platform.analytics.read` were one string while DEC-035 stood and there was no money to
-// separate; DEC-080 splits them because the questions separated. The nav item is absent for
-// `staff` (`OpsLayout`), and a direct visit still gets a full-page 403 naming the capability
-// rather than an empty screen that looks broken — the same posture `/ops/analytics` takes.
-//
-// SISTER PAGE, NOT A REPLACEMENT. Analytics answers "is this working?" in organisations,
-// seats and activity. This answers "what did we take?" in rupees. Merging them would make
-// one page that argues with itself about which number matters.
-//
-// THE WINDOW IS THE SAME WINDOW, down to the twelve-month default and the URL params, so an
-// owner moving between the two pages does not have to re-narrow the range.
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { TIERS, formatMoney, type PaymentKind, type Tier } from '@endur/shared';
@@ -40,13 +26,6 @@ type PaymentRow = {
   payerName: string;
   tier: Tier;
   fromTier: Tier | null;
-  /**
-   * `expiry` is in the union but does not reach this table — `/platform/earnings` excludes it
-   * from the window (`DEC-098`), because a Rs 0 plan move is not a capture and counting it as
-   * one would drag the average payment down with events where no money changed hands. The
-   * type stays honest about the column, and the row below still renders correctly if it ever
-   * arrives.
-   */
   kind: PaymentKind;
   amountMinor: number;
 };
@@ -60,18 +39,6 @@ function readWindow(params: URLSearchParams): EarningsWindow {
   };
 }
 
-/**
- * The total, counting up from zero.
- *
- * THE ONE ANIMATED FIGURE ON THE PAGE, and it is animated for a reason rather than for
- * texture: the revenue line beneath it draws at the same moment, and a number that lands
- * with the line reads as one fact arriving instead of two. Every other stat is static.
- *
- * REDUCED MOTION IS CHECKED HERE, in JS, which is the one exception to "honoured globally,
- * once" (endur.css) — that rule collapses CSS durations and can say nothing about a
- * `setInterval` counting integers. A reader who has asked for less motion gets the final
- * figure on the first frame.
- */
 function useCountUp(target: number, ms = 600): number {
   const [value, setValue] = useState(target);
 
@@ -89,17 +56,12 @@ function useCountUp(target: number, ms = 600): number {
     const start = performance.now();
     const tick = (now: number): void => {
       const t = Math.min(1, (now - start) / ms);
-      // The same shape as `--ease` — decelerating, so the figure settles rather than stops.
       const eased = 1 - Math.pow(1 - t, 3);
       setValue(Math.round(target * eased));
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
 
-    // THE FIGURE LANDS EVEN IF THE FRAMES NEVER COME. `requestAnimationFrame` does not run
-    // in a background or throttled tab, and a revenue total stranded at ₹0 because nobody
-    // painted is a WRONG NUMBER on screen — far worse than an unanimated right one. The
-    // animation is decoration; this is the guarantee underneath it.
     const land = window.setTimeout(() => setValue(target), ms + 80);
     return () => {
       cancelAnimationFrame(raf);
@@ -231,8 +193,6 @@ export default function Earnings(): JSX.Element {
               />
               <StatCard
                 kicker="Average payment"
-                // A dash, never ₹0 — the same argument the conversion rate makes next door.
-                // A mean of no payments is not a payment of zero.
                 value={
                   data.totals.averageMinor === null
                     ? '—'

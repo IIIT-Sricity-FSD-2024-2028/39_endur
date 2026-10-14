@@ -1,22 +1,3 @@
-// <EnterpriseQueue> — 24, 70 § The Enterprise queue, DEC-100, T-100.
-//
-// A WORK QUEUE, NOT A FEED, and every decision below follows from that one word.
-//
-// OLDEST FIRST (the server orders it that way). Every other list on `/ops` answers "what just
-// happened"; this one answers "who has been waiting longest", and newest-first is how the
-// first customer who asked becomes the last one called.
-//
-// READING IT CHANGES NOTHING. That is the whole difference between this and the notification
-// the owner's instruction first suggested — a bell clears on read, and what has to survive is
-// "somebody has to ring this customer back". The row leaves the queue when an operator says
-// it has, not when they look at it.
-//
-// IT DISAPPEARS WHEN IT IS EMPTY. An empty queue on a dashboard is a permanent card that
-// teaches the reader to skip that part of the page, and then to skip it on the day it has
-// something in it.
-//
-// STILL INV-011: an organisation's name, a person's name and address, a date, and one note
-// they typed. `EnterpriseRequestRow` has no field that could carry anything else.
 import { Link } from 'react-router-dom';
 import type { EnterpriseRequestRow, EnterpriseStatus } from '@endur/shared';
 import { formatRelative } from '../../lib/format.js';
@@ -31,13 +12,10 @@ export function EnterpriseQueue({
 }: {
   rows: readonly EnterpriseRequestRow[];
   busyId: string | null;
-  /** A refused write, rendered. It used to be swallowed — see `useEnterpriseQueue`. */
   error: string | null;
   onUpdate: (id: string, status: EnterpriseStatus) => void;
   onApprove: (id: string) => void;
 }): JSX.Element | null {
-  // The card still disappears when there is nothing outstanding AND nothing went wrong. An
-  // error with no rows behind it must still render, or a failed load looks like an empty queue.
   if (rows.length === 0 && !error) return null;
 
   return (

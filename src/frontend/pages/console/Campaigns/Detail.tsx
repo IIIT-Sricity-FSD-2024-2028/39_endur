@@ -1,14 +1,3 @@
-// T-038 — /app/campaigns/:id. 38, design_specs/design/06 §6.4.
-//
-// **Share is reachable forever from here**, not only in the moment after launch. The share
-// sheet is never a one-time screen (38 § The share sheet).
-//
-// design_specs §6.4 also draws a responses-over-time sparkline, an average completion time
-// and a per-subject breakdown. NONE OF THOSE HAVE AN ENDPOINT: `CampaignDetail` carries a
-// response count and its subjects, and `13` specifies nothing that would answer the other
-// three. Per-subject numbers are `40`'s (the results page, behind the k-anonymity gate),
-// which is where they belong — a second ungated path to per-subject aggregates is exactly
-// what INV-007 exists to prevent. The stat cards here show what is true.
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -31,14 +20,6 @@ export default function CampaignDetail(): JSX.Element {
   const campaign = useCampaign(id);
 
   const [sharing, setSharing] = useState(false);
-  /**
-   * The URL the launch call itself returned.
-   *
-   * `launch()` also refetches, and the refetched campaign carries the same URL — but "the
-   * share sheet appears within one second of launch" is an acceptance criterion, and
-   * hanging it on a second round trip means a slow or failed refetch shows the reader
-   * nothing at all after the one irreversible button on the page.
-   */
   const [launchedUrl, setLaunchedUrl] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,7 +79,6 @@ export default function CampaignDetail(): JSX.Element {
               </button>
             )}
             {detail.status === 'draft' && can('campaign.launch') && (
-              // The irreversible one. Disabled while in flight, and idempotent behind that.
               <button type="button" className="btn btn-primary" onClick={launch} disabled={busy}>
                 {busy ? 'Launching…' : `Launch ${labels.campaign.one.toLowerCase()}`}
               </button>

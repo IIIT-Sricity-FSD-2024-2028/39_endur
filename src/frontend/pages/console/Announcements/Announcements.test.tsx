@@ -1,12 +1,3 @@
-// T-094 — /app/announcements and <AnnouncementBanner>. 61, 24 § Announcements.
-//
-// The assertions that matter here are the two the feature is FOR:
-//
-//   · a drafter who cannot publish is not offered a Publish button — the seeded gap
-//     between `announcement.create` and `announcement.publish` is the reason they are two
-//     verbs, and a button the API would refuse hides it (INV-003 is still the server's).
-//   · a published row prints a FRACTION, and a draft does not print zeros. "0 of 0" on
-//     something sent to nobody reads as a broken feature rather than an unsent one.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import type { AnnouncementSummary, Capability } from '@endur/shared';

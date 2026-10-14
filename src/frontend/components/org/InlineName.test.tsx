@@ -1,11 +1,3 @@
-// 24 §7 — "Enter commits, Esc reverts, blur commits."
-//
-// Every one of these three was written before it was tested, and Esc was WRONG: it
-// committed. `setDraft(value)` is asynchronous and `blur()` is not, so the blur handler ran
-// first with the draft the user had just asked to throw away.
-//
-// The first version of this test passed anyway, because `.blur()` on an element that was
-// never focused is a no-op. `input.focus()` is the line that makes it a real test.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { InlineName } from './InlineName.js';
@@ -45,11 +37,6 @@ describe('<InlineName>', () => {
     expect(onCommit).toHaveBeenCalledWith('Provost');
   });
 
-  // The structure page's `+` is what found this: Enter created TWO units. Enter used to
-  // commit and THEN blur, and blur commits -- so every Enter fired twice, with the same
-  // draft both times because neither render had happened yet. A rename survived it (writing
-  // the same name twice is the same name), which is why it sat here unseen until a caller
-  // whose commit was not idempotent used it.
   it('commits ONCE on Enter, not once for the key and again for the blur it causes', () => {
     const { input, onCommit } = mount();
     fireEvent.change(input, { target: { value: 'Provost' } });

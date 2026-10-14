@@ -1,8 +1,3 @@
-// T-038 — /app/campaigns/new. 38 § Interactions, 06 §6.2.
-//
-// The path that ends at the QR. Two things are load-bearing and both are asserted below:
-// **launching produces exactly one token** no matter how the button is pressed, and **the
-// share sheet appears with no intermediate success page** in between.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -36,8 +31,6 @@ const SUBJECTS: SubjectSummary[] = [
   },
 ];
 
-/** Reassignable so one test can shrink the tree to a single person — see the agreement
- *  test at the end of step 2. The mock factory reads the binding on each call. */
 let UNITS: UnitNode[] = [{
   id: 'u1', name: 'Engineering', parentId: null, isTemporary: false, endsAt: null,
   peopleCount: 40, subjectCount: 2, peopleTotal: 55, subjectTotal: 2,
@@ -88,7 +81,6 @@ const mount = () =>
     { capabilities: ALL, labels: NONSENSE_LABELS, path: '/app/campaigns/new' },
   );
 
-/** Walk to step 3 with a form and one subject chosen. */
 const toStepThree = (): void => {
   fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -124,7 +116,6 @@ describe('step 1 — the form, and one less typing beat', () => {
       target: { value: 'My own name' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
-    // Overwriting something typed is the kind of small theft that makes a form hostile.
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: /Name this plithe/ }).value)
       .toBe('My own name');
   });
@@ -144,9 +135,6 @@ describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () =>
   it('asks it as its OWN question, under its own heading', () => {
     mount();
     toStepTwo();
-    // 38 exists partly to stop these being folded together. Above: who is EXPECTED — a
-    // denominator, enforced nowhere. Below: who GETS IN — a gate, enforced on every
-    // request. The heading break is what says so on screen.
     expect(screen.getByText('Who can respond?')).toBeTruthy();
     expect(screen.getByText('Who gets in?')).toBeTruthy();
   });
@@ -154,9 +142,6 @@ describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () =>
   it('the two questions do not share a visible option label', () => {
     mount();
     toStepTwo();
-    // Both once said "Anyone with the link". Two radios with the same label on one screen
-    // undoes the section break the previous test asserts — and it is ambiguous to a screen
-    // reader, which hears the label and not the heading above it.
     expect(screen.getAllByRole('radio', { name: /^Anyone with the link/ })).toHaveLength(1);
     expect(screen.getAllByRole('radio', { name: /^Open to everyone/ })).toHaveLength(1);
   });
@@ -177,8 +162,6 @@ describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () =>
   it('states the CONSEQUENCE at the point of choosing, not in a help page', () => {
     mount();
     toStepTwo();
-    // This mode gives up a promise (52 §1): participation stops being private even though
-    // the answer stays anonymous. The person choosing it is the one who should be told.
     expect(screen.getByText(/You’ll see who responded, never what they said/)).toBeTruthy();
   });
 
@@ -212,7 +195,6 @@ describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () =>
     fireEvent.click(screen.getByRole('radio', { name: /Only people in Northfield/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-    // A summary that omits an irreversible choice is not a summary.
     expect(screen.getByText(/restricted/)).toBeTruthy();
   });
 });
@@ -232,7 +214,6 @@ describe('step 2 — two different questions', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    // Respondents never log in (DEC-009).
     expect(screen.getByRole<HTMLInputElement>('radio', { name: /Anyone with the link/ }).checked).toBe(true);
   });
 
@@ -244,9 +225,6 @@ describe('step 2 — two different questions', () => {
   });
 
   it('AGREES with the count — "1 frimble", not "1 frimbles"', () => {
-    // This line passed `labels.respondent.many` as BOTH forms until T-044, so a one-person
-    // unit read "About 1 frimbles can respond." The two forms are stored rather than
-    // derived precisely so a screen can get this right (22 §2, §5).
     const whole = UNITS;
     UNITS = [{
       id: 'u9', name: 'Solo', parentId: null, isTemporary: false, endsAt: null,
@@ -268,8 +246,6 @@ describe('step 2 — two different questions', () => {
     fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     fireEvent.click(screen.getByRole('radio', { name: /Everyone in a zblorn/ }));
-    // 40 in Engineering plus 15 in Physics: the number moving is the visible proof the
-    // hierarchy is wired up rather than decorative.
     expect(screen.getByText(/About 55 frimbles/)).toBeTruthy();
   });
 });
@@ -319,7 +295,6 @@ describe('step 3 — the summary, then the irreversible button', () => {
     const button = screen.getByRole('button', { name: 'Launch plithe' });
     fireEvent.click(button);
     fireEvent.click(button);
-    // The QR already on screen would otherwise point at a campaign nobody is looking at.
     expect(create).toHaveBeenCalledTimes(1);
 
     release({ id: 'c9', name: 'x', anonymous: true, endsAt: null });
@@ -327,9 +302,6 @@ describe('step 3 — the summary, then the irreversible button', () => {
   });
 
   it('keeps the draft when the launch fails, and mints nothing', async () => {
-    // A real ApiError, not a bare Error: only a server message is fit to show a reader.
-    // Anything else falls back to one sentence, which is the convention across every page —
-    // "Cannot read properties of undefined" is not an error message for a person.
     create.mockRejectedValue(new ApiError({
       code: 'CONFLICT', status: 409, requestId: 'r1',
       message: 'The dates overlap something.',
@@ -339,8 +311,6 @@ describe('step 3 — the summary, then the irreversible button', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/dates overlap/));
-    // 38 § States: the draft is preserved and no token is minted. The reader fixes it and
-    // presses again rather than starting over.
     expect(launchCampaign).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Launch plithe' })).toBeTruthy();
     expect(screen.getByText(/Mid-term form · 8 questions/)).toBeTruthy();

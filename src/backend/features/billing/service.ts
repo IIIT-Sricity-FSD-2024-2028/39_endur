@@ -44,22 +44,46 @@ type Row = {
 };
 
 // Turns a subscription row into the summary the plan page reads.
-const view = (row: Row, seatBreakdown: BillingSummary['seatBreakdown']): BillingSummary => ({
+// `lapsedFromTrial` is a fact about the PAYMENT EVENT that set `lapsedFrom`, not about the
+// subscription itself - DEC-116 - so it is passed in rather than read off `row`, which carries
+// no such column.
+const view = (
+  row: Row,
+  seatBreakdown: BillingSummary['seatBreakdown'],
+  lapsedFromTrial: boolean | null,
+): BillingSummary => ({
   tier: row.tier as Tier,
   status: row.status as BillingStatus,
   periodStart: row.periodStart.toISOString(),
   periodEnd: row.periodEnd.toISOString(),
   pendingTier: (row.pendingTier as Tier | null) ?? null,
   lapsedFrom: (row.lapsedFrom as Tier | null) ?? null,
+  lapsedFromTrial,
   seats: seatBreakdown.activeUsers + seatBreakdown.nonPersonSubjects,
   seatBreakdown,
 });
 
+// Was the lapse behind `lapsedFrom` a trial running out, or a paid plan nobody renewed?
+// DEC-116. Not stored on the subscription - it is a fact about the ledger row written at the
+// moment the lapse happened, so it is derived from there, and only ever looked up when
+// `lapsedFrom` is non-null (the common case - nothing lapsed - never pays for this query).
+async function lapsedFromTrialFor(orgId: string, lapsedFrom: string | null): Promise<boolean | null> {
+  if (lapsedFrom === null) return null;
+  const last = await prisma.payment.findFirst({
+    where: { orgId, kind: { in: ['lapse', 'trial_expired'] } },
+    orderBy: { createdAt: 'desc' },
+    select: { kind: true },
+  });
+  return last?.kind === 'trial_expired';
+}
+
 // Applies a period that has ended, and returns the row as it now stands.
-// Three outcomes, and which one applies is effectiveTier()'s answer, not this function's:
+// Four outcomes, and which one applies is effectiveTier()'s answer plus `status`, not this function's:
 //   1. a scheduled move down applies - the customer asked for it;
-//   2. nobody renewed, so the org drops to bronze and the page can say what it came down from;
-//   3. already on bronze - the period simply rolls forward, free, and nothing else is written.
+//   2. nobody renewed a paid plan, so the org drops to bronze and the page can say what it came down from;
+//   3. a trial ran out unconverted, so the org drops to bronze the same way, but it is not a lapse -
+//      DEC-116 - nothing was ever being paid for, so there is nothing that "stopped";
+//   4. already on bronze - the period simply rolls forward, free, and nothing else is written.
 // The audit row is written here rather than queued, because this is a date passing rather than an action
 // anybody took, and the queue would stamp it with whoever happened to open the page.
 async function applyExpiredPeriod(row: Row & { orgId: string }, requestId?: string) {
@@ -67,18 +91,26 @@ async function applyExpiredPeriod(row: Row & { orgId: string }, requestId?: stri
 
   const from = row.tier as Tier;
   const next = effectiveTier(row);
+  // Read BEFORE anything is written, from the one field the entitlement gate never reads -
+  // this function is the one place `status` is allowed to change WHAT HAPPENS, as opposed to
+  // what the gate decides with. DEC-116.
+  const wasTrialing = row.status === 'trialing';
 
-  // Outcome 3, and the only path that clears the lapse notice, so it survives exactly the one period it is news for.
+  // Outcome 4, and the only path that clears the lapse notice, so it survives exactly the one period it is news for.
+  // A trial can land here too - only when `tier` was already bronze, the lowest SIGNUP_TIER, in which case a
+  // bronze trial running out and bronze still being deserved is not news either.
   if (next === from) {
     return prisma.subscription.update({
       where: { orgId: row.orgId },
-      data: { pendingTier: null, lapsedFrom: null, ...newPeriod() },
+      data: { pendingTier: null, lapsedFrom: null, status: 'active', ...newPeriod() },
     });
   }
 
-  // Outcomes 1 and 2 differ in three fields. 'scheduled' asks whether this is the tier the customer NAMED,
-  // because a stale pending value that was not honoured is a lapse, not a downgrade anybody asked for.
-  const scheduled = row.pendingTier !== null && next === row.pendingTier;
+  // Outcomes 1, 2 and 3 differ in a few fields. 'scheduled' asks whether this is the tier the customer
+  // NAMED, because a stale pending value that was not honoured is a lapse, not a downgrade anybody asked
+  // for - and a trial's `pendingTier` is always null anyway (scheduleDowngrade refuses it, below), so
+  // `!wasTrialing` here is defence in depth rather than the only thing preventing confusion.
+  const scheduled = !wasTrialing && row.pendingTier !== null && next === row.pendingTier;
 
   return prisma.$transaction(async (tx) => {
     const moved = await tx.subscription.update({
@@ -92,14 +124,21 @@ async function applyExpiredPeriod(row: Row & { orgId: string }, requestId?: stri
       },
     });
 
-    // Zero rupees, and the pricing function arrives at that itself. A negative row in an append-only ledger
-    // would be a refund, and this product has never had one.
+    // Zero rupees. For outcome 1 the pricing function arrives at that itself (same tier in and out
+    // further up the ladder is never the case here, but 0 is still correct by construction for a
+    // scheduled move - no money ever changes hands on a downgrade). For outcomes 2 and 3 it is NOT
+    // free by construction - `changeCostMinor(from, bronze)` would return a real nonzero amount for a
+    // real priced tier - so the capture is explicitly zeroed instead: a negative row in an append-only
+    // ledger would be a refund, and this product has never had one, but a silently-priced one would be
+    // a phantom charge nobody sees.
     await recordPayment(tx, {
       orgId: row.orgId,
       tier: next,
       fromTier: from,
-      // Two kinds for one shape: "asked to spend less" and "stopped paying" are opposite facts about the business.
-      kind: scheduled ? 'expiry' : 'lapse',
+      // Three kinds for one shape: "asked to spend less", "stopped paying" and "never started
+      // paying" are three different facts about the business.
+      kind: scheduled ? 'expiry' : wasTrialing ? 'trial_expired' : 'lapse',
+      amountMinor: 0,
       // Nobody paid, and nobody is named.
       payerName: 'Endur',
       payerEmail: '',
@@ -109,7 +148,7 @@ async function applyExpiredPeriod(row: Row & { orgId: string }, requestId?: stri
       data: {
         orgId: row.orgId,
         actorUserId: null,
-        action: scheduled ? 'billing.expire' : 'billing.lapse',
+        action: scheduled ? 'billing.expire' : wasTrialing ? 'billing.trial_expire' : 'billing.lapse',
         targetType: 'subscription',
         targetId: row.orgId,
         ...(requestId ? { requestId } : {}),
@@ -129,7 +168,9 @@ export async function readBilling(orgId: string, requestId?: string): Promise<Bi
     seatsFor(orgId),
   ]);
   if (existing) {
-    return view(await applyExpiredPeriod({ ...existing, orgId }, requestId), seatBreakdown);
+    const applied = await applyExpiredPeriod({ ...existing, orgId }, requestId);
+    const lapsedFromTrial = await lapsedFromTrialFor(orgId, applied.lapsedFrom);
+    return view(applied, seatBreakdown, lapsedFromTrial);
   }
 
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
@@ -145,7 +186,8 @@ export async function readBilling(orgId: string, requestId?: string): Promise<Bi
       ...newPeriod(),
     },
   });
-  return view(repaired, seatBreakdown);
+  // A freshly-repaired row has never lapsed from anything, trial or otherwise.
+  return view(repaired, seatBreakdown, null);
 }
 
 // Joins a HIGHER tier, effective immediately.
@@ -153,6 +195,11 @@ export async function readBilling(orgId: string, requestId?: string): Promise<Bi
 // money is captured at the join and there are no refunds, so a mid-period downgrade would charge a customer
 // again for less than they already hold. A downgrade is scheduled for the end of the period instead.
 // Enterprise is refused here, because it is priced individually and stays operator-assigned.
+//
+// EXCEPT MID-TRIAL — DEC-116. A trial captures nothing, so the rule that protects a payment
+// already made has nothing to protect: a trialing-Gold org converting to paid Bronze is making
+// its FIRST purchase, not asking for a refund. `wasTrialing` is read once, before either check,
+// and both checks are skipped for it.
 export async function joinTier(
   req: Request,
   orgId: string,
@@ -166,19 +213,23 @@ export async function joinTier(
 
   // Read first, so a missing row is repaired before the update - and it gives us the tier being left.
   const before = await readBilling(orgId);
+  const wasTrialing = before.status === 'trialing';
 
   // The one-way check, before anything is written. Two messages, because "already on this" and "cannot come
   // down mid-period" are different situations with different remedies. 409, since the request itself is fine.
-  if (tierRank(tier) === tierRank(before.tier)) {
-    throw new ConflictError(`This organisation is already on ${plan.name}.`);
-  }
-  if (tierRank(tier) < tierRank(before.tier)) {
-    throw new ConflictError(
-      `A plan can only move up while a period is running. This organisation is on ` +
-        `${PLAN_OPTIONS.find((option) => option.tier === before.tier)?.name ?? before.tier} ` +
-        `until ${before.periodEnd.slice(0, 10)}, and there are no refunds — ` +
-        `schedule the move down for the end of the period instead.`,
-    );
+  // Skipped entirely mid-trial - see the DEC-116 comment above.
+  if (!wasTrialing) {
+    if (tierRank(tier) === tierRank(before.tier)) {
+      throw new ConflictError(`This organisation is already on ${plan.name}.`);
+    }
+    if (tierRank(tier) < tierRank(before.tier)) {
+      throw new ConflictError(
+        `A plan can only move up while a period is running. This organisation is on ` +
+          `${PLAN_OPTIONS.find((option) => option.tier === before.tier)?.name ?? before.tier} ` +
+          `until ${before.periodEnd.slice(0, 10)}, and there are no refunds — ` +
+          `schedule the move down for the end of the period instead.`,
+      );
+    }
   }
 
   // Who paid, taken from the session rather than the body, because the name is copied onto the ledger row.
@@ -199,13 +250,14 @@ export async function joinTier(
     });
 
     // The capture, in the same transaction as the tier it pays for.
-    // It charges the DIFFERENCE between the old tier and the new one - except after a lapse, where the
-    // customer never paid for the tier they are on, so the rejoin is priced at the full amount.
+    // It charges the DIFFERENCE between the old tier and the new one - except after a lapse, or mid-trial
+    // (DEC-116), where the customer never paid for the tier they are on, so the join is priced at the
+    // full amount instead of a diff from a tier nothing was ever captured for.
     await recordPayment(tx, {
       orgId,
       tier,
       fromTier: before.tier,
-      pricedFrom: before.lapsedFrom ? null : before.tier,
+      pricedFrom: before.lapsedFrom || wasTrialing ? null : before.tier,
       kind: 'change',
       payerName: payer?.name ?? 'Unknown',
       payerEmail: payer?.email ?? '',
@@ -230,6 +282,18 @@ export async function scheduleDowngrade(
 ): Promise<BillingSummary> {
   const before = await readBilling(orgId, req.ctx.requestId);
   const plan = PLAN_OPTIONS.find((option) => option.tier === tier);
+
+  // DEC-116. Nothing has been paid for during a trial, so there is nothing to schedule a move
+  // down FROM. Refused outright rather than left harmless: applyExpiredPeriod's `scheduled`
+  // check is hard-coded to ignore `pendingTier` while trialing (above), so a silently-accepted
+  // write here would let the plan page promise a scheduled downgrade the server would never
+  // honour - worse than refusing the click.
+  if (before.status === 'trialing') {
+    throw new ConflictError(
+      'Nothing has been paid for yet, so there is nothing to schedule a move down from — ' +
+        'convert to a paid plan first, or just let the trial run out.',
+    );
+  }
 
   if (tierRank(tier) === tierRank(before.tier)) {
     throw new ConflictError(

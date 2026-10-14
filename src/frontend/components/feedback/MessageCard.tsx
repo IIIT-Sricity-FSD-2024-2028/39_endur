@@ -1,18 +1,3 @@
-// <MessageCard> — a message from Endur. 24, 58 § From Endur, DEC-101, T-101.
-//
-// NOT <ResponseCard>. They look alike and they are not the same card: a response card carries
-// a campaign, a subject, a score and an archive verb, and every one of those is meaningless
-// on a message from your vendor. Reusing it would have meant four props that are always null
-// and an archive button that archives nothing — which is how one component becomes two
-// components wearing one name.
-//
-// UNREAD IS A WEIGHT, NOT A DOT. Three messages a year means the tab is almost always empty,
-// so the state that has to be legible at a glance is "there is something new here" — and a
-// bold row says that without a legend.
-//
-// THE BODY IS ALWAYS SHOWN. `<ResponseCard>` collapses because a queue of four hundred
-// comments has to be scannable; this stream is a handful of rows, and a message from your
-// vendor that you have to click to read is a message half of them will not read.
 import { formatRelative } from '../../lib/format.js';
 import { Icon } from '../Icon.js';
 

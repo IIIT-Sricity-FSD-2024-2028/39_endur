@@ -1,19 +1,7 @@
-// <ThemeToggle> — the appearance control (DEC-028).
-//
-// Three properties are worth pinning and none of them is "it renders three buttons".
-//
-//   1. The choice is THREE-valued. "System" is not "light", and a control that collapses
-//      them stops tracking sunset without ever saying so.
-//   2. The choice is DEVICE-scoped: localStorage, never the store or the API.
-//   3. It is a real radiogroup — ONE tab stop, arrow keys between the segments. Three
-//      buttons each announcing itself as part of one control is three tab stops for a
-//      widget the ARIA pattern says should cost one.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeToggle } from './ThemeToggle.js';
 
-/** jsdom has no matchMedia. `theme.ts` guards for it, so this proves the guard AND lets a
- *  test say what the OS is currently doing. */
 function setSystem(dark: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -38,8 +26,6 @@ describe('the three-valued choice', () => {
     render(<ThemeToggle />);
     expect(screen.getByRole('radio', { name: 'Match system' }).getAttribute('aria-checked'))
       .toBe('true');
-    // Nothing stored: following the OS is the absence of a choice, so there is nothing to
-    // write down. A stored "system" and a missing key must not mean different things.
     expect(window.localStorage.getItem('endur.theme')).toBeNull();
   });
 

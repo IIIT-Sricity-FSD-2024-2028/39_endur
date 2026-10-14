@@ -1,15 +1,3 @@
-// /activate/:token — 57 § Interactions, § Data contract.
-//
-// PUBLIC WORLD, beside `/login` and `/start`, not the console: whoever is here has no
-// session, by definition — `<ConsoleLayout>` would bounce them to `/login` before this ever
-// rendered. It also must not bounce a signed-in stranger away: 57's own acceptance list
-// says the activation is filed under the INVITE's organisation even when a different
-// tenant's session is live on the same browser, so this route carries no
-// `<RedirectIfSignedIn>` the way `/login` and `/start` do.
-//
-// GET BEFORE POST (57 § The token): the screen greets the person by name and names the
-// organisation before asking for a password, because a bare password box reached from a
-// pasted link is indistinguishable from a phishing page.
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -39,8 +27,6 @@ export default function Activate(): JSX.Element {
       .then((landing) => navigate(landing, { replace: true }))
       .catch((caught: unknown) => {
         setBusy(false);
-        // 422 says the password rule; anything else is the uniform dead end — the token
-        // was consumed or invalidated between the GET and this POST.
         setError(
           caught instanceof ApiError
             ? caught.fieldError('body.password') ?? caught.message
@@ -56,9 +42,6 @@ export default function Activate(): JSX.Element {
           {preview.loading ? (
             <p className="text-muted">Checking your link…</p>
           ) : preview.error || !preview.data ? (
-            // ONE screen, ONE sentence — 57 § Interactions. It does not say which of
-            // expired, used, or unknown happened, and it offers no self-serve resend: both
-            // would answer questions for someone holding a token they should not have.
             <>
               <h1 className="auth-title">That link is not active</h1>
               <p className="auth-sub">Ask whoever invited you for a new link.</p>

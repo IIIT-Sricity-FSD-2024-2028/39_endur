@@ -1,8 +1,3 @@
-// T-040 — <BarRow> and <StackedBar>. 24 §3, 21 §8, design_specs/design/08 §8.1.
-//
-// One rule runs through both files and it is an accessibility invariant, not a preference:
-// NEVER COLOUR ALONE. A bar whose only content is a colour is unreadable in greyscale, on a
-// projector, and to about one man in twelve.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BarRow } from './BarRow.js';
@@ -23,9 +18,6 @@ describe('<BarRow>', () => {
   });
 
   it('derives the percent from the same numbers as the bar width', () => {
-    // Taken as a prop, the width and the label could disagree — and a bar that disagrees
-    // with its own number is worse than no bar. `ResultsView` carries a server-computed
-    // `percent` that this deliberately ignores.
     const { container } = render(<BarRow label="4" value={198} total={612} showPercent />);
     const fill = container.querySelector<HTMLElement>('.bar-fill');
     expect(fill?.style.width).toBe('32%');
@@ -33,8 +25,6 @@ describe('<BarRow>', () => {
   });
 
   it('is single-colour by default', () => {
-    // 40 forbids colouring rating 1 red and rating 5 green: that is interpretation, and
-    // interpretation is the Analyze layer. The default has to be the neutral one.
     const { container } = render(<BarRow label="1" value={26} total={612} />);
     expect(container.querySelector('.fill-accent')).toBeTruthy();
   });

@@ -1,8 +1,3 @@
-// T-038 — /app/campaigns and /app/campaigns/:id. 38, 06 §6.1 and §6.4.
-//
-// The assertion that matters most here is the cheapest-looking one: **Share is a top-level
-// button on the card.** On demo day, list → projected QR must be one click, and a `⋯` menu
-// is a second click plus a hunt.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -107,7 +102,6 @@ describe('the list card is one click from a projected QR', () => {
 
   it('offers nothing to share on a DRAFT — it has no token and no reachable URL', () => {
     mountList();
-    // 38 § States. A draft that offered a Share button would be offering a dead link.
     expect(within(card('Not launched')).queryByRole('button', { name: /Share/ })).toBeNull();
     expect(within(card('Not launched')).queryByRole('link', { name: 'Results' })).toBeNull();
   });
@@ -154,9 +148,6 @@ describe('the detail page', () => {
     mountDetail();
     expect(screen.getByText('612')).toBeTruthy();
     expect(screen.getByText('Data Structures')).toBeTruthy();
-    // design_specs §6.4 draws a per-subject breakdown; those numbers live behind the
-    // k-anonymity gate on the results screen, and a second ungated path to them is exactly
-    // what INV-007 exists to prevent.
     expect(screen.getByText(/suppression threshold/)).toBeTruthy();
   });
 
@@ -169,7 +160,6 @@ describe('the detail page', () => {
     const button = screen.getByRole('button', { name: /Launch plithe/ });
     fireEvent.click(button);
     fireEvent.click(button);
-    // Minting the token is irreversible; a double-click must not produce two links.
     expect(launch).toHaveBeenCalledTimes(1);
     expect(launch).toHaveBeenCalledWith('key-for-c1');
 
@@ -190,7 +180,6 @@ describe('the detail page', () => {
     mountDetail();
     expect(screen.queryByRole('button', { name: 'Close early' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Launch/ })).toBeNull();
-    // Results outlive the campaign, which is the point of closing rather than deleting.
     expect(screen.getByRole('link', { name: 'Results' })).toBeTruthy();
   });
 

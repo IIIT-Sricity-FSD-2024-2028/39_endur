@@ -1,6 +1,3 @@
-// INV-001 has one mechanical defence and one human one. The human one is the vocabulary
-// walk (22 §5, T-044). This is the mechanical one: prove that the resolver never hands a
-// component `undefined`, and that a partially-renamed org keeps the renames it has.
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -28,8 +25,6 @@ describe('useLabels', () => {
     }
   });
 
-  // Falling back to the whole default SET would silently discard the renames an org does
-  // have — the university that renamed only `subject` would suddenly say "Unit" again.
   it('merges per key, so a partial rename keeps its other words', () => {
     const { result } = renderHook(() => useLabels(), {
       wrapper: withLabels({ subject: { one: 'Course', many: 'Courses' } }),

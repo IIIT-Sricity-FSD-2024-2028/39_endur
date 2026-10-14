@@ -1,9 +1,3 @@
-// T-035 — the six inputs. 24 §5, 05 §5.3, 39 § Input specifications.
-//
-// These tests are the standing evidence for INV-008. They exercise the components through
-// the SAME entry point the preview and the respondent form use — `<QuestionInput>`,
-// switching on kind — because a test that reached past it into `RatingInput` would pass
-// happily on the day somebody adds a second dispatcher beside this one.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { AnswerValue, QuestionConfig } from '@endur/shared';
@@ -34,12 +28,9 @@ const mount = (q: Question, value?: AnswerValue, readOnly = false) => {
 describe('all six kinds render, and each announces itself as a group', () => {
   it('rating draws one point per step, with the anchors on the ends', () => {
     mount(question(RATING));
-    // A fieldset + legend, so the question text IS the group's accessible name. No ARIA.
     const group = screen.getByRole('group', { name: /How was it\?/ });
     expect(within(group).getAllByRole('radio')).toHaveLength(5);
 
-    // The anchors are announced where they mean something — on the ends, not repeated on
-    // all five. "1, Poor" is what the person choosing 1 needs to hear.
     expect(screen.getByRole('radio', { name: '1 — Poor' })).toBeTruthy();
     expect(screen.getByRole('radio', { name: '5 — Great' })).toBeTruthy();
     expect(screen.getByRole('radio', { name: '3' })).toBeTruthy();
@@ -48,7 +39,6 @@ describe('all six kinds render, and each announces itself as a group', () => {
   it('a 1-10 rating is ten points and still not a slider', () => {
     mount(question({ kind: 'rating', max: 10, lowLabel: 'Low', highLabel: 'High' }));
     expect(screen.getAllByRole('radio')).toHaveLength(10);
-    // 39 is explicit: a slider is unusable one-handed and makes an exact answer impossible.
     expect(screen.queryByRole('slider')).toBeNull();
   });
 
@@ -75,8 +65,6 @@ describe('all six kinds render, and each announces itself as a group', () => {
     yesno.unmount();
 
     mount(question({ kind: 'text', multiline: false }));
-    // One control, so a <label> rather than a <fieldset> — a group of one is a lie to a
-    // screen reader.
     expect(screen.getByLabelText(/How was it\?/)).toBeTruthy();
     expect(screen.queryByRole('group')).toBeNull();
   });
@@ -128,14 +116,11 @@ describe('answers travel as AnswerValue, discriminated by kind', () => {
 
 describe('the constraints that only exist because of the question', () => {
   it('maxSelections stops the UNPICKED options rather than ignoring the tap', () => {
-    // Silently swallowing the tap reads as a broken control; a disabled row plus a line of
-    // copy says what happened.
     mount(
       question({ kind: 'multi', options: ['A', 'B', 'C'], maxSelections: 2 }),
       { kind: 'multi', options: ['A', 'B'] },
     );
     expect(screen.getByRole<HTMLInputElement>('checkbox', { name: 'C' }).disabled).toBe(true);
-    // Already chosen, so it must stay removable.
     expect(screen.getByRole<HTMLInputElement>('checkbox', { name: 'A' }).disabled).toBe(false);
     expect(screen.getByText(/Choose up to 2/)).toBeTruthy();
   });
@@ -144,7 +129,6 @@ describe('the constraints that only exist because of the question', () => {
     const { onChange } = mount(
       question({ kind: 'single', options: ['Bus', 'Train'], allowOther: true }),
     );
-    // A results screen full of "Other" tells nobody anything.
     fireEvent.change(screen.getByPlaceholderText('Other'), { target: { value: 'Bicycle' } });
     expect(onChange).toHaveBeenCalledWith({ kind: 'single', option: 'Bicycle' });
   });
@@ -173,7 +157,6 @@ describe('the constraints that only exist because of the question', () => {
 describe('readOnly is the preview, and it is the SAME component (INV-008)', () => {
   it('renders every control and disables all of them', () => {
     mount(question(SINGLE), undefined, true);
-    // Present and announced — the reader is meant to see exactly what a respondent gets.
     const radios = screen.getAllByRole<HTMLInputElement>('radio');
     expect(radios).toHaveLength(3);
     expect(radios.every((radio) => radio.disabled)).toBe(true);

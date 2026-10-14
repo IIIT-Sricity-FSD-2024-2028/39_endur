@@ -1,23 +1,3 @@
-// The powers grid. 33 § "Interactions — the powers grid", rewritten for plain language by
-// `DEC-076`.
-//
-// THE ARGUMENT FOR A GRID OVER A LIST OF PERMISSIONS is that mistakes become VISIBLE rather
-// than discoverable. An over-granted role is a visibly dark column; a capability nobody
-// holds is a visibly empty row. Neither is something you go looking for — they are things
-// you cannot help seeing, and that is the whole design.
-//
-// WHAT `DEC-076` CHANGED, and why it is the same argument: a grid can only make a mistake
-// visible if the reader can read it. The cells said `self`, `unit`, `tree`, `all` — `tree`
-// being the shape of the data structure the scope walks, which is not a word anybody outside
-// this repository has ever used for "and everything under it" — and the only way to change
-// one was to click it repeatedly and watch what happened. Now a cell is a phrase in the
-// organisation's own words (`scope-labels.ts`), and changing one is picking from a list of
-// six named choices. Nothing about what the grid MEANS moved; the whole change is that it
-// says it out loud.
-//
-// Colour intensity still tracks SCOPE WIDTH, not "is there a grant here". A grid where every
-// filled cell looked the same would answer "who has this" and lose "how far", which is the
-// half that actually decides what somebody can reach (INV-005).
 import { useMemo, useState } from 'react';
 import type {
   CapabilityMeta, GrantCell, GrantChoice, GrantWarning, RoleView,
@@ -28,7 +8,6 @@ import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { useLabels } from '../../../lib/labels.js';
 import { cellKey, choiceOf, type GridController } from '../../../lib/roles.js';
 
-/** Width, not identity — 0 is an empty cell and 4 is `all`. Drives the CSS custom property. */
 const WEIGHT: Record<string, number> = { self: 1, own_unit: 2, subtree: 3, all: 4 };
 
 const weightOf = (choice: GrantChoice): number =>
@@ -37,7 +16,6 @@ const weightOf = (choice: GrantChoice): number =>
 export function PowersGrid({ grid, editable, myRoleIds }: {
   grid: GridController;
   editable: boolean;
-  /** The roles the READER holds, for the self-lockout prompt below. */
   myRoleIds: string[];
 }): JSX.Element {
   const labels = useLabels();
@@ -59,7 +37,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
     return [...groups];
   }, [state?.catalogue]);
 
-  /** Warnings are rendered AT THE SITE OF THE PROBLEM, never as a list at the bottom (33). */
   const warningsFor = useMemo(() => {
     const byCell = new Map<string, GrantWarning[]>();
     const byRow = new Map<string, GrantWarning[]>();
@@ -74,17 +51,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
     return { byCell, byRow };
   }, [state?.warnings]);
 
-  /**
-   * THE SECOND HALF OF 33 § "The lockout guard", and the half the server cannot do.
-   *
-   * The server refuses a matrix where NOBODY holds `grant.update` — that is unrecoverable
-   * and gets a `409`. Handing the grid to somebody else and keeping none for yourself is a
-   * different thing: perfectly legal, occasionally exactly what you meant, and still a
-   * one-way door for the person pressing the button. Only the client knows which roles the
-   * reader holds, so only the client can ask.
-   *
-   * Asked BEFORE the request, not after a failure, because there is no failure to react to.
-   */
   const losingOwnGrid =
     myRoleIds.length > 0 &&
     myRoleIds.some((id) => grid.savedCells.get(cellKey(id, 'grant.update'))?.effect === 'allow') &&
@@ -106,15 +72,8 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   const roleName = (id: string): string =>
     state.roles.find((role) => role.id === id)?.name ?? 'that role';
 
-  // THE WIDEST PHRASE THIS ORGANISATION ACTUALLY PRODUCES, in characters. Every cell is at
-  // least this wide, so none of them can truncate — `min-width: 6em` was cutting "Their
-  // department + below" to "Their department + belc", and no fixed width can be right when
-  // the noun in the middle is the tenant's to choose. One number, measured once.
   const cellCh = Math.max(...GRANT_CHOICES.map((choice) => choiceWord(choice, labels).length));
 
-  // How many powers each role actually holds. The grid already SHOWS this as a darker
-  // column; a number lets two columns be compared without eyeballing them, and it is the
-  // first thing anybody auditing a role wants to know.
   const grantedBy = new Map<string, number>();
   for (const role of state.roles) {
     let held = 0;
@@ -153,9 +112,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
             <button
               type="button"
               className="btn btn-primary"
-              // AN EXPLICIT SAVE, NOT AUTOSAVE (33 § State). Every other editable surface in
-              // the product writes on blur; this is the one screen where the cost of an
-              // accidental change is an organisation nobody can administer.
               disabled={!grid.dirty || grid.saving}
               onClick={() => {
                 if (losingOwnGrid) setConfirming(true);
@@ -206,18 +162,10 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
       )}
 
       {grid.saveError && (
-        // ONE LINE ABOVE THE GRID, and the working copy is still on screen behind it
-        // (33 § States). A refusal here is the lockout guard or WOULD_ESCALATE, and both are
-        // sentences the administrator has to act on — clearing their edits would make the
-        // message unusable.
         <p className="field-error powers-error" role="alert">{grid.saveError}</p>
       )}
 
       {editable && (
-        // TWO DROPDOWNS AND A BUTTON, not a sentence made of buttons. What stood here was
-        // "Copy a whole role's powers · From… · onto · [Manager] [Staff] [Guest]", where the
-        // role buttons WERE the action — a row of things that look like navigation and
-        // rewrite a whole column when pressed.
         <div className="powers-copy">
           <label htmlFor="powers-copy-from">Copy every power from</label>
           <select
@@ -279,9 +227,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
                   key={role.id}
                   scope="col"
                   className="powers-role"
-                  // THE MISCONCEPTION THIS TITLE EXISTS TO KILL: that a lower number means
-                  // more power. It does not, and never has (DEC-002) — the number is the
-                  // role's place in the list, and THIS GRID is where power comes from.
                   title={`${role.name} is ${ordinal(role.level)} in the list of roles. The order decides who is shown above whom — it never decides what a role can do. That is this grid.`}
                 >
                   <span className="powers-role-name">{role.name}</span>
@@ -356,17 +301,11 @@ function Row({
 }): JSX.Element {
   const labels = useLabels();
 
-  // An ORPHAN ROW — nobody at all can do this — is a state you should not have to look for.
   const orphan = roles.every((role) => {
     const cell = cells.get(cellKey(role.id, entry.key));
     return !cell || cell.effect === 'deny';
   });
 
-  // NOT BUILT YET — there is no route behind it, so no grant on it can do anything. The row
-  // stays READABLE rather than hidden (what it will be called, which module it lands in, is
-  // exactly what somebody planning a role wants to know now), but it stops offering a choice
-  // it cannot honour. A control that accepts an answer nobody will act on is a worse lie
-  // than a greyed one.
   const soon = entry.phase === 'P3';
 
   return (
@@ -385,11 +324,6 @@ function Row({
             )}
           </span>
           {editable && !soon && (
-            // WAS A HIDDEN ACTION ON THE ROW LABEL — clicking the words "delete the entire
-            // organisation" granted it to every role at once, with nothing on screen saying
-            // so. Now it is the same dropdown as a cell, visibly labelled, and pinned to a
-            // FIXED WIDTH at the right of the label: as a bare select it sized to its own
-            // longest option, so 64 rows produced 64 widths at 64 offsets.
             <ChoicePicker
               className="powers-all"
               value={null}
@@ -424,9 +358,6 @@ function Row({
                 onChoose={(next) => grid.setCell(role.id, entry.key, next)}
               />
             ) : (
-              // Read-only is a FACT, not a disabled control (33 § States). A greyed-out
-              // dropdown reads as "you are doing this wrong"; a plain chip reads as the rule
-              // it is, which is what somebody without `grant.update` came here to see.
               <span
                 className={`powers-chip${choice === 'blocked' ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
                 style={{ ['--weight' as string]: weightOf(choice) }}
@@ -448,16 +379,6 @@ function Row({
   );
 }
 
-/**
- * One cell, as a NATIVE SELECT. `DEC-076`.
- *
- * A custom popover would have needed its own focus trap, its own keyboard map and its own
- * escape from the grid's horizontal scroll container — which clips anything absolutely
- * positioned inside it. A `<select>` is rendered by the browser outside the page entirely:
- * it cannot be clipped, it works on a phone, it is already keyboard- and screen-reader-
- * correct, and every administrator alive has used one. The most intuitive control here is
- * the one nobody had to invent.
- */
 function ChoicePicker({
   value, onChoose, ariaLabel, className, style, title, placeholder,
 }: {
@@ -467,7 +388,6 @@ function ChoicePicker({
   className: string;
   style?: Record<string, string | number>;
   title?: string;
-  /** Only the row control has one: it shows an instruction rather than a current value. */
   placeholder?: string;
 }): JSX.Element {
   const labels = useLabels();
@@ -493,5 +413,4 @@ function ChoicePicker({
   );
 }
 
-/** `null` cannot be an option value, so the absent grant travels as the word it reads as. */
 const keyOf = (choice: GrantChoice): string => (choice === null ? 'none' : choice);

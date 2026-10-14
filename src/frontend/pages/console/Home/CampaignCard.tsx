@@ -1,8 +1,3 @@
-// One collecting campaign. 46 § Interactions, design_specs/design/04 §4.1.
-//
-// The card links to results and carries Share directly, because during a demo the most
-// common thing anybody wants from this screen is the QR code — and making that one click
-// instead of four is the whole reason the URL travels in the home payload.
 import type { HomeView } from '@endur/shared';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../../components/Icon.js';

@@ -1,7 +1,3 @@
-// <OrgRow> — `24` §6b, `70` § Components. One organisation in the estate list.
-//
-// `PlatformOrgSummary` carries counts only — the prop type is where INV-011 is enforced for
-// this component, since a row that cannot RECEIVE response content cannot render it.
 import type { PlatformOrgSummary } from '@endur/shared';
 import { isQuietOrg } from '@endur/shared';
 import { NOTICE_WINDOW_DAYS, daysUntil } from '../billing/PlanNoticeBanner.js';
@@ -45,35 +41,15 @@ export function OrgRow({
 
 export type OrgChip = 'quiet' | 'overSeats' | 'lapsed' | 'endingSoon';
 
-/**
- * Every chip at once, per `70` § Interactions — evaluated here rather than server-side
- * because the estate list is the client-sorted page it was given (`service.ts:191`), and
- * these predicates are display only.
- */
 export function orgChips(org: PlatformOrgSummary, now: Date = new Date()): OrgChip[] {
   const chips: OrgChip[] = [];
-  // `71`'s decision 4 — the same predicate the analytics `orgsQuiet30d` count uses, imported
-  // from `@endur/shared` rather than restated, so the two screens cannot disagree.
   if (isQuietOrg(org)) chips.push('quiet');
-  // `seatLimit` is always `null` today (`T-057` unbuilt) — guarded explicitly so this never
-  // lights for every customer once seats start at zero.
   if (org.seatLimit !== null && org.seats > org.seatLimit) chips.push('overSeats');
-  // DEC-113, and the two are mutually exclusive by construction: `lapsedFrom` is only ever set
-  // on a bronze row whose period has just restarted, so it can never also be a paid plan with
-  // days left. Written as `else` anyway — two chips saying opposite things about one plan is
-  // the kind of thing a later change makes possible without meaning to.
   if (org.lapsedFrom) chips.push('lapsed');
   else if (endingSoon(org, now)) chips.push('endingSoon');
   return chips;
 }
 
-/**
- * A paid plan inside its last seven days — the same window the customer's own banner uses
- * (`components/billing/PlanNoticeBanner.tsx`, `16` §7d).
- *
- * BRONZE IS NEVER "ENDING". It rolls forward free, so there is no expiry for an operator to
- * act on and a chip there would light on most of the estate, permanently, meaning nothing.
- */
 function endingSoon(org: PlatformOrgSummary, now: Date): boolean {
   if (org.tier === 'bronze' || !org.periodEnd) return false;
   const left = daysUntil(org.periodEnd, now);

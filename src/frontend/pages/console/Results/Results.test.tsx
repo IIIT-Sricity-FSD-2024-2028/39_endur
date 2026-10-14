@@ -1,8 +1,3 @@
-// T-040 — /app/campaigns/:id/results. 40, design_specs/design/08 §8.1.
-//
-// The assertions that carry the most weight are about what this page REFUSES to do:
-// suppress below the threshold without rendering a workaround, colour a distribution, and
-// show comments to somebody who may see only aggregates.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -139,13 +134,10 @@ beforeEach(() => {
 describe('the four stat cards', () => {
   it('shows the counts, and a dash where there is no denominator', () => {
     const { container } = mount();
-    // Scoped to the stat row: 4.3 is also q1's average further down the page, and a query
-    // that matches both is a query that would keep passing if one of them vanished.
     const cards = within(container.querySelector('.stat-row') as HTMLElement);
     expect(cards.getByText('612')).toBeTruthy();
     expect(cards.getByText('4.3')).toBeTruthy();
     expect(cards.getByText('287')).toBeTruthy();
-    // The server sent responses ÷ subjects here until T-040 — 5100% on this fixture.
     expect(screen.getByText(/no total to measure against/)).toBeTruthy();
   });
 
@@ -164,7 +156,6 @@ describe('the four stat cards', () => {
   it('keeps the numbers on screen when a poll fails, and says they are stale', () => {
     results = { ...results, error: new Error('offline') };
     mount();
-    // A page somebody is presenting from must not blank (40 § States).
     expect(screen.getByText('612')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toMatch(/last successful check/);
   });
@@ -174,14 +165,11 @@ describe('per-question cards state what happened and do not judge it', () => {
   it('numbers each question and names its type', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Q1 · How clear were the explanations?' })).toBeTruthy();
-    // From the distribution's own length — the results DTO carries no config.
     expect(screen.getByText(/Rating 1–5 · 612 answers/)).toBeTruthy();
   });
 
   it('draws every rating bar in ONE colour', () => {
     const { container } = mount();
-    // 40: "do not colour rating 1 red and rating 5 green — that is interpretation". The
-    // page has no branch that could; this is the test that keeps it that way.
     const q1 = container.querySelectorAll('.qr-card')[0] as HTMLElement;
     const fills = [...q1.querySelectorAll('.bar-fill')];
     expect(fills).toHaveLength(5);
@@ -193,8 +181,6 @@ describe('per-question cards state what happened and do not judge it', () => {
   it('uses three colours for NPS, where they are the instrument\'s own words', () => {
     const { container } = mount();
     const q2 = container.querySelectorAll('.qr-card')[1] as HTMLElement;
-    // The one exception, and it is an exception because a 0–6 IS a detractor by definition
-    // rather than by inference (CONF-004).
     expect(q2.querySelector('.stacked-track')).toBeTruthy();
     expect(within(q2).getByText('Detractors')).toBeTruthy();
     expect(within(q2).getByText('+40')).toBeTruthy();
@@ -202,7 +188,6 @@ describe('per-question cards state what happened and do not judge it', () => {
 
   it('shows the average as a number, with no badge and no threshold colour', () => {
     const { container } = mount();
-    // <ScoreBadge> is catalogued in 24 and deliberately not built — CONF-016.
     expect(container.querySelector('.qr-average')?.textContent).toMatch(/^4\.3/);
     expect(container.querySelector('.score-badge')).toBeNull();
   });
@@ -226,8 +211,6 @@ describe('comments are a different level of access', () => {
 
   it('is ABSENT without response.read — not greyed, and the aggregates still render', () => {
     mount(['results.read', 'campaign.read']);
-    // 40 § States. Seeing that the average is 4.3 and reading what one person wrote are
-    // different levels of access, and this is what that looks like on the page.
     expect(screen.queryByRole('heading', { name: 'Comments' })).toBeNull();
     expect(screen.getAllByText('4.3').length).toBeGreaterThan(0);
   });
@@ -256,8 +239,6 @@ describe('the k-anonymity gate is the server\'s, and this page just explains it'
       data: { responseCount: 3, audienceEstimate: null, responseRate: null, suppressed: true, threshold: 5 },
     };
     const { container } = mount();
-    // Enforced by absence in the body (52 §2) — there is nothing here that could
-    // reconstruct a distribution, and that is the guarantee rather than a UI convention.
     expect(container.querySelectorAll('.qr-card')).toHaveLength(0);
     expect(container.querySelector('.stat-row')).toBeNull();
   });
@@ -268,8 +249,6 @@ describe('the empty and closed states', () => {
     results = { ...results, data: { ...VIEW, responseCount: 0, questions: [] } };
     mount();
     expect(screen.getByText('No responses yet')).toBeTruthy();
-    // Deliberately NOT the same name as the header's Share button: two controls a query
-    // cannot tell apart are two controls a screen reader cannot tell apart (N-036).
     fireEvent.click(screen.getByRole('button', { name: 'Share the link' }));
     expect(screen.getByRole('dialog', { name: /Share Spring check/ })).toBeTruthy();
   });
@@ -297,7 +276,6 @@ describe('export', () => {
     }));
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
-    // A plain <a href> would answer a 402 by showing the reader an error envelope.
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not included in your plan/));
   });
 

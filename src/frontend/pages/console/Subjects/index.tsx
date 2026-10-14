@@ -1,10 +1,3 @@
-// T-034 — /app/subjects. 35, design_specs/design/04 §4.5.
-//
-// **The vocabulary showcase.** Subjects are the biggest generalisation in the product — a
-// course, a restaurant, a ward, a bus route — and this is the screen where an evaluator
-// sees that the same code reviews all four. Every noun here comes from `useLabels()`, and
-// the nonsense audit must find nothing (INV-001). If a word on this page is hardcoded, the
-// claim the whole product rests on is false in the one place somebody is looking.
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { SubjectSummary } from '@endur/shared';
@@ -48,7 +41,6 @@ export default function Subjects(): JSX.Element {
   const rows = list.data?.data ?? [];
   const total = list.data?.meta.total ?? 0;
 
-  /** Any filter change starts paging again — a cursor from the old query means nothing. */
   const setFilter = (patch: Record<string, string | null>): void => {
     const next = new URLSearchParams(params);
     for (const [key, value] of Object.entries(patch)) {
@@ -118,7 +110,6 @@ export default function Subjects(): JSX.Element {
       header: 'Linked person',
       hideBelow: 'md',
       render: (row) =>
-        // Plain text until /app/people exists — see DetailPanel for the same call.
         row.linkedUserId ? (
           <span>{row.linkedUserName}</span>
         ) : (
@@ -175,8 +166,6 @@ export default function Subjects(): JSX.Element {
           ...(archived ? [{ label: 'Archived', onClear: () => setFilter({ archived: null }) }] : []),
         ]}
         action={
-          // Hidden when the empty state is showing its own copy of it: two identical
-          // primary actions on one screen is the reader wondering which is the real one.
           can('subject.create') && !(rows.length === 0 && !filtered) ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
               <Icon name="add" size={18} /> Add a {labels.subject.one}
@@ -256,8 +245,6 @@ export default function Subjects(): JSX.Element {
           caption={labels.subject.many}
           empty={
             filtered ? (
-              // The two empties differ, and the difference is the whole point: one is a
-              // product with nothing in it, the other is a query with nothing in it (35).
               <EmptyState
                 icon="subject"
                 title={`No ${labels.subject.many} match those filters`}
@@ -348,10 +335,6 @@ export default function Subjects(): JSX.Element {
   );
 }
 
-/**
- * Archive states what is KEPT, not what is lost — because keeping is what actually happens
- * (10 §9). "Are you sure?" would hide the one fact that makes this safe to press.
- */
 export function archiveConsequence(subject: SubjectSummary, campaignWord: string): string {
   const kept = subject.totalResponses > 0
     ? `keeps its ${pluralise(subject.totalResponses, 'response', 'responses')} and `

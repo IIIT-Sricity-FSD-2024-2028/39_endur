@@ -1,13 +1,3 @@
-// <GapBar> — 24 §3, new at T-084 for `44` § The gap view.
-//
-// Two bars on ONE axis, which is the whole requirement: self and received have to be
-// directly comparable or the gap is two numbers in a row rather than a finding.
-//
-// IT NAMES NO WINNER. `44` is explicit — self higher than received is a blind spot, self
-// lower is under-confidence, both are worth knowing and NEITHER IS A GRADE. *"A gap view
-// that reads as an accusation guarantees the next reflection is gamed."* So there is no
-// valence, no red, no green: one accent tone for the person's own reading and one neutral
-// tone for everybody else's, and the delta is stated as a signed number with a plain word.
 export function GapBar({
   label,
   self,
@@ -15,7 +5,6 @@ export function GapBar({
   max,
 }: {
   label: string;
-  /** `null` where the question has no number — a paragraph has no average (44). */
   self: number | null;
   received: number | null;
   max: number | null;
@@ -30,8 +19,6 @@ export function GapBar({
       <p className="gap-label">{label}</p>
 
       {self === null && received === null ? (
-        // NOT a zero-length bar. A written answer has no average, and drawing an empty bar
-        // for it would say "scored nothing" about a question nobody scored.
         <p className="text-meta">Written answer — nothing to compare.</p>
       ) : (
         <>

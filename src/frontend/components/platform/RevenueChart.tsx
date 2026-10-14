@@ -1,17 +1,3 @@
-// <RevenueChart> — `71` § Revenue, DEC-080. What was taken, per period.
-//
-// NO CHARTING LIBRARY (DEC-064) — the third placement of `<TrendLine>`'s primitives, after
-// `<GrowthChart>`: an inline `<svg>` at a fixed viewBox with `preserveAspectRatio="none"`,
-// `vector-effect="non-scaling-stroke"` on the path, and a real `<table className="sr-only">`
-// carrying the same numbers underneath.
-//
-// ONE SERIES, AND IT GETS AN AREA. `<GrowthChart>` deliberately refuses one — four filled
-// regions overlapping is mud — but a single quantity accumulating over time reads better
-// with the ground under it, and there is nothing for it to obscure.
-//
-// THE FLOOR IS ZERO, NOT THE MINIMUM. A revenue line scaled from its own lowest month makes
-// a quiet month look like nothing was earned at all; the whole point of the chart is the
-// SIZE of what came in, so the baseline has to be the real one.
 import { formatMoney } from '@endur/shared';
 
 export type RevenuePoint = { period: string; revenueMinor: number; payments: number };
@@ -33,8 +19,6 @@ export function RevenueChart({ series }: { series: RevenuePoint[] }): JSX.Elemen
   const y = (value: number): number => H - PAD - (value / peak) * (H - PAD * 2);
 
   const line = series.map((point, index) => `${x(index)},${y(point.revenueMinor)}`).join(' ');
-  // The area is the line, closed along the baseline. Same points, so the two can never
-  // disagree about where the curve is.
   const area = `${x(0)},${H - PAD} ${line} ${x(count - 1)},${H - PAD}`;
 
   return (

@@ -1,14 +1,7 @@
-// <FileUpload> — 24 §5, 48. T-062.
-//
-// The client checks are a courtesy, not a control (the server refuses the same things and
-// is tested separately in backend/test/upload.test.ts). What these tests are actually about
-// is that the courtesy behaves: the right message, inline, and no request fired.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FileUpload } from './FileUpload.js';
 
-// jsdom has no object URLs. The component uses one for the instant local preview, which is
-// a real behaviour worth keeping, so it is stubbed rather than removed.
 beforeAll(() => {
   URL.createObjectURL = vi.fn(() => 'blob:preview');
   URL.revokeObjectURL = vi.fn();
@@ -52,7 +45,6 @@ describe('<FileUpload>', () => {
     const { onUpload, input } = setup({ maxBytes: 1024 });
     fireEvent.change(input, { target: { files: [png(4096)] } });
 
-    // "That file is too large" tells you nothing you can act on.
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/is 0/);
     expect(alert.textContent).toMatch(/limit is 0/);
