@@ -66,7 +66,7 @@ export default function Setup(): JSX.Element {
     if (target) setParams({ step: target.key }, { replace: false });
   };
 
-  const current = useMemo(
+  const currentPreset = useMemo(
     () => presets.data?.find((preset) => preset.key === state.industry),
     [presets.data, state.industry],
   );
@@ -84,7 +84,7 @@ export default function Setup(): JSX.Element {
   });
 
   const choose = (preset: PresetView): void => {
-    if (state.industry && state.industry !== preset.key && hasEdits(state, current)) {
+    if (state.industry && state.industry !== preset.key && hasEdits(state, currentPreset)) {
       setPendingPreset(preset);
       return;
     }
@@ -211,7 +211,7 @@ export default function Setup(): JSX.Element {
           roles={state.roles}
           units={state.units}
           labels={state.labels}
-          preset={current}
+          preset={currentPreset}
           includeTemplates={state.includeTemplates}
           onToggleTemplates={(value) => patch({ includeTemplates: value })}
           onJump={goto}
