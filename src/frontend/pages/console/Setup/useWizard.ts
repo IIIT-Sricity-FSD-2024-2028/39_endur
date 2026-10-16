@@ -47,6 +47,9 @@ export const stepIndex = (key: string): number => {
   return found === -1 ? 0 : found;
 };
 
+// Module-level, not component state: ids only need to be unique within one wizard
+// session, and a counter that reset on every render would hand out the same id twice
+// across two unrelated adds in the same tick.
 let counter = 0;
 const nextId = (prefix: string): string => `${prefix}-${(counter += 1)}`;
 
