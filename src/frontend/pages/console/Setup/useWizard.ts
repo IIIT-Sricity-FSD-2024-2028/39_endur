@@ -30,6 +30,8 @@ export type WizardState = {
   includeTemplates: boolean;
 };
 
+/** The wizard's five screens, in the order they are walked. `key` is what lives in the
+ *  `?step=` query param, so a step is linkable and Back/Forward work like real navigation. */
 export const STEPS = [
   { key: 'industry', label: 'Industry' },
   { key: 'roles', label: 'Roles' },
@@ -45,9 +47,13 @@ export const stepIndex = (key: string): number => {
   return found === -1 ? 0 : found;
 };
 
+// Module-level, not component state: ids only need to be unique within one wizard
+// session, and a counter that reset on every render would hand out the same id twice
+// across two unrelated adds in the same tick.
 let counter = 0;
 const nextId = (prefix: string): string => `${prefix}-${(counter += 1)}`;
 
+/** Where the wizard starts, before any preset is chosen — nothing pre-filled. */
 const emptyState = (): WizardState => ({
   industry: null,
   roles: [],
@@ -57,16 +63,17 @@ const emptyState = (): WizardState => ({
   includeTemplates: true,
 });
 
+/** Same length, same name at every index — the check `hasEdits` runs once for roles and
+ *  once for units, factored out so the two never silently drift apart. */
+const sameNamesInOrder = (a: { name: string }[], b: { name: string }[]): boolean =>
+  a.length === b.length && a.every((item, index) => item.name === b[index]?.name);
+
 /** True once anything past step 1 has been edited — what makes changing industry a prompt
  *  rather than a silent overwrite (31 § State). */
 export const hasEdits = (state: WizardState, preset: PresetView | undefined): boolean => {
   if (!preset || !state.industry) return false;
-  const sameRoles =
-    state.roles.length === preset.roles.length &&
-    state.roles.every((role, index) => role.name === preset.roles[index]?.name);
-  const sameUnits =
-    state.units.length === preset.units.length &&
-    state.units.every((unit, index) => unit.name === preset.units[index]?.name);
+  const sameRoles = sameNamesInOrder(state.roles, preset.roles);
+  const sameUnits = sameNamesInOrder(state.units, preset.units);
   const sameLabels = LabelKey.options.every(
     (key) =>
       state.labels[key].one === (preset.labels[key]?.one ?? DEFAULT_LABELS[key].one) &&
