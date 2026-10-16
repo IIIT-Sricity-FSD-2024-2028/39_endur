@@ -172,22 +172,23 @@ export async function putSlots(
 ): Promise<BookableSummary> {
   const existing = await prisma.bookable.findFirst({
     where: { id, orgId },
-    select: {
-      slots: {
-        select: { id: true, _count: { select: { bookings: { where: { cancelledAt: null } } } } },
-      },
-    },
+    select: { slots: { select: { id: true } } },
   });
   if (!existing) throw new NotFoundError('That bookable does not exist.');
 
-  const booked = existing.slots.filter((slot) => slot._count.bookings > 0);
-  if (booked.length > 0) {
-    throw new ConflictError(
-      'Some of these slots have bookings. Cancel those first, then change the times.',
-    );
-  }
-
   await runInTransaction(req, async (tx) => {
+    // Locked and counted INSIDE the transaction, the same order book() uses: counted outside it, a booking
+    // landing between the check and the delete would be dropped by the cascade.
+    for (const slot of existing.slots) await lockSlot(tx, slot.id);
+    const booked = await tx.booking.count({
+      where: { slot: { bookableId: id }, cancelledAt: null },
+    });
+    if (booked > 0) {
+      throw new ConflictError(
+        'Some of these slots have bookings. Cancel those first, then change the times.',
+      );
+    }
+
     await tx.slot.deleteMany({ where: { bookableId: id } });
     if (body.slots.length > 0) {
       await tx.slot.createMany({
@@ -340,11 +341,15 @@ export async function readPublicBookable(bookable: LiveBookable): Promise<Public
     select: bookableSelect,
   });
   if (!row) throw new NotFoundError('That link is not available.');
+  // A time that has already started cannot be booked, so a guest is never offered one.
+  const now = Date.now();
   return {
     name: bookable.name,
     description: bookable.description,
     orgName: bookable.orgName,
-    slots: slotViews(row).map(({ capacity: _capacity, ...slot }) => slot),
+    slots: slotViews(row)
+      .filter((slot) => new Date(slot.startsAt).getTime() > now)
+      .map(({ capacity: _capacity, ...slot }) => slot),
   };
 }
 
@@ -365,7 +370,10 @@ export async function book(
       where: { id: body.slotId, bookableId: bookable.id },
       select: { id: true, capacity: true, startsAt: true, endsAt: true },
     });
-    if (!slot) throw new NotFoundError('That time is not available.');
+    // A slot that has already started is gone, the same as one that never existed.
+    if (!slot || slot.startsAt.getTime() <= Date.now()) {
+      throw new NotFoundError('That time is not available.');
+    }
 
     // The lock, from the one file allowed raw SQL: Prisma has no expression for SELECT ... FOR UPDATE.
     await lockSlot(tx, slot.id);
