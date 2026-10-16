@@ -5,6 +5,8 @@ import { pluralise } from '../../../../lib/format.js';
 import { depthOf, type RoleDraft, type UnitDraft } from '../useWizard.js';
 import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';
 
+/** One summary card. `step`/`onJump` are a pair — omit both for a card with nothing to
+ *  edit (Starter templates, which is a toggle on this screen, not a jump to another one). */
 function Card({
   kicker,
   step,
