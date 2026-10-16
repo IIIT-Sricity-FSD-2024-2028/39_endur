@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "//exports": "Two entry points, chosen by who is asking. Everything that compiles TypeScript itself (tsx in dev, Vite, Vitest, tsc) takes `default` and reads src/, so an edit here is live on the next request and a fresh clone needs no build step. Plain `node` cannot run src/ (its relative imports are written ./foo.js and no sibling .js exists there), so the production start passes --conditions=compiled and gets dist/. Pointing `default` at dist/ instead made every dev server and test run read whatever dist/ was last built: on 2026-10-16 that was a 1 Sep build with no `trial` on RegisterBody, so Zod stripped it and every trial sign-up was treated as a paid one.",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "compiled": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "build": "tsc -b",

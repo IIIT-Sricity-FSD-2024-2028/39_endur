@@ -81,8 +81,8 @@ export function PlanPicker({
 
             {mode === 'signup' && plan.features && plan.features.length > 0 && (
               <ul className="plan-features">
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} className="plan-feature-item">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="plan-feature-item">
                     <Icon name="check" size={16} />
                     <span>{feature}</span>
                   </li>

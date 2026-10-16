@@ -180,7 +180,7 @@ platformRouter.get(
   },
 );
 
-// Suspends or restores an organisation.
+// Overrides an organisation's plan.
 platformRouter.post(
   '/orgs/:id/plan',
   validate(OverridePlanDto),
@@ -196,7 +196,7 @@ platformRouter.post(
   },
 );
 
-// Overrides an organisation's plan.
+// Suspends or restores an organisation.
 platformRouter.post(
   '/orgs/:id/suspend',
   validate(SuspendDto),

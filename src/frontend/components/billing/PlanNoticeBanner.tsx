@@ -46,13 +46,15 @@ export function noticeFor(
     };
   }
 
+  // No "Renew": a plan cannot be renewed before it ends (DEC-113 - the way back is joining again
+  // once it has), so a button promising one would open a page with nothing to press.
   return {
     tone: 'ending',
     text:
       `Your ${tierName(summary.tier)} plan ends on ${formatDate(summary.periodEnd)}. ` +
-      `Renew it to keep what it includes — otherwise this organisation moves to ` +
-      `${tierName('bronze')}.`,
-    action: 'Renew',
+      `Plans do not renew on their own: after that this organisation moves to ` +
+      `${tierName('bronze')}, and you can join ${tierName(summary.tier)} again from Plan.`,
+    action: 'View plan',
   };
 }
 

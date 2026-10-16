@@ -101,6 +101,23 @@ describe('converting mid-trial charges full price — DEC-116', () => {
     expect(capture.amountMinor).toBe(priceOf('gold'));
   });
 
+  // A full month was paid for, so a full month starts now. Keeping the trial's end date would
+  // drop a customer who paid on day 3 to bronze on day 15.
+  it('starts a fresh one-month period, not the rest of the trial', async () => {
+    const founder = await registerOrg('custom', 'gold', true);
+    const trialEnd = (await rowOf(founder.orgId))!.periodEnd;
+
+    const converted = await withCsrf(founder, 'post', '/api/v1/billing/tier').send({ tier: 'gold' });
+    expect(converted.status).toBe(200);
+
+    const row = await rowOf(founder.orgId);
+    expect(row!.periodEnd.getTime()).toBeGreaterThan(trialEnd.getTime());
+    const expected = new Date(row!.periodStart.getTime());
+    expected.setUTCMonth(expected.getUTCMonth() + 1);
+    expect(Math.abs(row!.periodEnd.getTime() - expected.getTime())).toBeLessThan(4 * 86_400_000);
+    expect(row!.periodStart.toISOString().slice(0, 10)).toBe(new Date().toISOString().slice(0, 10));
+  });
+
   it('allows paying for the exact tier being trialed, at full price', async () => {
     const founder = await registerOrg('custom', 'gold', true);
     const converted = await withCsrf(founder, 'post', '/api/v1/billing/tier').send({ tier: 'gold' });

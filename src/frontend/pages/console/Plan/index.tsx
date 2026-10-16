@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { PLAN_OPTIONS, tierRank, type BillingSummary, type PlanOption, type Tier } from '@endur/shared';
+import {
+  PLAN_OPTIONS,
+  joinPricedFrom,
+  tierRank,
+  type BillingSummary,
+  type PlanOption,
+  type Tier,
+} from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { PlanPicker } from '../../../components/billing/PlanPicker.js';
 import { PaymentDialog } from '../../../components/billing/PaymentDialog.js';
@@ -45,7 +52,10 @@ export default function Plan(): JSX.Element {
   const [scheduling, setScheduling] = useState(false);
   const [asking, setAsking] = useState(false);
   const [askSending, setAskSending] = useState(false);
-  const [paying, setPaying] = useState<Tier | null>(null);
+  // What the checkout is for, and what it is priced from, fixed when it opens. Fixed rather than
+  // read from `summary` on each render, because a successful join replaces `summary` while the
+  // success screen is still up, and the amount on it must not change underneath the customer.
+  const [paying, setPaying] = useState<{ tier: Tier; pricedFrom: Tier | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -58,18 +68,23 @@ export default function Plan(): JSX.Element {
       )
     : [];
 
-  const apply = (tier: Tier, paymentRef?: string): void => {
+  // Called by the checkout before it says "Payment successful", so a join the server refuses
+  // never reaches that screen. On a refusal the dialog closes and the reason is shown on the
+  // page; the rejection is passed on so the dialog knows not to celebrate.
+  const apply = (tier: Tier, paymentRef: string): Promise<void> => {
     setBusyTier(tier);
     setError(null);
-    setPaying(null);
-    void join(tier, paymentRef)
+    return join(tier, paymentRef)
       .then((updated) => {
         billing.set(updated);
         const name = catalogue.find((plan) => plan.tier === tier)?.name ?? tier;
         setToast(`You are on ${name}. It applies from your next action.`);
       })
-      .catch((failed: unknown) =>
-        setError(failed instanceof ApiError ? failed.message : 'Could not change the plan.'))
+      .catch((failed: unknown) => {
+        setPaying(null);
+        setError(failed instanceof ApiError ? failed.message : 'Could not change the plan.');
+        throw failed;
+      })
       .finally(() => setBusyTier(null));
   };
 
@@ -81,7 +96,7 @@ export default function Plan(): JSX.Element {
       return;
     }
     if (summary.status !== 'trialing' && tierRank(tier) <= tierRank(summary.tier)) return;
-    setPaying(tier);
+    setPaying({ tier, pricedFrom: joinPricedFrom(summary) });
   };
 
   const ask = (note: string): void => {
@@ -143,7 +158,7 @@ export default function Plan(): JSX.Element {
   }
 
   const buying: PlanOption | undefined = paying
-    ? catalogue.find((plan) => plan.tier === paying)
+    ? catalogue.find((plan) => plan.tier === paying.tier)
     : undefined;
 
   return (
@@ -312,9 +327,10 @@ export default function Plan(): JSX.Element {
           <h3 className="utility" id="plan-change">Change plan</h3>
           <p className="text-muted">
             A plan is one month, billed once, and applies as soon as it is paid. Moving up
-            charges the difference for the rest of this period. Nothing you have collected is
-            deleted, and running {labels.campaign.many.toLowerCase()} keep running whichever
-            plan you are on.
+            charges the difference for the rest of this period. Plans do not renew on their
+            own: when a period ends, the organisation moves to Bronze (or to a move down you
+            scheduled), and joining again starts a new month at the full price. Nothing you have collected is deleted, and running{' '}
+            {labels.campaign.many.toLowerCase()} keep running whichever plan you are on.
           </p>
 
           {error && <p className="form-error" role="alert">{error}</p>}
@@ -343,12 +359,13 @@ export default function Plan(): JSX.Element {
         </section>
       </div>
 
-      {buying && summary && (
+      {buying && paying && (
         <PaymentDialog
           plan={buying}
           mode="change"
-          fromTier={summary.status === 'trialing' ? null : summary.tier}
+          fromTier={paying.pricedFrom}
           onPaid={(reference) => apply(buying.tier, reference)}
+          onDone={() => setPaying(null)}
           onCancel={() => setPaying(null)}
         />
       )}

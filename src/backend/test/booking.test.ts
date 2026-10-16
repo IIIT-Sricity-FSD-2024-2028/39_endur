@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { prisma } from '../db/client.js';
-import { addStaff, app, setUpOrg, withCsrf, type Session } from './helpers.js';
+import { addStaff, app, setUpOrg, unitIdByName, withCsrf, type Session } from './helpers.js';
 
 async function subscribe(orgId: string, tier: 'gold' | 'silver' | 'bronze'): Promise<void> {
   const today = new Date();
@@ -96,6 +96,102 @@ describe('booking', () => {
 
     const after = await publicRead(token);
     expect(after.body.data.slots[0].remaining).toBe(0);
+  });
+
+  it('hides a time that has already started, and refuses to book it', async () => {
+    const { id, token } = await openOne(owner, 3);
+    const slotId = (await publicRead(token)).body.data.slots[0].id as string;
+    await prisma.slot.update({
+      where: { id: slotId },
+      data: { startsAt: new Date(at(-1)), endsAt: new Date(at(1)) },
+    });
+
+    const listed = await publicRead(token);
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.slots).toHaveLength(0);
+
+    const late = await takeSlot(token, slotId, 'Latecomer');
+    expect(late.status).toBe(404);
+    expect(await prisma.booking.count({ where: { slot: { bookableId: id } } })).toBe(0);
+  });
+
+  // Changing the times while guests are booking. Either the change wins, and nobody holds a
+  // booking on a slot that no longer exists, or a booking wins and the change is refused - and a
+  // booker who loses is told the time has gone, never handed a 500.
+  //
+  // The dangerous window is narrow (a slot change takes ~20ms), so the change is started first and
+  // the bookings follow at a spread of small delays. Before lockSlot reported a deleted row, about
+  // one round in five handed the bookers a 500.
+  it('never loses a booking to a slot change, and never 500s the booker who lost', async () => {
+    for (const delay of [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0, 6, 12, 18, 24]) {
+      const { id, token } = await openOne(owner, 10);
+      const slotId = (await publicRead(token)).body.data.slots[0].id as string;
+
+      // `.then` sends it now; a supertest request does not leave until something awaits it.
+      const change = withCsrf(owner, 'put', `/api/v1/bookables/${id}/slots`)
+        .send({ slots: [{ startsAt: at(48), endsAt: at(49), capacity: 10 }] })
+        .then((res) => res);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      const bookings = await Promise.all(
+        Array.from({ length: 4 }, (_unused, index) =>
+          takeSlot(token, slotId, `Racer${index}`).then((res) => res)),
+      );
+      const changed = await change;
+
+      expect([200, 409]).toContain(changed.status);
+      expect(bookings.map((res) => res.status).filter((status) => status !== 201 && status !== 404))
+        .toEqual([]);
+      const made = bookings.filter((res) => res.status === 201).length;
+      const live = await prisma.booking.count({
+        where: { slot: { bookableId: id }, cancelledAt: null },
+      });
+      expect(live).toBe(made);
+      if (changed.status === 200) expect(made).toBe(0);
+      else expect(made).toBeGreaterThan(0);
+    }
+  }, 60_000);
+
+  it('lists, renames and deletes a bookable, and keeps another organisation out of all three', async () => {
+    const { id } = await openOne(owner, 2);
+    const stranger = await setUpOrg('hotel');
+    await subscribe(stranger.orgId, 'gold');
+
+    const listed = await owner.agent.get('/api/v1/bookables');
+    expect(listed.status).toBe(200);
+    expect((listed.body.data as Array<{ id: string }>).some((row) => row.id === id)).toBe(true);
+    const theirs = await stranger.agent.get('/api/v1/bookables');
+    expect((theirs.body.data as Array<{ id: string }>).some((row) => row.id === id)).toBe(false);
+
+    const renamed = await withCsrf(owner, 'patch', `/api/v1/bookables/${id}`).send({ name: 'Renamed room' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.data.name).toBe('Renamed room');
+    const hijack = await withCsrf(stranger, 'patch', `/api/v1/bookables/${id}`).send({ name: 'Hijacked' });
+    expect(hijack.status).toBe(404);
+
+    expect((await withCsrf(stranger, 'delete', `/api/v1/bookables/${id}`)).status).toBe(404);
+    const gone = await withCsrf(owner, 'delete', `/api/v1/bookables/${id}`);
+    expect(gone.status).toBe(204);
+    expect(await prisma.bookable.count({ where: { id } })).toBe(0);
+    expect(await prisma.slot.count({ where: { bookableId: id } })).toBe(0);
+  });
+
+  // The foreign key knows nothing about tenants, so the service has to check the subject is ours.
+  it('refuses to link a bookable to another organisation’s subject', async () => {
+    const { id } = await openOne(owner, 1);
+    const stranger = await setUpOrg('hotel');
+    const theirUnit = await unitIdByName(stranger.orgId, 'Section A');
+    const theirs = await withCsrf(stranger, 'post', '/api/v1/subjects').send({ name: 'Their room', unitId: theirUnit });
+    expect(theirs.status).toBe(201);
+
+    const res = await withCsrf(owner, 'patch', `/api/v1/bookables/${id}`).send({ subjectId: theirs.body.data.id });
+    expect(res.status).toBe(404);
+    const row = await prisma.bookable.findUnique({ where: { id }, select: { subjectId: true } });
+    expect(row?.subjectId).toBeNull();
+
+    const ourUnit = await unitIdByName(owner.orgId, 'Section A');
+    const ours = await withCsrf(owner, 'post', '/api/v1/subjects').send({ name: 'Our room', unitId: ourUnit });
+    const linked = await withCsrf(owner, 'patch', `/api/v1/bookables/${id}`).send({ subjectId: ours.body.data.id });
+    expect(linked.status).toBe(200);
   });
 
   it('frees the place when a booking is cancelled, immediately', async () => {

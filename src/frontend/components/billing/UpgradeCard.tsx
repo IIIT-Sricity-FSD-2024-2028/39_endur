@@ -1,5 +1,7 @@
 import { PLAN_OPTIONS, type Tier } from '@endur/shared';
+import { Link } from 'react-router-dom';
 import { Icon, type IconName } from '../Icon.js';
+import { useCan } from '../../lib/capabilities.js';
 
 export function UpgradeCard({
   requiredTier,
@@ -12,6 +14,7 @@ export function UpgradeCard({
   icon?: IconName;
   sells?: string;
 }): JSX.Element {
+  const can = useCan();
   const plan = PLAN_OPTIONS.find((option) => option.tier === requiredTier);
   const current = PLAN_OPTIONS.find((option) => option.tier === currentTier);
 
@@ -28,15 +31,17 @@ export function UpgradeCard({
         </p>
       )}
 
-      {/* NO BUTTON, and its absence is deliberate rather than unfinished. The plan page and
-          its per-tier Join action are `T-058` (`49` § Interactions), and there is no
-          checkout at all in any phase (DEC-035). A primary button that navigates nowhere is
-          precisely what `design_specs/design/02` §7 refuses in the sidebar, and it would be
-          a worse offence here — on the one screen whose entire job is to make an upgrade
-          path legible. When `T-058` lands, the button belongs here. */}
-      <p className="text-meta">
-        Whoever manages billing for your organisation can change the plan.
-      </p>
+      {/* The way to the plan page, for whoever may change the plan. Everybody else is told who
+          can, rather than shown a button that would open a page where every action is disabled. */}
+      {can('billing.update') ? (
+        <Link className="btn btn-primary" to="/app/plan">
+          See plans
+        </Link>
+      ) : (
+        <p className="text-meta">
+          Whoever manages billing for your organisation can change the plan.
+        </p>
+      )}
     </section>
   );
 }

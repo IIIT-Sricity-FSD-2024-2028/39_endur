@@ -877,7 +877,7 @@ export const PaymentRecordSchema = mirrors<PaymentRecord>()(
     at: iso(),
     tier: Tier,
     fromTier: Tier.nullable(),
-    kind: z.enum(['signup', 'change', 'expiry', 'lapse']),
+    kind: z.enum(['signup', 'trial_signup', 'change', 'expiry', 'lapse', 'trial_expired']),
     // Always minor units (paise). Money as a decimal number disagrees with itself at the third place.
     amountMinor: z.number(),
     currency: z.literal('INR'),

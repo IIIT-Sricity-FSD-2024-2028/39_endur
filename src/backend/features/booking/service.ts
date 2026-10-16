@@ -21,7 +21,7 @@ import type {
   UpdateBookableBody,
 } from '@endur/shared';
 import { prisma } from '../../db/client.js';
-import { lockSlot } from '../../db/graph.js';
+import { lockSlot, lockSlotsOf } from '../../db/graph.js';
 import { runInTransaction } from '../../db/tx.js';
 import { config } from '../../lib/config.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
@@ -170,16 +170,14 @@ export async function putSlots(
   id: string,
   body: PutSlotsBody,
 ): Promise<BookableSummary> {
-  const existing = await prisma.bookable.findFirst({
-    where: { id, orgId },
-    select: { slots: { select: { id: true } } },
-  });
+  const existing = await prisma.bookable.findFirst({ where: { id, orgId }, select: { id: true } });
   if (!existing) throw new NotFoundError('That bookable does not exist.');
 
   await runInTransaction(req, async (tx) => {
     // Locked and counted INSIDE the transaction, the same order book() uses: counted outside it, a booking
-    // landing between the check and the delete would be dropped by the cascade.
-    for (const slot of existing.slots) await lockSlot(tx, slot.id);
+    // landing between the check and the delete would be dropped by the cascade. Every slot the bookable
+    // has NOW is locked, in one ordered statement - not a list read before the transaction began.
+    await lockSlotsOf(tx, id);
     const booked = await tx.booking.count({
       where: { slot: { bookableId: id }, cancelledAt: null },
     });
@@ -376,7 +374,9 @@ export async function book(
     }
 
     // The lock, from the one file allowed raw SQL: Prisma has no expression for SELECT ... FOR UPDATE.
-    await lockSlot(tx, slot.id);
+    // Waiting on it behind a slot change that then deleted this slot leaves nothing locked, and the
+    // insert below would fail on the foreign key - a 500 for a time that has simply gone.
+    if (!(await lockSlot(tx, slot.id))) throw new NotFoundError('That time is not available.');
 
     const taken = await tx.booking.count({ where: { slotId: slot.id, cancelledAt: null } });
     if (taken >= slot.capacity) throw new SlotFullError();

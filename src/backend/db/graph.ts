@@ -92,8 +92,19 @@ export async function wouldCreateCycle(
 }
 
 // Locks one booking slot row inside a transaction, so two phones cannot take the last place at once.
-export async function lockSlot(tx: Prisma.TransactionClient, slotId: string): Promise<void> {
-  await tx.$queryRaw`SELECT id FROM slots WHERE id = ${slotId}::uuid FOR UPDATE`;
+// False when the row is gone: a slot change held the lock first and deleted it, and FOR UPDATE then
+// returns nothing rather than failing, so the caller has to be told.
+export async function lockSlot(tx: Prisma.TransactionClient, slotId: string): Promise<boolean> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM slots WHERE id = ${slotId}::uuid FOR UPDATE`;
+  return rows.length > 0;
+}
+
+// Locks every slot of one bookable in one statement, in id order, so two slot changes made at once
+// queue behind each other instead of each holding half the rows the other needs (a deadlock).
+export async function lockSlotsOf(tx: Prisma.TransactionClient, bookableId: string): Promise<void> {
+  await tx.$queryRaw`
+    SELECT id FROM slots WHERE bookable_id = ${bookableId}::uuid ORDER BY id FOR UPDATE`;
 }
 
 // The migrations this database has finished, read from Prisma's own bookkeeping table.

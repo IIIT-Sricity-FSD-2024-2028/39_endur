@@ -143,6 +143,24 @@ describe('a plan change writes one capture — DEC-080', () => {
   });
 });
 
+// Two tabs pressing Pay at the same moment. Both read Bronze before either writes, so a
+// read-then-check alone lets both through and the ledger takes two captures for one plan.
+describe('two joins at the same moment', () => {
+  // Five rather than two: before the fix, five at once wrote 3 to 5 captures every time, while
+  // two at once sometimes happened not to overlap.
+  it('lets exactly one through and writes exactly one capture', async () => {
+    const founder = await registerOrg('custom', 'bronze');
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => join(founder, { tier: 'gold' })),
+    );
+
+    expect(results.map((res) => res.status).sort()).toEqual([200, 409, 409, 409, 409]);
+    const changes = (await paymentsOf(founder.orgId)).filter((row) => row.kind === 'change');
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.amountMinor).toBe(priceOf('gold') - priceOf('bronze'));
+  });
+});
+
 describe('the earnings page is the owner’s — DEC-080, 19 §4', () => {
   it('refuses staff and names the capability', async () => {
     const staff = await makeOperator('staff');
@@ -169,6 +187,19 @@ describe('the earnings page is the owner’s — DEC-080, 19 §4', () => {
       .toEqual(['bronze', 'silver', 'gold', 'enterprise']);
     // The organisation registered a moment ago is in the window and in the ledger.
     expect(data.recent.some((row) => row.orgId === founder.orgId)).toBe(true);
+  });
+
+  // A trial takes no money, so its ₹0 rows are not payments any more than a lapse is.
+  it('leaves trial sign-ups and trial expiries out of the money', async () => {
+    const trial = await registerOrg('custom', 'gold', true);
+    const owner = await makeOperator('owner');
+
+    const res = await owner.get('/api/v1/platform/earnings');
+    expect(res.status).toBe(200);
+    const data = res.body.data as PlatformEarnings;
+    expect(data.recent.some((row) => row.orgId === trial.orgId)).toBe(false);
+    expect(data.recent.every((row) => row.kind !== 'trial_signup' && row.kind !== 'trial_expired'))
+      .toBe(true);
   });
 
   // A mean of no payments is not zero, so the page renders a dash rather than a zero amount.

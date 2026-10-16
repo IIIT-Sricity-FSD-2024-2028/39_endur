@@ -105,22 +105,6 @@ export default function Simulator(): JSX.Element {
   const subjects = useSubjectList({ q: subjectTerm || undefined });
   const campaigns = useCampaignList();
 
-  if (!can('simulator.run')) {
-    return (
-      <div className="page">
-        <PageHeader
-          title="Permission simulator"
-          subtitle="Ask whether somebody could do something, and see exactly why."
-        />
-        <EmptyState
-          icon="role"
-          title="You do not have access to this"
-          body="Your account cannot run the simulator. Whoever administers your organisation can change that."
-        />
-      </div>
-    );
-  }
-
   const targetReady =
     targetKind === 'org' ||
     (targetKind === 'unit' && targetUnitId !== '') ||
@@ -142,6 +126,25 @@ export default function Simulator(): JSX.Element {
     }
     return campaigns.data?.data.find((c) => c.id === targetCampaignId)?.name ?? 'that campaign';
   }, [targetKind, targetUnitId, targetPerson, targetSubjectId, targetCampaignId, units.data, subjects.data, campaigns.data, labels]);
+
+  // After every hook, never before one: React matches hooks to their slots by call order, so an
+  // early return above the useMemo would change how many hooks run whenever this permission
+  // changed under an open page, and React throws on that.
+  if (!can('simulator.run')) {
+    return (
+      <div className="page">
+        <PageHeader
+          title="Permission simulator"
+          subtitle="Ask whether somebody could do something, and see exactly why."
+        />
+        <EmptyState
+          icon="role"
+          title="You do not have access to this"
+          body="Your account cannot run the simulator. Whoever administers your organisation can change that."
+        />
+      </div>
+    );
+  }
 
   const capabilityLabel =
     catalogue.data?.find((c) => c.key === capability)?.label ?? capability;
