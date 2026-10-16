@@ -53,6 +53,7 @@ export const stepIndex = (key: string): number => {
 let counter = 0;
 const nextId = (prefix: string): string => `${prefix}-${(counter += 1)}`;
 
+/** Where the wizard starts, before any preset is chosen — nothing pre-filled. */
 const emptyState = (): WizardState => ({
   industry: null,
   roles: [],
