@@ -26,7 +26,8 @@ import type {
   SupportSessionRow,
   Tier,
 } from '@endur/shared';
-import { TIERS, isQuietOrg, supportDeniedFor } from '@endur/shared';
+import { TIERS, isQuietOrg, supportDeniedFor, tierRank } from '@endur/shared';
+import type { Prisma } from '@prisma/client';
 import type { PaymentKind } from '@endur/shared';
 import { platformClient } from '../../platform/db.js';
 import { newPeriod } from '../../billing/period.js';
@@ -206,18 +207,62 @@ const ORG_SELECT = {
   },
 } as const;
 
-export async function estate(query: EstateQuery): Promise<Paged<PlatformOrgSummary>> {
-  const where = {
-    ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
-    ...(query.industry ? { industry: query.industry } : {}),
-    ...(query.tier || query.status
-      ? {
+// Organisations the product is SERVING `tier` to today - effectiveTier() from billing/effective.ts, written
+// as a query. The row prints the effective tier, so filtering on the stored column would list a Gold period
+// that ended (and has not been read since) under Gold with "Bronze" printed on it.
+//   still running            -> the stored tier;
+//   ended, move down booked  -> the booked tier, when it is below the stored one;
+//   ended, nothing booked    -> bronze, and so is an organisation with no row at all.
+// "Ended" is the same UTC-midnight rule as periodHasEnded: the last day still counts as paid.
+function servingTier(tier: Tier, now: Date = new Date()): Prisma.OrganizationWhereInput {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (tier === 'bronze') {
+    // Spelled out rather than written as NOT(any tier above): pending_tier is NULL on most rows, and in
+    // SQL a NOT over a comparison with NULL is unknown, not true - that form silently dropped every lapse.
+    const ended = { periodEnd: { lt: today } };
+    return {
+      OR: [
+        { subscription: null },
+        { subscription: { tier: 'bronze', periodEnd: { gte: today } } },
+        { subscription: { ...ended, pendingTier: null } },
+        { subscription: { ...ended, pendingTier: 'bronze' } },
+        // A booked tier that is not below the stored one is ignored by effectiveTier, so it lands here too.
+        ...TIERS.filter((pending) => pending !== 'bronze').map((pending) => ({
           subscription: {
-            ...(query.tier ? { tier: query.tier } : {}),
-            ...(query.status ? { status: query.status } : {}),
+            ...ended,
+            pendingTier: pending,
+            tier: { in: TIERS.filter((t) => tierRank(t) <= tierRank(pending)) },
           },
-        }
-      : {}),
+        })),
+      ],
+    };
+  }
+  return {
+    OR: [
+      { subscription: { tier, periodEnd: { gte: today } } },
+      {
+        subscription: {
+          periodEnd: { lt: today },
+          pendingTier: tier,
+          tier: { in: TIERS.filter((t) => tierRank(t) > tierRank(tier)) },
+        },
+      },
+    ],
+  };
+}
+
+export async function estate(query: EstateQuery): Promise<Paged<PlatformOrgSummary>> {
+  // Combined with AND rather than spread into one object: servingTier and the page cursor both need an OR.
+  const where: Prisma.OrganizationWhereInput = {
+    AND: [
+      ...(query.q ? [{ name: { contains: query.q, mode: 'insensitive' as const } }] : []),
+      ...(query.industry ? [{ industry: query.industry }] : []),
+      ...(query.tier ? [servingTier(query.tier)] : []),
+      // "none" is the status the row prints for an organisation with no subscription row.
+      ...(query.status
+        ? [query.status === 'none' ? { subscription: null } : { subscription: { status: query.status } }]
+        : []),
+    ],
   };
 
   // Cursor pagination on creation date, like every other list. The page is sorted by last activity in
@@ -226,7 +271,7 @@ export async function estate(query: EstateQuery): Promise<Paged<PlatformOrgSumma
 
   const [rows, total] = await Promise.all([
     db.organization.findMany({
-      where: { ...where, ...after },
+      where: { AND: [where, after] },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
       select: ORG_SELECT,
