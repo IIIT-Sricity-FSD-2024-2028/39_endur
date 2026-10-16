@@ -12,30 +12,46 @@ const TIER_LABEL: Record<Tier, string> = {
   enterprise: 'Enterprise',
 };
 
-const mintReference = (): string =>
-  `endur_${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 6)}`;
+// Same shape as the server's own references (endur_ + 18 hex characters), from the browser's
+// cryptographic generator. Math.random could repeat, and a repeat hits the UNIQUE constraint on
+// payments.reference.
+const mintReference = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(9));
+  return `endur_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+};
 
 export function PaymentDialog({
   plan,
   mode,
   fromTier = null,
   onPaid,
+  onDone,
   onCancel,
 }: {
   plan: PlanOption;
   mode: 'signup' | 'change';
   fromTier?: Tier | null;
-  onPaid: (reference: string) => void;
+  // The server's answer. "Payment successful" is shown only once this resolves; if it rejects,
+  // the parent has the error and the dialog goes back to idle.
+  onPaid: (reference: string) => Promise<unknown>;
+  // After the success screen has been seen.
+  onDone?: () => void;
   onCancel: () => void;
 }): JSX.Element {
   const [phase, setPhase] = useState<'idle' | 'paying' | 'done'>('idle');
   const payRef = useRef<HTMLButtonElement>(null);
   const timers = useRef<number[]>([]);
+  const alive = useRef(true);
 
   const dismissable = phase === 'idle';
 
+  // Focus once, on open. Kept out of the effect below, which re-runs whenever the parent passes
+  // a new onCancel, and would pull focus back to Pay on every parent render.
   useEffect(() => {
     payRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && dismissable) onCancel();
     };
@@ -43,12 +59,16 @@ export function PaymentDialog({
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, dismissable]);
 
-  useEffect(
-    () => () => {
-      for (const id of timers.current) window.clearTimeout(id);
-    },
-    [],
-  );
+  useEffect(() => {
+    alive.current = true;
+    // The same array for the dialog's whole life (ids are pushed into it, it is never replaced),
+    // so holding it here still sees every timer started after this ran.
+    const pending = timers.current;
+    return () => {
+      alive.current = false;
+      for (const id of pending) window.clearTimeout(id);
+    };
+  }, []);
 
   function pay(): void {
     if (phase !== 'idle') return;
@@ -56,8 +76,16 @@ export function PaymentDialog({
     const reference = mintReference();
     timers.current.push(
       window.setTimeout(() => {
-        setPhase('done');
-        timers.current.push(window.setTimeout(() => onPaid(reference), SUCCESS_MS));
+        onPaid(reference).then(
+          () => {
+            if (!alive.current) return;
+            setPhase('done');
+            timers.current.push(window.setTimeout(() => onDone?.(), SUCCESS_MS));
+          },
+          () => {
+            if (alive.current) setPhase('idle');
+          },
+        );
       }, CAPTURE_MS),
     );
   }
@@ -93,7 +121,10 @@ export function PaymentDialog({
 
             <p className="pay-amount">
               {amount}
-              <span className="pay-period text-meta"> / month</span>
+              {/* A difference is a one-off for the period already running, not a monthly price. */}
+              <span className="pay-period text-meta">
+                {isDifference ? ' for the rest of this period' : ' / month'}
+              </span>
             </p>
 
             {/* THE SUBTRACTION, SHOWN. An amount that is neither of the two prices on the

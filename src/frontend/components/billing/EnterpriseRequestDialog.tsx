@@ -15,8 +15,13 @@ export function EnterpriseRequestDialog({
   const [note, setNote] = useState('');
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
+  // Focus once, on open - not in the effect below, which re-runs whenever `sending` or the
+  // parent's onCancel changes and would pull focus back into the note each time.
   useEffect(() => {
     noteRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && !sending) onCancel();
     };

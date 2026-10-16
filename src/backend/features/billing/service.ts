@@ -6,6 +6,7 @@
 // reference arrived would put an authorisation decision behind a string the client made up.
 import {
   PLAN_OPTIONS,
+  joinPricedFrom,
   tierRank,
   type BillingStatus,
   type BillingSummary,
@@ -241,23 +242,42 @@ export async function joinTier(
         })
       : null;
 
+  // It charges the DIFFERENCE between the old tier and the new one - except after a lapse, or mid-trial
+  // (DEC-116), where the customer never paid for the tier they are on, so the join is priced at the
+  // full amount instead of a diff from a tier nothing was ever captured for. The checkout prints its
+  // amount from the same function.
+  const pricedFrom = joinPricedFrom(before);
+
   await runInTransaction(req, async (tx) => {
-    await tx.subscription.update({
-      where: { orgId },
+    // ONLY IF THE PLAN IS STILL WHAT WAS CHECKED ABOVE. Two tabs pressing Pay together both read
+    // Bronze before either writes, and a plain update let both through - five at once wrote up to
+    // five captures for one Gold plan. Postgres makes the second UPDATE wait for the first to commit
+    // and then re-checks this WHERE against the row as it now stands, so the loser matches nothing
+    // and its transaction rolls back before any payment row is written.
+    const moved = await tx.subscription.updateMany({
+      where: { orgId, tier: before.tier, status: before.status },
       // The status moves with the tier, and joining also cancels any scheduled move down and clears the
       // lapse notice: somebody who has just paid for Gold should not still be told their Gold ran out.
-      data: { tier, status: 'active', pendingTier: null, lapsedFrom: null },
+      // A full-price join buys a full month from today. A difference only pays for the rest of the
+      // period already running, so that period stays.
+      data: {
+        tier,
+        status: 'active',
+        pendingTier: null,
+        lapsedFrom: null,
+        ...(pricedFrom === null ? newPeriod() : {}),
+      },
     });
+    if (moved.count !== 1) {
+      throw new ConflictError('The plan changed while this was being paid for. Reload to see where it stands.');
+    }
 
     // The capture, in the same transaction as the tier it pays for.
-    // It charges the DIFFERENCE between the old tier and the new one - except after a lapse, or mid-trial
-    // (DEC-116), where the customer never paid for the tier they are on, so the join is priced at the
-    // full amount instead of a diff from a tier nothing was ever captured for.
     await recordPayment(tx, {
       orgId,
       tier,
       fromTier: before.tier,
-      pricedFrom: before.lapsedFrom || wasTrialing ? null : before.tier,
+      pricedFrom,
       kind: 'change',
       payerName: payer?.name ?? 'Unknown',
       payerEmail: payer?.email ?? '',

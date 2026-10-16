@@ -39,6 +39,15 @@ describe('when the notice appears — 16 §7d', () => {
     expect(noticeFor(endingIn(-1), NOW)).toBeNull();
   });
 
+  // There is no renewal before the end (DEC-113), so the banner must not offer one: its button
+  // used to say Renew and open a page where the current plan cannot be pressed.
+  it('does not promise a renewal, and says how to get the plan back', () => {
+    const notice = noticeFor(endingIn(3), NOW);
+    expect(notice?.action).not.toMatch(/renew/i);
+    expect(notice?.text).not.toMatch(/renew it/i);
+    expect(notice?.text).toMatch(/join Gold again/);
+  });
+
   it('never warns a bronze organisation — it rolls forward free', () => {
     expect(noticeFor(endingIn(1, 'bronze'), NOW)).toBeNull();
   });

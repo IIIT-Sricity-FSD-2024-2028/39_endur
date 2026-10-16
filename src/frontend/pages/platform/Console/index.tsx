@@ -26,6 +26,9 @@ export default function Console(): JSX.Element {
   const can = useOpsCan();
   const queue = useEnterpriseQueue(can('platform.enterprise.read'));
   const [queueBusy, setQueueBusy] = useState<string | null>(null);
+  // The search box's text, held here so the input is controlled like every other filter. It
+  // reaches the URL (and the request) on Enter or when the box loses focus, not per keystroke.
+  const [term, setTerm] = useState(filters.q ?? '');
 
   const sorted = useMemo(() => {
     const rows = [...estate.rows];
@@ -94,8 +97,13 @@ export default function Console(): JSX.Element {
         <input
           className="input"
           placeholder="Search by name"
-          defaultValue={filters.q ?? ''}
-          onBlur={(event) => setFilter('q', event.target.value)}
+          aria-label="Search organisations by name"
+          value={term}
+          onChange={(event) => setTerm(event.target.value)}
+          onBlur={() => setFilter('q', term.trim())}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') setFilter('q', term.trim());
+          }}
         />
         <select className="input" value={filters.tier ?? ''} onChange={(event) => setFilter('tier', event.target.value)}>
           <option value="">Any tier</option>

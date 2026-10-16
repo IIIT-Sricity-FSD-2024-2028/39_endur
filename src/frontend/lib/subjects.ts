@@ -57,13 +57,20 @@ export function useSubjectList(query: SubjectQuery): SubjectListController {
     };
   }, []);
 
+  // Numbered, so only the newest request may write. The simulator searches on every keystroke,
+  // and without this an older, slower answer arriving last would replace the right one.
+  const latest = useRef(0);
+
   const load = useCallback(async (path: string) => {
+    const ticket = ++latest.current;
     setState((current) => ({ ...current, loading: true }));
     try {
       const page = await apiGet<Page<SubjectSummary>>(`/subjects${path}`);
+      if (ticket !== latest.current) return;
       last.current = page;
       if (alive.current) setState({ data: page, loading: false, error: null });
     } catch (error) {
+      if (ticket !== latest.current) return;
       // The last good page stays on screen with the error above it (35 § States).
       if (alive.current) setState((current) => ({ ...current, loading: false, error: error as Error }));
     }

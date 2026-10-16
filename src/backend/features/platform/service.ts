@@ -616,8 +616,9 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
   const granularity = query.granularity;
 
   // Expiry and lapse rows are both excluded: they record a plan move with no money on it, and this page
-  // is about money. Written as a list, so the next zero-amount kind is a name added here.
-  const UNPAID_KINDS = ['expiry', 'lapse'];
+  // is about money. Written as a list, so the next zero-amount kind is a name added here - which the two
+  // trial kinds (DEC-116) were not at first, so every trial counted as a payment and pulled the average down.
+  const UNPAID_KINDS = ['expiry', 'lapse', 'trial_signup', 'trial_expired'];
   const window = {
     createdAt: { gte: from, lte: to },
     status: 'succeeded',

@@ -54,8 +54,10 @@ export default function Start(): JSX.Element {
     setPaying(true);
   }
 
-  async function submit(options: { paymentRef?: string; trial?: boolean } = {}): Promise<void> {
-    if (busy || !tier) return;
+  // Resolves true once registered (and on the way into the app), false when refused. The checkout
+  // waits on it, so "Payment successful" is never shown for a registration the server turned down.
+  async function submit(options: { paymentRef?: string; trial?: boolean } = {}): Promise<boolean> {
+    if (busy || !tier) return false;
     setBusy(true);
     setError(null);
     try {
@@ -70,12 +72,14 @@ export default function Start(): JSX.Element {
         trial: options.trial ?? false,
       });
       navigate(landing, { replace: true });
+      return true;
     } catch (caught) {
       setPaying(false);
       setError(caught as Error);
       setBusy(false);
       const status = (caught as ApiError).status;
       if (status === 409 || status === 422) setStep('details');
+      return false;
     }
   }
 
@@ -210,7 +214,7 @@ export default function Start(): JSX.Element {
             <div className="auth-plan-wrapper">
               <div className="auth-plan-header">
                 <h1 className="auth-title">Choose a plan</h1>
-                <p className="auth-sub">One year, billed once. Change plan any time from settings</p>
+                <p className="auth-sub">One month, billed once. Change plan any time from Plan in the console.</p>
               </div>
 
               <PlanPicker
@@ -264,7 +268,13 @@ export default function Start(): JSX.Element {
         <PaymentDialog
           plan={chosenPlan}
           mode="signup"
-          onPaid={(reference) => void submit({ paymentRef: reference })}
+          // No onDone: registering signs the founder in, and the /start guard moves them into the
+          // app straight away, so landing on the setup wizard is the confirmation here.
+          onPaid={(reference) =>
+            submit({ paymentRef: reference }).then((registered) => {
+              if (!registered) throw new Error('Registration was refused.');
+            })
+          }
           onCancel={() => setPaying(false)}
         />
       )}

@@ -222,6 +222,23 @@ export const changeCostMinor = (from: Tier | null, to: Tier): number =>
   from === null ? priceOf(to) : Math.max(0, priceOf(to) - priceOf(from));
 
 /**
+ * WHAT A JOIN IS PRICED FROM — the `from` that `POST /billing/tier` hands `changeCostMinor`.
+ *
+ * `null`, the full price, when nothing was paid for the tier being left: mid-trial (DEC-116),
+ * or after a lapse, where the bronze being left is the free roll-over (DEC-113). Otherwise the
+ * tier in force, and an upgrade pays the difference (DEC-097).
+ *
+ * ONE FUNCTION FOR BOTH SIDES. The server prices the capture with it and the checkout prints
+ * the amount with it. They used to be two copies of this rule, and the client's had no lapse
+ * case: a lapsed Gold org was shown "Pay ₹900" and charged ₹999.
+ */
+export const joinPricedFrom = (plan: {
+  tier: Tier;
+  status: string;
+  lapsedFrom: Tier | null;
+}): Tier | null => (plan.status === 'trialing' || plan.lapsedFrom !== null ? null : plan.tier);
+
+/**
  * Money, as one string, from one place.
  *
  * WHOLE RUPEES WHEN THE PAISE ARE ZERO, which they always are today — "₹99" is what the
