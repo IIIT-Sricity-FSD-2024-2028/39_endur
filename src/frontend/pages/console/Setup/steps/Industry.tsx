@@ -65,6 +65,9 @@ export function IndustryStep({
               <label
                 className={`preset-card preset-card-simple${isSelected ? ' is-selected' : ''}`}
                 key={preset.key}
+                // A double-click both picks the card and advances — a shortcut for
+                // somebody who already knows which type they want and would otherwise
+                // click the card, then reach for Continue.
                 onDoubleClick={() => {
                   onSelect(preset);
                   onAdvance();
