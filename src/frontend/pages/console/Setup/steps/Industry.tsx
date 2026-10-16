@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import type { PresetView } from '@endur/shared';
 import { Icon, type IconName } from '../../../../components/Icon.js';
 
+// Keyed by preset, with 'organization' as the render-time fallback below — a preset the
+// server adds later still gets a card instead of a missing icon.
 const PRESET_ICONS: Record<string, IconName> = {
   university: 'university',
   hotel: 'hotel',
