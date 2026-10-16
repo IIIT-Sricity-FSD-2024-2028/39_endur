@@ -1,3 +1,5 @@
+// Step 4 of the wizard: a thin wrapper around <WordsEditor> plus a live preview, so a
+// reader sees the effect of a renamed word immediately rather than on the next screen.
 import type { LabelKey, ResolvedLabels } from '@endur/shared';
 import { WordsEditor } from '../../../../components/org/WordsEditor.js';
 import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';
