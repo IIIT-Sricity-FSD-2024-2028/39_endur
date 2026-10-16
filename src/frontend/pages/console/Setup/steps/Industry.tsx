@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import type { PresetView } from '@endur/shared';
 import { Icon, type IconName } from '../../../../components/Icon.js';
 
+// Keyed by preset, with 'organization' as the render-time fallback below — a preset the
+// server adds later still gets a card instead of a missing icon.
 const PRESET_ICONS: Record<string, IconName> = {
   university: 'university',
   hotel: 'hotel',
@@ -56,40 +58,47 @@ export function IndustryStep({
         </p>
 
         <div className="preset-grid" role="radiogroup" aria-label="Organization type">
-          {presets.map((preset) => (
-            <label
-              className={`preset-card preset-card-simple${selected === preset.key ? ' is-selected' : ''}`}
-              key={preset.key}
-              onDoubleClick={() => {
-                onSelect(preset);
-                onAdvance();
-              }}
-            >
-              <input
-                type="radio"
-                name="industry"
-                value={preset.key}
-                checked={selected === preset.key}
-                onChange={() => onSelect(preset)}
-              />
-              <div className="preset-card-icon">
-                <Icon name={PRESET_ICONS[preset.key] || 'organization'} size={24} />
-              </div>
-              <span className="preset-name">{preset.displayName}</span>
-              {VIBE_INDUSTRIES.has(preset.key) && (
-                <span
-                  className={`preset-swatch preset-swatch-${preset.key}`}
-                  aria-hidden="true"
-                  title="Theme colour for this organization type"
+          {presets.map((preset) => {
+            const isSelected = selected === preset.key;
+            const vibed = VIBE_INDUSTRIES.has(preset.key);
+            return (
+              <label
+                className={`preset-card preset-card-simple${isSelected ? ' is-selected' : ''}`}
+                key={preset.key}
+                // A double-click both picks the card and advances — a shortcut for
+                // somebody who already knows which type they want and would otherwise
+                // click the card, then reach for Continue.
+                onDoubleClick={() => {
+                  onSelect(preset);
+                  onAdvance();
+                }}
+              >
+                <input
+                  type="radio"
+                  name="industry"
+                  value={preset.key}
+                  checked={isSelected}
+                  onChange={() => onSelect(preset)}
                 />
-              )}
-              {selected === preset.key && (
-                <span className="preset-check" aria-hidden="true">
-                  <Icon name="check" size={16} />
-                </span>
-              )}
-            </label>
-          ))}
+                <div className="preset-card-icon">
+                  <Icon name={PRESET_ICONS[preset.key] || 'organization'} size={24} />
+                </div>
+                <span className="preset-name">{preset.displayName}</span>
+                {vibed && (
+                  <span
+                    className={`preset-swatch preset-swatch-${preset.key}`}
+                    aria-hidden="true"
+                    title="Theme colour for this organization type"
+                  />
+                )}
+                {isSelected && (
+                  <span className="preset-check" aria-hidden="true">
+                    <Icon name="check" size={16} />
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </div>
       </div>
 

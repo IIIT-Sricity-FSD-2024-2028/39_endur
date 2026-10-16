@@ -1,3 +1,5 @@
+// Step 4 of the wizard: a thin wrapper around <WordsEditor> plus a live preview, so a
+// reader sees the effect of a renamed word immediately rather than on the next screen.
 import type { LabelKey, ResolvedLabels } from '@endur/shared';
 import { WordsEditor } from '../../../../components/org/WordsEditor.js';
 import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';
@@ -19,6 +21,9 @@ export function WordsStep({
     <div className="step">
       <h2 className="step-title">What do you call things?</h2>
       <p className="step-lede">These words appear throughout Endur. Change them any time.</p>
+      {/* Every prop here is forwarded as-is — this step owns no editing state of its own,
+          only the wizard's, so a rename here and a rename from Settings later go through
+          the identical component rather than two implementations of the same form. */}
       <WordsEditor
         labels={labels}
         overrides={overrides}
