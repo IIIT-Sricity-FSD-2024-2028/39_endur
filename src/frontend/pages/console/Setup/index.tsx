@@ -17,6 +17,12 @@ import {
   STEPS, hasEdits, labelsForWire, stepIndex, useWizard, type WizardState,
 } from './useWizard.js';
 
+/**
+ * Whether `Continue` may be pressed from `step`. Each step has its own minimum: an
+ * industry chosen, at least two distinctly-named role levels, at least one named unit.
+ * Steps 3 (words) and 4 (review) have no gate of their own — anything left blank there
+ * just keeps its default.
+ */
 function canContinue(state: WizardState, step: number): boolean {
   if (step === 0) return state.industry !== null;
   if (step === 1) {
