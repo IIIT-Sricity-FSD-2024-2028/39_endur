@@ -51,6 +51,7 @@ export function ReviewStep({
   onJump: (step: number) => void;
 }): JSX.Element {
   const templates = preset?.templates ?? [];
+  const hasTemplates = templates.length > 0;
 
   return (
     <div className="step">
@@ -81,7 +82,7 @@ export function ReviewStep({
         </Card>
 
         <Card kicker="Starter templates">
-          {templates.length > 0 ? (
+          {hasTemplates ? (
             <>
               <Toggle
                 checked={includeTemplates}
