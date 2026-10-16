@@ -97,6 +97,9 @@ export function ReviewStep({
         </Card>
       </div>
 
+      {/* The same preview Words shows mid-edit, here one more time as the last confirmation
+          before Finish — the words above are figures and lists; this is what they actually
+          look like in the product. */}
       <DashboardPreview labels={labels} kicker="This is how your dashboard will look" />
     </div>
   );
