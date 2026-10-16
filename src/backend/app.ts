@@ -1,4 +1,6 @@
 // Builds the Express app: global middleware first, then every feature route, error handler last.
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import {
   context,
@@ -113,6 +115,19 @@ export function createApp() {
 
   // API docs, built by reading the routers above, so it must be mounted last. Off in production.
   if (!isProd) mount(app, '/api/v1/docs', docsRouter(app));
+
+  // Serves the built React app in production - single-origin deploy, so the session cookie's
+  // sameSite=lax keeps working with no CORS/cookie split to debug. In development the frontend
+  // is Vite's own dev server on :5173, proxying /api back here, so this block is skipped.
+  if (isProd) {
+    const frontendDist = path.resolve(fileURLToPath(import.meta.url), '../../../frontend/dist');
+    app.use(express.static(frontendDist));
+    // Anything under /api/* that reached here is a real 404, not a client route - falls through
+    // to the JSON 404 handler below rather than being served index.html.
+    app.get(/^(?!\/api\/).*/, (_req, res) => {
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  }
 
   // 14. auditWriter - safety net that writes any pending audit rows.
   app.use(auditWriter);
