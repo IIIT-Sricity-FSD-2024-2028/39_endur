@@ -30,6 +30,8 @@ export type WizardState = {
   includeTemplates: boolean;
 };
 
+/** The wizard's five screens, in the order they are walked. `key` is what lives in the
+ *  `?step=` query param, so a step is linkable and Back/Forward work like real navigation. */
 export const STEPS = [
   { key: 'industry', label: 'Industry' },
   { key: 'roles', label: 'Roles' },
