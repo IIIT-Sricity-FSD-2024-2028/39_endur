@@ -58,40 +58,44 @@ export function IndustryStep({
         </p>
 
         <div className="preset-grid" role="radiogroup" aria-label="Organization type">
-          {presets.map((preset) => (
-            <label
-              className={`preset-card preset-card-simple${selected === preset.key ? ' is-selected' : ''}`}
-              key={preset.key}
-              onDoubleClick={() => {
-                onSelect(preset);
-                onAdvance();
-              }}
-            >
-              <input
-                type="radio"
-                name="industry"
-                value={preset.key}
-                checked={selected === preset.key}
-                onChange={() => onSelect(preset)}
-              />
-              <div className="preset-card-icon">
-                <Icon name={PRESET_ICONS[preset.key] || 'organization'} size={24} />
-              </div>
-              <span className="preset-name">{preset.displayName}</span>
-              {VIBE_INDUSTRIES.has(preset.key) && (
-                <span
-                  className={`preset-swatch preset-swatch-${preset.key}`}
-                  aria-hidden="true"
-                  title="Theme colour for this organization type"
+          {presets.map((preset) => {
+            const isSelected = selected === preset.key;
+            const vibed = VIBE_INDUSTRIES.has(preset.key);
+            return (
+              <label
+                className={`preset-card preset-card-simple${isSelected ? ' is-selected' : ''}`}
+                key={preset.key}
+                onDoubleClick={() => {
+                  onSelect(preset);
+                  onAdvance();
+                }}
+              >
+                <input
+                  type="radio"
+                  name="industry"
+                  value={preset.key}
+                  checked={isSelected}
+                  onChange={() => onSelect(preset)}
                 />
-              )}
-              {selected === preset.key && (
-                <span className="preset-check" aria-hidden="true">
-                  <Icon name="check" size={16} />
-                </span>
-              )}
-            </label>
-          ))}
+                <div className="preset-card-icon">
+                  <Icon name={PRESET_ICONS[preset.key] || 'organization'} size={24} />
+                </div>
+                <span className="preset-name">{preset.displayName}</span>
+                {vibed && (
+                  <span
+                    className={`preset-swatch preset-swatch-${preset.key}`}
+                    aria-hidden="true"
+                    title="Theme colour for this organization type"
+                  />
+                )}
+                {isSelected && (
+                  <span className="preset-check" aria-hidden="true">
+                    <Icon name="check" size={16} />
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </div>
       </div>
 
