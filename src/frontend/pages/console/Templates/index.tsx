@@ -84,7 +84,7 @@ export default function Templates(): JSX.Element {
   const ownRows = own.data?.data ?? [];
   const filtered = Boolean(q || category || (industry && industry !== ALL));
 
-  const use = (template: TemplateSummary): void => {
+  const copyTemplate = (template: TemplateSummary): void => {
     setBusyId(template.id);
     setCardError(null);
     void own
@@ -245,7 +245,7 @@ export default function Templates(): JSX.Element {
                 busy={busyId === template.id}
                 error={cardError?.id === template.id ? cardError.text : undefined}
                 onPreview={() => setPreview(template)}
-                {...(can('template.clone') ? { onUse: () => use(template) } : {})}
+                {...(can('template.clone') ? { onUse: () => copyTemplate(template) } : {})}
               />
             ))}
           </div>
@@ -259,7 +259,7 @@ export default function Templates(): JSX.Element {
           onClose={() => setPreview(null)}
           {...(preview.isLibrary
             ? can('template.clone')
-              ? { onUse: () => { const target = preview; setPreview(null); use(target); } }
+              ? { onUse: () => { const target = preview; setPreview(null); copyTemplate(target); } }
               : {}
             : { onOpen: () => navigate(`/app/forms/${preview.id}/build`) })}
         />

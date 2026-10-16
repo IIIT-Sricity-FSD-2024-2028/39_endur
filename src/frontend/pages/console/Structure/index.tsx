@@ -75,7 +75,8 @@ export default function Structure(): JSX.Element {
   const nonce = useRef(0);
 
   const addLabel = `Add a ${labels.unit.one}`;
-  const data = units.data ?? [];
+  // Memoised so the empty fallback is one array, not a new one per render that re-runs the tree below.
+  const data = useMemo(() => units.data ?? [], [units.data]);
   const tree = useMemo(() => withDraft(data, draft, addLabel), [data, draft, addLabel]);
   const selected = selectedId ? findById(data, selectedId) : undefined;
 

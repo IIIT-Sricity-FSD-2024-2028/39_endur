@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { BillingSummary, Capability } from '@endur/shared';
 import { renderWithProviders } from '../../../test-utils.js';
+import { ApiError } from '../../../lib/api.js';
 import Plan from './index.js';
 
 const SILVER: BillingSummary = {
@@ -107,6 +108,53 @@ describe('Plan', () => {
 
     pay();
     await waitFor(() => expect(join).toHaveBeenCalledWith('gold', expect.stringMatching(/^endur_/)), PAID);
+  });
+
+  // The server charges the full price after a lapse (DEC-113), so the checkout must say so. It
+  // used to subtract Bronze and ask for ₹900, then the ledger took ₹999.
+  it('prices a rejoin after a lapse at the full amount the server charges', async () => {
+    summary = { ...SILVER, tier: 'bronze', lapsedFrom: 'gold', lapsedFromTrial: false };
+    render();
+    fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(screen.getByRole('button', { name: 'Pay ₹999' })).toBeTruthy();
+    expect(dialog.textContent).not.toMatch(/already on/);
+  });
+
+  it('asks the server before it says Payment successful, and keeps the amount it charged', async () => {
+    let celebratedFirst: boolean | null = null;
+    join.mockImplementation((tier: BillingSummary['tier']) => {
+      celebratedFirst = document.body.textContent?.includes('Payment successful') ?? false;
+      return Promise.resolve({ ...SILVER, tier });
+    });
+    render();
+    fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
+    await screen.findByRole('dialog');
+    pay();
+
+    await waitFor(() => expect(join).toHaveBeenCalled(), PAID);
+    expect(celebratedFirst).toBe(false);
+    const success = await screen.findByText('Payment successful', {}, PAID);
+    // The summary is already Gold by now; the receipt still shows what was charged.
+    expect(success.closest('.pay-success')?.textContent).toMatch(/₹500/);
+  });
+
+  it('never says Payment successful for a join the server refuses', async () => {
+    join.mockRejectedValue(
+      new ApiError({
+        code: 'CONFLICT', status: 409, requestId: 'r1',
+        message: 'The plan changed while this was being paid for. Reload to see where it stands.',
+      }),
+    );
+    render();
+    fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
+    await screen.findByRole('dialog');
+    pay();
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/plan changed/), PAID);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Payment successful')).toBeNull();
   });
 
   it('offers no way DOWN, and explains the gap rather than leaving one', () => {

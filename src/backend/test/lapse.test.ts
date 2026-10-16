@@ -122,6 +122,25 @@ describe('a period that ends with nobody renewing — DEC-113', () => {
     expect(capture.fromTier).toBe('bronze');
   });
 
+  // Full price buys a full month. Rejoining on day 20 of the bronze roll-over must not hand back
+  // Gold for only the 10 days that roll-over had left.
+  it('starts a fresh period on a rejoin, rather than finishing the bronze one', async () => {
+    const founder = await registerOrg('custom', 'gold');
+    await expirePeriod(founder.orgId);
+    await read(founder);
+    const soon = new Date();
+    soon.setUTCDate(soon.getUTCDate() + 3);
+    soon.setUTCHours(0, 0, 0, 0);
+    await prisma.subscription.update({ where: { orgId: founder.orgId }, data: { periodEnd: soon } });
+
+    const rejoin = await withCsrf(founder, 'post', '/api/v1/billing/tier').send({ tier: 'gold' });
+    expect(rejoin.status).toBe(200);
+
+    const row = await rowOf(founder.orgId);
+    expect(row!.periodEnd.getTime()).toBeGreaterThan(soon.getTime() + 20 * 86_400_000);
+    expect(row!.periodStart.toISOString().slice(0, 10)).toBe(new Date().toISOString().slice(0, 10));
+  });
+
   // An ordinary upgrade is untouched - the guard on the test above. If the lapse pricing leaked into the
   // normal path, every upgrade would start billing the full price.
   it('still charges the difference on an upgrade inside a running period', async () => {
@@ -131,6 +150,18 @@ describe('a period that ends with nobody renewing — DEC-113', () => {
 
     const rows = await paymentsOf(founder.orgId);
     expect(rows[rows.length - 1]?.amountMinor).toBe(priceOf('gold') - priceOf('bronze'));
+  });
+
+  // The difference pays for the rest of THIS period, so the period must not move.
+  it('keeps the running period on an upgrade priced as the difference', async () => {
+    const founder = await registerOrg('custom', 'bronze');
+    const before = await rowOf(founder.orgId);
+    const up = await withCsrf(founder, 'post', '/api/v1/billing/tier').send({ tier: 'silver' });
+    expect(up.status).toBe(200);
+
+    const after = await rowOf(founder.orgId);
+    expect(after!.periodStart.getTime()).toBe(before!.periodStart.getTime());
+    expect(after!.periodEnd.getTime()).toBe(before!.periodEnd.getTime());
   });
 
   /** The notice is news for one period and furniture after that. */

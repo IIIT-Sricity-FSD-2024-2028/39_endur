@@ -185,6 +185,27 @@ describe('choose a plan — DEC-048', () => {
     expect(document.body.textContent).not.toMatch(/[$£€]|\/mo|per month/i);
   });
 
+  // Billing is monthly everywhere (BILLING_PERIOD_MONTHS = 1); this heading said one year.
+  it('says a plan is one month, not one year', () => {
+    mount();
+    fill();
+    advance();
+    expect(document.body.textContent).toMatch(/One month, billed once/);
+    expect(document.body.textContent).not.toMatch(/one year|per year|\/ year/i);
+  });
+
+  it('registers before it ever says Payment successful', async () => {
+    let celebratedFirst: boolean | null = null;
+    registerOrg.mockImplementation(() => {
+      celebratedFirst = document.body.textContent?.includes('Payment successful') ?? false;
+      return Promise.resolve('/app/setup');
+    });
+    mount();
+    register();
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled(), PAID);
+    expect(celebratedFirst).toBe(false);
+  });
+
   it('offers a 14-day trial that registers with no payment captured', async () => {
     registerOrg.mockResolvedValue('/app/setup');
     mount();
