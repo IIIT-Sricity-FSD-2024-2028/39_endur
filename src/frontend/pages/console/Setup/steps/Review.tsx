@@ -5,6 +5,8 @@ import { pluralise } from '../../../../lib/format.js';
 import { depthOf, type RoleDraft, type UnitDraft } from '../useWizard.js';
 import { DashboardPreview } from '../../../../components/org/DashboardPreview.js';
 
+/** One summary card. `step`/`onJump` are a pair — omit both for a card with nothing to
+ *  edit (Starter templates, which is a toggle on this screen, not a jump to another one). */
 function Card({
   kicker,
   step,
@@ -49,6 +51,7 @@ export function ReviewStep({
   onJump: (step: number) => void;
 }): JSX.Element {
   const templates = preset?.templates ?? [];
+  const hasTemplates = templates.length > 0;
 
   return (
     <div className="step">
@@ -79,7 +82,7 @@ export function ReviewStep({
         </Card>
 
         <Card kicker="Starter templates">
-          {templates.length > 0 ? (
+          {hasTemplates ? (
             <>
               <Toggle
                 checked={includeTemplates}
@@ -94,6 +97,9 @@ export function ReviewStep({
         </Card>
       </div>
 
+      {/* The same preview Words shows mid-edit, here one more time as the last confirmation
+          before Finish — the words above are figures and lists; this is what they actually
+          look like in the product. */}
       <DashboardPreview labels={labels} kicker="This is how your dashboard will look" />
     </div>
   );

@@ -17,15 +17,26 @@ import {
   STEPS, hasEdits, labelsForWire, stepIndex, useWizard, type WizardState,
 } from './useWizard.js';
 
+// Mirrors STEPS' order in useWizard.ts — named here so the gate below reads as "the
+// industry step", not as a bare 0 a reader has to cross-reference.
+const INDUSTRY_STEP = 0;
+const ROLES_STEP = 1;
+const STRUCTURE_STEP = 2;
+
+/**
+ * Whether `Continue` may be pressed from `step`. Each step has its own minimum: an
+ * industry chosen, at least two distinctly-named role levels, at least one named unit.
+ * Steps 3 (words) and 4 (review) have no gate of their own — anything left blank there
+ * just keeps its default.
+ */
 function canContinue(state: WizardState, step: number): boolean {
-  if (step === 0) return state.industry !== null;
-  if (step === 1) {
+  if (step === INDUSTRY_STEP) return state.industry !== null;
+  if (step === ROLES_STEP) {
     const names = state.roles.map((role) => role.name.trim());
     return names.length >= 2 && names.every(Boolean) &&
       new Set(names.map((name) => name.toLowerCase())).size === names.length;
   }
-  if (step === 2) return state.units.length >= 1 && state.units.every((u) => u.name.trim());
-  if (step === 3) return true;
+  if (step === STRUCTURE_STEP) return state.units.length >= 1 && state.units.every((u) => u.name.trim());
   return true;
 }
 
@@ -39,6 +50,11 @@ function takesText(element: HTMLElement | null): boolean {
   if (element.tagName === 'BUTTON' || element.tagName === 'TEXTAREA') return true;
   if (element.tagName !== 'INPUT') return false;
   return !NON_TEXT_INPUTS.has((element as HTMLInputElement).type);
+}
+
+/** Keeps a requested step index inside the wizard's actual range. */
+function clampStep(index: number): number {
+  return Math.max(0, Math.min(index, STEPS.length - 1));
 }
 
 export default function Setup(): JSX.Element {
@@ -56,11 +72,11 @@ export default function Setup(): JSX.Element {
 
   const step = stepIndex(params.get('step') ?? 'industry');
   const goto = (index: number): void => {
-    const target = STEPS[Math.max(0, Math.min(index, STEPS.length - 1))];
+    const target = STEPS[clampStep(index)];
     if (target) setParams({ step: target.key }, { replace: false });
   };
 
-  const current = useMemo(
+  const currentPreset = useMemo(
     () => presets.data?.find((preset) => preset.key === state.industry),
     [presets.data, state.industry],
   );
@@ -78,7 +94,7 @@ export default function Setup(): JSX.Element {
   });
 
   const choose = (preset: PresetView): void => {
-    if (state.industry && state.industry !== preset.key && hasEdits(state, current)) {
+    if (state.industry && state.industry !== preset.key && hasEdits(state, currentPreset)) {
       setPendingPreset(preset);
       return;
     }
@@ -205,7 +221,7 @@ export default function Setup(): JSX.Element {
           roles={state.roles}
           units={state.units}
           labels={state.labels}
-          preset={current}
+          preset={currentPreset}
           includeTemplates={state.includeTemplates}
           onToggleTemplates={(value) => patch({ includeTemplates: value })}
           onJump={goto}
