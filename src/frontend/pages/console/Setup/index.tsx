@@ -17,6 +17,12 @@ import {
   STEPS, hasEdits, labelsForWire, stepIndex, useWizard, type WizardState,
 } from './useWizard.js';
 
+// Mirrors STEPS' order in useWizard.ts — named here so the gate below reads as "the
+// industry step", not as a bare 0 a reader has to cross-reference.
+const INDUSTRY_STEP = 0;
+const ROLES_STEP = 1;
+const STRUCTURE_STEP = 2;
+
 /**
  * Whether `Continue` may be pressed from `step`. Each step has its own minimum: an
  * industry chosen, at least two distinctly-named role levels, at least one named unit.
@@ -24,14 +30,13 @@ import {
  * just keeps its default.
  */
 function canContinue(state: WizardState, step: number): boolean {
-  if (step === 0) return state.industry !== null;
-  if (step === 1) {
+  if (step === INDUSTRY_STEP) return state.industry !== null;
+  if (step === ROLES_STEP) {
     const names = state.roles.map((role) => role.name.trim());
     return names.length >= 2 && names.every(Boolean) &&
       new Set(names.map((name) => name.toLowerCase())).size === names.length;
   }
-  if (step === 2) return state.units.length >= 1 && state.units.every((u) => u.name.trim());
-  if (step === 3) return true;
+  if (step === STRUCTURE_STEP) return state.units.length >= 1 && state.units.every((u) => u.name.trim());
   return true;
 }
 
