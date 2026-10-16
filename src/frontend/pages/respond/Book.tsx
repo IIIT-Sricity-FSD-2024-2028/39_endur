@@ -112,7 +112,14 @@ export default function Book(): JSX.Element {
       </header>
 
       <h2 className="rf-book-heading">Pick a time</h2>
-      <SlotGrid slots={bookable.slots} selectedId={slotId} onSelect={setSlotId} />
+      {/* The server leaves out times that have already started, so an empty list here can
+          mean every time has passed, not that none were ever added. */}
+      <SlotGrid
+        slots={bookable.slots}
+        selectedId={slotId}
+        onSelect={setSlotId}
+        emptyText="There are no upcoming times to book right now."
+      />
 
       <h2 className="rf-book-heading">Your details</h2>
       {/* SAID OUT LOUD, because the feedback form on the next table card promises the

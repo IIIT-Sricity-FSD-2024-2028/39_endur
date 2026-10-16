@@ -74,14 +74,15 @@ function useCountUp(target: number, ms = 600): number {
 
 export default function Earnings(): JSX.Element {
   const [params, setParams] = useSearchParams();
-  const window = readWindow(params);
-  const earnings = useEarnings(window);
+  // Not called `window`: that would shadow the browser's global inside this component.
+  const range = readWindow(params);
+  const earnings = useEarnings(range);
 
   const revenue = useCountUp(earnings.data?.totals.revenueMinor ?? 0);
 
   const setWindow = (patch: Partial<EarningsWindow>): void => {
     const next = new URLSearchParams(params);
-    const merged = { ...window, ...patch };
+    const merged = { ...range, ...patch };
     if (merged.from) next.set('from', merged.from); else next.delete('from');
     if (merged.to) next.set('to', merged.to); else next.delete('to');
     next.set('granularity', merged.granularity);
@@ -147,19 +148,19 @@ export default function Earnings(): JSX.Element {
               type="date"
               className="input"
               aria-label="From"
-              value={window.from?.slice(0, 10) ?? ''}
+              value={range.from?.slice(0, 10) ?? ''}
               onChange={(event) => setWindow({ from: event.target.value || undefined })}
             />
             <input
               type="date"
               className="input"
               aria-label="To"
-              value={window.to?.slice(0, 10) ?? ''}
+              value={range.to?.slice(0, 10) ?? ''}
               onChange={(event) => setWindow({ to: event.target.value || undefined })}
             />
             <select
               className="input"
-              value={window.granularity}
+              value={range.granularity}
               onChange={(event) =>
                 setWindow({ granularity: event.target.value === 'quarter' ? 'quarter' : 'month' })
               }

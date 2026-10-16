@@ -322,3 +322,49 @@ describe('the gate answers with the tier that was chosen — DEC-011, 16 §4', (
     expect(res.status).toBe(403);
   });
 });
+
+// The bookkeeping gap: an organisation with no subscription row at all. Nothing in the product
+// deletes one, but the gate and the plan page both promise to treat it as bronze rather than lock
+// the customer out - which is also the answer to "what if billing were taken out?".
+describe('an organisation with no subscription row', () => {
+  const NOWHERE = '00000000-0000-0000-0000-0000000000ee';
+
+  it('is gated as bronze before anything repairs it', async () => {
+    const founder = await registerOrg('custom', 'gold');
+    await prisma.subscription.delete({ where: { orgId: founder.orgId } });
+
+    const res = await founder.agent.get(`/api/v1/campaigns/${NOWHERE}/export`);
+    expect(res.status).toBe(402);
+    expect(res.body.error.details.currentTier).toBe('bronze');
+  });
+
+  it('is repaired as an active bronze month the first time the plan is read', async () => {
+    const founder = await registerOrg('custom', 'gold');
+    await prisma.subscription.delete({ where: { orgId: founder.orgId } });
+
+    const res = await founder.agent.get('/api/v1/billing');
+    expect(res.status).toBe(200);
+    expect(res.body.data.tier).toBe('bronze');
+    expect(res.body.data.status).toBe('active');
+    expect(res.body.data.lapsedFrom).toBeNull();
+
+    const row = await prisma.subscription.findUnique({ where: { orgId: founder.orgId } });
+    expect(row?.tier).toBe('bronze');
+    expect(row!.periodEnd.getTime()).toBeGreaterThan(Date.now());
+  });
+});
+
+describe('the plan catalogue', () => {
+  it('serves every tier, in order, with its price, to a signed-in reader', async () => {
+    const founder = await registerOrg('custom', 'bronze');
+    const res = await founder.agent.get('/api/v1/billing/plans');
+    expect(res.status).toBe(200);
+    const plans = res.body.data as Array<{ tier: string; priceMinor: number }>;
+    expect(plans.map((plan) => plan.tier)).toEqual([...TIERS]);
+    expect(plans.map((plan) => plan.priceMinor)).toEqual(TIERS.map((tier) => priceOf(tier)));
+  });
+
+  it('answers nobody who is signed out', async () => {
+    expect((await request(app).get('/api/v1/billing/plans')).status).toBe(401);
+  });
+});

@@ -7,6 +7,8 @@ export type SlotGridProps = {
   selectedId?: string | null;
   onSelect?: (slotId: string) => void;
   onRemove?: (slotId: string) => void;
+  /** What to say when there are no slots. The console has none yet; a guest may have none left. */
+  emptyText?: string;
 };
 
 const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -42,9 +44,15 @@ export function remainingLabel(remaining: number): string {
   return `${remaining} left`;
 }
 
-export function SlotGrid({ slots, selectedId, onSelect, onRemove }: SlotGridProps): JSX.Element {
+export function SlotGrid({
+  slots,
+  selectedId,
+  onSelect,
+  onRemove,
+  emptyText = 'No times yet.',
+}: SlotGridProps): JSX.Element {
   if (slots.length === 0) {
-    return <p className="text-muted">No times yet.</p>;
+    return <p className="text-muted">{emptyText}</p>;
   }
 
   return (

@@ -58,4 +58,11 @@ describe('SlotGrid', () => {
     render(<SlotGrid slots={[]} />);
     expect(screen.getByText('No times yet.')).toBeTruthy();
   });
+
+  // The guest page: past times are filtered out, so "yet" would be wrong once they have all gone.
+  it('says what the caller asks it to when there are none left', () => {
+    render(<SlotGrid slots={[]} emptyText="There are no upcoming times to book right now." />);
+    expect(screen.getByText('There are no upcoming times to book right now.')).toBeTruthy();
+    expect(screen.queryByText('No times yet.')).toBeNull();
+  });
 });
