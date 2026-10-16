@@ -52,6 +52,11 @@ function takesText(element: HTMLElement | null): boolean {
   return !NON_TEXT_INPUTS.has((element as HTMLInputElement).type);
 }
 
+/** Keeps a requested step index inside the wizard's actual range. */
+function clampStep(index: number): number {
+  return Math.max(0, Math.min(index, STEPS.length - 1));
+}
+
 export default function Setup(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -67,7 +72,7 @@ export default function Setup(): JSX.Element {
 
   const step = stepIndex(params.get('step') ?? 'industry');
   const goto = (index: number): void => {
-    const target = STEPS[Math.max(0, Math.min(index, STEPS.length - 1))];
+    const target = STEPS[clampStep(index)];
     if (target) setParams({ step: target.key }, { replace: false });
   };
 
