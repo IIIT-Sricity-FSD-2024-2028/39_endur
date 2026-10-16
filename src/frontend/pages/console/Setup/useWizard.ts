@@ -62,16 +62,17 @@ const emptyState = (): WizardState => ({
   includeTemplates: true,
 });
 
+/** Same length, same name at every index — the check `hasEdits` runs once for roles and
+ *  once for units, factored out so the two never silently drift apart. */
+const sameNamesInOrder = (a: { name: string }[], b: { name: string }[]): boolean =>
+  a.length === b.length && a.every((item, index) => item.name === b[index]?.name);
+
 /** True once anything past step 1 has been edited — what makes changing industry a prompt
  *  rather than a silent overwrite (31 § State). */
 export const hasEdits = (state: WizardState, preset: PresetView | undefined): boolean => {
   if (!preset || !state.industry) return false;
-  const sameRoles =
-    state.roles.length === preset.roles.length &&
-    state.roles.every((role, index) => role.name === preset.roles[index]?.name);
-  const sameUnits =
-    state.units.length === preset.units.length &&
-    state.units.every((unit, index) => unit.name === preset.units[index]?.name);
+  const sameRoles = sameNamesInOrder(state.roles, preset.roles);
+  const sameUnits = sameNamesInOrder(state.units, preset.units);
   const sameLabels = LabelKey.options.every(
     (key) =>
       state.labels[key].one === (preset.labels[key]?.one ?? DEFAULT_LABELS[key].one) &&
