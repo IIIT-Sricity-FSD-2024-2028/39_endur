@@ -13,7 +13,7 @@
     "start": "node --conditions=compiled dist/server.js",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "//db:migrate": "N-013, and 03 \u00a75 has said `migrate deploy`, never `migrate dev` since the suite was written \u2014 this script said `dev` anyway until 2026-08-31, when it bit. MIGRATIONS ARE HAND-WRITTEN HERE. schema.prisma cannot express the CHECK constraints, partial and GIN indexes, the DEFERRABLE unique on questions(template_id, position), the anonymity trigger, or the `sessions` table connect-pg-simple owns (DEC-014), so the database is PERMANENTLY drifted from it by design. `migrate dev` diffs the two and offers to \u0022fix\u0022 the difference: the migration it generated dropped all four of those objects and the sessions table with them. It failed on one DROP INDEX by luck \u2014 Postgres refuses to drop an index a constraint needs \u2014 and N-013 is precisely the note saying that had it succeeded, the app would still have run. Author migrations by hand and apply them with this.",
+    "//db:migrate": "N-013, and 03 §5 has said `migrate deploy`, never `migrate dev` since the suite was written — this script said `dev` anyway until 2026-08-31, when it bit. MIGRATIONS ARE HAND-WRITTEN HERE. schema.prisma cannot express the CHECK constraints, partial and GIN indexes, the DEFERRABLE unique on questions(template_id, position), the anonymity trigger, or the `sessions` table connect-pg-simple owns (DEC-014), so the database is PERMANENTLY drifted from it by design. `migrate dev` diffs the two and offers to \"fix\" the difference: the migration it generated dropped all four of those objects and the sessions table with them. It failed on one DROP INDEX by luck — Postgres refuses to drop an index a constraint needs — and N-013 is precisely the note saying that had it succeeded, the app would still have run. Author migrations by hand and apply them with this.",
     "db:migrate": "prisma migrate deploy && prisma generate",
     "db:generate": "prisma generate",
     "db:seed": "tsx database/seed/index.ts",
@@ -37,7 +37,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@esbuild/win32-x64": "^0.28.2",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
