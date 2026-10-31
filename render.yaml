@@ -1,0 +1,42 @@
+# Render Blueprint: one Node web service (API + built React app, same origin) and Postgres 16.
+# Render → New → Blueprint → pick this repo. You'll be asked for the two sync:false values.
+services:
+  - type: web
+    name: endur
+    runtime: node
+    plan: free
+    branch: main
+    # Dev dependencies (tsc, vite, prisma) are needed to build, so they are installed explicitly.
+    buildCommand: npm ci --include=dev && npm run build && npm run db:migrate
+    startCommand: npm run start -w @endur/api
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: endur-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: API_KEY_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: 'true'
+      # The app's own public URL, e.g. https://endur.onrender.com. QR codes are built from it.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: API_BASE_URL
+        sync: false
+      # Render's free disk is wiped on every deploy; stdout logs are kept in the dashboard.
+      - key: LOG_TO_FILE
+        value: 'false'
+
+databases:
+  - name: endur-db
+    plan: free
+    postgresMajorVersion: '16'
+    databaseName: endur
+    user: endur
