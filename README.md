@@ -116,3 +116,18 @@ separate `endur_test` database) rather than mocks — `test/globalSetup.ts` crea
 migrates it automatically on the first run, so no manual setup is needed beyond Postgres
 itself being up.
 
+
+## 🟧 Deploying
+
+Live at **https://endur.azurewebsites.net** — Azure App Service (Linux, Node 24, free F1)
+plus Azure Database for PostgreSQL 16 (B1ms), both in `endur-rg`, Southeast Asia.
+
+```bash
+az login                                   # once; the sign-in expires after 90 days unused
+bash scripts/deploy-azure.sh               # build HEAD and upload it
+bash scripts/deploy-azure.sh --migrate     # also apply new migrations first
+```
+
+Only committed code is deployed. `--migrate` reads `AZ_DATABASE_URL` from `.env.azure`
+(git-ignored, never commit it) and allows your current IP through the database firewall.
+Secrets live in the Web App's settings, not in the repo.
