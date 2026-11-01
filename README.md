@@ -119,7 +119,7 @@ itself being up.
 
 ## 🟧 Deploying
 
-Live at **https://endur-harsh.azurewebsites.net** — Azure App Service (Linux, Node 24, free F1)
+Live at **https://endur.azurewebsites.net** — Azure App Service (Linux, Node 24, free F1)
 plus Azure Database for PostgreSQL 16 (B1ms), both in `endur-rg`, Southeast Asia.
 
 ```bash

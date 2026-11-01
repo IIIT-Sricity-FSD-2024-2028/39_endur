@@ -13,7 +13,7 @@
 set -euo pipefail
 
 RESOURCE_GROUP="${AZ_RESOURCE_GROUP:-endur-rg}"
-APP_NAME="${AZ_APP_NAME:-endur-harsh}"
+APP_NAME="${AZ_APP_NAME:-endur}"
 PG_SERVER="${AZ_PG_SERVER:-endur-db-harsh}"
 MIGRATE=false
 [[ "${1:-}" == "--migrate" ]] && MIGRATE=true
