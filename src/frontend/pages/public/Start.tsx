@@ -7,7 +7,7 @@ import { PlanPicker } from '../../components/billing/PlanPicker.js';
 import { PaymentDialog } from '../../components/billing/PaymentDialog.js';
 import { useFormValidation } from '../../lib/validate.js';
 import { ApiError } from '../../lib/api.js';
-import { useRegister } from '../../lib/auth.js';
+import { useRefreshSession, useRegister } from '../../lib/auth.js';
 import { AuthAside } from './AuthAside.js';
 
 const MIN_PASSWORD = 10;
@@ -22,6 +22,7 @@ const DETAILS_SCHEMA = RegisterBody.pick({
 export default function Start(): JSX.Element {
   const navigate = useNavigate();
   const registerOrg = useRegister();
+  const refreshSession = useRefreshSession();
 
   const [step, setStep] = useState<'details' | 'plan'>('details');
   const [orgName, setOrgName] = useState('');
@@ -55,10 +56,12 @@ export default function Start(): JSX.Element {
     setPaying(true);
   }
 
-  // Resolves true once registered, false when refused. For a paid signup the navigation itself is
-  // held back (stored in landingRef) so PaymentDialog's "Payment successful" screen gets to show
-  // before the page changes out from under it; onDoneAfterPayment fires it once that screen has
-  // been seen. Trials and other non-dialog paths have nothing to wait on, so they navigate here.
+  // Resolves true once registered, false when refused. For a paid signup, hydrating the session
+  // is held back too (landingRef holds the destination instead) - `/start` is wrapped in
+  // <RedirectIfSignedIn>, which force-navigates the instant auth.status flips, and that would
+  // unmount PaymentDialog before its "Payment successful" screen is ever seen. onDone hydrates
+  // and navigates once that screen has had its moment. Trials and other non-dialog paths have
+  // nothing to wait on, so they hydrate and navigate here.
   async function submit(
     options: { paymentRef?: string; trial?: boolean; holdNavigation?: boolean } = {},
   ): Promise<boolean> {
@@ -66,16 +69,19 @@ export default function Start(): JSX.Element {
     setBusy(true);
     setError(null);
     try {
-      const landing = await registerOrg({
-        orgName: orgName.trim(),
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        industry: 'custom',
-        tier,
-        paymentRef: options.paymentRef,
-        trial: options.trial ?? false,
-      });
+      const landing = await registerOrg(
+        {
+          orgName: orgName.trim(),
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          industry: 'custom',
+          tier,
+          paymentRef: options.paymentRef,
+          trial: options.trial ?? false,
+        },
+        options.holdNavigation ? { skipHydrate: true } : undefined,
+      );
       if (options.holdNavigation) {
         landingRef.current = landing;
       } else {
@@ -285,7 +291,9 @@ export default function Start(): JSX.Element {
             })
           }
           onDone={() => {
-            if (landingRef.current) navigate(landingRef.current, { replace: true });
+            const landing = landingRef.current;
+            if (!landing) return;
+            void refreshSession().then(() => navigate(landing, { replace: true }));
           }}
           onCancel={() => setPaying(false)}
         />

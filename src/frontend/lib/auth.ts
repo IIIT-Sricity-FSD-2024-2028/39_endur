@@ -105,17 +105,26 @@ export function useActivate(): (token: string, password: string) => Promise<stri
  *
  * Always lands on `/app/setup`. There is no "configured" case to check: the org was
  * created seconds ago.
+ *
+ * `skipHydrate` lets a caller delay dispatching `signedIn` past this call. `/start` is
+ * wrapped in `<RedirectIfSignedIn>`, which force-navigates the instant `auth.status` flips
+ * to authenticated - hydrating here would unmount a payment dialog still showing "Payment
+ * successful" before its 1.5s is up. The caller is on the hook for hydrating (via
+ * `useRefreshSession`) once it is actually ready to navigate.
  */
-export function useRegister(): (body: RegisterBody) => Promise<string> {
+export function useRegister(): (
+  body: RegisterBody,
+  options?: { skipHydrate?: boolean },
+) => Promise<string> {
   const dispatch = useAppDispatch();
 
   return useCallback(
-    async (body: RegisterBody) => {
+    async (body: RegisterBody, options?: { skipHydrate?: boolean }) => {
       await apiPost<RegisterBody, { organization: { id: string; slug: string } }>(
         '/auth/register',
         body,
       );
-      await hydrate(dispatch);
+      if (!options?.skipHydrate) await hydrate(dispatch);
       return '/app/setup';
     },
     [dispatch],
