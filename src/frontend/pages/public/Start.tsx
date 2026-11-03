@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RegisterBody, SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
@@ -33,6 +33,7 @@ export default function Start(): JSX.Element {
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
+  const landingRef = useRef<string | null>(null);
 
   const details = useFormValidation(DETAILS_SCHEMA);
 
@@ -54,9 +55,13 @@ export default function Start(): JSX.Element {
     setPaying(true);
   }
 
-  // Resolves true once registered (and on the way into the app), false when refused. The checkout
-  // waits on it, so "Payment successful" is never shown for a registration the server turned down.
-  async function submit(options: { paymentRef?: string; trial?: boolean } = {}): Promise<boolean> {
+  // Resolves true once registered, false when refused. For a paid signup the navigation itself is
+  // held back (stored in landingRef) so PaymentDialog's "Payment successful" screen gets to show
+  // before the page changes out from under it; onDoneAfterPayment fires it once that screen has
+  // been seen. Trials and other non-dialog paths have nothing to wait on, so they navigate here.
+  async function submit(
+    options: { paymentRef?: string; trial?: boolean; holdNavigation?: boolean } = {},
+  ): Promise<boolean> {
     if (busy || !tier) return false;
     setBusy(true);
     setError(null);
@@ -71,7 +76,11 @@ export default function Start(): JSX.Element {
         paymentRef: options.paymentRef,
         trial: options.trial ?? false,
       });
-      navigate(landing, { replace: true });
+      if (options.holdNavigation) {
+        landingRef.current = landing;
+      } else {
+        navigate(landing, { replace: true });
+      }
       return true;
     } catch (caught) {
       setPaying(false);
@@ -268,13 +277,16 @@ export default function Start(): JSX.Element {
         <PaymentDialog
           plan={chosenPlan}
           mode="signup"
-          // No onDone: registering signs the founder in, and the /start guard moves them into the
-          // app straight away, so landing on the setup wizard is the confirmation here.
+          // Navigation is held until onDone, so the dialog's "Payment successful" screen has a
+          // chance to show before the page changes out from under it.
           onPaid={(reference) =>
-            submit({ paymentRef: reference }).then((registered) => {
+            submit({ paymentRef: reference, holdNavigation: true }).then((registered) => {
               if (!registered) throw new Error('Registration was refused.');
             })
           }
+          onDone={() => {
+            if (landingRef.current) navigate(landingRef.current, { replace: true });
+          }}
           onCancel={() => setPaying(false)}
         />
       )}
