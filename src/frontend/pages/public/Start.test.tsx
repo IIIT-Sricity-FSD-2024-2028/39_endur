@@ -6,8 +6,10 @@ import { ApiError } from '../../lib/api.js';
 import Start from './Start.js';
 
 const registerOrg = vi.fn();
+const refreshSession = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../lib/auth.js', () => ({
   useRegister: () => registerOrg,
+  useRefreshSession: () => refreshSession,
   useSignIn: () => vi.fn(),
 }));
 
@@ -56,6 +58,8 @@ const register = (email?: string, tier?: string) => {
 
 beforeEach(() => {
   registerOrg.mockReset();
+  refreshSession.mockClear();
+  refreshSession.mockResolvedValue(undefined);
 });
 
 describe('create organization — 30 §3.3', () => {

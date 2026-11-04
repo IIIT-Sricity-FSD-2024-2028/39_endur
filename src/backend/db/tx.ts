@@ -1,4 +1,5 @@
 // ctx.tx: runs a handler's writes and its audit rows in ONE transaction, so the log can never disagree with the data.
+import { isIP } from 'node:net';
 import type { Prisma } from '@prisma/client';
 import type { Request } from 'express';
 import { prisma } from './client.js';
@@ -23,6 +24,11 @@ async function flushAudit(req: Request, tx: Tx): Promise<void> {
   const { audit, decision, requestId, orgId, principal } = req.ctx;
   if (audit.length === 0) return;
 
+  // req.ip, behind a reverse proxy, is not guaranteed to be a bare address Postgres's `inet`
+  // column will accept (a malformed X-Forwarded-For can leave it with a port or garbage
+  // attached) - an unparseable value must not fail the whole audited write.
+  const clientIp = req.ip && isIP(req.ip) ? req.ip : null;
+
   await tx.auditLog.createMany({
     data: audit.map((intent) => ({
       orgId: orgId ?? null,
@@ -35,10 +41,7 @@ async function flushAudit(req: Request, tx: Tx): Promise<void> {
       ...(decision?.decidedBy ? { decidedBy: decision.decidedBy } : {}),
       requestId,
       // IP is stored for signed-in staff actions only, never for a response submission (see above).
-      ip:
-        principal?.kind === 'user' && !ANONYMOUS_ACTIONS.has(intent.action)
-          ? (req.ip ?? null)
-          : null,
+      ip: principal?.kind === 'user' && !ANONYMOUS_ACTIONS.has(intent.action) ? clientIp : null,
     })),
   });
 
@@ -67,7 +70,10 @@ export async function writeDenial(
         // A refusal names no target row; the actor, action and time are the security event.
         ...(decidedBy ? { decidedBy: decidedBy as never } : {}),
         requestId,
-        ip: principal?.kind === 'user' && !ANONYMOUS_ACTIONS.has(action) ? (req.ip ?? null) : null,
+        ip:
+          principal?.kind === 'user' && !ANONYMOUS_ACTIONS.has(action) && req.ip && isIP(req.ip)
+            ? req.ip
+            : null,
       },
     });
   } catch {

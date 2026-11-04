@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RegisterBody, SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
@@ -7,7 +7,7 @@ import { PlanPicker } from '../../components/billing/PlanPicker.js';
 import { PaymentDialog } from '../../components/billing/PaymentDialog.js';
 import { useFormValidation } from '../../lib/validate.js';
 import { ApiError } from '../../lib/api.js';
-import { useRegister } from '../../lib/auth.js';
+import { useRefreshSession, useRegister } from '../../lib/auth.js';
 import { AuthAside } from './AuthAside.js';
 
 const MIN_PASSWORD = 10;
@@ -22,6 +22,7 @@ const DETAILS_SCHEMA = RegisterBody.pick({
 export default function Start(): JSX.Element {
   const navigate = useNavigate();
   const registerOrg = useRegister();
+  const refreshSession = useRefreshSession();
 
   const [step, setStep] = useState<'details' | 'plan'>('details');
   const [orgName, setOrgName] = useState('');
@@ -33,6 +34,7 @@ export default function Start(): JSX.Element {
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
+  const landingRef = useRef<string | null>(null);
 
   const details = useFormValidation(DETAILS_SCHEMA);
 
@@ -54,24 +56,37 @@ export default function Start(): JSX.Element {
     setPaying(true);
   }
 
-  // Resolves true once registered (and on the way into the app), false when refused. The checkout
-  // waits on it, so "Payment successful" is never shown for a registration the server turned down.
-  async function submit(options: { paymentRef?: string; trial?: boolean } = {}): Promise<boolean> {
+  // Resolves true once registered, false when refused. For a paid signup, hydrating the session
+  // is held back too (landingRef holds the destination instead) - `/start` is wrapped in
+  // <RedirectIfSignedIn>, which force-navigates the instant auth.status flips, and that would
+  // unmount PaymentDialog before its "Payment successful" screen is ever seen. onDone hydrates
+  // and navigates once that screen has had its moment. Trials and other non-dialog paths have
+  // nothing to wait on, so they hydrate and navigate here.
+  async function submit(
+    options: { paymentRef?: string; trial?: boolean; holdNavigation?: boolean } = {},
+  ): Promise<boolean> {
     if (busy || !tier) return false;
     setBusy(true);
     setError(null);
     try {
-      const landing = await registerOrg({
-        orgName: orgName.trim(),
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        industry: 'custom',
-        tier,
-        paymentRef: options.paymentRef,
-        trial: options.trial ?? false,
-      });
-      navigate(landing, { replace: true });
+      const landing = await registerOrg(
+        {
+          orgName: orgName.trim(),
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          industry: 'custom',
+          tier,
+          paymentRef: options.paymentRef,
+          trial: options.trial ?? false,
+        },
+        options.holdNavigation ? { skipHydrate: true } : undefined,
+      );
+      if (options.holdNavigation) {
+        landingRef.current = landing;
+      } else {
+        navigate(landing, { replace: true });
+      }
       return true;
     } catch (caught) {
       setPaying(false);
@@ -268,13 +283,18 @@ export default function Start(): JSX.Element {
         <PaymentDialog
           plan={chosenPlan}
           mode="signup"
-          // No onDone: registering signs the founder in, and the /start guard moves them into the
-          // app straight away, so landing on the setup wizard is the confirmation here.
+          // Navigation is held until onDone, so the dialog's "Payment successful" screen has a
+          // chance to show before the page changes out from under it.
           onPaid={(reference) =>
-            submit({ paymentRef: reference }).then((registered) => {
+            submit({ paymentRef: reference, holdNavigation: true }).then((registered) => {
               if (!registered) throw new Error('Registration was refused.');
             })
           }
+          onDone={() => {
+            const landing = landingRef.current;
+            if (!landing) return;
+            void refreshSession().then(() => navigate(landing, { replace: true }));
+          }}
           onCancel={() => setPaying(false)}
         />
       )}
