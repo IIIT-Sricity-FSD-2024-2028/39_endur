@@ -53,7 +53,17 @@ function toError(response: Response, payload: unknown): OpsError {
   });
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/**
+ * The one platform request. Exported for the store's `opsApi` base query (R-505), which
+ * passes `suppress401Handler`: a 401 from a query is the store's to handle
+ * (`sessionExpiredMiddleware`), and the callback below stays for the plain calls.
+ */
+export async function opsRequest<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options: { signal?: AbortSignal | undefined; suppress401Handler?: boolean } = {},
+): Promise<T> {
   const headers = new Headers();
   if (body !== undefined) headers.set('Content-Type', 'application/json');
 
@@ -61,6 +71,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     method,
     headers,
     credentials: 'include',
+    ...(options.signal ? { signal: options.signal } : {}),
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
@@ -69,17 +80,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!response.ok) {
     const error = toError(response, payload);
-    if (error.status === 401) onUnauthenticated?.();
+    if (error.status === 401 && !options.suppress401Handler) onUnauthenticated?.();
     throw error;
   }
   return payload as T;
 }
 
-export const opsGet = <T>(path: string): Promise<T> => request<T>('GET', path);
+export const opsGet = <T>(path: string): Promise<T> => opsRequest<T>('GET', path);
 export const opsPost = <TIn, TOut>(path: string, body?: TIn): Promise<TOut> =>
-  request<TOut>('POST', path, body);
+  opsRequest<TOut>('POST', path, body);
 export const opsPatch = <TIn, TOut>(path: string, body: TIn): Promise<TOut> =>
-  request<TOut>('PATCH', path, body);
+  opsRequest<TOut>('PATCH', path, body);
 
 /**
  * `DEC-074` — an export is a file, not JSON, so it does not go through `request()`: it needs

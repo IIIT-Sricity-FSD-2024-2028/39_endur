@@ -1,26 +1,49 @@
-// Booking, client side. 13 § Booking, 23 §3, T-095.
+// Booking, the CONSOLE half. 13 § Booking, 23 §3, T-095.
 //
-// ONE FILE FOR BOTH SIDES, and that is a decision rather than convenience. The console half
-// and the public picker read the SAME `remaining` number, produced by the same server, and
-// splitting them would make it possible for one screen to compute availability a second way.
+// The public picker moved to `lib/booking-public.ts` in R-504: it is in the respondent
+// tree, which no store code may reach, and this half now reads through RTK Query
+// (`store/api/endpoints/booking.ts`). Both still read the SAME `remaining` number from the
+// same server; neither computes it.
 //
-// EVERY IMPORT FROM `@endur/shared` HERE IS `import type`. The public booking page is in the
-// respondent tree — a phone, a venue network, no account — and `pages/respond/bundle.test.ts`
-// asserts that nothing but React and the router reaches it. A value import of the DTOs would
-// pull zod onto that phone before the first slot rendered.
-import { useCallback, useEffect, useRef, useState } from 'react';
+// Its commands are a hook now (`useBookableCommands`) rather than free functions, because a
+// command that goes through the store needs the store's `dispatch`. Each resolves with what
+// the server answered, as before, and re-reads what it changed by itself.
+import { useCallback } from 'react';
 import type {
   BookableSummary,
-  BookingReceipt,
   BookingSummary,
   CreateBookableBody,
-  CreateBookingBody,
-  PublicBookable,
   PutSlotsBody,
   UpdateBookableBody,
 } from '@endur/shared';
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from './api.js';
-import type { Loadable } from './org.js';
+import { ApiError } from './api.js';
+import {
+  useCancelBookingMutation,
+  useCloseBookableMutation,
+  useCreateBookableMutation,
+  useDeleteBookableMutation,
+  useGetBookableQuery,
+  useGetBookablesQuery,
+  useGetBookingsQuery,
+  useOpenBookableMutation,
+  usePutSlotsMutation,
+  useUpdateBookableMutation,
+} from '../store/api/endpoints/booking.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
+
+/**
+ * 403 and 402 are ANSWERS, not failures: the page renders each as its own state, so
+ * neither becomes an error banner offering a retry that cannot help. A 402 is a DIFFERENT
+ * answer from a refusal (DEC-011): it names something buyable.
+ */
+function answerOf(error: Error | null): { forbidden: boolean; upgrade: boolean; error: Error | null } {
+  const status = error instanceof ApiError ? error.status : 0;
+  return {
+    forbidden: status === 403,
+    upgrade: status === 402,
+    error: status === 403 || status === 402 ? null : error,
+  };
+}
 
 export type BookablesController = Loadable<BookableSummary[]> & {
   rows: BookableSummary[];
@@ -32,53 +55,23 @@ export type BookablesController = Loadable<BookableSummary[]> & {
 };
 
 export function useBookables(enabled = true): BookablesController {
-  const [state, setState] = useState<Loadable<BookableSummary[]>>({
-    data: null,
-    loading: enabled,
-    error: null,
-  });
-  const [forbidden, setForbidden] = useState(false);
-  const [upgrade, setUpgrade] = useState(false);
-  const alive = useRef(true);
-
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const response = await apiGet<{ data: BookableSummary[] }>('/bookables');
-      if (!alive.current) return;
-      setForbidden(false);
-      setUpgrade(false);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      if (!alive.current) return;
-      const status = error instanceof ApiError ? error.status : 0;
-      setForbidden(status === 403);
-      setUpgrade(status === 402);
-      setState({
-        data: null,
-        loading: false,
-        // 403 and 402 are ANSWERS, not failures: the page renders each of them as its own
-        // state, so neither becomes an error banner offering a retry that cannot help.
-        error: status === 403 || status === 402 ? null : (error as Error),
-      });
-    }
-  }, [enabled]);
-
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    return () => {
-      alive.current = false;
+  const list = useLoadable(useGetBookablesQuery(undefined, { skip: !enabled }));
+  if (!enabled) {
+    return {
+      data: null, loading: false, error: null, rows: [], forbidden: false, upgrade: false,
+      reload: list.reload,
     };
-  }, [load]);
-
-  return { ...state, rows: state.data ?? [], forbidden, upgrade, reload: load };
+  }
+  const answer = answerOf(list.error);
+  // On a refusal there is nothing to show, not the last list somebody else could see.
+  const data = answer.forbidden || answer.upgrade ? null : list.data;
+  return { ...list, ...answer, data, rows: data ?? [] };
 }
 
+/**
+ * One bookable and its bookings. Both are read at once: the detail page has nothing useful
+ * to show with only one of them. Moving to another bookable never shows the last one.
+ */
 export function useBookable(id: string | undefined): {
   bookable: BookableSummary | null;
   bookings: BookingSummary[];
@@ -88,195 +81,66 @@ export function useBookable(id: string | undefined): {
   error: Error | null;
   reload: () => Promise<void>;
 } {
-  const [bookable, setBookable] = useState<BookableSummary | null>(null);
-  const [bookings, setBookings] = useState<BookingSummary[]>([]);
-  const [loading, setLoading] = useState(Boolean(id));
-  const [forbidden, setForbidden] = useState(false);
-  const [upgrade, setUpgrade] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const alive = useRef(true);
+  const bookable = useLoadable(useGetBookableQuery(id ?? '', { skip: !id }), { current: true });
+  const bookings = useLoadable(useGetBookingsQuery(id ?? '', { skip: !id }), { current: true });
+  const { reload: reloadBookable } = bookable;
+  const { reload: reloadBookings } = bookings;
 
-  const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      // Both at once: the detail page has nothing useful to show with only one of them, and
-      // two sequential round trips is two chances to leave the page half-drawn.
-      const [row, taken] = await Promise.all([
-        apiGet<{ data: BookableSummary }>(`/bookables/${id}`),
-        apiGet<{ data: BookingSummary[] }>(`/bookables/${id}/bookings`),
-      ]);
-      if (!alive.current) return;
-      setBookable(row.data);
-      setBookings(taken.data);
-      setForbidden(false);
-      setUpgrade(false);
-      setError(null);
-    } catch (cause) {
-      if (!alive.current) return;
-      const status = cause instanceof ApiError ? cause.status : 0;
-      setForbidden(status === 403);
-      setUpgrade(status === 402);
-      setError(status === 403 || status === 402 ? null : (cause as Error));
-    } finally {
-      if (alive.current) setLoading(false);
-    }
-  }, [id]);
+  const reload = useCallback(async () => {
+    await Promise.all([reloadBookable(), reloadBookings()]);
+  }, [reloadBookable, reloadBookings]);
 
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    return () => {
-      alive.current = false;
-    };
-  }, [load]);
-
-  return { bookable, bookings, loading, forbidden, upgrade, error, reload: load };
+  const answer = answerOf(bookable.error ?? bookings.error);
+  return {
+    bookable: bookable.data,
+    bookings: bookings.data ?? [],
+    loading: Boolean(id) && (bookable.loading || bookings.loading),
+    ...answer,
+    reload,
+  };
 }
 
-export const createBookable = async (body: CreateBookableBody): Promise<BookableSummary> =>
-  (await apiPost<CreateBookableBody, { data: BookableSummary }>('/bookables', body)).data;
+/** The list page's one command. Resolves with the new bookable, which the page opens. */
+export function useCreateBookable(): (body: CreateBookableBody) => Promise<BookableSummary> {
+  const [createBookable] = useCreateBookableMutation();
+  return useCallback((body: CreateBookableBody) => unwrapApi(createBookable(body)), [createBookable]);
+}
 
-export const updateBookable = async (
-  id: string,
-  body: UpdateBookableBody,
-): Promise<BookableSummary> =>
-  (await apiPatch<UpdateBookableBody, { data: BookableSummary }>(`/bookables/${id}`, body)).data;
-
-export const putSlots = async (id: string, body: PutSlotsBody): Promise<BookableSummary> =>
-  (await apiPut<PutSlotsBody, { data: BookableSummary }>(`/bookables/${id}/slots`, body)).data;
-
-/**
- * Open it, with the caller's idempotency key.
- *
- * The same shape as `launchCampaign` and `publishAnnouncement`, for the same reason: this
- * request mints a public token, and a double-click on stage must not produce two links — one
- * on the projector and the other on the card in somebody's hand.
- */
-export const openBookable = async (id: string, key: string): Promise<BookableSummary> =>
-  (
-    await apiPost<undefined, { data: BookableSummary }>(`/bookables/${id}/open`, undefined, {
-      idempotencyKey: key,
-    })
-  ).data;
-
-export const openKey = (id: string): string => `bookable-open-${id}`;
-
-export const closeBookable = async (id: string): Promise<BookableSummary> =>
-  (await apiPost<undefined, { data: BookableSummary }>(`/bookables/${id}/close`)).data;
-
-export const deleteBookable = (id: string): Promise<void> => apiDelete(`/bookables/${id}`);
-
-/** Somebody ELSE's booking — `booking.cancel`, and the only caller of that verb. */
-export const cancelBooking = (id: string): Promise<void> =>
-  apiPost<undefined, void>(`/bookings/${id}/cancel`);
-
-// ─────────────────────────────────────────────────────────────────────────────────────────
-// The public half. No session, no capability — the token is the access (DEC-009).
-// ─────────────────────────────────────────────────────────────────────────────────────────
-
-export type PublicBookableState = {
-  bookable: PublicBookable | null;
-  loading: boolean;
-  /** The uniform 404: unknown, unopened or closed, and the server refuses to say which
-   *  (13 §6) — so neither can this flag. The same shape `usePublicCampaign` takes. */
-  unavailable: boolean;
-  error: Error | null;
-  reload: () => Promise<void>;
+export type BookableCommands = {
+  update: (body: UpdateBookableBody) => Promise<BookableSummary>;
+  putSlots: (body: PutSlotsBody) => Promise<BookableSummary>;
+  /** With the caller's idempotency key (`openKey`). */
+  open: (key: string) => Promise<BookableSummary>;
+  close: () => Promise<BookableSummary>;
+  remove: () => Promise<void>;
+  /** Somebody ELSE's booking — `booking.cancel`, and the only caller of that verb. */
+  cancelBooking: (bookingId: string) => Promise<void>;
 };
 
-export function usePublicBookable(token: string | undefined): PublicBookableState {
-  const [bookable, setBookable] = useState<PublicBookable | null>(null);
-  const [loading, setLoading] = useState(Boolean(token));
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const alive = useRef(true);
+/** The detail page's commands, for one bookable. */
+export function useBookableCommands(id: string): BookableCommands {
+  const [updateBookable] = useUpdateBookableMutation();
+  const [putSlots] = usePutSlotsMutation();
+  const [openBookable] = useOpenBookableMutation();
+  const [closeBookable] = useCloseBookableMutation();
+  const [deleteBookable] = useDeleteBookableMutation();
+  const [cancelBooking] = useCancelBookingMutation();
 
-  const load = useCallback(async () => {
-    if (!token) {
-      setLoading(false);
-      setUnavailable(true);
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await apiGet<{ data: PublicBookable }>(`/public/bookables/${token}`);
-      if (!alive.current) return;
-      setBookable(response.data);
-      setUnavailable(false);
-      setError(null);
-    } catch (cause) {
-      if (!alive.current) return;
-      const status = cause instanceof ApiError ? cause.status : 0;
-      setUnavailable(status === 404);
-      setError(status === 404 ? null : (cause as Error));
-    } finally {
-      if (alive.current) setLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    return () => {
-      alive.current = false;
-    };
-  }, [load]);
-
-  return { bookable, loading, unavailable, error, reload: load };
+  return {
+    update: useCallback((body: UpdateBookableBody) => unwrapApi(updateBookable({ id, body })), [id, updateBookable]),
+    putSlots: useCallback((body: PutSlotsBody) => unwrapApi(putSlots({ id, body })), [id, putSlots]),
+    open: useCallback((key: string) => unwrapApi(openBookable({ id, key })), [id, openBookable]),
+    close: useCallback(() => unwrapApi(closeBookable(id)), [id, closeBookable]),
+    remove: useCallback(() => unwrapApi(deleteBookable(id)), [id, deleteBookable]),
+    cancelBooking: useCallback(
+      (bookingId: string) => unwrapApi(cancelBooking({ bookingId, bookableId: id })),
+      [id, cancelBooking],
+    ),
+  };
 }
 
 /**
- * Take a slot, idempotently.
- *
- * The key is minted per ATTEMPT and not derived from the token, for the reason
- * `submitKey()` gives on the response side: everybody in the room holds the same token, and
- * a key derived from it would make one person's retry replay somebody else's booking.
+ * The idempotency key for opening one bookable. Derived from the id, so every press of
+ * "Open" for it is the same request: the server answers a repeat with the first link.
  */
-export const takeSlot = async (
-  token: string,
-  body: CreateBookingBody,
-  key: string,
-): Promise<BookingReceipt> =>
-  (
-    await apiPost<CreateBookingBody, { data: BookingReceipt }>(
-      `/public/bookables/${token}/bookings`,
-      body,
-      { idempotencyKey: key },
-    )
-  ).data;
-
-export const bookKey = (): string =>
-  `book-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-
-/** The booker's OWN. The cancel token is the authorisation and it reaches one row. */
-export const cancelWithToken = (cancelToken: string): Promise<void> =>
-  apiPost<undefined, void>(`/public/bookings/${cancelToken}/cancel`);
-
-/** A booker's own key, kept so the page can offer "cancel this" after a reload (39 § State). */
-const MARKER = (token: string) => `endur.booked.${token}`;
-
-export function rememberBooking(token: string, cancelToken: string): void {
-  try {
-    window.localStorage.setItem(MARKER(token), cancelToken);
-  } catch {
-    // Private browsing, or storage disabled. Best-effort by design: losing the marker costs
-    // the booker a cancel button, and throwing here would cost them the booking.
-  }
-}
-
-export function rememberedBooking(token: string): string | null {
-  try {
-    return window.localStorage.getItem(MARKER(token));
-  } catch {
-    return null;
-  }
-}
-
-export function forgetBooking(token: string): void {
-  try {
-    window.localStorage.removeItem(MARKER(token));
-  } catch {
-    // As above.
-  }
-}
+export const openKey = (id: string): string => `bookable-open-${id}`;

@@ -1,10 +1,21 @@
-import { useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+// The builder page, on the REAL builder slice. Only the load (`useBuilder`) and the server
+// calls are stubbed; every edit goes through the reducer the app runs, so the assertions
+// read the store the page dispatched to (rubric items 6-9, docs/REDUX-PLAN.md §0).
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, TemplateDetail } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import { makeStore, renderWithProviders, stubApi, NONSENSE_LABELS, type StubCall } from '../../../test-utils.js';
 import type { QuestionDraft } from '../../../components/form/kinds.js';
+import type { AppStore } from '../../../store/index.js';
+import {
+  metaEdited,
+  saveFailed,
+  saveStarted,
+  selectBuilder,
+  templateLoaded,
+} from '../../../store/builderSlice.js';
+import '../../../store/middleware/autosave.js';
 import Builder from './index.js';
 
 const QUESTIONS: QuestionDraft[] = [
@@ -21,44 +32,24 @@ const state = {
   loading: false,
   loadError: null as Error | null,
   locked: false,
-  save: 'idle' as string,
-  saveError: null as Error | null,
+  /** Put the slice in `error` before rendering, as two failed saves would. */
+  failedSave: null as string | null,
 };
 
-const flush = vi.fn();
 const clone = vi.fn();
-let saved: QuestionDraft[][] = [];
+let calls: StubCall[];
 
 vi.mock('./useBuilder.js', () => ({
-  useBuilder: () => {
-    const [questions, setQuestions] = useState<QuestionDraft[]>(state.questions);
-    const [name, setName] = useState('Mid-term check');
-    return {
-      loading: state.loading,
-      loadError: state.loadError,
-      template: state.loadError ? null : ({ readOnly: state.locked } as TemplateDetail),
-      draft: { name, description: '', questions },
-      save: state.save,
-      saveError: state.saveError,
-      locked: state.locked,
-      estimatedSeconds: questions.length * 20,
-      setMeta: (patch: { name?: string }) => { if (patch.name !== undefined) setName(patch.name); },
-      setQuestions: (next: QuestionDraft[]) => { saved.push(next); setQuestions(next); },
-      addQuestion: () => {
-        const next = [...questions, {
-          kind: 'rating' as const, text: '', required: false,
-          config: { kind: 'rating' as const, max: 5 as const, lowLabel: 'Poor', highLabel: 'Excellent' },
-        }];
-        saved.push(next);
-        setQuestions(next);
-      },
-      flush,
-    };
-  },
+  useBuilder: () => ({
+    loading: state.loading,
+    loadError: state.loadError,
+    template: state.loadError ? null : ({ readOnly: state.locked } as TemplateDetail),
+  }),
 }));
 
 vi.mock('../../../lib/templates.js', () => ({
   cloneKey: (id: string) => `key-for-${id}`,
+  useCloneTemplate: () => clone,
   useTemplates: () => ({ data: null, loading: false, error: null, reload: vi.fn(), create: vi.fn(), clone, remove: vi.fn() }),
   useTemplate: () => ({ data: null, loading: false, error: null, reload: vi.fn() }),
   useTemplateLibrary: () => ({ data: null, loading: false, error: null, reload: vi.fn() }),
@@ -66,28 +57,60 @@ vi.mock('../../../lib/templates.js', () => ({
 
 const ALL: Capability[] = ['template.read', 'template.update', 'template.clone'];
 
-const mount = (capabilities: Capability[] = ALL) =>
-  renderWithProviders(
+let store: AppStore;
+
+const mount = (capabilities: Capability[] = ALL) => {
+  const session = { capabilities, labels: NONSENSE_LABELS, path: '/app/forms/t1/build' };
+  store = makeStore(session);
+  if (!state.loadError) {
+    store.dispatch(templateLoaded({
+      id: 't1',
+      draft: { name: 'Mid-term check', description: '', questions: state.questions },
+      locked: state.locked,
+    }));
+  }
+  if (state.failedSave) {
+    store.dispatch(metaEdited({ description: 'Edited before the network dropped' }));
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      store.dispatch(saveStarted());
+      store.dispatch(saveFailed({ templateId: 't1', message: state.failedSave }));
+    }
+  }
+  return renderWithProviders(
     <Routes>
       <Route path="/app/forms/:id/build" element={<Builder />} />
       <Route path="/app/forms/:id/preview" element={<p>PREVIEW</p>} />
     </Routes>,
-    { capabilities, labels: NONSENSE_LABELS, path: '/app/forms/t1/build' },
+    session,
+    store,
   );
+};
+
+const builder = () => selectBuilder(store.getState());
+const ids = () => builder().draft.questions.map((question) => question.id);
 
 const cards = (container: HTMLElement): HTMLElement[] =>
   [...container.querySelectorAll('.qcard')] as HTMLElement[];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  saved = [];
+  // Fake, so the autosave debounce an edit starts never fires into a later test.
+  vi.useFakeTimers();
   clone.mockResolvedValue({ id: 't2' });
+  // The autosave listener saves through RTK Query, over this.
+  calls = stubApi({
+    'PATCH /templates/t1': { body: { data: {} } },
+    'PUT /templates/t1/questions': { body: { data: {} } },
+  });
   state.questions = QUESTIONS;
   state.loading = false;
   state.loadError = null;
   state.locked = false;
-  state.save = 'idle';
-  state.saveError = null;
+  state.failedSave = null;
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('the stack: exactly one card is open', () => {
@@ -113,13 +136,13 @@ describe('add, duplicate, delete, undo', () => {
   it('adds a question from the tool rail', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Add question' }));
-    expect(saved.at(-1)).toHaveLength(4);
+    expect(builder().draft.questions).toHaveLength(4);
   });
 
   it('duplicates below the source and strips the id', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: /Duplicate How clear was it/ }));
-    const next = saved.at(-1) ?? [];
+    const next = builder().draft.questions;
     expect(next).toHaveLength(4);
     expect(next[1]?.id).toBeUndefined();
     expect(next[1]?.text).toBe('How clear was it?');
@@ -130,8 +153,8 @@ describe('add, duplicate, delete, undo', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: /Delete How clear was it/ }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(saved.at(-1)).toHaveLength(2);
-    expect(screen.getByRole('status').textContent).toContain('How clear was it? deleted.');
+    expect(builder().draft.questions).toHaveLength(2);
+    expect(screen.getByText('How clear was it? deleted.')).toBeTruthy();
   });
 
   it('undo puts it back where it was, not at the end', () => {
@@ -139,8 +162,45 @@ describe('add, duplicate, delete, undo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Was the pace right?' }));
     fireEvent.click(screen.getByRole('button', { name: /Delete Was the pace right/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    const next = saved.at(-1) ?? [];
-    expect(next.map((question) => question.id)).toEqual(['q1', 'q2', 'q3']);
+    expect(ids()).toEqual(['q1', 'q2', 'q3']);
+  });
+});
+
+describe('undo and redo, driven by the slice', () => {
+  it('start disabled, because there is nothing in `past` or `future`', () => {
+    mount();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Undo last change' }).disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Redo last change' }).disabled).toBe(true);
+  });
+
+  it('undo walks back a move and enables redo; redo walks it forward again', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: /Move How clear was it\? down/ }));
+    const undo = screen.getByRole<HTMLButtonElement>('button', { name: 'Undo last change' });
+    expect(undo.disabled).toBe(false);
+
+    fireEvent.click(undo);
+    expect(ids()).toEqual(['q1', 'q2', 'q3']);
+    const redo = screen.getByRole<HTMLButtonElement>('button', { name: 'Redo last change' });
+    expect(redo.disabled).toBe(false);
+
+    fireEvent.click(redo);
+    expect(ids()).toEqual(['q2', 'q1', 'q3']);
+  });
+
+  it('are not offered at all on a form the reader cannot edit', () => {
+    mount(['template.read']);
+    expect(screen.queryByRole('button', { name: 'Undo last change' })).toBeNull();
+  });
+});
+
+describe('the name field writes to the slice, and the page follows it', () => {
+  it('typing a name dispatches it, and the header title and save badge update', () => {
+    mount();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Form name' }), { target: { value: 'End-of-term' } });
+    expect(builder().draft.name).toBe('End-of-term');
+    expect(screen.getByRole('heading', { name: 'End-of-term' })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Unsaved changes');
   });
 });
 
@@ -153,14 +213,15 @@ describe('reorder works without a mouse', () => {
   it('moves a question down and keeps the open card open', () => {
     const { container } = mount();
     fireEvent.click(screen.getByRole('button', { name: /Move How clear was it\? down/ }));
-    expect((saved.at(-1) ?? []).map((question) => question.id)).toEqual(['q2', 'q1', 'q3']);
+    expect(ids()).toEqual(['q2', 'q1', 'q3']);
     expect(cards(container)[1]?.className).toContain('is-expanded');
   });
 
   it('does nothing at the ends rather than wrapping around', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: /Move How clear was it\? up/ }));
-    expect(saved).toHaveLength(0);
+    expect(ids()).toEqual(['q1', 'q2', 'q3']);
+    expect(builder().past).toHaveLength(0);
   });
 
   it('does not expand a collapsed card when its move button is pressed', () => {
@@ -173,9 +234,10 @@ describe('reorder works without a mouse', () => {
 describe('the header carries the live cost and the save state', () => {
   it('shows the question count and time, and updates as questions are added', () => {
     mount();
-    expect(screen.getByText(/3 questions · ~60 sec/)).toBeTruthy();
+    // rating 4 + yes/no 3 + text 25 = 32 s; another rating makes it 36 (SECONDS_PER_KIND).
+    expect(screen.getByText(/3 questions · ~30 sec/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add question' }));
-    expect(screen.getByText(/4 questions · ~80 sec/)).toBeTruthy();
+    expect(screen.getByText(/4 questions · ~40 sec/)).toBeTruthy();
   });
 
   it('says nothing at all before the first save', () => {
@@ -183,15 +245,22 @@ describe('the header carries the live cost and the save state', () => {
     expect(screen.queryByText(/Saved|Saving/)).toBeNull();
   });
 
-  it('shows a failed save where the reader must act, with the draft reassured', () => {
-    state.save = 'error';
-    state.saveError = new Error('The network dropped.');
+  it('shows a failed save where the reader must act, with the draft reassured', async () => {
+    state.failedSave = 'The network dropped.';
     mount();
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toContain('The network dropped.');
     expect(alert.textContent).toContain('Your work is still here.');
     fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
-    expect(flush).toHaveBeenCalledTimes(1);
+    // Now, not after the debounce: the retry listener sends what is dirty at once.
+    const patches = calls.filter((call) => call.method === 'PATCH');
+    expect(patches).toHaveLength(1);
+    expect(patches[0]?.body).toMatchObject({ description: 'Edited before the network dropped' });
+
+    // And the badge follows the slice back out of the error.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Saved');
   });
 
   it('links to the preview rather than rendering a second one', () => {

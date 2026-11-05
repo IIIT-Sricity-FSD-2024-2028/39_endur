@@ -65,7 +65,7 @@ export default function Setup(): JSX.Element {
   const refreshSession = useRefreshSession();
   const orgName = useAppSelector((s) => s.auth.org?.name ?? '');
 
-  const { state, patch, applyPreset, roles, units, labels } = useWizard();
+  const { state, applyPreset, toggleTemplates, reset, roles, units, labels } = useWizard();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [pendingPreset, setPendingPreset] = useState<PresetView | null>(null);
@@ -117,6 +117,7 @@ export default function Setup(): JSX.Element {
       });
       await refreshSession();
       navigate('/app?setup=done', { replace: true });
+      reset();
     } catch (caught) {
       setError(caught as Error);
       setSaving(false);
@@ -138,6 +139,7 @@ export default function Setup(): JSX.Element {
       });
       await refreshSession();
       navigate('/app?setup=skipped', { replace: true });
+      reset();
     } catch (caught) {
       setError(caught as Error);
       setSaving(false);
@@ -223,7 +225,7 @@ export default function Setup(): JSX.Element {
           labels={state.labels}
           preset={currentPreset}
           includeTemplates={state.includeTemplates}
-          onToggleTemplates={(value) => patch({ includeTemplates: value })}
+          onToggleTemplates={toggleTemplates}
           onJump={goto}
         />
       )}

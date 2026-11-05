@@ -4,7 +4,9 @@
 // the tier, and neither is an error to render red. What differs is a THIRD non-error that
 // only exists here — a **404 on the gap** is the ordering constraint, not a missing page.
 // The reviewee has not written their own assessment yet, and the remedy is the form.
-import { useCallback, useEffect, useRef, useState } from 'react';
+//
+// The reads are on RTK Query since R-502 (`store/api/endpoints/reflect.ts`); the three writes
+// stay plain calls, each followed by the page's own re-read.
 import type {
   CreatePlanBody,
   GapView,
@@ -12,17 +14,15 @@ import type {
   ReflectionForm,
   SubmitReflectionBody,
 } from '@endur/shared';
-import { ApiError, apiGet, apiPost } from './api.js';
+import { ApiError, apiPost } from './api.js';
+import { upgradeFrom } from './analysis.js';
 import type { Upgrade } from './analysis.js';
-import type { Loadable } from './org.js';
-
-const upgradeFrom = (error: unknown): Upgrade | null =>
-  error instanceof ApiError && error.status === 402
-    ? {
-        requiredTier: (error.details['requiredTier'] as Upgrade['requiredTier']) ?? null,
-        currentTier: (error.details['currentTier'] as Upgrade['currentTier']) ?? null,
-      }
-    : null;
+import {
+  useGetCyclesQuery,
+  useGetGapQuery,
+  useGetReflectionFormQuery,
+} from '../store/api/endpoints/reflect.js';
+import { useLoadable, type Loadable } from './query.js';
 
 export type Gated<T> = Loadable<T> & {
   forbidden: boolean;
@@ -32,60 +32,40 @@ export type Gated<T> = Loadable<T> & {
   reload: () => Promise<void>;
 };
 
-function useGated<T>(path: string | null, enabled = true): Gated<T> {
-  const [state, setState] = useState<Loadable<T>>({ data: null, loading: true, error: null });
-  const [forbidden, setForbidden] = useState(false);
-  const [upgrade, setUpgrade] = useState<Upgrade | null>(null);
-  const [locked, setLocked] = useState(false);
-  const alive = useRef(true);
+type GatedResult<T> = Parameters<typeof useLoadable<T>>[0];
 
-  const load = useCallback(async () => {
-    if (!path || !enabled) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    try {
-      const response = await apiGet<{ data: T }>(path);
-      if (!alive.current) return;
-      setForbidden(false);
-      setUpgrade(null);
-      setLocked(false);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      if (!alive.current) return;
-      const paid = upgradeFrom(error);
-      const status = error instanceof ApiError ? error.status : 0;
-      setUpgrade(paid);
-      setForbidden(!paid && status === 403);
-      setLocked(status === 404);
-      setState({
-        data: null,
-        loading: false,
-        error: paid || status === 403 || status === 404 ? null : (error as Error),
-      });
-    }
-  }, [path, enabled]);
-
-  useEffect(() => {
-    alive.current = true;
-    setState((current) => ({ ...current, loading: true }));
-    void load();
-    return () => {
-      alive.current = false;
-    };
-  }, [load]);
-
-  return { ...state, forbidden, upgrade, locked, reload: load };
+/**
+ * A read with the three non-errors told apart. `loading` means "nothing to show yet": the
+ * page swaps the form and the gap for "Loading…" while it is true, and the re-read after a
+ * plan is saved must not blank them. Another campaign never shows the last one's form.
+ */
+function useGated<T>(result: GatedResult<T>, active: boolean): Gated<T> {
+  const loaded = useLoadable(result, { current: true, initialOnly: true });
+  if (!active) return { data: null, loading: false, error: null, forbidden: false, upgrade: null, locked: false, reload: loaded.reload };
+  const upgrade = upgradeFrom(loaded.error);
+  const status = loaded.error instanceof ApiError ? loaded.error.status : 0;
+  const forbidden = !upgrade && status === 403;
+  const locked = status === 404;
+  const gated = Boolean(upgrade) || forbidden || locked;
+  return {
+    data: gated ? null : loaded.data,
+    loading: loaded.loading,
+    error: gated ? null : loaded.error,
+    forbidden,
+    upgrade,
+    locked,
+    reload: loaded.reload,
+  };
 }
 
 export const useCycles = (enabled = true): Gated<ReflectionCycle[]> =>
-  useGated<ReflectionCycle[]>('/reflect', enabled);
+  useGated(useGetCyclesQuery(undefined, { skip: !enabled }), enabled);
 
 export const useReflectionForm = (campaignId: string | null): Gated<ReflectionForm> =>
-  useGated<ReflectionForm>(campaignId ? `/reflect/${campaignId}` : null);
+  useGated(useGetReflectionFormQuery(campaignId ?? '', { skip: !campaignId }), Boolean(campaignId));
 
 export const useGap = (campaignId: string | null): Gated<GapView> =>
-  useGated<GapView>(campaignId ? `/reflect/${campaignId}/gap` : null);
+  useGated(useGetGapQuery(campaignId ?? '', { skip: !campaignId }), Boolean(campaignId));
 
 export const submitReflection = (campaignId: string, body: SubmitReflectionBody) =>
   apiPost<SubmitReflectionBody, { data: { id: string } }>(`/reflect/${campaignId}`, body);

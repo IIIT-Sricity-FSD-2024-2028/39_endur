@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { BillingSummary, Tier } from '@endur/shared';
-import { renderWithProviders } from '../../test-utils.js';
+import { renderWithProviders, stubApi } from '../../test-utils.js';
 import { NOTICE_WINDOW_DAYS, daysUntil, noticeFor, PlanNoticeBanner } from './PlanNoticeBanner.js';
 
 const NOW = new Date('2026-09-10T09:00:00.000Z');
@@ -71,15 +71,13 @@ describe('when the notice appears — 16 §7d', () => {
   });
 });
 
-const apiGet = vi.fn<(path: string) => Promise<{ data: BillingSummary }>>();
-vi.mock('../../lib/api.js', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>('../../lib/api.js');
-  return { ...actual, apiGet: (path: string) => apiGet(path) };
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('the banner in the console shell', () => {
   it('renders the sentence and a way to act on it', async () => {
-    apiGet.mockResolvedValue({ data: summaryOf({ tier: 'bronze', lapsedFrom: 'gold' }) });
+    stubApi({ 'GET /billing': { body: { data: summaryOf({ tier: 'bronze', lapsedFrom: 'gold' }) } } });
     renderWithProviders(<PlanNoticeBanner />, { capabilities: ['billing.read'] });
 
     const strip = await screen.findByRole('status');
@@ -90,10 +88,19 @@ describe('the banner in the console shell', () => {
   });
 
   it('is silent, and makes no request, for a reader who cannot see billing', () => {
-    apiGet.mockClear();
+    const calls = stubApi({});
     renderWithProviders(<PlanNoticeBanner />, { capabilities: ['campaign.read'] });
 
     expect(screen.queryByRole('status')).toBeNull();
-    expect(apiGet).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('is silent when the read fails: it is chrome on somebody else\'s page', async () => {
+    const calls = stubApi({ 'GET /billing': new TypeError('offline') });
+    renderWithProviders(<PlanNoticeBanner />, { capabilities: ['billing.read'] });
+
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

@@ -5,10 +5,10 @@
 // every write for the same reason an account action does — the powers and the account are
 // resolved server-side and there is no client-side way to guess the new state. Callers
 // re-fetch the person themselves after one of these settles.
-import { useEffect, useRef, useState } from 'react';
 import type { AccountInvite, ActivateAccountBody, ActivationPreview } from '@endur/shared';
-import { apiDelete, apiGet, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import { apiDelete, apiPost } from './api.js';
+import { useGetActivationPreviewQuery } from '../store/api/endpoints/accounts.js';
+import { useLoadable, type Loadable } from './query.js';
 
 /** `account.create` — a first sign-in link for somebody who has never had one. */
 export const inviteAccount = (personId: string): Promise<AccountInvite> =>
@@ -27,30 +27,10 @@ export const revokeAccount = (personId: string): Promise<void> =>
  * the caller reads `error` for the uniform dead-end message (57 § The token).
  */
 export function useActivationPreview(token: string): Loadable<ActivationPreview> {
-  const [state, setState] = useState<Loadable<ActivationPreview>>({
-    data: null, loading: true, error: null,
-  });
-  const alive = useRef(true);
-
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    setState({ data: null, loading: true, error: null });
-    void apiGet<{ data: ActivationPreview }>(`/auth/activate/${token}`)
-      .then(({ data }) => {
-        if (alive.current) setState({ data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (alive.current) setState({ data: null, loading: false, error });
-      });
-  }, [token]);
-
-  return state;
+  // `initialOnly`: the page swaps its whole form for "Checking your link…" while loading,
+  // and a re-read (the network coming back, say) must not do that to somebody typing.
+  const preview = useLoadable(useGetActivationPreviewQuery(token), { current: true, initialOnly: true });
+  return { data: preview.data, loading: preview.loading, error: preview.error };
 }
 
 /**

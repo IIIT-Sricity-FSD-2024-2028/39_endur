@@ -4,7 +4,7 @@
 // stored** (DEC-016). It arrives derived on every read, so there is no `setStatus`, no state
 // machine here, and `Cancel schedule` is a PATCH that clears `startsAt` rather than a
 // transition backwards.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type {
   AudiencePreview,
   AudienceRule,
@@ -17,8 +17,16 @@ import type {
   QuickCampaignBody,
   UpdateCampaignBody,
 } from '@endur/shared';
-import { apiGet, apiPatch, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import { apiGet, apiPost } from './api.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import {
+  useCloseCampaignMutation,
+  useCreateCampaignMutation,
+  useGetCampaignQuery,
+  useGetCampaignsQuery,
+  useLaunchCampaignMutation,
+  useUpdateCampaignMutation,
+} from '../store/api/endpoints/campaigns.js';
 
 export type CampaignQuery = { status?: CampaignStatus | undefined; cursor?: string | undefined };
 
@@ -35,41 +43,21 @@ export type CampaignListController = Loadable<Page<CampaignSummary>> & {
   create: (body: CreateCampaignBody) => Promise<CampaignDetail>;
 };
 
+/**
+ * One page of campaigns. Creating one invalidates the list and Home (R-205), so every
+ * mounted list and the Home counters refetch by themselves. The last good page stays on
+ * screen with the error above it (38 § States).
+ */
 export function useCampaignList(query: CampaignQuery = {}): CampaignListController {
-  const [state, setState] = useState<Loadable<Page<CampaignSummary>>>({
-    data: null, loading: true, error: null,
-  });
-  const alive = useRef(true);
-  const search = campaignSearch(query);
+  const list = useLoadable(useGetCampaignsQuery(campaignSearch(query)));
+  const [createCampaign] = useCreateCampaignMutation();
 
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+  const create = useCallback(
+    (body: CreateCampaignBody) => unwrapApi(createCampaign(body)),
+    [createCampaign],
+  );
 
-  const load = useCallback(async (path: string) => {
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const page = await apiGet<Page<CampaignSummary>>(`/campaigns${path}`);
-      if (alive.current) setState({ data: page, loading: false, error: null });
-    } catch (error) {
-      // The last good page stays on screen with the error above it (38 § States).
-      if (alive.current) setState((current) => ({ ...current, loading: false, error: error as Error }));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(search);
-  }, [load, search]);
-
-  const create = useCallback(async (body: CreateCampaignBody) => {
-    const response = await apiPost<CreateCampaignBody, { data: CampaignDetail }>('/campaigns', body);
-    return response.data;
-  }, []);
-
-  return { ...state, reload: () => load(search), create };
+  return { ...list, create };
 }
 
 export type CampaignController = Loadable<CampaignDetail> & {
@@ -79,31 +67,23 @@ export type CampaignController = Loadable<CampaignDetail> & {
   close: () => Promise<void>;
 };
 
+/**
+ * One campaign. Each command resolves once the page can show its result, as before:
+ * `update` and `close` write the server's answer into the cache; `launch` answers with the
+ * link, so the campaign is re-read before the promise resolves.
+ */
 export function useCampaign(id: string | undefined): CampaignController {
-  const [state, setState] = useState<Loadable<CampaignDetail>>({
-    data: null, loading: true, error: null,
-  });
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    try {
-      const response = await apiGet<{ data: CampaignDetail }>(`/campaigns/${id}`);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      setState({ data: null, loading: false, error: error as Error });
-    }
-  }, [id]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const campaign = useLoadable(useGetCampaignQuery(id ?? '', { skip: !id }), { current: true });
+  const [updateCampaign] = useUpdateCampaignMutation();
+  const [launchCampaignMutation] = useLaunchCampaignMutation();
+  const [closeCampaign] = useCloseCampaignMutation();
+  const { reload } = campaign;
 
   const update = useCallback(
     async (body: UpdateCampaignBody) => {
-      await apiPatch<UpdateCampaignBody, { data: CampaignDetail }>(`/campaigns/${id ?? ''}`, body);
-      await load();
+      await unwrapApi(updateCampaign({ id: id ?? '', body }));
     },
-    [id, load],
+    [id, updateCampaign],
   );
 
   /**
@@ -115,27 +95,25 @@ export function useCampaign(id: string | undefined): CampaignController {
    */
   const launch = useCallback(
     async (key: string) => {
-      const response = await apiPost<undefined, { data: LaunchResult }>(
-        `/campaigns/${id ?? ''}/launch`,
-        undefined,
-        { idempotencyKey: key },
-      );
-      await load();
-      return response.data;
+      const result = await unwrapApi(launchCampaignMutation({ id: id ?? '', key }));
+      await reload();
+      return result;
     },
-    [id, load],
+    [id, launchCampaignMutation, reload],
   );
 
   const close = useCallback(async () => {
-    await apiPost<undefined, { data: CampaignDetail }>(`/campaigns/${id ?? ''}/close`);
-    await load();
-  }, [id, load]);
+    await unwrapApi(closeCampaign(id ?? ''));
+  }, [id, closeCampaign]);
 
-  return { ...state, reload: load, update, launch, close };
+  return { ...campaign, update, launch, close };
 }
 
 /**
  * The live audience count, debounced.
+ *
+ * NOT on RTK Query yet: no page uses it today (docs/REDUX-PLAN.md, R-202). Move it to the
+ * `campaigns` endpoints, providing `{ Campaign, id }`, when one does.
  *
  * It is the visible proof that the org graph is real and not decorative — a number that
  * moves when you change a dropdown is worth more than a paragraph claiming the hierarchy is

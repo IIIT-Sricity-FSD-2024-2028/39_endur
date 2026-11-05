@@ -5,7 +5,7 @@ import { InlineName } from '../../../components/org/InlineName.js';
 import { PowersByPlace } from '../../../components/org/PowersByPlace.js';
 import { Involvement } from '../../../components/org/Involvement.js';
 import { PositionChip } from '../People/PositionEditor.js';
-import { apiDelete, apiUpload, ApiError } from '../../../lib/api.js';
+import { ApiError } from '../../../lib/api.js';
 import { useRefreshSession } from '../../../lib/auth.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
@@ -86,17 +86,14 @@ export default function Profile(): JSX.Element {
               shape="circle"
               current={user?.avatarUrl ?? sessionUser?.avatarUrl ?? null}
               hint="PNG, JPEG or WebP, up to 2 MB."
+              // The top bar's photo follows by itself: both re-read `/auth/me` (R-504).
               onUpload={async (file) => {
                 setError(null);
-                await apiUpload<{ data: unknown }>('/profile/avatar', file);
-                await refresh();
-                await profile.reload();
+                await profile.uploadAvatar(file);
               }}
               onRemove={async () => {
                 setError(null);
-                await apiDelete('/profile/avatar');
-                await refresh();
-                await profile.reload();
+                await profile.removeAvatar();
               }}
             />
 

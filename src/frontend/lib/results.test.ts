@@ -1,20 +1,16 @@
-// T-040 — the results seam. 40 § State, § States.
+// T-040, R-203 — the results seam, on RTK Query over a stubbed `fetch`. 40 § State, § States.
 //
 // Two behaviours here decide whether the demo's second beat works: the poll that makes the
 // number move without anybody touching anything, and the failed poll that must NOT blank a
 // page somebody is presenting from.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement, type ReactNode } from 'react';
+import { Provider } from 'react-redux';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ResultsView } from '@endur/shared';
-import { ApiError } from './api.js';
+import { setupStore } from '../store/index.js';
+import { errorReply, heldReply, stubApi, type StubReply } from '../test-utils.js';
 import { POLL_MS, resultsSearch, useResponses, useResults } from './results.js';
-
-const apiGet = vi.fn();
-
-vi.mock('./api.js', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, apiGet: (...args: unknown[]) => apiGet(...args) as unknown };
-});
 
 const view = (responseCount: number): ResultsView => ({
   responseCount,
@@ -25,13 +21,17 @@ const view = (responseCount: number): ResultsView => ({
   questions: [],
 });
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  apiGet.mockResolvedValue({ data: view(612) });
-});
+const answer = (responseCount: number): StubReply => ({ body: { data: view(responseCount) } });
+
+function render<T>(hook: () => T) {
+  const store = setupStore();
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(Provider, { store, children });
+  return renderHook(hook, { wrapper });
+}
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('the query string', () => {
@@ -44,60 +44,78 @@ describe('the query string', () => {
 
 describe('polling', () => {
   it('loads once on mount', async () => {
-    const { result } = renderHook(() => useResults('c1'));
+    const calls = stubApi({ 'GET /campaigns/c1/results': answer(612) });
+    const { result } = render(() => useResults('c1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(apiGet).toHaveBeenCalledWith('/campaigns/c1/results');
+    expect(calls.map((call) => call.path)).toEqual(['/campaigns/c1/results']);
     expect(result.current.data?.responseCount).toBe(612);
   });
 
   it('reports what arrived, and never on the first load', async () => {
-    const { result } = renderHook(() => useResults('c1'));
+    stubApi({ 'GET /campaigns/c1/results': (_call, count) => answer(count === 1 ? 612 : 613) });
+    const { result } = render(() => useResults('c1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
     // 612 responses "arriving" because the page opened would make the one number on this
     // screen that must be trusted look invented.
     expect(result.current.arrived).toBe(0);
 
-    apiGet.mockResolvedValue({ data: view(613) });
     await act(async () => { await result.current.reload(); });
-    expect(result.current.arrived).toBe(1);
+    await waitFor(() => expect(result.current.arrived).toBe(1));
+  });
+
+  it('a poll that brings nothing new says nothing arrived', async () => {
+    stubApi({ 'GET /campaigns/c1/results': (_call, count) => answer(count === 1 ? 612 : 613) });
+    const { result } = render(() => useResults('c1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.reload(); });
+    await waitFor(() => expect(result.current.arrived).toBe(1));
+
+    // Same count again: the "landed" moment must not hang around for a second poll.
+    await act(async () => { await result.current.reload(); });
+    await waitFor(() => expect(result.current.arrived).toBe(0));
   });
 
   it('polls every ten seconds', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    renderHook(() => useResults('c1'));
-    await vi.waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+    const calls = stubApi({ 'GET /campaigns/c1/results': answer(612) });
+    render(() => useResults('c1'));
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
 
     await act(async () => { await vi.advanceTimersByTimeAsync(POLL_MS); });
-    expect(apiGet).toHaveBeenCalledTimes(2);
+    expect(calls).toHaveLength(2);
   });
 
   it('does not stack a second request behind a slow one', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    apiGet.mockImplementation(() => new Promise(() => undefined));
-    renderHook(() => useResults('c1'));
-    await vi.waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+    const never = heldReply();
+    const calls = stubApi({ 'GET /campaigns/c1/results': () => never.promise });
+    render(() => useResults('c1'));
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
 
     // Venue wifi. A request that never comes back must not queue six more behind it.
     await act(async () => { await vi.advanceTimersByTimeAsync(POLL_MS * 3); });
-    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(1);
   });
 
   it('KEEPS THE LAST GOOD DATA when a poll fails', async () => {
-    const { result } = renderHook(() => useResults('c1'));
+    stubApi({
+      'GET /campaigns/c1/results': (_call, count) => (count === 1 ? answer(612) : new TypeError('offline')),
+    });
+    const { result } = render(() => useResults('c1'));
     await waitFor(() => expect(result.current.data?.responseCount).toBe(612));
 
-    apiGet.mockRejectedValue(new Error('offline'));
     await act(async () => { await result.current.reload(); });
 
     // 40 § States, and the reason is concrete: this page is on a projector.
+    await waitFor(() => expect(result.current.error).toBeTruthy());
     expect(result.current.data?.responseCount).toBe(612);
-    expect(result.current.error).toBeTruthy();
   });
 
   it('asks for exactly what the filters say', async () => {
-    const { result } = renderHook(() => useResults('c1', { unitId: 'u9' }));
+    const calls = stubApi({ 'GET /campaigns/c1/results?unitId=u9': answer(3) });
+    const { result } = render(() => useResults('c1', { unitId: 'u9' }));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(apiGet).toHaveBeenCalledWith('/campaigns/c1/results?unitId=u9');
+    expect(calls[0]?.path).toBe('/campaigns/c1/results?unitId=u9');
   });
 });
 
@@ -110,43 +128,49 @@ describe('the comments, behind their own capability', () => {
   };
 
   it('does not ask at all when the capability is absent', async () => {
-    renderHook(() => useResponses('c1', false));
+    const calls = stubApi({});
+    render(() => useResponses('c1', false));
     await new Promise((resolve) => setTimeout(resolve, 0));
     // A request nobody may answer is a request not worth making.
-    expect(apiGet).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
   });
 
   it('reads a 403 as "this section is absent", not as an error to render', async () => {
-    apiGet.mockRejectedValue(new ApiError({ code: 'FORBIDDEN', status: 403, requestId: 'r', message: 'no' }));
-    const { result } = renderHook(() => useResponses('c1'));
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    stubApi({ 'GET /campaigns/c1/responses': errorReply(403, 'FORBIDDEN', 'no') });
+    const { result } = render(() => useResponses('c1'));
+    await waitFor(() => expect(result.current.forbidden).toBe(true));
 
     // 40 § States: the aggregates still render and the comment section is simply not there.
-    expect(result.current.forbidden).toBe(true);
     expect(result.current.error).toBeNull();
+    expect(result.current.data).toBeNull();
   });
 
   it('carries the suppression flag through untouched', async () => {
-    apiGet.mockResolvedValue({ ...page, data: [], meta: { total: 3 }, suppressed: true });
-    const { result } = renderHook(() => useResponses('c1'));
+    stubApi({ 'GET /campaigns/c1/responses': { body: { ...page, data: [], meta: { total: 3 }, suppressed: true } } });
+    const { result } = render(() => useResponses('c1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.suppressed).toBe(true);
     expect(result.current.data?.data).toEqual([]);
   });
 
   it('appends the next page rather than replacing it', async () => {
-    apiGet.mockResolvedValue(page);
-    const { result } = renderHook(() => useResponses('c1'));
+    const calls = stubApi({
+      'GET /campaigns/c1/responses': { body: page },
+      'GET /campaigns/c1/responses?cursor=cur': {
+        body: {
+          ...page,
+          data: [{ id: 'r2', submittedAt: '2026-08-20T09:00:00.000Z', subjectName: null, answers: [] }],
+          page: { nextCursor: null, hasMore: false },
+        },
+      },
+    });
+    const { result } = render(() => useResponses('c1'));
     await waitFor(() => expect(result.current.data?.data).toHaveLength(1));
 
-    apiGet.mockResolvedValue({
-      ...page,
-      data: [{ id: 'r2', submittedAt: '2026-08-20T09:00:00.000Z', subjectName: null, answers: [] }],
-      page: { nextCursor: null, hasMore: false },
-    });
     await act(async () => { await result.current.loadMore(); });
 
-    expect(apiGet).toHaveBeenLastCalledWith('/campaigns/c1/responses?cursor=cur');
-    expect(result.current.data?.data.map((item) => item.id)).toEqual(['r1', 'r2']);
+    expect(calls.at(-1)?.path).toBe('/campaigns/c1/responses?cursor=cur');
+    await waitFor(() => expect(result.current.data?.data.map((item) => item.id)).toEqual(['r1', 'r2']));
+    expect(result.current.data?.page.hasMore).toBe(false);
   });
 });

@@ -4,32 +4,25 @@
 // runs unconditionally for every visitor. An operator session is the rare case; asking
 // `/platform/me` on every page load of the product for a cookie almost nobody carries is a
 // wasted round trip on every customer's first paint.
+//
+// On RTK Query since R-505: `getOpsMe` (`store/api/opsApi.ts`), whose answer `opsSlice` takes
+// through `extraReducers`, the way `auth` takes `/auth/me`'s.
 import { useEffect } from 'react';
-import type { PlatformMeResponse } from '@endur/shared';
-import { opsGet, setOpsUnauthenticatedHandler } from './ops.js';
+import { setOpsUnauthenticatedHandler } from './ops.js';
 import { useAppDispatch } from '../store/index.js';
-import { opsSignedIn, opsSignedOut } from '../store/opsSlice.js';
+import { opsSignedOut } from '../store/opsSlice.js';
+import { opsApi } from '../store/api/opsApi.js';
 
 export function useBootOpsSession(): void {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    // A 401 from any later platform call lands here too — the same shape `useBootSession`
-    // gives the org side, so an expired operator session routes to `/ops/login` from
-    // wherever they were, never to `/login`.
+    // A 401 from a PLAIN platform call (sign-out, an org action) lands here; one from a
+    // query reaches `sessionExpiredMiddleware`. Either way an expired operator session
+    // routes to `/ops/login` from wherever they were, never to `/login`.
     setOpsUnauthenticatedHandler(() => dispatch(opsSignedOut()));
-
-    let cancelled = false;
-    void opsGet<PlatformMeResponse>('/me')
-      .then((me) => {
-        if (!cancelled) dispatch(opsSignedIn({ operator: me.operator, capabilities: me.capabilities }));
-      })
-      .catch(() => {
-        if (!cancelled) dispatch(opsSignedOut());
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [dispatch]);
+
+  // The operator tree's live subscription to `/platform/me`.
+  opsApi.useGetOpsMeQuery();
 }

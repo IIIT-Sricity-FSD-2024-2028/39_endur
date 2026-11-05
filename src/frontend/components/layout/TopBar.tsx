@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../Icon.js';
 import { ThemeToggle } from '../ThemeToggle.js';
 import { useAppSelector } from '../../store/index.js';
-import { signOut } from '../../lib/session.js';
+import { useSignOut } from '../../lib/session.js';
 
 export function TopBar({
   onOpenMenu,
@@ -44,6 +44,7 @@ export function TopBar({
 
 function UserChip({ name, email }: { name: string; email: string }): JSX.Element {
   const menu = useMenu();
+  const signOut = useSignOut();
   const initials = name
     .split(' ')
     .filter(Boolean)

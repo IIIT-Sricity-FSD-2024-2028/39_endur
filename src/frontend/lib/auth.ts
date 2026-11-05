@@ -10,9 +10,10 @@ import { useCallback } from 'react';
 import type { HomeView, LoginBody, MeResponse, RegisterBody } from '@endur/shared';
 import { apiGet, apiPost } from './api.js';
 import { activate as activateToken } from './accounts.js';
+import { unwrapApi } from './query.js';
 import { useAppDispatch } from '../store/index.js';
-import { labelsLoaded, signedIn } from '../store/index.js';
 import type { AppDispatch } from '../store/index.js';
+import { refreshMe, signIn } from '../store/thunks/session.js';
 
 /**
  * Re-run boot by hand after a successful sign-in.
@@ -23,10 +24,9 @@ import type { AppDispatch } from '../store/index.js';
  * definition of what a session is.
  */
 async function hydrate(dispatch: AppDispatch): Promise<MeResponse> {
-  const me = await apiGet<MeResponse>('/auth/me');
-  dispatch(signedIn(me));
-  dispatch(labelsLoaded(me.labels));
-  return me;
+  // `refreshMe` refetches the `getMe` query; its answer reaches the auth and vocabulary
+  // slices through their `extraReducers` (R-104), so there is nothing to dispatch here.
+  return await unwrapApi(dispatch(refreshMe()));
 }
 
 /**
@@ -65,13 +65,9 @@ export function useSignIn(): (credentials: LoginBody) => Promise<string> {
 
   return useCallback(
     async (credentials: LoginBody) => {
-      // `suppress401Handler` because a 401 here is the ANSWER, not an expired session.
-      // Without it, a mistyped password would fire the global handler and the page would
-      // be told it had been logged out — from a page nobody was logged in on.
-      await apiPost<LoginBody, { ok: true }>('/auth/login', credentials, {
-        suppress401Handler: true,
-      });
-      await hydrate(dispatch);
+      // The `session/signIn` thunk: log in, then read the session. A wrong password
+      // rejects with the server's error, rebuilt as an `ApiError` for the form.
+      await unwrapApi(dispatch(signIn(credentials)));
       return await landingRoute();
     },
     [dispatch],

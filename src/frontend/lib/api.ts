@@ -92,7 +92,7 @@ export function setUnauthenticatedHandler(handler: () => void): void {
   onUnauthenticated = handler;
 }
 
-type Options = Omit<RequestInit, 'body' | 'method'> & {
+export type RequestOptions = Omit<RequestInit, 'body' | 'method'> & {
   /** Replays safely: the server returns the FIRST response rather than acting twice (12 §4.15). */
   idempotencyKey?: string;
   /**
@@ -106,7 +106,18 @@ type Options = Omit<RequestInit, 'body' | 'method'> & {
   suppress401Handler?: boolean;
 };
 
-async function request<T>(method: string, path: string, body?: unknown, opts: Options = {}): Promise<T> {
+/**
+ * Exported for exactly one other caller: RTK Query's `baseQuery` (`store/api/baseQuery.ts`,
+ * docs/REDUX-PLAN.md §6.1). CSRF, credentials, idempotency keys, multipart and the error
+ * envelope then stay in ONE client, rather than two that drift apart. Pages still never
+ * call it; they call a `use*` hook.
+ */
+export async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  opts: RequestOptions = {},
+): Promise<T> {
   const { idempotencyKey, suppress401Handler, headers: extraHeaders, ...init } = opts;
   const headers = new Headers(extraHeaders);
 
@@ -189,16 +200,16 @@ function toError(response: Response, payload: unknown): ApiError {
   return response.status === 401 ? new SessionExpiredError(init) : new ApiError(init);
 }
 
-export const apiGet = <T>(path: string, opts?: Options): Promise<T> =>
+export const apiGet = <T>(path: string, opts?: RequestOptions): Promise<T> =>
   request<T>('GET', path, undefined, opts);
 
-export const apiPost = <TIn, TOut>(path: string, body?: TIn, opts?: Options): Promise<TOut> =>
+export const apiPost = <TIn, TOut>(path: string, body?: TIn, opts?: RequestOptions): Promise<TOut> =>
   request<TOut>('POST', path, body, opts);
 
-export const apiPatch = <TIn, TOut>(path: string, body: TIn, opts?: Options): Promise<TOut> =>
+export const apiPatch = <TIn, TOut>(path: string, body: TIn, opts?: RequestOptions): Promise<TOut> =>
   request<TOut>('PATCH', path, body, opts);
 
-export const apiPut = <TIn, TOut>(path: string, body: TIn, opts?: Options): Promise<TOut> =>
+export const apiPut = <TIn, TOut>(path: string, body: TIn, opts?: RequestOptions): Promise<TOut> =>
   request<TOut>('PUT', path, body, opts);
 
 /**
@@ -209,7 +220,7 @@ export const apiPut = <TIn, TOut>(path: string, body: TIn, opts?: Options): Prom
 export const apiDelete = <TOut = void, TIn = undefined>(
   path: string,
   body?: TIn,
-  opts?: Options,
+  opts?: RequestOptions,
 ): Promise<TOut> => request<TOut>('DELETE', path, body, opts);
 
 /**

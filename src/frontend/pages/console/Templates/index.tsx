@@ -4,11 +4,10 @@ import { PRESET_VOCABULARIES, type TemplateSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
-import { Toast } from '../../../components/feedback/Toast.js';
 import { Icon } from '../../../components/Icon.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
-import { useAppSelector } from '../../../store/index.js';
+import { toastShown, useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
 import { cloneKey, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
 import { TemplateCard } from './TemplateCard.js';
@@ -43,7 +42,11 @@ export default function Templates(): JSX.Element {
   const [preview, setPreview] = useState<TemplateSummary | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cardError, setCardError] = useState<{ id: string; text: string } | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  // The shell's ToastHost draws it (R-307); this page only says what happened.
+  const showToast = (message: string): void => {
+    dispatch(toastShown({ message }));
+  };
 
   const message = (error: unknown, fallback: string): string =>
     error instanceof ApiError ? error.message : fallback;
@@ -287,7 +290,7 @@ export default function Templates(): JSX.Element {
             setPending(null);
             void own
               .remove(template.id)
-              .then(() => setToast(`${template.name} deleted.`))
+              .then(() => showToast(`${template.name} deleted.`))
               .catch((error: unknown) => {
                 setCardError({ id: template.id, text: message(error, 'That could not be deleted.') });
               });
@@ -295,8 +298,6 @@ export default function Templates(): JSX.Element {
           onCancel={() => setPending(null)}
         />
       )}
-
-      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </>
   );
 }

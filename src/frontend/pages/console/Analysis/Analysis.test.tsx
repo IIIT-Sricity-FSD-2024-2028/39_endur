@@ -1,21 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type { AnalysisView, Capability, ThemeDetail } from '@endur/shared';
-import { NONSENSE_LABELS, renderWithProviders } from '../../../test-utils.js';
+import {
+  NONSENSE_LABELS, errorReply, renderWithProviders, stubApi, type StubReply,
+} from '../../../test-utils.js';
 import Analysis from './index.js';
-
-const hoisted = vi.hoisted(() => {
-  class ApiError extends Error {
-    status: number;
-    details: Record<string, unknown>;
-    constructor(status: number, message: string, details: Record<string, unknown> = {}) {
-      super(message);
-      this.status = status;
-      this.details = details;
-    }
-  }
-  return { ApiError };
-});
 
 const view = (over: Partial<AnalysisView> = {}): AnalysisView => ({
   suppressed: false,
@@ -67,50 +56,45 @@ const detail = (over: Partial<ThemeDetail> = {}): ThemeDetail => ({
   ...over,
 });
 
-let overview: AnalysisView | (() => never);
-let themeAnswer: ThemeDetail | (() => never);
+/** A route's answer: the data, or (from `throws`) the failure the server sends. */
+type Failure = { failure: StubReply };
+const answer = (value: object): StubReply =>
+  'failure' in value ? (value as Failure).failure : { body: { data: value } };
+
+let overview: AnalysisView | Failure;
+let themeAnswer: ThemeDetail | Failure;
 let paths: string[];
 
-const apiGet = vi.fn((path: string) => {
-  paths.push(path);
-  if (path.startsWith('/analysis/themes/')) {
-    if (typeof themeAnswer === 'function') return themeAnswer();
-    return { data: themeAnswer };
-  }
-  if (path.startsWith('/analysis')) {
-    if (typeof overview === 'function') return overview();
-    return { data: overview };
-  }
-  if (path.startsWith('/campaigns')) {
-    return { data: [{ id: 'c-1', name: 'Autumn round' }], page: {}, meta: { total: 1 } };
-  }
-  if (path.startsWith('/subjects')) {
-    return { data: [{ id: 's-1', name: 'North wing' }], page: {}, meta: { total: 1 } };
-  }
-  if (path.startsWith('/units')) return { data: [] };
-  throw new Error(`unmocked GET ${path}`);
+// The stub server (R-502): the real hooks and the real cache run above it.
+const server = () => stubApi({
+  'GET /analysis/themes/*': (call) => {
+    paths.push(call.path);
+    return answer(themeAnswer);
+  },
+  'GET /analysis*': (call) => {
+    paths.push(call.path);
+    return answer(overview);
+  },
+  'GET /campaigns*': { body: { data: [{ id: 'c-1', name: 'Autumn round' }], page: {}, meta: { total: 1 } } },
+  'GET /subjects*': { body: { data: [{ id: 's-1', name: 'North wing' }], page: {}, meta: { total: 1 } } },
+  'GET /units*': { body: { data: [] } },
 });
-
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (p: string) => apiGet(p),
-  apiPost: vi.fn(),
-  apiPut: vi.fn(),
-  apiPatch: vi.fn(),
-  apiDelete: vi.fn(),
-  ApiError: hoisted.ApiError,
-}));
 
 const ALL: Capability[] = ['analysis.read', 'response.read', 'campaign.read', 'subject.read', 'unit.read'];
 
 const mount = (capabilities: Capability[] = ALL, path = '/app/analysis') =>
   renderWithProviders(<Analysis />, { capabilities, path, labels: NONSENSE_LABELS });
 
-const throws = (status: number, message: string, details?: Record<string, unknown>) => () => {
-  throw new hoisted.ApiError(status, message, details);
-};
+const throws = (status: number, message: string, details?: Record<string, unknown>): Failure => ({
+  failure: errorReply(status, 'REFUSED', message, details),
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  server();
   overview = view();
   themeAnswer = detail();
   paths = [];

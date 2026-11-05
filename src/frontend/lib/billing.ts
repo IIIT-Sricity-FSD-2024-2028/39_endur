@@ -1,42 +1,54 @@
 // The plan, as the console reads it. 49 § Data contract, 23 §3.
 //
-// Nothing here is cached in the store and that is the whole design: `49` § State says a
-// stale tier is a wrong tier. The page fetches on open and refetches after a join, so what
-// it shows is what the entitlement gate will decide with on the next request.
-import { useCallback, useEffect, useState } from 'react';
-import type {
-  BillingSummary,
-  EnterpriseRequestState,
-  PlanOption,
-  Tier,
-} from '@endur/shared';
-import { apiDelete, apiGet, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+// `49` § State says a stale tier is a wrong tier. On RTK Query since R-503
+// (`store/api/endpoints/billing.ts`), and that rule now holds in two ways it did not before:
+// every write puts the server's whole summary into the one cache entry the page AND the
+// shell's plan banner read, and the page shows its skeleton rather than a cached tier while
+// a fresh read is in flight. What it shows is what the entitlement gate will decide with on
+// the next request.
+import { useCallback } from 'react';
+import type { BillingSummary, PlanOption, Tier } from '@endur/shared';
+import { useAppDispatch } from '../store/index.js';
+import {
+  billingApi,
+  useCancelDowngradeMutation,
+  useGetBillingQuery,
+  useGetEnterpriseRequestQuery,
+  useGetPlansQuery,
+  useJoinTierMutation,
+  useRequestEnterpriseMutation,
+  useScheduleDowngradeMutation,
+} from '../store/api/endpoints/billing.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
 
+/**
+ * The summary. `loading` is true during ANY read, a re-read included, and the Plan page
+ * swaps itself for a skeleton while it is: a cached tier shown for a moment is still a tier
+ * the gate may no longer agree with.
+ */
 export function useBilling(): Loadable<BillingSummary> & { set: (next: BillingSummary) => void } {
-  const [state, setState] = useState<Loadable<BillingSummary>>({
-    data: null, loading: true, error: null,
-  });
+  const dispatch = useAppDispatch();
+  const billing = useLoadable(useGetBillingQuery());
 
-  useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: BillingSummary }>('/billing')
-      .then((response) => {
-        if (!cancelled) setState({ data: response.data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const set = useCallback(
+    (next: BillingSummary) => {
+      dispatch(billingApi.util.updateQueryData('getBilling', undefined, () => next));
+    },
+    [dispatch],
+  );
 
-  const set = useCallback((next: BillingSummary) => {
-    setState({ data: next, loading: false, error: null });
-  }, []);
+  return { data: billing.data, loading: billing.loading, error: billing.error, set };
+}
 
-  return { ...state, set };
+/**
+ * For the shell's plan banner: the same cache entry as the Plan page, so a join there is
+ * here at once. `null` when the reader may not see billing (nothing is asked), while it
+ * loads, and on a failure, which is SILENT by design: the banner is chrome on somebody
+ * else's page, and an error strip about a plan on top of a broken subjects list tells
+ * them about the wrong problem.
+ */
+export function usePlanSummary(enabled: boolean): BillingSummary | null {
+  return useGetBillingQuery(undefined, { skip: !enabled }).data ?? null;
 }
 
 /**
@@ -46,25 +58,8 @@ export function useBilling(): Loadable<BillingSummary> & { set: (next: BillingSu
  * change without a client release.
  */
 export function usePlans(): Loadable<readonly PlanOption[]> {
-  const [state, setState] = useState<Loadable<readonly PlanOption[]>>({
-    data: null, loading: true, error: null,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: PlanOption[] }>('/billing/plans')
-      .then((response) => {
-        if (!cancelled) setState({ data: response.data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return state;
+  const plans = useLoadable(useGetPlansQuery());
+  return { data: plans.data, loading: plans.loading, error: plans.error };
 }
 
 /**
@@ -75,16 +70,11 @@ export function usePlans(): Loadable<readonly PlanOption[]> {
  * and writes the row with or without one, so a caller with nothing to pass may omit it.
  */
 export function useJoinTier(): (tier: Tier, paymentRef?: string) => Promise<BillingSummary> {
-  return useCallback(async (tier: Tier, paymentRef?: string) => {
-    // The key is OMITTED rather than sent as `undefined` — `exactOptionalPropertyTypes` is on,
-    // and `{ paymentRef: undefined }` would also serialise as a null-ish field the DTO would
-    // then have to tolerate. A caller with nothing to say says nothing.
-    const response = await apiPost<{ tier: Tier; paymentRef?: string }, { data: BillingSummary }>(
-      '/billing/tier',
-      paymentRef ? { tier, paymentRef } : { tier },
-    );
-    return response.data;
-  }, []);
+  const [joinTier] = useJoinTierMutation();
+  return useCallback(
+    (tier: Tier, paymentRef?: string) => unwrapApi(joinTier({ tier, paymentRef })),
+    [joinTier],
+  );
 }
 
 /**
@@ -100,22 +90,13 @@ export function useJoinTier(): (tier: Tier, paymentRef?: string) => Promise<Bill
  * so there is no dialog in front of these and no reference to carry.
  */
 export function useScheduleDowngrade(): (tier: Tier) => Promise<BillingSummary> {
-  return useCallback(async (tier: Tier) => {
-    const response = await apiPost<{ tier: Tier }, { data: BillingSummary }>(
-      '/billing/downgrade',
-      { tier },
-    );
-    return response.data;
-  }, []);
+  const [scheduleDowngrade] = useScheduleDowngradeMutation();
+  return useCallback((tier: Tier) => unwrapApi(scheduleDowngrade(tier)), [scheduleDowngrade]);
 }
 
 export function useCancelDowngrade(): () => Promise<BillingSummary> {
-  return useCallback(async () => {
-    // No body. There is only ever one pending value, so naming it would let a caller cancel a
-    // downgrade that had already been replaced and be told it worked (13 § Billing).
-    const response = await apiDelete<{ data: BillingSummary }>('/billing/downgrade');
-    return response.data;
-  }, []);
+  const [cancelDowngrade] = useCancelDowngradeMutation();
+  return useCallback(() => unwrapApi(cancelDowngrade()), [cancelDowngrade]);
 }
 
 /**
@@ -125,36 +106,24 @@ export function useCancelDowngrade(): () => Promise<BillingSummary> {
  * an open request — because that is all the card's verb depends on. The lifecycle beyond that
  * (contacted, closed) is the OWNER'S, on `/ops`; telling a customer their request had been
  * "closed" would raise a question the product cannot answer.
+ *
+ * A failed read is SWALLOWED, and that is the right failure: it decides one word on one
+ * button, and an error banner over the plan page because we could not tell whether somebody
+ * had already asked would be the page reporting our problem as theirs.
  */
 export function useEnterpriseRequest(): {
   requestedAt: string | null;
   request: (note: string) => Promise<void>;
 } {
-  const [requestedAt, setRequestedAt] = useState<string | null>(null);
+  const { data } = useGetEnterpriseRequestQuery();
+  const [requestEnterprise] = useRequestEnterpriseMutation();
 
-  useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: EnterpriseRequestState }>('/billing/enterprise-request')
-      .then((response) => {
-        if (!cancelled) setRequestedAt(response.data.requestedAt);
-      })
-      // SWALLOWED, and that is the right failure. This read decides one word on one button;
-      // an error banner over the plan page because we could not tell whether somebody had
-      // already asked would be the page reporting our problem as theirs.
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const request = useCallback(
+    async (note: string) => {
+      await unwrapApi(requestEnterprise(note));
+    },
+    [requestEnterprise],
+  );
 
-  const request = useCallback(async (note: string) => {
-    const response = await apiPost<
-      { note?: string },
-      { data: EnterpriseRequestState }
-    >('/billing/enterprise-request', note.trim() ? { note: note.trim() } : {});
-    setRequestedAt(response.data.requestedAt);
-  }, []);
-
-  return { requestedAt, request };
+  return { requestedAt: data?.requestedAt ?? null, request };
 }
-

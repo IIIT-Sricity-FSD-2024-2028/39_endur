@@ -1,19 +1,20 @@
-import type { SaveState } from './useBuilder.js';
+// The save badge. It reads the builder slice itself rather than taking props, so it is the
+// only thing that re-renders when the save state moves (idle → dirty → saving → saved).
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { saveRetried, selectSaveError, selectSaveState } from '../../../store/builderSlice.js';
 
-export function SaveIndicator({
-  state,
-  error,
-  onRetry,
-}: {
-  state: SaveState;
-  error: Error | null;
-  onRetry: () => void;
-}): JSX.Element | null {
+export function SaveIndicator(): JSX.Element | null {
+  const state = useAppSelector(selectSaveState);
+  const error = useAppSelector(selectSaveError);
+  const dispatch = useAppDispatch();
+
   if (state === 'error') {
     return (
       <span className="save-state is-error" role="alert">
-        {error?.message ?? 'That did not save.'} Your work is still here.{' '}
-        <button type="button" className="btn btn-ghost" onClick={onRetry}>Try again</button>
+        {error ?? 'That did not save.'} Your work is still here.{' '}
+        <button type="button" className="btn btn-ghost" onClick={() => dispatch(saveRetried())}>
+          Try again
+        </button>
       </span>
     );
   }

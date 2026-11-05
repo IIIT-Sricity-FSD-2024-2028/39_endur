@@ -26,6 +26,21 @@ const NO_REQ_BODY = {
     "14 §3: read req.data (validated) — req.body is unvalidated input and bypasses validate(Dto).",
 };
 
+/** R-110 (docs/REDUX-PLAN.md §7) — the store's typed hooks are the only way in. */
+const UNTYPED_REDUX_HOOKS = {
+  name: 'react-redux',
+  importNames: ['useDispatch', 'useSelector', 'useStore'],
+  message:
+    'R-110: use useAppDispatch / useAppSelector / useAppStore from store/index.ts. They are these same hooks, typed with this store.',
+};
+
+/** R-110, 23 §3 — server data reaches a page through a lib/ hook, never the API slice. */
+const STORE_API_FROM_UI = {
+  group: ['**/store/api', '**/store/api/**'],
+  message:
+    "R-110 / 23 §3: pages and components get server data from a lib/ use* hook, never from store/api directly. The hook's signature is the contract that keeps pages unchanged.",
+};
+
 /** DEC-012 — design values live in design_specs, never inline. */
 const NO_INLINE_HEX = {
   selector: 'Literal[value=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b/]',
@@ -105,6 +120,26 @@ export default tseslint.config(
     files: ['src/frontend/**/*.{ts,tsx}'],
     ignores: ['src/frontend/design-system/**'],
     rules: { 'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS, NO_INLINE_HEX] },
+  },
+
+  // R-110 — Redux hooks only in their typed form, defined once in store/index.ts.
+  {
+    files: ['src/frontend/**/*.{ts,tsx}'],
+    ignores: ['src/frontend/store/index.ts'],
+    rules: { 'no-restricted-imports': ['error', { paths: [UNTYPED_REDUX_HOOKS] }] },
+  },
+
+  // R-110 — and pages and components never import the API slice. The hook rule is repeated
+  // because flat config REPLACES a rule's options (the warning above, about
+  // no-restricted-syntax, applies to no-restricted-imports just the same).
+  {
+    files: ['src/frontend/pages/**/*.{ts,tsx}', 'src/frontend/components/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [UNTYPED_REDUX_HOOKS], patterns: [STORE_API_FROM_UI] },
+      ],
+    },
   },
 
   // Tests assert on supertest's `res.body`, which its types declare as `any`. Typed-lint

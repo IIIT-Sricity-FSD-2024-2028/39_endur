@@ -11,13 +11,9 @@ import { ApiError } from '../../../lib/api.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDateTime } from '../../../lib/format.js';
 import {
-  cancelBooking,
-  closeBookable,
-  deleteBookable,
-  openBookable,
   openKey,
-  putSlots,
   useBookable,
+  useBookableCommands,
 } from '../../../lib/booking.js';
 
 type Draft = { id: string; startsAt: string; endsAt: string; capacity: number; remaining: number };
@@ -42,6 +38,7 @@ export default function BookingDetail(): JSX.Element {
   const navigate = useNavigate();
   const can = useCan();
   const { bookable, bookings, loading, forbidden, upgrade, reload } = useBookable(id);
+  const commands = useBookableCommands(id ?? '');
 
   const canUpdate = can('booking.update');
   const canDelete = can('booking.delete');
@@ -163,7 +160,7 @@ export default function BookingDetail(): JSX.Element {
       endsAt: new Date(slot.endsAt),
       capacity: slot.capacity,
     }));
-    act(putSlots(id, { slots }));
+    act(commands.putSlots({ slots }));
   };
 
   return (
@@ -183,7 +180,7 @@ export default function BookingDetail(): JSX.Element {
                 type="button"
                 className="btn btn-primary"
                 disabled={busy || drafts.length === 0 || dirty}
-                onClick={() => id && act(openBookable(id, openKey(id)))}
+                onClick={() => id && act(commands.open(openKey(id)))}
               >
                 Open for booking
               </button>
@@ -349,7 +346,7 @@ export default function BookingDetail(): JSX.Element {
           verb="Close"
           onConfirm={() => {
             setClosing(false);
-            if (id) act(closeBookable(id));
+            if (id) act(commands.close());
           }}
           onCancel={() => setClosing(false)}
         />
@@ -365,7 +362,7 @@ export default function BookingDetail(): JSX.Element {
             setRemoving(false);
             if (!id) return;
             setBusy(true);
-            void deleteBookable(id)
+            void commands.remove()
               .then(() => navigate('/app/booking'))
               .catch(() => setError('That did not work.'))
               .finally(() => setBusy(false));
@@ -383,7 +380,7 @@ export default function BookingDetail(): JSX.Element {
           onConfirm={() => {
             const target = cancelling.id;
             setCancelling(null);
-            act(cancelBooking(target));
+            act(commands.cancelBooking(target));
           }}
           onCancel={() => setCancelling(null)}
         />

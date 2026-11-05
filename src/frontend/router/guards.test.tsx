@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { configureStore } from '@reduxjs/toolkit';
 import type { Capability, HeldCapabilities, MeResponse } from '@endur/shared';
-import { authReducer, signedIn, signedOut } from '../store/authSlice.js';
-import { vocabularyReducer } from '../store/vocabularySlice.js';
+import { setupStore } from '../store/index.js';
+import { signedIn, signedOut } from '../store/authSlice.js';
 import { RedirectIfSignedIn, RequireCapability, RequireSession } from './guards.js';
 
 const held = (capabilities: Capability[]): HeldCapabilities => {
@@ -22,7 +21,7 @@ const me = (capabilities: Capability[]): MeResponse => ({
 });
 
 function mount(node: JSX.Element, session?: 'in' | 'out', capabilities: Capability[] = []) {
-  const store = configureStore({ reducer: { auth: authReducer, vocabulary: vocabularyReducer } });
+  const store = setupStore();
   if (session === 'in') store.dispatch(signedIn(me(capabilities)));
   if (session === 'out') store.dispatch(signedOut());
 
@@ -74,7 +73,7 @@ describe('RequireCapability', () => {
 
 describe('RedirectIfSignedIn', () => {
   const mountPublic = (session?: 'in' | 'out') => {
-    const store = configureStore({ reducer: { auth: authReducer, vocabulary: vocabularyReducer } });
+    const store = setupStore();
     if (session === 'in') store.dispatch(signedIn(me([])));
     if (session === 'out') store.dispatch(signedOut());
 

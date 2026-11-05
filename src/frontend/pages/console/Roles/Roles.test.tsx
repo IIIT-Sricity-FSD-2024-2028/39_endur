@@ -1,9 +1,14 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+// The Roles page over a stubbed `fetch` (R-403): the real hooks, the real RTK Query cache
+// and the real `powersGridSlice` underneath. The stub server applies a grid save, so what
+// the page shows after one is what the server would say.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type {
   Capability, CapabilityMeta, GrantCell, GrantWarning, PutGrantsBody, RoleView,
 } from '@endur/shared';
-import { NONSENSE_LABELS, renderWithProviders } from '../../../test-utils.js';
+import {
+  NONSENSE_LABELS, errorReply, renderWithProviders, stubApi, type StubReply,
+} from '../../../test-utils.js';
 import Roles from './index.js';
 
 const roles: RoleView[] = [
@@ -24,34 +29,40 @@ let warnings: GrantWarning[];
 let put: PutGrantsBody | null;
 let posted: unknown[];
 let myPositions: Array<{ roleId: string | null; roleName: string }>;
+/** Set to make the next `PUT /grants` refuse, as the lockout guard would. */
+let refusal: StubReply | null;
 
-const apiGet = vi.fn((path: string) => {
-  if (path === '/roles') return { data: roles };
-  if (path === '/authz/capabilities') return { data: catalogue };
-  if (path === '/grants') return { data: grid };
-  if (path === '/grants/warnings') return { data: warnings };
-  if (path === '/profile') return { data: { user: {}, positions: myPositions, powersByPlace: [] } };
-  throw new Error(`unmocked GET ${path}`);
-});
-const apiPut = vi.fn((_path: string, body: PutGrantsBody) => {
-  put = body;
-  return { data: [] };
-});
-const apiPost = vi.fn((path: string, body: unknown) => {
-  posted.push([path, body]);
-  return { data: null };
-});
-const apiPatch = vi.fn((_path: string, _body: unknown) => ({ data: null }));
-const apiDelete = vi.fn((_path: string, _body: unknown) => ({ data: null }));
+/** What the server does with a save: writes the cells it was given, leaves the rest. */
+function applied(cells: GrantCell[]): GrantCell[] {
+  let next = [...grid];
+  for (const cell of cells) {
+    next = next.filter((row) => row.roleId !== cell.roleId || row.capability !== cell.capability);
+    if (cell.scope !== null) next.push(cell);
+  }
+  return next;
+}
 
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (p: string) => apiGet(p),
-  apiPut: (p: string, b: PutGrantsBody) => apiPut(p, b),
-  apiPost: (p: string, b: unknown) => apiPost(p, b),
-  apiPatch: (p: string, b: unknown) => apiPatch(p, b),
-  apiDelete: (p: string, b: unknown) => apiDelete(p, b),
-  ApiError: class ApiError extends Error {},
-}));
+const server = () => stubApi({
+  'GET /roles': () => ({ body: { data: roles } }),
+  'GET /authz/capabilities': { body: { data: catalogue } },
+  'GET /grants': () => ({ body: { data: grid } }),
+  'GET /grants/warnings': () => ({ body: { data: warnings } }),
+  'GET /profile': () => ({ body: { data: { user: {}, positions: myPositions, powersByPlace: [] } } }),
+  'PUT /grants': (call) => {
+    put = call.body as PutGrantsBody;
+    if (refusal) {
+      const reply = refusal;
+      refusal = null;
+      return reply;
+    }
+    grid = applied(put.cells);
+    return { body: { data: grid } };
+  },
+  'POST /roles/reorder': (call) => {
+    posted.push([call.path, call.body]);
+    return { body: { data: roles } };
+  },
+});
 
 const ALL: Capability[] = ['role.read', 'role.update', 'role.create', 'role.delete',
   'grant.read', 'grant.update'];
@@ -70,8 +81,13 @@ const choose = (name: RegExp, option: string): void => {
   fireEvent.change(cell(name), { target: { value: option } });
 };
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 beforeEach(() => {
-  vi.clearAllMocks();
+  server();
+  refusal = null;
   put = null;
   posted = [];
   grid = [
@@ -228,19 +244,6 @@ describe('the powers grid', () => {
     );
   });
 
-  it('copies a whole column — two dropdowns and a button, not a row of buttons', async () => {
-    mount();
-    await openPowers();
-
-    fireEvent.change(screen.getByLabelText(/Copy every power from/i), { target: { value: 'r1' } });
-    fireEvent.change(screen.getByLabelText(/^onto$/i), { target: { value: 'r3' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
-
-    expect(cell(/Learner: may open plithes for answers, in their own zblorn and every zblorn under it/i)).toBeTruthy();
-    expect(cell(/Learner: may change what every role is allowed to do, anywhere in the organisation/i)).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toMatch(/Copied Principal’s powers onto Learner/);
-  });
-
   it('undoes the last change', async () => {
     mount();
     await openPowers();
@@ -272,8 +275,8 @@ describe('the powers grid', () => {
   });
 
   it('keeps the working copy when a save is REFUSED', async () => {
-    apiPut.mockRejectedValueOnce(
-      new Error('That would leave no role able to change powers, and nobody could undo it.'),
+    refusal = errorReply(
+      409, 'CONFLICT', 'That would leave no role able to change powers, and nobody could undo it.',
     );
     mount();
     await openPowers();

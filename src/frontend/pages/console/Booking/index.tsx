@@ -7,7 +7,7 @@ import { Icon } from '../../../components/Icon.js';
 import { ApiError } from '../../../lib/api.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDate, pluralise } from '../../../lib/format.js';
-import { createBookable, useBookables } from '../../../lib/booking.js';
+import { useBookables, useCreateBookable } from '../../../lib/booking.js';
 
 export function stateLine(bookable: BookableSummary): string {
   if (bookable.closedAt) return `Closed ${formatDate(bookable.closedAt)}`;
@@ -24,6 +24,7 @@ export default function Booking(): JSX.Element {
   const can = useCan();
   const navigate = useNavigate();
   const list = useBookables();
+  const createBookable = useCreateBookable();
 
   const canCreate = can('booking.create');
   const [name, setName] = useState('');

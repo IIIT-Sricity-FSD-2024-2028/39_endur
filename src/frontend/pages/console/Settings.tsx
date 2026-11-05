@@ -6,7 +6,6 @@ import {
 import { PageHeader } from '../../components/layout/PageHeader.js';
 import { WordsEditor } from '../../components/org/WordsEditor.js';
 import { DashboardPreview } from '../../components/org/DashboardPreview.js';
-import { Toast } from '../../components/feedback/Toast.js';
 import { useCan } from '../../lib/capabilities.js';
 import { ApiError } from '../../lib/api.js';
 import { derivePlural } from '../../lib/format.js';
@@ -14,7 +13,7 @@ import { FileUpload } from '../../components/form/FileUpload.js';
 import {
   useOrg, usePresets, useRemoveLogo, useUpdateLabels, useUpdateOrg, useUploadLogo,
 } from '../../lib/org.js';
-import { labelsLoaded, useAppDispatch } from '../../store/index.js';
+import { labelsLoaded, toastShown, useAppDispatch } from '../../store/index.js';
 
 const overridesOf = (labels: ResolvedLabels): LabelKey[] =>
   LabelKey.options.filter((key) => labels[key].many !== derivePlural(labels[key].one));
@@ -40,7 +39,10 @@ export default function Settings(): JSX.Element {
   const [savingWords, setSavingWords] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [wordsError, setWordsError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  // The shell's ToastHost draws it (R-307); this page only says what happened.
+  const showToast = (message: string): void => {
+    dispatch(toastShown({ message }));
+  };
 
   const loaded = org.data;
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function Settings(): JSX.Element {
     void updateOrg({ name: name.trim(), industry })
       .then((updated) => {
         applied(updated);
-        setToast('Organization saved.');
+        showToast('Organization saved.');
       })
       .catch((error: unknown) => setProfileError(message(error, 'Could not save.')))
       .finally(() => setSavingProfile(false));
@@ -90,7 +92,7 @@ export default function Settings(): JSX.Element {
     void updateLabels({ ...draft })
       .then((updated) => {
         applied(updated);
-        setToast('Words saved. Every screen is using them now.');
+        showToast('Words saved. Every screen is using them now.');
       })
       .catch((error: unknown) =>
         setWordsError(message(error, 'Could not save those words.')))
@@ -255,8 +257,6 @@ export default function Settings(): JSX.Element {
           )}
         </section>
       </div>
-
-      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </>
   );
 }

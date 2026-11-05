@@ -3376,14 +3376,6 @@ a.involve-name { color: inherit; }
 .powers-actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
 .powers-error { margin-bottom: var(--space-3); }
 
-.powers-copy {
-  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
-  padding: var(--space-2) 0 var(--space-4);
-}
-.powers-copy label { font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
-.powers-copy .input { width: auto; }
-.powers-copied { font-size: 12px; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
-
 /* THE LEGEND. Six words carry every cell on this screen and one of them behaves unlike the
    other five, so it is spelled out ONCE, at the top, rather than living in tooltips somebody
    has to go hunting for (DEC-076). It is written in the tenant's own vocabulary, because the
@@ -4738,13 +4730,6 @@ a.involve-name { color: inherit; }
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-surface) 55%, transparent);
   gap: var(--space-2) var(--space-6);
-}
-
-/* The copy row is a distinct tool from the grid, so it gets the divider that says so. */
-.powers-copy {
-  padding: var(--space-4) 0 0;
-  border-top: 1px solid var(--color-divider);
-  gap: var(--space-3);
 }
 
 .powers-scroll { border-radius: var(--radius-lg); }

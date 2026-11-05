@@ -1,24 +1,22 @@
-// T-037 — the builder's draft and its autosave. 37 § State, § Interactions.
+// The builder's load half: fetch a template and hand it to the builder slice (R-305), and
+// the undo history surviving a route change and a reload (R-304).
 //
-// The acceptance criterion this file exists for is "autosave never loses typed input,
-// including across a failed save and a retry". That is not observable by looking at the
-// screen — it needs a failing request, a keystroke during a request, and an unmount, all of
-// which are cheap here and impossible to rehearse by hand.
+// The draft's own behaviour (edits, undo, the save state machine) is tested where it now
+// lives: store/builderSlice.test.ts for the reducers, store/middleware/autosave.test.ts for
+// autosave. This file is what is left in the hook.
+import { createElement, type ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
+import { Provider } from 'react-redux';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TemplateDetail } from '@endur/shared';
+import { errorReply, stubApi, type StubCall } from '../../../test-utils.js';
+import { setupStore, type AppStore } from '../../../store/index.js';
+import { signedOut } from '../../../store/authSlice.js';
+import { metaEdited, selectBuilder, undoRequested } from '../../../store/builderSlice.js';
+import { HISTORY_WRITE_MS } from '../../../store/middleware/builderHistory.js';
+import { ApiError } from '../../../lib/api.js';
 import { useBuilder } from './useBuilder.js';
 
-const apiGet = vi.fn();
-const apiPatch = vi.fn();
-const apiPut = vi.fn();
-
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (...args: unknown[]) => apiGet(...args) as unknown,
-  apiPatch: (...args: unknown[]) => apiPatch(...args) as unknown,
-  apiPut: (...args: unknown[]) => apiPut(...args) as unknown,
-  ApiError: class extends Error {},
-}));
 
 const template = (over: Partial<TemplateDetail> = {}): TemplateDetail => ({
   id: 't1', name: 'Mid-term check', category: 'Teaching', description: 'A short one.',
@@ -36,197 +34,136 @@ const template = (over: Partial<TemplateDetail> = {}): TemplateDetail => ({
   ...over,
 });
 
-/** Mount, and let the initial load settle. */
-async function mount(detail = template()) {
-  apiGet.mockResolvedValue({ data: detail });
-  const view = renderHook(() => useBuilder('t1'));
-  await act(async () => { await Promise.resolve(); });
-  return view;
-}
+let calls: StubCall[];
+const sent = (method: string) => calls.filter((call) => call.method === method);
 
-/** Push past the 800ms debounce and let the request settle. */
-async function settle(): Promise<void> {
-  await act(async () => {
-    vi.advanceTimersByTime(900);
-    await Promise.resolve();
-    await Promise.resolve();
+/** The server, for one template: GET answers `detail`; saves succeed. */
+function serve(detail: TemplateDetail | 'missing' = template()) {
+  calls = stubApi({
+    'GET /templates/t1': detail === 'missing' ? errorReply(404, 'NOT_FOUND', 'gone') : { body: { data: detail } },
+    'PATCH /templates/t1': { body: { data: template() } },
+    'PUT /templates/t1/questions': { body: { data: template() } },
   });
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  vi.useFakeTimers();
-  apiPatch.mockResolvedValue({ data: template() });
-  apiPut.mockResolvedValue({ data: template() });
-});
-afterEach(() => vi.useRealTimers());
+/** Mount against `store`, and let the initial load settle. */
+async function mount(store: AppStore, detail = template()) {
+  serve(detail);
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(Provider, { store, children });
+  const view = renderHook(() => useBuilder('t1'), { wrapper });
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  return view;
+}
 
-describe('loading turns a template into a draft', () => {
-  it('drops `position` — it is derived from array order on save and never sent', async () => {
-    const { result } = await mount();
+const builder = (store: AppStore) => selectBuilder(store.getState());
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  window.sessionStorage.clear();
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe('loading turns a template into the slice\'s draft', () => {
+  it('drops `position`: it is derived from array order on save and never sent', async () => {
+    const store = setupStore();
+    const { result } = await mount(store);
+    expect(result.current.loading).toBe(false);
     // A client-supplied position and a client-supplied order can disagree, and then one of
     // them is silently wrong (37).
-    for (const question of result.current.draft.questions) {
+    for (const question of builder(store).draft.questions) {
       expect('position' in question).toBe(false);
     }
-    expect(result.current.draft.questions.map((q) => q.text)).toEqual([
+    expect(builder(store).draft.questions.map((q) => q.text)).toEqual([
       'How clear was it?', 'Was the pace right?',
     ]);
   });
 
-  it('starts idle — an indicator saying "Saved" before any save is reporting on nothing', async () => {
-    const { result } = await mount();
-    expect(result.current.save).toBe('idle');
-    expect(apiPut).not.toHaveBeenCalled();
+  it('starts idle, and carries the lock from `readOnly`', async () => {
+    const store = setupStore();
+    await mount(store, template({ readOnly: true }));
+    expect(builder(store).save).toBe('idle');
+    expect(builder(store).locked).toBe(true);
+    expect(sent('PUT')).toHaveLength(0);
   });
 
   it('surfaces a LOAD failure, which is a different thing from a save failure', async () => {
-    apiGet.mockRejectedValue(new Error('gone'));
-    const { result } = renderHook(() => useBuilder('t1'));
-    await act(async () => { await Promise.resolve(); });
+    const store = setupStore();
+    serve('missing');
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(Provider, { store, children });
+    const { result } = renderHook(() => useBuilder('t1'), { wrapper });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    // An ApiError, rebuilt from the store's plain error, so the page can show its message.
+    expect(result.current.loadError).toBeInstanceOf(ApiError);
     expect(result.current.loadError?.message).toBe('gone');
     expect(result.current.template).toBeNull();
+    expect(builder(store).templateId).toBeNull();
   });
 });
 
-describe('autosave is debounced, and says only what is true', () => {
-  it('does not fire before 800ms, and fires once for a burst of typing', async () => {
-    const { result } = await mount();
-    act(() => result.current.setMeta({ name: 'M' }));
-    act(() => result.current.setMeta({ name: 'Mi' }));
-    act(() => result.current.setMeta({ name: 'Mid' }));
-    expect(result.current.save).toBe('dirty');
-
-    act(() => { vi.advanceTimersByTime(700); });
-    expect(apiPatch).not.toHaveBeenCalled();
-
-    await settle();
-    expect(apiPatch).toHaveBeenCalledTimes(1);
-    // The LAST value, not the one captured when the first timer was set.
-    expect(apiPatch.mock.calls[0]?.[1]).toMatchObject({ name: 'Mid' });
-    expect(result.current.save).toBe('saved');
-  });
-
-  it('sends the meta and the questions to their OWN endpoints', async () => {
-    const { result } = await mount();
-    act(() => result.current.setMeta({ description: 'Two minutes.' }));
-    await settle();
-    // Renaming a form must not rewrite its questions (37 § Data contract).
-    expect(apiPatch).toHaveBeenCalledTimes(1);
-    expect(apiPut).not.toHaveBeenCalled();
-
-    act(() => result.current.addQuestion());
-    await settle();
-    expect(apiPut).toHaveBeenCalledTimes(1);
-    expect(apiPatch).toHaveBeenCalledTimes(1);
-  });
-
-  it('saves the whole question set in ONE request, not one per question', async () => {
-    const { result } = await mount();
-    act(() => result.current.addQuestion());
-    act(() => result.current.addQuestion());
-    act(() => result.current.setQuestions([...result.current.draft.questions].reverse()));
-    await settle();
-
-    expect(apiPut).toHaveBeenCalledTimes(1);
-    const body = apiPut.mock.calls[0]?.[1] as { questions: unknown[] };
-    expect(body.questions).toHaveLength(4);
-  });
-
-  it('never reports "Saved" over a keystroke that arrived mid-request', async () => {
-    let release: (value: unknown) => void = () => undefined;
-    apiPatch.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
-    const { result } = await mount();
-
-    act(() => result.current.setMeta({ name: 'First' }));
-    await act(async () => { vi.advanceTimersByTime(900); await Promise.resolve(); });
-    expect(result.current.save).toBe('saving');
-
-    // Typed while the request was in flight.
-    act(() => result.current.setMeta({ name: 'Second' }));
-    await act(async () => { release({ data: template() }); await Promise.resolve(); });
-
-    // "Saved" here would be the one lie this indicator can tell.
-    expect(result.current.save).toBe('dirty');
-    expect(result.current.draft.name).toBe('Second');
+describe('leaving the page', () => {
+  it('saves what was typed at once, instead of dropping it with the debounce timer', async () => {
+    const store = setupStore();
+    const { unmount } = await mount(store);
+    act(() => { store.dispatch(metaEdited({ name: 'Typed, then left' })); });
+    unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(sent('PATCH')[0]?.body).toMatchObject({ name: 'Typed, then left' });
   });
 });
 
-describe('a failed save costs the reader nothing but a retry', () => {
-  it('retries once automatically, then stops and hands over a button', async () => {
-    apiPatch.mockRejectedValue(new Error('offline'));
-    const { result } = await mount();
-    act(() => result.current.setMeta({ name: 'Renamed' }));
+describe('the undo history outlives the page (R-304, Q-2)', () => {
+  it('survives a route change: leave, come back, and undo still works', async () => {
+    const store = setupStore();
+    const first = await mount(store);
+    act(() => { store.dispatch(metaEdited({ name: 'Renamed' })); });
+    first.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(900); });
 
-    await settle();
-    // First failure: one silent retry rather than an error the reader has to read.
-    expect(apiPatch).toHaveBeenCalledTimes(1);
-    expect(result.current.save).toBe('dirty');
+    // Back again. The server has the save, so its draft matches and the history is kept.
+    await mount(store, template({ name: 'Renamed' }));
+    expect(builder(store).past).toHaveLength(1);
 
-    await settle();
-    expect(apiPatch).toHaveBeenCalledTimes(2);
-    // Retrying forever hides the fault.
-    expect(result.current.save).toBe('error');
-    expect(result.current.saveError?.message).toBe('offline');
+    act(() => { store.dispatch(undoRequested()); });
+    expect(builder(store).draft.name).toBe('Mid-term check');
   });
 
-  it('KEEPS the draft through both failures — nothing is reloaded or reset', async () => {
-    apiPut.mockRejectedValue(new Error('offline'));
-    const { result } = await mount();
-    act(() => result.current.setQuestions([]));
-    await settle();
-    await settle();
+  it('survives a reload, through sessionStorage', async () => {
+    const before = setupStore();
+    await mount(before);
+    act(() => { before.dispatch(metaEdited({ name: 'Renamed' })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(Math.max(HISTORY_WRITE_MS, 900)); });
 
-    expect(result.current.save).toBe('error');
-    expect(result.current.draft.questions).toHaveLength(0);
+    // A reload is a brand-new store with the same tab's sessionStorage.
+    const after = setupStore();
+    await mount(after, template({ name: 'Renamed' }));
+    expect(builder(after).past).toHaveLength(1);
+    expect(builder(after).past[0]?.name).toBe('Mid-term check');
   });
 
-  it('keeps typing usable while it is failing, and sends the newest on retry', async () => {
-    apiPatch.mockRejectedValue(new Error('offline'));
-    const { result } = await mount();
-    act(() => result.current.setMeta({ name: 'One' }));
-    await settle();
-    await settle();
-    expect(result.current.save).toBe('error');
+  it('is thrown away after a reload if the server copy no longer matches it', async () => {
+    const before = setupStore();
+    await mount(before);
+    act(() => { before.dispatch(metaEdited({ name: 'Renamed' })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(900); });
 
-    act(() => result.current.setMeta({ name: 'Two' }));
-    apiPatch.mockResolvedValue({ data: template() });
-    await settle();
-
-    expect(result.current.save).toBe('saved');
-    expect(apiPatch.mock.calls.at(-1)?.[1]).toMatchObject({ name: 'Two' });
+    // Someone else saved over it in the meantime.
+    const after = setupStore();
+    await mount(after, template({ name: 'Somebody else\'s name' }));
+    expect(builder(after).past).toEqual([]);
+    expect(builder(after).draft.name).toBe('Somebody else\'s name');
   });
 
-  it('flush() saves now rather than waiting out the debounce', async () => {
-    const { result } = await mount();
-    act(() => result.current.setMeta({ name: 'Now' }));
-    await act(async () => { result.current.flush(); await Promise.resolve(); });
-    expect(apiPatch).toHaveBeenCalledTimes(1);
-  });
-});
+  it('is cleared from sessionStorage by signing out', async () => {
+    const store = setupStore();
+    await mount(store);
+    act(() => { store.dispatch(metaEdited({ name: 'Renamed' })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(900); });
+    expect(window.sessionStorage.length).toBe(1);
 
-describe('a locked template accepts no edits at all', () => {
-  it('reports locked and ignores every write, so nothing can be queued behind the banner', async () => {
-    const { result } = await mount(template({ readOnly: true }));
-    expect(result.current.locked).toBe(true);
-
-    act(() => result.current.setMeta({ name: 'Sneaky' }));
-    act(() => result.current.addQuestion());
-    await settle();
-
-    expect(apiPatch).not.toHaveBeenCalled();
-    expect(apiPut).not.toHaveBeenCalled();
-    expect(result.current.draft.name).toBe('Mid-term check');
-  });
-});
-
-describe('the completion time is derived from the DRAFT, live', () => {
-  it('changes as questions are added, without waiting for a save', async () => {
-    const { result } = await mount();
-    const before = result.current.estimatedSeconds;
-    act(() => result.current.addQuestion());
-    // Watching this climb past two minutes is more persuasive than an error message (37),
-    // and a number that only moved after a save would make the argument a beat too late.
-    expect(result.current.estimatedSeconds).toBeGreaterThan(before);
+    act(() => { store.dispatch(signedOut()); });
+    expect(window.sessionStorage.length).toBe(0);
   });
 });

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { RequirePlatformAuth, RequireSession, SessionLoading } from './guards.js';
 import { AmbientBackground } from '../components/AmbientBackground.js';
+import { ToastHost } from '../components/feedback/ToastHost.js';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import { opsSignedOut } from '../store/opsSlice.js';
 import { opsPost } from '../lib/ops.js';
@@ -68,6 +69,8 @@ export function ConsoleLayout(): JSX.Element {
           <Outlet />
         </AppShell>
       </Suspense>
+      {/* The console's one toast (R-307). Pages dispatch `toastShown`; this draws it. */}
+      <ToastHost />
     </RequireSession>
   );
 }
@@ -123,6 +126,7 @@ export function OpsLayout(): JSX.Element {
         <main className="ops-main">
           <Outlet />
         </main>
+        <ToastHost />
       </div>
     </RequirePlatformAuth>
   );

@@ -3,8 +3,12 @@
 // These are the rules that make the wizard survive a demo: order is the level, a unit
 // cannot swallow its own ancestor, deleting a branch deletes the branch, and a plural
 // stops being derived the moment somebody types one.
+import { createElement, type ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { setupStore, type AppStore } from '../../../store/index.js';
+import { signedOut } from '../../../store/authSlice.js';
 import { depthOf, toTree, useWizard, type UnitDraft } from './useWizard.js';
 import type { PresetView } from '@endur/shared';
 
@@ -50,9 +54,15 @@ describe('toTree / depthOf', () => {
   });
 });
 
+/** The hook over a real store, which the state now lives in (R-306). */
+const render = (store: AppStore = setupStore()) => {
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(Provider, { store, children });
+  return renderHook(() => useWizard(), { wrapper });
+};
+
 describe('useWizard', () => {
   const mount = () => {
-    const hook = renderHook(() => useWizard());
+    const hook = render();
     act(() => hook.result.current.applyPreset(preset));
     return hook;
   };
@@ -139,5 +149,39 @@ describe('useWizard', () => {
     act(() => result.current.labels.resetPlural('unit'));
     expect(result.current.state.labels.unit.many).toBe('Properties');
     expect(result.current.state.pluralOverrides).not.toContain('unit');
+  });
+});
+
+describe('the state lives in the store (R-306)', () => {
+  it('survives leaving the wizard and coming back, which a useState never could', () => {
+    const store = setupStore();
+    const first = render(store);
+    act(() => first.result.current.applyPreset(preset));
+    act(() => first.result.current.roles.rename(first.result.current.state.roles[0]?.id ?? '', 'General Manager'));
+    first.unmount();
+
+    const again = render(store);
+    expect(again.result.current.state.industry).toBe('hotel');
+    expect(again.result.current.state.roles[0]?.name).toBe('General Manager');
+  });
+
+  it('hands back the id of a role it just added, so the row can take focus', () => {
+    const { result } = render();
+    act(() => result.current.applyPreset(preset));
+    let id = '';
+    act(() => { id = result.current.roles.add(); });
+    expect(result.current.state.roles.find((role) => role.id === id)?.name).toBe('New role');
+  });
+
+  it('starts again after Finish (reset) and after signing out', () => {
+    const store = setupStore();
+    const { result } = render(store);
+    act(() => result.current.applyPreset(preset));
+    act(() => result.current.reset());
+    expect(result.current.state.industry).toBeNull();
+
+    act(() => result.current.applyPreset(preset));
+    act(() => { store.dispatch(signedOut()); });
+    expect(result.current.state.roles).toEqual([]);
   });
 });

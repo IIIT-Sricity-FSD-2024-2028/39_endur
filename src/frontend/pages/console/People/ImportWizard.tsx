@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ImportPeopleBody, ImportPreview, ImportRow } from '@endur/shared';
-import { apiPost, ApiError } from '../../../lib/api.js';
+import { ApiError } from '../../../lib/api.js';
+import { usePeopleImport } from '../../../lib/people.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useUnits } from '../../../lib/units.js';
@@ -29,6 +30,7 @@ export function ImportWizard({
   const can = useCan();
   const units = useUnits();
   const roles = useRoles();
+  const importer = usePeopleImport();
   const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
 
   const [step, setStep] = useState<Step>({ kind: 'pick' });
@@ -40,8 +42,8 @@ export function ImportWizard({
     const reader = new FileReader();
     reader.onload = () => {
       const csv = typeof reader.result === 'string' ? reader.result : '';
-      void apiPost<{ csv: string }, { data: ImportPreview }>('/people/import/preview', { csv })
-        .then(({ data }) => setStep({ kind: 'review', csv, preview: data, error: null }))
+      void importer.preview(csv)
+        .then((preview) => setStep({ kind: 'review', csv, preview, error: null }))
         .catch((error: unknown) => {
           setStep({ kind: 'pick' });
           window.alert(message(error, 'That file could not be read.'));
@@ -58,12 +60,8 @@ export function ImportWizard({
     const rows = parseCsvRows(csv);
     const body: ImportPeopleBody = { rows, roleMapping, unitMapping };
     setStep({ kind: 'committing', csv, preview });
-    void apiPost<ImportPeopleBody, { data: { created: number; updated: number; assigned: number; skipped: string[] } }>(
-      '/people/import',
-      body,
-      { idempotencyKey: importKey(csv) },
-    )
-      .then(({ data }) => setStep({ kind: 'done', result: data }))
+    void importer.commit(body, importKey(csv))
+      .then((result) => setStep({ kind: 'done', result }))
       .catch((error: unknown) => {
         setStep({ kind: 'review', csv, preview, error: message(error, 'That import could not be committed.') });
       });

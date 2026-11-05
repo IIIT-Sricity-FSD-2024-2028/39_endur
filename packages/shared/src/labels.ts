@@ -6,8 +6,13 @@
 // "Faculty" pluralises to "Faculty", and deriving it would be wrong exactly where a
 // university is watching.
 import { z } from 'zod';
+import { LABEL_KEYS } from './label-defaults.js';
 
-export const LabelKey = z.enum(['unit', 'subject', 'respondent', 'reviewee', 'campaign']);
+// The plain values live in `label-defaults.ts` so the console's entry chunk can use them
+// without zod; they are re-exported here, so every import of them is unchanged.
+export { LABEL_KEYS, DEFAULT_LABELS, resolveLabels, type ResolvedLabels } from './label-defaults.js';
+
+export const LabelKey = z.enum(LABEL_KEYS);
 export type LabelKey = z.infer<typeof LabelKey>;
 
 export const Label = z.object({
@@ -19,33 +24,3 @@ export type Label = z.infer<typeof Label>;
 /** What is stored in organizations.labels (10 §3). Partial — a missing key falls back. */
 export const LabelSet = z.record(LabelKey, Label);
 export type LabelSet = z.infer<typeof LabelSet>;
-
-/** What a component actually consumes: every key present, so no render can hit undefined. */
-export type ResolvedLabels = Record<LabelKey, Label>;
-
-/**
- * The Custom preset. Also the fallback for every key, so a missing label renders a
- * generic word — never `undefined`, never a crash (22 §3).
- */
-export const DEFAULT_LABELS: ResolvedLabels = {
-  unit: { one: 'Unit', many: 'Units' },
-  subject: { one: 'Subject', many: 'Subjects' },
-  respondent: { one: 'Respondent', many: 'Respondents' },
-  reviewee: { one: 'Reviewee', many: 'Reviewees' },
-  campaign: { one: 'Campaign', many: 'Campaigns' },
-};
-
-/**
- * Merge per key, not per set. An org that has renamed only `subject` still gets sensible
- * words for the other four; falling back to the whole default set would silently discard
- * the renames it does have.
- */
-export function resolveLabels(stored: LabelSet | null | undefined): ResolvedLabels {
-  if (!stored) return DEFAULT_LABELS;
-  const out = { ...DEFAULT_LABELS };
-  for (const key of LabelKey.options) {
-    const label = stored[key];
-    if (label) out[key] = label;
-  }
-  return out;
-}

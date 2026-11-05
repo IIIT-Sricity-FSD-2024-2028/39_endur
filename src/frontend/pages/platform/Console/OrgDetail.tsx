@@ -8,13 +8,13 @@ import {
 } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
-import { Toast } from '../../../components/feedback/Toast.js';
 import { StatCard } from '../../../components/data/StatCard.js';
 import { PlanPicker } from '../../../components/billing/PlanPicker.js';
 import { MessageComposer } from '../../../components/platform/MessageComposer.js';
 import { useOrgDetail } from '../../../lib/estate.js';
 import { useOpsCan } from '../../../lib/opsCapabilities.js';
 import { opsPost, OpsError } from '../../../lib/ops.js';
+import { toastShown, useAppDispatch } from '../../../store/index.js';
 
 export default function OrgDetail(): JSX.Element {
   const { id } = useParams<{ id: string }>();
@@ -30,7 +30,11 @@ export default function OrgDetail(): JSX.Element {
   const [messageSending, setMessageSending] = useState(false);
   const [supportReason, setSupportReason] = useState('');
   const [supportBusy, setSupportBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  // The shell's ToastHost draws it (R-307); this page only says what happened.
+  const showToast = (message: string): void => {
+    dispatch(toastShown({ message }));
+  };
   const [error, setError] = useState<string | null>(null);
 
   if (detail.forbidden) {
@@ -58,7 +62,7 @@ export default function OrgDetail(): JSX.Element {
     void opsPost(`/orgs/${id}/plan`, { tier: pendingTier })
       .then(() => {
         setPendingTier(null);
-        setToast(`Plan set to ${pendingTier}.`);
+        showToast(`Plan set to ${pendingTier}.`);
         return detail.reload();
       })
       .catch((err) => setError(err instanceof OpsError ? err.message : 'Could not change the plan.'))
@@ -74,7 +78,7 @@ export default function OrgDetail(): JSX.Element {
       .then(() => {
         setSuspendOpen(false);
         setSuspendConfirmText('');
-        setToast(suspended ? 'Organisation reinstated.' : 'Organisation suspended.');
+        showToast(suspended ? 'Organisation reinstated.' : 'Organisation suspended.');
         return detail.reload();
       })
       .catch((err) => setError(err instanceof OpsError ? err.message : 'Could not change suspension.'))
@@ -107,7 +111,7 @@ export default function OrgDetail(): JSX.Element {
         `/orgs/${id}/message`,
         { subject, body },
       );
-      setToast(`Sent to ${response.data.sentTo} administrator${response.data.sentTo === 1 ? '' : 's'}.`);
+      showToast(`Sent to ${response.data.sentTo} administrator${response.data.sentTo === 1 ? '' : 's'}.`);
     } catch (err) {
       setError(err instanceof OpsError ? err.message : 'Could not send the message.');
     } finally {
@@ -129,7 +133,6 @@ export default function OrgDetail(): JSX.Element {
       />
 
       {error && <p className="field-error" role="alert">{error}</p>}
-      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
       <div className="stat-row">
         <StatCard kicker="Units" value={org.counts.units} />

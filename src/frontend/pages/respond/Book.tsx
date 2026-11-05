@@ -10,7 +10,7 @@ import {
   rememberedBooking,
   takeSlot,
   usePublicBookable,
-} from '../../lib/booking.js';
+} from '../../lib/booking-public.js';
 import { Unavailable } from './Unavailable.js';
 
 const WHEN = new Intl.DateTimeFormat(undefined, {

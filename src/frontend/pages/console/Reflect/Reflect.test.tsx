@@ -1,21 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type { Capability, GapView, ReflectionCycle, ReflectionForm } from '@endur/shared';
-import { renderWithProviders } from '../../../test-utils.js';
+import { errorReply, renderWithProviders, stubApi, type StubReply } from '../../../test-utils.js';
 import Reflect from './index.js';
-
-const hoisted = vi.hoisted(() => {
-  class ApiError extends Error {
-    status: number;
-    details: Record<string, unknown>;
-    constructor(status: number, message: string, details: Record<string, unknown> = {}) {
-      super(message);
-      this.status = status;
-      this.details = details;
-    }
-  }
-  return { ApiError };
-});
 
 const cycle: ReflectionCycle = {
   campaignId: 'c-1', campaignName: 'Autumn round', subjectId: 's-1', subjectName: 'North wing',
@@ -44,43 +31,41 @@ const gap = (over: Partial<Omit<GapView, 'rows'>> & { rows?: GapView['rows'] } =
   ...over,
 } as GapView);
 
-let cycles: ReflectionCycle[] | (() => never);
-let gapAnswer: GapView | (() => never);
+/** A route's answer: the data, or (from `throws`) the failure the server sends. */
+type Failure = { failure: StubReply };
+const answer = (value: object): StubReply =>
+  'failure' in value ? (value as Failure).failure : { body: { data: value } };
+
+let cycles: ReflectionCycle[] | Failure;
+let gapAnswer: GapView | Failure;
 let posted: Array<{ path: string; body: unknown }>;
 
-const apiGet = vi.fn((path: string) => {
-  if (path.endsWith('/gap')) {
-    if (typeof gapAnswer === 'function') return gapAnswer();
-    return { data: gapAnswer };
-  }
-  if (path === '/reflect') {
-    if (typeof cycles === 'function') return cycles();
-    return { data: cycles };
-  }
-  if (path.startsWith('/reflect/')) return { data: form };
-  throw new Error(`unmocked GET ${path}`);
-});
-
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (p: string) => apiGet(p),
-  apiPost: (p: string, b: unknown) => {
-    posted.push({ path: p, body: b });
-    return { data: { id: 'r-1' } };
+// The stub server (R-502): the real hooks and the real cache run above it. The writes are
+// still plain calls, through the same client, so they reach it too.
+const server = () => stubApi({
+  'GET /reflect': () => answer(cycles),
+  'GET /reflect/c-1': { body: { data: form } },
+  'GET /reflect/c-1/gap': () => answer(gapAnswer),
+  'POST /reflect/*': (call) => {
+    posted.push({ path: call.path, body: call.body });
+    return { body: { data: { id: 'r-1' } } };
   },
-  apiPut: vi.fn(), apiPatch: vi.fn(), apiDelete: vi.fn(),
-  ApiError: hoisted.ApiError,
-}));
+});
 
 const ALL: Capability[] = ['reflection.read', 'reflection.create', 'actionplan.create'];
 const mount = (capabilities: Capability[] = ALL, path = '/app/reflect') =>
   renderWithProviders(<Reflect />, { capabilities, path });
 
-const throws = (status: number, message: string, details?: Record<string, unknown>) => () => {
-  throw new hoisted.ApiError(status, message, details);
-};
+const throws = (status: number, message: string, details?: Record<string, unknown>): Failure => ({
+  failure: errorReply(status, 'REFUSED', message, details),
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  server();
   cycles = [cycle];
   gapAnswer = throws(404, 'Not found');
   posted = [];

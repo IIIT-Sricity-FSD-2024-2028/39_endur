@@ -3,31 +3,18 @@
 // `simulate()` on the server is `resolve()` itself, called directly (`authz/simulate.ts`).
 // This file does not repeat that promise; it only shapes the request and keeps the local
 // history `42` § State asks for — the last five simulations, on screen through a demo.
-import { useCallback, useEffect, useState } from 'react';
+//
+// On RTK Query since R-406 (`store/api/endpoints/simulator.ts`). The catalogue is now the
+// same cache entry as the powers grid's rows, so the second of the two pages asks nothing.
+import { useCallback, useState } from 'react';
 import type { CapabilityMeta, DecisionView, SimulateBody } from '@endur/shared';
-import { apiGet, apiPost, ApiError } from './api.js';
-import type { Loadable } from './org.js';
+import { ApiError } from './api.js';
+import { useGetCapabilityCatalogueQuery } from '../store/api/endpoints/roles.js';
+import { useSimulateMutation } from '../store/api/endpoints/simulator.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
 
 export function useCapabilityCatalogue(): Loadable<CapabilityMeta[]> {
-  const [state, setState] = useState<Loadable<CapabilityMeta[]>>({
-    data: null, loading: true, error: null,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: CapabilityMeta[] }>('/authz/capabilities')
-      .then((response) => {
-        if (!cancelled) setState({ data: response.data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return state;
+  return useLoadable(useGetCapabilityCatalogueQuery());
 }
 
 export type SimulationRecord = {
@@ -54,6 +41,7 @@ export type SimulatorController = {
 let seq = 0;
 
 export function useSimulator(): SimulatorController {
+  const [simulate] = useSimulateMutation();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -68,10 +56,7 @@ export function useSimulator(): SimulatorController {
       setError(null);
       setForbidden(false);
       try {
-        const { data } = await apiPost<SimulateBody, { data: DecisionView }>(
-          '/authz/simulate',
-          query,
-        );
+        const data: DecisionView = await unwrapApi(simulate(query));
         seq += 1;
         setHistory((current) => [
           {
@@ -94,7 +79,7 @@ export function useSimulator(): SimulatorController {
         setRunning(false);
       }
     },
-    [],
+    [simulate],
   );
 
   return { running, error, forbidden, history, run };

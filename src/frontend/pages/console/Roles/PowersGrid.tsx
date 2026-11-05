@@ -20,9 +20,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
 }): JSX.Element {
   const labels = useLabels();
   const [openModules, setOpenModules] = useState<Set<string>>(new Set());
-  const [copyFrom, setCopyFrom] = useState('');
-  const [copyTo, setCopyTo] = useState('');
-  const [copied, setCopied] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const state = grid.state;
@@ -68,9 +65,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
       return next;
     });
   };
-
-  const roleName = (id: string): string =>
-    state.roles.find((role) => role.id === id)?.name ?? 'that role';
 
   const cellCh = Math.max(...GRANT_CHOICES.map((choice) => choiceWord(choice, labels).length));
 
@@ -163,55 +157,6 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
 
       {grid.saveError && (
         <p className="field-error powers-error" role="alert">{grid.saveError}</p>
-      )}
-
-      {editable && (
-        <div className="powers-copy">
-          <label htmlFor="powers-copy-from">Copy every power from</label>
-          <select
-            id="powers-copy-from"
-            className="input"
-            value={copyFrom}
-            onChange={(event) => {
-              setCopyFrom(event.target.value);
-              setCopied(null);
-            }}
-          >
-            <option value="">Choose a role…</option>
-            {state.roles.map((role) => (
-              <option key={role.id} value={role.id}>{role.name}</option>
-            ))}
-          </select>
-          <label htmlFor="powers-copy-to">onto</label>
-          <select
-            id="powers-copy-to"
-            className="input"
-            value={copyTo}
-            onChange={(event) => {
-              setCopyTo(event.target.value);
-              setCopied(null);
-            }}
-          >
-            <option value="">Choose a role…</option>
-            {state.roles.map((role) => (
-              <option key={role.id} value={role.id} disabled={role.id === copyFrom}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-ghost btn-small"
-            disabled={copyFrom === '' || copyTo === '' || copyFrom === copyTo}
-            onClick={() => {
-              grid.copyColumn(copyFrom, copyTo);
-              setCopied(`Copied ${roleName(copyFrom)}’s powers onto ${roleName(copyTo)}. Nothing is saved yet — press Save changes, or Undo.`);
-            }}
-          >
-            Copy
-          </button>
-          {copied && <span className="powers-copied" role="status">{copied}</span>}
-        </div>
       )}
 
       {/* Its OWN scrolling container, so the page body never scrolls sideways. 64 rows by

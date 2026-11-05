@@ -11,7 +11,6 @@ import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { PlanPicker } from '../../../components/billing/PlanPicker.js';
 import { PaymentDialog } from '../../../components/billing/PaymentDialog.js';
 import { EnterpriseRequestDialog } from '../../../components/billing/EnterpriseRequestDialog.js';
-import { Toast } from '../../../components/feedback/Toast.js';
 import { Icon } from '../../../components/Icon.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
@@ -26,6 +25,7 @@ import {
   useScheduleDowngrade,
 } from '../../../lib/billing.js';
 import { daysUntil } from '../../../components/billing/PlanNoticeBanner.js';
+import { toastShown, useAppDispatch } from '../../../store/index.js';
 
 const tierName = (plan: PlanOption | undefined): string =>
   plan ? (plan.name.split('—')[0]?.trim() ?? plan.name) : 'a lower plan';
@@ -57,7 +57,11 @@ export default function Plan(): JSX.Element {
   // success screen is still up, and the amount on it must not change underneath the customer.
   const [paying, setPaying] = useState<{ tier: Tier; pricedFrom: Tier | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  // The shell's ToastHost draws it (R-307); this page only says what happened.
+  const showToast = (message: string): void => {
+    dispatch(toastShown({ message }));
+  };
 
   const summary = billing.data;
   const catalogue = plans.data ?? PLAN_OPTIONS;
@@ -78,7 +82,7 @@ export default function Plan(): JSX.Element {
       .then((updated) => {
         billing.set(updated);
         const name = catalogue.find((plan) => plan.tier === tier)?.name ?? tier;
-        setToast(`You are on ${name}. It applies from your next action.`);
+        showToast(`You are on ${name}. It applies from your next action.`);
       })
       .catch((failed: unknown) => {
         setPaying(null);
@@ -106,7 +110,7 @@ export default function Plan(): JSX.Element {
       .request(note)
       .then(() => {
         setAsking(false);
-        setToast('We have your request. Somebody from Endur will be in touch.');
+        showToast('We have your request. Somebody from Endur will be in touch.');
       })
       .catch((failed: unknown) =>
         setError(failed instanceof ApiError ? failed.message : 'Could not send that request.'))
@@ -120,7 +124,7 @@ export default function Plan(): JSX.Element {
       .then((updated) => {
         billing.set(updated);
         const name = catalogue.find((plan) => plan.tier === updated.pendingTier)?.name;
-        setToast(
+        showToast(
           name
             ? `${name} is scheduled for ${formatDate(updated.periodEnd)}. Nothing is charged today.`
             : 'That move is cancelled. Your plan stays as it is.',
@@ -378,8 +382,6 @@ export default function Plan(): JSX.Element {
           onCancel={() => setAsking(false)}
         />
       )}
-
-      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </>
   );
 }

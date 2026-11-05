@@ -6,12 +6,23 @@
 //
 // `state`, the filters and the cursor live in the URL, so a filtered queue is a link
 // somebody can paste — the same rule as `40`'s filters.
-import { useCallback, useEffect, useRef, useState } from 'react';
+//
+// On RTK Query since R-501 (`store/api/endpoints/inbox.ts`): the queue is an infinite query,
+// and the optimistic marks are patches to its cache, undone in place on failure.
+import { useCallback, useMemo, useState } from 'react';
 import type { InboxMessage, InboxQuery, InboxResponse, InboxState, Page } from '@endur/shared';
-import { ApiError, apiGet, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import { ApiError } from './api.js';
+import { isSerializedApiError } from '../store/api/errors.js';
+import {
+  useGetInboxInfiniteQuery,
+  useGetMessagesQuery,
+  useMarkInboxMutation,
+  useMarkMessageMutation,
+  type MarkAction,
+} from '../store/api/endpoints/inbox.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
 
-export type MarkAction = 'read' | 'unread' | 'archive' | 'unarchive';
+export type { MarkAction };
 
 export type InboxController = Loadable<Page<InboxResponse>> & {
   /** Absent capability, not an empty queue — the page renders a 403 rather than "up to date". */
@@ -33,159 +44,74 @@ export function inboxSearch(query: Partial<InboxQuery>): string {
   return search ? `?${search}` : '';
 }
 
-/** What a mark does to a card, applied locally before the request leaves. */
-function applyMark(card: InboxResponse, action: MarkAction): InboxResponse {
-  switch (action) {
-    case 'read':
-      return { ...card, read: true };
-    case 'unread':
-      return { ...card, read: false };
-    case 'archive':
-      // Mirrors the server: archiving marks read too. Nobody archives a comment they have
-      // not read, and leaving it unread would keep it in the unread count after it left.
-      return { ...card, archived: true, read: true };
-    case 'unarchive':
-      return { ...card, archived: false };
-  }
-}
-
-/** Whether a card still belongs in the tab being looked at, after a mark. */
-function belongsIn(card: InboxResponse, state: InboxState): boolean {
-  switch (state) {
-    case 'archived':
-      return card.archived;
-    case 'read':
-      return card.read && !card.archived;
-    case 'unread':
-      return !card.read && !card.archived;
-    case 'all':
-      return !card.archived;
-  }
-}
-
+/**
+ * The queue. Another tab or filter never shows the last one's cards while it loads; a
+ * failed re-read keeps the last good page on screen with the error above it (58 § States).
+ * Without the capability it asks nothing and reads as loading, as it did: the page shows
+ * its refusal before it looks at `loading`.
+ */
 export function useInbox(query: Partial<InboxQuery>, enabled = true): InboxController {
-  const [state, setState] = useState<Loadable<Page<InboxResponse>>>({
-    data: null, loading: true, error: null,
-  });
-  const [forbidden, setForbidden] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [failures, setFailures] = useState<Record<string, string>>({});
-  const alive = useRef(true);
-
   const tab: InboxState = query.state ?? 'unread';
   const search = inboxSearch(query);
+  const args = useMemo(() => ({ search, tab }), [search, tab]);
 
-  const fetchPage = useCallback(
-    async (cursor?: string) => {
-      if (!enabled) return;
-      try {
-        const params = new URLSearchParams(search.replace(/^\?/, ''));
-        if (cursor) params.set('cursor', cursor);
-        const suffix = params.toString() ? `?${params.toString()}` : '';
-        const response = await apiGet<Page<InboxResponse>>(`/inbox${suffix}`);
-        if (!alive.current) return;
-        setForbidden(false);
-        setState((current) => ({
-          data:
-            cursor && current.data
-              ? { ...response, data: [...current.data.data, ...response.data] }
-              : response,
-          loading: false,
-          error: null,
-        }));
-      } catch (error) {
-        if (!alive.current) return;
-        if (error instanceof ApiError && error.status === 403) {
-          setForbidden(true);
-          setState({ data: null, loading: false, error: null });
-          return;
-        }
-        // The last good page stays on screen (58 § States). An error above the list is a
-        // thing you can recover from; a blank page is not.
-        setState((current) => ({ ...current, loading: false, error: error as Error }));
-      }
-    },
-    [enabled, search],
-  );
+  const inbox = useGetInboxInfiniteQuery(args, { skip: !enabled });
+  const { fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = inbox;
+  const [markInbox] = useMarkInboxMutation();
+  const [failures, setFailures] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    alive.current = true;
-    setState((current) => ({ ...current, loading: true }));
-    void fetchPage();
-    return () => {
-      alive.current = false;
-    };
-  }, [fetchPage]);
+  // The loaded pages as ONE page: every card so far, and the cursor and total from the
+  // newest page.
+  const pages = inbox.currentData?.pages;
+  const data = useMemo(() => {
+    const last = pages?.at(-1);
+    return pages && last ? { ...last, data: pages.flatMap((page) => page.data) } : undefined;
+  }, [pages]);
+
+  const forbidden = isSerializedApiError(inbox.error) && inbox.error.status === 403;
+  const loaded = useLoadable({
+    ...inbox,
+    // "Load more" has its own flag; the queue itself is not reloading.
+    isFetching: isFetching && !isFetchingNextPage,
+    data,
+    currentData: data,
+  });
 
   const loadMore = useCallback(async () => {
-    const cursor = state.data?.page.nextCursor;
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
-    await fetchPage(cursor);
-    if (alive.current) setLoadingMore(false);
-  }, [fetchPage, loadingMore, state.data?.page.nextCursor]);
+    if (hasNextPage && !isFetching) await fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetching]);
 
   /**
-   * OPTIMISTIC, and it reverts the ONE card rather than reloading the queue.
-   *
-   * A reload after every tick would renumber the list under the reader's cursor while they
-   * work down it, which on a queue is the same as losing their place.
+   * OPTIMISTIC, and it reverts the ONE card rather than reloading the queue
+   * (`markInbox` in the endpoints says how, and why `keep` exists).
    */
   const mark = useCallback(
     async (responseId: string, action: MarkAction, opts?: { keep?: boolean }) => {
-      const before = state.data;
-      if (!before) return;
-
+      if (!data) return;
       setFailures((current) => {
         if (!(responseId in current)) return current;
         const next = { ...current };
         delete next[responseId];
         return next;
       });
-
-      const applied = before.data.map((card) =>
-        card.id === responseId ? applyMark(card, action) : card,
-      );
-      // A card that no longer belongs in this tab LEAVES it, and meta.total follows. That
-      // is what "unread: 12" going to "unread: 11" means, and it has to happen at the click
-      // or the count is a number nobody believes.
-      //
-      // `keep` IS THE EXCEPTION, AND IT EXISTS BECAUSE THE FIRST VERSION HAD A BUG: opening
-      // a card marks it read, and on the Unread tab that evicted the card the reader had
-      // just opened — the detail appeared and vanished in the same frame. A card never
-      // disappears as a side effect of being READ. It leaves when the reader triages it:
-      // the tick, the archive button, `u`, `e`. The count drops either way, because the
-      // count is about unread and it genuinely just changed.
-      const kept = opts?.keep
-        ? applied
-        : applied.filter((card) => belongsIn(card, tab));
-      const left = applied.filter((card) => !belongsIn(card, tab)).length;
-      setState((current) => ({
-        ...current,
-        data: { ...before, data: kept, meta: { total: Math.max(0, before.meta.total - left) } },
-      }));
-
       try {
-        await apiPost<undefined, void>(`/inbox/${responseId}/${action}`);
+        await unwrapApi(markInbox({ responseId, action, keep: opts?.keep, args }));
       } catch (error) {
-        if (!alive.current) return;
-        setState((current) => ({ ...current, data: before }));
         setFailures((current) => ({
           ...current,
-          [responseId]:
-            error instanceof ApiError ? error.message : 'That did not save. Try again.',
+          [responseId]: error instanceof ApiError ? error.message : 'That did not save. Try again.',
         }));
       }
     },
-    [state.data, tab],
+    [data, markInbox, args],
   );
 
   return {
-    ...state,
+    ...loaded,
+    ...(forbidden ? { data: null, error: null } : {}),
     forbidden,
     loadMore,
-    loadingMore,
-    reload: () => fetchPage(),
+    loadingMore: isFetchingNextPage,
     mark,
     failures,
   };
@@ -194,11 +120,11 @@ export function useInbox(query: Partial<InboxQuery>, enabled = true): InboxContr
 // ---------------------------------------------------------------------------
 // From Endur — DEC-101, T-101, 58 § From Endur.
 //
-// A SECOND STREAM, DELIBERATELY SIMPLER THAN THE FIRST. No optimistic mark, no revert, no
-// per-card failure map, no cursor. `useInbox` above carries all of that because it is a queue
-// of four hundred comments that a person works through at speed; this is a handful of messages
-// a year, and the machinery that makes the comment queue feel fast would be machinery guarding
-// against a problem this stream does not have.
+// A SECOND STREAM, DELIBERATELY SIMPLER THAN THE FIRST. No revert, no per-card failure map,
+// no cursor. `useInbox` above carries all of that because it is a queue of four hundred
+// comments that a person works through at speed; this is a handful of messages a year, and
+// the machinery that makes the comment queue feel fast would be machinery guarding against a
+// problem this stream does not have.
 //
 // That is not a shortcut — it is `INV-009` read correctly. What is shared is the MECHANIC the
 // reader sees (a tab, unread counts, click to read); what is not shared is an implementation
@@ -211,46 +137,15 @@ export type MessagesController = Loadable<Page<InboxMessage>> & {
 };
 
 export function useMessages(enabled = true): MessagesController {
-  const [state, setState] = useState<Loadable<Page<InboxMessage>>>({
-    data: null, loading: enabled, error: null,
-  });
+  const messages = useLoadable(useGetMessagesQuery(undefined, { skip: !enabled }));
+  const [markMessage] = useMarkMessageMutation();
 
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    try {
-      const page = await apiGet<Page<InboxMessage>>('/inbox/messages');
-      setState({ data: page, loading: false, error: null });
-    } catch (error) {
-      setState({ data: null, loading: false, error: error as Error });
-    }
-  }, [enabled]);
+  const mark = useCallback(
+    async (id: string, action: 'read' | 'unread') => {
+      await unwrapApi(markMessage({ id, action }));
+    },
+    [markMessage],
+  );
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const mark = useCallback(async (id: string, action: 'read' | 'unread') => {
-    // Applied locally FIRST, like the comment queue — a message the reader has plainly just
-    // opened should not sit there looking unread while a request flies. Unlike the comment
-    // queue there is no revert on failure: the only consequence of a lost mark is a bold row
-    // that comes back on the next load, and a message that silently un-reads itself mid-read
-    // is the more alarming of the two failures.
-    setState((current) =>
-      current.data
-        ? {
-            ...current,
-            data: {
-              ...current.data,
-              data: current.data.data.map((row) =>
-                row.id === id ? { ...row, read: action === 'read' } : row,
-              ),
-            },
-          }
-        : current,
-    );
-    await apiPost(`/inbox/messages/${id}/${action}`);
-  }, []);
-
-  return { ...state, mark, reload: load };
+  return { ...messages, loading: enabled && messages.loading, mark };
 }
-

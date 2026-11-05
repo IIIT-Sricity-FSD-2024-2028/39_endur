@@ -3,7 +3,9 @@
 // The list is ONE request: `SubjectSummary` already carries `activeCampaigns`,
 // `totalResponses` and `lastResponseAt`, computed server-side, because fetching them per
 // row would turn an 18-row list into 19 requests and venue wifi gets a vote (35).
-import { useCallback, useEffect, useRef, useState } from 'react';
+//
+// On RTK Query since R-405 (`store/api/endpoints/subjects.ts`). Names and shapes unchanged.
+import { useCallback } from 'react';
 import type {
   CreateSubjectBody,
   Page,
@@ -11,8 +13,15 @@ import type {
   SubjectSummary,
   UpdateSubjectBody,
 } from '@endur/shared';
-import { apiGet, apiPatch, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import {
+  useArchiveSubjectMutation,
+  useCreateSubjectMutation,
+  useGetSubjectQuery,
+  useGetSubjectsQuery,
+  useRenameSubjectMutation,
+  useUpdateSubjectMutation,
+} from '../store/api/endpoints/subjects.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
 
 export type SubjectQuery = {
   q?: string | undefined;
@@ -29,7 +38,7 @@ export type SubjectListController = Loadable<Page<SubjectSummary>> & {
   archive: (id: string) => Promise<void>;
 };
 
-/** The query string, built once so the effect can depend on a string rather than an object. */
+/** The query string, built once so the cache key is a string rather than an object. */
 export function subjectSearch(query: SubjectQuery): string {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
@@ -42,118 +51,68 @@ export function subjectSearch(query: SubjectQuery): string {
   return search ? `?${search}` : '';
 }
 
+/**
+ * The list. The last good page stays on screen while the next loads, and with the error
+ * above it if a re-read fails (35 § States).
+ *
+ * The simulator searches on every keystroke, and this used to number its requests so an
+ * older, slower answer arriving last could not replace the right one. Each search is now
+ * its own cache entry, and the hook reads the entry for what the box says, so a late answer
+ * lands in its own entry and is simply not the one on screen.
+ */
 export function useSubjectList(query: SubjectQuery): SubjectListController {
-  const [state, setState] = useState<Loadable<Page<SubjectSummary>>>({
-    data: null, loading: true, error: null,
-  });
-  const last = useRef<Page<SubjectSummary> | null>(null);
-  const alive = useRef(true);
-  const search = subjectSearch(query);
-
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  // Numbered, so only the newest request may write. The simulator searches on every keystroke,
-  // and without this an older, slower answer arriving last would replace the right one.
-  const latest = useRef(0);
-
-  const load = useCallback(async (path: string) => {
-    const ticket = ++latest.current;
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const page = await apiGet<Page<SubjectSummary>>(`/subjects${path}`);
-      if (ticket !== latest.current) return;
-      last.current = page;
-      if (alive.current) setState({ data: page, loading: false, error: null });
-    } catch (error) {
-      if (ticket !== latest.current) return;
-      // The last good page stays on screen with the error above it (35 § States).
-      if (alive.current) setState((current) => ({ ...current, loading: false, error: error as Error }));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(search);
-  }, [load, search]);
-
-  const reload = useCallback(() => load(search), [load, search]);
+  const list = useLoadable(useGetSubjectsQuery(subjectSearch(query)));
+  const { reload } = list;
+  const [createSubject] = useCreateSubjectMutation();
+  const [renameSubject] = useRenameSubjectMutation();
+  const [updateSubject] = useUpdateSubjectMutation();
+  const [archiveSubject] = useArchiveSubjectMutation();
 
   const create = useCallback(
     async (body: CreateSubjectBody) => {
-      const response = await apiPost<CreateSubjectBody, { data: SubjectSummary }>('/subjects', body);
-      await load(search);
-      return response.data;
+      const created = await unwrapApi(createSubject(body));
+      await reload();
+      return created;
     },
-    [load, search],
+    [createSubject, reload],
   );
 
   /**
    * Optimistic, with revert on failure (24 §7). It is one field, and renaming three
    * subjects must feel like typing rather than like three round trips.
    */
-  const rename = useCallback(async (id: string, name: string) => {
-    const previous = last.current;
-    if (previous) {
-      const next = {
-        ...previous,
-        data: previous.data.map((row) => (row.id === id ? { ...row, name } : row)),
-      };
-      last.current = next;
-      setState((current) => ({ ...current, data: next }));
-    }
-    try {
-      await apiPatch<UpdateSubjectBody, { data: SubjectSummary }>(`/subjects/${id}`, { name });
-    } catch (error) {
-      last.current = previous;
-      setState((current) => ({ ...current, data: previous }));
-      throw error;
-    }
-  }, []);
+  const rename = useCallback(
+    async (id: string, name: string) => {
+      await unwrapApi(renameSubject({ id, name }));
+    },
+    [renameSubject],
+  );
 
   const update = useCallback(
     async (id: string, body: UpdateSubjectBody) => {
-      await apiPatch<UpdateSubjectBody, { data: SubjectSummary }>(`/subjects/${id}`, body);
-      await load(search);
+      await unwrapApi(updateSubject({ id, body }));
+      await reload();
     },
-    [load, search],
+    [updateSubject, reload],
   );
 
   const archive = useCallback(
     async (id: string) => {
-      await apiPost<undefined, { data: SubjectSummary }>(`/subjects/${id}/archive`);
-      await load(search);
+      await unwrapApi(archiveSubject(id));
+      await reload();
     },
-    [load, search],
+    [archiveSubject, reload],
   );
 
-  return { ...state, reload, create, rename, update, archive };
+  return { ...list, create, rename, update, archive };
 }
 
-/** One subject, with its cycles. `GET /subjects/:id` answers both halves in one call. */
+/**
+ * One subject, with its cycles. Without an id it asks nothing and reads as loading, as
+ * before; moving to another subject never shows the last one while it loads.
+ */
 export function useSubject(id: string | undefined): Loadable<SubjectDetail> & {
   reload: () => Promise<void>;
 } {
-  const [state, setState] = useState<Loadable<SubjectDetail>>({
-    data: null, loading: true, error: null,
-  });
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    try {
-      const response = await apiGet<{ data: SubjectDetail }>(`/subjects/${id}`);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      setState({ data: null, loading: false, error: error as Error });
-    }
-  }, [id]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { ...state, reload: load };
+  return useLoadable(useGetSubjectQuery(id ?? '', { skip: !id }), { current: true });
 }

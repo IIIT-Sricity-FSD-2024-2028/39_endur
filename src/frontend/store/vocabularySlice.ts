@@ -5,6 +5,7 @@
 // page title is the ten-second proof of the whole product (N-003).
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { DEFAULT_LABELS, resolveLabels, type LabelSet, type ResolvedLabels } from '@endur/shared';
+import { sessionApi } from './api/endpoints/session.js';
 
 export type VocabularyState = {
   /** Every key present, always. A component can never render `undefined` (22 §3). */
@@ -13,7 +14,7 @@ export type VocabularyState = {
 
 const initialState: VocabularyState = { labels: DEFAULT_LABELS };
 
-const vocabularySlice = createSlice({
+export const vocabularySlice = createSlice({
   name: 'vocabulary',
   initialState,
   reducers: {
@@ -28,6 +29,14 @@ const vocabularySlice = createSlice({
     labelsCleared(state) {
       state.labels = DEFAULT_LABELS;
     },
+  },
+
+  // The same `getMe` answer the auth slice takes (R-104): one action, two slices. A labels
+  // edit in Settings invalidates `Me`, and every screen re-skins from this.
+  extraReducers: (builder) => {
+    builder.addMatcher(sessionApi.endpoints.getMe.matchFulfilled, (state, action) => {
+      state.labels = resolveLabels(action.payload.labels);
+    });
   },
 });
 

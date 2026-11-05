@@ -7,19 +7,23 @@
 //
 // The library is small, fixed and browsed by eye; paginating twenty cards would add a
 // control that never has anything to do. The org's own list grows without limit.
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type {
-  CreateTemplateBody,
-  Page,
-  TemplateDetail,
-  TemplateSummary,
-} from '@endur/shared';
-import { apiDelete, apiGet, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import { useCallback } from 'react';
+import type { CreateTemplateBody, Page, TemplateDetail, TemplateSummary } from '@endur/shared';
+import type { AppDispatch } from '../store/index.js';
+import {
+  templatesApi,
+  useCloneTemplateMutation,
+  useCreateTemplateMutation,
+  useDeleteTemplateMutation,
+  useGetTemplateLibraryQuery,
+  useGetTemplateQuery,
+  useGetTemplatesQuery,
+} from '../store/api/endpoints/templates.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
 
 export type LibraryFilters = { industry?: string | undefined; category?: string | undefined };
 
-/** The query string, built once so the effect depends on a string rather than an object. */
+/** The query string, built once so the cache key is a string rather than an object. */
 export function librarySearch(filters: LibraryFilters): string {
   const params = new URLSearchParams();
   if (filters.industry) params.set('industry', filters.industry);
@@ -40,26 +44,7 @@ export function librarySearch(filters: LibraryFilters): string {
 export function useTemplateLibrary(filters: LibraryFilters = {}): Loadable<TemplateSummary[]> & {
   reload: () => Promise<void>;
 } {
-  const [state, setState] = useState<Loadable<TemplateSummary[]>>({
-    data: null, loading: true, error: null,
-  });
-  const search = librarySearch(filters);
-
-  const load = useCallback(async () => {
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const response = await apiGet<{ data: TemplateSummary[] }>(`/templates/library${search}`);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      setState((current) => ({ ...current, loading: false, error: error as Error }));
-    }
-  }, [search]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { ...state, reload: load };
+  return useLoadable(useGetTemplateLibraryQuery(librarySearch(filters)));
 }
 
 export type TemplateListController = Loadable<Page<TemplateSummary>> & {
@@ -70,98 +55,80 @@ export type TemplateListController = Loadable<Page<TemplateSummary>> & {
   remove: (id: string) => Promise<void>;
 };
 
-export function useTemplates(query: { q?: string | undefined; cursor?: string | undefined } = {}): TemplateListController {
-  const [state, setState] = useState<Loadable<Page<TemplateSummary>>>({
-    data: null, loading: true, error: null,
-  });
-  const alive = useRef(true);
+/**
+ * Clone a template. `key` is the caller's idempotency key and is NOT generated here.
+ *
+ * 36 § Acceptance: a double-clicked clone produces one template. The client disables the
+ * button while the request is in flight, which covers the double click; the key covers
+ * the case the button cannot — a phone that retries the request because the first
+ * response never arrived. The server returns the FIRST response either way (13 §7). The
+ * caller owns the key because only the caller knows which press is a retry of which.
+ *
+ * Its own hook so a page that only clones (the builder) does not also load the list.
+ */
+export function useCloneTemplate(): TemplateListController['clone'] {
+  const [clone] = useCloneTemplateMutation();
+  return useCallback(
+    (id: string, key: string, name?: string) =>
+      unwrapApi(clone({ id, key, ...(name ? { name } : {}) })),
+    [clone],
+  );
+}
 
+/**
+ * The org's own templates. Creating, cloning or deleting one invalidates the list, so it
+ * refetches by itself: `remove` no longer reloads by hand, and a template cloned from
+ * another page is in the list when you come back.
+ */
+export function useTemplates(query: { q?: string | undefined; cursor?: string | undefined } = {}): TemplateListController {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.cursor) params.set('cursor', query.cursor);
   const search = params.toString() ? `?${params.toString()}` : '';
 
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+  // The last good page stays on screen with the error above it (36 § States): `data`.
+  const list = useLoadable(useGetTemplatesQuery(search));
+  const [createTemplate] = useCreateTemplateMutation();
+  const [deleteTemplate] = useDeleteTemplateMutation();
+  const clone = useCloneTemplate();
 
-  const load = useCallback(async (path: string) => {
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const page = await apiGet<Page<TemplateSummary>>(`/templates${path}`);
-      if (alive.current) setState({ data: page, loading: false, error: null });
-    } catch (error) {
-      // The last good page stays on screen with the error above it (36 § States).
-      if (alive.current) setState((current) => ({ ...current, loading: false, error: error as Error }));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(search);
-  }, [load, search]);
-
-  const reload = useCallback(() => load(search), [load, search]);
-
-  const create = useCallback(async (body: CreateTemplateBody) => {
-    const response = await apiPost<CreateTemplateBody, { data: TemplateSummary }>('/templates', body);
-    return response.data;
-  }, []);
-
-  /**
-   * `key` is the caller's idempotency key and is NOT generated here.
-   *
-   * 36 § Acceptance: a double-clicked clone produces one template. The client disables the
-   * button while the request is in flight, which covers the double click; the key covers
-   * the case the button cannot — a phone that retries the request because the first
-   * response never arrived. The server returns the FIRST response either way (13 §7). The
-   * caller owns the key because only the caller knows which press is a retry of which.
-   */
-  const clone = useCallback(async (id: string, key: string, name?: string) => {
-    const response = await apiPost<{ name?: string }, { data: TemplateDetail }>(
-      `/templates/${id}/clone`,
-      name ? { name } : {},
-      { idempotencyKey: key },
-    );
-    return response.data;
-  }, []);
-
+  const create = useCallback(
+    (body: CreateTemplateBody) => unwrapApi(createTemplate(body)),
+    [createTemplate],
+  );
   const remove = useCallback(
     async (id: string) => {
-      await apiDelete<{ data: { ok: true } }>(`/templates/${id}`);
-      await load(search);
+      await unwrapApi(deleteTemplate(id));
     },
-    [load, search],
+    [deleteTemplate],
   );
 
-  return { ...state, reload, create, clone, remove };
+  return { ...list, create, clone, remove };
 }
 
 /** One template, with its questions. What the preview renders. */
 export function useTemplate(id: string | undefined): Loadable<TemplateDetail> & {
   reload: () => Promise<void>;
 } {
-  const [state, setState] = useState<Loadable<TemplateDetail>>({
-    data: null, loading: true, error: null,
-  });
+  // `current`: only this id's data, so a dialog opened for B never shows A's questions
+  // while B loads. Skipped without an id, which reads as loading, as before.
+  return useLoadable(useGetTemplateQuery(id ?? '', { skip: !id }), { current: true });
+}
 
-  const load = useCallback(async () => {
-    if (!id) return;
-    try {
-      const response = await apiGet<{ data: TemplateDetail }>(`/templates/${id}`);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      setState({ data: null, loading: false, error: error as Error });
-    }
-  }, [id]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { ...state, reload: load };
+/**
+ * Fetch one template fresh, once, for the builder (R-201).
+ *
+ * Not a `useTemplate`: the builder takes the server's copy exactly ONCE per visit and edits
+ * from there, and a later refetch (on reconnect, say) must never replace what the reader is
+ * typing. This answers with the result of this one request, and holds the cache
+ * subscription until `release`, so Preview reads the same entry meanwhile.
+ */
+export function openTemplate(
+  dispatch: AppDispatch,
+  id: string,
+): { loaded: Promise<TemplateDetail>; release: () => void } {
+  const request = dispatch(templatesApi.endpoints.getTemplate.initiate(id, { forceRefetch: true }));
+  return { loaded: unwrapApi(request), release: () => request.unsubscribe() };
 }
 
 /**

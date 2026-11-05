@@ -10,17 +10,36 @@
 // the audit log as one; bundling it into the create would also make "who gave them that?"
 // unanswerable for the commonest way people get access. The UI hides the seam by asking
 // both questions in one dialog — it does not remove it.
-import { useCallback, useEffect, useRef, useState } from 'react';
+//
+// On RTK Query since R-404 (`store/api/endpoints/people.ts`). Names and shapes unchanged.
+// The import wizard's two requests moved here too (`usePeopleImport`): they were the last
+// `apiPost` calls made from inside a component in this part of the console.
+import { useCallback } from 'react';
 import type {
   CreateAssignmentBody,
   CreatePersonBody,
+  ImportPeopleBody,
+  ImportPreview,
   Page,
   PersonDetail,
   PersonSummary,
   UpdatePersonBody,
 } from '@endur/shared';
-import { apiDelete, apiGet, apiPatch, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import {
+  useAssignPersonMutation,
+  useCreatePersonMutation,
+  useDeletePersonMutation,
+  useGetPeopleQuery,
+  useGetPersonQuery,
+  useImportPeopleMutation,
+  usePreviewImportMutation,
+  useUnassignPersonMutation,
+  useUpdatePersonMutation,
+  type ImportResult,
+} from '../store/api/endpoints/people.js';
+import { unwrapApi, useLoadable, type Loadable } from './query.js';
+
+export type { ImportResult };
 
 /**
  * The first few people anchored in a unit, for the structure detail panel
@@ -28,7 +47,7 @@ import type { Loadable } from './org.js';
  * filters for permission reasons (INV-003).
  */
 export function usePeopleIn(unitId: string | null): Loadable<Page<PersonSummary>> {
-  return usePeopleQuery(unitId ? `unitId=${encodeURIComponent(unitId)}&limit=5` : null);
+  return usePeopleQuery(unitId ? `?unitId=${encodeURIComponent(unitId)}&limit=5` : null);
 }
 
 /**
@@ -40,35 +59,23 @@ export function usePeopleIn(unitId: string | null): Loadable<Page<PersonSummary>
  */
 export function usePeopleSearch(term: string): Loadable<Page<PersonSummary>> {
   const trimmed = term.trim();
-  return usePeopleQuery(trimmed.length >= 2 ? `q=${encodeURIComponent(trimmed)}&limit=6` : null);
+  return usePeopleQuery(trimmed.length >= 2 ? `?q=${encodeURIComponent(trimmed)}&limit=6` : null);
 }
 
-/** `null` means "do not ask" — an empty search box must not fetch the whole directory. */
+/**
+ * `null` means "do not ask" — an empty search box must not fetch the whole directory.
+ *
+ * A new search never shows the last one's results (`current`). `loading` means "waiting,
+ * with nothing to show": the panel prints "Loading…" above the list, and a re-read of a
+ * list already on screen is not that.
+ */
 function usePeopleQuery(search: string | null): Loadable<Page<PersonSummary>> {
-  const [state, setState] = useState<Loadable<Page<PersonSummary>>>({
-    data: null, loading: false, error: null,
+  const people = useLoadable(useGetPeopleQuery(search ?? '', { skip: search === null }), {
+    current: true,
+    initialOnly: true,
   });
-
-  useEffect(() => {
-    if (!search) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    let cancelled = false;
-    setState({ data: null, loading: true, error: null });
-    void apiGet<Page<PersonSummary>>(`/people?${search}`)
-      .then((page) => {
-        if (!cancelled) setState({ data: page, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [search]);
-
-  return state;
+  if (search === null) return { data: null, loading: false, error: null };
+  return { data: people.data, loading: people.loading, error: people.error };
 }
 
 /* ------------------------------------------------------------------ the list page */
@@ -89,7 +96,7 @@ export type PeopleListController = Loadable<Page<PersonSummary>> & {
   unassign: (id: string, edgeId: string) => Promise<void>;
 };
 
-/** Built once so the effect depends on a string rather than a freshly-made object. */
+/** Built once so the cache key is a string rather than a freshly-made object. */
 export function peopleSearch(query: PeopleQuery): string {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
@@ -100,62 +107,44 @@ export function peopleSearch(query: PeopleQuery): string {
   return search ? `?${search}` : '';
 }
 
+/**
+ * The directory. The last good page stays on screen while the next one loads, and with the
+ * error above it if a re-read fails (34 § States). Every command resolves once the list
+ * has been re-read, as before: a row edited twice in a row must not be edited against the
+ * old copy.
+ */
 export function usePeopleList(query: PeopleQuery): PeopleListController {
-  const [state, setState] = useState<Loadable<Page<PersonSummary>>>({
-    data: null, loading: true, error: null,
-  });
-  const alive = useRef(true);
-  const search = peopleSearch(query);
-
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  const load = useCallback(async (path: string) => {
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const page = await apiGet<Page<PersonSummary>>(`/people${path}`);
-      if (alive.current) setState({ data: page, loading: false, error: null });
-    } catch (error) {
-      // The last good page stays on screen with the error above it (34 § States).
-      if (alive.current) {
-        setState((current) => ({ ...current, loading: false, error: error as Error }));
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(search);
-  }, [load, search]);
-
-  const reload = useCallback(() => load(search), [load, search]);
+  const list = useLoadable(useGetPeopleQuery(peopleSearch(query)));
+  const { reload } = list;
+  const [createPerson] = useCreatePersonMutation();
+  const [updatePerson] = useUpdatePersonMutation();
+  const [deletePerson] = useDeletePersonMutation();
+  const [assignPerson] = useAssignPersonMutation();
+  const [unassignPerson] = useUnassignPersonMutation();
 
   const create = useCallback(
     async (body: CreatePersonBody) => {
-      const response = await apiPost<CreatePersonBody, { data: PersonSummary }>('/people', body);
-      await load(search);
-      return response.data;
+      const created = await unwrapApi(createPerson(body));
+      await reload();
+      return created;
     },
-    [load, search],
+    [createPerson, reload],
   );
 
   const update = useCallback(
     async (id: string, body: UpdatePersonBody) => {
-      await apiPatch<UpdatePersonBody, { data: PersonSummary }>(`/people/${id}`, body);
-      await load(search);
+      await unwrapApi(updatePerson({ id, body }));
+      await reload();
     },
-    [load, search],
+    [updatePerson, reload],
   );
 
   const remove = useCallback(
     async (id: string) => {
-      await apiDelete(`/people/${id}`);
-      await load(search);
+      await unwrapApi(deletePerson(id));
+      await reload();
     },
-    [load, search],
+    [deletePerson, reload],
   );
 
   /**
@@ -167,24 +156,21 @@ export function usePeopleList(query: PeopleQuery): PeopleListController {
    */
   const assign = useCallback(
     async (id: string, body: CreateAssignmentBody) => {
-      await apiPost<CreateAssignmentBody, { data: PersonSummary }>(
-        `/people/${id}/assignments`,
-        body,
-      );
-      await load(search);
+      await unwrapApi(assignPerson({ id, body }));
+      await reload();
     },
-    [load, search],
+    [assignPerson, reload],
   );
 
   const unassign = useCallback(
     async (id: string, edgeId: string) => {
-      await apiDelete(`/people/${id}/assignments/${edgeId}`);
-      await load(search);
+      await unwrapApi(unassignPerson({ id, edgeId }));
+      await reload();
     },
-    [load, search],
+    [unassignPerson, reload],
   );
 
-  return { ...state, reload, create, update, remove, assign, unassign };
+  return { ...list, create, update, remove, assign, unassign };
 }
 
 /* ------------------------------------------------------------------ the detail page */
@@ -205,48 +191,27 @@ export type PersonController = Loadable<PersonDetail> & {
  * server-side across the whole capability catalogue. There is no client-side way to work out
  * what adding "Tutor at Section B" grants somebody, and a screen that showed the new chip
  * beside the old power list would be showing a state that never existed.
+ *
+ * The re-read is the `{ Person, id }` tag each write invalidates; the promise resolves once
+ * it is in. Moving to another person never shows the last one's record while it loads.
  */
 export function usePerson(id: string): PersonController {
-  const [state, setState] = useState<Loadable<PersonDetail>>({
-    data: null, loading: true, error: null,
-  });
-  const alive = useRef(true);
-
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  const load = useCallback(async () => {
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const { data } = await apiGet<{ data: PersonDetail }>(`/people/${id}`);
-      if (alive.current) setState({ data, loading: false, error: null });
-    } catch (error) {
-      // The last good copy stays on screen with the error above it, like the list (34).
-      if (alive.current) {
-        setState((current) => ({ ...current, loading: false, error: error as Error }));
-      }
-    }
-  }, [id]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const person = useLoadable(useGetPersonQuery(id), { current: true });
+  const { reload } = person;
+  const [updatePerson] = useUpdatePersonMutation();
+  const [assignPerson] = useAssignPersonMutation();
+  const [unassignPerson] = useUnassignPersonMutation();
 
   const patch = useCallback(
     async (body: UpdatePersonBody) => {
-      await apiPatch<UpdatePersonBody, { data: PersonSummary }>(`/people/${id}`, body);
-      await load();
+      await unwrapApi(updatePerson({ id, body }));
+      await reload();
     },
-    [id, load],
+    [id, updatePerson, reload],
   );
 
   return {
-    ...state,
-    reload: load,
+    ...person,
     rename: useCallback((name: string) => patch({ name }), [patch]),
     // Editable HERE and nowhere else in the product: an administrator changing somebody's
     // address is an identity change with an audit row against it, and `/profile` refuses
@@ -254,20 +219,43 @@ export function usePerson(id: string): PersonController {
     setEmail: useCallback((email: string) => patch({ email }), [patch]),
     assign: useCallback(
       async (body: CreateAssignmentBody) => {
-        await apiPost<CreateAssignmentBody, { data: PersonSummary }>(
-          `/people/${id}/assignments`,
-          body,
-        );
-        await load();
+        await unwrapApi(assignPerson({ id, body }));
+        await reload();
       },
-      [id, load],
+      [id, assignPerson, reload],
     ),
     unassign: useCallback(
       async (edgeId: string) => {
-        await apiDelete(`/people/${id}/assignments/${edgeId}`);
-        await load();
+        await unwrapApi(unassignPerson({ id, edgeId }));
+        await reload();
       },
-      [id, load],
+      [id, unassignPerson, reload],
+    ),
+  };
+}
+
+/* ------------------------------------------------------------------ the import */
+
+export type PeopleImport = {
+  /** What the file would do: its columns, a sample, and the names this org lacks. */
+  preview: (csv: string) => Promise<ImportPreview>;
+  /** `key` is the caller's idempotency key, derived from the file (`importKey`). */
+  commit: (body: ImportPeopleBody, key: string) => Promise<ImportResult>;
+};
+
+/**
+ * The CSV import's two requests, for `ImportWizard`. The commit re-reads the directory,
+ * each role's head count and the branches' people by itself, so the list behind the wizard
+ * is current when it closes.
+ */
+export function usePeopleImport(): PeopleImport {
+  const [previewImport] = usePreviewImportMutation();
+  const [importPeople] = useImportPeopleMutation();
+  return {
+    preview: useCallback((csv: string) => unwrapApi(previewImport(csv)), [previewImport]),
+    commit: useCallback(
+      (body: ImportPeopleBody, key: string) => unwrapApi(importPeople({ body, key })),
+      [importPeople],
     ),
   };
 }

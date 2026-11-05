@@ -1,23 +1,31 @@
 // Announcements, client side. 13 § Announcements, 23 §3, T-094.
 //
-// Local state and no polling, like `lib/audit.ts`: an announcement list is a record of what
-// was sent, not a monitor, and a list that re-fetches under the reader moves the row they
-// were reading. The banner on Home reloads when it is dismissed and not otherwise.
+// No polling, like `lib/audit.ts`: an announcement list is a record of what was sent, not a
+// monitor, and a list that re-fetches under the reader moves the row they were reading.
+//
+// The reads are on RTK Query since R-501 (`store/api/endpoints/announcements.ts`): the list
+// page and Home's banner share one cache entry. The writes stay plain calls through the
+// same client, and every caller re-reads after one, as before; turning them into hooks
+// would change three pages and their tests for no difference anybody would see.
 //
 // THE RECIPIENT COUNT COMES FROM THE SERVER. `useRecipientPreview` asks the API for it as
 // the composer's audience changes rather than counting the org tree in the browser — the
 // number on screen has to be the number of receipts publish will write, and there is only
 // one resolver that knows (`features/campaigns/audience.ts`).
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
-  AnnouncementPreview,
   AnnouncementSummary,
   AudienceRule,
   CreateAnnouncementBody,
   UpdateAnnouncementBody,
 } from '@endur/shared';
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from './api.js';
-import type { Loadable } from './org.js';
+import { apiDelete, apiPatch, apiPost } from './api.js';
+import { isSerializedApiError } from '../store/api/errors.js';
+import {
+  useGetAnnouncementsQuery,
+  useGetRecipientCountQuery,
+} from '../store/api/endpoints/announcements.js';
+import { useLoadable, type Loadable } from './query.js';
 
 export type AnnouncementController = Loadable<AnnouncementSummary[]> & {
   rows: AnnouncementSummary[];
@@ -27,42 +35,13 @@ export type AnnouncementController = Loadable<AnnouncementSummary[]> & {
 };
 
 export function useAnnouncements(enabled = true): AnnouncementController {
-  const [state, setState] = useState<Loadable<AnnouncementSummary[]>>({
-    data: null,
-    loading: enabled,
-    error: null,
-  });
-  const [forbidden, setForbidden] = useState(false);
-  const alive = useRef(true);
-
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    setState((current) => ({ ...current, loading: true }));
-    try {
-      const response = await apiGet<{ data: AnnouncementSummary[] }>('/announcements');
-      if (!alive.current) return;
-      setForbidden(false);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      if (!alive.current) return;
-      const status = error instanceof ApiError ? error.status : 0;
-      setForbidden(status === 403);
-      setState({ data: null, loading: false, error: status === 403 ? null : (error as Error) });
-    }
-  }, [enabled]);
-
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    return () => {
-      alive.current = false;
-    };
-  }, [load]);
-
-  return { ...state, rows: state.data ?? [], forbidden, reload: load };
+  const query = useGetAnnouncementsQuery(undefined, { skip: !enabled });
+  const list = useLoadable(query);
+  // A 403 is an answer, not a failure: the page renders a refusal, never "nothing yet".
+  const forbidden = isSerializedApiError(query.error) && query.error.status === 403;
+  if (!enabled) return { data: null, loading: false, error: null, rows: [], forbidden: false, reload: list.reload };
+  if (forbidden) return { data: null, loading: list.loading, error: null, rows: [], forbidden, reload: list.reload };
+  return { ...list, rows: list.data ?? [], forbidden };
 }
 
 export const createAnnouncement = async (
@@ -119,33 +98,20 @@ export const markAnnouncementRead = (id: string): Promise<void> =>
  * zero it does not believe.
  */
 export function useRecipientPreview(rule: AudienceRule, enabled = true): number | null {
-  const [count, setCount] = useState<number | null>(null);
-  // Serialised, so the effect re-runs on a CHANGE of rule rather than on every render — a
-  // fresh object literal from the parent is a new identity every time.
+  // Serialised, so a CHANGE of rule is what counts rather than every render — a fresh
+  // object literal from the parent is a new identity every time.
   const key = JSON.stringify(rule);
+  const [settled, setSettled] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
-    let alive = true;
-    setCount(null);
-    const timer = setTimeout(() => {
-      void apiPost<{ audience: AudienceRule }, { data: AnnouncementPreview }>(
-        '/announcements/preview',
-        { audience: JSON.parse(key) as AudienceRule },
-      )
-        .then((response) => {
-          if (alive) setCount(response.data.recipients);
-        })
-        // Silent: this is a number beside a form, and an error banner for a count the
-        // reader did not ask for would be louder than the fact it reports.
-        .catch(() => undefined);
-    }, 250);
-
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
+    const timer = setTimeout(() => setSettled(key), 250);
+    return () => clearTimeout(timer);
   }, [key, enabled]);
 
-  return count;
+  // Silent on failure: this is a number beside a form, and an error banner for a count the
+  // reader did not ask for would be louder than the fact it reports.
+  const { currentData } = useGetRecipientCountQuery(settled ?? '', { skip: !enabled || settled === null });
+  // Until the rule on screen has settled and been answered, the count is "not known yet".
+  return enabled && settled === key ? currentData ?? null : null;
 }

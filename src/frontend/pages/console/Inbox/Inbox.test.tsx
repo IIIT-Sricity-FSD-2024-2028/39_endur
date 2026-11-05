@@ -1,7 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type { Capability, InboxResponse, Page } from '@endur/shared';
-import { NONSENSE_LABELS, renderWithProviders } from '../../../test-utils.js';
+import {
+  NONSENSE_LABELS, errorReply, heldReply, renderWithProviders, stubApi, type StubCall,
+} from '../../../test-utils.js';
 import Inbox from './index.js';
 
 const card = (over: Partial<InboxResponse> = {}): InboxResponse => ({
@@ -39,53 +41,40 @@ function filtered(state: string): InboxResponse[] {
   }
 }
 
-const apiGet = vi.fn((path: string) => {
-  if (path.startsWith('/inbox')) {
-    const search = new URLSearchParams(path.split('?')[1] ?? '');
-    return page(filtered(search.get('state') ?? 'unread'));
-  }
-  if (path.startsWith('/campaigns')) {
-    return { data: [{ id: 'c-1', name: 'Autumn round' }], page: {}, meta: { total: 1 } };
-  }
-  if (path.startsWith('/subjects')) {
-    return { data: [{ id: 's-1', name: 'Data Structures' }], page: {}, meta: { total: 1 } };
-  }
-  throw new Error(`unmocked GET ${path}`);
-});
+/** The stub server (R-501): the real hooks and the real cache run above it. */
+let calls: StubCall[];
+/** Set to hold every mark's answer back, to see what the page does before it arrives. */
+let holdMarks: ReturnType<typeof heldReply> | null;
 
-const hoisted = vi.hoisted(() => {
-  class ApiError extends Error {
-    status: number;
-    constructor(status: number, message: string) {
-      super(message);
-      this.status = status;
-    }
-  }
-  return { ApiError };
-});
+const inboxGets = (): string[] =>
+  calls.filter((call) => call.method === 'GET' && call.path.startsWith('/inbox')).map((call) => call.path);
 
-const apiPost = vi.fn((path: string) => {
-  marks.push(path);
-  if (failMark) throw new hoisted.ApiError(500, 'The server said no.');
-  return { data: null };
+const server = () => stubApi({
+  'GET /inbox*': (call) => {
+    const search = new URLSearchParams(call.path.split('?')[1] ?? '');
+    return { body: page(filtered(search.get('state') ?? 'unread')) };
+  },
+  'GET /campaigns*': { body: { data: [{ id: 'c-1', name: 'Autumn round' }], page: {}, meta: { total: 1 } } },
+  'GET /subjects*': { body: { data: [{ id: 's-1', name: 'Data Structures' }], page: {}, meta: { total: 1 } } },
+  'POST /inbox/*': (call) => {
+    marks.push(call.path);
+    if (holdMarks) return holdMarks.promise;
+    return failMark ? errorReply(500, 'INTERNAL', 'The server said no.') : { status: 204 };
+  },
 });
-
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (p: string) => apiGet(p),
-  apiPost: (p: string) => apiPost(p),
-  apiPut: vi.fn(),
-  apiPatch: vi.fn(),
-  apiDelete: vi.fn(),
-  ApiError: hoisted.ApiError,
-}));
 
 const ALL: Capability[] = ['response.read', 'campaign.read', 'subject.read'];
 
 const mount = (capabilities: Capability[] = ALL, path = '/app/inbox') =>
   renderWithProviders(<Inbox />, { capabilities, path, labels: NONSENSE_LABELS });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 beforeEach(() => {
-  vi.clearAllMocks();
+  calls = server();
+  holdMarks = null;
   queue = [card()];
   nextCursor = null;
   failMark = false;
@@ -96,9 +85,7 @@ describe('the queue', () => {
   it('opens on UNREAD, not on everything — the queue is what is new', async () => {
     mount();
     await screen.findByText(/projector in Room 4/);
-    expect(apiGet.mock.calls.map(([p]) => p).find((p) => p.startsWith('/inbox'))).toContain(
-      'state=unread',
-    );
+    expect(inboxGets()[0]).toContain('state=unread');
   });
 
   it('shows the score from the same response, with its scale and no colour class', async () => {
@@ -124,7 +111,7 @@ describe('the queue', () => {
     expect(
       document.querySelector('.response-card-detail')?.textContent,
     ).toContain('Autumn round');
-    expect(marks).toEqual(['/inbox/resp-1/read']);
+    await waitFor(() => expect(marks).toEqual(['/inbox/resp-1/read']));
   });
 
   it('DOES NOT EVICT THE CARD IT JUST OPENED — the bug the test above found', async () => {
@@ -136,8 +123,8 @@ describe('the queue', () => {
     expect(screen.getByRole('tab', { name: /Unread/ }).textContent).toBe('Unread');
 
     fireEvent.click(screen.getByTitle('Mark unread (u)'));
-    fireEvent.click(screen.getByTitle('Mark read (u)'));
-    expect(screen.queryByText(/projector in Room 4/)).toBeNull();
+    fireEvent.click(await screen.findByTitle('Mark read (u)'));
+    await waitFor(() => expect(screen.queryByText(/projector in Room 4/)).toBeNull());
   });
 
   it('DOES NOT mark read on scroll — the only marks are the ones asked for', async () => {
@@ -152,14 +139,18 @@ describe('the queue', () => {
 describe('marking is optimistic and belongs to the reader', () => {
   it('moves the card out of Unread AT THE CLICK, before any response', async () => {
     queue = [card(), card({ id: 'resp-2', questionId: 'q-2', comment: 'Second comment' })];
+    holdMarks = heldReply({ status: 204 });
     mount();
     await screen.findByText(/projector in Room 4/);
     expect(screen.getAllByRole('article')).toHaveLength(2);
 
     fireEvent.click(screen.getAllByTitle('Mark read (u)')[0] as Element);
 
-    expect(screen.queryByText(/projector in Room 4/)).toBeNull();
+    // Gone while the server has still not answered (the reply is held).
+    await waitFor(() => expect(screen.queryByText(/projector in Room 4/)).toBeNull());
+    expect(marks).toEqual(['/inbox/resp-1/read']);
     expect(screen.getByText('Second comment')).toBeTruthy();
+    holdMarks.release();
   });
 
   it('REVERTS THE ONE CARD and says so on it when the save fails', async () => {
@@ -178,7 +169,7 @@ describe('marking is optimistic and belongs to the reader', () => {
     await screen.findByText(/projector in Room 4/);
     fireEvent.click(screen.getByTitle('Archive (e)'));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(marks).toEqual(['/inbox/resp-1/archive']);
+    await waitFor(() => expect(marks).toEqual(['/inbox/resp-1/archive']));
   });
 
   it('drops the unread count as the card leaves, rather than after a reload', async () => {
@@ -188,7 +179,7 @@ describe('marking is optimistic and belongs to the reader', () => {
     expect(screen.getByRole('tab', { name: /Unread/ }).textContent).toContain('2');
 
     fireEvent.click(screen.getAllByTitle('Archive (e)')[0] as Element);
-    expect(screen.getByRole('tab', { name: /Unread/ }).textContent).toContain('1');
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Unread/ }).textContent).toContain('1'));
   });
 
   it('carries a count on Unread ALONE — a badge on Read is a number nobody acts on', async () => {
@@ -205,14 +196,14 @@ describe('j/k/e/u, and every one of them is also a button', () => {
     mount();
     await screen.findByText(/projector in Room 4/);
     fireEvent.keyDown(window, { key: 'u' });
-    expect(marks).toEqual(['/inbox/resp-1/read']);
+    await waitFor(() => expect(marks).toEqual(['/inbox/resp-1/read']));
   });
 
   it('archives with `e`', async () => {
     mount();
     await screen.findByText(/projector in Room 4/);
     fireEvent.keyDown(window, { key: 'e' });
-    expect(marks).toEqual(['/inbox/resp-1/archive']);
+    await waitFor(() => expect(marks).toEqual(['/inbox/resp-1/archive']));
   });
 
   it('moves the selection with j and k without marking anything', async () => {
@@ -274,21 +265,13 @@ describe('access', () => {
   it('renders a full-page refusal without response.read, not an empty queue', async () => {
     mount([]);
     await screen.findByText('You do not have access to this');
-    expect(apiGet.mock.calls.map(([p]) => p).some((p) => p.startsWith('/inbox'))).toBe(false);
+    expect(inboxGets()).toEqual([]);
   });
 
   it('keeps the tab, the filters and the cursor in the URL so a queue is linkable', async () => {
     mount(ALL, '/app/inbox?state=archived');
-    await waitFor(() => {
-      expect(
-        apiGet.mock.calls.map(([p]) => p).find((p) => p.startsWith('/inbox')),
-      ).toContain('state=archived');
-    });
+    await waitFor(() => expect(inboxGets()[0]).toContain('state=archived'));
     fireEvent.click(screen.getByRole('tab', { name: 'All' }));
-    await waitFor(() => {
-      expect(
-        apiGet.mock.calls.map(([p]) => p).some((p) => p.includes('state=all')),
-      ).toBe(true);
-    });
+    await waitFor(() => expect(inboxGets().some((path) => path.includes('state=all'))).toBe(true));
   });
 });
