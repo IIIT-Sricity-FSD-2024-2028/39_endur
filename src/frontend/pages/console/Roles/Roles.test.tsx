@@ -349,6 +349,63 @@ describe('the powers grid', () => {
     expect(screen.getAllByText('0 of 4 powers')).toHaveLength(1);
   });
 
+  it('sums up each group PER ROLE in its heading, and follows every change', async () => {
+    mount();
+    await openPowers();
+
+    const sums = (group: RegExp): Array<string | null> => {
+      const band = screen.getByRole('button', { name: group }).closest('tr') as HTMLElement;
+      return [...band.querySelectorAll('td')].map((td) => td.textContent);
+    };
+    expect(sums(/^Powers/)).toEqual(['All', 'None', 'None']);
+    expect(sums(/^Campaigns/)).toEqual(['1 of 2', '1 of 2', 'None']);
+    // Nothing in it can be given yet, so "None" would be a claim about the roles. It is not.
+    expect(sums(/^Platform/)).toEqual(['Soon', 'Soon', 'Soon']);
+
+    choose(/Learner: cannot open plithes/i, 'all');
+    expect(sums(/^Campaigns/)).toEqual(['1 of 2', '1 of 2', '1 of 2']);
+
+    choose(/Learner: may open plithes for answers, anywhere/i, 'blocked');
+    expect(sums(/^Campaigns/)).toEqual(['1 of 2', '1 of 2', 'None · 1 blocked']);
+  });
+
+  it('a heading folds ITS OWN group, and only that one', async () => {
+    mount();
+    await openPowers();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Campaigns/ }));
+    expect(screen.queryByText('open plithes for answers')).toBeNull();
+    expect(screen.getByText('change what every role is allowed to do')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Campaigns/ }).getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(screen.getByRole('button', { name: /^Campaigns/ }));
+    expect(screen.getByText('open plithes for answers')).toBeTruthy();
+  });
+
+  it('finds a power by name, whatever is folded', async () => {
+    mount();
+    await openPowers();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
+    expect(screen.queryByText('open plithes for answers')).toBeNull();
+    expect(screen.queryByText('change what every role is allowed to do')).toBeNull();
+
+    const search = screen.getByRole('searchbox', { name: 'Find a power' });
+    fireEvent.change(search, { target: { value: 'CLOSE' } });
+    expect(screen.getByText('close plithes to further answers')).toBeTruthy();
+    expect(screen.queryByText('open plithes for answers')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Powers/ })).toBeNull();
+
+    fireEvent.change(search, { target: { value: 'zzz' } });
+    expect(screen.getByText('No power matches “zzz”.')).toBeTruthy();
+
+    // Clearing the search puts back what was folded before it.
+    fireEvent.change(search, { target: { value: '' } });
+    expect(screen.queryByText('close plithes to further answers')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
+    expect(screen.getByText('close plithes to further answers')).toBeTruthy();
+  });
+
   it('sizes every cell to the longest phrase THIS organisation produces', async () => {
     mount();
     await openPowers();

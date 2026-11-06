@@ -3397,12 +3397,14 @@ a.involve-name { color: inherit; }
    to — 33 asks for a grid that scrolls sideways, not one that collapses into cards, because
    a matrix with its columns stacked has stopped being a matrix. The page body must never
    scroll horizontally; this element does instead. */
-/* IT SCROLLS IN BOTH DIRECTIONS, AND THAT IS WHAT MAKES THE HEADERS STICK. The header row
-   below has been ` top: 0` since T-052 and it never once stuck: an element
-   with `overflow-x: auto` and no height is a scroll container that CANNOT scroll vertically,
-   so `top: 0` pinned the row to a box that never moves while the PAGE carried it away. With
+/* IT SCROLLS IN BOTH DIRECTIONS, AND THAT IS WHAT MAKES THE HEADERS STICK. The role row
+   and the power column are `position: sticky` against THIS box: an element with
+   `overflow-x: auto` and no height is a scroll container that CANNOT scroll vertically, so
+   `top: 0` pinned the row to a box that never moves while the PAGE carried it away. With
    64 rows, the reader was choosing between six phrases in a column whose role name had
-   scrolled off the top — which is the one thing a matrix must never make you guess. */
+   scrolled off the top — which is the one thing a matrix must never make you guess.
+   (The `top`/`left` offsets were here for months with no `position` beside them, so
+   neither header ever stuck. Without `position: sticky` they do nothing at all.) */
 .powers-scroll {
   overflow: auto;
   max-height: calc(100vh - 21rem);
@@ -3418,14 +3420,14 @@ a.involve-name { color: inherit; }
 .powers-corner { width: 100%; }
 
 .powers-corner, .powers-role {
-   top: 0; z-index: 2;
+  position: sticky; top: 0; z-index: 2;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-divider);
   padding: var(--space-2) var(--space-3);
   text-align: left; font-weight: 600;
 }
 /* The corner is sticky in BOTH axes, so it never slides out from under either header. */
-.powers-corner { left: 0; z-index: 4; }
+.powers-corner { left: 0; z-index: 4; border-right: 1px solid var(--color-divider); }
 .powers-role { text-align: center; white-space: nowrap; }
 .powers-role-name { display: block; }
 .powers-role-level { display: block; font-size: 11px; font-weight: 400; }
@@ -3439,7 +3441,18 @@ a.involve-name { color: inherit; }
    one of them is a <tr>. The module header row was being laid out as a two-column CSS grid
    by a rule written for a different screen, which is why it rendered as a small box floating
    at the left of the table instead of a band across it. */
-.powers-group th { padding: 0; background: var(--color-surface); }
+/* A shade off the rows, so a group reads as a break in the list rather than one more row. */
+.powers-group > * {
+  background: color-mix(in srgb, var(--color-text) 4%, var(--color-surface));
+  border-bottom: 1px solid var(--color-divider);
+}
+/* The heading is pinned with the power column, so the group's name stays beside its
+   summary however far right you scroll. */
+.powers-group-head {
+  position: sticky; left: 0; z-index: 1;
+  padding: 0;
+  border-right: 1px solid var(--color-divider);
+}
 .powers-group-toggle {
   display: flex; align-items: center; gap: var(--space-2); width: 100%;
   padding: var(--space-2) var(--space-3);
@@ -3448,16 +3461,49 @@ a.involve-name { color: inherit; }
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
 .powers-group-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+/* Disabled while a search is open: every match is shown, so there is nothing to fold. */
+.powers-group-toggle:disabled { cursor: default; }
+
+/* How much of the group each role holds: "All", "None", "2 of 5". The same fact as the
+   rows beneath it, readable without opening them. */
+.powers-group-sum {
+  padding: var(--space-2) var(--space-3);
+  text-align: center; white-space: nowrap; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.powers-group-sum[data-level="all"] { color: var(--color-text); font-weight: 600; }
+.powers-group-sum[data-level="none"], .powers-group-sum[data-level="soon"] {
+  color: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.powers-group-blocked { color: var(--status-bad-800); font-weight: 400; }
+
+.powers-tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.powers-search { flex: 1 1 240px; max-width: 360px; }
+.powers-empty { padding: var(--space-4) var(--space-3); }
+
+/* The row under the pointer is lit end to end, so a cell five roles across is still
+   plainly on the row whose name is pinned at the left. Opaque, because the pinned label
+   has to keep covering the cells that slide beneath it. */
+.powers-row:hover > * {
+  background-color: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
 
 .powers-row > * { border-bottom: 1px solid var(--color-divider); }
 
 /* THE POWER NAME FOLLOWS YOU SIDEWAYS. Scrolled right to the fifth role, every row label had
    left the screen and the grid became six phrases with nothing to attach them to. */
 .powers-capability {
-   left: 0; z-index: 1;
+  position: sticky; left: 0; z-index: 1;
   background: var(--color-surface);
+  /* The edge the cells slide under. Without it a half-hidden cell reads as part of the label. */
+  border-right: 1px solid var(--color-divider);
   padding: var(--space-2) var(--space-3);
-  text-align: left; font-weight: 400; white-space: nowrap;
+  text-align: left; font-weight: 400;
+  /* LONG NAMES WRAP. On one line the longest ("edit the organisation — its name, its
+     industry and its words") set the pinned column at ~500px, so it hid half the grid it
+     labels. Wrapped, it gives up width to the roles and still takes the slack when the
+     grid is narrow enough to have some. */
+  min-width: 22rem;
 }
 /* Label left, "Set all…" right, ALWAYS IN THE SAME PLACE. Each row's control used to be a
    bare select that sized itself to its own longest option, so 64 rows produced 64 different
@@ -3533,6 +3579,15 @@ a.involve-name { color: inherit; }
   outline: 2px solid var(--color-accent); outline-offset: 1px;
 }
 
+/* "NO" RECEDES. Filled boxes are the powers a role holds; an outline is one it does not.
+   With every cell filled, "No" had the same weight as "Everywhere" and the shape of a
+   role — which is the point of a grid — was buried under 70 rows of equal blocks. */
+.powers-cell.is-none, .powers-chip.is-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-divider);
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+
 /* A BLOCK RENDERS DISTINCTLY, because it does not merely mean "less" — it BEATS every
    allow, from any role, group or stand-in (INV-004). A darker shade of the same colour
    would read as "more", which is exactly backwards. */
@@ -3554,14 +3609,23 @@ a.involve-name { color: inherit; }
   color: var(--status-warn-800);
 }
 
+/* "Set all…" on all 73 rows was a second column of identical boxes beside the words.
+   With a pointer it shows on the row you are on (and on keyboard focus); on touch, where
+   nothing hovers, it stays. */
+@media (hover: hover) {
+  .powers-all { opacity: 0; }
+  .powers-row:hover .powers-all, .powers-all:focus { opacity: 1; }
+}
+
 @media (max-width: 640px) {
   .powers-bar { flex-direction: column; }
-  .powers-capability { white-space: normal; min-width: 14ch; }
+  .powers-capability { min-width: 14ch; }
   .powers-capability-inner { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
   .powers-all { width: 100%; }
-  /* A phone has no room for a pinned column AND the cells it labels. */
+  /* A phone has no room for a pinned column AND the cells it labels. The corner unpins
+     with it, or "Power" would stay put over a column that has scrolled away. */
   .powers-scroll { max-height: none; }
-  .powers-capability { position: static; }
+  .powers-capability, .powers-corner, .powers-group-head { position: static; }
 }
 
 /* ── T-080 · the response inbox ──────────────────────────────────────────── */
