@@ -97,7 +97,7 @@ export async function createCampaign(
   }
   if (template.orgId === null) {
     // Library templates are shared, so a campaign must point at this org's own copy. Clone it first.
-    throw new ConflictError('Clone that template into your organisation before using it.');
+    throw new ConflictError('Clone that template into your organization before using it.');
   }
 
   const subjects = await prisma.subject.findMany({
@@ -299,6 +299,13 @@ export async function launchCampaign(
   }
   if (campaign.closedAt) {
     throw new ConflictError(`That ${nounsOf(req).campaign.one.toLowerCase()} has been closed.`);
+  }
+  // The body checks refuse a past closing time when it is set; a draft can still be launched
+  // after its closing time has gone by, and that launch would be closed from its first second.
+  if (campaign.endsAt && campaign.endsAt.getTime() <= Date.now()) {
+    throw new ConflictError(
+      `Its closing time has already passed. Set a later one before launching this ${nounsOf(req).campaign.one.toLowerCase()}.`,
+    );
   }
 
   // A members-only campaign is also delivered: a message in the Inbox of everyone it is for,

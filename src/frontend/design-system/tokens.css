@@ -73,8 +73,8 @@
 
   /* ── Space — density 1.10× ──────────────────────────────── */
   --space-1: 4.4px;  --space-2: 8.8px;  --space-3: 13.2px;
-  --space-4: 17.6px; --space-6: 26.4px; --space-8: 35.2px;
-  --space-12: 52.8px; --space-16: 70.4px; --space-24: 105.6px;
+  --space-4: 17.6px; --space-5: 22px;   --space-6: 26.4px; --space-8: 35.2px;
+  --space-10: 44px;  --space-12: 52.8px; --space-16: 70.4px; --space-24: 105.6px;
 
   /* ── Radius ─────────────────────────────────────────────── */
   --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;

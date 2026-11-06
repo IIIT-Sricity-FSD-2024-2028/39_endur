@@ -7,6 +7,7 @@ import { authenticate } from '../../middleware/authenticate.js';
 import { HomeDto, type HomeQuery } from '@endur/shared';
 import { UnauthenticatedError } from '../../lib/errors.js';
 import { readHome } from './service.js';
+import { readAnswered } from './answered.js';
 import { readWaiting } from './waiting.js';
 
 export const homeRouter: Router = Router();
@@ -36,6 +37,17 @@ homeRouter.get('/waiting', authenticate, requireCapability('org.read'), (req, re
   // (requireMembership), so nothing is waiting for them.
   if (principal.support) return res.json({ data: [] });
   void readWaiting(req.ctx.orgId as string, principal.id)
+    .then((data) => res.json({ data }))
+    .catch(next);
+});
+
+// Past feedback: the members-only forms this person has answered (that they did, never what).
+// Guarded exactly like /waiting, and empty for a support session for the same reason.
+homeRouter.get('/answered', authenticate, requireCapability('org.read'), (req, res, next) => {
+  const principal = req.ctx.principal;
+  if (principal?.kind !== 'user') return next(new UnauthenticatedError());
+  if (principal.support) return res.json({ data: [] });
+  void readAnswered(req.ctx.orgId as string, principal.id)
     .then((data) => res.json({ data }))
     .catch(next);
 });

@@ -103,18 +103,31 @@ export function FileUpload({
         )}
 
         <div className="file-actions">
+          {/* THE BROWSER'S OWN CONTROL, HIDDEN BUT KEPT. "Choose File · No file chosen" is
+              drawn by the browser in its own font and colours, on every theme; the styled
+              label below opens the same picker. The input stays the thing that is labelled,
+              focused and changed, so a keyboard and a screen reader meet a real file field. */}
           <input
             id={inputId}
             ref={input}
             type="file"
+            className="file-input"
             accept={ACCEPTED.join(',')}
             disabled={disabled || busy}
             onChange={(event) => void handle(event.target.files?.[0])}
           />
-          {shown && !disabled && (
-            <button type="button" className="btn btn-danger-ghost" onClick={() => void remove()} disabled={busy}>
-              Remove
-            </button>
+          {!disabled && (
+            <>
+              <label htmlFor={inputId} className={`btn btn-secondary file-pick${busy ? ' is-busy' : ''}`}>
+                {shown ? 'Replace' : 'Choose an image'}
+              </label>
+              {shown && (
+                <button type="button" className="btn btn-danger-ghost" onClick={() => void remove()} disabled={busy}>
+                  Remove
+                </button>
+              )}
+              <span className="text-meta file-drop-hint">or drop one here</span>
+            </>
           )}
         </div>
       </div>

@@ -23,7 +23,7 @@ const expirePeriod = async (orgId: string): Promise<void> => {
 };
 
 describe('a period that ends with nobody renewing — DEC-113', () => {
-  it('moves the organisation to bronze on the first read, and says what it lost', async () => {
+  it('moves the organization to bronze on the first read, and says what it lost', async () => {
     const founder = await registerOrg('custom', 'gold');
     await expirePeriod(founder.orgId);
 

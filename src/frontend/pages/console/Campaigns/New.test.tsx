@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import type { Capability, Page, SubjectSummary, TemplateSummary, UnitNode } from '@endur/shared';
 import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
 import { ApiError } from '../../../lib/api.js';
+import { toLocalInput } from '../../../lib/when.js';
 import New from './New.js';
 
 vi.mock('qrcode', () => ({
@@ -86,6 +87,9 @@ const mount = () =>
     { capabilities, labels: NONSENSE_LABELS, path: '/app/campaigns/new' },
   );
 
+/** A `datetime-local` value this many days from now. */
+const inDays = (days: number): string => toLocalInput(Date.now() + days * 24 * 60 * 60 * 1000);
+
 const toStepThree = (): void => {
   fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -160,7 +164,7 @@ describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () =>
       .toBe(true);
   });
 
-  it('names the organisation rather than saying "your organization"', () => {
+  it('names the organization rather than saying "your organization"', () => {
     mount();
     toStepTwo();
     expect(screen.getByRole('radio', { name: /Only people in Northfield/ })).toBeTruthy();
@@ -275,10 +279,29 @@ describe('step 3 — the summary, then the irreversible button', () => {
   it('refuses a window that closes before it opens', () => {
     mount();
     toStepThree();
-    fireEvent.change(screen.getByLabelText('Opens'), { target: { value: '2026-09-10T09:00' } });
-    fireEvent.change(screen.getByLabelText('Closes'), { target: { value: '2026-09-01T09:00' } });
+    fireEvent.change(screen.getByLabelText('Opens'), { target: { value: inDays(10) } });
+    fireEvent.change(screen.getByLabelText('Closes'), { target: { value: inDays(1) } });
     expect(screen.getByRole('alert').textContent).toMatch(/after Opens/);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Launch plithe' }).disabled).toBe(true);
+  });
+
+  it('refuses a closing time that has already passed, and launches once it is moved on', async () => {
+    mount();
+    toStepThree();
+    const closes = screen.getByLabelText<HTMLInputElement>('Closes');
+    // The picker itself greys out the past.
+    expect(closes.min).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+
+    fireEvent.change(closes, { target: { value: inDays(-1) } });
+    expect(screen.getByRole('alert').textContent).toMatch(/already passed/);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Launch plithe' }).disabled).toBe(true);
+
+    fireEvent.change(closes, { target: { value: inDays(3) } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const sent = create.mock.calls[0]?.[0] as { endsAt: Date };
+    expect(sent.endsAt.getTime()).toBeGreaterThan(Date.now());
   });
 
   it('creates then launches, and lands straight on the QR with no success page between', async () => {
@@ -356,7 +379,7 @@ describe('step 1 — the library, for whoever runs campaigns without building fo
     expect(create.mock.calls[0]?.[0]).toMatchObject({ templateId: 'copy-of-lib1' });
   });
 
-  it('does not offer a library form the organisation already has a copy of', () => {
+  it('does not offer a library form the organization already has a copy of', () => {
     capabilities = [...ALL, 'template.clone'];
     LIBRARY = [libraryForm('lib1', 'Mid-term form original')];
     const original = TEMPLATES[0] as TemplateSummary;

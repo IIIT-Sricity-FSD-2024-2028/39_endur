@@ -134,7 +134,7 @@ describe('/app/profile', () => {
     expect(next.value).toBe('');
   });
 
-  it('lists what YOU are being asked for, in the organisation’s own noun', () => {
+  it('lists what YOU are being asked for, in the organization’s own noun', () => {
     state = {
       data: {
         ...PROFILE,

@@ -145,7 +145,7 @@ describe('a matrix arriving from the server', () => {
     expect(grid.past.some((step) => 'r2|a' in step)).toBe(false);
   });
 
-  it('is cleared with the cache: sign-out, or another organisation', () => {
+  it('is cleared with the cache: sign-out, or another organization', () => {
     const edited = reduce(loaded([allow('r1', 'a')]), cellSet({ roleId: 'r1', capability: 'a', choice: null }));
     expect(reduce(edited, signedOut())).toEqual(initial);
     expect(reduce(edited, api.util.resetApiState())).toEqual(initial);

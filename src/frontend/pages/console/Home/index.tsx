@@ -11,12 +11,13 @@ import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useHome } from '../../../lib/home.js';
 import { markAnnouncementRead, useAnnouncements } from '../../../lib/announcements.js';
-import { useWaiting } from '../../../lib/waiting.js';
+import { useAnswered, useWaiting } from '../../../lib/waiting.js';
 import { useAppSelector } from '../../../store/index.js';
 import { RANGE_LABEL, promptCopy, statCards } from './cards.js';
 import { CampaignCard } from './CampaignCard.js';
 import { Recent } from './Recent.js';
 import { Waiting } from './Waiting.js';
+import { Answered } from './Answered.js';
 
 type Campaign = NonNullable<HomeView['activeCampaigns']>[number];
 
@@ -30,9 +31,10 @@ export default function Home(): JSX.Element {
   const announcements = useAnnouncements(can('announcement.read'));
   const [dismissed, setDismissed] = useState<string[]>([]);
   const waiting = useWaiting();
+  const answered = useAnswered();
 
   const view = home.data;
-  const orgName = org?.name ?? 'Your organisation';
+  const orgName = org?.name ?? 'Your organization';
 
   if (home.loading && !view) return <Skeleton title={orgName} />;
 
@@ -97,7 +99,7 @@ export default function Home(): JSX.Element {
       <Waiting rows={waiting.rows} orgName={orgName} />
 
       {readsNothing ? (
-        waiting.rows.length > 0 ? null : (
+        waiting.rows.length > 0 || answered.rows.length > 0 ? null : (
           <EmptyState
             icon="home"
             title="Nothing assigned to you yet"
@@ -216,6 +218,15 @@ export default function Home(): JSX.Element {
           </div>
         </>
       )}
+
+      {/* Past feedback, last: what this person has already done matters less than anything
+          on the page that is still waiting. For somebody who looks after nothing, it comes
+          straight after the forms still waiting, because nothing else is in between. */}
+      <Answered
+        rows={answered.rows}
+        orgName={orgName}
+        caughtUp={readsNothing && waiting.rows.length === 0}
+      />
 
       {sharing?.url && (
         <ShareSheet

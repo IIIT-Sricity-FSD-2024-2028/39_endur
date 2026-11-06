@@ -71,7 +71,7 @@ export default function Console(): JSX.Element {
     <div className="page">
       <PageHeader
         title="Organizations"
-        subtitle="Every organisation on the platform, as numbers."
+        subtitle="Every organization on the platform, as numbers."
         vocabulary={false}
       />
 
@@ -97,7 +97,7 @@ export default function Console(): JSX.Element {
         <input
           className="input"
           placeholder="Search by name"
-          aria-label="Search organisations by name"
+          aria-label="Search organizations by name"
           value={term}
           onChange={(event) => setTerm(event.target.value)}
           onBlur={() => setFilter('q', term.trim())}
@@ -153,7 +153,7 @@ export default function Console(): JSX.Element {
           empty={
             <EmptyState
               icon="organization"
-              title="No organisations match those filters"
+              title="No organizations match those filters"
               body="Try clearing a filter, or check back once the estate has grown."
             />
           }

@@ -42,7 +42,7 @@ export default function OrgDetail(): JSX.Element {
       <div className="fullpage">
         <div>
           <h3>You do not have access to this</h3>
-          <p className="text-muted">Your operator account cannot open this organisation.</p>
+          <p className="text-muted">Your operator account cannot open this organization.</p>
         </div>
       </div>
     );
@@ -78,7 +78,7 @@ export default function OrgDetail(): JSX.Element {
       .then(() => {
         setSuspendOpen(false);
         setSuspendConfirmText('');
-        showToast(suspended ? 'Organisation reinstated.' : 'Organisation suspended.');
+        showToast(suspended ? 'Organization reinstated.' : 'Organization suspended.');
         return detail.reload();
       })
       .catch((err) => setError(err instanceof OpsError ? err.message : 'Could not change suspension.'))
@@ -160,7 +160,7 @@ export default function OrgDetail(): JSX.Element {
               bronze BECAUSE Gold ran out, not because they chose it. */}
           <p className="text-meta ops-plan-period">
             {org.lapsedFrom
-              ? `${org.lapsedFrom} ended without a renewal — this organisation fell to ${org.tier}.`
+              ? `${org.lapsedFrom} ended without a renewal — this organization fell to ${org.tier}.`
               : org.periodEnd
                 ? `Current period ends ${new Date(org.periodEnd).toLocaleDateString()}.`
                 : 'No subscription row — reads as bronze everywhere.'}
@@ -222,7 +222,7 @@ export default function OrgDetail(): JSX.Element {
             here because the day it is narrowed, the card should vanish rather than mock. */}
         {can('platform.support.enter') && (
           <section className="card ops-support-card">
-            <h3>Open this organisation’s console</h3>
+            <h3>Open this organization’s console</h3>
             <p className="text-meta">
               You will be signed in to {org.name} as yourself, for {SUPPORT_SESSION_MINUTES}{' '}
               minutes, under a banner they cannot dismiss. Responses, results, analysis and
@@ -279,13 +279,13 @@ export default function OrgDetail(): JSX.Element {
             (INV-003). */}
         {canSuspend && (
           <section className="card">
-            <h3>{suspended ? 'Reinstate' : 'Suspend'} this organisation</h3>
+            <h3>{suspended ? 'Reinstate' : 'Suspend'} this organization</h3>
             <p className="text-meta">
               Suspension cuts staff sign-in and does not stop the respondent surface — a QR code
               on a wall keeps working.
             </p>
             <button type="button" className="btn btn-danger" onClick={() => setSuspendOpen(true)}>
-              {suspended ? 'Reinstate organisation' : 'Suspend organisation'}
+              {suspended ? 'Reinstate organization' : 'Suspend organization'}
             </button>
           </section>
         )}

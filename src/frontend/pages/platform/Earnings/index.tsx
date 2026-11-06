@@ -109,7 +109,7 @@ export default function Earnings(): JSX.Element {
     { key: 'at', header: 'When', primary: true, render: (row) => formatDate(row.at) },
     {
       key: 'org',
-      header: 'Organisation',
+      header: 'Organization',
       render: (row) => <Link to={`/ops/orgs/${row.orgId}`}>{row.orgName}</Link>,
     },
     { key: 'payer', header: 'Paid by', render: (row) => row.payerName },
@@ -125,7 +125,7 @@ export default function Earnings(): JSX.Element {
       header: 'Reason',
       render: (row) =>
         row.kind === 'signup'
-          ? 'New organisation'
+          ? 'New organization'
           : `${row.fromTier ? TIER_LABEL[row.fromTier] : 'Unknown'} → ${TIER_LABEL[row.tier]}` +
             (row.kind === 'expiry' ? ' · scheduled' : ''),
     },
@@ -190,7 +190,7 @@ export default function Earnings(): JSX.Element {
               <StatCard
                 kicker="Payments"
                 value={data.totals.payments}
-                context={`${data.totals.orgsPaying} organisation${data.totals.orgsPaying === 1 ? '' : 's'} paid in this window`}
+                context={`${data.totals.orgsPaying} organization${data.totals.orgsPaying === 1 ? '' : 's'} paid in this window`}
               />
               <StatCard
                 kicker="Average payment"
@@ -206,7 +206,7 @@ export default function Earnings(): JSX.Element {
                 }
               />
               <StatCard
-                kicker="Organisations on a plan"
+                kicker="Organizations on a plan"
                 value={data.byTier.reduce((sum, row) => sum + row.orgsOnTier, 0)}
                 context={TIERS.map(
                   (tier) =>
@@ -228,7 +228,7 @@ export default function Earnings(): JSX.Element {
               <h3>Plan mix</h3>
               <p className="text-muted">
                 The ring is who is on each plan <strong>now</strong>. The amount beside it is
-                what that plan earned <strong>in this window</strong> — an organisation that
+                what that plan earned <strong>in this window</strong> — an organization that
                 has since moved still paid.
               </p>
               <TierDonut slices={data.byTier} />
@@ -238,7 +238,7 @@ export default function Earnings(): JSX.Element {
               <h3>Plans bought over time</h3>
               <p className="text-muted">
                 Purchases per period — not a census of who was on what. Nothing records the
-                tier an organisation sat on in a past month, and inventing it would move
+                tier an organization sat on in a past month, and inventing it would move
                 historic figures retroactively.
               </p>
               <TierTrendChart series={data.tierOverTime} />
@@ -258,7 +258,7 @@ export default function Earnings(): JSX.Element {
             <section className="card">
               <h3>Who moved plan</h3>
               <p className="text-muted">
-                Changes only — a new organisation choosing its first plan is above, not here.
+                Changes only — a new organization choosing its first plan is above, not here.
               </p>
               {data.recentChanges.length === 0 ? (
                 <p className="text-muted">Nobody changed plan in this window.</p>

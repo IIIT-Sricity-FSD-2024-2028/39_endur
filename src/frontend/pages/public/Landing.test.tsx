@@ -51,7 +51,7 @@ describe('landing — 30 § Landing', () => {
     expect(screen.queryByText(PRESET_VOCABULARIES[0]!.labels.unit.one)).toBeNull();
   });
 
-  it('rewrites the headline into the chosen organisation\'s words', () => {
+  it('rewrites the headline into the chosen organization\'s words', () => {
     reducedMotion(true);
     const { container } = mount();
     const hospital = PRESET_VOCABULARIES.find((entry) => entry.key === 'hospital');

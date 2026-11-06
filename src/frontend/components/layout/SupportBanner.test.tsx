@@ -40,7 +40,7 @@ describe('who is told — DEC-114', () => {
 
     const banner = screen.getByRole('status').textContent ?? '';
     expect(banner).toContain('Priya Raman');
-    expect(banner).toContain('from Endur support is signed in to your organisation');
+    expect(banner).toContain('from Endur support is signed in to your organization');
     expect(banner).toContain('Ticket 418 — their campaign will not launch');
 
     expect(banner).toContain('stay closed to them');

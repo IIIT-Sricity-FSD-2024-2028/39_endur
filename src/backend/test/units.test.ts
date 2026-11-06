@@ -559,7 +559,7 @@ describe('DELETE /units/:id', () => {
 });
 
 describe('tenant isolation on by-id routes — D-001 until RLS lands', () => {
-  it('a unit from another organisation is 404, not 403', async () => {
+  it('a unit from another organization is 404, not 403', async () => {
     const [mine, theirs] = await Promise.all([setUpOrg(), setUpOrg()]);
     clearGrantCache();
     const theirUnit = await unitIdByName(theirs.orgId, 'Section A');

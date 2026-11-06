@@ -175,7 +175,7 @@ export async function readBilling(orgId: string, requestId?: string): Promise<Bi
   }
 
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
-  if (!org) throw new NotFoundError('That organisation does not exist.');
+  if (!org) throw new NotFoundError('That organization does not exist.');
 
   const repaired = await prisma.subscription.create({
     data: {
@@ -221,11 +221,11 @@ export async function joinTier(
   // Skipped entirely mid-trial - see the DEC-116 comment above.
   if (!wasTrialing) {
     if (tierRank(tier) === tierRank(before.tier)) {
-      throw new ConflictError(`This organisation is already on ${plan.name}.`);
+      throw new ConflictError(`This organization is already on ${plan.name}.`);
     }
     if (tierRank(tier) < tierRank(before.tier)) {
       throw new ConflictError(
-        `A plan can only move up while a period is running. This organisation is on ` +
+        `A plan can only move up while a period is running. This organization is on ` +
           `${PLAN_OPTIONS.find((option) => option.tier === before.tier)?.name ?? before.tier} ` +
           `until ${before.periodEnd.slice(0, 10)}, and there are no refunds — ` +
           `schedule the move down for the end of the period instead.`,
@@ -317,7 +317,7 @@ export async function scheduleDowngrade(
 
   if (tierRank(tier) === tierRank(before.tier)) {
     throw new ConflictError(
-      `This organisation is already on ${plan?.name ?? tier}, so there is nothing to move down to.`,
+      `This organization is already on ${plan?.name ?? tier}, so there is nothing to move down to.`,
     );
   }
   if (tierRank(tier) > tierRank(before.tier)) {

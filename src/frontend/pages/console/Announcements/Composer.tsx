@@ -126,7 +126,7 @@ export function Composer({
                   />
                   <span className="q-dot" aria-hidden="true" />
                   <span>Everyone here</span>
-                  <span className="text-meta">Every account in the organisation</span>
+                  <span className="text-meta">Every account in the organization</span>
                 </label>
                 <label className="q-option">
                   <input

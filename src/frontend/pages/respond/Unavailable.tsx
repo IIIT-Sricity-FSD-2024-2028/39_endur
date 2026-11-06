@@ -21,7 +21,7 @@ const COPY: Record<Variant, { title: string; body: (org: string) => string }> = 
   },
   notMember: {
     title: "This isn't your organization's link",
-    body: (org) => `This form belongs to ${org}. You're signed in to a different organisation.`,
+    body: (org) => `This form belongs to ${org}. You're signed in to a different organization.`,
   },
 };
 

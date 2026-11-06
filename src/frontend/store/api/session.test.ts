@@ -197,7 +197,7 @@ describe('the session thunks (R-105)', () => {
   });
 });
 
-describe('switching organisation (R-106)', () => {
+describe('switching organization (R-106)', () => {
   it('resets the cache when /auth/me comes back for a different org', async () => {
     stubApi({
       'GET /auth/me': (_call, count) => ({

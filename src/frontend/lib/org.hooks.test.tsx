@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe('a save reaches the app shell, with no reload', () => {
-  it('renaming the organisation re-reads /auth/me, so the top bar has the new name', async () => {
+  it('renaming the organization re-reads /auth/me, so the top bar has the new name', async () => {
     let name = 'Northfield';
     const calls = stubApi({
       'GET /auth/me': () => ({ body: meFixture({ orgName: name }) }),

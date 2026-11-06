@@ -116,8 +116,13 @@ npm run db:up                            # docker compose, if you have Docker
 npm run db:migrate
 npm run db:seed
 
-npm run dev                              # api :4000 · web :5173
+npm run dev                              # api :4000 · web :5173, one labelled job
 ```
+
+`npm run dev` runs both servers under `concurrently`: their output is prefixed `[api]` /
+`[web]`, and if either one stops the other is stopped too, so a dead half is never left
+looking alive. Run it in a terminal you keep open; if that terminal is closed (a VS Code
+reload closes them), stop the leftovers and start it again.
 
 `.env` has to exist **before** `npm install` — its `postinstall` hook runs
 `prisma generate`, which needs `DATABASE_URL` to already be set.
@@ -130,6 +135,8 @@ Useful checks:
 npm run typecheck
 npm run lint          # includes rules enforcing the project's invariants
 npm run audit:vocab   # no hardcoded domain noun in a component
+npm run audit:css     # no undefined CSS token, no offset on an element that is never positioned
+npm run format:check  # Prettier, not yet enforced (see CI below)
 ```
 
 ## 🟦 Testing
@@ -147,6 +154,25 @@ The backend tests run against a real database (`TEST_DATABASE_URL` in `.env.exam
 separate `endur_test` database) rather than mocks — `test/globalSetup.ts` creates and
 migrates it automatically on the first run, so no manual setup is needed beyond Postgres
 itself being up.
+
+End-to-end tests drive the real app in Chromium (Playwright, `e2e/`):
+
+```bash
+npx playwright install chromium   # once per machine
+npm run test:e2e
+```
+
+They use a database of their own, `endur_e2e`, which `scripts/e2e-db.mjs` drops, recreates,
+migrates and seeds on every run (it refuses any name that does not end in `_e2e`), and their
+own ports (API 4100, web 5180), so they run beside `npm run dev` without touching it.
+
+## 🟩 CI
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
+typecheck, lint, `audit:vocab`, `audit:css`, both test suites (against a throwaway
+Postgres 16), the build, and the end-to-end tests. `format:check` runs but does not fail
+the build yet: the codebase predates the formatter being enforced. After a one-off
+`npm run format` commit, remove its `continue-on-error`.
 
 
 ## 🟧 Deploying

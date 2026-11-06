@@ -57,7 +57,7 @@ describe('laneState — capability first, tier second', () => {
       .toBe('capability');
   });
 
-  it('offers the tier when the reader may, and the organisation may not', () => {
+  it('offers the tier when the reader may, and the organization may not', () => {
     expect(laneState({ allowed: true, built: true, needsTier: 'gold', heldTier: 'bronze' }))
       .toBe('tier');
   });
@@ -124,7 +124,7 @@ describe('the gallery', () => {
     expect(screen.getAllByText(/Whoever manages billing/)).toHaveLength(2);
   });
 
-  it('stops selling a tier the organisation already holds', () => {
+  it('stops selling a tier the organization already holds', () => {
     tier = 'enterprise';
     show(ALL_FIVE);
     expect(screen.queryByRole('link', { name: 'See the plan' })).toBeNull();

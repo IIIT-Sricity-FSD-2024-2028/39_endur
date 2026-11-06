@@ -48,6 +48,7 @@ import type {
   GrantWarning,
   HomeView,
   WaitingForm,
+  AnsweredForm,
   ImportPreview,
   InboxMessage,
   InboxResponse,
@@ -745,6 +746,17 @@ export const WaitingFormSchema = mirrors<WaitingForm>()(
     about: z.string().nullable(),
     questionCount: z.number(),
     estimatedSeconds: z.number(),
+    endsAt: z.string().nullable(),
+  }),
+);
+
+export const AnsweredFormSchema = mirrors<AnsweredForm>()(
+  z.object({
+    campaignId: z.string(),
+    name: z.string(),
+    about: z.string().nullable(),
+    status: z.enum(['open', 'closed']),
+    closedAt: z.string().nullable(),
     endsAt: z.string().nullable(),
   }),
 );

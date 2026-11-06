@@ -96,7 +96,7 @@ export default function Analysis(): JSX.Element {
         <EmptyState
           icon="results"
           title="You do not have access to this"
-          body="Your account cannot open the analysis. Whoever administers your organisation can change that."
+          body="Your account cannot open the analysis. Whoever administers your organization can change that."
         />
       </div>
     );

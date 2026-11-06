@@ -201,7 +201,7 @@ describe('subjects', () => {
     // The type is free text the client picks, and ONE value of it decides visibility - left settable,
     // creating a subject would be enough to widen the audience of your own campaign.
     const res = await withCsrf(founder, 'post', '/api/v1/subjects').send({
-      name: 'Not the organisation',
+      name: 'Not the organization',
       unitId: sectionA,
       type: 'organisation',
     });
@@ -212,7 +212,7 @@ describe('subjects', () => {
     expect(res.body.error.details.fields[0].path).toBe('body.type');
     // And nothing was written under a different type instead: refused, not rewritten.
     expect(
-      await prisma.subject.count({ where: { orgId: founder.orgId, name: 'Not the organisation' } }),
+      await prisma.subject.count({ where: { orgId: founder.orgId, name: 'Not the organization' } }),
     ).toBe(0);
   });
 

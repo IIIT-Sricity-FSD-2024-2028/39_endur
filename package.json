@@ -11,7 +11,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "npm run dev -w @endur/api & npm run dev -w @endur/web",
+    "//dev": "Both servers as ONE job: labelled output, and if either stops the other is stopped too (-k), so a dead half is never left looking alive. A shell `&` did neither.",
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm run dev -w @endur/api",
     "dev:web": "npm run dev -w @endur/web",
     "build": "npm run build -w @endur/shared && npm run build -w @endur/api && npm run build -w @endur/web",
@@ -28,10 +29,16 @@
     "db:reset": "npm run db:reset -w @endur/api",
     "demo:contention": "npm run demo:contention -w @endur/api --",
     "audit:vocab": "node scripts/audit-vocab.mjs",
-    "audit:drift": "node scripts/audit-drift.mjs"
+    "audit:drift": "node scripts/audit-drift.mjs",
+    "audit:css": "node scripts/audit-css.mjs",
+    "format:check": "prettier --check .",
+    "//test:e2e": "Rebuilds endur_e2e from nothing (scripts/e2e-db.mjs), then drives the real app in Chromium. First run on a machine: `npx playwright install chromium`.",
+    "test:e2e": "node scripts/e2e-db.mjs && playwright test -c e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.65.0",
+    "concurrently": "^9.2.5",
     "eslint": "^9.33.0",
     "prettier": "^3.6.2",
     "typescript": "^5.9.2",

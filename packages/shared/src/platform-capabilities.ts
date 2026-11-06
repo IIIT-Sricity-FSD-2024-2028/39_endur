@@ -56,7 +56,7 @@ export const PLATFORM_CAPABILITY_CATALOGUE = {
   },
   'platform.enterprise.read': {
     roles: OWNER_ONLY,
-    note: 'The queue of customers asking to be sold Enterprise (DEC-100, 70). OWNER ONLY by direct instruction, and for platform.revenue.read’s reason: staff see every organisation because support helps one customer at a time, and this is a REVENUE queue rather than a support one — the same split DEC-080 already made',
+    note: 'The queue of customers asking to be sold Enterprise (DEC-100, 70). OWNER ONLY by direct instruction, and for platform.revenue.read’s reason: staff see every organization because support helps one customer at a time, and this is a REVENUE queue rather than a support one — the same split DEC-080 already made',
   },
   'platform.enterprise.update': {
     roles: OWNER_ONLY,
@@ -68,7 +68,7 @@ export const PLATFORM_CAPABILITY_CATALOGUE = {
   },
   'platform.support.read': {
     roles: BOTH,
-    note: 'The register of support sessions — who entered which organisation, why, and when they left. Split from platform.support.enter for the reason every other pair here is split: reading the register changes nothing, and entering is the action that must be attributable. Held by BOTH so an operator can see their own trail without an owner opening it for them',
+    note: 'The register of support sessions — who entered which organization, why, and when they left. Split from platform.support.enter for the reason every other pair here is split: reading the register changes nothing, and entering is the action that must be attributable. Held by BOTH so an operator can see their own trail without an owner opening it for them',
   },
   'platform.operator.manage': { roles: OWNER_ONLY, note: 'Create, disable and re-role operator accounts' },
 } as const satisfies Record<string, Entry>;

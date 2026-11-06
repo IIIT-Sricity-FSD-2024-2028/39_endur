@@ -48,7 +48,7 @@ export function tenantResolver(opts: TenantResolverOptions): RequestHandler {
           return next();
         }
         if (!opts.required) return next();
-        next(new AppError('UNRESOLVED_TENANT', 'No organisation could be determined.'));
+        next(new AppError('UNRESOLVED_TENANT', 'No organization could be determined.'));
       })
       .catch(next);
   };

@@ -17,8 +17,8 @@ function remainingWords(minutes: number): string {
 export function reachOf(role: SupportContext['role'], operator: boolean): string {
   if (role === 'owner') {
     return operator
-      ? 'As an Endur owner you have full access to this organisation, responses and results included. Every action is recorded in their audit log under your name.'
-      : 'As an Endur owner, they have full access to this organisation, responses and results included. Every action is recorded in your audit log under their name.';
+      ? 'As an Endur owner you have full access to this organization, responses and results included. Every action is recorded in their audit log under your name.'
+      : 'As an Endur owner, they have full access to this organization, responses and results included. Every action is recorded in your audit log under their name.';
   }
   return operator
     ? 'Responses, results and check-in notes are closed to you.'
@@ -64,11 +64,11 @@ function Strip({ support }: { support: SupportContext }): JSX.Element {
       <p className="sr-only">
         {operator ? (
           <>
-            Support session. You are signed in to this organisation as yourself, and they can see
+            Support session. You are signed in to this organization as yourself, and they can see
             that you are.
           </>
         ) : (
-          <>{support.operatorName} from Endur support is signed in to your organisation.</>
+          <>{support.operatorName} from Endur support is signed in to your organization.</>
         )}{' '}
         {reachOf(support.role, operator)}
       </p>

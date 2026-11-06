@@ -52,7 +52,7 @@ export default function Inbox(): JSX.Element {
 
   // Without the queue, Messages is the whole page, so it loads whatever the tab says.
   const messages = useMessages(showingMessages || !can('response.read') || inbox.forbidden);
-  const orgName = useAppSelector((root) => root.auth.org?.name) ?? 'Your organisation';
+  const orgName = useAppSelector((root) => root.auth.org?.name) ?? 'Your organization';
   const messageRows = messages.data?.data ?? [];
   const unreadMessages = messageRows.filter((row) => !row.read).length;
   // The filters belong to the queue; without it they would only be asked for to be refused.

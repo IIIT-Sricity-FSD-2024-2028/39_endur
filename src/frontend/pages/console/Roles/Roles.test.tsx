@@ -191,9 +191,9 @@ describe('the powers grid', () => {
     await openPowers();
 
     choose(/Learner: cannot open plithes/i, 'all');
-    expect(cell(/Learner: may open plithes for answers, anywhere in the organisation/i)).toBeTruthy();
+    expect(cell(/Learner: may open plithes for answers, anywhere in the organization/i)).toBeTruthy();
 
-    choose(/Learner: may open plithes for answers, anywhere in the organisation/i, 'none');
+    choose(/Learner: may open plithes for answers, anywhere in the organization/i, 'none');
     expect(cell(/Learner: cannot open plithes/i)).toBeTruthy();
   });
 
@@ -293,7 +293,7 @@ describe('the powers grid', () => {
     mount();
     await openPowers();
 
-    choose(/Principal: may change what every role is allowed to do, anywhere in the organisation/i, 'none');
+    choose(/Principal: may change what every role is allowed to do, anywhere in the organization/i, 'none');
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(await screen.findByRole('alertdialog')).toBeTruthy();
@@ -406,7 +406,7 @@ describe('the powers grid', () => {
     expect(screen.getByText('close plithes to further answers')).toBeTruthy();
   });
 
-  it('sizes every cell to the longest phrase THIS organisation produces', async () => {
+  it('sizes every cell to the longest phrase THIS organization produces', async () => {
     mount();
     await openPowers();
 

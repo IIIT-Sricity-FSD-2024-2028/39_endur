@@ -211,7 +211,7 @@ describe('metadata', () => {
 });
 
 describe('the filename is never trusted', () => {
-  it('cannot escape the organisation directory with ../', async () => {
+  it('cannot escape the organization directory with ../', async () => {
     const founder = await setUpOrg();
     const res = await uploadLogo(founder, makePng(20, 20), '../../../../tmp/endur-escape.png');
     expect(res.status).toBe(201);

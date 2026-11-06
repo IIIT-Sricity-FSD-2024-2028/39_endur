@@ -12,7 +12,7 @@
 export type CapabilityPhase = 'P1' | 'P2' | 'P3';
 
 export type CapabilityModule =
-  | 'Organisation'
+  | 'Organization'
   | 'Structure'
   | 'Roles'
   | 'Powers'
@@ -39,9 +39,9 @@ type Entry = { module: CapabilityModule; phase: CapabilityPhase; note?: string }
  * be a second place to keep in sync.
  */
 export const CAPABILITY_CATALOGUE = {
-  'org.read': { module: 'Organisation', phase: 'P1' },
-  'org.update': { module: 'Organisation', phase: 'P1', note: 'name, industry, labels' },
-  'org.delete': { module: 'Organisation', phase: 'P2', note: 'danger zone' },
+  'org.read': { module: 'Organization', phase: 'P1' },
+  'org.update': { module: 'Organization', phase: 'P1', note: 'name, industry, labels' },
+  'org.delete': { module: 'Organization', phase: 'P2', note: 'danger zone' },
 
   'unit.read': { module: 'Structure', phase: 'P1' },
   'unit.create': { module: 'Structure', phase: 'P1' },

@@ -48,7 +48,7 @@ describe('when the notice appears — 16 §7d', () => {
     expect(notice?.text).toMatch(/join Gold again/);
   });
 
-  it('never warns a bronze organisation — it rolls forward free', () => {
+  it('never warns a bronze organization — it rolls forward free', () => {
     expect(noticeFor(endingIn(1, 'bronze'), NOW)).toBeNull();
   });
 

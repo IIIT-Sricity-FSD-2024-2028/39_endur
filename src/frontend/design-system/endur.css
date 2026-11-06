@@ -234,7 +234,7 @@
 
 /* ── Top bar — 56px, sticky, chrome, hairline under ───────────────────── */
 .topbar {
-   top: 0; z-index: 20;
+  position: sticky; top: 0; z-index: 20;
   height: 56px; flex: none;
   display: flex; align-items: center; gap: var(--space-3);
   padding-inline: var(--space-4);
@@ -293,7 +293,7 @@
 
 /* ── Sidebar — 232px, chrome, 40px pilled items inset 8px ─────────────── */
 .shell-rail { flex: none; width: 232px; align-self: stretch; background: var(--color-surface); }
-.sidebar {  top: 56px; padding: var(--space-3) var(--space-2); }
+.sidebar { position: sticky; top: 56px; padding: var(--space-3) var(--space-2); }
 .sidebar ul { list-style: none; margin: 0; padding: 0; }
 .sidebar-group + .sidebar-group { margin-top: var(--space-4); }
 .sidebar-heading { margin: 0 0 var(--space-1); padding-inline: var(--space-2); }
@@ -1619,7 +1619,7 @@ textarea.q-text-input { min-height: 90px; }
 }
 .builder-first:hover { border-color: var(--color-accent); color: var(--color-accent-800); }
 
-.builder-rail {  top: 76px; display: flex; flex-direction: column; gap: var(--space-2); }
+.builder-rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: var(--space-2); }
 .rail-tool {
   width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -1646,7 +1646,7 @@ textarea.q-text-input { min-height: 90px; }
 @media (max-width: 639px) {
   .builder { flex-direction: column; }
   .builder-rail {
-     bottom: 0; top: auto; z-index: 20;
+    position: sticky; bottom: 0; top: auto; z-index: 20;
     flex-direction: row; justify-content: center; width: 100%;
     padding: var(--space-2); background: var(--color-bg);
     border-top: 1px solid var(--color-divider);
@@ -1828,7 +1828,7 @@ textarea.q-text-input { min-height: 90px; }
 /* Sticky, and it counts QUESTIONS rather than scroll: scroll percentage lies
    on a form whose last question is a long text answer (39, rule 3). */
 .rf-progress {
-   top: 0; z-index: 20;
+  position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) 0;
   background: var(--color-bg);
@@ -2091,6 +2091,41 @@ textarea.q-text-input { min-height: 90px; }
 }
 
 .settings-skeleton { gap: var(--space-3); min-height: 120px; }
+
+/* The words card has no card of its own to sit at the floor of (WordsEditor draws its own),
+   so its bar is a plain row. The rule above pulled it out past both edges of the section. */
+.settings-card > .card-actions {
+  margin: 0; padding: 0; border: 0; background: none; border-radius: 0;
+}
+/* Said beside the button it belongs to, so "Saved" and "Unsaved changes" never disagree. */
+.settings-unsaved { margin-right: auto; align-self: center; color: var(--status-warn-800); }
+
+/* READ-ONLY: facts, not fields. */
+.settings-facts { margin: 0; }
+.settings-fact {
+  display: grid; grid-template-columns: 10rem 1fr; align-items: center; gap: var(--space-3);
+}
+.settings-fact dt { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.settings-fact dd { margin: 0; }
+.words-table { width: 100%; border-collapse: collapse; }
+.words-table th, .words-table td {
+  padding: var(--space-2) var(--space-3); text-align: left; font-weight: 400;
+  border-bottom: 1px solid var(--color-divider);
+}
+.words-table tbody tr:last-child > * { border-bottom: 0; }
+.words-table thead th { padding-top: 0; }
+
+@media (max-width: 639px) {
+  .settings-fact { grid-template-columns: 1fr; gap: 2px; }
+  /* Stacked fields have no columns for a header to name; each plural says what it is. */
+  .word-row-header { display: none; }
+  .word-plural { flex-wrap: wrap; }
+  .word-plural-label {
+    position: static; width: 100%; height: auto; margin: 0; overflow: visible;
+    clip-path: none; white-space: normal;
+    font-size: 12px; color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    THE MATERIAL LAYER — DEC-027 · DEC-028 · DEC-029 · DEC-030
@@ -2708,7 +2743,7 @@ html:active-view-transition * {
 /* The public nav floats rather than sitting flush — it is a pill on the page,
    which is what makes the ambient field visible above and around it. */
 .nav-public {
-   top: var(--space-3); z-index: 20;
+  position: sticky; top: var(--space-3); z-index: 20;
   width: min(1180px, calc(100% - var(--space-6)));
   margin: var(--space-3) auto 0;
   border-radius: 999px;
@@ -2988,7 +3023,7 @@ html:active-view-transition * {
   padding: var(--space-6);
   overflow-y: auto;
 }
-.tpv-figure { margin: 0;  top: 0; }
+.tpv-figure { margin: 0; position: sticky; top: 0; }
 .tp-large { border-radius: var(--radius-md); }
 
 .tpv-detail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
@@ -3083,6 +3118,16 @@ html:active-view-transition * {
   background: var(--color-accent-100);
 }
 .file-upload .file-drop.is-busy { opacity: 0.7; }
+.file-upload .file-drop { position: relative; }
+.file-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+/* Visually hidden, still focusable: the label below is what is seen and pressed. */
+.file-input {
+  position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;
+  clip-path: inset(50%);
+}
+.file-pick { cursor: pointer; }
+.file-pick.is-busy { pointer-events: none; opacity: 0.6; }
+.file-input:focus-visible + .file-pick { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
 .file-preview,
 .file-placeholder {
@@ -3123,12 +3168,12 @@ html:active-view-transition * {
 .position-chip {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 2px var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-divider);
   border-radius: 999px;
   font-size: 13px;
   background: var(--color-surface);
 }
-.position-chip.is-primary { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); }
+.position-chip.is-primary { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-divider)); }
 .position-role { font-weight: 600; }
 .position-dash { color: color-mix(in srgb, var(--color-text) 45%, transparent); }
 .position-unit { color: color-mix(in srgb, var(--color-text) 75%, transparent); }
@@ -3148,7 +3193,7 @@ html:active-view-transition * {
 .position-editor {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
   padding: var(--space-2);
-  border: 1px dashed var(--color-border);
+  border: 1px dashed var(--color-divider);
   border-radius: var(--radius-md);
   width: 100%;
 }
@@ -3193,7 +3238,7 @@ html:active-view-transition * {
 
 /* Indented under the unit heading, because the indent IS the claim: everything inside it
    applies at that place and nowhere else (INV-005). */
-.powers-place { border-left: 2px solid var(--color-border); padding-left: var(--space-3); }
+.powers-place { border-left: 2px solid var(--color-divider); padding-left: var(--space-3); }
 
 .powers-modules { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; }
 .powers-module { display: grid; grid-template-columns: 14ch 1fr; gap: var(--space-3); }
@@ -3239,7 +3284,7 @@ html:active-view-transition * {
 
 /* The indent carries the grouping the way .powers-place's does: everything inside this rule
    belongs to the heading above it. */
-.involve-group { border-left: 2px solid var(--color-border); padding-left: var(--space-3); }
+.involve-group { border-left: 2px solid var(--color-divider); padding-left: var(--space-3); }
 
 .involve-row {
   display: grid;
@@ -3249,7 +3294,7 @@ html:active-view-transition * {
   gap: 0 var(--space-3);
   padding: var(--space-2) 0;
 }
-.involve-row + .involve-row { border-top: 1px solid var(--color-border); }
+.involve-row + .involve-row { border-top: 1px solid var(--color-divider); }
 
 .involve-main { grid-area: main; display: flex; align-items: center; gap: var(--space-2); }
 .involve-name { font-weight: 600; }
@@ -4474,7 +4519,7 @@ a.involve-name { color: inherit; }
   height: 14px;
   border-radius: 50%;
   margin-top: var(--space-2);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
 }
 .preset-swatch-university { background: linear-gradient(135deg, var(--vibe-university-1), var(--vibe-university-2)); }
 .preset-swatch-hotel { background: linear-gradient(135deg, var(--vibe-hotel-1), var(--vibe-hotel-2)); }
@@ -4918,7 +4963,7 @@ a.involve-name { color: inherit; }
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   border: 1px solid transparent;
-  font-size: var(--text-sm);
+  font-size: var(--text-small);
   line-height: 1.5;
 }
 
@@ -4948,7 +4993,7 @@ a.involve-name { color: inherit; }
   gap: var(--space-2);
   margin: var(--space-4) 0 0;
   max-width: 78ch;
-  font-size: var(--text-sm);
+  font-size: var(--text-small);
   line-height: 1.5;
   color: var(--status-bad-800);
 }
@@ -5836,7 +5881,7 @@ textarea.input {
      wide; one edge makes it a lid the rest of the page hangs from. */
   border-bottom: 2px solid var(--status-bad-500);
   color: var(--status-bad-800);
-  font-size: var(--text-sm);
+  font-size: var(--text-small);
   line-height: 1.5;
 }
 
@@ -5914,10 +5959,28 @@ textarea.input {
 /* Inside a card the form needs no room for a phone's thumb under the button, and its
    progress bar sits on the card rather than on a strip of page colour. */
 .rf-embedded .rf-form { padding-bottom: 0; }
-.rf-embedded .rf-progress { background: transparent; padding-top: 0; }
+/* Not sticky inside a card: at the top of the page it would slide under the console's top bar. */
+.rf-embedded .rf-progress { position: static; background: transparent; padding-top: 0; }
 @media (max-width: 640px) {
   .waiting-row { flex-direction: column; align-items: stretch; }
 }
+
+/* Past feedback, under the forms still waiting: the same card, without the accent edge,
+   because none of it is waiting on anybody. */
+.answered {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.answered-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.answered-item {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.answered-item:first-child { border-top: 0; }
+.answered-item .waiting-what { flex: 1; }
+.answered-check { flex: none; color: var(--status-good-500); }
+.answered-more { align-self: flex-start; }
 
 .message-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 

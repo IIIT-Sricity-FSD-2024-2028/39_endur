@@ -151,7 +151,7 @@ describe('booking', () => {
     }
   }, 60_000);
 
-  it('lists, renames and deletes a bookable, and keeps another organisation out of all three', async () => {
+  it('lists, renames and deletes a bookable, and keeps another organization out of all three', async () => {
     const { id } = await openOne(owner, 2);
     const stranger = await setUpOrg('hotel');
     await subscribe(stranger.orgId, 'gold');
@@ -176,7 +176,7 @@ describe('booking', () => {
   });
 
   // The foreign key knows nothing about tenants, so the service has to check the subject is ours.
-  it('refuses to link a bookable to another organisation’s subject', async () => {
+  it('refuses to link a bookable to another organization’s subject', async () => {
     const { id } = await openOne(owner, 1);
     const stranger = await setUpOrg('hotel');
     const theirUnit = await unitIdByName(stranger.orgId, 'Section A');
@@ -315,7 +315,7 @@ describe('booking', () => {
 
   // The tier ladder from outside: 402 for an organisation on a lower plan, 403 for a role without the
   // capability - never the other way round, because the capability check runs first.
-  it('402s a silver organisation and keeps the public link answering', async () => {
+  it('402s a silver organization and keeps the public link answering', async () => {
     const { token } = await openOne(owner, 2);
     const slotId = (await publicRead(token)).body.data.slots[0].id as string;
 

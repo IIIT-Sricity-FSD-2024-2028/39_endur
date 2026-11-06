@@ -169,7 +169,7 @@ export default function Plan(): JSX.Element {
     <>
       <PageHeader
         title="Plan"
-        subtitle="What this organisation is on, what it is using, and how to change it."
+        subtitle="What this organization is on, what it is using, and how to change it."
       />
 
       <div className="settings-page">
@@ -261,7 +261,7 @@ export default function Plan(): JSX.Element {
                   Your <strong>{tierName(catalogue.find((plan) => plan.tier === summary.lapsedFrom))}</strong>{' '}
                   {/* DEC-116. "Your Gold TRIAL ended" vs "Your Gold PLAN ended" — a trial never
                       had money flowing, so the paid-lapse sentence would misstate what happened. */}
-                  {summary.lapsedFromTrial ? 'trial' : 'plan'} ended and this organisation moved to{' '}
+                  {summary.lapsedFromTrial ? 'trial' : 'plan'} ended and this organization moved to{' '}
                   <strong>{tierName(catalogue.find((plan) => plan.tier === summary.tier))}</strong>.
                   Nothing you have collected has been deleted — choose a plan below to get those
                   screens back.
@@ -332,7 +332,7 @@ export default function Plan(): JSX.Element {
           <p className="text-muted">
             A plan is one month, billed once, and applies as soon as it is paid. Moving up
             charges the difference for the rest of this period. Plans do not renew on their
-            own: when a period ends, the organisation moves to Bronze (or to a move down you
+            own: when a period ends, the organization moves to Bronze (or to a move down you
             scheduled), and joining again starts a new month at the full price. Nothing you have collected is deleted, and running{' '}
             {labels.campaign.many.toLowerCase()} keep running whichever plan you are on.
           </p>
@@ -356,7 +356,7 @@ export default function Plan(): JSX.Element {
 
           {!mayChange && (
             <p className="text-meta">
-              <Icon name="role" size={16} /> Whoever manages billing for your organisation can
+              <Icon name="role" size={16} /> Whoever manages billing for your organization can
               change the plan from this page.
             </p>
           )}

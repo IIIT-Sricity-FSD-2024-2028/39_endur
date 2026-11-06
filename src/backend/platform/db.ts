@@ -74,7 +74,7 @@ export function platformClient() {
           }
           if (model && WRITES.has(operation) && !WRITABLE_MODELS.has(model)) {
             throw new PlatformSeamViolation(
-              `\`${model}.${operation}\` writes inside a customer's organisation, which no platform capability means`,
+              `\`${model}.${operation}\` writes inside a customer's organization, which no platform capability means`,
             );
           }
           assertNoContentRelations(args);

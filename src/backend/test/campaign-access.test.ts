@@ -111,7 +111,7 @@ describe('access: the gate, and the order it runs in', () => {
     // The public default is unchanged: the demo path and every seeded campaign still ask for nothing.
   });
 
-  it('refuses a stranger with 401 SIGN_IN_REQUIRED, naming the organisation', async () => {
+  it('refuses a stranger with 401 SIGN_IN_REQUIRED, naming the organization', async () => {
     const res = await stranger().get(`/api/v1/public/campaigns/${restricted.token}`);
 
     expect(res.status).toBe(401);
@@ -230,13 +230,10 @@ describe('access: what an organization submission writes, and what it does not',
       SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'campaign_participants'
     `;
-    // THAT they answered, and when. Never what. A response id here is the single migration that would
-    // join the two halves of this design.
-    expect(columns.map((c) => c.column_name).sort()).toEqual([
-      'campaign_id',
-      'responded_at',
-      'user_id',
-    ]);
+    // THAT they answered. Not what, and not when: a response id here would join the two halves of
+    // this design in one migration, and a time did it by clock — the response is written in the
+    // same transaction, so its submitted_at was the same instant.
+    expect(columns.map((c) => c.column_name).sort()).toEqual(['campaign_id', 'user_id']);
   });
 
   it('DEC-045 — the audit row carries NEITHER an actor NOR an ip', async () => {

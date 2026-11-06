@@ -74,7 +74,7 @@ async function guard(req: Parameters<RequestHandler>[0]): Promise<void> {
     throw new WouldEscalateError(
       `You cannot give a role “${describeCapability(capability, nounsOf(req))}” — ` +
         'a role can be given to anybody anywhere, and you do not hold that ' +
-        'everywhere in this organisation.',
+        'everywhere in this organization.',
       capability,
     );
   }

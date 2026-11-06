@@ -13,7 +13,7 @@ export const custom: Preset = {
     { name: 'Level 4' },
   ],
   units: [
-    { tempId: 'root', name: 'Organisation', parentTempId: null },
+    { tempId: 'root', name: 'Organization', parentTempId: null },
     { tempId: 'unit-a', name: 'Unit A', parentTempId: 'root' },
     { tempId: 'unit-b', name: 'Unit B', parentTempId: 'root' },
   ],

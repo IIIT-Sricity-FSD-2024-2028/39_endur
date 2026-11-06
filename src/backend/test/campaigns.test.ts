@@ -205,6 +205,41 @@ describe('campaign lifecycle', () => {
     expect(launched.body.data.status).toBe('scheduled');
   });
 
+  it('refuses a closing time that has already passed, when it is set and again at launch', async () => {
+    const pastClose = new Date(Date.now() - HOUR).toISOString();
+    const body = { name: 'Already over', templateId, subjectIds: [subjectId], audience: { kind: 'anyone' } };
+
+    // Set on create, or on a draft's edit: refused by the schema, naming the field.
+    const created = await withCsrf(founder, 'post', '/api/v1/campaigns').send({ ...body, endsAt: pastClose });
+    expect(created.status).toBe(422);
+    expect(JSON.stringify(created.body)).toMatch(/endsAt/);
+
+    const draft = await withCsrf(founder, 'post', '/api/v1/campaigns').send(body);
+    expect(draft.status).toBe(201);
+    const edited = await withCsrf(founder, 'patch', `/api/v1/campaigns/${draft.body.data.id}`)
+      .send({ endsAt: pastClose });
+    expect(edited.status).toBe(422);
+    // Clearing it is still fine: no closing time means "until somebody closes it".
+    const cleared = await withCsrf(founder, 'patch', `/api/v1/campaigns/${draft.body.data.id}`)
+      .send({ endsAt: null });
+    expect(cleared.status).toBe(200);
+
+    // A draft whose closing time went by while it sat there is not launched closed.
+    await prisma.campaign.update({
+      where: { id: draft.body.data.id as string },
+      data: { endsAt: new Date(Date.now() - 60_000) },
+    });
+    const launched = await withCsrf(founder, 'post', `/api/v1/campaigns/${draft.body.data.id}/launch`)
+      .send({});
+    expect(launched.status).toBe(409);
+    expect(launched.body.error.message).toMatch(/closing time has already passed/i);
+    const after = await prisma.campaign.findUniqueOrThrow({
+      where: { id: draft.body.data.id as string },
+      select: { publicToken: true },
+    });
+    expect(after.publicToken).toBeNull();
+  });
+
   it('refuses a campaign on a template with no questions, and on a library template', async () => {
     const blank = await withCsrf(founder, 'post', '/api/v1/templates').send({
       name: 'Blank',
@@ -350,7 +385,30 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
     expect(extraOptions.status).toBe(422);
   });
 
-  it('reuses ONE organisation subject rather than adding one per poll — DEC-089', async () => {
+  it('refuses a poll whose closing time has already passed, and makes nothing', async () => {
+    const before = await prisma.campaign.count({ where: { orgId: founder.orgId } });
+    const res = await withCsrf(founder, 'post', '/api/v1/campaigns/quick').send({
+      purpose: 'poll',
+      name: 'Too late',
+      options: ['Yes', 'No'],
+      endsAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+    });
+    // It launches the moment it is made, so this would be a QR code that turns everyone away.
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(res.body)).toMatch(/closing time has already passed/);
+    expect(await prisma.campaign.count({ where: { orgId: founder.orgId } })).toBe(before);
+
+    const later = await withCsrf(founder, 'post', '/api/v1/campaigns/quick').send({
+      purpose: 'poll',
+      name: 'In time',
+      options: ['Yes', 'No'],
+      endsAt: new Date(Date.now() + HOUR).toISOString(),
+    });
+    expect(later.status).toBe(201);
+    expect(later.body.data.status).toBe('open');
+  });
+
+  it('reuses ONE organization subject rather than adding one per poll — DEC-089', async () => {
     await withCsrf(founder, 'post', '/api/v1/campaigns/quick').send({
       purpose: 'poll',
       name: 'Second poll',
@@ -361,7 +419,7 @@ describe('POST /campaigns/quick — a poll and a suggestion box on the same engi
       where: { orgId: founder.orgId, type: 'organisation' },
       select: { id: true },
     });
-    // Three quick campaigns by now: a subject each would fill the Subjects screen with rows nobody created.
+    // Four quick campaigns by now: a subject each would fill the Subjects screen with rows nobody created.
     expect(subjects).toHaveLength(1);
   });
 

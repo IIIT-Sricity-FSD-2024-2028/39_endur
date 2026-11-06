@@ -4,7 +4,7 @@
 // (`/public/campaigns/:token`), the same two the `/r/…` link uses: a members-only campaign
 // answered from Home is the same submission, gated by the same session check, recorded the
 // same anonymous way. Only `channel` differs.
-import type { PublicCampaign, SubmitResponseBody, WaitingForm } from '@endur/shared';
+import type { AnsweredForm, PublicCampaign, SubmitResponseBody, WaitingForm } from '@endur/shared';
 import { api } from '../api.js';
 
 export type AnswerWaitingArgs = {
@@ -19,6 +19,13 @@ export const waitingApi = api.injectEndpoints({
     getWaiting: build.query<WaitingForm[], void>({
       query: () => '/home/waiting',
       transformResponse: (response: { data: WaitingForm[] }) => response.data,
+      providesTags: ['Waiting'],
+    }),
+
+    // Past feedback. Under the same tag, so answering a card moves it here in the same refresh.
+    getAnswered: build.query<AnsweredForm[], void>({
+      query: () => '/home/answered',
+      transformResponse: (response: { data: AnsweredForm[] }) => response.data,
       providesTags: ['Waiting'],
     }),
 
@@ -46,4 +53,9 @@ export const waitingApi = api.injectEndpoints({
   }),
 });
 
-export const { useGetWaitingQuery, useGetWaitingFormQuery, useAnswerWaitingMutation } = waitingApi;
+export const {
+  useGetWaitingQuery,
+  useGetAnsweredQuery,
+  useGetWaitingFormQuery,
+  useAnswerWaitingMutation,
+} = waitingApi;

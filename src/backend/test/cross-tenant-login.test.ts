@@ -34,7 +34,7 @@ async function secondAccountFor(email: string, password: string): Promise<string
   return other.orgId;
 }
 
-describe('login when one address exists in two organisations — CONF-013', () => {
+describe('login when one address exists in two organizations — CONF-013', () => {
   it('cannot be locked out by a stranger inviting their address elsewhere', async () => {
     const victim = `${unique('victim')}@example.test`;
     const res = await request(app).post('/api/v1/auth/register').send({
@@ -59,7 +59,7 @@ describe('login when one address exists in two organisations — CONF-013', () =
     expect(after.status).toBe(200);
   });
 
-  it('signs the victim in to THEIR organisation, not the stranger\'s', async () => {
+  it('signs the victim in to THEIR organization, not the stranger\'s', async () => {
     const victim = `${unique('victim')}@example.test`;
     const created = await request(app).post('/api/v1/auth/register').send({
       email: victim, password: PASSWORD, name: 'Victim',
@@ -94,7 +94,7 @@ describe('login when one address exists in two organisations — CONF-013', () =
 // The honest collision, which was a silent permanent lockout rather than mere ambiguity:
 // activate a second account on an address that already had one, get signed in by the activation,
 // and then never be able to log in again, because only the older row was ever compared against.
-describe('a person with a real account in two organisations — DEC-049', () => {
+describe('a person with a real account in two organizations — DEC-049', () => {
   it('can sign in to the one they just activated, not only the older one', async () => {
     const shared = `${unique('both')}@example.test`;
     const OTHER = 'the-other-org-password';
@@ -122,7 +122,7 @@ describe('a person with a real account in two organisations — DEC-049', () => 
 
   // The one case that needs a question, and only because the password cannot tell the two apart.
   // It costs nothing on stage: no seeded organisation shares an address.
-  it('asks which organisation when the SAME password opens both', async () => {
+  it('asks which organization when the SAME password opens both', async () => {
     const shared = `${unique('same')}@example.test`;
 
     const first = await request(app).post('/api/v1/auth/register').send({

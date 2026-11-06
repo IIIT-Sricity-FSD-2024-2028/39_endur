@@ -4,7 +4,7 @@
 // open, and only until that person has answered. The answer itself stays exactly as anonymous
 // as on the link (campaign-access.test.ts): Home submits through the same route.
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { AudienceRule, WaitingForm } from '@endur/shared';
+import type { AnsweredForm, AudienceRule, WaitingForm } from '@endur/shared';
 import {
   addStaff, roleIdByLevel, setUpOrg, unitIdByName, withCsrf, type Session,
 } from './helpers.js';
@@ -43,6 +43,19 @@ const waitingFor = async (session: Session): Promise<string[]> => {
   const res = await session.agent.get('/api/v1/home/waiting');
   expect(res.status).toBe(200);
   return (res.body.data as WaitingForm[]).map((form) => form.name).sort();
+};
+
+const answeredBy = async (session: Session): Promise<AnsweredForm[]> => {
+  const res = await session.agent.get('/api/v1/home/answered');
+  expect(res.status).toBe(200);
+  return res.body.data as AnsweredForm[];
+};
+
+const answer = async (session: Session, token: string) => {
+  const sent = await withCsrf(session, 'post', `/api/v1/public/campaigns/${token}/responses`)
+    .set('Idempotency-Key', `home-${token}-${Math.random()}`)
+    .send({ answers: await answersFor(session, token), channel: 'home' });
+  expect(sent.status).toBe(201);
 };
 
 const messagesFor = async (session: Session) => {
@@ -86,6 +99,7 @@ describe('forms waiting on Home', () => {
   let sectionA: Launched;
   let sectionAOnly: Launched;
   let later: Launched;
+  let publicLink: Launched;
 
   beforeAll(async () => {
     founder = await setUpOrg();
@@ -117,7 +131,7 @@ describe('forms waiting on Home', () => {
     sectionAOnly = await launch('Section A only', 'organization', {
       kind: 'unit', unitId: sectionAId, includeSubtree: false,
     });
-    await launch('Public link', 'public', { kind: 'anyone' });
+    publicLink = await launch('Public link', 'public', { kind: 'anyone' });
     later = await launch('Next month', 'organization', { kind: 'anyone' },
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
   });
@@ -191,4 +205,45 @@ describe('forms waiting on Home', () => {
     ]);
     expect(await messagesFor(founder)).toEqual([]);
   });
+
+  describe('past feedback', () => {
+    it('lists what the reader has answered, and nobody else’s', async () => {
+      // Chen answered "Everyone" above; nobody else has answered anything yet.
+      expect((await answeredBy(chen)).map((form) => form.name)).toEqual(['Everyone']);
+      expect(await answeredBy(asha)).toEqual([]);
+      expect(await answeredBy(outsider)).toEqual([]);
+    });
+
+    it('says THAT they answered and what it was about, never what they said, and not when', async () => {
+      const [form] = await answeredBy(chen);
+      expect(form).toEqual({
+        campaignId: everyone.campaignId,
+        name: 'Everyone',
+        about: 'Algebra',
+        status: 'open',
+        closedAt: null,
+        endsAt: null,
+      });
+    });
+
+    it('keeps a form after it closes, and says when it closed', async () => {
+      await answer(asha, learners.token);
+      expect((await answeredBy(asha)).map((form) => [form.name, form.status])).toEqual([
+        ['Learners', 'open'],
+      ]);
+
+      const closed = await withCsrf(founder, 'post', `/api/v1/campaigns/${learners.campaignId}/close`)
+        .send({});
+      expect(closed.status).toBe(200);
+      const [form] = await answeredBy(asha);
+      expect(form).toMatchObject({ name: 'Learners', status: 'closed', endsAt: null });
+      expect(Date.parse(form?.closedAt ?? '')).toBeGreaterThan(Date.now() - 60_000);
+    });
+
+    it('a public link answered while signed in is not listed: it never records who answered', async () => {
+      await answer(ben, publicLink.token);
+      expect(await answeredBy(ben)).toEqual([]);
+    });
+  });
 });
+

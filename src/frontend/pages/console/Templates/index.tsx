@@ -40,7 +40,7 @@ export default function Templates(): JSX.Element {
       <EmptyState
         icon="template"
         title="Forms are built by whoever manages them"
-        body={`You pick a form when you start a ${round}: your organisation's forms and the library's are both listed there.`}
+        body={`You pick a form when you start a ${round}: your organization's forms and the library's are both listed there.`}
         action={
           can('campaign.create') ? (
             <Link className="btn btn-primary" to="/app/campaigns/new">New {round}</Link>

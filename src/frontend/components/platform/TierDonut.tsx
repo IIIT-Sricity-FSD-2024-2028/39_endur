@@ -51,11 +51,11 @@ export function TierDonut({ slices }: { slices: TierSlice[] }): JSX.Element {
       </ul>
 
       <table className="sr-only">
-        <caption>Plan mix — organisations on each tier now, and what each earned in this window</caption>
+        <caption>Plan mix — organizations on each tier now, and what each earned in this window</caption>
         <thead>
           <tr>
             <th scope="col">Plan</th>
-            <th scope="col">Organisations now</th>
+            <th scope="col">Organizations now</th>
             <th scope="col">Payments in window</th>
             <th scope="col">Revenue in window</th>
           </tr>

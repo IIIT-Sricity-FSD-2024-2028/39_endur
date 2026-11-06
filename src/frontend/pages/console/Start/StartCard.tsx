@@ -69,7 +69,7 @@ export function StartCard({
           </Link>
         ) : (
           <p className="text-meta start-card-reason">
-            Part of a higher plan. Whoever manages billing for your organisation can change it.
+            Part of a higher plan. Whoever manages billing for your organization can change it.
           </p>
         ))}
         {state === 'soon' && (

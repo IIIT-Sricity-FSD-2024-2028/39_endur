@@ -54,7 +54,7 @@ vi.mock('../../../lib/opsCapabilities.js', () => ({
 }));
 
 const latest = (): EstateFilters => asked[asked.length - 1]!;
-const search = (): HTMLInputElement => screen.getByLabelText('Search organisations by name');
+const search = (): HTMLInputElement => screen.getByLabelText('Search organizations by name');
 
 beforeEach(() => {
   asked.length = 0;

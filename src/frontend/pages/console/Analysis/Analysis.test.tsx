@@ -171,7 +171,7 @@ describe('suppression', () => {
     expect(screen.queryByText('Key drivers')).toBeNull();
   });
 
-  it('an empty organisation gets the empty state, not the suppression card', async () => {
+  it('an empty organization gets the empty state, not the suppression card', async () => {
     overview = { suppressed: true, threshold: 5, reliability: {
       responseCount: 0, audienceEstimate: null, responseRate: null, confidence: 'low' } };
     mount();

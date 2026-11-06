@@ -1,0 +1,126 @@
+# Every push and pull request: the same checks a reviewer would otherwise run by hand.
+#
+# The secrets below are placeholders that exist only inside this job's throwaway Postgres;
+# nothing here reaches a real database or the deployed app.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: endur
+          POSTGRES_PASSWORD: endur
+          POSTGRES_DB: endur
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U endur"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # `npm ci` runs `prisma generate`, which needs DATABASE_URL set before install.
+      DATABASE_URL: postgresql://endur:endur@localhost:5432/endur
+      TEST_DATABASE_URL: postgresql://endur:endur@localhost:5432/endur_test
+      SESSION_SECRET: ci-only-session-secret-that-is-long-enough
+      LOG_TO_FILE: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The project's own invariants: no hardcoded domain noun, and no CSS that fails silently.
+      # (audit:drift is not here: it reads architecture/, which is not in the repository.)
+      - name: Audits
+        run: |
+          npm run audit:vocab
+          npm run audit:css
+
+      - name: Frontend tests
+        run: npm run test -w @endur/web
+
+      # Integration tests against the real Postgres above; globalSetup creates and migrates
+      # endur_test on its own.
+      - name: Backend tests
+        run: npm run test -w @endur/api
+
+      - name: Build
+        run: npm run build
+
+      # Not blocking yet: 408 files predate the formatter being enforced. Once the one-off
+      # `npm run format` commit lands, delete `continue-on-error` and this becomes a gate.
+      - name: Formatting
+        run: npm run format:check
+        continue-on-error: true
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: endur
+          POSTGRES_PASSWORD: endur
+          POSTGRES_DB: endur
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U endur"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://endur:endur@localhost:5432/endur
+      SESSION_SECRET: ci-only-session-secret-that-is-long-enough
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      # Rebuilds and seeds endur_e2e, starts the API and the web app, drives Chromium.
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

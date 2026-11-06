@@ -63,11 +63,11 @@ beforeEach(() => {
 });
 
 describe('reinstating actually reinstates — D-043', () => {
-  it('sends the request when a suspended organisation is reinstated', async () => {
+  it('sends the request when a suspended organization is reinstated', async () => {
     org = { ...ORG, suspendedAt: '2026-08-20T00:00:00.000Z' };
     render();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reinstate organisation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reinstate organization' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reinstate' }));
 
     await waitFor(() =>
@@ -76,7 +76,7 @@ describe('reinstating actually reinstates — D-043', () => {
 
   it('keeps the typed-name gate on suspend, and it is the button that refuses', () => {
     render();
-    fireEvent.click(screen.getByRole('button', { name: 'Suspend organisation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suspend organization' }));
 
     const confirm = screen.getByRole('button', { name: 'Suspend' });
     expect(confirm.hasAttribute('disabled')).toBe(true);
@@ -86,7 +86,7 @@ describe('reinstating actually reinstates — D-043', () => {
 
   it('suspends once the name is typed', async () => {
     render();
-    fireEvent.click(screen.getByRole('button', { name: 'Suspend organisation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suspend organization' }));
     fireEvent.change(screen.getByLabelText(/Type "Northfield" to confirm/), {
       target: { value: 'Northfield' },
     });
@@ -101,13 +101,13 @@ describe('the suspension card is absent for staff — DEC-104', () => {
   it('renders neither the button nor the heading without platform.org.suspend', () => {
     held = ['platform.org.read'] as PlatformCapability[];
     render();
-    expect(screen.queryByRole('button', { name: /Suspend organisation/ })).toBeNull();
-    expect(screen.queryByText(/Suspend this organisation/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Suspend organization/ })).toBeNull();
+    expect(screen.queryByText(/Suspend this organization/)).toBeNull();
     expect(screen.getByText('Northfield')).toBeTruthy();
   });
 
   it('renders it for an owner', () => {
     render();
-    expect(screen.getByRole('button', { name: 'Suspend organisation' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Suspend organization' })).toBeTruthy();
   });
 });

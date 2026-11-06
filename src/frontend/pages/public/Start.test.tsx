@@ -293,7 +293,7 @@ describe('the details are checked before the plan step — DEC-110', () => {
     expect(screen.getByText(/at least one letter/i)).toBeTruthy();
   });
 
-  it('refuses a whitespace-only organisation name', () => {
+  it('refuses a whitespace-only organization name', () => {
     mount();
     badDetails('Anitha Rao', '   ');
     advance();

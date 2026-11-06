@@ -48,7 +48,7 @@ export default function Logs(): JSX.Element {
   const header = (
     <PageHeader
       title="Activity log"
-      subtitle="What happened in this organisation, and which rule allowed it."
+      subtitle="What happened in this organization, and which rule allowed it."
     />
   );
 
@@ -59,7 +59,7 @@ export default function Logs(): JSX.Element {
         <EmptyState
           icon="log"
           title="You do not have access to this"
-          body="Your account cannot read the activity log. Whoever administers your organisation can change that."
+          body="Your account cannot read the activity log. Whoever administers your organization can change that."
         />
       </div>
     );
@@ -237,7 +237,7 @@ export default function Logs(): JSX.Element {
               <EmptyState
                 icon="log"
                 title="Nothing has been recorded yet"
-                body="Every change made in this organisation appears here, with the rule that allowed it."
+                body="Every change made in this organization appears here, with the rule that allowed it."
               />
             )
           }

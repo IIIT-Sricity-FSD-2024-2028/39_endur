@@ -115,7 +115,7 @@ export default function Simulator(): JSX.Element {
   const ready = principal !== null && capability !== '' && targetReady;
 
   const targetLabel = useMemo(() => {
-    if (targetKind === 'org') return 'the whole organisation';
+    if (targetKind === 'org') return 'the whole organization';
     if (targetKind === 'unit') {
       return findUnitName(units.data ?? [], targetUnitId) ?? `that ${labels.unit.one.toLowerCase()}`;
     }
@@ -140,7 +140,7 @@ export default function Simulator(): JSX.Element {
         <EmptyState
           icon="role"
           title="You do not have access to this"
-          body="Your account cannot run the simulator. Whoever administers your organisation can change that."
+          body="Your account cannot run the simulator. Whoever administers your organization can change that."
         />
       </div>
     );
@@ -209,7 +209,7 @@ export default function Simulator(): JSX.Element {
                 setTargetCampaignId('');
               }}
             >
-              <option value="org">the whole organisation</option>
+              <option value="org">the whole organization</option>
               <option value="unit">a {labels.unit.one.toLowerCase()}</option>
               <option value="person">a person</option>
               <option value="subject">a {labels.subject.one.toLowerCase()}</option>
@@ -285,7 +285,7 @@ export default function Simulator(): JSX.Element {
           </button>
         </p>
         <p className="text-meta">
-          Every blank comes from something real in your organisation — there is no way to ask
+          Every blank comes from something real in your organization — there is no way to ask
           an invalid question.
         </p>
       </div>

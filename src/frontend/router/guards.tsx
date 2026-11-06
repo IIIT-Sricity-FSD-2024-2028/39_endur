@@ -46,7 +46,7 @@ export function RequireCapability({
         <div>
           <h3>You do not have access to this</h3>
           <p className="text-muted">
-            Your account cannot open this page. Whoever administers your organisation can
+            Your account cannot open this page. Whoever administers your organization can
             change that.
           </p>
         </div>

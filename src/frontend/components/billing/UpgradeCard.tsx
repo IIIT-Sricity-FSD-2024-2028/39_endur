@@ -39,7 +39,7 @@ export function UpgradeCard({
         </Link>
       ) : (
         <p className="text-meta">
-          Whoever manages billing for your organisation can change the plan.
+          Whoever manages billing for your organization can change the plan.
         </p>
       )}
     </section>

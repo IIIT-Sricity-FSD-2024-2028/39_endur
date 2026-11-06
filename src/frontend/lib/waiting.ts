@@ -1,9 +1,10 @@
 // Members-only forms waiting for the signed-in person's answer: the card on Home, the count
 // beside Home in the sidebar, and answering from the card.
 import { useCallback } from 'react';
-import type { PublicCampaign, SubmitResponseBody, WaitingForm } from '@endur/shared';
+import type { AnsweredForm, PublicCampaign, SubmitResponseBody, WaitingForm } from '@endur/shared';
 import {
   useAnswerWaitingMutation,
+  useGetAnsweredQuery,
   useGetWaitingFormQuery,
   useGetWaitingQuery,
 } from '../store/api/endpoints/waiting.js';
@@ -27,6 +28,12 @@ export function useWaiting(): WaitingController {
     useGetWaitingQuery(undefined, { pollingInterval: POLL_MS, skipPollingIfUnfocused: true }),
     { initialOnly: true },
   );
+  return { ...result, rows: result.data ?? [] };
+}
+
+/** Past feedback: the members-only forms this person has answered. That they did, never what. */
+export function useAnswered(): Loadable<AnsweredForm[]> & { rows: AnsweredForm[] } {
+  const result = useLoadable(useGetAnsweredQuery(), { initialOnly: true });
   return { ...result, rows: result.data ?? [] };
 }
 

@@ -10,6 +10,7 @@ import { SlotGrid } from '../../../components/data/SlotGrid.js';
 import { ApiError } from '../../../lib/api.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDateTime } from '../../../lib/format.js';
+import { toLocalInput } from '../../../lib/when.js';
 import {
   openKey,
   useBookable,
@@ -17,14 +18,6 @@ import {
 } from '../../../lib/booking.js';
 
 type Draft = { id: string; startsAt: string; endsAt: string; capacity: number; remaining: number };
-
-export function toLocalInput(iso: string): string {
-  const date = new Date(iso);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
-}
 
 function nextHour(after?: string): Date {
   const base = after ? new Date(after) : new Date();

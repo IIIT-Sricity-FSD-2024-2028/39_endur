@@ -4,7 +4,7 @@ import { TopBar } from './TopBar.js';
 import { renderWithProviders } from '../../test-utils.js';
 
 describe('TopBar', () => {
-  it('names the organisation the caller is actually in', () => {
+  it('names the organization the caller is actually in', () => {
     renderWithProviders(<TopBar onOpenMenu={() => undefined} />, { orgName: 'The Grand Palace' });
     expect(screen.getByText('The Grand Palace')).toBeTruthy();
   });

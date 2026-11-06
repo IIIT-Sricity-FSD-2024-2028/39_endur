@@ -82,7 +82,7 @@ export function GrowthChart({
           no text equivalent is a blank region to a screen reader. No net column: `71`
           decision 2 has no honest combined figure to put in one. */}
       <table className="sr-only">
-        <caption>Organisation movement, over time</caption>
+        <caption>Organization movement, over time</caption>
         <thead>
           <tr>
             <th scope="col">Period</th>

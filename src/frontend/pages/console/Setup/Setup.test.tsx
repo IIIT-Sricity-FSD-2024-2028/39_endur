@@ -112,7 +112,7 @@ describe('step 1 — industry', () => {
     expect(screen.getByText(/Select an organization type/)).toBeTruthy();
   });
 
-  it('carries the presenter\'s script for an organisation nobody listed', () => {
+  it('carries the presenter\'s script for an organization nobody listed', () => {
     mount();
     expect(screen.getByText(/Pick the closest one/)).toBeTruthy();
   });
@@ -197,7 +197,7 @@ describe('step 3 — structure', () => {
     expect(document.activeElement).toBe(after[after.length - 1]);
   });
 
-  it('never offers to delete the root — it is the organisation', () => {
+  it('never offers to delete the root — it is the organization', () => {
     toStructure();
     expect(screen.queryByLabelText('Delete Northfield')).toBeNull();
     expect(screen.getByLabelText('Delete Engineering')).toBeTruthy();

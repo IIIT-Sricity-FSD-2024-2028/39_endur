@@ -25,6 +25,7 @@ import {
   GrantWarningSchema,
   HomeViewSchema,
   WaitingFormSchema,
+  AnsweredFormSchema,
   ImportPreviewSchema,
   InboxMessageSchema,
   InboxResponseSchema,
@@ -121,15 +122,15 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   ),
   'GET /api/v1/auth/me': ok(
     MeResponseSchema,
-    'THE BOOT CALL. Session, organisation, vocabulary and the caller’s capability map in one response, so the SPA’s first paint is already correct.',
+    'THE BOOT CALL. Session, organization, vocabulary and the caller’s capability map in one response, so the SPA’s first paint is already correct.',
   ),
   'POST /api/v1/auth/login': done(
-    'Sign in. Answers `409 ACCOUNT_AMBIGUOUS` — naming the organisations — when the same address and password open more than one (DEC-049).',
+    'Sign in. Answers `409 ACCOUNT_AMBIGUOUS` — naming the organizations — when the same address and password open more than one (DEC-049).',
   ),
   'POST /api/v1/auth/logout': done('Sign out. Destroys the session record server-side, not just the cookie.'),
   'POST /api/v1/auth/register': created(
     z.object({ organization: z.object({ id: z.string(), slug: z.string() }) }),
-    'Create an organisation and its first user in ONE transaction. A tier is required and has no default (DEC-048).',
+    'Create an organization and its first user in ONE transaction. A tier is required and has no default (DEC-048).',
   ),
   'GET /api/v1/auth/activate/:token': ok(
     data(ActivationPreviewSchema),
@@ -138,16 +139,16 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   'POST /api/v1/auth/activate/:token': done('Set a password and activate. The only way an account is ever given one (57).'),
 
   /* ---- organisation — 30, 31 -------------------------------------------- */
-  'GET /api/v1/org/': ok(data(OrgViewSchema), 'The organisation: name, industry, vocabulary and whether setup is complete.'),
-  'GET /api/v1/org/presets': ok(list(PresetViewSchema), 'The industry presets — roles, units, labels and templates a new organisation can start from.'),
-  'PATCH /api/v1/org/': ok(data(OrgViewSchema), 'Rename the organisation or change its industry.'),
+  'GET /api/v1/org/': ok(data(OrgViewSchema), 'The organization: name, industry, vocabulary and whether setup is complete.'),
+  'GET /api/v1/org/presets': ok(list(PresetViewSchema), 'The industry presets — roles, units, labels and templates a new organization can start from.'),
+  'PATCH /api/v1/org/': ok(data(OrgViewSchema), 'Rename the organization or change its industry.'),
   'PATCH /api/v1/org/labels': ok(
     data(OrgViewSchema),
     'Change the VOCABULARY. Every domain noun on every screen is read from here (INV-001) — this is the call that re-skins the product.',
   ),
   'POST /api/v1/org/setup': created(data(OrgViewSchema), 'The setup wizard’s one write: roles, units and labels in a single transaction.'),
-  'POST /api/v1/org/logo': created(data(FileRow), 'Upload the organisation logo. Multipart.'),
-  'DELETE /api/v1/org/logo': noContent('Remove the organisation logo.'),
+  'POST /api/v1/org/logo': created(data(FileRow), 'Upload the organization logo. Multipart.'),
+  'DELETE /api/v1/org/logo': noContent('Remove the organization logo.'),
 
   /* ---- structure — 32 ---------------------------------------------------- */
   'GET /api/v1/units/': ok(
@@ -169,7 +170,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
 
   /* ---- roles, grants, the simulator — 33, 42 ----------------------------- */
   'GET /api/v1/roles/': ok(list(RoleViewSchema), 'Every role, with how many people hold it and how many grants hang off it.'),
-  'POST /api/v1/roles/': created(data(RoleViewSchema), 'Create a role. Roles are DATA — an organisation names its own (INV-002).'),
+  'POST /api/v1/roles/': created(data(RoleViewSchema), 'Create a role. Roles are DATA — an organization names its own (INV-002).'),
   'PATCH /api/v1/roles/:id': ok(data(RoleViewSchema), 'Rename a role.'),
   'DELETE /api/v1/roles/:id': ok(data(z.object({ deleted: z.number() })), 'Delete a role.'),
   'POST /api/v1/roles/reorder': ok(
@@ -185,7 +186,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
     list(z.object({ roleId: z.string(), capability: z.string(), scope: z.string(), effect: z.string() })),
     'Save the powers grid. Refuses to let the caller grant more than they hold (INV-012) or to lock themselves out.',
   ),
-  'GET /api/v1/authz/capabilities': ok(list(CapabilityMetaSchema), 'The capability catalogue (11 §3), labelled in the organisation’s own vocabulary.'),
+  'GET /api/v1/authz/capabilities': ok(list(CapabilityMetaSchema), 'The capability catalogue (11 §3), labelled in the organization’s own vocabulary.'),
   'POST /api/v1/authz/simulate': ok(
     data(DecisionViewSchema),
     'THE SIMULATOR. Ask the resolver a question and get the decision WITH ITS TRACE — the rule that decided, and every rule that did not.',
@@ -196,12 +197,12 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   'GET /api/v1/people/:id': ok(data(PersonDetailSchema), 'One person, with their effective powers GROUPED BY PLACE — which is what proves INV-005 on screen.'),
   'POST /api/v1/people/': created(data(PersonSummarySchema), 'Add a person. Accepts NO role and no capability — a position is a separate, audited call (14 §8).'),
   'PATCH /api/v1/people/:id': ok(data(PersonSummarySchema), 'Change a person’s name or email. NOT their account state — that is `account.*`.'),
-  'DELETE /api/v1/people/:id': ok(data(z.object({ deleted: z.number() })), 'Remove a person from the organisation.'),
+  'DELETE /api/v1/people/:id': ok(data(z.object({ deleted: z.number() })), 'Remove a person from the organization.'),
   'POST /api/v1/people/:id/assignments': created(data(PersonSummarySchema), 'Give somebody a position — a role AT a unit. The unit is the anchor, and the anchor is the whole of INV-005.'),
   'DELETE /api/v1/people/:id/assignments/:edgeId': ok(data(z.object({ deleted: z.number() })), 'End a position.'),
   'POST /api/v1/people/import/preview': ok(
     data(ImportPreviewSchema),
-    'Parse a CSV and say what it would do — including the role and unit names this organisation does not have.',
+    'Parse a CSV and say what it would do — including the role and unit names this organization does not have.',
   ),
   'POST /api/v1/people/import': ok(data(Counted), 'Commit a CSV import. Checked against INV-012 row by row, so a one-row CSV cannot name the Owner role.'),
   'POST /api/v1/people/:id/avatar': created(data(FileRow), 'Upload a person’s avatar. Multipart.'),
@@ -225,15 +226,15 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   'DELETE /api/v1/profile/avatar': noContent('Remove your own avatar.'),
 
   /* ---- subjects — 35 ----------------------------------------------------- */
-  'GET /api/v1/subjects/': ok(page(SubjectSummarySchema), 'Subjects — the things feedback is ABOUT. A class, a ward, a bus route, a manager: whatever this organisation wants to improve.'),
+  'GET /api/v1/subjects/': ok(page(SubjectSummarySchema), 'Subjects — the things feedback is ABOUT. A class, a ward, a bus route, a manager: whatever this organization wants to improve.'),
   'GET /api/v1/subjects/:id': ok(data(SubjectDetailSchema), 'One subject, with every campaign cycle it has been through.'),
   'POST /api/v1/subjects/': created(data(SubjectSummarySchema), 'Create a subject.'),
   'PATCH /api/v1/subjects/:id': ok(data(SubjectSummarySchema), 'Rename a subject or move it to another unit.'),
   'POST /api/v1/subjects/:id/archive': ok(data(SubjectSummarySchema), 'Archive a subject. Never deleted — its history is somebody’s feedback.'),
 
   /* ---- templates — 37 ---------------------------------------------------- */
-  'GET /api/v1/templates/': ok(page(TemplateSummarySchema), 'This organisation’s own templates.'),
-  'GET /api/v1/templates/library': ok(list(TemplateSummarySchema), 'The shared library — templates any organisation may clone.'),
+  'GET /api/v1/templates/': ok(page(TemplateSummarySchema), 'This organization’s own templates.'),
+  'GET /api/v1/templates/library': ok(list(TemplateSummarySchema), 'The shared library — templates any organization may clone.'),
   'GET /api/v1/templates/:id': ok(data(TemplateDetailSchema), 'One template with its questions, in order.'),
   'POST /api/v1/templates/': created(data(TemplateDetailSchema), 'Create a template.'),
   'PATCH /api/v1/templates/:id': ok(data(TemplateDetailSchema), 'Rename a template or change its description.'),
@@ -241,14 +242,14 @@ export const RESPONSES: Record<string, ResponseSpec> = {
     data(TemplateDetailSchema),
     'Replace the question set. POSITION IS DERIVED FROM THE ORDER SENT, never from a field — the same rule role levels follow.',
   ),
-  'POST /api/v1/templates/:id/clone': created(data(TemplateDetailSchema), 'Clone a library template into this organisation, where it becomes editable.'),
+  'POST /api/v1/templates/:id/clone': created(data(TemplateDetailSchema), 'Clone a library template into this organization, where it becomes editable.'),
   'DELETE /api/v1/templates/:id': ok(data(z.object({ deleted: z.number() })), 'Delete a template. Refuses while a campaign still uses it.'),
 
   /* ---- campaigns — 38 ---------------------------------------------------- */
   'GET /api/v1/campaigns/': ok(page(CampaignSummarySchema), 'Campaigns, scope-filtered.'),
   'GET /api/v1/campaigns/:id': ok(data(CampaignDetailSchema), 'One campaign, with its audience rule and its subjects.'),
   'POST /api/v1/campaigns/': created(data(CampaignDetailSchema), 'Create a campaign as a draft.'),
-  'POST /api/v1/campaigns/quick': created(data(CampaignDetailSchema), 'Create AND launch in one call — the demo path, and the one most organisations actually use.'),
+  'POST /api/v1/campaigns/quick': created(data(CampaignDetailSchema), 'Create AND launch in one call — the demo path, and the one most organizations actually use.'),
   'PATCH /api/v1/campaigns/:id': ok(
     data(CampaignDetailSchema),
     'Edit a draft. `anonymous` becomes IMMUTABLE at launch — a database trigger enforces it, so a campaign cannot be retroactively de-anonymised.',
@@ -319,8 +320,9 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   'POST /api/v1/bookings/:id/cancel': noContent('Cancel a booking from the console side.'),
 
   /* ---- home — 50 --------------------------------------------------------- */
-  'GET /api/v1/home/': ok(data(HomeViewSchema), 'The console home: the numbers, the live campaigns, and what to do next if the organisation is not set up yet.'),
+  'GET /api/v1/home/': ok(data(HomeViewSchema), 'The console home: the numbers, the live campaigns, and what to do next if the organization is not set up yet.'),
   'GET /api/v1/home/waiting': ok(data(z.array(WaitingFormSchema)), 'Members-only campaigns open now that the signed-in person is in the audience of and has not answered yet.'),
+  'GET /api/v1/home/answered': ok(data(z.array(AnsweredFormSchema)), 'Past feedback: the members-only campaigns the signed-in person has answered. That they did, never what, and not when.'),
 
   /* ---- activity log — 56 ------------------------------------------------- */
   'GET /api/v1/audit/': ok(
@@ -334,7 +336,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   'POST /api/v1/billing/tier': ok(data(BillingSummarySchema), 'Join a tier. NO AMOUNT IS EVER SENT — the price is read server-side from the catalogue, so a client cannot name one.'),
   'POST /api/v1/billing/downgrade': ok(data(BillingSummarySchema), 'Schedule a move down at the end of the period. Nothing is taken away mid-period.'),
   'DELETE /api/v1/billing/downgrade': ok(data(BillingSummarySchema), 'Cancel a scheduled downgrade.'),
-  'GET /api/v1/billing/enterprise-request': ok(data(EnterpriseRequestStateSchema), 'Whether this organisation has already asked to be sold Enterprise.'),
+  'GET /api/v1/billing/enterprise-request': ok(data(EnterpriseRequestStateSchema), 'Whether this organization has already asked to be sold Enterprise.'),
   'POST /api/v1/billing/enterprise-request': created(data(EnterpriseRequestStateSchema), 'Ask to be sold Enterprise. It lands in the platform owner’s queue.'),
 
   /* ---- files — 48 -------------------------------------------------------- */
@@ -366,7 +368,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   'POST /api/v1/platform/auth/logout': done('Operator sign-out.'),
   'GET /api/v1/platform/me': ok(PlatformMeResponseSchema, 'Who the operator is and what their ROLE holds. Two fixed roles, not a grid (19 §3).'),
   'GET /api/v1/platform/orgs': ok(page(PlatformOrgSummarySchema), 'The estate. EVERY FIELD IS A NUMBER, A NAME, A DATE OR AN ENUM — INV-011 expressed as a type.'),
-  'GET /api/v1/platform/orgs/:id': ok(data(PlatformOrgDetailSchema), 'One organisation’s METADATA and counts. Never its content, and no link that could reach any.'),
+  'GET /api/v1/platform/orgs/:id': ok(data(PlatformOrgDetailSchema), 'One organization’s METADATA and counts. Never its content, and no link that could reach any.'),
   'GET /api/v1/platform/stats': ok(data(PlatformStatsSchema), 'Estate totals.'),
   'GET /api/v1/platform/analytics': ok(data(PlatformAnalyticsSchema), 'Adoption and movement across the whole estate. Owner only — support helps one customer at a time.'),
   'GET /api/v1/platform/earnings': ok(data(PlatformEarningsSchema), 'The money, in MINOR UNITS. Owner only, and deliberately split from analytics (DEC-080).'),
@@ -375,7 +377,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
     data(z.object({ status: z.string() })),
     'Suspend or reinstate. CUTS STAFF SIGN-IN AND NOTHING ELSE — a QR code on a wall belongs to people who did not choose the plan.',
   ),
-  'POST /api/v1/platform/orgs/:id/message': ok(data(z.object({ sentTo: z.number() })), 'Message an organisation’s administrators. Recipients are resolved server-side — an operator never types an address.'),
+  'POST /api/v1/platform/orgs/:id/message': ok(data(z.object({ sentTo: z.number() })), 'Message an organization’s administrators. Recipients are resolved server-side — an operator never types an address.'),
   'GET /api/v1/platform/audit': ok(page(PlatformAuditEntrySchema), 'The PLATFORM’s own audit trail. Separate from a customer’s: our activity is not part of their evidence.'),
   'GET /api/v1/platform/logs': ok(
     withMeta(z.array(LogFileMetaSchema), LogStoreMetaSchema),
@@ -412,6 +414,6 @@ export const RESPONSES: Record<string, ResponseSpec> = {
   ),
   'GET /api/v1/platform/support-sessions': ok(
     list(SupportSessionRowSchema),
-    'The support register: who entered which organisation, why, and when they left.',
+    'The support register: who entered which organization, why, and when they left.',
   ),
 };

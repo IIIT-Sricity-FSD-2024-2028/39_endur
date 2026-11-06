@@ -89,7 +89,7 @@ describe('trendOf — two cycles is enough to say more or fewer', () => {
 });
 
 describe('the page', () => {
-  it('says what it is in the organisation vocabulary (INV-001)', () => {
+  it('says what it is in the organization vocabulary (INV-001)', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Data Structures' })).toBeTruthy();
     expect(screen.getByText('Quaxel · in Engineering')).toBeTruthy();

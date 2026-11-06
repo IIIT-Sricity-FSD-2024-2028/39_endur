@@ -90,7 +90,7 @@ describe('the estate list — 70, DEC-113', () => {
 
   // "None" in the status filter means no subscription row at all - which the row prints as
   // status "none" and tier bronze.
-  it('finds an organisation with no subscription row under status None and under Bronze', async () => {
+  it('finds an organization with no subscription row under status None and under Bronze', async () => {
     const operator = await makeOperator();
     const bare = await registerOrg('custom', 'silver');
     await prisma.subscription.delete({ where: { orgId: bare.orgId } });

@@ -232,7 +232,7 @@ describe('a template in use by a launched campaign is read-only', () => {
 });
 
 describe('the shared library', () => {
-  it('is readable but not writable, and belongs to no organisation', async () => {
+  it('is readable but not writable, and belongs to no organization', async () => {
     const founder = await setUpOrg();
     const library = await prisma.template.create({
       data: { orgId: null, name: 'Library form', category: 'General', industry: 'custom' },

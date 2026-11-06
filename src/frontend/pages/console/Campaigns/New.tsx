@@ -12,6 +12,7 @@ import { useLabels } from '../../../lib/labels.js';
 import { useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
+import { PAST_CLOSE, isPast, toLocalInput } from '../../../lib/when.js';
 import { cloneKey, useCloneTemplate, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
 import { canAny, FORM_BUILDING, useCan } from '../../../lib/capabilities.js';
 import { useSubjectList } from '../../../lib/subjects.js';
@@ -58,6 +59,9 @@ export default function CampaignNew(): JSX.Element {
   const [audience, setAudience] = useState<AudienceRule>({ kind: 'anyone' });
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  // When Closes was last judged against: as it is typed, and again on Launch, so a wizard left
+  // open past that time cannot launch something already closed.
+  const [now, setNow] = useState(() => Date.now());
   const [anonymous, setAnonymous] = useState(true);
   const [access, setAccess] = useState<CampaignAccess>('public');
 
@@ -90,10 +94,12 @@ export default function CampaignNew(): JSX.Element {
     if (!name.trim()) setName(autoName(templateName));
   };
 
+  const windowInOrder = !endsAt || !startsAt || new Date(endsAt) > new Date(startsAt);
+  const closesInPast = isPast(endsAt, now);
   const ready = [
     templateId !== '' && name.trim() !== '',
     subjectIds.length > 0,
-    !endsAt || !startsAt || new Date(endsAt) > new Date(startsAt),
+    windowInOrder && !closesInPast,
   ];
 
   /** The organisation's form to launch with: the pick itself, or its copy if it is the library's. */
@@ -106,6 +112,9 @@ export default function CampaignNew(): JSX.Element {
   };
 
   const launch = (): void => {
+    const at = Date.now();
+    setNow(at);
+    if (isPast(endsAt, at)) return;
     setBusy(true);
     setError(null);
     const createWith = (formId: string) => list.create({
@@ -176,7 +185,7 @@ export default function CampaignNew(): JSX.Element {
             <>
               <h4 className="tsection-head wizard-library-head">From the library</h4>
               <p className="text-meta wizard-library-hint">
-                Copied into {orgName || 'your organisation'} when you launch.
+                Copied into {orgName || 'your organization'} when you launch.
               </p>
               <div className="tgrid">
                 {libraryRows.map((row) => (
@@ -190,7 +199,7 @@ export default function CampaignNew(): JSX.Element {
               No forms yet.{' '}
               {canAny(can, FORM_BUILDING)
                 ? <Link to="/app/templates">Build one, or copy one from the library</Link>
-                : 'Whoever manages forms for your organisation can add one.'}
+                : 'Whoever manages forms for your organization can add one.'}
             </p>
           )}
           </div>
@@ -371,8 +380,13 @@ export default function CampaignNew(): JSX.Element {
               <input
                 type="datetime-local"
                 className="input"
+                min={toLocalInput(now)}
                 value={endsAt}
-                onChange={(event) => setEndsAt(event.target.value)}
+                aria-invalid={closesInPast || !windowInOrder || undefined}
+                onChange={(event) => {
+                  setEndsAt(event.target.value);
+                  setNow(Date.now());
+                }}
               />
             </label>
           </div>
@@ -380,7 +394,11 @@ export default function CampaignNew(): JSX.Element {
             Leave Opens empty to start as soon as you launch. Leave Closes empty and it runs
             until somebody closes it.
           </p>
-          {!ready[2] && <p className="form-error" role="alert">Closes has to be after Opens.</p>}
+          {closesInPast ? (
+            <p className="form-error" role="alert">{PAST_CLOSE}</p>
+          ) : (
+            !windowInOrder && <p className="form-error" role="alert">Closes has to be after Opens.</p>
+          )}
           </div>
 
           <div className="panel-section">

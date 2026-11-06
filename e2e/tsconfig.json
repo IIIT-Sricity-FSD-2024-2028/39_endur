@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "rootDir": "./",
+    "outDir": "./dist-types",
+    "noEmit": false
+  },
+  "include": ["*.ts"],
+  "exclude": ["dist-types", "node_modules"],
+  "references": [{ "path": "../packages/shared" }]
+}

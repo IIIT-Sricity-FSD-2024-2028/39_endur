@@ -4,7 +4,8 @@ import {
   type LabelSet, type OrgView, type ResolvedLabels,
 } from '@endur/shared';
 import { PageHeader } from '../../components/layout/PageHeader.js';
-import { WordsEditor } from '../../components/org/WordsEditor.js';
+import { WordsEditor, WordsTable } from '../../components/org/WordsEditor.js';
+import { LeaveGuard } from '../../components/feedback/LeaveGuard.js';
 import { DashboardPreview } from '../../components/org/DashboardPreview.js';
 import { useCan } from '../../lib/capabilities.js';
 import { ApiError } from '../../lib/api.js';
@@ -17,6 +18,14 @@ import { labelsLoaded, toastShown, useAppDispatch } from '../../store/index.js';
 
 const overridesOf = (labels: ResolvedLabels): LabelKey[] =>
   LabelKey.options.filter((key) => labels[key].many !== derivePlural(labels[key].one));
+
+const industryOf = (org: OrgView): Industry => {
+  const parsed = Industry.safeParse(org.industry);
+  return parsed.success ? parsed.data : 'custom';
+};
+
+const sameWords = (a: ResolvedLabels, b: ResolvedLabels): boolean =>
+  LabelKey.options.every((key) => a[key].one === b[key].one && a[key].many === b[key].many);
 
 export default function Settings(): JSX.Element {
   const can = useCan();
@@ -51,9 +60,15 @@ export default function Settings(): JSX.Element {
     setDraft(resolved);
     setOverrides(overridesOf(resolved));
     setName(loaded.name);
-    const parsed = Industry.safeParse(loaded.industry);
-    setIndustry(parsed.success ? parsed.data : 'custom');
+    setIndustry(industryOf(loaded));
   }, [loaded]);
+
+  // WHAT IS UNSAVED, per card. Each Save wakes up only when its card differs from what the
+  // server holds, says "Saved" otherwise, and leaving with either one unsaved asks first.
+  const saved = useMemo(() => (loaded ? resolveLabels(loaded.labels) : null), [loaded]);
+  const profileDirty =
+    loaded !== null && (name.trim() !== loaded.name || industry !== industryOf(loaded));
+  const wordsDirty = draft !== null && saved !== null && !sameWords(draft, saved);
 
   useEffect(() => {
     if (!draft || window.location.hash !== '#words') return;
@@ -64,6 +79,8 @@ export default function Settings(): JSX.Element {
     () => (presets.data ?? []).map((preset) => ({ key: preset.key, name: preset.displayName })),
     [presets.data],
   );
+  const industryName = (key: string): string =>
+    industries.find((entry) => entry.key === key)?.name ?? key.charAt(0).toUpperCase() + key.slice(1);
 
   const message = (error: unknown, fallback: string): string =>
     error instanceof ApiError ? error.message : fallback;
@@ -145,7 +162,7 @@ export default function Settings(): JSX.Element {
     );
   }
 
-  if (!draft) {
+  if (!draft || !loaded) {
     return (
       <>
         <PageHeader title="Settings" />
@@ -154,9 +171,55 @@ export default function Settings(): JSX.Element {
     );
   }
 
+  // READ, NOT A FORM WITH EVERY FIELD SWITCHED OFF. Without `org.update` this page is only
+  // reachable by typing its address (the sidebar item needs the power), and what it owes
+  // that reader is the facts: a disabled input still looks like somewhere to type.
+  if (!editable) {
+    return (
+      <>
+        <PageHeader
+          title="Settings"
+          subtitle="How your organization is set up. Whoever manages it can change this."
+        />
+        <div className="settings-page">
+          <section className="settings-card" aria-labelledby="settings-org">
+            <h3 className="utility" id="settings-org">Organization</h3>
+            <dl className="card settings-facts">
+              <div className="settings-fact">
+                <dt>Name</dt>
+                <dd>{loaded.name}</dd>
+              </div>
+              <div className="settings-fact">
+                <dt>Industry</dt>
+                <dd>{industryName(industryOf(loaded))}</dd>
+              </div>
+              <div className="settings-fact">
+                <dt>Logo</dt>
+                <dd>
+                  {loaded.logoUrl ? (
+                    <img src={loaded.logoUrl} alt={`${loaded.name} logo`} className="file-preview shape-square" />
+                  ) : (
+                    <span className="text-muted">None</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="settings-card" id="words" aria-labelledby="settings-words">
+            <h3 className="utility" id="settings-words">Official Terms</h3>
+            <p className="text-muted">These appear throughout Endur.</p>
+            <WordsTable labels={saved ?? draft} />
+          </section>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader title="Settings" />
+      <LeaveGuard when={profileDirty || wordsDirty} what="your changes to these settings" />
 
       <div className="settings-page">
         <section className="settings-card" aria-labelledby="settings-org">
@@ -169,7 +232,6 @@ export default function Settings(): JSX.Element {
                 className="input"
                 value={name}
                 maxLength={120}
-                disabled={!editable}
                 onChange={(event) => setName(event.target.value)}
               />
             </div>
@@ -180,7 +242,7 @@ export default function Settings(): JSX.Element {
                 id="org-industry"
                 className="input"
                 value={industry}
-                disabled={!editable || industries.length === 0}
+                disabled={industries.length === 0}
                 onChange={(event) => setIndustry(event.target.value as Industry)}
               >
                 {industries.map((entry) => (
@@ -199,8 +261,7 @@ export default function Settings(): JSX.Element {
               label="Logo"
               shape="square"
               current={org.data?.logoUrl ?? null}
-              disabled={!editable}
-              hint="PNG, JPEG or WebP, up to 2 MB."
+              hint="PNG, JPEG or WebP, up to 2 MB. It is saved as soon as you choose it."
               onUpload={async (file) => {
                 org.set(await uploadLogo(file));
               }}
@@ -211,18 +272,17 @@ export default function Settings(): JSX.Element {
 
             {profileError && <p className="field-error" role="alert">{profileError}</p>}
 
-            {editable && (
-              <div className="card-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={savingProfile || !name.trim()}
-                  onClick={saveProfile}
-                >
-                  {savingProfile ? 'Saving…' : 'Save organization'}
-                </button>
-              </div>
-            )}
+            <div className="card-actions">
+              {profileDirty && <span className="text-meta settings-unsaved">Unsaved changes</span>}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={savingProfile || !name.trim() || !profileDirty}
+                onClick={saveProfile}
+              >
+                {savingProfile ? 'Saving…' : profileDirty ? 'Save organization' : 'Saved'}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -233,7 +293,6 @@ export default function Settings(): JSX.Element {
           <WordsEditor
             labels={draft}
             overrides={overrides}
-            readOnly={!editable}
             onSetOne={setOne}
             onSetMany={setMany}
             onResetPlural={resetPlural}
@@ -243,18 +302,17 @@ export default function Settings(): JSX.Element {
           {blank && <p className="field-error" role="alert">Every word needs a singular and a plural.</p>}
           {wordsError && <p className="field-error" role="alert">{wordsError}</p>}
 
-          {editable && (
-            <div className="card-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={savingWords || Boolean(blank)}
-                onClick={saveWords}
-              >
-                {savingWords ? 'Saving…' : 'Save words'}
-              </button>
-            </div>
-          )}
+          <div className="card-actions">
+            {wordsDirty && <span className="text-meta settings-unsaved">Unsaved changes</span>}
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={savingWords || Boolean(blank) || !wordsDirty}
+              onClick={saveWords}
+            >
+              {savingWords ? 'Saving…' : wordsDirty ? 'Save words' : 'Saved'}
+            </button>
+          </div>
         </section>
       </div>
     </>

@@ -54,6 +54,27 @@ export type WaitingForm = {
 };
 
 /**
+ * A members-only form the signed-in person has ANSWERED: their past feedback, under the
+ * forms still waiting on Home.
+ *
+ * It says THAT they answered and nothing about WHAT (INV-006): a response carries no
+ * identity, so there is nothing to show them, even their own answer. And not WHEN, either:
+ * the participation row keeps no time, because a time would pair them with their response.
+ */
+export type AnsweredForm = {
+  campaignId: string;
+  name: string;
+  /** What it was about when there was exactly one thing; with several, the form asked. */
+  about: string | null;
+  /** Whether others can still answer it. */
+  status: 'open' | 'closed';
+  /** Closed: when it closed (pressed, or its closing time came). Open: null. */
+  closedAt: string | null;
+  /** Open: when it will close, if it has a closing time. Closed: null. */
+  endsAt: string | null;
+};
+
+/**
  * The whole dashboard, in ONE round trip (46).
  *
  * Every section is OPTIONAL, and that is load-bearing rather than defensive typing: a

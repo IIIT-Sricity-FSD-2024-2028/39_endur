@@ -323,7 +323,7 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
 });
 
 describe('the two access dead ends — DEC-037, 39 § States', () => {
-  it('a stranger is told WHICH organisation, and offered a way in', () => {
+  it('a stranger is told WHICH organization, and offered a way in', () => {
     usePublicCampaign.mockReturnValue(gated('signIn', 'Northfield University'));
     mount();
 

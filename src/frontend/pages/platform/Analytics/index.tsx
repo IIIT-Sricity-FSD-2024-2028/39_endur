@@ -115,7 +115,7 @@ export default function Analytics(): JSX.Element {
           <div className="ops-sections">
             <div className="stat-row">
               <StatCard
-                kicker="Organisations"
+                kicker="Organizations"
                 value={data.orgs.joined}
                 context={`${data.orgs.total} total · excludes ${data.orgs.trialing} trialing and ${data.orgs.cancelled} cancelled`}
               />
@@ -131,7 +131,7 @@ export default function Analytics(): JSX.Element {
               <StatCard
                 kicker="Gone quiet"
                 value={data.adoption.orgsQuiet30d}
-                context={`of ${data.orgs.total} organisations · no response in the last 30 days`}
+                context={`of ${data.orgs.total} organizations · no response in the last 30 days`}
               />
             </div>
 
@@ -152,7 +152,7 @@ export default function Analytics(): JSX.Element {
                 columns={movementColumns}
                 rows={data.movement}
                 rowKey={(row) => row.period}
-                caption="Organisation movement by period"
+                caption="Organization movement by period"
                 empty={<p className="text-muted">No movement in this window.</p>}
               />
             </section>
@@ -164,7 +164,7 @@ export default function Analytics(): JSX.Element {
                   reconstructing it from `payments` is a different feature. */}
               <h3>Tier mix · as of today</h3>
               <p className="text-muted">
-                {data.byTier.reduce((sum, row) => sum + row.orgs, 0)} organisations · excludes{' '}
+                {data.byTier.reduce((sum, row) => sum + row.orgs, 0)} organizations · excludes{' '}
                 {data.orgs.trialing} trialing
               </p>
               {/* NO SEAT COUNT ON THE LABEL — DEC-102. Nothing is billed per seat, so a seat
@@ -186,7 +186,7 @@ export default function Analytics(): JSX.Element {
             <section className="card">
               <h3>Adoption · as of today</h3>
               <p className="text-muted">
-                {data.adoption.orgsWithACampaign} of {data.orgs.total} organisations have a
+                {data.adoption.orgsWithACampaign} of {data.orgs.total} organizations have a
                 campaign · {data.adoption.orgsWithAResponse} have at least one response
               </p>
               <Link className="btn btn-secondary" to="/ops">

@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/shared" },
-    { "path": "./src/backend" },
-    { "path": "./src/frontend" }
+    {
+      "path": "./packages/shared"
+    },
+    {
+      "path": "./src/backend"
+    },
+    {
+      "path": "./src/frontend"
+    },
+    {
+      "path": "./e2e"
+    }
   ]
 }

@@ -84,7 +84,7 @@ describe('sign in — 30 §3.2', () => {
     });
   });
 
-  it('lands on the wizard, not the console, when the organisation is unconfigured', async () => {
+  it('lands on the wizard, not the console, when the organization is unconfigured', async () => {
     signIn.mockResolvedValue('/app/setup');
     mount();
     fill();
@@ -208,7 +208,7 @@ const AMBIGUOUS = () =>
     },
   });
 
-describe('one address, two organisations — DEC-049', () => {
+describe('one address, two organizations — DEC-049', () => {
   it('asks which, naming them, instead of failing', async () => {
     signIn.mockRejectedValueOnce(AMBIGUOUS());
     mount();

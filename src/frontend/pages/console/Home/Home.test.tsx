@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 describe('the page as a whole', () => {
-  it('opens with the organisation’s name and one primary action', () => {
+  it('opens with the organization’s name and one primary action', () => {
     mount();
     expect(screen.getByRole('heading', { name: 'Northfield' })).toBeTruthy();
     expect(screen.getByRole('link', { name: /New plithe/i })).toBeTruthy();
@@ -117,7 +117,7 @@ describe('what the caller may not read is ABSENT — INV-003', () => {
   });
 });
 
-describe('a brand-new organisation', () => {
+describe('a brand-new organization', () => {
   beforeEach(() => {
     home = {
       data: {

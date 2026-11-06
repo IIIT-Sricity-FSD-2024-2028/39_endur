@@ -4,6 +4,7 @@ import { Icon } from '../../../components/Icon.js';
 import { ApiError } from '../../../lib/api.js';
 import { quickCreate } from '../../../lib/campaigns.js';
 import { useLabels } from '../../../lib/labels.js';
+import { PAST_CLOSE, isPast, toLocalInput } from '../../../lib/when.js';
 
 const MAX_OPTIONS = 10;
 
@@ -40,6 +41,9 @@ export function QuickDialog({
   const [name, setName] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [endsAt, setEndsAt] = useState('');
+  // The moment the closing time was last judged against: when it was typed, and again on
+  // submit, so a dialog left open past that time cannot create a link that is already closed.
+  const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +56,9 @@ export function QuickDialog({
   }, [onCancel, busy]);
 
   const filled = options.map((option) => option.trim()).filter(Boolean);
-  const ready = name.trim() !== '' && (purpose === 'suggestion' || filled.length >= 2);
+  const closesInPast = isPast(endsAt, now);
+  const ready =
+    name.trim() !== '' && (purpose === 'suggestion' || filled.length >= 2) && !closesInPast;
 
   const setOption = (index: number, value: string): void =>
     setOptions((current) => current.map((option, at) => (at === index ? value : option)));
@@ -91,7 +97,9 @@ export function QuickDialog({
           className="subject-form dialog-form"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!ready || busy) return;
+            const at = Date.now();
+            setNow(at);
+            if (!ready || busy || isPast(endsAt, at)) return;
             submit();
           }}
         >
@@ -156,9 +164,18 @@ export function QuickDialog({
                 id="quick-ends"
                 className="input"
                 type="datetime-local"
+                min={toLocalInput(now)}
                 value={endsAt}
-                onChange={(event) => setEndsAt(event.target.value)}
+                aria-invalid={closesInPast || undefined}
+                aria-describedby={closesInPast ? 'quick-ends-error' : undefined}
+                onChange={(event) => {
+                  setEndsAt(event.target.value);
+                  setNow(Date.now());
+                }}
               />
+              {closesInPast && (
+                <p className="field-error" id="quick-ends-error" role="alert">{PAST_CLOSE}</p>
+              )}
               {/* Said BEFORE the button rather than discovered after it: this creates a live,
                   public link, and both properties are fixed once it exists (10 §4.3). */}
               <p className="field-help">

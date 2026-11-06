@@ -19,7 +19,7 @@ const expirePeriod = async (orgId: string): Promise<void> => {
 };
 
 describe('the entitlement gate needs no change for a trial — DEC-116', () => {
-  it('opens a Gold surface immediately for an organisation trialing Gold', async () => {
+  it('opens a Gold surface immediately for an organization trialing Gold', async () => {
     const founder = await registerOrg('custom', 'gold', true);
     const res = await founder.agent.get('/api/v1/analysis');
     expect(res.status).not.toBe(402);
@@ -138,7 +138,7 @@ describe('converting mid-trial charges full price — DEC-116', () => {
   });
 
   // The guard on the guard: an ORDINARY paid org still cannot move down or sideways mid-period.
-  it('still refuses an equal or lower tier for a PAID organisation', async () => {
+  it('still refuses an equal or lower tier for a PAID organization', async () => {
     const founder = await registerOrg('custom', 'gold', false);
     const res = await withCsrf(founder, 'post', '/api/v1/billing/tier').send({ tier: 'bronze' });
     expect(res.status).toBe(409);

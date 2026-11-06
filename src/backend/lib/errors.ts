@@ -60,7 +60,7 @@ export class SignInRequiredError extends AppError {
 // Signed in, but to a different organisation than the campaign belongs to.
 export class NotAMemberError extends AppError {
   constructor(organizationName: string) {
-    super('NOT_A_MEMBER', 'This form belongs to a different organisation.', {
+    super('NOT_A_MEMBER', 'This form belongs to a different organization.', {
       organizationName,
     });
   }

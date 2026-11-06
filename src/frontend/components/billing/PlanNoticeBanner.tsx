@@ -24,7 +24,7 @@ export function noticeFor(
     return {
       tone: 'lapsed',
       text:
-        `Your ${tierName(summary.lapsedFrom)} ${noun} has ended and this organisation is now on ` +
+        `Your ${tierName(summary.lapsedFrom)} ${noun} has ended and this organization is now on ` +
         `${tierName(summary.tier)}. Nothing you have collected has been deleted.`,
       action: 'Choose a plan',
     };
@@ -40,7 +40,7 @@ export function noticeFor(
       tone: 'ending',
       text:
         `Your ${tierName(summary.tier)} trial ends on ${formatDate(summary.periodEnd)}. ` +
-        `Add payment to keep it — otherwise this organisation moves to ${tierName('bronze')}.`,
+        `Add payment to keep it — otherwise this organization moves to ${tierName('bronze')}.`,
       action: 'Add payment',
     };
   }
@@ -51,7 +51,7 @@ export function noticeFor(
     tone: 'ending',
     text:
       `Your ${tierName(summary.tier)} plan ends on ${formatDate(summary.periodEnd)}. ` +
-      `Plans do not renew on their own: after that this organisation moves to ` +
+      `Plans do not renew on their own: after that this organization moves to ` +
       `${tierName('bronze')}, and you can join ${tierName(summary.tier)} again from Plan.`,
     action: 'View plan',
   };
