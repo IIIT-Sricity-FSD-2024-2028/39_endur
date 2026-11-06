@@ -76,7 +76,10 @@ export type InboxResponse = {
 export type InboxMessage = {
   id: string;
   at: string;
-  /** `platform_message` today. A value rather than a second type — `10` §5. */
+  /**
+   * `platform_message` (from Endur) or `feedback_request` (a members-only form for you,
+   * sent at launch). A value rather than a second type — `10` §5.
+   */
   kind: string;
   subject: string;
   body: string;
@@ -97,3 +100,6 @@ export type InboxMessageQuery = z.infer<typeof InboxMessageQuery>;
 export const InboxMessageListDto = dto({ query: InboxMessageQuery });
 export const InboxMessageMarkDto = dto({ params: z.object({ id: Id }) });
 
+
+/** The message a members-only launch sends to each person it is for. */
+export const FEEDBACK_REQUEST = 'feedback_request';

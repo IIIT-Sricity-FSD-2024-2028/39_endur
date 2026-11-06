@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Capability, InboxResponse, Page } from '@endur/shared';
 import {
   NONSENSE_LABELS, errorReply, heldReply, renderWithProviders, stubApi, type StubCall,
@@ -262,10 +262,44 @@ describe('three empties, because they mean three different things', () => {
 });
 
 describe('access', () => {
-  it('renders a full-page refusal without response.read, not an empty queue', async () => {
+  it('without response.read it is MESSAGES ALONE, never the queue', async () => {
+    calls = stubApi({
+      'GET /inbox/messages*': { body: { data: [], page: { nextCursor: null, hasMore: false }, meta: { total: 0 } } },
+    });
     mount([]);
-    await screen.findByText('You do not have access to this');
-    expect(inboxGets()).toEqual([]);
+    await screen.findByText('No messages');
+    expect(screen.queryByRole('tab')).toBeNull();
+    // Nothing but the messages was asked for.
+    expect(inboxGets().length).toBeGreaterThan(0);
+    expect(inboxGets().every((path) => path.startsWith('/inbox/messages'))).toBe(true);
+  });
+
+  it('a form request is FROM THE ORGANISATION and says where to answer it', async () => {
+    calls = stubApi({
+      'GET /inbox/messages*': { body: {
+        data: [
+          {
+            id: 'm1', at: '2026-11-05T10:00:00.000Z', kind: 'feedback_request', read: false,
+            subject: 'Waiting for your answer: Spring check',
+            body: 'It is at the top of your Home page, and you can answer it there.',
+          },
+          { id: 'm2', at: '2026-11-01T10:00:00.000Z', kind: 'platform_message', read: true, subject: 'Welcome', body: 'Hello.' },
+        ],
+        page: { nextCursor: null, hasMore: false },
+        meta: { total: 2 },
+      } },
+      'POST /inbox/messages/*': { status: 204 },
+    });
+    mount([]);
+
+    const request = (await screen.findByText('Waiting for your answer: Spring check')).closest('article') as HTMLElement;
+    expect(within(request).getByText('Northfield')).toBeTruthy();
+    const answer = within(request).getByRole('link', { name: 'Answer on Home' });
+    expect(answer.getAttribute('href')).toBe('/app');
+
+    const fromUs = screen.getByText('Welcome').closest('article') as HTMLElement;
+    expect(within(fromUs).getByText('Endur')).toBeTruthy();
+    expect(within(fromUs).queryByRole('link')).toBeNull();
   });
 
   it('keeps the tab, the filters and the cursor in the URL so a queue is linkable', async () => {

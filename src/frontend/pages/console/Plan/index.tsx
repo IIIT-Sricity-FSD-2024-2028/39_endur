@@ -339,25 +339,25 @@ export default function Plan(): JSX.Element {
 
           {error && <p className="form-error" role="alert">{error}</p>}
 
-          {/* Without `billing.update` the picker is inert rather than absent: knowing which
-              plan you are on and what the next one adds is `billing.read`'s answer, and
-              hiding it would leave an administrator's colleague unable to say what to ask
-              for. The buttons are what the capability gates. */}
+          {/* Without `billing.update` the plans still show — which one this is and what the
+              next adds is `billing.read`'s answer, and hiding it would leave an
+              administrator's colleague unable to say what to ask for — but with NO buttons,
+              not greyed ones. The buttons are what the capability gates. */}
           <PlanPicker
             plans={catalogue}
             current={summary.tier}
             mode="join"
             busyTier={busyTier}
             requestedTier={enterprise.requestedAt ? 'enterprise' : null}
-            disabled={!mayChange}
+            actions={mayChange}
             belowIsLive={summary.status === 'trialing'}
             onSelect={choose}
           />
 
           {!mayChange && (
             <p className="text-meta">
-              <Icon name="role" size={16} /> Changing the plan needs the billing permission.
-              An administrator can do it from this page.
+              <Icon name="role" size={16} /> Whoever manages billing for your organisation can
+              change the plan from this page.
             </p>
           )}
         </section>

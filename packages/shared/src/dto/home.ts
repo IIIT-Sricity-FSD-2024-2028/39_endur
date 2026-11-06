@@ -35,6 +35,25 @@ export type HomeQuery = z.infer<typeof HomeQuery>;
 export const HomeDto = dto({ query: HomeQuery });
 
 /**
+ * A members-only form waiting for the signed-in person (`GET /home/waiting`).
+ *
+ * Only `access: 'organization'` campaigns can be here. They are the ones that know whether
+ * THIS person has answered (a participation row, never joined to the answer), so the card
+ * can go away once they have. A public link cannot know, and would sit there for ever.
+ */
+export type WaitingForm = {
+  campaignId: string;
+  /** The `/r/:token` token: the form loads and submits through the same two routes. */
+  token: string;
+  name: string;
+  /** What it is about when there is exactly one thing; with several, the form asks. */
+  about: string | null;
+  questionCount: number;
+  estimatedSeconds: number;
+  endsAt: string | null;
+};
+
+/**
  * The whole dashboard, in ONE round trip (46).
  *
  * Every section is OPTIONAL, and that is load-bearing rather than defensive typing: a

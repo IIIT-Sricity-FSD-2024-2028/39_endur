@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { AnnouncementSummary, AudienceRule } from '@endur/shared';
 import { ApiError } from '../../../lib/api.js';
 import { useLabels } from '../../../lib/labels.js';
+import { useCan } from '../../../lib/capabilities.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { pluralise } from '../../../lib/format.js';
@@ -22,6 +23,7 @@ export function Composer({
   onCancel: () => void;
 }): JSX.Element {
   const labels = useLabels();
+  const can = useCan();
   const units = useUnits();
 
   const [title, setTitle] = useState(editing?.title ?? '');
@@ -183,7 +185,7 @@ export function Composer({
             {error && (
               <p className="form-error" role="alert">
                 {error}{' '}
-                {upgrade && <Link to="/app/plan">See the plans</Link>}
+                {upgrade && can('billing.update') && <Link to="/app/plan">See the plans</Link>}
               </p>
             )}
           </div>

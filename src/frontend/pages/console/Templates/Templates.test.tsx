@@ -43,7 +43,9 @@ vi.mock('../../../lib/templates.js', () => ({
   useTemplates: () => ({ ...list, reload, create, clone, remove }),
 }));
 
-const ALL: Capability[] = ['template.read', 'template.create', 'template.clone', 'template.delete'];
+const ALL: Capability[] = [
+  'template.read', 'template.create', 'template.update', 'template.clone', 'template.delete',
+];
 
 const mount = (capabilities: Capability[] = ALL, path = '/app/templates') =>
   renderWithProviders(
@@ -248,7 +250,7 @@ describe('delete states its consequence, and refuses when the server would', () 
 
 describe('capabilities decide what is offered, never what is enforced', () => {
   it('hides Use without template.clone and Delete without template.delete', () => {
-    mount(['template.read']);
+    mount(['template.read', 'template.update']);
     expect(screen.queryByRole('button', { name: 'Use' })).toBeNull();
     expect(screen.queryByRole('img', { name: /^Delete / })).toBeNull();
     expect(screen.queryByRole('button', { name: /Blank form/ })).toBeNull();
@@ -256,10 +258,29 @@ describe('capabilities decide what is offered, never what is enforced', () => {
   });
 
   it('leaves Preview available to everybody who can read', () => {
-    mount(['template.read']);
+    mount(['template.read', 'template.update']);
     expect(
       within(section('Library')).getAllByRole('button', { name: 'Preview' }).length,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('a page for whoever BUILDS forms', () => {
+  it('reading and copying alone is not this page: it points at the campaign wizard', () => {
+    // As seeded for Faculty: they pick and copy forms inside the wizard instead.
+    mount(['template.read', 'template.clone', 'campaign.create']);
+    expect(screen.getByText('Forms are built by whoever manages them')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Library' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'New plithe' }).getAttribute('href'))
+      .toBe('/app/campaigns/new');
+  });
+
+  it('no Open on a form somebody cannot change, and a copy stays on this page', async () => {
+    mount(['template.read', 'template.create', 'template.clone']);
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    fireEvent.click(within(section('Library')).getAllByRole('button', { name: 'Use' })[0] as HTMLElement);
+    expect(await screen.findByText(/is in your templates/)).toBeTruthy();
+    expect(screen.queryByText('BUILDER')).toBeNull();
   });
 });
 

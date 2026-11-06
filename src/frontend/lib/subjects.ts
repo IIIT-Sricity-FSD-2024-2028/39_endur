@@ -6,6 +6,7 @@
 //
 // On RTK Query since R-405 (`store/api/endpoints/subjects.ts`). Names and shapes unchanged.
 import { useCallback } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
 import type {
   CreateSubjectBody,
   Page,
@@ -60,8 +61,9 @@ export function subjectSearch(query: SubjectQuery): string {
  * its own cache entry, and the hook reads the entry for what the box says, so a late answer
  * lands in its own entry and is simply not the one on screen.
  */
-export function useSubjectList(query: SubjectQuery): SubjectListController {
-  const list = useLoadable(useGetSubjectsQuery(subjectSearch(query)));
+/** `enabled: false` asks nothing: a page that only sometimes shows the list (Inbox's filters). */
+export function useSubjectList(query: SubjectQuery, enabled = true): SubjectListController {
+  const list = useLoadable(useGetSubjectsQuery(enabled ? subjectSearch(query) : skipToken));
   const { reload } = list;
   const [createSubject] = useCreateSubjectMutation();
   const [renameSubject] = useRenameSubjectMutation();

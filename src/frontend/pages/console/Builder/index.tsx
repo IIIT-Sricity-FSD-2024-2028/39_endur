@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { QuestionCard } from '../../../components/form/QuestionCard.js';
 import { Icon } from '../../../components/Icon.js';
@@ -29,7 +29,20 @@ import { toastShown } from '../../../store/uiSlice.js';
 import { useBuilder } from './useBuilder.js';
 import { SaveIndicator } from './SaveIndicator.js';
 
+/**
+ * The editor is for whoever may change forms. Anybody else who reaches it (an old link, a
+ * typed address) is shown the form itself, read-only, rather than an editor whose every
+ * control is switched off. A LOCKED form is a different thing — an editor looking at a form
+ * that is in use — and BuilderPage still shows that read-only, with the way to copy it.
+ */
 export default function Builder(): JSX.Element {
+  const { id } = useParams<{ id: string }>();
+  const can = useCan();
+  if (!can('template.update')) return <Navigate to={`/app/forms/${id ?? ''}/preview`} replace />;
+  return <BuilderPage />;
+}
+
+function BuilderPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const can = useCan();
   const labels = useLabels();

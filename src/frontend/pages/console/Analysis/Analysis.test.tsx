@@ -295,6 +295,13 @@ describe('a theme drills through to its source comments', () => {
     );
   });
 
+  it('without response.read a theme is a row to read, not a door that opens on a refusal', async () => {
+    mount(['analysis.read', 'campaign.read', 'subject.read', 'unit.read']);
+    await waitFor(() => expect(document.querySelector('.theme-label')?.textContent).toBe('Parking'));
+    expect(screen.queryByRole('button', { name: 'Parking' })).toBeNull();
+    expect(screen.queryByText(/Open one to read the comments/)).toBeNull();
+  });
+
   it('is a BUTTON, not a clickable row', async () => {
     mount();
     const opener = await screen.findByRole('button', { name: 'Parking' });

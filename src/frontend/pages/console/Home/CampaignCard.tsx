@@ -1,6 +1,7 @@
 import type { HomeView } from '@endur/shared';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../../components/Icon.js';
+import { useCan } from '../../../lib/capabilities.js';
 import { endsIn } from './cards.js';
 
 type Campaign = NonNullable<HomeView['activeCampaigns']>[number];
@@ -15,10 +16,16 @@ export function CampaignCard({
   onShare: () => void;
 }): JSX.Element {
   const closing = endsIn(campaign.endsAt);
+  // Its results for whoever may read them; the campaign itself for everybody else, rather
+  // than a link to a page that would only say no.
+  const can = useCan();
+  const to = can('results.read')
+    ? `/app/campaigns/${campaign.id}/results`
+    : `/app/campaigns/${campaign.id}`;
 
   return (
     <li className="card home-campaign">
-      <Link className="home-campaign-name" to={`/app/campaigns/${campaign.id}/results`}>
+      <Link className="home-campaign-name" to={to}>
         {campaign.name}
       </Link>
 

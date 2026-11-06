@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PRESET_VOCABULARIES, type TemplateSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { Icon } from '../../../components/Icon.js';
 import { useLabels } from '../../../lib/labels.js';
-import { useCan } from '../../../lib/capabilities.js';
+import { canAny, FORM_BUILDING, useCan } from '../../../lib/capabilities.js';
 import { toastShown, useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
 import { cloneKey, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
@@ -22,7 +22,36 @@ function industryName(key: string): string {
   return preset?.displayName ?? key.charAt(0).toUpperCase() + key.slice(1);
 }
 
+/**
+ * The form workshop, for whoever may build or change forms (FORM_BUILDING). Reading and
+ * copying forms is what running a campaign needs, and the campaign wizard does both, so a
+ * reader who can do nothing else here is pointed there rather than shown a page of forms
+ * they cannot make or change. Only a typed address gets this far: the sidebar item is gated
+ * the same way.
+ */
 export default function Templates(): JSX.Element {
+  const can = useCan();
+  const labels = useLabels();
+  if (canAny(can, FORM_BUILDING)) return <TemplatesPage />;
+  const round = labels.campaign.one.toLowerCase();
+  return (
+    <>
+      <PageHeader title="Templates" />
+      <EmptyState
+        icon="template"
+        title="Forms are built by whoever manages them"
+        body={`You pick a form when you start a ${round}: your organisation's forms and the library's are both listed there.`}
+        action={
+          can('campaign.create') ? (
+            <Link className="btn btn-primary" to="/app/campaigns/new">New {round}</Link>
+          ) : undefined
+        }
+      />
+    </>
+  );
+}
+
+function TemplatesPage(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
   const navigate = useNavigate();
@@ -92,7 +121,11 @@ export default function Templates(): JSX.Element {
     setCardError(null);
     void own
       .clone(template.id, cloneKey(template.id))
-      .then((created) => navigate(`/app/forms/${created.id}/build`))
+      .then((created) => {
+        // Into the builder for whoever can change it; anybody else has their copy listed above.
+        if (can('template.update')) navigate(`/app/forms/${created.id}/build`);
+        else showToast(`“${created.name}” is in your templates.`);
+      })
       .catch((error: unknown) => {
         setCardError({ id: template.id, text: message(error, 'That could not be copied.') });
       })
@@ -209,7 +242,9 @@ export default function Templates(): JSX.Element {
                 busy={busyId === template.id}
                 error={cardError?.id === template.id ? cardError.text : undefined}
                 onPreview={() => setPreview(template)}
-                onOpen={() => navigate(`/app/forms/${template.id}/build`)}
+                {...(can('template.update')
+                  ? { onOpen: () => navigate(`/app/forms/${template.id}/build`) }
+                  : {})}
                 {...(can('template.delete') ? { onDelete: () => setPending(template) } : {})}
               />
             ))}
@@ -264,7 +299,9 @@ export default function Templates(): JSX.Element {
             ? can('template.clone')
               ? { onUse: () => { const target = preview; setPreview(null); copyTemplate(target); } }
               : {}
-            : { onOpen: () => navigate(`/app/forms/${preview.id}/build`) })}
+            : can('template.update')
+              ? { onOpen: () => navigate(`/app/forms/${preview.id}/build`) }
+              : {})}
         />
       )}
 

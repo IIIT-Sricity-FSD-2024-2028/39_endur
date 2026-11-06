@@ -83,7 +83,7 @@ export default function CampaignDetail(): JSX.Element {
                 {busy ? 'Launching…' : `Launch ${labels.campaign.one.toLowerCase()}`}
               </button>
             )}
-            {detail.status !== 'draft' && (
+            {detail.status !== 'draft' && can('results.read') && (
               <Link className="btn btn-secondary" to={`/app/campaigns/${detail.id}/results`}>
                 Results
               </Link>

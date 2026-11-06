@@ -24,6 +24,7 @@ import {
   GapViewSchema,
   GrantWarningSchema,
   HomeViewSchema,
+  WaitingFormSchema,
   ImportPreviewSchema,
   InboxMessageSchema,
   InboxResponseSchema,
@@ -319,6 +320,7 @@ export const RESPONSES: Record<string, ResponseSpec> = {
 
   /* ---- home — 50 --------------------------------------------------------- */
   'GET /api/v1/home/': ok(data(HomeViewSchema), 'The console home: the numbers, the live campaigns, and what to do next if the organisation is not set up yet.'),
+  'GET /api/v1/home/waiting': ok(data(z.array(WaitingFormSchema)), 'Members-only campaigns open now that the signed-in person is in the audience of and has not answered yet.'),
 
   /* ---- activity log — 56 ------------------------------------------------- */
   'GET /api/v1/audit/': ok(

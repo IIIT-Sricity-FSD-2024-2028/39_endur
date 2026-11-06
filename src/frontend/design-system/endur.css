@@ -5566,7 +5566,6 @@ a.involve-name { color: inherit; }
 /* The operator typed paragraphs; the product does not get to remove them. */
 .message-body { margin: 0; white-space: pre-wrap; line-height: 1.55; max-width: 72ch; }
 
-.message-mark { align-self: flex-start; }
 
 
 /* ── The Enterprise queue — DEC-100, 70 ────────────────────────────────────
@@ -5879,3 +5878,50 @@ textarea.input {
   .support-banner-countdown { margin-left: 0; }
   .support-banner { align-items: flex-start; }
 }
+
+/* ── Forms waiting for your answer — Home, the sidebar count, Inbox messages ─────────── */
+
+/* The count beside Home in the sidebar: the same chip as an inbox tab's unread count,
+   pushed to the row's end so the label stays where every other label is. */
+.sidebar-count {
+  margin-left: auto;
+  min-width: 20px; padding: 0 6px;
+  border-radius: 999px; text-align: center;
+  background: var(--color-accent); color: var(--color-bg);
+  font-size: var(--text-micro); font-weight: 600; line-height: 20px;
+}
+
+/* An accent edge, like an unread message: this card is something waiting on YOU. */
+.waiting {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  border-left: 4px solid var(--color-accent);
+}
+.waiting-head { display: flex; flex-direction: column; gap: var(--space-1); }
+.waiting-head .panel-title { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.waiting-hint { margin: 0; }
+.waiting-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.waiting-item {
+  padding: var(--space-3);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.waiting-item.is-open { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-divider)); }
+.waiting-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.waiting-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.waiting-name { font-weight: 600; }
+.waiting-form { margin-top: var(--space-3); }
+.waiting-status { margin: var(--space-3) 0 0; }
+/* Inside a card the form needs no room for a phone's thumb under the button, and its
+   progress bar sits on the card rather than on a strip of page colour. */
+.rf-embedded .rf-form { padding-bottom: 0; }
+.rf-embedded .rf-progress { background: transparent; padding-top: 0; }
+@media (max-width: 640px) {
+  .waiting-row { flex-direction: column; align-items: stretch; }
+}
+
+.message-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* The campaign wizard's library forms, under the organisation's own (whoever may copy). */
+.wizard-library-head { margin: var(--space-6) 0 var(--space-1); }
+.wizard-library-hint { margin: 0 0 var(--space-3); }
+

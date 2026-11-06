@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type {
-  AudienceRule, CampaignAccess, CampaignDetail, Label, SubjectSummary, UnitNode,
+  AudienceRule, CampaignAccess, CampaignDetail, Label, SubjectSummary, TemplateSummary, UnitNode,
 } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
@@ -12,7 +12,8 @@ import { useLabels } from '../../../lib/labels.js';
 import { useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
-import { useTemplates } from '../../../lib/templates.js';
+import { cloneKey, useCloneTemplate, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
+import { canAny, FORM_BUILDING, useCan } from '../../../lib/capabilities.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
@@ -34,8 +35,18 @@ export default function CampaignNew(): JSX.Element {
   const labels = useLabels();
   const navigate = useNavigate();
   const orgName = useAppSelector((state) => state.auth.org?.name ?? '');
+  const orgIndustry = useAppSelector((state) => state.auth.org?.industry ?? '');
+  const can = useCan();
+  const mayCopy = can('template.clone');
 
   const templates = useTemplates();
+  // THE LIBRARY, HERE. Whoever runs campaigns but does not build forms has no Templates page
+  // (FORM_BUILDING), so the forms they may copy are offered where they choose one, and the
+  // copy is made when they launch.
+  const library = useTemplateLibrary({}, mayCopy);
+  const cloneTemplate = useCloneTemplate();
+  /** The copy made for a library pick, kept so a retried launch does not copy it twice. */
+  const copied = useRef<{ from: string; id: string } | null>(null);
   const subjects = useSubjectList({});
   const units = useUnits();
   const list = useCampaignList();
@@ -55,8 +66,22 @@ export default function CampaignNew(): JSX.Element {
   const [launched, setLaunched] = useState<{ campaign: CampaignDetail; url: string } | null>(null);
 
   const templateRows = templates.data?.data ?? [];
+  // This industry's library forms the organisation does not already have. "Has" is a copy of
+  // it (listed with its own forms, under whatever name it was given) or a form of the same
+  // name: a seeded organisation's forms were written directly, not copied, and two cards
+  // called "Course feedback" would be one choice offered twice.
+  const alreadyCopied = new Set(templateRows.map((row) => row.clonedFromId));
+  const ownNames = new Set(templateRows.map((row) => row.name.trim().toLowerCase()));
+  const libraryRows = mayCopy
+    ? (library.data ?? []).filter(
+      (row) =>
+        !alreadyCopied.has(row.id) &&
+        !ownNames.has(row.name.trim().toLowerCase()) &&
+        (!row.industry || !orgIndustry || row.industry === orgIndustry),
+    )
+    : [];
   const subjectRows = subjects.data?.data ?? [];
-  const template = templateRows.find((row) => row.id === templateId);
+  const template = [...templateRows, ...libraryRows].find((row) => row.id === templateId);
 
   const audienceLine = useAudienceLine(audience, units.data ?? [], labels.respondent);
 
@@ -71,20 +96,32 @@ export default function CampaignNew(): JSX.Element {
     !endsAt || !startsAt || new Date(endsAt) > new Date(startsAt),
   ];
 
+  /** The organisation's form to launch with: the pick itself, or its copy if it is the library's. */
+  /** The organisation's own copy of a library pick, made once even if the launch is retried. */
+  const copyOf = async (libraryId: string): Promise<string> => {
+    if (copied.current?.from === libraryId) return copied.current.id;
+    const copy = await cloneTemplate(libraryId, cloneKey(libraryId));
+    copied.current = { from: libraryId, id: copy.id };
+    return copy.id;
+  };
+
   const launch = (): void => {
     setBusy(true);
     setError(null);
-    void list
-      .create({
-        name: name.trim(),
-        templateId,
-        subjectIds,
-        audience,
-        anonymous,
-        access,
-        ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
-        ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
-      })
+    const createWith = (formId: string) => list.create({
+      name: name.trim(),
+      templateId: formId,
+      subjectIds,
+      audience,
+      anonymous,
+      access,
+      ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
+      ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
+    });
+    // The organisation's own form goes straight to create, in this same tick; a library pick
+    // is copied first (a campaign can only point at the organisation's own form).
+    const created = template?.isLibrary ? copyOf(templateId).then(createWith) : createWith(templateId);
+    void created
       .then(async (campaign) => {
         const result = await launchCampaign(campaign.id, launchKey(campaign.id));
         setLaunched({ campaign, url: result.url });
@@ -128,28 +165,32 @@ export default function CampaignNew(): JSX.Element {
         <section className="wizard-step">
           <div className="panel-section">
           <h3 className="panel-title">Which form?</h3>
-          <div className="tgrid">
-            {templateRows.map((row) => {
-              const time = approxDuration(row.estimatedSeconds);
-              return (
-                <button
-                  type="button"
-                  key={row.id}
-                  className={`card tcard tpick${templateId === row.id ? ' is-picked' : ''}`}
-                  aria-pressed={templateId === row.id}
-                  onClick={() => chooseTemplate(row.id, row.name)}
-                >
-                  <span className="tcard-name">{row.name}</span>
-                  <span className="tcard-cost">
-                    {pluralise(row.questionCount, 'question', 'questions')}{time ? ` · ${time}` : ''}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {templateRows.length === 0 && !templates.loading && (
+          {templateRows.length > 0 && (
+            <div className="tgrid">
+              {templateRows.map((row) => (
+                <FormPick key={row.id} row={row} picked={templateId === row.id} onPick={chooseTemplate} />
+              ))}
+            </div>
+          )}
+          {libraryRows.length > 0 && (
+            <>
+              <h4 className="tsection-head wizard-library-head">From the library</h4>
+              <p className="text-meta wizard-library-hint">
+                Copied into {orgName || 'your organisation'} when you launch.
+              </p>
+              <div className="tgrid">
+                {libraryRows.map((row) => (
+                  <FormPick key={row.id} row={row} picked={templateId === row.id} onPick={chooseTemplate} />
+                ))}
+              </div>
+            </>
+          )}
+          {templateRows.length === 0 && libraryRows.length === 0 && !templates.loading && !library.loading && (
             <p className="text-muted">
-              No forms yet. <Link to="/app/templates">Copy one from the library</Link> first.
+              No forms yet.{' '}
+              {canAny(can, FORM_BUILDING)
+                ? <Link to="/app/templates">Build one, or copy one from the library</Link>
+                : 'Whoever manages forms for your organisation can add one.'}
             </p>
           )}
           </div>
@@ -430,3 +471,29 @@ function find(nodes: UnitNode[], id: string): UnitNode | undefined {
 }
 
 const countPeople = (node: UnitNode): number => node.peopleTotal ?? 0;
+
+/** One form to choose. The organisation's and the library's look the same: a form is a form. */
+function FormPick({
+  row,
+  picked,
+  onPick,
+}: {
+  row: TemplateSummary;
+  picked: boolean;
+  onPick: (id: string, name: string) => void;
+}): JSX.Element {
+  const time = approxDuration(row.estimatedSeconds);
+  return (
+    <button
+      type="button"
+      className={`card tcard tpick${picked ? ' is-picked' : ''}`}
+      aria-pressed={picked}
+      onClick={() => onPick(row.id, row.name)}
+    >
+      <span className="tcard-name">{row.name}</span>
+      <span className="tcard-cost">
+        {pluralise(row.questionCount, 'question', 'questions')}{time ? ` · ${time}` : ''}
+      </span>
+    </button>
+  );
+}

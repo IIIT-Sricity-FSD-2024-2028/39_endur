@@ -1,5 +1,5 @@
 // Campaigns: a template pointed at some subjects, for a window of time.
-import { CampaignAccess, estimateSeconds } from '@endur/shared';
+import { CampaignAccess, estimateSeconds, FEEDBACK_REQUEST } from '@endur/shared';
 import type {
   AudiencePreview,
   CampaignDetail,
@@ -15,7 +15,7 @@ import type {
 import type { Request } from 'express';
 import { prisma } from '../../db/client.js';
 import { runInTransaction, type Tx } from '../../db/tx.js';
-import { positionFilter, ruleOf } from './audience.js';
+import { audienceUsers, positionFilter, ruleOf } from './audience.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { nounsOf } from '../../lib/vocabulary.js';
 import { afterCursor, CURSOR_ORDER, pageOf, type Paged } from '../../lib/paginate.js';
@@ -301,9 +301,29 @@ export async function launchCampaign(
     throw new ConflictError(`That ${nounsOf(req).campaign.one.toLowerCase()} has been closed.`);
   }
 
+  // A members-only campaign is also delivered: a message in the Inbox of everyone it is for,
+  // pointing at the card on their Home page. Read before the transaction (it is a read of who,
+  // not a write), and never the launcher, who knows.
+  const recipients = campaign.access === 'organization'
+    ? (await audienceUsers(orgId, ruleOf(campaign.audienceRule))).filter((id) => id !== userId)
+    : [];
+
   const token = await runInTransaction(req, async (tx) => {
     const minted = mintToken();
     await tx.campaign.update({ where: { id: campaignId }, data: { publicToken: minted } });
+    if (recipients.length > 0) {
+      const message = waitingMessage(campaign, statusOf({ ...campaign, publicToken: minted }));
+      // In the launch's transaction, so a launch that fails sends nothing and one that succeeds
+      // cannot have lost its messages.
+      await tx.notification.createMany({
+        data: recipients.map((recipient) => ({
+          orgId,
+          userId: recipient,
+          kind: FEEDBACK_REQUEST,
+          ...message,
+        })),
+      });
+    }
     req.ctx.audit.push({
       action: 'campaign.launch',
       targetType: 'campaign',
@@ -318,6 +338,21 @@ export async function launchCampaign(
     // Derived, so a campaign launched with a future start date comes back as scheduled rather than open.
     status: statusOf({ ...campaign, publicToken: token }),
   };
+}
+
+// The Inbox message for one person a members-only campaign is for. No dates: they would be in
+// the server's time zone, and the Home card shows the closing date in the reader's.
+function waitingMessage(
+  campaign: { name: string; anonymous: boolean },
+  status: ReturnType<typeof statusOf>,
+): { subject: string; body: string } {
+  const where = status === 'scheduled'
+    ? 'It is not open yet. It will appear at the top of your Home page when it opens.'
+    : 'It is at the top of your Home page, and you can answer it there.';
+  const promise = campaign.anonymous
+    ? ' Only the fact that you answered is recorded, never what you said.'
+    : '';
+  return { subject: `Waiting for your answer: ${campaign.name}`, body: `${where}${promise}` };
 }
 
 // Closes a campaign, so it stops accepting answers.

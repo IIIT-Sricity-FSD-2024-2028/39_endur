@@ -53,7 +53,9 @@ vi.mock('../../../lib/campaigns.js', () => ({
   useAudiencePreview: () => ({ data: null, loading: false, error: null }),
 }));
 
-const ALL: Capability[] = ['campaign.read', 'campaign.create', 'campaign.launch', 'campaign.close'];
+const ALL: Capability[] = [
+  'campaign.read', 'campaign.create', 'campaign.launch', 'campaign.close', 'results.read',
+];
 
 const mountList = (capabilities: Capability[] = ALL, path = '/app/campaigns') =>
   renderWithProviders(
@@ -181,6 +183,12 @@ describe('the detail page', () => {
     expect(screen.queryByRole('button', { name: 'Close early' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Launch/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Results' })).toBeTruthy();
+  });
+
+  it('offers no Results to somebody who may not read them', () => {
+    one = { data: detail({ status: 'closed', closedAt: '2026-08-26T00:00:00.000Z' }), loading: false, error: null };
+    mountDetail(['campaign.read']);
+    expect(screen.queryByRole('link', { name: 'Results' })).toBeNull();
   });
 
   it('hides launch and close without the capability, and still renders the page', () => {

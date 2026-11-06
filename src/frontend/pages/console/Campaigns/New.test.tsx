@@ -46,6 +46,9 @@ const page = <T,>(rows: T[]): Page<T> => ({
 
 const create = vi.fn();
 const launchCampaign = vi.fn();
+const cloneTemplate = vi.fn();
+let LIBRARY: TemplateSummary[] = [];
+let capabilities: Capability[] = [];
 
 vi.mock('../../../lib/campaigns.js', () => ({
   launchKey: (id: string) => `key-for-${id}`,
@@ -58,8 +61,10 @@ vi.mock('../../../lib/campaigns.js', () => ({
 vi.mock('../../../lib/templates.js', () => ({
   useTemplates: () => ({ data: page(TEMPLATES), loading: false, error: null }),
   useTemplate: () => ({ data: null, loading: false, error: null }),
-  useTemplateLibrary: () => ({ data: null, loading: false, error: null }),
-  cloneKey: (id: string) => id,
+  useTemplateLibrary: (_filters: unknown, enabled = true) =>
+    ({ data: enabled ? LIBRARY : null, loading: false, error: null }),
+  useCloneTemplate: () => cloneTemplate,
+  cloneKey: (id: string) => `clone-key-${id}`,
 }));
 vi.mock('../../../lib/subjects.js', () => ({
   useSubjectList: () => ({ data: page(SUBJECTS), loading: false, error: null }),
@@ -78,7 +83,7 @@ const mount = () =>
       <Route path="/app/campaigns/new" element={<New />} />
       <Route path="/app/campaigns/:id" element={<p>DETAIL</p>} />
     </Routes>,
-    { capabilities: ALL, labels: NONSENSE_LABELS, path: '/app/campaigns/new' },
+    { capabilities, labels: NONSENSE_LABELS, path: '/app/campaigns/new' },
   );
 
 const toStepThree = (): void => {
@@ -90,6 +95,8 @@ const toStepThree = (): void => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  LIBRARY = [];
+  capabilities = ALL;
   create.mockResolvedValue({
     id: 'c9', name: 'Mid-term form — August 2026', status: 'draft',
     templateId: 't1', templateName: 'Mid-term form', subjectCount: 1, responseCount: 0,
@@ -316,3 +323,61 @@ describe('step 3 — the summary, then the irreversible button', () => {
     expect(screen.getByText(/Mid-term form · 8 questions/)).toBeTruthy();
   });
 });
+
+describe('step 1 — the library, for whoever runs campaigns without building forms', () => {
+  const libraryForm = (id: string, name: string, over: Partial<TemplateSummary> = {}): TemplateSummary => ({
+    id, name, category: 'Teaching', description: null, industry: 'university',
+    questionCount: 6, estimatedSeconds: 90, campaignCount: 0, isLibrary: true,
+    clonedFromId: null, createdAt: '2026-01-01T00:00:00.000Z', ...over,
+  });
+
+  it('offers the library forms not already copied, and copies the one picked AT LAUNCH', async () => {
+    capabilities = [...ALL, 'template.clone'];
+    LIBRARY = [
+      libraryForm('lib1', 'Course pulse'),
+      // Another industry's form is not this organisation's to pick from.
+      libraryForm('lib2', 'Guest stay', { industry: 'hotel' }),
+    ];
+    cloneTemplate.mockResolvedValue({ id: 'copy-of-lib1', name: 'Course pulse' });
+    mount();
+
+    expect(screen.getByText('From the library')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Guest stay/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Course pulse/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Data Structures/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    // Nothing is copied by picking: an abandoned wizard leaves no stray form behind.
+    expect(cloneTemplate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(cloneTemplate).toHaveBeenCalledWith('lib1', 'clone-key-lib1');
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ templateId: 'copy-of-lib1' });
+  });
+
+  it('does not offer a library form the organisation already has a copy of', () => {
+    capabilities = [...ALL, 'template.clone'];
+    LIBRARY = [libraryForm('lib1', 'Mid-term form original')];
+    const original = TEMPLATES[0] as TemplateSummary;
+    TEMPLATES[0] = { ...original, clonedFromId: 'lib1' };
+    mount();
+    expect(screen.queryByText('From the library')).toBeNull();
+    TEMPLATES[0] = original;
+  });
+
+  it('nor one with the same name as a form it already has', () => {
+    capabilities = [...ALL, 'template.clone'];
+    LIBRARY = [libraryForm('lib1', 'Mid-term form'), libraryForm('lib2', 'Course pulse')];
+    mount();
+    expect(screen.getAllByRole('button', { name: /Mid-term form/ })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Course pulse/ })).toBeTruthy();
+  });
+
+  it('offers no library to somebody who may not copy forms', () => {
+    LIBRARY = [libraryForm('lib1', 'Course pulse')];
+    mount();
+    expect(screen.queryByText('From the library')).toBeNull();
+  });
+});
+

@@ -5,6 +5,7 @@
 // machine here, and `Cancel schedule` is a PATCH that clears `startsAt` rather than a
 // transition backwards.
 import { useCallback, useEffect, useState } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
 import type {
   AudiencePreview,
   AudienceRule,
@@ -48,8 +49,9 @@ export type CampaignListController = Loadable<Page<CampaignSummary>> & {
  * mounted list and the Home counters refetch by themselves. The last good page stays on
  * screen with the error above it (38 § States).
  */
-export function useCampaignList(query: CampaignQuery = {}): CampaignListController {
-  const list = useLoadable(useGetCampaignsQuery(campaignSearch(query)));
+/** `enabled: false` asks nothing: a page that only sometimes shows the list (Inbox's filters). */
+export function useCampaignList(query: CampaignQuery = {}, enabled = true): CampaignListController {
+  const list = useLoadable(useGetCampaignsQuery(enabled ? campaignSearch(query) : skipToken));
   const [createCampaign] = useCreateCampaignMutation();
 
   const create = useCallback(

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { InboxMessage, InboxState } from '@endur/shared';
+import { FEEDBACK_REQUEST, type InboxMessage, type InboxState } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ResponseCard } from '../../../components/feedback/ResponseCard.js';
@@ -15,6 +15,7 @@ import {
 } from '../../../lib/inbox.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
 import { useSubjectList } from '../../../lib/subjects.js';
+import { useAppSelector } from '../../../store/index.js';
 
 const TABS: Array<{ id: InboxState; label: string }> = [
   { id: 'all', label: 'All' },
@@ -49,11 +50,14 @@ export default function Inbox(): JSX.Element {
     can('response.read') && !showingMessages,
   );
 
-  const messages = useMessages(showingMessages);
+  // Without the queue, Messages is the whole page, so it loads whatever the tab says.
+  const messages = useMessages(showingMessages || !can('response.read') || inbox.forbidden);
+  const orgName = useAppSelector((root) => root.auth.org?.name) ?? 'Your organisation';
   const messageRows = messages.data?.data ?? [];
   const unreadMessages = messageRows.filter((row) => !row.read).length;
-  const campaigns = useCampaignList();
-  const subjects = useSubjectList({});
+  // The filters belong to the queue; without it they would only be asked for to be refused.
+  const campaigns = useCampaignList({}, can('response.read'));
+  const subjects = useSubjectList({}, can('response.read'));
 
   const cards = useMemo(() => inbox.data?.data ?? [], [inbox.data]);
 
@@ -116,15 +120,14 @@ export default function Inbox(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // NO QUEUE, STILL AN INBOX. Reading individual responses is a separate permission, but
+  // messages are addressed to the reader by name, and "a form is waiting for your answer"
+  // goes to exactly the people least likely to hold `response.read`.
   if (!can('response.read') || inbox.forbidden) {
     return (
       <div className="page">
-        <PageHeader title="Inbox" />
-        <EmptyState
-          icon="inbox"
-          title="You do not have access to this"
-          body="Reading individual responses is a separate permission from seeing the numbers. Ask an administrator if you need it."
-        />
+        <PageHeader title="Inbox" subtitle="Messages addressed to you." />
+        <MessageStream messages={messages} rows={messageRows} orgName={orgName} />
       </div>
     );
   }
@@ -173,7 +176,7 @@ export default function Inbox(): JSX.Element {
           className={`tab ${showingMessages ? 'is-active' : ''}`}
           onClick={() => setParam('state', MESSAGES_TAB)}
         >
-          From Endur
+          Messages
           {unreadMessages > 0 && <span className="tab-count">{unreadMessages}</span>}
         </button>
       </nav>
@@ -216,7 +219,7 @@ export default function Inbox(): JSX.Element {
       )}
 
       {showingMessages ? (
-        <MessageStream messages={messages} rows={messageRows} />
+        <MessageStream messages={messages} rows={messageRows} orgName={orgName} />
       ) : (
       <>
       {/* Above the list, and the last good page stays visible underneath (58 § States). */}
@@ -276,9 +279,11 @@ export default function Inbox(): JSX.Element {
 function MessageStream({
   messages,
   rows,
+  orgName,
 }: {
   messages: MessagesController;
   rows: InboxMessage[];
+  orgName: string;
 }): JSX.Element {
   if (messages.loading && rows.length === 0) {
     return (
@@ -300,8 +305,8 @@ function MessageStream({
     return (
       <EmptyState
         icon="inbox"
-        title="Nothing from Endur"
-        body="Messages from us about your account land here. There are none."
+        title="No messages"
+        body="Messages addressed to you land here: forms waiting for your answer, and notes from Endur about your account. There are none."
       />
     );
   }
@@ -311,6 +316,10 @@ function MessageStream({
       {rows.map((row) => (
         <MessageCard
           key={row.id}
+          // A form request is from the organisation, not from us, and the card says where
+          // to answer it. Everything else here is Endur's.
+          from={row.kind === FEEDBACK_REQUEST ? orgName : 'Endur'}
+          {...(row.kind === FEEDBACK_REQUEST ? { action: { to: '/app', label: 'Answer on Home' } } : {})}
           subject={row.subject}
           body={row.body}
           at={row.at}

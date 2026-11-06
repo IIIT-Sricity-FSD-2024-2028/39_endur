@@ -33,6 +33,8 @@ export const TAG_TYPES = [
   'Billing',
   'Bookable',
   'Profile',
+  // Members-only forms waiting for the signed-in person's answer (Home card, sidebar count).
+  'Waiting',
 ] as const;
 
 export const api = createApi({

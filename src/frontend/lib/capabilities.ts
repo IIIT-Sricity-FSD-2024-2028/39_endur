@@ -38,3 +38,23 @@ export function useCan(): Can {
     [capabilities],
   );
 }
+
+/** Holds at least one of these, somewhere: for a page several different powers each make useful. */
+export const canAny = (can: Can, capabilities: readonly Capability[], atLeast?: Scope): boolean =>
+  capabilities.some((capability) => can(capability, atLeast));
+
+/**
+ * What makes the Templates page worth opening: building or changing a form.
+ *
+ * NOT `template.read`. Reading and copying forms is what somebody who RUNS a campaign needs,
+ * and they do it inside the campaign wizard, which lists the organisation's forms and the
+ * library's. A page of forms you can neither make nor change was a page of things you could
+ * not do (the reason the owner gave for removing it).
+ */
+export const FORM_BUILDING: readonly Capability[] = ['template.create', 'template.update'];
+
+/** Each thing the Start page can start: a poll or a box, a full campaign, a notice, slots. */
+export const STARTABLE: readonly Capability[] = [
+  'campaign.launch', 'campaign.create', 'announcement.create', 'booking.create',
+];
+

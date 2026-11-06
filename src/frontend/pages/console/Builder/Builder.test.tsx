@@ -302,10 +302,10 @@ describe('states', () => {
     expect(screen.getByRole('button', { name: 'Duplicate to edit' })).toBeTruthy();
   });
 
-  it('renders read-only without template.update, and still lets somebody look', () => {
+  it('without template.update it is the PREVIEW, not an editor with every control off', () => {
     mount(['template.read']);
-    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Form name' }).disabled).toBe(true);
-    expect(screen.getByDisplayValue('How clear was it?')).toBeTruthy();
+    expect(screen.getByText('PREVIEW')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Form name' })).toBeNull();
   });
 
   it('a missing form is a page, not a blank screen', () => {

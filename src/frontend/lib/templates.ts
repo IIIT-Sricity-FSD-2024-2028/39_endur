@@ -8,6 +8,7 @@
 // The library is small, fixed and browsed by eye; paginating twenty cards would add a
 // control that never has anything to do. The org's own list grows without limit.
 import { useCallback } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
 import type { CreateTemplateBody, Page, TemplateDetail, TemplateSummary } from '@endur/shared';
 import type { AppDispatch } from '../store/index.js';
 import {
@@ -41,10 +42,10 @@ export function librarySearch(filters: LibraryFilters): string {
  * fetch of ~20 cards, then filter in the browser, means switching the segment is instant
  * and "show me everything" costs no request at all.
  */
-export function useTemplateLibrary(filters: LibraryFilters = {}): Loadable<TemplateSummary[]> & {
+export function useTemplateLibrary(filters: LibraryFilters = {}, enabled = true): Loadable<TemplateSummary[]> & {
   reload: () => Promise<void>;
 } {
-  return useLoadable(useGetTemplateLibraryQuery(librarySearch(filters)));
+  return useLoadable(useGetTemplateLibraryQuery(enabled ? librarySearch(filters) : skipToken));
 }
 
 export type TemplateListController = Loadable<Page<TemplateSummary>> & {

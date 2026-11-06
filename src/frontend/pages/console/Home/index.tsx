@@ -11,10 +11,12 @@ import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useHome } from '../../../lib/home.js';
 import { markAnnouncementRead, useAnnouncements } from '../../../lib/announcements.js';
+import { useWaiting } from '../../../lib/waiting.js';
 import { useAppSelector } from '../../../store/index.js';
 import { RANGE_LABEL, promptCopy, statCards } from './cards.js';
 import { CampaignCard } from './CampaignCard.js';
 import { Recent } from './Recent.js';
+import { Waiting } from './Waiting.js';
 
 type Campaign = NonNullable<HomeView['activeCampaigns']>[number];
 
@@ -27,6 +29,7 @@ export default function Home(): JSX.Element {
   const [sharing, setSharing] = useState<Campaign | null>(null);
   const announcements = useAnnouncements(can('announcement.read'));
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const waiting = useWaiting();
 
   const view = home.data;
   const orgName = org?.name ?? 'Your organisation';
@@ -89,12 +92,18 @@ export default function Home(): JSX.Element {
         }}
       />
 
+      {/* Forms this person is asked to answer, under the announcements and above the
+          dashboard: for somebody who looks after nothing, this is the whole page. */}
+      <Waiting rows={waiting.rows} orgName={orgName} />
+
       {readsNothing ? (
-        <EmptyState
-          icon="home"
-          title="Nothing assigned to you yet"
-          body="When you are given something to look after, it will show up here."
-        />
+        waiting.rows.length > 0 ? null : (
+          <EmptyState
+            icon="home"
+            title="Nothing assigned to you yet"
+            body="When you are given something to look after, it will show up here."
+          />
+        )
       ) : isNew ? (
         <EmptyState
           icon="inbox"

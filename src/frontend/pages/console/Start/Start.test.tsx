@@ -7,8 +7,8 @@ import Start, { laneState, tierReaches } from './index.js';
 let tier: Tier | null = 'bronze';
 
 vi.mock('../../../lib/billing.js', () => ({
-  useBilling: (): { data: BillingSummary | null; loading: boolean; error: Error | null } => ({
-    data: tier
+  usePlanSummary: (enabled: boolean): BillingSummary | null =>
+    enabled && tier
       ? {
           tier,
           status: 'active',
@@ -21,9 +21,6 @@ vi.mock('../../../lib/billing.js', () => ({
           seatBreakdown: { activeUsers: 4, nonPersonSubjects: 0 },
         }
       : null,
-    loading: false,
-    error: null,
-  }),
 }));
 
 const show = (capabilities: Capability[]): void => {
@@ -32,9 +29,10 @@ const show = (capabilities: Capability[]): void => {
 
 const ALL_FIVE: Capability[] = [
   'campaign.launch',
-  'template.read',
+  'campaign.create',
   'announcement.create',
   'booking.create',
+  'billing.read',
 ];
 
 describe('tierReaches — the ladder, compared by ORDER', () => {
@@ -80,28 +78,50 @@ describe('laneState — capability first, tier second', () => {
 });
 
 describe('the gallery', () => {
-  it('shows all five lanes to a reader who can launch', () => {
+  it('shows all five lanes to a reader who may start all five', () => {
     tier = 'bronze';
-    show(['campaign.launch', 'template.read']);
+    show(ALL_FIVE);
     for (const lane of ['Poll', 'Suggestion box', 'Feedback', 'Announcement', 'Booking']) {
       expect(screen.getByText(lane)).toBeTruthy();
     }
+    expect(screen.getByText('Five ways to ask.')).toBeTruthy();
   });
 
-  it('disables a lane the reader may not use, and says why', () => {
+  it('LEAVES OUT a lane the reader may not use — absent, not a locked card', () => {
     tier = 'bronze';
-    show(['template.read']);
-    const poll = screen.getByRole('button', { name: 'New poll' });
-    expect((poll as HTMLButtonElement).disabled).toBe(true);
-    expect(document.body.textContent).toContain('You cannot launch here.');
+    show(['campaign.create']);
+    expect(screen.queryByText('Poll')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New poll' })).toBeNull();
+    expect(screen.queryByText('Announcement')).toBeNull();
+    expect(screen.getByText('One way to ask.')).toBeTruthy();
   });
 
-  it('sends a lane the ORGANISATION lacks to the plan, never to a dead card', () => {
+  it('starts a full campaign in the wizard, which is where the form is picked', () => {
     tier = 'bronze';
-    show(ALL_FIVE);
+    show(['campaign.create']);
+    expect(screen.getByRole('link', { name: 'New plithe' }).getAttribute('href'))
+      .toBe('/app/campaigns/new');
+  });
+
+  it('says there is nothing to start when the role can start nothing', () => {
+    tier = 'bronze';
+    show([]);
+    expect(screen.getByText('Nothing to start here')).toBeTruthy();
+  });
+
+  it('sends a lane the ORGANISATION lacks to the plan, for whoever may change it', () => {
+    tier = 'bronze';
+    show([...ALL_FIVE, 'billing.update']);
     const plan = screen.getAllByRole('link', { name: 'See the plan' });
     expect(plan).toHaveLength(2);
     expect(plan[0]?.getAttribute('href')).toBe('/app/plan');
+  });
+
+  it('tells everybody else who can, rather than linking to a page they cannot use', () => {
+    tier = 'bronze';
+    show(ALL_FIVE);
+    expect(screen.queryByRole('link', { name: 'See the plan' })).toBeNull();
+    expect(screen.getAllByText(/Whoever manages billing/)).toHaveLength(2);
   });
 
   it('stops selling a tier the organisation already holds', () => {
@@ -116,11 +136,19 @@ describe('the gallery', () => {
     expect(screen.queryByRole('link', { name: 'See the plan' })).toBeNull();
   });
 
-  it('disables a paid lane the READER may not use, even on a tier that buys it', () => {
+  it('asks nothing about the plan of a reader who may not see it, and offers the lane', () => {
+    tier = 'bronze';
+    show(['announcement.create', 'booking.create']);
+    // No tier to sell them and none to wait for: the page it opens answers for the plan.
+    expect(screen.getByRole('link', { name: 'Compose' }).getAttribute('href')).toBe('/app/announcements');
+    expect(screen.queryByText('Not built yet.')).toBeNull();
+  });
+
+  it('leaves out a paid lane the READER may not use, even on a tier that buys it', () => {
     tier = 'enterprise';
-    show(['campaign.launch', 'template.read']);
-    expect(document.body.textContent).toContain('You cannot write announcements here.');
-    expect(document.body.textContent).toContain('You cannot publish bookable times here.');
+    show(['campaign.launch', 'campaign.create']);
+    expect(screen.queryByText('Announcement')).toBeNull();
+    expect(screen.queryByText('Booking')).toBeNull();
     expect(screen.queryByRole('link', { name: 'See the plan' })).toBeNull();
   });
 

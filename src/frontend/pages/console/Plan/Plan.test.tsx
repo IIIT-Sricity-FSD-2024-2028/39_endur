@@ -204,13 +204,12 @@ describe('Plan', () => {
     expect(action.hasAttribute('disabled')).toBe(true);
   });
 
-  it('reads without billing.update, and cannot change the plan', () => {
+  it('reads without billing.update: the plans, and NO buttons rather than greyed ones', () => {
     render(['billing.read']);
     expect(screen.getAllByText('Silver — Understand').length).toBeGreaterThan(0);
-    for (const action of screen.getAllByRole('button')) {
-      expect((action as HTMLButtonElement).disabled).toBe(true);
-    }
-    expect(screen.getByText(/needs the billing permission/)).toBeTruthy();
+    expect(document.querySelectorAll('.plan-grid button')).toHaveLength(0);
+    expect(screen.getByText('Your current plan')).toBeTruthy();
+    expect(screen.getByText(/Whoever manages billing/)).toBeTruthy();
   });
 });
 

@@ -6,6 +6,7 @@
 // customer's world (22 §1).
 import type { ResolvedLabels } from '@endur/shared';
 import type { Capability, Scope } from '@endur/shared';
+import { FORM_BUILDING, STARTABLE } from '../../lib/capabilities.js';
 import type { IconName } from '../Icon.js';
 
 export type NavGroup = 'organize' | 'collect' | 'understand' | 'system';
@@ -22,8 +23,11 @@ export type NavItem = {
   /** One line of what the screen will do, shown on hover. Required when disabled — a
    *  greyed item with no explanation is just a broken link. */
   soonHint?: string;
-  /** Hides the item when the caller does not hold it. Usability, never enforcement. */
-  needs?: Capability;
+  /**
+   * Hides the item when the caller does not hold it. Usability, never enforcement. A list
+   * means ANY ONE of them: a page that several different powers each make worth opening.
+   */
+  needs?: Capability | readonly Capability[];
   /**
    * How far `needs` has to REACH before the item is worth showing — T-087, and it defaults
    * to `self`, which is what every item meant before.
@@ -71,12 +75,14 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
     { to: '/app/subjects', label: labels.subject.many, icon: 'subject', group: 'organize',
       needs: 'subject.read' },
 
-    // T-093. FIRST in the group and gated on nothing: the gallery is five cards that each
-    // gate themselves, and the one screen where the whole product is visible at once must
-    // not be the one screen somebody has to be told about.
-    { to: '/app/start', label: 'Start', icon: 'start', group: 'collect' },
+    // T-093. FIRST in the group. Its cards now show only what the reader can start, so the
+    // item needs at least one of those powers: a gallery of locked cards was a page of
+    // things somebody could not do, which is the one kind of page the owner asked to go.
+    { to: '/app/start', label: 'Start', icon: 'start', group: 'collect', needs: STARTABLE },
+    // Building or changing forms, not merely reading them: whoever only runs campaigns
+    // picks and copies forms inside the campaign wizard (see FORM_BUILDING).
     { to: '/app/templates', label: 'Templates', icon: 'template', group: 'collect',
-      needs: 'template.read' },
+      needs: FORM_BUILDING },
     { to: '/app/campaigns', label: labels.campaign.many, icon: 'campaign', group: 'collect',
       needs: 'campaign.read' },
 
@@ -119,12 +125,11 @@ export function navItems(labels: ResolvedLabels): NavItem[] {
       needs: 'analysis.read' },
     // Un-disabled by T-080 — the last edit of that task, never a task of its own.
     //
-    // `response.read` and NOT a minimum scope (DEC-051): unlike People, a narrow hold here
-    // is a real queue and not a list of one. `own_unit` on `response.read` means the
-    // comments from your own section's campaigns, which is exactly what a section head
-    // should open this page to read.
-    { to: '/app/inbox', label: 'Inbox', icon: 'inbox', group: 'understand',
-      needs: 'response.read' },
+    // GATED ON NOTHING since members-only forms started arriving as messages: everybody has
+    // a Messages tab, because "a form is waiting for your answer" is addressed to the people
+    // least likely to hold `response.read`. Without it the page shows Messages alone; with
+    // it, the comment queue too (`own_unit` there is a real queue, not a list of one).
+    { to: '/app/inbox', label: 'Inbox', icon: 'inbox', group: 'understand' },
     // Un-disabled by T-084 — THE LAST "Soon" TAG IN THE SIDEBAR. Every item now goes
     // somewhere real.
     //

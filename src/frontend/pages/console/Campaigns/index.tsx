@@ -181,7 +181,7 @@ export default function Campaigns(): JSX.Element {
                       <Icon name="share" size={16} /> Share
                     </button>
                   )}
-                  {campaign.status !== 'draft' && (
+                  {campaign.status !== 'draft' && can('results.read') && (
                     <Link className="btn btn-secondary" to={`/app/campaigns/${campaign.id}/results`}>
                       Results
                     </Link>

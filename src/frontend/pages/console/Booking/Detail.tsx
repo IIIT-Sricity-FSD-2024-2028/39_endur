@@ -90,11 +90,11 @@ export default function BookingDetail(): JSX.Element {
           icon="booking"
           title="Booking is part of Gold"
           body="Publish times, let people take them from a code, and let the server keep two phones from taking the last one."
-          action={
-            <Link className="btn btn-primary" to="/app/plan">
-              See the plan
-            </Link>
-          }
+          // The way to the plan page for whoever may change the plan; nobody else gets a
+          // button to a page they cannot use (as <UpgradeCard> does).
+          {...(can('billing.update')
+            ? { action: <Link className="btn btn-primary" to="/app/plan">See the plan</Link> }
+            : {})}
         />
       </>
     );

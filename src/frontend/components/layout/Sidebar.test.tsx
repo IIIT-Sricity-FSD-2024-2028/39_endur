@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar.js';
 import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
 
 const ALL = ['unit.read', 'role.read', 'person.read', 'subject.read',
-             'template.read', 'campaign.read', 'response.read',
+             'template.read', 'template.create', 'campaign.read', 'campaign.launch', 'response.read',
              'analysis.read', 'reflection.read',
              'audit.read',
              'org.read', 'org.update'] as const;
@@ -42,7 +42,9 @@ describe('what each level sees', () => {
   const L1 = {
     'org.read': 'all', 'org.update': 'all', 'unit.read': 'subtree', 'role.read': 'all',
     'person.read': 'subtree', 'subject.read': 'subtree', 'template.read': 'all',
-    'campaign.read': 'subtree', 'response.read': 'subtree',
+    'template.create': 'all', 'template.update': 'all',
+    'campaign.read': 'subtree', 'campaign.create': 'subtree', 'campaign.launch': 'subtree',
+    'response.read': 'subtree',
     'analysis.read': 'subtree',
     'reflection.read': 'self',
     'audit.read': 'all',
@@ -52,8 +54,11 @@ describe('what each level sees', () => {
   const L2 = { ...L1, 'org.update': undefined, 'audit.read': undefined } as const;
   const L3 = {
     'org.read': 'all', 'unit.read': 'own_unit', 'role.read': 'all',
-    'person.read': 'own_unit', 'subject.read': 'own_unit', 'template.read': 'all',
-    'campaign.read': 'own_unit', 'response.read': 'own_unit',
+    'person.read': 'own_unit', 'subject.read': 'own_unit',
+    // As seeded for Faculty: forms to read and copy, none to build or change.
+    'template.read': 'all', 'template.clone': 'all',
+    'campaign.read': 'own_unit', 'campaign.create': 'own_unit', 'campaign.launch': 'own_unit',
+    'response.read': 'own_unit',
     'analysis.read': 'own_unit',
     'reflection.read': 'self',
     'announcement.read': 'all',
@@ -94,16 +99,20 @@ describe('what each level sees', () => {
   it('L3 reviewee-level — KEEPS People, because their roster is real', () => {
     show(L3);
     expect(rendered()).toContain('People');
+    // No Templates: they read and copy forms but cannot build or change one, and they pick
+    // and copy inside the campaign wizard instead.
     expect(rendered()).toEqual([
       'Home', 'Structure', 'Roles', 'People', 'Quaxels',
-      'Start', 'Templates', 'Plithes', 'Announcements', 'Booking',
+      'Start', 'Plithes', 'Announcements', 'Booking',
       'Analysis', 'Inbox', 'Reflect',
     ]);
   });
 
   it('L4 lowest — Subjects, and nothing else in `organize`', () => {
     show(L4);
-    expect(rendered()).toEqual(['Home', 'Quaxels', 'Start', 'Announcements']);
+    // Inbox too, for its Messages: a form waiting for their answer is sent there. And no
+    // Start: there is nothing this level can start, and a gallery of locked cards is gone.
+    expect(rendered()).toEqual(['Home', 'Quaxels', 'Announcements', 'Inbox']);
   });
 
   it('drops People for an account that can only reach itself — the whole of D-027', () => {

@@ -197,6 +197,12 @@ describe('the active campaigns', () => {
     expect(link.getAttribute('href')).toBe('/app/campaigns/c1/results');
   });
 
+  it('links to the campaign itself for somebody who may not read results', () => {
+    mount(ALL.filter((capability) => capability !== 'results.read'));
+    const link = screen.getByRole('link', { name: 'Spring check' });
+    expect(link.getAttribute('href')).toBe('/app/campaigns/c1');
+  });
+
   it('opens the QR from the payload, with no second request', () => {
     const { container } = mount();
     const card = screen.getByText('Spring check').closest('li') as HTMLElement;

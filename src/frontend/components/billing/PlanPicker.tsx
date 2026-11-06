@@ -18,6 +18,7 @@ export function PlanPicker({
   requestedTier = null,
   disabled = false,
   belowIsLive = false,
+  actions = true,
 }: {
   plans: readonly PlanOption[];
   current: Tier | null;
@@ -27,6 +28,11 @@ export function PlanPicker({
   requestedTier?: Tier | null;
   disabled?: boolean;
   belowIsLive?: boolean;
+  /**
+   * False for a reader who may see the plans but not change them: the cards say what each
+   * plan is and which one this is, and carry no buttons at all — not disabled ones.
+   */
+  actions?: boolean;
 }): JSX.Element {
   return (
     <div
@@ -121,7 +127,9 @@ export function PlanPicker({
                 anything teaches the reader to distrust every greyed control they meet. The
                 sentence says WHY, because a card that simply lost its button reads as a
                 rendering fault. */}
-            {below ? (
+            {!actions ? (
+              selected ? <p className="plan-note text-meta">Your current plan</p> : null
+            ) : below ? (
               <p className="plan-note plan-below-note text-meta">
                 Below your plan. There are no refunds part-way through a period, so a move down
                 is scheduled from Current plan above and takes effect when this one ends.
