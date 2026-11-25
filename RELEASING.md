@@ -9,11 +9,11 @@ redeploy it.
 
 [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`, tagged with a lowercase `v`.
 
-| Bump | When | Example |
-|---|---|---|
+| Bump  | When                                                              | Example           |
+| ----- | ----------------------------------------------------------------- | ----------------- |
 | MAJOR | A rewrite, or a change that breaks existing data, URLs or the API | `3.0.0` → `4.0.0` |
-| MINOR | New features that keep everything else working | `3.0.1` → `3.1.0` |
-| PATCH | Bug fixes only | `3.1.0` → `3.1.1` |
+| MINOR | New features that keep everything else working                    | `3.0.1` → `3.1.0` |
+| PATCH | Bug fixes only                                                    | `3.1.0` → `3.1.1` |
 
 ## Branches
 

@@ -4,6 +4,7 @@
 //
 // Exits 1 when the version has no section, so a release cannot go out without its changelog entry.
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const version = process.argv[2]?.replace(/^v/, '');
@@ -12,7 +13,8 @@ if (!version) {
   process.exit(1);
 }
 
-const changelog = readFileSync(fileURLToPath(new URL('../CHANGELOG.md', import.meta.url)), 'utf8');
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const changelog = readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
 const lines = changelog.split('\n');
 const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
 if (start === -1) {
@@ -21,9 +23,14 @@ if (start === -1) {
 }
 
 // The section runs until the next version heading or the link references at the bottom.
-let end = lines.findIndex((line, i) => i > start && (line.startsWith('## [') || /^\[[^\]]+\]: /.test(line)));
+let end = lines.findIndex(
+  (line, i) => i > start && (line.startsWith('## [') || /^\[[^\]]+\]: /.test(line)),
+);
 if (end === -1) end = lines.length;
 
-const body = lines.slice(start + 1, end).join('\n').trim();
+const body = lines
+  .slice(start + 1, end)
+  .join('\n')
+  .trim();
 const compare = lines.find((line) => line.startsWith(`[${version}]: `))?.slice(version.length + 4);
 process.stdout.write(body + (compare ? `\n\n**Full changes:** ${compare}\n` : '\n'));
