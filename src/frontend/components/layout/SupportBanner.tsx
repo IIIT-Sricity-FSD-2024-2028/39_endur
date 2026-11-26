@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+// The strip a support session puts above everything. Its clock and "Leaving…" are
+// `state.chrome.support` (store/screens/chrome.ts); leaving is the `supportSessionLeft` thunk.
+import { useEffect } from 'react';
 import type { SupportContext } from '@endur/shared';
-import { useAppSelector } from '../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { selectSupportClock, supportClockTicked, supportSessionLeft } from '../../store/screens/chrome.js';
 import { Icon } from '../Icon.js';
-import { opsPost } from '../../lib/ops.js';
 
 export function minutesLeft(expiresAt: string, now: Date = new Date()): number {
   const remaining = new Date(expiresAt).getTime() - now.getTime();
@@ -17,8 +19,8 @@ function remainingWords(minutes: number): string {
 export function reachOf(role: SupportContext['role'], operator: boolean): string {
   if (role === 'owner') {
     return operator
-      ? 'As an Endur owner you have full access to this organisation, responses and results included. Every action is recorded in their audit log under your name.'
-      : 'As an Endur owner, they have full access to this organisation, responses and results included. Every action is recorded in your audit log under their name.';
+      ? 'As an Endur owner you have full access to this organization, responses and results included. Every action is recorded in their audit log under your name.'
+      : 'As an Endur owner, they have full access to this organization, responses and results included. Every action is recorded in your audit log under their name.';
   }
   return operator
     ? 'Responses, results and check-in notes are closed to you.'
@@ -31,22 +33,23 @@ export function SupportBanner(): JSX.Element | null {
 }
 
 function Strip({ support }: { support: SupportContext }): JSX.Element {
-  const [minutes, setMinutes] = useState(() => minutesLeft(support.expiresAt));
-  const [leaving, setLeaving] = useState(false);
+  const dispatch = useAppDispatch();
+  const { now, leaving } = useAppSelector(selectSupportClock);
+  const minutes = minutesLeft(support.expiresAt, new Date(now));
 
+  // The clock is a timer (a resource); each tick puts the time into the store. Once on
+  // mount, so a strip that appears later does not count from when the app started.
   useEffect(() => {
-    const timer = window.setInterval(() => setMinutes(minutesLeft(support.expiresAt)), 30_000);
+    dispatch(supportClockTicked());
+    const timer = window.setInterval(() => dispatch(supportClockTicked()), 30_000);
     return () => window.clearInterval(timer);
-  }, [support.expiresAt]);
+  }, [dispatch]);
 
+  // Even a failure means going back: the row is ended before anything else in
+  // `leaveSupport`, so if the call reached the server at all the access is already gone, and
+  // if it did not, `/ops` is still where the operator wants to be.
   const leave = (): void => {
-    setLeaving(true);
-    void opsPost('/support-session/leave', {})
-      .then(() => window.location.assign('/ops'))
-      // Even a failure means going back: the row is ended before anything else in
-      // `leaveSupport`, so if this call reached the server at all the access is already gone,
-      // and if it did not, `/ops` is still where the operator wants to be.
-      .catch(() => window.location.assign('/ops'));
+    void dispatch(supportSessionLeft()).then(() => window.location.assign('/ops'));
   };
 
   const operator = support.viewer === 'operator';
@@ -64,11 +67,11 @@ function Strip({ support }: { support: SupportContext }): JSX.Element {
       <p className="sr-only">
         {operator ? (
           <>
-            Support session. You are signed in to this organisation as yourself, and they can see
+            Support session. You are signed in to this organization as yourself, and they can see
             that you are.
           </>
         ) : (
-          <>{support.operatorName} from Endur support is signed in to your organisation.</>
+          <>{support.operatorName} from Endur support is signed in to your organization.</>
         )}{' '}
         {reachOf(support.role, operator)}
       </p>

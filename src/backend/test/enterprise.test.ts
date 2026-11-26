@@ -175,7 +175,7 @@ describe('a message from Endur reaches the customer — DEC-101', () => {
 
   // The stream belongs to the READER, not the organisation: a message addressed to one administrator
   // must not be readable by a colleague, and the scope is in the WHERE rather than checked afterwards.
-  it('is scoped to the addressee, not to the organisation', async () => {
+  it('is scoped to the addressee, not to the organization', async () => {
     const org = await setUpOrg();
     const owner = await makeOperator('owner');
     expect(
@@ -237,7 +237,7 @@ describe('approving an Enterprise request is a SALE — DEC-111', () => {
   });
 
   // A second approve is a 409, not a second capture.
-  it('refuses to approve an organisation that is already on Enterprise', async () => {
+  it('refuses to approve an organization that is already on Enterprise', async () => {
     const founder = await registerOrg('custom', 'silver');
     expect((await ask(founder)).status).toBe(201);
     const owner = await makeOperator('owner');

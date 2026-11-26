@@ -36,9 +36,9 @@ import { CAPABILITY_CATALOGUE, type Capability } from './capabilities.js';
  * PLURAL — a row label is about the class of thing, never one of them.
  */
 const PHRASES: Record<Capability, string> = {
-  'org.read': 'view the organisation',
-  'org.update': 'edit the organisation — its name, its industry and its words',
-  'org.delete': 'delete the entire organisation',
+  'org.read': 'view the organization',
+  'org.update': 'edit the organization — its name, its industry and its words',
+  'org.delete': 'delete the entire organization',
 
   'unit.read': 'view {unit}',
   'unit.create': 'add {unit}',
@@ -107,7 +107,7 @@ const PHRASES: Record<Capability, string> = {
   'apikey.create': 'issue an API key',
   'apikey.revoke': 'revoke an API key',
 
-  'billing.read': 'see which plan this organisation is on',
+  'billing.read': 'see which plan this organization is on',
   'billing.update': 'change the plan',
 
   'reflection.create': 'write a self-reflection',

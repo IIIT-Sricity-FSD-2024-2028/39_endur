@@ -35,3 +35,10 @@ Understand/
 architecture/
 Videos/
 .claude/
+
+docs/
+
+# Playwright
+test-results/
+playwright-report/
+e2e/dist-types/

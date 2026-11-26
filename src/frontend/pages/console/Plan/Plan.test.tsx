@@ -1,7 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// The Plan page through the real store: the summary, the catalogue and the Enterprise flag
+// are RTK Query reads, every write is a thunk in store/screens/plan.ts, and `stubApi` stands
+// in for the server, asking the spies below what to answer. docs/REDUX-PLAN.md §6.10 (R-710).
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import type { BillingSummary, Capability } from '@endur/shared';
-import { renderWithProviders } from '../../../test-utils.js';
+import { PLAN_OPTIONS, type BillingSummary, type Capability } from '@endur/shared';
+import { errorReply, renderWithProviders, stubApi, type StubReply } from '../../../test-utils.js';
 import { ApiError } from '../../../lib/api.js';
 import Plan from './index.js';
 
@@ -24,25 +27,37 @@ const requestEnterprise = vi.fn();
 let enterpriseRequestedAt: string | null = null;
 let summary: BillingSummary = SILVER;
 
-vi.mock('../../../lib/billing.js', async () => {
-  const react = await import('react');
-  return {
-    useBilling: () => {
-      const [data, set] = react.useState<BillingSummary | null>(summary);
-      return { data, loading: false, error: null, set };
-    },
-    usePlans: () => ({ data: null, loading: false, error: null }),
-    useJoinTier: () => join,
-    useScheduleDowngrade: () => scheduleDowngrade,
-    useCancelDowngrade: () => cancelDowngrade,
-    useEnterpriseRequest: () => ({ requestedAt: enterpriseRequestedAt, request: requestEnterprise }),
-  };
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+
+const server = () => stubApi({
+  'GET /billing': () => ({ body: { data: summary } }),
+  'GET /billing/plans': { body: { data: PLAN_OPTIONS } },
+  'GET /billing/enterprise-request': () => ({ body: { data: { requestedAt: enterpriseRequestedAt } } }),
+  'POST /billing/tier': (call) => {
+    const { tier, paymentRef } = call.body as { tier: string; paymentRef?: string };
+    return answer(join, tier, paymentRef);
+  },
+  'POST /billing/downgrade': (call) => answer(scheduleDowngrade, (call.body as { tier: string }).tier),
+  'DELETE /billing/downgrade': () => answer(cancelDowngrade),
+  'POST /billing/enterprise-request': (call) =>
+    answer(requestEnterprise, (call.body as { note?: string }).note),
 });
 
 const ALL: Capability[] = ['billing.read', 'billing.update'];
 
-const render = (capabilities: Capability[] = ALL) =>
-  renderWithProviders(<Plan />, { capabilities, path: '/app/plan' });
+/** Mounted, with the summary read (the page shows a skeleton until it is). */
+const render = async (capabilities: Capability[] = ALL) => {
+  const result = renderWithProviders(<Plan />, { capabilities, path: '/app/plan' });
+  await screen.findByRole('heading', { name: 'Current plan' });
+  return result;
+};
 
 const card = (name: string): HTMLElement => {
   const found = screen.getAllByText(name).find((node) => node.closest('.plan-card'));
@@ -52,7 +67,10 @@ const card = (name: string): HTMLElement => {
 const pay = () => fireEvent.click(screen.getByRole('button', { name: /^Pay ₹/ }));
 const PAID = { timeout: 4000 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
+  server();
   summary = SILVER;
   join.mockReset();
   join.mockImplementation((tier: BillingSummary['tier']) =>
@@ -62,31 +80,31 @@ beforeEach(() => {
   cancelDowngrade.mockReset();
   cancelDowngrade.mockResolvedValue(SILVER);
   requestEnterprise.mockReset();
-  requestEnterprise.mockResolvedValue(undefined);
+  requestEnterprise.mockResolvedValue({ requestedAt: '2026-08-30T00:00:00.000Z' });
   enterpriseRequestedAt = null;
 });
 
 describe('Plan', () => {
-  it('names the current plan and marks it in the picker', () => {
-    render();
+  it('names the current plan and marks it in the picker', async () => {
+    await render();
     expect(screen.getAllByText('Silver — Understand').length).toBeGreaterThan(0);
     expect(within(card('Silver — Understand')).getByRole('button').textContent)
       .toContain('Current plan');
   });
 
-  it('shows what the seat count is made of — 16 §5, never a bare total', () => {
-    render();
+  it('shows what the seat count is made of — 16 §5, never a bare total', async () => {
+    await render();
     expect(screen.getByText(/30 people with accounts/)).toBeTruthy();
     expect(screen.getByText(/4 subjects that are not a person/)).toBeTruthy();
   });
 
-  it('states that respondents are never counted', () => {
-    render();
+  it('states that respondents are never counted', async () => {
+    await render();
     expect(screen.getByText(/never counted/)).toBeTruthy();
   });
 
-  it('prices every tier it offers, per month — DEC-080, DEC-096', () => {
-    const { container } = render();
+  it('prices every tier it offers, per month — DEC-080, DEC-096', async () => {
+    const { container } = await render();
     const text = container.textContent ?? '';
     expect(text).toContain('₹99');
     expect(text).toContain('₹999');
@@ -96,7 +114,7 @@ describe('Plan', () => {
   });
 
   it('takes an UPGRADE straight to the checkout, priced as the difference', async () => {
-    render();
+    await render();
     fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
@@ -114,7 +132,7 @@ describe('Plan', () => {
   // used to subtract Bronze and ask for ₹900, then the ledger took ₹999.
   it('prices a rejoin after a lapse at the full amount the server charges', async () => {
     summary = { ...SILVER, tier: 'bronze', lapsedFrom: 'gold', lapsedFromTrial: false };
-    render();
+    await render();
     fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
 
     const dialog = await screen.findByRole('dialog');
@@ -128,7 +146,7 @@ describe('Plan', () => {
       celebratedFirst = document.body.textContent?.includes('Payment successful') ?? false;
       return Promise.resolve({ ...SILVER, tier });
     });
-    render();
+    await render();
     fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
     await screen.findByRole('dialog');
     pay();
@@ -147,7 +165,7 @@ describe('Plan', () => {
         message: 'The plan changed while this was being paid for. Reload to see where it stands.',
       }),
     );
-    render();
+    await render();
     fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
     await screen.findByRole('dialog');
     pay();
@@ -157,8 +175,8 @@ describe('Plan', () => {
     expect(screen.queryByText('Payment successful')).toBeNull();
   });
 
-  it('offers no way DOWN, and explains the gap rather than leaving one', () => {
-    render();
+  it('offers no way DOWN, and explains the gap rather than leaving one', async () => {
+    await render();
     const bronze = within(card('Bronze — Measure'));
     expect(bronze.queryByRole('button')).toBeNull();
     expect(bronze.getByText(/Below your plan/)).toBeTruthy();
@@ -169,13 +187,13 @@ describe('Plan', () => {
     expect(join).not.toHaveBeenCalled();
   });
 
-  it('states that moving up charges the difference', () => {
-    render();
+  it('states that moving up charges the difference', async () => {
+    await render();
     expect(screen.getByText(/charges the difference/)).toBeTruthy();
   });
 
   it('cancels the checkout without changing anything', async () => {
-    render();
+    await render();
     fireEvent.click(within(card('Gold — Improve')).getByRole('button'));
     await screen.findByRole('dialog');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -184,7 +202,7 @@ describe('Plan', () => {
   });
 
   it('asks about Enterprise rather than buying it — no checkout, no charge', async () => {
-    render();
+    await render();
     fireEvent.click(within(card('Enterprise — Decide')).getByRole('button', { name: 'Request' }));
 
     const dialog = within(screen.getByRole('dialog'));
@@ -196,21 +214,21 @@ describe('Plan', () => {
     expect(join).not.toHaveBeenCalled();
   });
 
-  it('reads Requested once one is open, and offers no second ask', () => {
+  it('reads Requested once one is open, and offers no second ask', async () => {
     enterpriseRequestedAt = '2026-08-30T00:00:00.000Z';
-    render();
+    await render();
+    await waitFor(() =>
+      expect(within(card('Enterprise — Decide')).getByRole('button').textContent).toContain('Requested'));
     const action = within(card('Enterprise — Decide')).getByRole('button');
-    expect(action.textContent).toContain('Requested');
     expect(action.hasAttribute('disabled')).toBe(true);
   });
 
-  it('reads without billing.update, and cannot change the plan', () => {
-    render(['billing.read']);
+  it('reads without billing.update: the plans, and NO buttons rather than greyed ones', async () => {
+    await render(['billing.read']);
     expect(screen.getAllByText('Silver — Understand').length).toBeGreaterThan(0);
-    for (const action of screen.getAllByRole('button')) {
-      expect((action as HTMLButtonElement).disabled).toBe(true);
-    }
-    expect(screen.getByText(/needs the billing permission/)).toBeTruthy();
+    expect(document.querySelectorAll('.plan-grid button')).toHaveLength(0);
+    expect(screen.getByText('Your current plan')).toBeTruthy();
+    expect(screen.getByText(/Whoever manages billing/)).toBeTruthy();
   });
 });
 
@@ -218,8 +236,8 @@ describe('scheduling a move down — DEC-098', () => {
   const scheduleBlock = (): HTMLElement =>
     document.querySelector('.plan-schedule') as HTMLElement;
 
-  it('offers every sellable tier below the current one, with the date on it', () => {
-    render();
+  it('offers every sellable tier below the current one, with the date on it', async () => {
+    await render();
     const block = within(scheduleBlock());
     expect(block.getByRole('button', { name: 'Move to Bronze' })).toBeTruthy();
     expect(block.queryByRole('button', { name: /Move to Gold/ })).toBeNull();
@@ -229,7 +247,7 @@ describe('scheduling a move down — DEC-098', () => {
 
   it('schedules without opening the checkout — nothing is charged today', async () => {
     scheduleDowngrade.mockResolvedValue({ ...SILVER, pendingTier: 'bronze' });
-    render();
+    await render();
     fireEvent.click(screen.getByRole('button', { name: 'Move to Bronze' }));
 
     await waitFor(() => expect(scheduleDowngrade).toHaveBeenCalledWith('bronze'));
@@ -240,7 +258,7 @@ describe('scheduling a move down — DEC-098', () => {
   it('states what is scheduled and offers to cancel it', async () => {
     summary = { ...SILVER, pendingTier: 'bronze' };
     cancelDowngrade.mockResolvedValue(SILVER);
-    render();
+    await render();
 
     const block = scheduleBlock();
     expect(block.textContent).toMatch(/Moving to/);
@@ -252,14 +270,14 @@ describe('scheduling a move down — DEC-098', () => {
     await waitFor(() => expect(cancelDowngrade).toHaveBeenCalled());
   });
 
-  it('is absent for a reader who cannot change the plan', () => {
-    render(['billing.read']);
+  it('is absent for a reader who cannot change the plan', async () => {
+    await render(['billing.read']);
     expect(scheduleBlock()).toBeNull();
   });
 
-  it('disappears on the lowest tier', () => {
+  it('disappears on the lowest tier', async () => {
     summary = { ...SILVER, tier: 'bronze' };
-    render();
+    await render();
     expect(scheduleBlock()).toBeNull();
   });
 });

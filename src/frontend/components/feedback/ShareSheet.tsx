@@ -1,10 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+// The share sheet. Its copy answer, full-screen mode and the QR's failure are its own entry in
+// `state.widgets` (store/screens/widgets.ts), under this sheet's `useId()`.
+import { useEffect, useId, useRef } from 'react';
 import QRCode from 'qrcode';
 import type { CampaignAccess, CampaignStatus } from '@endur/shared';
 import { Icon } from '../Icon.js';
 import { formatDateTime } from '../../lib/format.js';
 import { useLabels } from '../../lib/labels.js';
-import { useAppSelector } from '../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  copiedFaded,
+  instanceLeft,
+  linkCopied,
+  qrDrawn,
+  selectCopy,
+  selectShare,
+  shareStageToggled,
+} from '../../store/screens/widgets.js';
 
 const SHARE_STATUS: Record<CampaignStatus, { label: string; tag: string }> = {
   open: { label: 'Collecting', tag: 'tag-good' },
@@ -50,27 +62,40 @@ export function ShareSheet({
 }): JSX.Element {
   const L = useLabels();
   const orgName = useAppSelector((state) => state.auth.org?.name ?? '');
-  const [copied, setCopied] = useState(false);
-  const [presenting, setPresenting] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const copyState = useAppSelector((state) => selectCopy(state, id));
+  const { presenting, qrFailed } = useAppSelector((state) => selectShare(state, id));
+  useClearOnLeave(instanceLeft({ id }));
+  const copied = copyState === 'copied';
+  const failed = copyState === 'failed';
+  const setPresenting = (next: boolean): void => {
+    dispatch(shareStageToggled({ id, presenting: next }));
+  };
+  const onDrawn = (ok: boolean): void => {
+    dispatch(qrDrawn({ id, ok }));
+  };
+
+  // Effect (DOM): Escape leaves full screen first, then closes the sheet.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
-      if (presenting) setPresenting(false);
+      if (presenting) dispatch(shareStageToggled({ id, presenting: false }));
       else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, presenting]);
+  }, [dispatch, id, onClose, presenting]);
 
+  // The clipboard and the timer are the browser's; what they answered goes into the store.
   const copy = (): void => {
     void navigator.clipboard?.writeText(url).then(
       () => {
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), COPIED_MS);
+        dispatch(linkCopied({ id, ok: true }));
+        window.setTimeout(() => dispatch(copiedFaded({ id })), COPIED_MS);
       },
-      () => setFailed(true),
+      () => dispatch(linkCopied({ id, ok: false })),
     );
   };
 
@@ -92,7 +117,7 @@ export function ShareSheet({
     return (
       <div className="present" role="dialog" aria-modal="true" aria-label={`${campaignName} — code`}>
         <p className="present-name">{campaignName}</p>
-        <Qr url={url} size={Math.round(QR_SIZE * 2)} className="present-qr" />
+        <Qr url={url} size={Math.round(QR_SIZE * 2)} className="present-qr" failed={qrFailed} onDrawn={onDrawn} />
         <p className="present-url">{display(url)}</p>
         <button type="button" className="btn btn-secondary present-exit" onClick={() => setPresenting(false)}>
           Close
@@ -123,7 +148,7 @@ export function ShareSheet({
         </header>
 
         <div className="share-body">
-          <Qr url={url} size={QR_SIZE} className="share-qr" />
+          <Qr url={url} size={QR_SIZE} className="share-qr" failed={qrFailed} onDrawn={onDrawn} />
 
           {/* Selectable, and big. Somebody at the back types this. */}
           <p className="share-url">{display(url)}</p>
@@ -188,9 +213,23 @@ export function ShareSheet({
 
 const display = (url: string): string => url.replace(/^https?:\/\//, '');
 
-function Qr({ url, size, className }: { url: string; size: number; className?: string }): JSX.Element {
+/** The code, drawn onto a canvas (a DOM resource). Whether it drew is the sheet's to keep. */
+function Qr({
+  url,
+  size,
+  className,
+  failed,
+  onDrawn,
+}: {
+  url: string;
+  size: number;
+  className?: string;
+  failed: boolean;
+  onDrawn: (ok: boolean) => void;
+}): JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [error, setError] = useState(false);
+
+  // Effect (DOM): draw the code onto its canvas; whether it drew goes to the store.
 
   useEffect(() => {
     const canvas = ref.current;
@@ -201,15 +240,17 @@ function Qr({ url, size, className }: { url: string; size: number; className?: s
       width: size,
       color: { dark: DARK, light: LIGHT },
     }).then(
-      () => setError(false),
-      () => setError(true),
+      () => onDrawn(true),
+      () => onDrawn(false),
     );
+    // Not on `onDrawn`: it is a new function each render, and drawing again for that would
+    // flicker the code.
   }, [url, size]);
 
   return (
     <div className={className}>
       <canvas ref={ref} width={size} height={size} role="img" aria-label={`QR code for ${display(url)}`} />
-      {error && (
+      {failed && (
         <p className="field-error" role="alert">
           The code could not be drawn. Use the address below.
         </p>

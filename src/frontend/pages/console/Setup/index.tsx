@@ -1,13 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { PresetView } from '@endur/shared';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { Icon } from '../../../components/Icon.js';
 import { ApiError } from '../../../lib/api.js';
-import { usePresets, useSetupOrg } from '../../../lib/org.js';
-import { useRefreshSession } from '../../../lib/auth.js';
-import { useAppSelector } from '../../../store/index.js';
+import { usePresets } from '../../../lib/org.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { pageErrorOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  presetSwitchAsked,
+  presetSwitchSettled,
+  selectSetup,
+  setupCommitted,
+  setupLeft,
+} from '../../../store/screens/setup.js';
 import { IndustryStep } from './steps/Industry.js';
 import { RolesStep } from './steps/Roles.js';
 import { StructureStep } from './steps/Structure.js';
@@ -61,14 +68,17 @@ export default function Setup(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const presets = usePresets();
-  const commit = useSetupOrg();
-  const refreshSession = useRefreshSession();
   const orgName = useAppSelector((s) => s.auth.org?.name ?? '');
 
-  const { state, patch, applyPreset, roles, units, labels } = useWizard();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [pendingPreset, setPendingPreset] = useState<PresetView | null>(null);
+  const { state, applyPreset, toggleTemplates, roles, units, labels } = useWizard();
+  // The commit, its failure and the preset switch waiting for a yes are `state.setup`
+  // (store/screens/setup.ts); what is being set up is `state.wizard`, which outlives the page.
+  const dispatch = useAppDispatch();
+  const page = useAppSelector(selectSetup);
+  useClearOnLeave(setupLeft());
+  const { saving } = page;
+  const error = pageErrorOf(page.error);
+  const pendingPreset = presets.data?.find((preset) => preset.key === page.pendingPresetKey) ?? null;
 
   const step = stepIndex(params.get('step') ?? 'industry');
   const goto = (index: number): void => {
@@ -80,6 +90,8 @@ export default function Setup(): JSX.Element {
     () => presets.data?.find((preset) => preset.key === state.industry),
     [presets.data, state.industry],
   );
+
+  // Effect (DOM): Enter moves to the next step when this one is complete.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -95,18 +107,17 @@ export default function Setup(): JSX.Element {
 
   const choose = (preset: PresetView): void => {
     if (state.industry && state.industry !== preset.key && hasEdits(state, currentPreset)) {
-      setPendingPreset(preset);
+      dispatch(presetSwitchAsked({ key: preset.key }));
       return;
     }
     applyPreset(preset);
   };
 
-  async function finish(): Promise<void> {
-    if (!state.industry || saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await commit({
+  const finish = (): void => {
+    if (!state.industry) return;
+    void dispatch(setupCommitted({
+      outcome: 'done',
+      body: {
         industry: state.industry,
         roles: state.roles.map((role) => ({ name: role.name.trim() })),
         units: state.units.map((unit) => ({
@@ -114,35 +125,28 @@ export default function Setup(): JSX.Element {
         })),
         labels: labelsForWire(state.labels),
         includeTemplates: state.includeTemplates,
-      });
-      await refreshSession();
-      navigate('/app?setup=done', { replace: true });
-    } catch (caught) {
-      setError(caught as Error);
-      setSaving(false);
-    }
-  }
+      },
+    })).then((result) => {
+      if (setupCommitted.fulfilled.match(result)) navigate('/app?setup=done', { replace: true });
+    });
+  };
 
-  async function skip(): Promise<void> {
+  const skip = (): void => {
     const custom = presets.data?.find((preset) => preset.key === 'custom');
-    if (!custom || saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await commit({
+    if (!custom) return;
+    void dispatch(setupCommitted({
+      outcome: 'skipped',
+      body: {
         industry: 'custom',
         roles: custom.roles.map((role) => ({ name: role.name })),
         units: custom.units.map((unit) => ({ ...unit })),
         labels: { ...custom.labels },
         includeTemplates: true,
-      });
-      await refreshSession();
-      navigate('/app?setup=skipped', { replace: true });
-    } catch (caught) {
-      setError(caught as Error);
-      setSaving(false);
-    }
-  }
+      },
+    })).then((result) => {
+      if (setupCommitted.fulfilled.match(result)) navigate('/app?setup=skipped', { replace: true });
+    });
+  };
 
   if (presets.loading) {
     return <p className="text-muted" aria-live="polite">Loading…</p>;
@@ -164,7 +168,7 @@ export default function Setup(): JSX.Element {
     <div className="wizard">
       <div className="wizard-top">
         <p className="utility">Setting up {orgName}</p>
-        <button type="button" className="btn btn-ghost" onClick={() => void skip()} disabled={saving}>
+        <button type="button" className="btn btn-ghost" onClick={skip} disabled={saving}>
           Skip setup →
         </button>
       </div>
@@ -223,7 +227,7 @@ export default function Setup(): JSX.Element {
           labels={state.labels}
           preset={currentPreset}
           includeTemplates={state.includeTemplates}
-          onToggleTemplates={(value) => patch({ includeTemplates: value })}
+          onToggleTemplates={toggleTemplates}
           onJump={goto}
         />
       )}
@@ -256,7 +260,7 @@ export default function Setup(): JSX.Element {
             type="button"
             className="btn btn-primary"
             disabled={saving || !state.industry}
-            onClick={() => void finish()}
+            onClick={finish}
           >
             {saving && <span className="spinner" aria-hidden="true" />}
             Finish setup
@@ -285,9 +289,9 @@ export default function Setup(): JSX.Element {
           destructive
           onConfirm={() => {
             applyPreset(pendingPreset);
-            setPendingPreset(null);
+            dispatch(presetSwitchSettled());
           }}
-          onCancel={() => setPendingPreset(null)}
+          onCancel={() => dispatch(presetSwitchSettled())}
         />
       )}
     </div>

@@ -355,7 +355,7 @@ describe('support access — DEC-114', () => {
     expect(audit).toBeTruthy();
   });
 
-  it('gets into a SUSPENDED organisation, which the customer’s own staff cannot', async () => {
+  it('gets into a SUSPENDED organization, which the customer’s own staff cannot', async () => {
     // The one carve-out in the tenant resolver: the moment a customer most needs somebody from Endur
     // inside their console is the moment they have been cut off from it.
     const target = await registerOrg();

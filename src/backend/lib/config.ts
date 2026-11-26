@@ -44,6 +44,9 @@ const Env = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  /** Sign-in attempts per IP and email in 15 minutes. Raised only by the end-to-end run,
+   *  which signs the same seeded accounts in many times over (e2e/playwright.config.ts). */
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 
   K_ANON_THRESHOLD: z.coerce.number().int().min(1).default(5),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

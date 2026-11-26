@@ -1,79 +1,117 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { QuestionCard } from '../../../components/form/QuestionCard.js';
-import { Toast } from '../../../components/feedback/Toast.js';
 import { Icon } from '../../../components/Icon.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
 import { ApiError } from '../../../lib/api.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
-import { cloneKey, useTemplates } from '../../../lib/templates.js';
-import type { QuestionDraft } from '../../../components/form/kinds.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  formDuplicated,
+  questionCardOpened,
+  selectBuilderPage,
+} from '../../../store/screens/builderPage.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import {
+  questionAdded,
+  questionDuplicated,
+  questionEdited,
+  questionMoved,
+  questionRemoved,
+  questionRestored,
+  metaEdited,
+  redoRequested,
+  selectCanRedo,
+  selectCanUndo,
+  selectDraft,
+  selectEstimatedSeconds,
+  selectLocked,
+  undoRequested,
+} from '../../../store/builderSlice.js';
+import { toastShown } from '../../../store/uiSlice.js';
 import { useBuilder } from './useBuilder.js';
 import { SaveIndicator } from './SaveIndicator.js';
 
+/**
+ * The editor is for whoever may change forms. Anybody else who reaches it (an old link, a
+ * typed address) is shown the form itself, read-only, rather than an editor whose every
+ * control is switched off. A LOCKED form is a different thing — an editor looking at a form
+ * that is in use — and BuilderPage still shows that read-only, with the way to copy it.
+ */
 export default function Builder(): JSX.Element {
+  const { id } = useParams<{ id: string }>();
+  const can = useCan();
+  if (!can('template.update')) return <Navigate to={`/app/forms/${id ?? ''}/preview`} replace />;
+  return <BuilderPage />;
+}
+
+function BuilderPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const can = useCan();
   const labels = useLabels();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const builder = useBuilder(id);
-  const templates = useTemplates();
 
-  const [openAt, setOpenAt] = useState<number | null>(0);
-  const [undo, setUndo] = useState<{ question: QuestionDraft; at: number } | null>(null);
-  const [cloning, setCloning] = useState(false);
+  // The draft and everything derived from it come from the builder slice. Each selector is
+  // its own subscription, so typing in a question re-renders what reads the draft and
+  // nothing that reads only, say, whether there is anything to redo.
+  const draft = useAppSelector(selectDraft);
+  const locked = useAppSelector(selectLocked);
+  const estimatedSeconds = useAppSelector(selectEstimatedSeconds);
+  const canUndo = useAppSelector(selectCanUndo);
+  const canRedo = useAppSelector(selectCanRedo);
 
-  const { draft, locked } = builder;
+  // Which card is open, and Duplicate, are `state.builderPage` (store/screens/builderPage.ts):
+  // it follows the builder's own events, so a duplicated question opens its copy by itself.
+  const page = useAppSelector(selectBuilderPage);
+  const openAt = page.openAt;
+  const cloning = page.duplicating;
+  const duplicateError = messageOf(page.duplicateError, 'That could not be duplicated.');
+  const setOpenAt = (index: number): void => {
+    dispatch(questionCardOpened({ index }));
+  };
+
   const editable = can('template.update') && !locked;
 
-  const replace = (at: number, question: QuestionDraft): void =>
-    builder.setQuestions(draft.questions.map((existing, index) => (index === at ? question : existing)));
+  // Every edit is an event with its payload; the slice does the array work, records the
+  // undo step and marks the draft dirty, and the autosave listener takes it from there.
+  const addQuestion = (): void => {
+    // A new question starts as a rating: it is the most common kind in every seeded
+    // template, and starting somewhere is faster than starting at a chooser.
+    dispatch(questionAdded({ kind: 'rating' }));
+  };
 
   const duplicate = (at: number): void => {
-    const source = draft.questions[at];
-    if (!source) return;
-    const questions = [...draft.questions];
-    const { id: _drop, ...rest } = source;
-    questions.splice(at + 1, 0, { ...rest, config: { ...source.config } });
-    builder.setQuestions(questions);
-    setOpenAt(at + 1);
+    dispatch(questionDuplicated({ index: at }));
   };
 
   const remove = (at: number): void => {
     const question = draft.questions[at];
-    if (!question) return;
-    builder.setQuestions(draft.questions.filter((_, index) => index !== at));
-    setUndo({ question, at });
-    setOpenAt(null);
+    if (!question || !id) return;
+    dispatch(questionRemoved({ index: at }));
+    // Deleted at once, no dialog, with an Undo. The Undo is an ACTION, not a callback: the
+    // toast lives in the store (R-307), and pressing it dispatches `questionRestored`.
+    dispatch(
+      toastShown({
+        message: `${question.text.trim() || `Question ${at + 1}`} deleted.`,
+        undo: questionRestored({ templateId: id, at, question }),
+      }),
+    );
   };
 
   const move = (at: number, direction: -1 | 1): void => {
     const to = at + direction;
     if (to < 0 || to >= draft.questions.length) return;
-    const questions = [...draft.questions];
-    const [moved] = questions.splice(at, 1);
-    if (moved) questions.splice(to, 0, moved);
-    builder.setQuestions(questions);
-    if (openAt === at) setOpenAt(to);
-  };
-
-  const restore = (): void => {
-    if (!undo) return;
-    const questions = [...draft.questions];
-    questions.splice(Math.min(undo.at, questions.length), 0, undo.question);
-    builder.setQuestions(questions);
-    setUndo(null);
+    dispatch(questionMoved({ from: at, to }));
   };
 
   const duplicateTemplate = (): void => {
     if (!id) return;
-    setCloning(true);
-    void templates
-      .clone(id, cloneKey(id), `${draft.name} (copy)`)
-      .then((created) => navigate(`/app/forms/${created.id}/build`))
-      .finally(() => setCloning(false));
+    void dispatch(formDuplicated({ templateId: id, name: draft.name })).then((result) => {
+      if (formDuplicated.fulfilled.match(result)) navigate(`/app/forms/${result.payload.id}/build`);
+    });
   };
 
   if (builder.loading) {
@@ -86,7 +124,7 @@ export default function Builder(): JSX.Element {
     );
   }
 
-  if (builder.loadError || !builder.template) {
+  if (builder.loadError || !builder.ready) {
     return (
       <div className="fullpage">
         <div>
@@ -102,7 +140,7 @@ export default function Builder(): JSX.Element {
     );
   }
 
-  const time = approxDuration(builder.estimatedSeconds);
+  const time = approxDuration(estimatedSeconds);
 
   return (
     <>
@@ -111,7 +149,30 @@ export default function Builder(): JSX.Element {
         vocabulary={false}
         action={
           <span className="page-actions">
-            <SaveIndicator state={builder.save} error={builder.saveError} onRetry={builder.flush} />
+            <SaveIndicator />
+            {editable && (
+              <>
+                {/* Enabled and disabled straight from the slice: `past` and `future`. */}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  aria-label="Undo last change"
+                  disabled={!canUndo}
+                  onClick={() => dispatch(undoRequested())}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  aria-label="Redo last change"
+                  disabled={!canRedo}
+                  onClick={() => dispatch(redoRequested())}
+                >
+                  Redo
+                </button>
+              </>
+            )}
             <Link className="btn btn-secondary" to={`/app/forms/${id ?? ''}/preview`}>Preview</Link>
           </span>
         }
@@ -139,6 +200,8 @@ export default function Builder(): JSX.Element {
               {cloning ? 'Duplicating…' : 'Duplicate to edit'}
             </button>
           )}
+          {/* Said where it was pressed: a duplicate that failed used to do nothing at all. */}
+          {duplicateError && <p className="form-error" role="alert">{duplicateError}</p>}
         </div>
       )}
 
@@ -154,7 +217,7 @@ export default function Builder(): JSX.Element {
               placeholder="Untitled form"
               aria-label="Form name"
               disabled={!editable}
-              onChange={(event) => builder.setMeta({ name: event.target.value })}
+              onChange={(event) => dispatch(metaEdited({ name: event.target.value }))}
             />
             <input
               className="input builder-desc"
@@ -163,7 +226,7 @@ export default function Builder(): JSX.Element {
               placeholder="Add a line saying what this is for and how long it takes."
               aria-label="Form description"
               disabled={!editable}
-              onChange={(event) => builder.setMeta({ description: event.target.value })}
+              onChange={(event) => dispatch(metaEdited({ description: event.target.value }))}
             />
           </div>
 
@@ -175,7 +238,7 @@ export default function Builder(): JSX.Element {
               expanded={openAt === index}
               readOnly={!editable}
               onExpand={() => setOpenAt(index)}
-              onChange={(next) => replace(index, next)}
+              onChange={(next) => dispatch(questionEdited({ index, question: next }))}
               onDuplicate={() => duplicate(index)}
               onDelete={() => remove(index)}
               {...(editable && draft.questions.length > 1
@@ -185,7 +248,7 @@ export default function Builder(): JSX.Element {
           ))}
 
           {draft.questions.length === 0 && (
-            <button type="button" className="builder-first" onClick={builder.addQuestion} disabled={!editable}>
+            <button type="button" className="builder-first" onClick={addQuestion} disabled={!editable}>
               <Icon name="add" size={20} /> Add your first question
             </button>
           )}
@@ -197,20 +260,13 @@ export default function Builder(): JSX.Element {
             A rail of one is honest; four buttons that do nothing are not. */}
         {editable && (
           <div className="builder-rail">
-            <button type="button" className="rail-tool" onClick={builder.addQuestion}>
+            <button type="button" className="rail-tool" onClick={addQuestion}>
               <Icon name="add" size={20} label="Add question" />
             </button>
           </div>
         )}
       </div>
 
-      {undo && (
-        <Toast
-          message={`${undo.question.text.trim() || `Question ${undo.at + 1}`} deleted.`}
-          undo={restore}
-          onDismiss={() => setUndo(null)}
-        />
-      )}
     </>
   );
 }

@@ -33,7 +33,8 @@ export const SubmitResponseBody = z.object({
   subjectId: z.string().uuid().optional(),
   answers: z.array(SubmittedAnswer).max(50),
   durationMs: z.number().int().min(0).max(60 * 60 * 1000).optional(),
-  channel: z.enum(['link', 'qr', 'kiosk', 'api']).default('link'),
+  /** `home`: answered on the signed-in person's Home page, a members-only campaign only. */
+  channel: z.enum(['link', 'qr', 'kiosk', 'api', 'home']).default('link'),
 });
 export type SubmitResponseBody = z.infer<typeof SubmitResponseBody>;
 

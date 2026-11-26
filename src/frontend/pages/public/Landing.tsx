@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react';
+// The public landing page. The rotating example (which vocabulary the headline shows, and
+// whether the reader has taken it over) is `state.entry.landing`; the timer is a resource,
+// started and stopped by an effect, and each tick dispatches `landingRotated`.
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PITCH_KEYS, PRESET_VOCABULARIES } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
 import { Illustration, type IllustrationName } from '../../components/illustrations/Illustration.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import { landingLeft, landingPicked, landingRotated, selectEntry } from '../../store/screens/entry.js';
 
 const DWELL_MS = 3500;
 
@@ -19,19 +25,24 @@ const prefersReducedMotion = (): boolean =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default function Landing(): JSX.Element {
-  const [index, setIndex] = useState(0);
-  const [engaged, setEngaged] = useState(false);
+  const dispatch = useAppDispatch();
+  const { index, engaged } = useAppSelector(selectEntry).landing;
+  useClearOnLeave(landingLeft());
+
+  // Effect (timer): rotate the example until the reader picks one; each tick is an action.
 
   useEffect(() => {
     if (engaged || prefersReducedMotion()) return;
     const timer = window.setInterval(
-      () => setIndex((current) => (current + 1) % PRESET_VOCABULARIES.length),
+      () => dispatch(landingRotated({ count: PRESET_VOCABULARIES.length })),
       DWELL_MS,
     );
     return () => window.clearInterval(timer);
-  }, [engaged]);
+  }, [dispatch, engaged]);
 
   const active = PRESET_VOCABULARIES[index] ?? PRESET_VOCABULARIES[0];
+
+  // Effect (DOM): the page takes the example's look (`data-vibe`).
 
   useEffect(() => {
     document.documentElement.dataset.vibe = active?.key ?? 'university';
@@ -43,8 +54,7 @@ export default function Landing(): JSX.Element {
   if (!active) return <></>;
 
   const pick = (next: number): void => {
-    setEngaged(true);
-    setIndex(next);
+    dispatch(landingPicked({ index: next }));
   };
 
   return (

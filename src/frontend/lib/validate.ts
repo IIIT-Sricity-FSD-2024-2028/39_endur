@@ -16,7 +16,6 @@
 // IT IS NOT THE RULE. The server validates every request regardless (`middleware/validate.ts`),
 // which is what INV-003 requires — this only decides when to bother the person. A caller that
 // skipped it would be refused exactly as before.
-import { useCallback, useState } from 'react';
 import type { z } from 'zod';
 
 /** `path -> message`, flattened the way `ApiError.fields` already is. */
@@ -48,49 +47,6 @@ export function fieldErrorsOf(schema: z.ZodTypeAny, value: unknown): FieldErrors
 export const isValid = (schema: z.ZodTypeAny, value: unknown): boolean =>
   schema.safeParse(value).success;
 
-export type FormValidation = {
-  /** What to render under each input. Empty until the form has been submitted once. */
-  errors: FieldErrors;
-  /**
-   * Validate, store the messages, and say whether to proceed.
-   *
-   * ON SUBMIT, NOT ON EVERY KEYSTROKE, and that is the decision this hook encodes. A name is
-   * invalid for as long as it takes to type the first letter of it; telling somebody so while
-   * their finger is still on the `S` of `Sanjay` is the product shouting at them for doing the
-   * thing it asked. `26` § Forms says an error appears when a person has finished with a field
-   * — pressing the button is the clearest possible signal that they have.
-   */
-  check: (value: unknown) => boolean;
-  /**
-   * Drop the message for one field. Called on change, so an error the reader is visibly
-   * fixing disappears as they fix it rather than sitting there contradicting the screen.
-   */
-  clear: (path: string) => void;
-  reset: () => void;
-};
-
-export function useFormValidation(schema: z.ZodTypeAny): FormValidation {
-  const [errors, setErrors] = useState<FieldErrors>({});
-
-  const check = useCallback(
-    (value: unknown): boolean => {
-      const next = fieldErrorsOf(schema, value);
-      setErrors(next);
-      return Object.keys(next).length === 0;
-    },
-    [schema],
-  );
-
-  const clear = useCallback((path: string) => {
-    setErrors((current) => {
-      if (!(path in current)) return current;
-      const next = { ...current };
-      delete next[path];
-      return next;
-    });
-  }, []);
-
-  const reset = useCallback(() => setErrors({}), []);
-
-  return { errors, check, clear, reset };
-}
+// The errors themselves are kept by the form's slice (`/start`: `state.entry.signup`), on
+// submit and not on every keystroke: a name is invalid for as long as it takes to type its
+// first letter (26 § Forms). Each field's message is dropped as soon as that field is edited.

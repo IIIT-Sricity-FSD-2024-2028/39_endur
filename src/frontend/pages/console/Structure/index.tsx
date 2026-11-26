@@ -1,31 +1,48 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+// The org's tree. What is selected, being added, asked of the tree, or being deleted is
+// `state.structure` (store/screens/structure.ts); every command is a thunk there.
+// docs/REDUX-PLAN.md §6.10.
+import { useMemo } from 'react';
 import {
   MAX_REPEAT,
   parseUnitRange,
   repeatCount,
   type CreateUnitBody,
-  type UnitImpact,
   type UnitNode,
 } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
-import { UnitTree, type UnitTreeRequest } from '../../../components/org/UnitTree.js';
+import { UnitTree } from '../../../components/org/UnitTree.js';
 import { UnitMap } from '../../../components/org/UnitMap.js';
 import { Icon } from '../../../components/Icon.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
-import { unitImpact, useUnits } from '../../../lib/units.js';
+import { useUnitImpact, useUnits } from '../../../lib/units.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  isDraftRow as isDraft,
+  rowMessageShown,
+  selectStructure,
+  structurePageLeft,
+  treeAsked,
+  unitDeleteAsked,
+  unitDeleteDismissed,
+  unitDeleted,
+  unitDraftDropped,
+  unitDraftStarted,
+  unitReparented,
+  unitRenamed,
+  unitSelected,
+  unitsCreated,
+  type UnitDraft as Draft,
+} from '../../../store/screens/structure.js';
 import { pluralise } from '../../../lib/format.js';
 import { DetailPanel } from './DetailPanel.js';
 import { Overview } from './Overview.js';
 import { checkingConsequence, deleteConsequence, unknownConsequence } from './consequence.js';
 
-const DRAFT = 'draft:';
-const isDraft = (id: string): boolean => id.startsWith(DRAFT);
-
-type Draft = { id: string; parentId: string | null };
 
 const findById = (nodes: UnitNode[], id: string): UnitNode | undefined => {
   for (const node of nodes) {
@@ -63,61 +80,38 @@ export default function Structure(): JSX.Element {
   const can = useCan();
   const units = useUnits();
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [request, setRequest] = useState<UnitTreeRequest | undefined>(undefined);
-  const [rowMessage, setRowMessage] = useState<{ id: string; text: string } | undefined>(undefined);
-  const [pending, setPending] = useState<UnitNode | null>(null);
-  const [impact, setImpact] = useState<{ data: UnitImpact | null; error: Error | null }>({
-    data: null, error: null,
-  });
-  const drafts = useRef(0);
-  const nonce = useRef(0);
+  const dispatch = useAppDispatch();
+  const { selectedId, draft, request, rowMessage, deletingId } = useAppSelector(selectStructure);
+  useClearOnLeave(structurePageLeft());
+  const setSelectedId = (unitId: string | null): void => {
+    dispatch(unitSelected({ unitId }));
+  };
 
   const addLabel = `Add a ${labels.unit.one}`;
   // Memoised so the empty fallback is one array, not a new one per render that re-runs the tree below.
   const data = useMemo(() => units.data ?? [], [units.data]);
   const tree = useMemo(() => withDraft(data, draft, addLabel), [data, draft, addLabel]);
   const selected = selectedId ? findById(data, selectedId) : undefined;
-
-  useEffect(() => {
-    if (!pending) return;
-    let cancelled = false;
-    setImpact({ data: null, error: null });
-    void unitImpact(pending.id)
-      .then((result) => {
-        if (!cancelled) setImpact({ data: result, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setImpact({ data: null, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pending]);
+  const pending = deletingId ? (findById(data, deletingId) ?? null) : null;
+  // What deleting it costs: read when the confirmation opens, fresh every time.
+  const impact = useUnitImpact(pending?.id ?? null);
 
   const startDraft = (parentId: string | null): void => {
-    drafts.current += 1;
-    setRowMessage(undefined);
-    setDraft({ id: `${DRAFT}${drafts.current}`, parentId });
+    dispatch(unitDraftStarted(parentId));
   };
 
   const ask = (id: string, action: 'rename' | 'move'): void => {
-    nonce.current += 1;
-    setRequest({ id, action, nonce: nonce.current });
+    dispatch(treeAsked({ id, action }));
   };
 
-  const failure = (error: unknown, fallback: string): string =>
-    error instanceof ApiError ? error.message : fallback;
-
-  const createFrom = async (name: string, parentId: string | null, rowId: string): Promise<void> => {
+  const createFrom = (name: string, parentId: string | null, rowId: string): void => {
     const parsed = parseUnitRange(name);
     const count = parsed.repeat ? repeatCount(parsed.repeat) : 1;
     if (count > MAX_REPEAT) {
-      setRowMessage({
+      dispatch(rowMessageShown({
         id: rowId,
         text: `That would create ${pluralise(count, labels.unit.one, labels.unit.many)}. The most in one go is ${MAX_REPEAT}.`,
-      });
+      }));
       return;
     }
 
@@ -127,46 +121,27 @@ export default function Structure(): JSX.Element {
       isTemporary: false,
       ...(parsed.repeat ? { repeat: parsed.repeat } : {}),
     };
-    try {
-      await units.create(body);
-      setDraft(null);
-      setRowMessage(undefined);
-    } catch (error) {
-      setRowMessage({ id: rowId, text: failure(error, `${parsed.name} could not be created.`) });
-    }
+    void dispatch(unitsCreated({ body, rowId, failure: `${parsed.name} could not be created.` }));
   };
 
   const handleRename = (id: string, name: string): void => {
     if (isDraft(id)) {
-      void createFrom(name, draft?.parentId ?? null, id);
+      createFrom(name, draft?.parentId ?? null, id);
       return;
     }
-    setRowMessage(undefined);
-    void units.rename(id, name).catch((error: unknown) => {
-      setRowMessage({ id, text: failure(error, 'That name could not be saved.') });
-    });
+    void dispatch(unitRenamed({ rowId: id, name, failure: 'That name could not be saved.' }));
   };
 
   const handleReparent = (id: string, newParentId: string): void => {
-    setRowMessage(undefined);
-    void units.reparent(id, newParentId).catch((error: unknown) => {
-      setRowMessage({ id, text: failure(error, 'That move could not be saved.') });
-    });
+    void dispatch(unitReparented({ rowId: id, newParentId, failure: 'That move could not be saved.' }));
   };
 
   const confirmDelete = (): void => {
     if (!pending || !impact.data) return;
-    const node = pending;
-    setPending(null);
-    const reassign = node.children.length > 0 ? (node.parentId ?? undefined) : undefined;
-    void units
-      .remove(node.id, reassign)
-      .then(() => {
-        if (selectedId === node.id) setSelectedId(null);
-      })
-      .catch((error: unknown) => {
-        setRowMessage({ id: node.id, text: failure(error, `${node.name} could not be deleted.`) });
-      });
+    const reassign = pending.children.length > 0 ? (pending.parentId ?? undefined) : undefined;
+    void dispatch(
+      unitDeleted({ rowId: pending.id, reassignChildrenTo: reassign, failure: `${pending.name} could not be deleted.` }),
+    );
   };
 
   const total = countUnits(data);
@@ -194,7 +169,7 @@ export default function Structure(): JSX.Element {
 
       {units.error && (
         <p className="form-error" role="alert">
-          {failure(units.error, 'Could not load the structure.')}{' '}
+          {units.error instanceof ApiError ? units.error.message : 'Could not load the structure.'}{' '}
           <button type="button" className="btn btn-ghost" onClick={() => void units.reload()}>
             Try again
           </button>
@@ -253,15 +228,13 @@ export default function Structure(): JSX.Element {
               subjectWord={labels.subject}
               selectedId={selectedId ?? undefined}
               focusId={draft?.id}
-              request={request}
-              rowMessage={rowMessage}
+              request={request ?? undefined}
+              rowMessage={rowMessage ?? undefined}
               onSelect={setSelectedId}
               onRename={can('unit.update') || can('unit.create') ? handleRename : undefined}
-              onCancelEdit={(id) => {
-                if (draft?.id === id) setDraft(null);
-              }}
+              onCancelEdit={(id) => dispatch(unitDraftDropped({ id }))}
               onAddChild={can('unit.create') ? startDraft : undefined}
-              onDelete={can('unit.delete') ? (id) => setPending(findById(data, id) ?? null) : undefined}
+              onDelete={can('unit.delete') ? (id) => dispatch(unitDeleteAsked({ unitId: id })) : undefined}
               onReparent={can('unit.reparent') ? handleReparent : undefined}
             />
           </div>
@@ -277,7 +250,7 @@ export default function Structure(): JSX.Element {
               canReadPeople={can('person.read')}
               onRename={() => ask(selected.id, 'rename')}
               onMove={() => ask(selected.id, 'move')}
-              onDelete={() => setPending(selected)}
+              onDelete={() => dispatch(unitDeleteAsked({ unitId: selected.id }))}
             />
           )}
         </div>
@@ -305,7 +278,7 @@ export default function Structure(): JSX.Element {
           destructive
           confirmDisabled={!impact.data}
           onConfirm={confirmDelete}
-          onCancel={() => setPending(null)}
+          onCancel={() => dispatch(unitDeleteDismissed())}
         />
       )}
     </>

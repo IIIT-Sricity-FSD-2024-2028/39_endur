@@ -79,7 +79,7 @@ describe('deleteConsequence — real numbers, never "are you sure?"', () => {
     expect(text).toBe('Deleting Physics removes an empty zblorn. Nothing else changes.');
   });
 
-  it('uses the organisation vocabulary, never a hardcoded noun (INV-001)', () => {
+  it('uses the organization vocabulary, never a hardcoded noun (INV-001)', () => {
     const text = deleteConsequence({
       name: 'Physics',
       impact: impact({ subjectsAffected: 1 }),

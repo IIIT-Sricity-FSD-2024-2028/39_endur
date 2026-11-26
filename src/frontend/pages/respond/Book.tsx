@@ -1,16 +1,20 @@
-import { useCallback, useState } from 'react';
+// `/book/:token`: a public booking page. What the booker picks and types is
+// `state.respond.bookings[token]` (store/screens/respond.ts); taking and cancelling a slot are
+// thunks there. docs/REDUX-PLAN.md §6.10 (R-704).
 import { useParams } from 'react-router-dom';
 import { SlotGrid } from '../../components/data/SlotGrid.js';
-import { ApiError } from '../../lib/api.js';
+import { rememberedBooking, usePublicBookable } from '../../lib/booking-public.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
 import {
-  bookKey,
-  cancelWithToken,
-  forgetBooking,
-  rememberBooking,
-  rememberedBooking,
-  takeSlot,
-  usePublicBookable,
-} from '../../lib/booking.js';
+  bookerEmailEdited,
+  bookerNameEdited,
+  bookingCancelled,
+  bookingPageLeft,
+  selectBooking,
+  slotPicked,
+  slotTaken,
+} from '../../store/screens/respond.js';
 import { Unavailable } from './Unavailable.js';
 
 const WHEN = new Intl.DateTimeFormat(undefined, {
@@ -21,57 +25,27 @@ const WHEN = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 });
 
-const TOO_SLOW = 'That slot just filled. Pick another one.';
-const GENERIC_FAILURE = 'That did not go through. Your details are still here — try again.';
-
 export default function Book(): JSX.Element {
   const { token } = useParams<{ token: string }>();
   const { bookable, loading, unavailable, error, reload } = usePublicBookable(token);
 
-  const [slotId, setSlotId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [sending, setSending] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [cancelToken, setCancelToken] = useState<string | null>(() =>
-    token ? rememberedBooking(token) : null,
-  );
-  const [taken, setTaken] = useState<{ startsAt: string; endsAt: string } | null>(null);
+  const bookingToken = token ?? '';
+  const dispatch = useAppDispatch();
+  const fill = useAppSelector((state) => selectBooking(state, bookingToken));
+  useClearOnLeave(bookingPageLeft({ token: bookingToken }));
+  const { slotId, name, email, sending, failure } = fill;
+  // Booked on THIS visit (the receipt), or on an earlier one (the key this device kept),
+  // unless it was cancelled here. The device's marker is read where it lives, not copied.
+  const cancelToken =
+    fill.booked?.cancelToken ?? (fill.cancelled || !token ? null : rememberedBooking(token));
+  const taken = fill.booked;
 
-  const submit = useCallback(async () => {
-    if (!token || !slotId) return;
-    setSending(true);
-    setFailure(null);
-    try {
-      const receipt = await takeSlot(token, { slotId, name, email }, bookKey());
-      rememberBooking(token, receipt.cancelToken);
-      setCancelToken(receipt.cancelToken);
-      setTaken({ startsAt: receipt.startsAt, endsAt: receipt.endsAt });
-    } catch (cause) {
-      const status = cause instanceof ApiError ? cause.status : 0;
-      setFailure(status === 409 ? TOO_SLOW : GENERIC_FAILURE);
-      setSlotId(null);
-      await reload();
-    } finally {
-      setSending(false);
-    }
-  }, [token, slotId, name, email, reload]);
-
-  const cancel = useCallback(async () => {
-    if (!token || !cancelToken) return;
-    setSending(true);
-    try {
-      await cancelWithToken(cancelToken);
-      forgetBooking(token);
-      setCancelToken(null);
-      setTaken(null);
-      await reload();
-    } catch {
-      setFailure(GENERIC_FAILURE);
-    } finally {
-      setSending(false);
-    }
-  }, [token, cancelToken, reload]);
+  const submit = (): void => {
+    if (token) void dispatch(slotTaken({ token }));
+  };
+  const cancel = (): void => {
+    if (token && cancelToken) void dispatch(bookingCancelled({ token, cancelToken }));
+  };
 
   if (loading) {
     return (
@@ -93,7 +67,7 @@ export default function Book(): JSX.Element {
         </p>
         {/* No account was needed to book and none is needed to undo it: the cancel key came
             back with the booking and is kept on this device (DEC-090). */}
-        <button type="button" className="btn btn-secondary" disabled={sending} onClick={() => void cancel()}>
+        <button type="button" className="btn btn-secondary" disabled={sending} onClick={cancel}>
           Cancel this booking
         </button>
         <p className="rf-brand" aria-hidden="true">Endur</p>
@@ -117,7 +91,7 @@ export default function Book(): JSX.Element {
       <SlotGrid
         slots={bookable.slots}
         selectedId={slotId}
-        onSelect={setSlotId}
+        onSelect={(id) => dispatch(slotPicked({ token: bookingToken, slotId: id }))}
         emptyText="There are no upcoming times to book right now."
       />
 
@@ -135,7 +109,7 @@ export default function Book(): JSX.Element {
           className="input"
           value={name}
           autoComplete="name"
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => dispatch(bookerNameEdited({ token: bookingToken, name: event.target.value }))}
         />
       </label>
 
@@ -146,7 +120,7 @@ export default function Book(): JSX.Element {
           type="email"
           value={email}
           autoComplete="email"
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => dispatch(bookerEmailEdited({ token: bookingToken, email: event.target.value }))}
         />
       </label>
 
@@ -160,7 +134,7 @@ export default function Book(): JSX.Element {
         type="button"
         className="btn btn-primary btn-lg rf-book-submit"
         disabled={!ready || sending}
-        onClick={() => void submit()}
+        onClick={submit}
       >
         {sending ? 'Booking…' : 'Book this time'}
       </button>

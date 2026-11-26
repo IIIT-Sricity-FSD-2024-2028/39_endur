@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+// An inline rename. What is typed is this field's entry in `state.widgets.names`
+// (store/screens/widgets.ts), with the value it started from; once the value itself changes,
+// the field shows the new one. The commit is the caller's (`onCommit`, a thunk there).
+import { useEffect, useId, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import { instanceLeft, nameReset, nameTyped, selectNameShown } from '../../store/screens/widgets.js';
 
 export function InlineName({
   value,
@@ -15,12 +21,18 @@ export function InlineName({
   autoFocus?: boolean;
   placeholder?: string | undefined;
 }): JSX.Element {
-  const [draft, setDraft] = useState(value);
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector((state) => selectNameShown(state, id, value));
+  useClearOnLeave(instanceLeft({ id }));
   const ref = useRef<HTMLInputElement>(null);
   const reverting = useRef(false);
   const committed = useRef(false);
+  const revert = (): void => {
+    dispatch(nameReset({ id }));
+  };
 
-  useEffect(() => setDraft(value), [value]);
+  // Effect (DOM): focus and select the field when asked to.
 
   useEffect(() => {
     if (autoFocus) {
@@ -32,13 +44,13 @@ export function InlineName({
   const commit = (): void => {
     if (reverting.current) {
       reverting.current = false;
-      setDraft(value);
+      revert();
       onCancel?.();
       return;
     }
     const next = draft.trim();
     if (!next) {
-      setDraft(value);
+      revert();
       onCancel?.();
       return;
     }
@@ -52,7 +64,7 @@ export function InlineName({
       aria-label={ariaLabel}
       placeholder={placeholder}
       value={draft}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => dispatch(nameTyped({ id, text: event.target.value, base: value }))}
       onBlur={() => {
         if (committed.current) {
           committed.current = false;
@@ -74,7 +86,7 @@ export function InlineName({
         if (event.key === 'Escape') {
           event.preventDefault();
           reverting.current = true;
-          setDraft(value);
+          revert();
           event.currentTarget.blur();
         }
       }}

@@ -1,22 +1,42 @@
-import { useMemo, useState } from 'react';
+// The three-step campaign wizard. Everything typed and chosen is `state.campaigns.wizard`
+// (store/screens/campaigns.ts), every change an action; Launch is the `campaignLaunchSubmitted`
+// thunk. docs/REDUX-PLAN.md §6.10.
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type {
-  AudienceRule, CampaignAccess, CampaignDetail, Label, SubjectSummary, UnitNode,
-} from '@endur/shared';
+import type { AudienceRule, Label, SubjectSummary, TemplateSummary, UnitNode } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { Toggle } from '../../../components/form/Toggle.js';
 import { Icon } from '../../../components/Icon.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
 import { useLabels } from '../../../lib/labels.js';
-import { useAppSelector } from '../../../store/index.js';
-import { ApiError } from '../../../lib/api.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
-import { useTemplates } from '../../../lib/templates.js';
+import { PAST_CLOSE, toLocalInput } from '../../../lib/when.js';
+import { useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
+import { canAny, FORM_BUILDING, useCan } from '../../../lib/capabilities.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
-import { launchCampaign, launchKey, useCampaignList } from '../../../lib/campaigns.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  accessChosen,
+  anonymityChosen,
+  audienceChosen,
+  campaignLaunchSubmitted,
+  campaignNameEdited,
+  campaignWizardLeft,
+  closesAtEdited,
+  formPicked,
+  launchAttempted,
+  opensAtEdited,
+  selectClosesInPast,
+  selectStepsReady,
+  selectWizard,
+  subjectToggled,
+  windowInOrder as inOrder,
+  wizardStepChanged,
+} from '../../../store/screens/campaigns.js';
 import { summarise } from './summary.js';
 
 const STEPS = [
@@ -25,74 +45,67 @@ const STEPS = [
   { key: 'when', label: 'When' },
 ];
 
-export function autoName(templateName: string, now = new Date()): string {
-  const month = now.toLocaleString(undefined, { month: 'long', year: 'numeric' });
-  return `${templateName} — ${month}`;
-}
+export { autoName } from '../../../store/screens/campaigns.js';
 
 export default function CampaignNew(): JSX.Element {
   const labels = useLabels();
   const navigate = useNavigate();
   const orgName = useAppSelector((state) => state.auth.org?.name ?? '');
+  const orgIndustry = useAppSelector((state) => state.auth.org?.industry ?? '');
+  const can = useCan();
+  const mayCopy = can('template.clone');
 
   const templates = useTemplates();
+  // THE LIBRARY, HERE. Whoever runs campaigns but does not build forms has no Templates page
+  // (FORM_BUILDING), so the forms they may copy are offered where they choose one, and the
+  // copy is made when they launch.
+  const library = useTemplateLibrary({}, mayCopy);
   const subjects = useSubjectList({});
   const units = useUnits();
-  const list = useCampaignList();
 
-  const [step, setStep] = useState(0);
-  const [templateId, setTemplateId] = useState('');
-  const [name, setName] = useState('');
-  const [subjectIds, setSubjectIds] = useState<string[]>([]);
-  const [audience, setAudience] = useState<AudienceRule>({ kind: 'anyone' });
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
-  const [anonymous, setAnonymous] = useState(true);
-  const [access, setAccess] = useState<CampaignAccess>('public');
-
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [launched, setLaunched] = useState<{ campaign: CampaignDetail; url: string } | null>(null);
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectWizard);
+  const ready = useAppSelector(selectStepsReady);
+  const closesInPast = useAppSelector(selectClosesInPast);
+  const windowInOrder = inOrder(draft);
+  useClearOnLeave(campaignWizardLeft());
+  const { step, templateId, name, subjectIds, audience, startsAt, endsAt, anonymous, access } = draft;
+  const busy = draft.sending;
+  const error = messageOf(draft.error, 'That could not be launched.');
+  const launched = draft.launched;
 
   const templateRows = templates.data?.data ?? [];
+  // This industry's library forms the organisation does not already have. "Has" is a copy of
+  // it (listed with its own forms, under whatever name it was given) or a form of the same
+  // name: a seeded organisation's forms were written directly, not copied, and two cards
+  // called "Course feedback" would be one choice offered twice.
+  const alreadyCopied = new Set(templateRows.map((row) => row.clonedFromId));
+  const ownNames = new Set(templateRows.map((row) => row.name.trim().toLowerCase()));
+  const libraryRows = mayCopy
+    ? (library.data ?? []).filter(
+      (row) =>
+        !alreadyCopied.has(row.id) &&
+        !ownNames.has(row.name.trim().toLowerCase()) &&
+        (!row.industry || !orgIndustry || row.industry === orgIndustry),
+    )
+    : [];
   const subjectRows = subjects.data?.data ?? [];
-  const template = templateRows.find((row) => row.id === templateId);
+  const template = [...templateRows, ...libraryRows].find((row) => row.id === templateId);
 
   const audienceLine = useAudienceLine(audience, units.data ?? [], labels.respondent);
 
   const chooseTemplate = (id: string, templateName: string): void => {
-    setTemplateId(id);
-    if (!name.trim()) setName(autoName(templateName));
+    dispatch(formPicked(id, templateName));
+  };
+  const setStep = (next: number): void => {
+    dispatch(wizardStepChanged(next));
   };
 
-  const ready = [
-    templateId !== '' && name.trim() !== '',
-    subjectIds.length > 0,
-    !endsAt || !startsAt || new Date(endsAt) > new Date(startsAt),
-  ];
-
   const launch = (): void => {
-    setBusy(true);
-    setError(null);
-    void list
-      .create({
-        name: name.trim(),
-        templateId,
-        subjectIds,
-        audience,
-        anonymous,
-        access,
-        ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
-        ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
-      })
-      .then(async (campaign) => {
-        const result = await launchCampaign(campaign.id, launchKey(campaign.id));
-        setLaunched({ campaign, url: result.url });
-      })
-      .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : 'That could not be launched.');
-      })
-      .finally(() => setBusy(false));
+    // Judge Closes again first: the thunk's `condition` then refuses a wizard left open past
+    // its own closing time, and a second press while the first is in flight.
+    dispatch(launchAttempted());
+    void dispatch(campaignLaunchSubmitted({ isLibrary: template?.isLibrary ?? false }));
   };
 
   const summary = useMemo(
@@ -128,28 +141,32 @@ export default function CampaignNew(): JSX.Element {
         <section className="wizard-step">
           <div className="panel-section">
           <h3 className="panel-title">Which form?</h3>
-          <div className="tgrid">
-            {templateRows.map((row) => {
-              const time = approxDuration(row.estimatedSeconds);
-              return (
-                <button
-                  type="button"
-                  key={row.id}
-                  className={`card tcard tpick${templateId === row.id ? ' is-picked' : ''}`}
-                  aria-pressed={templateId === row.id}
-                  onClick={() => chooseTemplate(row.id, row.name)}
-                >
-                  <span className="tcard-name">{row.name}</span>
-                  <span className="tcard-cost">
-                    {pluralise(row.questionCount, 'question', 'questions')}{time ? ` · ${time}` : ''}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {templateRows.length === 0 && !templates.loading && (
+          {templateRows.length > 0 && (
+            <div className="tgrid">
+              {templateRows.map((row) => (
+                <FormPick key={row.id} row={row} picked={templateId === row.id} onPick={chooseTemplate} />
+              ))}
+            </div>
+          )}
+          {libraryRows.length > 0 && (
+            <>
+              <h4 className="tsection-head wizard-library-head">From the library</h4>
+              <p className="text-meta wizard-library-hint">
+                Copied into {orgName || 'your organization'} when you launch.
+              </p>
+              <div className="tgrid">
+                {libraryRows.map((row) => (
+                  <FormPick key={row.id} row={row} picked={templateId === row.id} onPick={chooseTemplate} />
+                ))}
+              </div>
+            </>
+          )}
+          {templateRows.length === 0 && libraryRows.length === 0 && !templates.loading && !library.loading && (
             <p className="text-muted">
-              No forms yet. <Link to="/app/templates">Copy one from the library</Link> first.
+              No forms yet.{' '}
+              {canAny(can, FORM_BUILDING)
+                ? <Link to="/app/templates">Build one, or copy one from the library</Link>
+                : 'Whoever manages forms for your organization can add one.'}
             </p>
           )}
           </div>
@@ -162,7 +179,7 @@ export default function CampaignNew(): JSX.Element {
               className="input"
               value={name}
               maxLength={120}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => dispatch(campaignNameEdited({ name: event.target.value }))}
             />
             <p className="field-help">
               Auto-filled from the form. {labels.respondent.many} see this name.
@@ -184,13 +201,7 @@ export default function CampaignNew(): JSX.Element {
                 <input
                   type="checkbox"
                   checked={subjectIds.includes(subject.id)}
-                  onChange={() =>
-                    setSubjectIds((current) =>
-                      current.includes(subject.id)
-                        ? current.filter((id) => id !== subject.id)
-                        : [...current, subject.id],
-                    )
-                  }
+                  onChange={() => dispatch(subjectToggled({ subjectId: subject.id }))}
                 />
                 <span className="q-dot q-dot-square" aria-hidden="true" />
                 <span>{subject.name}</span>
@@ -218,7 +229,7 @@ export default function CampaignNew(): JSX.Element {
                 type="radio"
                 name="audience"
                 checked={audience.kind === 'anyone'}
-                onChange={() => setAudience({ kind: 'anyone' })}
+                onChange={() => dispatch(audienceChosen({ audience: { kind: 'anyone' } }))}
               />
               <span className="q-dot" aria-hidden="true" />
               <span>Anyone with the link</span>
@@ -230,7 +241,9 @@ export default function CampaignNew(): JSX.Element {
                 name="audience"
                 checked={audience.kind === 'unit'}
                 onChange={() =>
-                  setAudience({ kind: 'unit', unitId: units.data?.[0]?.id ?? '', includeSubtree: true })
+                  dispatch(audienceChosen({
+                    audience: { kind: 'unit', unitId: units.data?.[0]?.id ?? '', includeSubtree: true },
+                  }))
                 }
               />
               <span className="q-dot" aria-hidden="true" />
@@ -243,7 +256,9 @@ export default function CampaignNew(): JSX.Element {
                   className="input"
                   value={audience.unitId}
                   onChange={(event) =>
-                    setAudience({ kind: 'unit', unitId: event.target.value, includeSubtree: true })
+                    dispatch(audienceChosen({
+                      audience: { kind: 'unit', unitId: event.target.value, includeSubtree: true },
+                    }))
                   }
                 >
                   {flattenUnits(units.data ?? []).map((option) => (
@@ -272,7 +287,7 @@ export default function CampaignNew(): JSX.Element {
                 type="radio"
                 name="access"
                 checked={access === 'public'}
-                onChange={() => setAccess('public')}
+                onChange={() => dispatch(accessChosen({ access: 'public' }))}
               />
               <span className="q-dot" aria-hidden="true" />
               {/* NOT "Anyone with the link" — that is the audience option four lines above,
@@ -288,7 +303,7 @@ export default function CampaignNew(): JSX.Element {
                 type="radio"
                 name="access"
                 checked={access === 'organization'}
-                onChange={() => setAccess('organization')}
+                onChange={() => dispatch(accessChosen({ access: 'organization' }))}
               />
               <span className="q-dot" aria-hidden="true" />
               <span>Only people in {orgName || 'your organization'}</span>
@@ -322,7 +337,7 @@ export default function CampaignNew(): JSX.Element {
                 type="datetime-local"
                 className="input"
                 value={startsAt}
-                onChange={(event) => setStartsAt(event.target.value)}
+                onChange={(event) => dispatch(opensAtEdited({ value: event.target.value }))}
               />
             </label>
             <label className="qe-field">
@@ -330,8 +345,10 @@ export default function CampaignNew(): JSX.Element {
               <input
                 type="datetime-local"
                 className="input"
+                min={toLocalInput(draft.judgedAt || Date.now())}
                 value={endsAt}
-                onChange={(event) => setEndsAt(event.target.value)}
+                aria-invalid={closesInPast || !windowInOrder || undefined}
+                onChange={(event) => dispatch(closesAtEdited(event.target.value))}
               />
             </label>
           </div>
@@ -339,13 +356,17 @@ export default function CampaignNew(): JSX.Element {
             Leave Opens empty to start as soon as you launch. Leave Closes empty and it runs
             until somebody closes it.
           </p>
-          {!ready[2] && <p className="form-error" role="alert">Closes has to be after Opens.</p>}
+          {closesInPast ? (
+            <p className="form-error" role="alert">{PAST_CLOSE}</p>
+          ) : (
+            !windowInOrder && <p className="form-error" role="alert">Closes has to be after Opens.</p>
+          )}
           </div>
 
           <div className="panel-section">
           <Toggle
             checked={anonymous}
-            onChange={setAnonymous}
+            onChange={(next) => dispatch(anonymityChosen({ anonymous: next }))}
             label={`Collect responses anonymously`}
             hint="We never store who submitted what. This cannot be changed after launch."
           />
@@ -397,12 +418,12 @@ export default function CampaignNew(): JSX.Element {
       {launched && (
         <ShareSheet
           url={launched.url}
-          campaignName={launched.campaign.name}
+          campaignName={launched.name}
           status="open"
-          endsAt={launched.campaign.endsAt}
-          anonymous={launched.campaign.anonymous}
-          access={launched.campaign.access}
-          onClose={() => navigate(`/app/campaigns/${launched.campaign.id}`)}
+          endsAt={launched.endsAt}
+          anonymous={launched.anonymous}
+          access={launched.access}
+          onClose={() => navigate(`/app/campaigns/${launched.campaignId}`)}
         />
       )}
     </>
@@ -430,3 +451,29 @@ function find(nodes: UnitNode[], id: string): UnitNode | undefined {
 }
 
 const countPeople = (node: UnitNode): number => node.peopleTotal ?? 0;
+
+/** One form to choose. The organisation's and the library's look the same: a form is a form. */
+function FormPick({
+  row,
+  picked,
+  onPick,
+}: {
+  row: TemplateSummary;
+  picked: boolean;
+  onPick: (id: string, name: string) => void;
+}): JSX.Element {
+  const time = approxDuration(row.estimatedSeconds);
+  return (
+    <button
+      type="button"
+      className={`card tcard tpick${picked ? ' is-picked' : ''}`}
+      aria-pressed={picked}
+      onClick={() => onPick(row.id, row.name)}
+    >
+      <span className="tcard-name">{row.name}</span>
+      <span className="tcard-cost">
+        {pluralise(row.questionCount, 'question', 'questions')}{time ? ` · ${time}` : ''}
+      </span>
+    </button>
+  );
+}

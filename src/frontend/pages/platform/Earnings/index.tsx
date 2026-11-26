@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { TIERS, formatMoney, type PaymentKind, type Tier } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -39,37 +39,45 @@ function readWindow(params: URLSearchParams): EarningsWindow {
   };
 }
 
-function useCountUp(target: number, ms = 600): number {
-  const [value, setValue] = useState(target);
+/**
+ * The window's revenue, counting up to its value when it arrives. An ANIMATION, so it is a
+ * ref writing frames into its own text node, not state (DEC-R03's one exception, as the
+ * Structure page's counters): the figure rendered is always the true one, and the count-up
+ * only runs between frames, skipped for reduced motion.
+ */
+function CountedMoney({ minor, currency, ms = 600 }: {
+  minor: number;
+  currency: Parameters<typeof formatMoney>[1];
+  ms?: number;
+}): JSX.Element {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Effect (animation): count up to the figure by writing frames to the element.
 
   useEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
     const reduced =
-      typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || target === 0) {
-      setValue(target);
-      return;
-    }
+    if (reduced || minor === 0) return undefined;
 
     let raf = 0;
     const start = performance.now();
     const tick = (now: number): void => {
       const t = Math.min(1, (now - start) / ms);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(target * eased));
+      element.textContent = formatMoney(Math.round(minor * (1 - Math.pow(1 - t, 3))), currency);
       if (t < 1) raf = requestAnimationFrame(tick);
+      else element.textContent = formatMoney(minor, currency);
     };
     raf = requestAnimationFrame(tick);
-
-    const land = window.setTimeout(() => setValue(target), ms + 80);
     return () => {
       cancelAnimationFrame(raf);
-      window.clearTimeout(land);
+      element.textContent = formatMoney(minor, currency);
     };
-  }, [target, ms]);
+  }, [minor, currency, ms]);
 
-  return value;
+  return <span ref={ref}>{formatMoney(minor, currency)}</span>;
 }
 
 export default function Earnings(): JSX.Element {
@@ -78,7 +86,6 @@ export default function Earnings(): JSX.Element {
   const range = readWindow(params);
   const earnings = useEarnings(range);
 
-  const revenue = useCountUp(earnings.data?.totals.revenueMinor ?? 0);
 
   const setWindow = (patch: Partial<EarningsWindow>): void => {
     const next = new URLSearchParams(params);
@@ -109,7 +116,7 @@ export default function Earnings(): JSX.Element {
     { key: 'at', header: 'When', primary: true, render: (row) => formatDate(row.at) },
     {
       key: 'org',
-      header: 'Organisation',
+      header: 'Organization',
       render: (row) => <Link to={`/ops/orgs/${row.orgId}`}>{row.orgName}</Link>,
     },
     { key: 'payer', header: 'Paid by', render: (row) => row.payerName },
@@ -125,7 +132,7 @@ export default function Earnings(): JSX.Element {
       header: 'Reason',
       render: (row) =>
         row.kind === 'signup'
-          ? 'New organisation'
+          ? 'New organization'
           : `${row.fromTier ? TIER_LABEL[row.fromTier] : 'Unknown'} → ${TIER_LABEL[row.tier]}` +
             (row.kind === 'expiry' ? ' · scheduled' : ''),
     },
@@ -184,13 +191,13 @@ export default function Earnings(): JSX.Element {
             <div className="stat-row">
               <StatCard
                 kicker="Revenue in this window"
-                value={formatMoney(revenue, data.currency)}
+                value={<CountedMoney minor={data.totals.revenueMinor} currency={data.currency} />}
                 context={`${formatMoney(data.totals.lifetimeRevenueMinor, data.currency)} taken in total, all time`}
               />
               <StatCard
                 kicker="Payments"
                 value={data.totals.payments}
-                context={`${data.totals.orgsPaying} organisation${data.totals.orgsPaying === 1 ? '' : 's'} paid in this window`}
+                context={`${data.totals.orgsPaying} organization${data.totals.orgsPaying === 1 ? '' : 's'} paid in this window`}
               />
               <StatCard
                 kicker="Average payment"
@@ -206,7 +213,7 @@ export default function Earnings(): JSX.Element {
                 }
               />
               <StatCard
-                kicker="Organisations on a plan"
+                kicker="Organizations on a plan"
                 value={data.byTier.reduce((sum, row) => sum + row.orgsOnTier, 0)}
                 context={TIERS.map(
                   (tier) =>
@@ -228,7 +235,7 @@ export default function Earnings(): JSX.Element {
               <h3>Plan mix</h3>
               <p className="text-muted">
                 The ring is who is on each plan <strong>now</strong>. The amount beside it is
-                what that plan earned <strong>in this window</strong> — an organisation that
+                what that plan earned <strong>in this window</strong> — an organization that
                 has since moved still paid.
               </p>
               <TierDonut slices={data.byTier} />
@@ -238,7 +245,7 @@ export default function Earnings(): JSX.Element {
               <h3>Plans bought over time</h3>
               <p className="text-muted">
                 Purchases per period — not a census of who was on what. Nothing records the
-                tier an organisation sat on in a past month, and inventing it would move
+                tier an organization sat on in a past month, and inventing it would move
                 historic figures retroactively.
               </p>
               <TierTrendChart series={data.tierOverTime} />
@@ -258,7 +265,7 @@ export default function Earnings(): JSX.Element {
             <section className="card">
               <h3>Who moved plan</h3>
               <p className="text-muted">
-                Changes only — a new organisation choosing its first plan is above, not here.
+                Changes only — a new organization choosing its first plan is above, not here.
               </p>
               {data.recentChanges.length === 0 ? (
                 <p className="text-muted">Nobody changed plan in this window.</p>

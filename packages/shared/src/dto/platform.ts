@@ -467,7 +467,7 @@ export type EnterpriseRequestRow = {
  * operator who can name their own powers at the door is an operator who can name all of them.
  */
 export const EnterSupport = z.object({
-  reason: textField(500).min(10, 'Say why you are entering this organisation — the customer sees this.'),
+  reason: textField(500).min(10, 'Say why you are entering this organization — the customer sees this.'),
 });
 export const EnterSupportDto = dto({ params: OrgIdParam, body: EnterSupport });
 

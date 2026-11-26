@@ -125,7 +125,7 @@ describe('<AccessNotice> — which of the two promises this form makes (24 §7, 
       .toBeNull();
   });
 
-  it('NEVER claims the organisation can read the answers', () => {
+  it('NEVER claims the organization can read the answers', () => {
     // The failure that would matter. "will see that you responded" is true; anything
     // stronger would be a lie the schema contradicts (INV-006).
     for (const anonymous of [true, false]) {
@@ -135,7 +135,7 @@ describe('<AccessNotice> — which of the two promises this form makes (24 §7, 
     }
   });
 
-  it('uses the organisation from the payload, not a hardcoded word', () => {
+  it('uses the organization from the payload, not a hardcoded word', () => {
     expect(accessNotice({ anonymous: true, access: 'organization', organizationName: 'Grand Palace' }))
       .toContain('Grand Palace');
   });

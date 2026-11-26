@@ -103,7 +103,7 @@ describe('vocabulary and accessibility', () => {
     expect(screen.getByText('2 people · 3 Courses')).toBeTruthy();
   });
 
-  it('counts ONE subject in the singular — the organisation stores both words', () => {
+  it('counts ONE subject in the singular — the organization stores both words', () => {
     const one = [node('a', 'Alpha', [], { subjectCount: 1, subjectTotal: 1 })];
     render(<UnitMap nodes={one} subjectWord={{ one: 'Service', many: 'Services' }} unitWord="Services" />);
     expect(screen.getByText('2 people · 1 Service')).toBeTruthy();

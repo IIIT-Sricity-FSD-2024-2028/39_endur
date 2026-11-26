@@ -1,0 +1,14 @@
+-- Members-only participation forgets WHEN (INV-006).
+--
+-- `campaign_participants` records THAT a member answered a campaign, so they cannot answer
+-- twice and the Home card knows to go. It also recorded `responded_at`, and the response it
+-- belonged to was written in the SAME transaction: `responses.submitted_at` was the same
+-- instant. Anyone holding the database could sort both tables by time and pair each member
+-- with their answer — the one join this design exists to make impossible, made by a clock.
+--
+-- Nothing in the product ever read the column. It goes, and the times already stored go
+-- with it: they ARE the leak, so there is nothing to keep.
+--
+-- What remains is (campaign_id, user_id): a fact with no moment attached. The audit row for
+-- a submission already carries no actor and no IP (DEC-045) for the same reason.
+ALTER TABLE "campaign_participants" DROP COLUMN "responded_at";

@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { PublicCampaign, ResolvedLabels } from '@endur/shared';
 import { ApiError } from '../../lib/api.js';
+import { errorReply, makeStore, stubApi, type StubReply } from '../../test-utils.js';
 import Fill from './Fill.js';
 
 const LABELS: ResolvedLabels = {
@@ -44,11 +46,25 @@ let responded = false;
 
 vi.mock('../../lib/respond.js', () => ({
   usePublicCampaign: (...args: unknown[]) => usePublicCampaign(...args) as unknown,
-  submitResponse: (...args: unknown[]) => submitResponse(...args) as unknown,
-  submitKey: (token: string) => `key-for-${token}`,
   hasResponded: () => responded,
   markResponded: (...args: unknown[]) => markResponded(...args) as unknown,
 }));
+
+/**
+ * The send is the respond slice's thunk over RTK Query (store/screens/respond.ts), so it goes
+ * through the real store and API layer to the stubbed server, which asks `submitResponse`
+ * what to answer: each test still says what the server does and checks what was sent.
+ */
+const answerWith = async (token: string, body: unknown, key: string | null): Promise<StubReply> => {
+  try {
+    return { body: { data: await (submitResponse(token, body, key) as Promise<unknown>) } };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return errorReply(error.status, error.code, error.message, error.details);
+    }
+    throw error;
+  }
+};
 
 const reload = vi.fn();
 const ready = (over: Partial<PublicCampaign> = {}) => ({
@@ -68,12 +84,14 @@ function DoneProbe(): JSX.Element {
 
 const mount = () =>
   render(
-    <MemoryRouter initialEntries={['/r/K4M9X2PQ']}>
-      <Routes>
-        <Route path="/r/:token" element={<Fill />} />
-        <Route path="/r/:token/done" element={<DoneProbe />} />
-      </Routes>
-    </MemoryRouter>,
+    <Provider store={makeStore({ signedOut: true })}>
+      <MemoryRouter initialEntries={['/r/K4M9X2PQ']}>
+        <Routes>
+          <Route path="/r/:token" element={<Fill />} />
+          <Route path="/r/:token/done" element={<DoneProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </Provider>,
   );
 
 const answerAll = (): void => {
@@ -81,8 +99,14 @@ const answerAll = (): void => {
   fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  stubApi({
+    'POST /public/campaigns/*': (call) =>
+      answerWith(call.path.split('/')[3] ?? '', call.body, call.headers.get('idempotency-key')),
+  });
   responded = false;
   usePublicCampaign.mockReturnValue(ready());
   submitResponse.mockResolvedValue({ responseCount: 613 });
@@ -181,7 +205,7 @@ describe('submitting', () => {
         // No `subjectId`, and that is right: the server resolves the single-subject case
         // itself. The client only names one when the reader had a choice to make.
       },
-      'key-for-K4M9X2PQ',
+      expect.stringMatching(/^submit:K4M9X2PQ:/),
     );
   });
 
@@ -323,7 +347,7 @@ describe('the dead ends — every one of them breaks the demo if missing', () =>
 });
 
 describe('the two access dead ends — DEC-037, 39 § States', () => {
-  it('a stranger is told WHICH organisation, and offered a way in', () => {
+  it('a stranger is told WHICH organization, and offered a way in', () => {
     usePublicCampaign.mockReturnValue(gated('signIn', 'Northfield University'));
     mount();
 

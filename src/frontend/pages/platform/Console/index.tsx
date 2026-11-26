@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
@@ -7,6 +7,16 @@ import { OrgRow, orgChips } from '../../../components/platform/OrgRow.js';
 import { useEnterpriseQueue, useEstate, type EstateFilters } from '../../../lib/estate.js';
 import { EnterpriseQueue } from '../../../components/platform/EnterpriseQueue.js';
 import { useOpsCan } from '../../../lib/opsCapabilities.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  enterpriseRequestApproved,
+  enterpriseRequestMoved,
+  estateLeft,
+  estateSearchTyped,
+  opsMessageOf,
+  selectOperator,
+} from '../../../store/screens/operator.js';
 import type { PlatformOrgSummary } from '@endur/shared';
 
 function readFilters(params: URLSearchParams): EstateFilters {
@@ -25,10 +35,12 @@ export default function Console(): JSX.Element {
   const estate = useEstate(filters);
   const can = useOpsCan();
   const queue = useEnterpriseQueue(can('platform.enterprise.read'));
-  const [queueBusy, setQueueBusy] = useState<string | null>(null);
-  // The search box's text, held here so the input is controlled like every other filter. It
-  // reaches the URL (and the request) on Enter or when the box loses focus, not per keystroke.
-  const [term, setTerm] = useState(filters.q ?? '');
+  const dispatch = useAppDispatch();
+  const { term: typed, queueBusyId: queueBusy, queueError } = useAppSelector(selectOperator).estate;
+  useClearOnLeave(estateLeft());
+  // The search box's text: `null` until typed in, when it shows the URL's. It reaches the URL
+  // (and the request) on Enter or when the box loses focus, not per keystroke.
+  const term = typed ?? filters.q ?? '';
 
   const sorted = useMemo(() => {
     const rows = [...estate.rows];
@@ -71,7 +83,7 @@ export default function Console(): JSX.Element {
     <div className="page">
       <PageHeader
         title="Organizations"
-        subtitle="Every organisation on the platform, as numbers."
+        subtitle="Every organization on the platform, as numbers."
         vocabulary={false}
       />
 
@@ -82,24 +94,18 @@ export default function Console(): JSX.Element {
       <EnterpriseQueue
         rows={queue.rows}
         busyId={queueBusy}
-        error={queue.error}
-        onUpdate={(id, status) => {
-          setQueueBusy(id);
-          void queue.update(id, status).finally(() => setQueueBusy(null));
-        }}
-        onApprove={(id) => {
-          setQueueBusy(id);
-          void queue.approve(id).finally(() => setQueueBusy(null));
-        }}
+        error={opsMessageOf(queueError, 'That did not go through.') ?? queue.error}
+        onUpdate={(id, status) => void dispatch(enterpriseRequestMoved({ id, status }))}
+        onApprove={(id) => void dispatch(enterpriseRequestApproved(id))}
       />
 
       <div className="ops-filters">
         <input
           className="input"
           placeholder="Search by name"
-          aria-label="Search organisations by name"
+          aria-label="Search organizations by name"
           value={term}
-          onChange={(event) => setTerm(event.target.value)}
+          onChange={(event) => dispatch(estateSearchTyped({ term: event.target.value }))}
           onBlur={() => setFilter('q', term.trim())}
           onKeyDown={(event) => {
             if (event.key === 'Enter') setFilter('q', term.trim());
@@ -153,7 +159,7 @@ export default function Console(): JSX.Element {
           empty={
             <EmptyState
               icon="organization"
-              title="No organisations match those filters"
+              title="No organizations match those filters"
               body="Try clearing a filter, or check back once the estate has grown."
             />
           }

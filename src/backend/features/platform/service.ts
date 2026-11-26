@@ -637,7 +637,7 @@ const paymentView = (row: PaymentRow) => ({
   id: row.id,
   at: row.createdAt.toISOString(),
   orgId: row.orgId,
-  orgName: row.org?.name ?? 'Unknown organisation',
+  orgName: row.org?.name ?? 'Unknown organization',
   tier: row.tier as Tier,
   fromTier: (row.fromTier as Tier | null) ?? null,
   kind: row.kind as PaymentKind,
@@ -1192,7 +1192,7 @@ export async function approveEnterpriseRequest(
   const from = (request.org.subscription?.tier ?? 'bronze') as Tier;
   if (from === 'enterprise') {
     // Neither a 500 nor a silent success: approving again would capture a second time for a tier they hold.
-    throw new ConflictError('That organisation is already on Enterprise.');
+    throw new ConflictError('That organization is already on Enterprise.');
   }
 
   const operator = req.ctx.principal;

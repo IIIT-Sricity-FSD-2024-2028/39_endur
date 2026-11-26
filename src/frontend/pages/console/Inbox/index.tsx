@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+// `/app/inbox`. The queue and the messages are RTK Query reads; the tab and the filters are
+// the URL's; the open card, the keyboard cursor and each card's failed mark are
+// `state.inbox` (store/screens/inbox.ts), and every mark is a thunk there.
+import { useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { InboxMessage, InboxState } from '@endur/shared';
+import { FEEDBACK_REQUEST, type InboxMessage, type InboxState } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ResponseCard } from '../../../components/feedback/ResponseCard.js';
@@ -15,6 +18,17 @@ import {
 } from '../../../lib/inbox.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
 import { useSubjectList } from '../../../lib/subjects.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  cardToggled,
+  cursorMoved,
+  inboxLeft,
+  inboxMarked,
+  inboxQueueChanged,
+  messageMarked,
+  selectInboxScreen,
+} from '../../../store/screens/inbox.js';
 
 const TABS: Array<{ id: InboxState; label: string }> = [
   { id: 'all', label: 'All' },
@@ -49,16 +63,20 @@ export default function Inbox(): JSX.Element {
     can('response.read') && !showingMessages,
   );
 
-  const messages = useMessages(showingMessages);
+  // Without the queue, Messages is the whole page, so it loads whatever the tab says.
+  const messages = useMessages(showingMessages || !can('response.read') || inbox.forbidden);
+  const orgName = useAppSelector((root) => root.auth.org?.name) ?? 'Your organization';
   const messageRows = messages.data?.data ?? [];
   const unreadMessages = messageRows.filter((row) => !row.read).length;
-  const campaigns = useCampaignList();
-  const subjects = useSubjectList({});
+  // The filters belong to the queue; without it they would only be asked for to be refused.
+  const campaigns = useCampaignList({}, can('response.read'));
+  const subjects = useSubjectList({}, can('response.read'));
 
   const cards = useMemo(() => inbox.data?.data ?? [], [inbox.data]);
 
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [cursor, setCursor] = useState(0);
+  const dispatch = useAppDispatch();
+  const { expanded, cursor, failures } = useAppSelector(selectInboxScreen);
+  useClearOnLeave(inboxLeft());
   const listRef = useRef<HTMLDivElement>(null);
 
   const setParam = (key: string, value: string | undefined): void => {
@@ -66,8 +84,7 @@ export default function Inbox(): JSX.Element {
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
-    setExpanded(null);
-    setCursor(0);
+    dispatch(inboxQueueChanged());
   };
 
   const clearFilters = (): void => {
@@ -75,13 +92,15 @@ export default function Inbox(): JSX.Element {
     next.delete('campaignId');
     next.delete('subjectId');
     setParams(next, { replace: true });
-    setExpanded(null);
-    setCursor(0);
+    dispatch(inboxQueueChanged());
   };
 
   const mark = (responseId: string, action: MarkAction, keep = false): void => {
-    void inbox.mark(responseId, action, { keep });
+    if (!inbox.data) return;
+    void dispatch(inboxMarked({ responseId, action, keep, args: inbox.args }));
   };
+
+  // Effect (DOM): the queue's keyboard shortcuts (j, k, e, u); each dispatches.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -93,11 +112,11 @@ export default function Inbox(): JSX.Element {
       switch (event.key) {
         case 'j':
           event.preventDefault();
-          setCursor((index) => Math.min(index + 1, Math.max(0, cards.length - 1)));
+          dispatch(cursorMoved({ by: 1, count: cards.length }));
           return;
         case 'k':
           event.preventDefault();
-          setCursor((index) => Math.max(0, index - 1));
+          dispatch(cursorMoved({ by: -1, count: cards.length }));
           return;
         case 'e':
           if (!card) return;
@@ -116,15 +135,14 @@ export default function Inbox(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // NO QUEUE, STILL AN INBOX. Reading individual responses is a separate permission, but
+  // messages are addressed to the reader by name, and "a form is waiting for your answer"
+  // goes to exactly the people least likely to hold `response.read`.
   if (!can('response.read') || inbox.forbidden) {
     return (
       <div className="page">
-        <PageHeader title="Inbox" />
-        <EmptyState
-          icon="inbox"
-          title="You do not have access to this"
-          body="Reading individual responses is a separate permission from seeing the numbers. Ask an administrator if you need it."
-        />
+        <PageHeader title="Inbox" subtitle="Messages addressed to you." />
+        <MessageStream messages={messages} rows={messageRows} orgName={orgName} />
       </div>
     );
   }
@@ -173,7 +191,7 @@ export default function Inbox(): JSX.Element {
           className={`tab ${showingMessages ? 'is-active' : ''}`}
           onClick={() => setParam('state', MESSAGES_TAB)}
         >
-          From Endur
+          Messages
           {unreadMessages > 0 && <span className="tab-count">{unreadMessages}</span>}
         </button>
       </nav>
@@ -216,7 +234,7 @@ export default function Inbox(): JSX.Element {
       )}
 
       {showingMessages ? (
-        <MessageStream messages={messages} rows={messageRows} />
+        <MessageStream messages={messages} rows={messageRows} orgName={orgName} />
       ) : (
       <>
       {/* Above the list, and the last good page stays visible underneath (58 § States). */}
@@ -243,15 +261,13 @@ export default function Inbox(): JSX.Element {
               selected={index === cursor}
               expanded={expanded === `${card.id}:${card.questionId}`}
               onToggleExpand={() => {
-                const key = `${card.id}:${card.questionId}`;
-                setExpanded((current) => (current === key ? null : key));
-                setCursor(index);
+                dispatch(cardToggled({ key: `${card.id}:${card.questionId}`, index }));
                 if (!card.read) mark(card.id, 'read', true);
               }}
               onToggleRead={() => mark(card.id, card.read ? 'unread' : 'read')}
               onArchive={() => mark(card.id, card.archived ? 'unarchive' : 'archive')}
               subjectWord={labels.subject.one}
-              error={inbox.failures[card.id]}
+              error={messageOf(failures[card.id], 'That did not save. Try again.') ?? undefined}
             />
           ))}
 
@@ -276,10 +292,13 @@ export default function Inbox(): JSX.Element {
 function MessageStream({
   messages,
   rows,
+  orgName,
 }: {
   messages: MessagesController;
   rows: InboxMessage[];
+  orgName: string;
 }): JSX.Element {
+  const dispatch = useAppDispatch();
   if (messages.loading && rows.length === 0) {
     return (
       <div className="message-list" aria-busy="true">
@@ -300,8 +319,8 @@ function MessageStream({
     return (
       <EmptyState
         icon="inbox"
-        title="Nothing from Endur"
-        body="Messages from us about your account land here. There are none."
+        title="No messages"
+        body="Messages addressed to you land here: forms waiting for your answer, and notes from Endur about your account. There are none."
       />
     );
   }
@@ -311,11 +330,15 @@ function MessageStream({
       {rows.map((row) => (
         <MessageCard
           key={row.id}
+          // A form request is from the organisation, not from us, and the card says where
+          // to answer it. Everything else here is Endur's.
+          from={row.kind === FEEDBACK_REQUEST ? orgName : 'Endur'}
+          {...(row.kind === FEEDBACK_REQUEST ? { action: { to: '/app', label: 'Answer on Home' } } : {})}
           subject={row.subject}
           body={row.body}
           at={row.at}
           read={row.read}
-          onMark={(action) => void messages.mark(row.id, action)}
+          onMark={(action) => void dispatch(messageMarked({ id: row.id, action }))}
         />
       ))}
     </div>

@@ -1,30 +1,14 @@
-// The billing hooks against a faked api layer. The Plan page tests mock this whole module, so
-// without this file nothing checked which endpoints the page actually calls, or with what.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StrictMode } from 'react';
+// The billing reads over a stubbed `fetch` (R-503). The writes are thunks, tested in
+// store/screens/plan.test.ts.
+import { describe, expect, it, afterEach, vi } from 'vitest';
+import { createElement, StrictMode, type ReactNode } from 'react';
+import { Provider } from 'react-redux';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { BillingSummary } from '@endur/shared';
-import {
-  useBilling,
-  useCancelDowngrade,
-  useEnterpriseRequest,
-  useJoinTier,
-  usePlans,
-  useScheduleDowngrade,
-} from './billing.js';
-
-const apiGet = vi.fn<(path: string) => Promise<unknown>>();
-const apiPost = vi.fn<(path: string, body?: unknown) => Promise<unknown>>();
-const apiDelete = vi.fn<(path: string) => Promise<unknown>>();
-vi.mock('./api.js', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>('./api.js');
-  return {
-    ...actual,
-    apiGet: (path: string) => apiGet(path),
-    apiPost: (path: string, body?: unknown) => apiPost(path, body),
-    apiDelete: (path: string) => apiDelete(path),
-  };
-});
+import { setupStore, type AppStore } from '../store/index.js';
+import { tierJoined } from '../store/screens/plan.js';
+import { stubApi } from '../test-utils.js';
+import { useBilling, useEnterpriseRequestedAt, usePlanSummary, usePlans } from './billing.js';
 
 const SUMMARY: BillingSummary = {
   tier: 'silver',
@@ -37,134 +21,106 @@ const SUMMARY: BillingSummary = {
   seats: 3,
   seatBreakdown: { activeUsers: 3, nonPersonSubjects: 0 },
 };
+const answer = (summary: BillingSummary) => ({ body: { data: summary } });
 
-beforeEach(() => {
-  apiGet.mockReset();
-  apiPost.mockReset();
-  apiDelete.mockReset();
+function render<T>(hook: () => T, strict = false, store: AppStore = setupStore()) {
+  const wrapper = ({ children }: { children: ReactNode }) => {
+    const tree = createElement(Provider, { store, children });
+    return strict ? createElement(StrictMode, null, tree) : tree;
+  };
+  return renderHook(hook, { wrapper });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('useBilling', () => {
   it('loads the summary from GET /billing', async () => {
-    apiGet.mockResolvedValue({ data: SUMMARY });
-    const { result } = renderHook(() => useBilling());
+    const calls = stubApi({ 'GET /billing': answer(SUMMARY) });
+    const { result } = render(() => useBilling());
     expect(result.current.loading).toBe(true);
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(apiGet).toHaveBeenCalledWith('/billing');
+    expect(calls.map((call) => call.path)).toEqual(['/billing']);
     expect(result.current.data).toEqual(SUMMARY);
     expect(result.current.error).toBeNull();
   });
 
   it('keeps the error and no data when the read fails', async () => {
-    apiGet.mockRejectedValue(new Error('offline'));
-    const { result } = renderHook(() => useBilling());
+    stubApi({ 'GET /billing': new TypeError('offline') });
+    const { result } = render(() => useBilling());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.data).toBeNull();
     expect(result.current.error?.message).toBe('offline');
   });
 
-  // The page replaces the whole summary with what the server returned, never patches one field.
-  it('replaces the summary wholesale through set()', async () => {
-    apiGet.mockResolvedValue({ data: SUMMARY });
-    const { result } = renderHook(() => useBilling());
-    await waitFor(() => expect(result.current.loading).toBe(false));
+  // StrictMode mounts, unmounts and remounts (as development does). The hook used to send two
+  // reads and needed a cancelled flag so the abandoned one could not answer last; the cache
+  // sends one.
+  it('sends one read under StrictMode, not two', async () => {
+    const calls = stubApi({ 'GET /billing': answer(SUMMARY) });
+    const { result } = render(() => useBilling(), true);
+    await waitFor(() => expect(result.current.data?.tier).toBe('silver'));
+    expect(calls).toHaveLength(1);
+  });
+});
 
-    const gold: BillingSummary = { ...SUMMARY, tier: 'gold' };
-    act(() => result.current.set(gold));
-    expect(result.current.data).toEqual(gold);
+describe('the Plan page and the shell banner read ONE summary', () => {
+  it('a join on the page is in the banner at once, with no second read', async () => {
+    const calls = stubApi({
+      'GET /billing': answer({ ...SUMMARY, status: 'trialing' }),
+      'POST /billing/tier': answer({ ...SUMMARY, tier: 'gold' }),
+    });
+    const store = setupStore();
+    const { result } = render(() => ({
+      banner: usePlanSummary(true),
+      page: useBilling(),
+    }), false, store);
+    await waitFor(() => expect(result.current.banner?.status).toBe('trialing'));
+
+    await act(async () => {
+      await store.dispatch(tierJoined({ tier: 'gold', paymentRef: 'endur_abc123' }));
+    });
+
+    // Before, the banner fetched once when the console opened and kept saying "your trial
+    // ends — add payment" after payment, until a reload.
+    await waitFor(() => expect(result.current.banner?.tier).toBe('gold'));
+    expect(result.current.page.data?.tier).toBe('gold');
+    expect(calls.filter((call) => call.method === 'GET')).toHaveLength(1);
   });
 
-  // The cancelled flag, made visible. StrictMode runs the effect, cleans it up, and runs it again
-  // (as development does), so two reads go out. If the first, abandoned one answers LAST, the
-  // flag is all that stops it overwriting the second.
-  it('ignores the answer to a read whose effect was cleaned up', async () => {
-    const pending: Array<(value: unknown) => void> = [];
-    apiGet.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
-    const { result } = renderHook(() => useBilling(), { wrapper: StrictMode });
-    expect(pending).toHaveLength(2);
-
-    await act(async () => {
-      pending[1]!({ data: { ...SUMMARY, tier: 'gold' } });
-      await Promise.resolve();
-    });
-    await act(async () => {
-      pending[0]!({ data: SUMMARY });
-      await Promise.resolve();
-    });
-    expect(result.current.data?.tier).toBe('gold');
+  it('the banner asks nothing for a reader who may not see billing', () => {
+    const calls = stubApi({});
+    const { result } = render(() => usePlanSummary(false));
+    expect(result.current).toBeNull();
+    expect(calls).toHaveLength(0);
   });
 });
 
 describe('usePlans', () => {
   it('reads the catalogue from the server', async () => {
-    apiGet.mockResolvedValue({ data: [{ tier: 'bronze' }] });
-    const { result } = renderHook(() => usePlans());
+    const calls = stubApi({ 'GET /billing/plans': { body: { data: [{ tier: 'bronze' }] } } });
+    const { result } = render(() => usePlans());
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(apiGet).toHaveBeenCalledWith('/billing/plans');
+    expect(calls[0]?.path).toBe('/billing/plans');
     expect(result.current.data).toEqual([{ tier: 'bronze' }]);
   });
 });
 
-describe('the plan writes', () => {
-  it('joins with the tier and the reference the checkout minted', async () => {
-    apiPost.mockResolvedValue({ data: { ...SUMMARY, tier: 'gold' } });
-    const { result } = renderHook(() => useJoinTier());
-    const updated = await result.current('gold', 'endur_abc123');
-    expect(apiPost).toHaveBeenCalledWith('/billing/tier', { tier: 'gold', paymentRef: 'endur_abc123' });
-    expect(updated.tier).toBe('gold');
-  });
-
-  // Never an amount, and no empty paymentRef key either: the DTO would have to tolerate it.
-  it('sends only the tier when there is no reference', async () => {
-    apiPost.mockResolvedValue({ data: SUMMARY });
-    const { result } = renderHook(() => useJoinTier());
-    await result.current('silver');
-    expect(apiPost).toHaveBeenCalledWith('/billing/tier', { tier: 'silver' });
-  });
-
-  it('schedules a move down with a POST and cancels it with a DELETE', async () => {
-    apiPost.mockResolvedValue({ data: { ...SUMMARY, pendingTier: 'bronze' } });
-    apiDelete.mockResolvedValue({ data: SUMMARY });
-    const schedule = renderHook(() => useScheduleDowngrade()).result.current;
-    const cancel = renderHook(() => useCancelDowngrade()).result.current;
-
-    expect((await schedule('bronze')).pendingTier).toBe('bronze');
-    expect(apiPost).toHaveBeenCalledWith('/billing/downgrade', { tier: 'bronze' });
-    expect((await cancel()).pendingTier).toBeNull();
-    expect(apiDelete).toHaveBeenCalledWith('/billing/downgrade');
-  });
-});
-
-describe('useEnterpriseRequest', () => {
+describe('useEnterpriseRequestedAt', () => {
   it('reads whether a request is already open', async () => {
-    apiGet.mockResolvedValue({ data: { requestedAt: '2026-10-10T00:00:00.000Z' } });
-    const { result } = renderHook(() => useEnterpriseRequest());
-    await waitFor(() => expect(result.current.requestedAt).toBe('2026-10-10T00:00:00.000Z'));
-    expect(apiGet).toHaveBeenCalledWith('/billing/enterprise-request');
+    stubApi({ 'GET /billing/enterprise-request': { body: { data: { requestedAt: '2026-10-10T00:00:00.000Z' } } } });
+    const { result } = render(() => useEnterpriseRequestedAt());
+    await waitFor(() => expect(result.current).toBe('2026-10-10T00:00:00.000Z'));
   });
 
   // It decides one word on one button, so a failed read leaves it at "Request" rather than
   // putting an error on the plan page.
-  it('treats a failed read as no request, without throwing', async () => {
-    apiGet.mockRejectedValue(new Error('offline'));
-    const { result } = renderHook(() => useEnterpriseRequest());
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(result.current.requestedAt).toBeNull();
-  });
-
-  it('sends a trimmed note, or no note at all, and then reads as requested', async () => {
-    apiGet.mockResolvedValue({ data: { requestedAt: null } });
-    apiPost.mockResolvedValue({ data: { requestedAt: '2026-10-17T00:00:00.000Z' } });
-    const { result } = renderHook(() => useEnterpriseRequest());
-
-    await act(() => result.current.request('  call after 5pm  '));
-    expect(apiPost).toHaveBeenLastCalledWith('/billing/enterprise-request', { note: 'call after 5pm' });
-    expect(result.current.requestedAt).toBe('2026-10-17T00:00:00.000Z');
-
-    await act(() => result.current.request('   '));
-    expect(apiPost).toHaveBeenLastCalledWith('/billing/enterprise-request', {});
+  it('treats a failed read as no request', async () => {
+    const calls = stubApi({ 'GET /billing/enterprise-request': new TypeError('offline') });
+    const { result } = render(() => useEnterpriseRequestedAt());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(result.current).toBeNull();
   });
 });

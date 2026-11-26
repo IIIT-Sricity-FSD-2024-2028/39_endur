@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { UnitNode } from '@endur/shared';
 import type { ResolvedLabels } from '@endur/shared';
 import { forestTotals, type Totals } from '../../../lib/unitTotals.js';
@@ -11,45 +11,52 @@ function perLevel(nodes: UnitNode[], depth = 0, into: number[] = []): number[] {
   return into;
 }
 
-function useCountUp(value: number, duration = 520): number {
-  const [shown, setShown] = useState(value);
+/**
+ * Counts a number up on first show. An ANIMATION, not state: it writes each frame straight
+ * into the element (60 a second through the store would be 60 actions a second for nothing
+ * anybody reads), and the rendered text is always the real value, so a re-render, a reader
+ * with reduced motion, or a screen reader only ever sees the true number.
+ */
+function useCountUp(value: number, duration = 520): React.RefObject<HTMLSpanElement> {
+  const ref = useRef<HTMLSpanElement>(null);
   const done = useRef(false);
 
+  // Effect (animation): count up to the value by writing frames to the element.
+
   useEffect(() => {
-    if (done.current) {
-      setShown(value);
-      return;
-    }
+    const element = ref.current;
+    if (done.current || !element) return undefined;
     done.current = true;
 
     const reduced =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || value === 0) {
-      setShown(value);
-      return;
-    }
+    if (reduced || value === 0) return undefined;
 
     let frame = 0;
     const started = performance.now();
     const tick = (now: number): void => {
       const progress = Math.min(1, (now - started) / duration);
-      setShown(Math.round(value * (1 - Math.pow(1 - progress, 3))));
+      element.textContent = String(Math.round(value * (1 - Math.pow(1 - progress, 3))));
       if (progress < 1) frame = requestAnimationFrame(tick);
+      else element.textContent = String(value);
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      element.textContent = String(value);
+    };
   }, [value, duration]);
 
-  return shown;
+  return ref;
 }
 
 function Stat({ label, value }: { label: string; value: number }): JSX.Element {
-  const shown = useCountUp(value);
+  const ref = useCountUp(value);
   return (
     <div className="stat-tile">
       <span className="utility">{label}</span>
-      <span className="stat-value num">{shown}</span>
+      <span className="stat-value num" ref={ref}>{value}</span>
     </div>
   );
 }

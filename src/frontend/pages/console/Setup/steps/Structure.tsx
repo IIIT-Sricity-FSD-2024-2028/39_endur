@@ -1,4 +1,7 @@
-import { useState } from 'react';
+// The unit just added (which takes the focus) is `state.setup.focusUnitId`; the units are the
+// wizard slice's, changed through the callbacks.
+import { useAppDispatch, useAppSelector } from '../../../../store/index.js';
+import { selectSetup, setupUnitAdded } from '../../../../store/screens/setup.js';
 import { UnitTree } from '../../../../components/org/UnitTree.js';
 import { Icon } from '../../../../components/Icon.js';
 import { toTree, type UnitDraft } from '../useWizard.js';
@@ -18,7 +21,11 @@ export function StructureStep({
   onDelete: (tempId: string) => void;
   onReparent: (tempId: string, newParentTempId: string) => void;
 }): JSX.Element {
-  const [focusId, setFocusId] = useState<string | undefined>(undefined);
+  const dispatch = useAppDispatch();
+  const focusId = useAppSelector(selectSetup).focusUnitId ?? undefined;
+  const added = (unitId: string): void => {
+    dispatch(setupUnitAdded({ unitId }));
+  };
   const tree = toTree(units);
   const root = tree[0];
   const addLabel = `Add a ${unitWord}`;
@@ -35,7 +42,7 @@ export function StructureStep({
           addLabel={addLabel}
           focusId={focusId}
           onRename={onRename}
-          onAddChild={(parentId) => setFocusId(onAddChild(parentId))}
+          onAddChild={(parentId) => added(onAddChild(parentId))}
           onDelete={onDelete}
           onReparent={onReparent}
         />
@@ -44,7 +51,7 @@ export function StructureStep({
           <button
             type="button"
             className="btn btn-ghost tree-add"
-            onClick={() => setFocusId(onAddChild(root.id))}
+            onClick={() => added(onAddChild(root.id))}
           >
             <Icon name="add" size={16} /> {addLabel}
           </button>

@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+// The console's top bar. Which menu is open is `state.chrome.openMenu`
+// (store/screens/chrome.ts); where the menu's panel sits is measured from the DOM and written
+// to the panel through a ref, which is layout and not state (DEC-R03's ref exception).
+import { useCallback, useEffect, useId, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Icon } from '../Icon.js';
 import { ThemeToggle } from '../ThemeToggle.js';
-import { useAppSelector } from '../../store/index.js';
-import { signOut } from '../../lib/session.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { menuClosed, menuToggled, selectOpenMenu } from '../../store/screens/chrome.js';
+import { useSignOut } from '../../lib/session.js';
 
 export function TopBar({
   onOpenMenu,
@@ -44,6 +48,7 @@ export function TopBar({
 
 function UserChip({ name, email }: { name: string; email: string }): JSX.Element {
   const menu = useMenu();
+  const signOut = useSignOut();
   const initials = name
     .split(' ')
     .filter(Boolean)
@@ -66,19 +71,21 @@ function UserChip({ name, email }: { name: string; email: string }): JSX.Element
       </button>
 
       {menu.open &&
-        menu.rect &&
         createPortal(
           <div
             ref={menu.panelRef}
             className="menu menu-right is-portal elev-lg"
             role="menu"
-            style={{ top: menu.rect.bottom + 9, right: window.innerWidth - menu.rect.right }}
           >
             <p className="menu-heading">{name}</p>
             <p className="text-meta menu-note">{email}</p>
-            {/* "My account" lived here and went to a scaffold page. Out until 47 is built —
-                the name and email above already say who is signed in, which is what the menu
-                is actually for (design_specs/design/02 §7). */}
+            {/* "My account" went to a scaffold page and was taken out until 47 was built. It
+                is built (name, photo, password), and with no link here it could not be
+                reached at all; so it is back (DEC-R04). */}
+            <Link to="/app/profile" role="menuitem" className="menu-item" onClick={menu.close}>
+              <Icon name="people" size={16} />
+              <span>My account</span>
+            </Link>
             <button type="button" role="menuitem" className="menu-item" onClick={() => void signOut()}>
               <Icon name="close" size={16} />
               <span>Sign out</span>
@@ -90,46 +97,67 @@ function UserChip({ name, email }: { name: string; email: string }): JSX.Element
   );
 }
 
+/**
+ * A top-bar menu: open or not is the store's (one menu at a time); where its panel sits is
+ * measured from the anchor and written to the panel directly, before paint and again on
+ * scroll and resize.
+ */
 function useMenu() {
-  const [open, setOpen] = useState(false);
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const open = useAppSelector(selectOpenMenu) === id;
   const anchorRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [rect, setRect] = useState<DOMRect | null>(null);
+  const close = useCallback(() => {
+    dispatch(menuClosed({ id }));
+  }, [dispatch, id]);
 
-  const updateRect = useCallback(() => {
-    if (anchorRef.current) setRect(anchorRef.current.getBoundingClientRect());
+  const place = useCallback(() => {
+    const anchor = anchorRef.current;
+    const panel = panelRef.current;
+    if (!anchor || !panel) return;
+    const rect = anchor.getBoundingClientRect();
+    panel.style.top = `${rect.bottom + 9}px`;
+    panel.style.right = `${window.innerWidth - rect.right}px`;
   }, []);
+
+  // Before the browser paints the panel, so it never shows in the wrong place first.
+  useLayoutEffect(() => {
+    if (open) place();
+  }, [open, place]);
+
+  // A menu left open when the bar goes (signing out, say) is closed with it.
+  useEffect(() => close, [close]);
+
+  // Effect (DOM): an open menu closes on a press outside it or Escape, and follows scroll and resize.
 
   useEffect(() => {
     if (!open) return;
-    updateRect();
     const onPointer = (event: MouseEvent): void => {
       const target = event.target as Node;
       if (anchorRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
+      close();
     };
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') close();
     };
-    const onReflow = (): void => updateRect();
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', onReflow);
-    window.addEventListener('scroll', onReflow, true);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
     return () => {
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', onReflow);
-      window.removeEventListener('scroll', onReflow, true);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
     };
-  }, [open, updateRect]);
+  }, [open, place, close]);
 
   return {
     open,
-    rect,
     anchorRef,
     panelRef,
-    toggle: () => setOpen((was) => !was),
-    close: () => setOpen(false),
+    toggle: () => dispatch(menuToggled({ id })),
+    close,
   };
 }

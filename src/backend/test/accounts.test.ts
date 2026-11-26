@@ -220,7 +220,7 @@ describe('activation — the person sets their own password', () => {
 
   // The page greets the person before asking for a password, because a bare password box reached from a
   // pasted link is indistinguishable from a phishing page.
-  it('greets the person by name and names the organisation before asking for anything', async () => {
+  it('greets the person by name and names the organization before asking for anything', async () => {
     const res = await request(app).get(`/api/v1/auth/activate/${tokenFrom(url)}`);
 
     expect(res.status).toBe(200);
@@ -326,7 +326,7 @@ describe('activation — the person sets their own password', () => {
 
   // The audit row carries no actor and no address, because there was no principal - and there could not
   // have been. The target says who activated, and the request id joins it to the request log.
-  it('audits the activation with no actor and no IP, in the INVITING organisation', async () => {
+  it('audits the activation with no actor and no IP, in the INVITING organization', async () => {
     await request(app)
       .post(`/api/v1/auth/activate/${tokenFrom(url)}`)
       .send({ password: 'a-long-enough-password' });
@@ -343,7 +343,7 @@ describe('activation — the person sets their own password', () => {
 
   // The organisation comes from the TOKEN, ahead of any session in the browser, so a stranger signed in
   // elsewhere cannot drag the audit row into their own organisation.
-  it('files the activation under the invite’s organisation even when a stranger is signed in', async () => {
+  it('files the activation under the invite’s organization even when a stranger is signed in', async () => {
     const other = await setUpOrg();
 
     await withCsrf(other, 'post', `/api/v1/auth/activate/${tokenFrom(url)}`).send({

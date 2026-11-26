@@ -1,26 +1,38 @@
-import { useState } from 'react';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { FileUpload } from '../../../components/form/FileUpload.js';
 import { InlineName } from '../../../components/org/InlineName.js';
 import { PowersByPlace } from '../../../components/org/PowersByPlace.js';
 import { Involvement } from '../../../components/org/Involvement.js';
 import { PositionChip } from '../People/PositionEditor.js';
-import { apiDelete, apiUpload, ApiError } from '../../../lib/api.js';
-import { useRefreshSession } from '../../../lib/auth.js';
+import { ApiError } from '../../../lib/api.js';
+import { unwrapApi } from '../../../lib/query.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useProfile } from '../../../lib/profile.js';
 import { formatDate, formatRelative } from '../../../lib/format.js';
-import { useAppSelector } from '../../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  avatarRemoved,
+  avatarUploaded,
+  profileLeft,
+  selectProfileScreen,
+  selfRenamed,
+} from '../../../store/screens/profile.js';
 import { PasswordCard } from './PasswordCard.js';
 
+/**
+ * "My account". The profile is an RTK Query read; the rename, the photo and the password are
+ * thunks in `store/screens/profile.ts`, and what failed is `state.profile`.
+ */
 export default function Profile(): JSX.Element {
   const sessionUser = useAppSelector((state) => state.auth.user);
-  const refresh = useRefreshSession();
   const profile = useProfile();
   const labels = useLabels();
   const can = useCan();
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const error = messageOf(useAppSelector(selectProfileScreen).renameError, 'That name could not be saved.');
+  useClearOnLeave(profileLeft());
 
   const user = profile.data?.user ?? null;
   const positions = profile.data?.positions ?? [];
@@ -53,17 +65,9 @@ export default function Profile(): JSX.Element {
               <InlineName
                 value={user?.name ?? sessionUser?.name ?? ''}
                 ariaLabel="Name"
-                onCommit={(name) => {
-                  setError(null);
-                  void profile
-                    .rename(name)
-                    // The shell renders the name too. One source of truth is why it changes
-                    // in the top bar without a reload (47 § State).
-                    .then(() => refresh())
-                    .catch((caught: unknown) => {
-                      setError(message(caught, 'That name could not be saved.'));
-                    });
-                }}
+                // The shell renders the name too; the thunk re-reads `/auth/me`, which is why
+                // it changes in the top bar without a reload (47 § State).
+                onCommit={(name) => void dispatch(selfRenamed(name))}
               />
             </div>
 
@@ -86,17 +90,12 @@ export default function Profile(): JSX.Element {
               shape="circle"
               current={user?.avatarUrl ?? sessionUser?.avatarUrl ?? null}
               hint="PNG, JPEG or WebP, up to 2 MB."
+              // The top bar's photo follows by itself: both re-read `/auth/me` (R-504).
               onUpload={async (file) => {
-                setError(null);
-                await apiUpload<{ data: unknown }>('/profile/avatar', file);
-                await refresh();
-                await profile.reload();
+                await unwrapApi(dispatch(avatarUploaded(file)));
               }}
               onRemove={async () => {
-                setError(null);
-                await apiDelete('/profile/avatar');
-                await refresh();
-                await profile.reload();
+                await unwrapApi(dispatch(avatarRemoved()));
               }}
             />
 
@@ -111,7 +110,7 @@ export default function Profile(): JSX.Element {
           </div>
         </section>
 
-        <PasswordCard onSubmit={profile.changePassword} />
+        <PasswordCard />
 
         <section className="settings-card" aria-labelledby="profile-positions">
           <h3 className="utility" id="profile-positions">Your positions</h3>

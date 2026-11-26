@@ -1,21 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Capability, GapView, ReflectionCycle, ReflectionForm } from '@endur/shared';
-import { renderWithProviders } from '../../../test-utils.js';
+import { errorReply, renderWithProviders, stubApi, type StubReply } from '../../../test-utils.js';
 import Reflect from './index.js';
-
-const hoisted = vi.hoisted(() => {
-  class ApiError extends Error {
-    status: number;
-    details: Record<string, unknown>;
-    constructor(status: number, message: string, details: Record<string, unknown> = {}) {
-      super(message);
-      this.status = status;
-      this.details = details;
-    }
-  }
-  return { ApiError };
-});
 
 const cycle: ReflectionCycle = {
   campaignId: 'c-1', campaignName: 'Autumn round', subjectId: 's-1', subjectName: 'North wing',
@@ -44,43 +31,41 @@ const gap = (over: Partial<Omit<GapView, 'rows'>> & { rows?: GapView['rows'] } =
   ...over,
 } as GapView);
 
-let cycles: ReflectionCycle[] | (() => never);
-let gapAnswer: GapView | (() => never);
+/** A route's answer: the data, or (from `throws`) the failure the server sends. */
+type Failure = { failure: StubReply };
+const answer = (value: object): StubReply =>
+  'failure' in value ? (value as Failure).failure : { body: { data: value } };
+
+let cycles: ReflectionCycle[] | Failure;
+let gapAnswer: GapView | Failure;
 let posted: Array<{ path: string; body: unknown }>;
 
-const apiGet = vi.fn((path: string) => {
-  if (path.endsWith('/gap')) {
-    if (typeof gapAnswer === 'function') return gapAnswer();
-    return { data: gapAnswer };
-  }
-  if (path === '/reflect') {
-    if (typeof cycles === 'function') return cycles();
-    return { data: cycles };
-  }
-  if (path.startsWith('/reflect/')) return { data: form };
-  throw new Error(`unmocked GET ${path}`);
-});
-
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (p: string) => apiGet(p),
-  apiPost: (p: string, b: unknown) => {
-    posted.push({ path: p, body: b });
-    return { data: { id: 'r-1' } };
+// The stub server (R-502): the real hooks and the real cache run above it. The writes are
+// thunks over mutations (store/screens/reflect.ts), so they reach it too.
+const server = () => stubApi({
+  'GET /reflect': () => answer(cycles),
+  'GET /reflect/c-1': { body: { data: form } },
+  'GET /reflect/c-1/gap': () => answer(gapAnswer),
+  'POST /reflect/*': (call) => {
+    posted.push({ path: call.path, body: call.body });
+    return { body: { data: { id: 'r-1' } } };
   },
-  apiPut: vi.fn(), apiPatch: vi.fn(), apiDelete: vi.fn(),
-  ApiError: hoisted.ApiError,
-}));
+});
 
 const ALL: Capability[] = ['reflection.read', 'reflection.create', 'actionplan.create'];
 const mount = (capabilities: Capability[] = ALL, path = '/app/reflect') =>
   renderWithProviders(<Reflect />, { capabilities, path });
 
-const throws = (status: number, message: string, details?: Record<string, unknown>) => () => {
-  throw new hoisted.ApiError(status, message, details);
-};
+const throws = (status: number, message: string, details?: Record<string, unknown>): Failure => ({
+  failure: errorReply(status, 'REFUSED', message, details),
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  server();
   cycles = [cycle];
   gapAnswer = throws(404, 'Not found');
   posted = [];
@@ -107,6 +92,30 @@ describe('/app/reflect', () => {
     expect(screen.getByText('How clear was it?')).toBeTruthy();
     expect(screen.getByRole('group', { name: /How clear was it/ })).toBeTruthy();
     expect(screen.getAllByRole('radio').length).toBe(5);
+  });
+
+  it('shows the gap straight after the assessment is recorded: the order is the server\'s', async () => {
+    mount(ALL, '/app/reflect?campaign=c-1');
+    await screen.findByText(/Your own assessment/);
+    fireEvent.click(screen.getByRole('radio', { name: '4' }));
+    gapAnswer = gap();
+    fireEvent.click(screen.getByRole('button', { name: /record my assessment/i }));
+    expect(await screen.findByText(/You rated yourself 2 higher than others did/)).toBeTruthy();
+  });
+
+  it('keeps the answers and says why when the assessment is refused', async () => {
+    stubApi({
+      'GET /reflect': () => answer(cycles),
+      'GET /reflect/c-1': { body: { data: form } },
+      'GET /reflect/c-1/gap': () => answer(gapAnswer),
+      'POST /reflect/c-1': errorReply(409, 'CONFLICT', 'You have already recorded yours.'),
+    });
+    mount(ALL, '/app/reflect?campaign=c-1');
+    await screen.findByText(/Your own assessment/);
+    fireEvent.click(screen.getByRole('radio', { name: '4' }));
+    fireEvent.click(screen.getByRole('button', { name: /record my assessment/i }));
+    expect((await screen.findByRole('alert')).textContent).toBe('You have already recorded yours.');
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: '4' }).checked).toBe(true);
   });
 
   it('submits the reflection to the campaign it is about', async () => {
@@ -157,6 +166,64 @@ describe('/app/reflect', () => {
     expect(await screen.findByText(/Publish slides before each session/)).toBeTruthy();
     expect(screen.getByText(/cannot be edited/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /finalise|save plan/i })).toBeNull();
+  });
+
+  it('writes a plan: adds a line, saves only the lines with words in them', async () => {
+    gapAnswer = gap();
+    mount(ALL, '/app/reflect?campaign=c-1');
+    const first = await screen.findByPlaceholderText('One thing you will change');
+    fireEvent.change(first, { target: { value: 'Publish slides before each session' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add another/ }));
+    expect(screen.getAllByPlaceholderText('One thing you will change')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+
+    await waitFor(() => expect(posted.some((post) => post.path === '/reflect/c-1/plan')).toBe(true));
+    expect(posted.find((post) => post.path === '/reflect/c-1/plan')?.body).toEqual({
+      items: [{ text: 'Publish slides before each session', status: 'open' }],
+    });
+  });
+
+  it('finalises a saved plan only once it is confirmed', async () => {
+    gapAnswer = gap({
+      plan: {
+        id: 'p-1',
+        items: [{ text: 'Publish slides before each session', status: 'open' }],
+        finalisedAt: null,
+        checkins: [],
+      },
+    });
+    mount(ALL, '/app/reflect?campaign=c-1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Finalise' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    expect(posted).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finalise' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Finalise' }));
+    await waitFor(() => expect(posted.map((post) => post.path)).toEqual(['/reflect/plans/p-1/finalise']));
+  });
+
+  it('edits a saved plan from what was saved', async () => {
+    gapAnswer = gap({
+      plan: {
+        id: 'p-1',
+        items: [{ text: 'Publish slides', status: 'open' }],
+        finalisedAt: null,
+        checkins: [],
+      },
+    });
+    mount(ALL, '/app/reflect?campaign=c-1');
+    const line = await screen.findByDisplayValue('Publish slides');
+    fireEvent.change(line, { target: { value: 'Publish slides a day early' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+    await waitFor(() => expect(posted.length).toBe(1));
+    expect(posted[0]?.body).toEqual({ items: [{ text: 'Publish slides a day early', status: 'open' }] });
+  });
+
+  it('goes back to the list from a cycle', async () => {
+    mount(ALL, '/app/reflect?campaign=c-1');
+    await screen.findByText(/Your own assessment/);
+    fireEvent.click(screen.getByRole('button', { name: /All cycles/ }));
+    expect(await screen.findByRole('button', { name: 'Autumn round' })).toBeTruthy();
   });
 
   it('lists cycles with a status, and opens one', async () => {

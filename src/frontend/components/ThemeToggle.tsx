@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+// The appearance switch. The choice is `state.chrome.theme` (store/screens/chrome.ts), and it
+// is also written to `localStorage`, which is what the page reads before React starts.
+import { useCallback, useEffect, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from '../store/index.js';
+import { selectTheme, themeChosen } from '../store/screens/chrome.js';
 import { Icon, type IconName } from './Icon.js';
 import {
   applyWithTransition,
   persist,
-  readChoice,
   resolve,
   type ThemeChoice,
 } from '../lib/theme.js';
@@ -15,8 +18,11 @@ const SEGMENTS: ReadonlyArray<{ choice: ThemeChoice; icon: IconName; label: stri
 ];
 
 export function ThemeToggle({ className }: { className?: string }): JSX.Element {
-  const [choice, setChoice] = useState<ThemeChoice>(() => readChoice());
+  const dispatch = useAppDispatch();
+  const choice = useAppSelector(selectTheme);
   const groupRef = useRef<HTMLDivElement>(null);
+
+  // Effect (browser): on "system", follow the OS colour scheme as it changes.
 
   useEffect(() => {
     if (choice !== 'system' || typeof window.matchMedia !== 'function') return;
@@ -27,14 +33,14 @@ export function ThemeToggle({ className }: { className?: string }): JSX.Element 
   }, [choice]);
 
   const pick = useCallback((next: ThemeChoice, event: React.MouseEvent<HTMLButtonElement>) => {
-    setChoice(next);
+    dispatch(themeChosen({ theme: next }));
     persist(next);
     const box = event.currentTarget.getBoundingClientRect();
     applyWithTransition(resolve(next), {
       x: box.left + box.width / 2,
       y: box.top + box.height / 2,
     });
-  }, []);
+  }, [dispatch]);
 
   const index = SEGMENTS.findIndex((segment) => segment.choice === choice);
 

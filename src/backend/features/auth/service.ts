@@ -134,5 +134,5 @@ async function uniqueSlug(name: string, contended: boolean): Promise<string> {
     const taken = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });
     if (!taken) return slug;
   }
-  throw new ConflictError('Could not derive a unique address for that organisation name.');
+  throw new ConflictError('Could not derive a unique address for that organization name.');
 }

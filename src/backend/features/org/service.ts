@@ -12,7 +12,7 @@ import { clearGrantCache } from '../../authz/index.js';
 // The organisation, as the console reads it.
 export async function readOrg(orgId: string): Promise<OrgView> {
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
-  if (!org) throw new NotFoundError('That organisation does not exist.');
+  if (!org) throw new NotFoundError('That organization does not exist.');
   return view(org);
 }
 
@@ -74,7 +74,7 @@ export async function setupOrg(
     ]);
     if (subjects > 0 || campaigns > 0) {
       throw new ConflictError(
-        'This organisation already has data. Edit the structure directly rather than running setup again.',
+        'This organization already has data. Edit the structure directly rather than running setup again.',
       );
     }
 
@@ -139,7 +139,7 @@ export async function setupOrg(
       where: { orgId, kind: 'person', userId },
       select: { id: true },
     });
-    if (!person) throw new NotFoundError('Your person record is missing from this organisation.');
+    if (!person) throw new NotFoundError('Your person record is missing from this organization.');
 
     const position = await tx.node.create({
       data: {

@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, OrgView, PresetView } from '@endur/shared';
-import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
+import {
+  NONSENSE_LABELS, renderWithProviders, errorReply, stubApi, type StubReply,
+} from '../../test-utils.js';
+import { ApiError } from '../../lib/api.js';
 import Settings from './Settings.js';
 
 const ORG: OrgView = {
@@ -28,23 +31,34 @@ const updateOrg = vi.fn();
 const updateLabels = vi.fn();
 let org: OrgView | null = ORG;
 
-vi.mock('../../lib/org.js', async () => {
-  const react = await import('react');
-  return {
-    useOrg: () => {
-      const [data, set] = react.useState<OrgView | null>(org);
-      return { data, loading: false, error: null, set };
-    },
-    usePresets: () => ({ data: PRESETS, loading: false, error: null }),
-    useUpdateOrg: () => updateOrg,
-    useUpdateLabels: () => updateLabels,
-    useUploadLogo: () => uploadLogo,
-    useRemoveLogo: () => removeLogo,
-  };
-});
+vi.mock('../../lib/org.js', () => ({
+  useOrg: () => ({ data: org, loading: false, error: null, set: vi.fn() }),
+  usePresets: () => ({ data: PRESETS, loading: false, error: null }),
+}));
 
 const uploadLogo = vi.fn();
 const removeLogo = vi.fn();
+
+/**
+ * The saves and the logo are thunks over RTK Query (store/screens/settings.ts): they reach
+ * the stubbed server, which asks the spies above what to answer.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const server = () => stubApi({
+  'PATCH /org': (call) => answer(updateOrg, call.body),
+  'PATCH /org/labels': (call) => answer(updateLabels, (call.body as { labels: unknown }).labels),
+  'POST /org/logo': () => answer(uploadLogo),
+  'DELETE /org/logo': () => answer(removeLogo),
+  'GET /org': () => ({ body: { data: org } }),
+  'GET /auth/me': { body: {} },
+});
 
 const ALL: Capability[] = ['org.read', 'org.update'];
 
@@ -56,8 +70,11 @@ const mount = (capabilities: Capability[] = ALL) =>
     { capabilities, labels: NONSENSE_LABELS, path: '/app/settings' },
   );
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  server();
   org = ORG;
   updateOrg.mockResolvedValue(ORG);
   updateLabels.mockResolvedValue(ORG);
@@ -127,15 +144,36 @@ describe('the words card', () => {
     updateLabels.mockRejectedValue(new Error('nope'));
     mount();
 
+    fireEvent.change(screen.getByLabelText('A part of the organization'), { target: { value: 'Wing' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save words' }));
     await waitFor(() => expect(screen.getByText(/Could not save those words/)).toBeTruthy());
 
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Northfield College' } });
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save organization' })
       .disabled).toBe(false);
   });
 });
 
 describe('the organization card', () => {
+  it('says "Saved" until something changes, and then says what is unsaved', () => {
+    mount();
+    const save = (): HTMLButtonElement =>
+      screen.getAllByRole<HTMLButtonElement>('button').find((button) => button.closest('.card-actions')
+        && button.className.includes('btn-secondary')) as HTMLButtonElement;
+    expect(save().textContent).toBe('Saved');
+    expect(save().disabled).toBe(true);
+    expect(screen.queryByText('Unsaved changes')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Northfield College' } });
+    expect(save().textContent).toBe('Save organization');
+    expect(save().disabled).toBe(false);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    // Back to what is saved: nothing to save again.
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: ORG.name } });
+    expect(save().textContent).toBe('Saved');
+  });
+
   it('says what changing the industry does not do', () => {
     mount();
     expect(screen.getByText('This only changes which templates we suggest.')).toBeTruthy();
@@ -153,11 +191,16 @@ describe('the organization card', () => {
 });
 
 describe('a caller who can read but not update', () => {
-  it('sees the words and no way to change them', () => {
+  it('sees the facts and the words as TEXT — no fields, switched off or otherwise', () => {
     mount(['org.read']);
-    expect(screen.getByLabelText<HTMLInputElement>('A part of the organization').disabled)
-      .toBe(true);
-    expect(screen.queryByRole('button', { name: 'Save words' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Save organization' })).toBeNull();
+    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+
+    const row = screen.getByRole('row', { name: /A part of the organization/ });
+    expect(row.textContent).toContain(ORG.labels.unit?.one ?? '');
+    expect(screen.getByText(ORG.name)).toBeTruthy();
+    expect(screen.getByText('University')).toBeTruthy();
   });
 });

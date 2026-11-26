@@ -15,3 +15,12 @@ export function closeConsequence(responseCount: number): string {
   const verb = responseCount === 1 ? 'has' : 'have';
   return `${collected} ${verb} come in. Closing stops new ones — the results stay.`;
 }
+
+/**
+ * Calling off a SCHEDULED one (R-805). It has a link but has not opened, so nobody has
+ * answered; closing it now means it never opens. The server allows it (any launched,
+ * unclosed campaign closes); the page offered no way to, so a campaign scheduled by
+ * mistake could only be waited out.
+ */
+export const CANCEL_SCHEDULED =
+  'It has not opened yet, so nobody has answered. Calling it off closes it now: it will never open, and its link will not work.';

@@ -146,7 +146,7 @@ const registerWith = (body: Record<string, unknown>) =>
     });
 
 describe('register writes the subscription — D-012 repaid', () => {
-  it.each([...SIGNUP_TIERS])('puts a new organisation on %s because that is what it picked', async (tier) => {
+  it.each([...SIGNUP_TIERS])('puts a new organization on %s because that is what it picked', async (tier) => {
     const res = await registerWith({ tier });
     expect(res.status).toBe(201);
 
@@ -287,7 +287,7 @@ describe('the gate answers with the tier that was chosen — DEC-011, 16 §4', (
   const exportOf = (session: Session) =>
     session.agent.get(`/api/v1/campaigns/${NOWHERE}/export`);
 
-  it('402s a bronze organisation and names silver as the remedy', async () => {
+  it('402s a bronze organization and names silver as the remedy', async () => {
     const founder = await registerOrg('custom', 'bronze');
     const res = await exportOf(founder);
     expect(res.status).toBe(402);
@@ -296,7 +296,7 @@ describe('the gate answers with the tier that was chosen — DEC-011, 16 §4', (
     expect(res.body.error.details.currentTier).toBe('bronze');
   });
 
-  it('lets a silver organisation past the gate', async () => {
+  it('lets a silver organization past the gate', async () => {
     const founder = await registerOrg('custom', 'silver');
     // 404, not 402: the gate opened and the handler could not find a campaign that is not
     // there. Anything other than 402 proves entitlement passed; 404 proves it precisely.
@@ -326,7 +326,7 @@ describe('the gate answers with the tier that was chosen — DEC-011, 16 §4', (
 // The bookkeeping gap: an organisation with no subscription row at all. Nothing in the product
 // deletes one, but the gate and the plan page both promise to treat it as bronze rather than lock
 // the customer out - which is also the answer to "what if billing were taken out?".
-describe('an organisation with no subscription row', () => {
+describe('an organization with no subscription row', () => {
   const NOWHERE = '00000000-0000-0000-0000-0000000000ee';
 
   it('is gated as bronze before anything repairs it', async () => {

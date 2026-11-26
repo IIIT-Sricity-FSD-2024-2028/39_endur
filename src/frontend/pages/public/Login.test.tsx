@@ -1,16 +1,37 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+// `/login` through the real store: signing in is the `loginSubmitted` thunk
+// (store/screens/entry.ts), which calls `POST /auth/login`, reads `/auth/me` and asks `/home`
+// where to land. `stubApi` stands in for the server, and asks the `signIn` spy what to answer:
+// a landing route ("/app" or "/app/setup") or a refusal.
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { makeStore, renderWithProviders } from '../../test-utils.js';
+import {
+  errorReply, makeStore, meFixture, renderWithProviders, stubApi, type StubReply,
+} from '../../test-utils.js';
 import { ApiError } from '../../lib/api.js';
+import { selectEntry } from '../../store/screens/entry.js';
 import Login from './Login.js';
 
 const signIn = vi.fn();
-vi.mock('../../lib/auth.js', () => ({
-  useSignIn: () => signIn,
-  useRegister: () => vi.fn(),
-}));
+let landing = '/app';
+
+const server = () => stubApi({
+  'POST /auth/login': async (call): Promise<StubReply> => {
+    try {
+      landing = (await signIn(call.body)) as string;
+      return { body: { ok: true } };
+    } catch (error) {
+      if (!(error instanceof ApiError)) return error as Error;
+      const reply = errorReply(error.status, error.code, error.message, error.details);
+      return error.retryAfter === undefined
+        ? reply
+        : { ...reply, headers: { 'Retry-After': String(error.retryAfter) } };
+    }
+  },
+  'GET /auth/me': () => ({ body: meFixture() }),
+  'GET /home': () => ({ body: { data: { configured: landing !== '/app/setup' } } }),
+});
 
 const apiError = (status: number, extra: Record<string, unknown> = {}) =>
   new ApiError({
@@ -53,8 +74,12 @@ const fill = (email = 'admin@northfield.endur.test', password = 'endur-demo-pass
 
 const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   signIn.mockReset();
+  landing = '/app';
+  server();
 });
 
 describe('sign in — 30 §3.2', () => {
@@ -84,7 +109,7 @@ describe('sign in — 30 §3.2', () => {
     });
   });
 
-  it('lands on the wizard, not the console, when the organisation is unconfigured', async () => {
+  it('lands on the wizard, not the console, when the organization is unconfigured', async () => {
     signIn.mockResolvedValue('/app/setup');
     mount();
     fill();
@@ -181,6 +206,21 @@ describe('sign in — 30 §3.2', () => {
     });
   });
 
+  // DEC-014 under DEC-R03: the screen's state is in Redux, the password is not.
+  it('keeps the password out of the store, through a refusal and a success', async () => {
+    signIn.mockRejectedValueOnce(apiError(401)).mockResolvedValueOnce('/app');
+    const { store } = mount();
+    fill();
+    submit();
+    await screen.findByRole('alert');
+    expect(selectEntry(store.getState()).login.email).toBe('admin@northfield.endur.test');
+    expect(JSON.stringify(store.getState())).not.toContain('endur-demo-password');
+
+    submit();
+    await waitFor(() => expect(screen.getByText('CONSOLE')).toBeTruthy());
+    expect(JSON.stringify(store.getState())).not.toContain('endur-demo-password');
+  });
+
   it('reveals and re-hides the password, and the button says which it will do', () => {
     mount();
     const password = screen.getByLabelText('Password');
@@ -208,7 +248,7 @@ const AMBIGUOUS = () =>
     },
   });
 
-describe('one address, two organisations — DEC-049', () => {
+describe('one address, two organizations — DEC-049', () => {
   it('asks which, naming them, instead of failing', async () => {
     signIn.mockRejectedValueOnce(AMBIGUOUS());
     mount();

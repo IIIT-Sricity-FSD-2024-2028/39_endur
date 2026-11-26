@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+// `/ops/orgs/:id` through the real store: the organisation is read through a mocked
+// `useOrgDetail`, and every write is a thunk in store/screens/operator.ts that reaches the
+// stubbed operator API, which asks the `opsPost` spy what to answer.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { PlatformCapability, PlatformOrgDetail } from '@endur/shared';
-import { renderWithProviders } from '../../../test-utils.js';
+import { OpsError } from '../../../lib/ops.js';
+import { errorReply, renderWithProviders, stubApi, type StubReply } from '../../../test-utils.js';
 import OrgDetail from './OrgDetail.js';
 
 const ORG: PlatformOrgDetail = {
@@ -43,17 +47,24 @@ vi.mock('../../../lib/opsCapabilities.js', () => ({
   useOpsCan: () => (capability: PlatformCapability) => held.includes(capability),
 }));
 
-vi.mock('../../../lib/ops.js', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    opsPost: (path: string, body: unknown) => opsPost(path, body) as Promise<unknown>,
-  };
+/** The operator API's POSTs, answered by the spy: its value, or its `OpsError` refusal. */
+const server = () => stubApi({
+  'POST /platform/*': async (call): Promise<StubReply> => {
+    try {
+      return { body: (await opsPost(call.path.replace(/^\/platform/, ''), call.body)) ?? { data: {} } };
+    } catch (error) {
+      if (error instanceof OpsError) return errorReply(error.status, error.code, error.message);
+      throw error;
+    }
+  },
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 const render = () => renderWithProviders(<OrgDetail />, { path: '/ops/orgs/org-1' });
 
 beforeEach(() => {
+  server();
   org = ORG;
   held = ['platform.org.read', 'platform.org.suspend'] as PlatformCapability[];
   opsPost.mockReset();
@@ -63,11 +74,11 @@ beforeEach(() => {
 });
 
 describe('reinstating actually reinstates — D-043', () => {
-  it('sends the request when a suspended organisation is reinstated', async () => {
+  it('sends the request when a suspended organization is reinstated', async () => {
     org = { ...ORG, suspendedAt: '2026-08-20T00:00:00.000Z' };
     render();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reinstate organisation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reinstate organization' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reinstate' }));
 
     await waitFor(() =>
@@ -76,7 +87,7 @@ describe('reinstating actually reinstates — D-043', () => {
 
   it('keeps the typed-name gate on suspend, and it is the button that refuses', () => {
     render();
-    fireEvent.click(screen.getByRole('button', { name: 'Suspend organisation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suspend organization' }));
 
     const confirm = screen.getByRole('button', { name: 'Suspend' });
     expect(confirm.hasAttribute('disabled')).toBe(true);
@@ -86,7 +97,7 @@ describe('reinstating actually reinstates — D-043', () => {
 
   it('suspends once the name is typed', async () => {
     render();
-    fireEvent.click(screen.getByRole('button', { name: 'Suspend organisation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suspend organization' }));
     fireEvent.change(screen.getByLabelText(/Type "Northfield" to confirm/), {
       target: { value: 'Northfield' },
     });
@@ -101,13 +112,116 @@ describe('the suspension card is absent for staff — DEC-104', () => {
   it('renders neither the button nor the heading without platform.org.suspend', () => {
     held = ['platform.org.read'] as PlatformCapability[];
     render();
-    expect(screen.queryByRole('button', { name: /Suspend organisation/ })).toBeNull();
-    expect(screen.queryByText(/Suspend this organisation/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Suspend organization/ })).toBeNull();
+    expect(screen.queryByText(/Suspend this organization/)).toBeNull();
     expect(screen.getByText('Northfield')).toBeTruthy();
   });
 
   it('renders it for an owner', () => {
     render();
-    expect(screen.getByRole('button', { name: 'Suspend organisation' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Suspend organization' })).toBeTruthy();
+  });
+});
+
+/** The "Set plan" button on the Gold card. */
+const goldButton = (): HTMLElement => {
+  const card = screen.getAllByText(/Gold/).map((node) => node.closest('.plan-card')).find(Boolean) as HTMLElement;
+  return within(card).getByRole('button', { name: /Set plan/ });
+};
+
+describe('the plan override', () => {
+  it('asks before it changes anything, then sets the tier and says so', async () => {
+    render();
+    fireEvent.click(goldButton());
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('Change Northfield to gold?');
+    expect(opsPost).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change plan' }));
+    await waitFor(() => expect(opsPost).toHaveBeenCalledWith('/orgs/org-1/plan', { tier: 'gold' }));
+    expect(await screen.findByText('Plan set to gold.')).toBeTruthy();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('cancels without a request', () => {
+    render();
+    fireEvent.click(goldButton());
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(opsPost).not.toHaveBeenCalled();
+  });
+
+  it('says why when the override is refused', async () => {
+    opsPost.mockRejectedValue(new OpsError({ code: 'CONFLICT', status: 409, message: 'A change is pending.', requestId: 'r' }));
+    render();
+    fireEvent.click(goldButton());
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Change plan' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('A change is pending.');
+  });
+});
+
+describe('support access — DEC-114', () => {
+  it('needs a real reason, then opens a session with it', async () => {
+    held = ['platform.org.read', 'platform.support.enter'] as PlatformCapability[];
+    opsPost.mockResolvedValue({ data: { redirectTo: '/app' } });
+    render();
+    const open = screen.getByRole<HTMLButtonElement>('button', { name: 'Open console' });
+    fireEvent.change(screen.getByLabelText(/Why are you going in/), { target: { value: 'short' } });
+    expect(open.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText(/Why are you going in/), {
+      target: { value: '  Ticket 418, their campaign will not launch  ' },
+    });
+    fireEvent.click(open);
+    await waitFor(() => expect(opsPost).toHaveBeenCalledWith('/orgs/org-1/support-session', {
+      reason: 'Ticket 418, their campaign will not launch',
+    }));
+  });
+
+  it('says why when a session is refused, and lets them try again', async () => {
+    held = ['platform.org.read', 'platform.support.enter'] as PlatformCapability[];
+    opsPost.mockRejectedValue(new OpsError({ code: 'FORBIDDEN', status: 403, message: 'Suspended organizations cannot be entered.', requestId: 'r' }));
+    render();
+    fireEvent.change(screen.getByLabelText(/Why are you going in/), {
+      target: { value: 'Ticket 418, their campaign will not launch' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open console' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Suspended organizations cannot be entered.');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Open console' }).disabled).toBe(false);
+  });
+});
+
+describe('messaging the administrators', () => {
+  const fill = () => {
+    fireEvent.change(screen.getByLabelText('Subject'), { target: { value: ' Your plan ' } });
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: ' It renews on Thursday. ' } });
+  };
+
+  it('says where the message goes, and that nothing is emailed', () => {
+    render();
+    expect(screen.getByText(/lands in their Endur inbox/)).toBeTruthy();
+    expect(screen.getByText(/Nothing is emailed/)).toBeTruthy();
+  });
+
+  it('sends the words, trimmed, says how many got it, and empties the box', async () => {
+    opsPost.mockResolvedValue({ data: { sentTo: 1 } });
+    render();
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    await waitFor(() => expect(opsPost).toHaveBeenCalledWith('/orgs/org-1/message', {
+      subject: 'Your plan', body: 'It renews on Thursday.',
+    }));
+    expect(await screen.findByText('Sent to 1 administrator.')).toBeTruthy();
+    expect(screen.getByLabelText<HTMLInputElement>('Subject').value).toBe('');
+  });
+
+  it('keeps the words when it did not go', async () => {
+    opsPost.mockRejectedValue(new OpsError({ code: 'INTERNAL', status: 500, message: 'Try again.', requestId: 'r' }));
+    render();
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Try again.');
+    expect(screen.getByLabelText<HTMLInputElement>('Subject').value).toBe(' Your plan ');
   });
 });

@@ -26,6 +26,69 @@ const NO_REQ_BODY = {
     "14 §3: read req.data (validated) — req.body is unvalidated input and bypasses validate(Dto).",
 };
 
+/**
+ * R-703 (docs/REDUX-PLAN.md §6.10, DEC-R03) — state lives in the store. A rule of its own,
+ * not another `no-restricted-imports` / `no-restricted-syntax` entry: flat config REPLACES
+ * those rules' options per block (see the warning below), and this one must never quietly
+ * switch off R-110 or INV-002 in the folders it covers.
+ */
+const endurPlugin = {
+  rules: {
+    'no-component-state': {
+      meta: {
+        type: 'problem',
+        messages: {
+          state:
+            "DEC-R03: no {{name}} here. Put the state in a slice (store/screens/), read it with useAppSelector and change it with an action. docs/REDUX-PLAN.md §6.10.",
+        },
+        schema: [],
+      },
+      create(context) {
+        const banned = new Set(['useState', 'useReducer']);
+        return {
+          ImportSpecifier(node) {
+            if (node.parent.source.value === 'react' && banned.has(node.imported.name)) {
+              context.report({ node, messageId: 'state', data: { name: node.imported.name } });
+            }
+          },
+          'CallExpression > MemberExpression.callee'(node) {
+            if (node.property.type === 'Identifier' && banned.has(node.property.name) &&
+                node.object.type === 'Identifier' && node.object.name === 'React') {
+              context.report({ node, messageId: 'state', data: { name: node.property.name } });
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
+/**
+ * Where DEC-R03 holds: no `useState` / `useReducer` in a component; screen state is in a
+ * Redux slice. Each R7 area was added as it was done (§8's bar), and since the inventory
+ * (`npm run audit:state`) reached 0 it is the whole client.
+ */
+const REDUX_ONLY = [
+  // R-715: every file of the client. The inventory reads 0 (`npm run audit:state`), so the
+  // list that grew folder by folder through R-701 – R-713 is now the whole tree.
+  'src/frontend/**/*.{ts,tsx}',
+];
+
+/** R-110 (docs/REDUX-PLAN.md §7) — the store's typed hooks are the only way in. */
+const UNTYPED_REDUX_HOOKS = {
+  name: 'react-redux',
+  importNames: ['useDispatch', 'useSelector', 'useStore'],
+  message:
+    'R-110: use useAppDispatch / useAppSelector / useAppStore from store/index.ts. They are these same hooks, typed with this store.',
+};
+
+/** R-110, 23 §3 — server data reaches a page through a lib/ hook, never the API slice. */
+const STORE_API_FROM_UI = {
+  group: ['**/store/api', '**/store/api/**'],
+  message:
+    "R-110 / 23 §3: pages and components get server data from a lib/ use* hook, never from store/api directly. The hook's signature is the contract that keeps pages unchanged.",
+};
+
 /** DEC-012 — design values live in design_specs, never inline. */
 const NO_INLINE_HEX = {
   selector: 'Literal[value=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b/]',
@@ -105,6 +168,34 @@ export default tseslint.config(
     files: ['src/frontend/**/*.{ts,tsx}'],
     ignores: ['src/frontend/design-system/**'],
     rules: { 'no-restricted-syntax': ['error', BANNED_DOMAIN_NOUNS, NO_INLINE_HEX] },
+  },
+
+  // R-110 — Redux hooks only in their typed form, defined once in store/index.ts.
+  {
+    files: ['src/frontend/**/*.{ts,tsx}'],
+    ignores: ['src/frontend/store/index.ts'],
+    rules: { 'no-restricted-imports': ['error', { paths: [UNTYPED_REDUX_HOOKS] }] },
+  },
+
+  // R-110 — and pages and components never import the API slice. The hook rule is repeated
+  // because flat config REPLACES a rule's options (the warning above, about
+  // no-restricted-syntax, applies to no-restricted-imports just the same).
+  {
+    files: ['src/frontend/pages/**/*.{ts,tsx}', 'src/frontend/components/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [UNTYPED_REDUX_HOOKS], patterns: [STORE_API_FROM_UI] },
+      ],
+    },
+  },
+
+  // R-703 — no component state where DEC-R03 is done. Tests may hold state of their own.
+  {
+    files: REDUX_ONLY,
+    ignores: ['**/*.test.{ts,tsx}'],
+    plugins: { endur: endurPlugin },
+    rules: { 'endur/no-component-state': 'error' },
   },
 
   // Tests assert on supertest's `res.body`, which its types declare as `any`. Typed-lint

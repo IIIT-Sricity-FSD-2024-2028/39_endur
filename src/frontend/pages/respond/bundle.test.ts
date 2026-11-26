@@ -1,8 +1,9 @@
 // T-039 — "the respondent bundle contains no console code" (39 § Acceptance, 20 §8).
 //
 // That line has been in the doc since revision one with no way to check it. This walks the
-// import graph out of the two respondent pages and fails if it reaches the console, the
-// store, or a heavy dependency none of which belong on a phone on a venue network.
+// import graph out of the respondent pages and fails if it reaches the console, more of the
+// store than the entry chunk already carries, or a heavy dependency, none of which belong on
+// a phone on a venue network.
 //
 // A STATIC walk, not a built bundle, and the difference is worth stating: route-level
 // splitting is what puts these pages in their own chunks, and this test asserts the property
@@ -113,22 +114,38 @@ describe('the respondent world stays its own world', () => {
     expect(console).toEqual([]);
   });
 
-  it('reaches no store', () => {
-    // 39 § State: local component state only. The respond world does not mount the
-    // console's providers, so a page that read from the store would crash in production
-    // while passing every test that happened to wrap it in one.
-    expect(reached.filter((path) => path.startsWith('store/'))).toEqual([]);
+  it('reaches the store only through what the entry already downloads, plus its own slice', () => {
+    // DEC-R03 (docs/REDUX-PLAN.md §6.10, R-704): the respondent's form is Redux state too.
+    // This used to say the respond world reached no store at all, on the belief that it did
+    // not mount the store's provider. It always did: App.tsx wraps the WHOLE router in
+    // <Provider>, so the store, Redux Toolkit, react-redux and RTK Query were already in the
+    // entry chunk every phone downloads. What a phone must not download is anything MORE
+    // than that: the console's slices and endpoints. So the respondent graph may reach a
+    // store file only if the entry already carries it, or if it is the respondent's own.
+    const entryFiles = new Set([...entry.files].map((file) => slashes(relative(FRONTEND, file))));
+    const OWN = new Set([
+      'store/screens/respond.ts',
+      'store/screens/common.ts',
+      'store/api/endpoints/respond.ts',
+    ]);
+    const extra = reached.filter(
+      (path) => path.startsWith('store/') && !entryFiles.has(path) && !OWN.has(path),
+    );
+    expect(extra).toEqual([]);
+    // And it does use them: the form's answers are `state.respond`, the send a thunk.
+    expect(reached).toContain('store/screens/respond.ts');
   });
 
   it('pulls in nothing heavy', () => {
     // lucide-react is thirty glyphs to draw two shapes; qrcode belongs to the console side
     // of the QR. Both would be downloaded before the first question renders.
     //
-    // `@endur/shared` is absent, which made this test fail the first time it ran and is
-    // worth stating: every use of it down this graph is `import type`, so the DTOs, the
-    // label resolver and — the weight that matters — zod are erased. React and the router
-    // are the whole of the respondent's runtime.
-    expect([...graph.packages].sort()).toEqual(['react', 'react-router-dom']);
+    // Every package the respondent pages reach must already be in the entry chunk: React,
+    // the router, and the store's own (Redux Toolkit, react-redux). Nothing new is
+    // downloaded for the form.
+    expect([...graph.packages].filter((name) => !entry.packages.has(name))).toEqual([]);
+    expect([...graph.packages]).not.toContain('lucide-react');
+    expect([...graph.packages]).not.toContain('qrcode');
   });
 
   it('does not download the console shell before the first question', () => {

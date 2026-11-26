@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type {
@@ -10,7 +10,9 @@ import type {
   UnitNode,
 } from '@endur/shared';
 import { ApiError } from '../../../lib/api.js';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubCall, type StubReply,
+} from '../../../test-utils.js';
 import Structure from './index.js';
 
 const unit = (over: Partial<UnitNode> & { id: string; name: string }): UnitNode => ({
@@ -62,13 +64,15 @@ let tree: { data: UnitNode[] | null; loading: boolean; error: Error | null };
 let mix: UnitComposition | null;
 let people: { data: Page<PersonSummary> | null; loading: boolean; error: Error | null };
 
-vi.mock('../../../lib/units.js', () => ({
+// The tree's reads are mocked; `useUnitImpact` is the real hook, so the impact read goes to
+// the stubbed server like the commands (thunks in store/screens/structure.ts) do.
+vi.mock('../../../lib/units.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useUnits: () => ({
     ...tree,
     totals: { people: 64, subjects: 1, units: 3 },
-    reload, create, rename, reparent, remove,
+    reload,
   }),
-  unitImpact: (id: string): Promise<UnitImpact> => impact(id) as Promise<UnitImpact>,
   useUnitComposition: (id: string | null) => ({
     data: id && mix?.unitId === id ? mix : null,
     loading: false,
@@ -78,6 +82,25 @@ vi.mock('../../../lib/units.js', () => ({
 vi.mock('../../../lib/people.js', () => ({
   usePeopleIn: (id: string | null) => (id ? people : { data: null, loading: false, error: null }),
 }));
+
+/** The stubbed server asks the spies above what to answer. */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const idOf = (call: StubCall): string => call.path.split('/')[2] ?? '';
+const server = () => stubApi({
+  'GET /units/*': (call) => answer(impact, idOf(call)),
+  'POST /units': (call) => answer(create, call.body),
+  'PATCH /units/*': (call) => answer(rename, idOf(call), (call.body as { name: string }).name),
+  'POST /units/*': (call) => answer(reparent, idOf(call), (call.body as { newParentId: string | null }).newParentId),
+  'DELETE /units/*': (call) =>
+    answer(remove, idOf(call), (call.body as { reassignChildrenTo?: string }).reassignChildrenTo),
+});
 
 const ALL: Capability[] = [
   'unit.read', 'unit.create', 'unit.update', 'unit.delete', 'unit.reparent', 'person.read',
@@ -105,8 +128,11 @@ const typeInto = (input: HTMLElement, value: string): void => {
   fireEvent.keyDown(input, { key: 'Enter' });
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  server();
   create.mockResolvedValue([]);
   rename.mockResolvedValue(undefined);
   reparent.mockResolvedValue(undefined);

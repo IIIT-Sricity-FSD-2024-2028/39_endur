@@ -1,7 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+// The read (`useProfile`) is mocked for each test's profile; the rename and the password
+// change are thunks (store/screens/profile.ts) that reach the stubbed server, which asks the
+// spies below what to answer.
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { ProfileView } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  errorReply, meFixture, renderWithProviders, stubApi, NONSENSE_LABELS, type StubReply,
+} from '../../../test-utils.js';
 import { ApiError } from '../../../lib/api.js';
 import Profile from './index.js';
 
@@ -35,14 +40,32 @@ const refresh = vi.fn();
 let state: { data: ProfileView | null; loading: boolean; error: Error | null };
 
 vi.mock('../../../lib/profile.js', () => ({
-  useProfile: () => ({ ...state, reload, rename, changePassword }),
+  useProfile: () => ({ ...state, reload }),
 }));
-vi.mock('../../../lib/auth.js', () => ({ useRefreshSession: () => refresh }));
+
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message, error.details);
+    throw error;
+  }
+};
+
+afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stubApi({
+    'PATCH /profile': (call) => answer(rename, (call.body as { name: string }).name),
+    'POST /profile/password': (call) => answer(changePassword, call.body),
+    'GET /auth/me': () => {
+      refresh();
+      return { body: meFixture({ name: 'Amara R' }) };
+    },
+  });
   state = { data: PROFILE, loading: false, error: null };
-  rename.mockResolvedValue(undefined);
+  rename.mockResolvedValue(PROFILE);
   changePassword.mockResolvedValue(undefined);
   refresh.mockResolvedValue(undefined);
 });
@@ -134,7 +157,7 @@ describe('/app/profile', () => {
     expect(next.value).toBe('');
   });
 
-  it('lists what YOU are being asked for, in the organisation’s own noun', () => {
+  it('lists what YOU are being asked for, in the organization’s own noun', () => {
     state = {
       data: {
         ...PROFILE,

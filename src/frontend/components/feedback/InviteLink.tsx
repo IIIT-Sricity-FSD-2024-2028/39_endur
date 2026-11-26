@@ -1,5 +1,18 @@
-import { useState } from 'react';
+// A one-time sign-in link, shown once. Its copy answer and "Regenerating…" are its own entry
+// in `state.widgets` (store/screens/widgets.ts). Regenerating is the page's command
+// (`onRegenerate`, a thunk there); this only says it is in flight.
+import { useId } from 'react';
 import { formatRelative } from '../../lib/format.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  copiedFaded,
+  instanceLeft,
+  linkCopied,
+  linkRegenerating,
+  selectCopy,
+  selectRegenerating,
+} from '../../store/screens/widgets.js';
 
 const COPIED_MS = 1500;
 
@@ -16,25 +29,28 @@ export function InviteLink({
   onRegenerate?: (() => Promise<void>) | undefined;
   onClose: () => void;
 }): JSX.Element {
-  const [copied, setCopied] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const copyState = useAppSelector((state) => selectCopy(state, id));
+  const regenerating = useAppSelector((state) => selectRegenerating(state, id));
+  useClearOnLeave(instanceLeft({ id }));
+  const copied = copyState === 'copied';
+  const failed = copyState === 'failed';
 
   const copy = (): void => {
     void navigator.clipboard?.writeText(url).then(
       () => {
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), COPIED_MS);
+        dispatch(linkCopied({ id, ok: true }));
+        window.setTimeout(() => dispatch(copiedFaded({ id })), COPIED_MS);
       },
-      () => setFailed(true),
+      () => dispatch(linkCopied({ id, ok: false })),
     );
   };
 
   const regenerate = (): void => {
-    if (!onRegenerate) return;
-    setRegenerating(true);
-    setCopied(false);
-    void onRegenerate().finally(() => setRegenerating(false));
+    if (!onRegenerate || regenerating) return;
+    dispatch(linkRegenerating({ id, busy: true }));
+    void onRegenerate().finally(() => dispatch(linkRegenerating({ id, busy: false })));
   };
 
   return (

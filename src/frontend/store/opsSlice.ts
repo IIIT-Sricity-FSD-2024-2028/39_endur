@@ -5,6 +5,7 @@
 // union type here is the same privilege confusion `19` §7 warns against for the layout.
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PlatformCapability, PlatformRole } from '@endur/shared';
+import { opsApi } from './api/opsApi.js';
 
 export type OpsStatus = 'unknown' | 'authenticated' | 'anonymous';
 
@@ -21,7 +22,7 @@ const initialState: OpsState = {
   capabilities: [],
 };
 
-const opsSlice = createSlice({
+export const opsSlice = createSlice({
   name: 'ops',
   initialState,
   reducers: {
@@ -41,6 +42,26 @@ const opsSlice = createSlice({
       state.operator = null;
       state.capabilities = [];
     },
+  },
+
+  // `/platform/me`'s answer, as `auth` takes `/auth/me`'s (R-505). At boot any failure means
+  // "not signed in"; later, a failed re-read is a network blip, and a real 401 reaches
+  // `sessionExpiredMiddleware`.
+  extraReducers: (builder) => {
+    builder
+      .addMatcher(opsApi.endpoints.getOpsMe.matchFulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.operator = action.payload.operator;
+        state.capabilities = action.payload.capabilities;
+      })
+      .addMatcher(opsApi.endpoints.getOpsMe.matchRejected, (state, action) => {
+        if (action.meta.condition) return;
+        if (state.status === 'unknown') {
+          state.status = 'anonymous';
+          state.operator = null;
+          state.capabilities = [];
+        }
+      });
   },
 });
 
