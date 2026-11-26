@@ -8,7 +8,8 @@ import type { LabelSet, OrgView } from '@endur/shared';
 import { setupStore, useAppSelector, type AppStore } from '../store/index.js';
 import { meFixture, stubApi, type StubCall } from '../test-utils.js';
 import { useBootSession } from './session.js';
-import { useOrg, useRemoveLogo, useUpdateLabels, useUpdateOrg, useUploadLogo } from './org.js';
+import { useOrg } from './org.js';
+import { logoRemoved, logoUploaded, orgProfileSaved, wordsSaved } from '../store/screens/settings.js';
 
 const org = (patch: Partial<OrgView> = {}): OrgView => ({
   id: 'o1', name: 'Northfield', slug: 'northfield', industry: 'university', labels: {},
@@ -39,18 +40,20 @@ describe('a save reaches the app shell, with no reload', () => {
         return { body: { data: org({ name }) } };
       },
     });
-    const { result } = render(() => {
+    const { result, store } = render(() => {
       useBootSession();
       return {
         org: useOrg(),
-        update: useUpdateOrg(),
         topBar: useAppSelector((state) => state.auth.org?.name),
       };
     });
     await waitFor(() => expect(result.current.topBar).toBe('Northfield'));
     await waitFor(() => expect(result.current.org.data?.name).toBe('Northfield'));
 
-    await act(async () => { await result.current.update({ name: 'Northfield College' }); });
+    // The Settings page's save: a thunk over the mutation (store/screens/settings.ts).
+    await act(async () => {
+      await store.dispatch(orgProfileSaved({ name: 'Northfield College', industry: 'university' }));
+    });
 
     // The page has the server's answer at once (written into the cache, not re-read)...
     expect(result.current.org.data?.name).toBe('Northfield College');
@@ -70,15 +73,14 @@ describe('a save reaches the app shell, with no reload', () => {
     });
     const { result, store } = render(() => {
       useBootSession();
-      return {
-        save: useUpdateLabels(),
-        unit: useAppSelector((state) => state.vocabulary.labels.unit.one),
-      };
+      return { unit: useAppSelector((state) => state.vocabulary.labels.unit.one) };
     });
     await waitFor(() => expect(result.current.unit).toBe('Unit'));
     await waitFor(() => expect(store.getState().api.queries['getMe(undefined)']?.status).toBe('fulfilled'));
 
-    await act(async () => { await result.current.save({ unit: { one: 'Ward', many: 'Wards' } }); });
+    await act(async () => {
+      await store.dispatch(wordsSaved({ unit: { one: 'Ward', many: 'Wards' } } as never));
+    });
 
     await waitFor(() => expect(result.current.unit).toBe('Ward'));
   });
@@ -100,31 +102,30 @@ describe('useOrg', () => {
       },
     });
     const seen: boolean[] = [];
-    const { result } = render(() => {
-      const value = { org: useOrg(), upload: useUploadLogo(), remove: useRemoveLogo() };
+    const { result, store } = render(() => {
+      const value = { org: useOrg() };
       seen.push(value.org.loading);
       return value;
     });
     await waitFor(() => expect(result.current.org.data).not.toBeNull());
     const before = seen.length;
 
-    let updated: OrgView | undefined;
+    // The Settings page's logo thunks (store/screens/settings.ts).
     await act(async () => {
-      updated = await result.current.upload(new File(['png'], 'logo.png', { type: 'image/png' }));
+      await store.dispatch(logoUploaded(new File(['png'], 'logo.png', { type: 'image/png' })));
     });
 
-    // The upload answers with the file, so the org is re-read, and that is what comes back.
-    expect(updated?.logoUrl).toBe('/files/logo.png');
+    // The upload answers with the file, so the org is re-read through its tag.
+    await waitFor(() => expect(result.current.org.data?.logoUrl).toBe('/files/logo.png'));
     expect(calls.find((call) => call.method === 'POST')?.body).toBeInstanceOf(FormData);
-    // One re-read, not two: the invalidation and the hook's own read are the same request.
     expect(count(calls, 'GET', '/org')).toBe(2);
     // Settings swaps the whole form for a skeleton while `loading`: a re-read must not.
     expect(seen.slice(before)).not.toContain(true);
     // The `File` went out in the request and never into the store.
     expect(consoleError).not.toHaveBeenCalled();
 
-    await act(async () => { updated = await result.current.remove(); });
-    expect(updated?.logoUrl).toBeNull();
+    await act(async () => { await store.dispatch(logoRemoved()); });
+    await waitFor(() => expect(result.current.org.data?.logoUrl).toBeNull());
   });
 
   it('set() puts an org the page already has into the cache', async () => {

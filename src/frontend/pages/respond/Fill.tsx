@@ -1,18 +1,18 @@
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  hasResponded, markResponded, submitResponse, usePublicCampaign, type DoneState,
-} from '../../lib/respond.js';
+import { hasResponded, markResponded, usePublicCampaign, type DoneState } from '../../lib/respond.js';
 import { RespondForm } from './RespondForm.js';
 import { Unavailable } from './Unavailable.js';
 
 // The `/r/:token` page: loading, the gates, and the thank-you page. The form itself is
-// <RespondForm>, shared with the card on a signed-in member's Home page.
+// <RespondForm>, shared with the card on a signed-in member's Home page; its state and its
+// send are the store's (store/screens/respond.ts).
 export default function Fill(): JSX.Element {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
 
-  const [already] = useState(() => (token ? hasResponded(token) : false));
+  // The device's own marker, read where it lives (localStorage), not app state. It only
+  // changes when this page sends, and that same moment navigates away to the thank-you page.
+  const already = token ? hasResponded(token) : false;
   const { campaign, loading, unavailable, gate, error, reload } = usePublicCampaign(
     already ? undefined : token,
   );
@@ -36,7 +36,6 @@ export default function Fill(): JSX.Element {
       token={token}
       campaign={campaign}
       channel="link"
-      send={(body, key) => submitResponse(token, body, key)}
       onSent={(result, about) => {
         markResponded(token);
         const state: DoneState = {

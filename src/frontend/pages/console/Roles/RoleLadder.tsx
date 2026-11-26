@@ -1,11 +1,25 @@
-import { useState } from 'react';
-import type { RoleView } from '@endur/shared';
+// The ladder. Its dialogs and commands are `state.roles.ladder` (store/screens/roles.ts);
+// adding, renaming, moving and deleting a role are thunks there.
 import { InlineName } from '../../../components/org/InlineName.js';
 import { RoleRow } from '../../../components/org/RoleRow.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { Icon } from '../../../components/Icon.js';
 import { pluralise } from '../../../lib/format.js';
 import type { RoleLadderController } from '../../../lib/roles.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  reassignChosen,
+  roleAddClosed,
+  roleAddOpened,
+  roleAdded,
+  roleDeleteAsked,
+  roleDeleteDismissed,
+  roleDeleted,
+  roleRenamed,
+  rolesReordered,
+  selectLadder,
+} from '../../../store/screens/roles.js';
 
 export function RoleLadder({
   ladder,
@@ -15,19 +29,10 @@ export function RoleLadder({
   editable: boolean;
 }): JSX.Element {
   const roles = ladder.data ?? [];
-  const [adding, setAdding] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<RoleView | null>(null);
-  const [reassignTo, setReassignTo] = useState('');
-
-  const run = (work: Promise<void>): void => {
-    setBusy(true);
-    setError(null);
-    void work
-      .catch((caught: Error) => setError(caught.message))
-      .finally(() => setBusy(false));
-  };
+  const dispatch = useAppDispatch();
+  const { adding, busy, deletingId, reassignTo, ...rest } = useAppSelector(selectLadder);
+  const error = messageOf(rest.error, 'That did not go through. Try again.');
+  const pending = roles.find((role) => role.id === deletingId) ?? null;
 
   const move = (index: number, delta: number): void => {
     const next = [...roles];
@@ -36,7 +41,7 @@ export function RoleLadder({
     if (!from || !to) return;
     next[index] = to;
     next[index + delta] = from;
-    run(ladder.reorder(next.map((role) => role.id)));
+    void dispatch(rolesReordered(next.map((role) => role.id)));
   };
 
   if (ladder.loading && roles.length === 0) {
@@ -64,15 +69,12 @@ export function RoleLadder({
             grantCount={role.grantCount}
             editable={editable}
             busy={busy}
-            onRename={(name) => run(ladder.rename(role.id, name))}
+            onRename={(name) => void dispatch(roleRenamed({ roleId: role.id, name }))}
             onMove={(direction) => move(index, direction)}
             onDelete={
               index === roles.length - 1
                 ? undefined
-                : () => {
-                    setReassignTo('');
-                    setPending(role);
-                  }
+                : () => dispatch(roleDeleteAsked({ roleId: role.id }))
             }
           />
         ))}
@@ -85,14 +87,11 @@ export function RoleLadder({
             autoFocus
             placeholder="Role name"
             ariaLabel="New role name"
-            onCancel={() => setAdding(false)}
-            onCommit={(name) => {
-              setAdding(false);
-              run(ladder.create(name));
-            }}
+            onCancel={() => dispatch(roleAddClosed())}
+            onCommit={(name) => void dispatch(roleAdded(name))}
           />
         ) : (
-          <button type="button" className="btn btn-secondary" onClick={() => setAdding(true)}>
+          <button type="button" className="btn btn-secondary" onClick={() => dispatch(roleAddOpened())}>
             <Icon name="add" size={16} /> Add a role
           </button>
         )
@@ -110,12 +109,10 @@ export function RoleLadder({
           verb="Delete"
           destructive
           confirmDisabled={pending.peopleCount > 0 && reassignTo === ''}
-          onCancel={() => setPending(null)}
-          onConfirm={() => {
-            const role = pending;
-            setPending(null);
-            run(ladder.remove(role.id, reassignTo || undefined));
-          }}
+          onCancel={() => dispatch(roleDeleteDismissed())}
+          onConfirm={() =>
+            void dispatch(roleDeleted({ roleId: pending.id, reassignTo: reassignTo || undefined }))
+          }
         />
       )}
 
@@ -126,7 +123,7 @@ export function RoleLadder({
             id="role-reassign"
             className="input"
             value={reassignTo}
-            onChange={(event) => setReassignTo(event.target.value)}
+            onChange={(event) => dispatch(reassignChosen({ roleId: event.target.value }))}
           >
             <option value="">Choose a role…</option>
             {roles

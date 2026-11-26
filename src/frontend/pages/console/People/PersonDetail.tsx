@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
+// One person. What is open and in flight on the page is `state.people.pages[id]`
+// (store/screens/people.ts); every command is a thunk there, and re-reads the person through
+// its tag, because their powers are worked out on the server. docs/REDUX-PLAN.md §6.10.
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { AccountInvite, AccountStatus, CreateAssignmentBody } from '@endur/shared';
+import type { AccountStatus } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
@@ -13,7 +16,28 @@ import { ApiError } from '../../../lib/api.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { usePerson, useRoles } from '../../../lib/people.js';
-import { inviteAccount, resetAccount, revokeAccount } from '../../../lib/accounts.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  FAILED,
+  accountLinkMade,
+  accountRevoked,
+  emailEditClosed,
+  emailEditOpened,
+  pageInviteClosed,
+  pagePositionClosed,
+  pagePositionOpened,
+  personEmailChanged,
+  personPageLeft,
+  personRenamed,
+  positionAdded,
+  positionRemoved,
+  revokeAsked,
+  revokeDismissed,
+  selectPersonPage,
+  unassignAsked,
+  unassignDismissed,
+} from '../../../store/screens/people.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { formatDate, formatRelative } from '../../../lib/format.js';
@@ -29,19 +53,17 @@ export default function PersonDetail(): JSX.Element {
   const roles = useRoles();
   const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
 
-  const [assigning, setAssigning] = useState(false);
-  const [assignBusy, setAssignBusy] = useState(false);
-  const [assignError, setAssignError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<{ edgeId: string; label: string } | null>(null);
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [accountBusy, setAccountBusy] = useState(false);
-  const [accountError, setAccountError] = useState<string | null>(null);
-  const [invite, setInvite] = useState<AccountInvite | null>(null);
-  const [revoking, setRevoking] = useState(false);
-
-  const message = (caught: unknown, fallback: string): string =>
-    caught instanceof ApiError ? caught.message : fallback;
+  const dispatch = useAppDispatch();
+  const page = useAppSelector((state) => selectPersonPage(state, id));
+  useClearOnLeave(personPageLeft({ personId: id }));
+  const { assigning, assignBusy, editingEmail, accountBusy, invite } = page;
+  const assignError = messageOf(page.assignError, FAILED.assign);
+  const error = page.failure ? messageOf(page.failure.error, FAILED[page.failure.during]) : null;
+  const accountError = page.accountFailure
+    ? messageOf(page.accountFailure.error, FAILED[page.accountFailure.during])
+    : null;
+  const pending = page.unassigning;
+  const revoking = page.confirmingRevoke;
 
   if (person.error instanceof ApiError && person.error.status === 404) {
     return (
@@ -61,42 +83,21 @@ export default function PersonDetail(): JSX.Element {
   const positions = data?.positions ?? [];
 
   const addPosition = (draft: PositionDraft): void => {
-    setAssignBusy(true);
-    setAssignError(null);
-    const body: CreateAssignmentBody = {
-      roleId: draft.roleId, unitId: draft.unitId, isPrimary: draft.isPrimary,
-    };
-    void person
-      .assign(body)
-      .then(() => setAssigning(false))
-      .catch((caught: unknown) => {
-        setAssignError(message(caught, 'That position could not be added.'));
-      })
-      .finally(() => setAssignBusy(false));
+    void dispatch(
+      positionAdded({
+        personId: id,
+        body: { roleId: draft.roleId, unitId: draft.unitId, isPrimary: draft.isPrimary },
+        from: 'page',
+      }),
+    );
   };
 
   const provision = (mode: 'create' | 'reset'): void => {
-    setAccountBusy(true);
-    setAccountError(null);
-    const call = mode === 'create' ? inviteAccount : resetAccount;
-    void call(id)
-      .then((result) => setInvite(result))
-      .catch((caught: unknown) => {
-        setAccountError(message(caught, 'That link could not be created.'));
-      })
-      .finally(() => setAccountBusy(false));
+    void dispatch(accountLinkMade({ personId: id, mode: mode === 'create' ? 'invite' : 'reset', from: 'page' }));
   };
 
   const revoke = (): void => {
-    setRevoking(false);
-    setAccountBusy(true);
-    setAccountError(null);
-    void revokeAccount(id)
-      .then(() => person.reload())
-      .catch((caught: unknown) => {
-        setAccountError(message(caught, 'That account could not be revoked.'));
-      })
-      .finally(() => setAccountBusy(false));
+    void dispatch(accountRevoked({ personId: id }));
   };
 
   return (
@@ -115,7 +116,7 @@ export default function PersonDetail(): JSX.Element {
 
       {person.error && !(person.error instanceof ApiError && person.error.status === 404) && (
         <p className="form-error" role="alert">
-          {message(person.error, 'Could not load this person.')}{' '}
+          {person.error instanceof ApiError ? person.error.message : 'Could not load this person.'}{' '}
           <button type="button" className="btn btn-ghost" onClick={() => void person.reload()}>
             Try again
           </button>
@@ -139,12 +140,7 @@ export default function PersonDetail(): JSX.Element {
                   <InlineName
                     value={data?.name ?? ''}
                     ariaLabel="Name"
-                    onCommit={(name) => {
-                      setError(null);
-                      void person.rename(name).catch((caught: unknown) => {
-                        setError(message(caught, 'That name could not be saved.'));
-                      });
-                    }}
+                    onCommit={(name) => void dispatch(personRenamed({ personId: id, name, from: 'page' }))}
                   />
                 ) : (
                   <p className="person-name-text">{data?.name}</p>
@@ -161,14 +157,8 @@ export default function PersonDetail(): JSX.Element {
                     value={data?.email ?? ''}
                     ariaLabel="Email"
                     autoFocus
-                    onCancel={() => setEditingEmail(false)}
-                    onCommit={(email) => {
-                      setError(null);
-                      setEditingEmail(false);
-                      void person.setEmail(email).catch((caught: unknown) => {
-                        setError(message(caught, 'That address could not be saved.'));
-                      });
-                    }}
+                    onCancel={() => dispatch(emailEditClosed({ personId: id }))}
+                    onCommit={(email) => void dispatch(personEmailChanged({ personId: id, email }))}
                   />
                 ) : (
                   <p className="person-email-row">
@@ -177,7 +167,7 @@ export default function PersonDetail(): JSX.Element {
                       <button
                         type="button"
                         className="btn btn-ghost btn-tiny"
-                        onClick={() => setEditingEmail(true)}
+                        onClick={() => dispatch(emailEditOpened({ personId: id }))}
                       >
                         <Icon name="edit" size={16} /> Change
                       </button>
@@ -211,7 +201,7 @@ export default function PersonDetail(): JSX.Element {
                 canRevoke={can('account.revoke')}
                 onInvite={() => provision('create')}
                 onReissue={() => provision('reset')}
-                onRevoke={() => setRevoking(true)}
+                onRevoke={() => dispatch(revokeAsked({ personId: id }))}
               />
               {accountError && <p className="field-error" role="alert">{accountError}</p>}
             </div>
@@ -239,10 +229,11 @@ export default function PersonDetail(): JSX.Element {
                     onRemove={
                       can('assignment.delete')
                         ? () =>
-                            setPending({
+                            dispatch(unassignAsked({
+                              personId: id,
                               edgeId: position.edgeId,
                               label: `${position.roleName} — ${position.unitName}`,
-                            })
+                            }))
                         : undefined
                     }
                   />
@@ -258,14 +249,14 @@ export default function PersonDetail(): JSX.Element {
                   error={assignError}
                   hasPositions={positions.length > 0}
                   onAdd={addPosition}
-                  onCancel={() => { setAssigning(false); setAssignError(null); }}
+                  onCancel={() => dispatch(pagePositionClosed({ personId: id }))}
                 />
               ) : (
                 can('assignment.create') && (
                   <button
                     type="button"
                     className="btn btn-secondary btn-tiny"
-                    onClick={() => { setAssignError(null); setAssigning(true); }}
+                    onClick={() => dispatch(pagePositionOpened({ personId: id }))}
                   >
                     <Icon name="add" size={16} /> Position
                   </button>
@@ -325,14 +316,8 @@ export default function PersonDetail(): JSX.Element {
           consequence={`Everything ${data?.name ?? 'they'} could do at ${pending.label.split(' — ')[1] ?? 'that place'} goes with it. They keep their account and any other positions.`}
           verb="Remove"
           destructive
-          onConfirm={() => {
-            const target = pending;
-            setPending(null);
-            void person.unassign(target.edgeId).catch((caught: unknown) => {
-              setError(message(caught, 'That position could not be removed.'));
-            });
-          }}
-          onCancel={() => setPending(null)}
+          onConfirm={() => void dispatch(positionRemoved({ personId: id, edgeId: pending.edgeId, from: 'page' }))}
+          onCancel={() => dispatch(unassignDismissed({ personId: id }))}
         />
       )}
 
@@ -343,7 +328,7 @@ export default function PersonDetail(): JSX.Element {
           verb="Revoke"
           destructive
           onConfirm={revoke}
-          onCancel={() => setRevoking(false)}
+          onCancel={() => dispatch(revokeDismissed({ personId: id }))}
         />
       )}
 
@@ -352,10 +337,7 @@ export default function PersonDetail(): JSX.Element {
           url={invite.url}
           expiresAt={invite.expiresAt}
           label={invite.personName}
-          onClose={() => {
-            setInvite(null);
-            void person.reload();
-          }}
+          onClose={() => dispatch(pageInviteClosed({ personId: id }))}
         />
       )}
     </>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PRESET_VOCABULARIES, type TemplateSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -9,7 +9,26 @@ import { useLabels } from '../../../lib/labels.js';
 import { canAny, FORM_BUILDING, useCan } from '../../../lib/capabilities.js';
 import { toastShown, useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { ApiError } from '../../../lib/api.js';
-import { cloneKey, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
+import { useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  FAILED,
+  blankFormOpened,
+  selectBlankForm,
+  selectBusyId,
+  selectCardError,
+  selectDeletingId,
+  selectPreviewId,
+  selectSearchDraft,
+  templateCopied,
+  templateDeleteAsked,
+  templateDeleteDismissed,
+  templateDeleted,
+  templatePreviewClosed,
+  templatePreviewOpened,
+  templateSearchTyped,
+  templatesPageLeft,
+} from '../../../store/screens/templates.js';
 import { TemplateCard } from './TemplateCard.js';
 import { PreviewDialog } from './PreviewDialog.js';
 import { deleteConsequence } from './consequence.js';
@@ -65,13 +84,22 @@ function TemplatesPage(): JSX.Element {
   const library = useTemplateLibrary();
   const own = useTemplates({ q });
 
-  const [term, setTerm] = useState(q);
-  const [blank, setBlank] = useState(false);
-  const [pending, setPending] = useState<TemplateSummary | null>(null);
-  const [preview, setPreview] = useState<TemplateSummary | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [cardError, setCardError] = useState<{ id: string; text: string } | null>(null);
+  // What the reader is doing here is `state.templates` (store/screens/templates.ts): the
+  // search box as typed, what is open, which card is busy. The filters are the URL.
   const dispatch = useAppDispatch();
+  const term = useAppSelector(selectSearchDraft) ?? q;
+  const blank = useAppSelector(selectBlankForm) !== null;
+  const previewId = useAppSelector(selectPreviewId);
+  const deletingId = useAppSelector(selectDeletingId);
+  const busyId = useAppSelector(selectBusyId);
+  const failed = useAppSelector(selectCardError);
+  const cardError = failed
+    ? { id: failed.id, text: messageOf(failed.error, FAILED[failed.during]) ?? '' }
+    : null;
+  useClearOnLeave(templatesPageLeft());
+  const setTerm = (value: string): void => {
+    dispatch(templateSearchTyped({ term: value }));
+  };
   // The shell's ToastHost draws it (R-307); this page only says what happened.
   const showToast = (message: string): void => {
     dispatch(toastShown({ message }));
@@ -115,21 +143,17 @@ function TemplatesPage(): JSX.Element {
 
   const ownRows = own.data?.data ?? [];
   const filtered = Boolean(q || category || (industry && industry !== ALL));
+  const preview = [...ownRows, ...(library.data ?? [])].find((row) => row.id === previewId) ?? null;
+  const pending = ownRows.find((row) => row.id === deletingId) ?? null;
 
   const copyTemplate = (template: TemplateSummary): void => {
-    setBusyId(template.id);
-    setCardError(null);
-    void own
-      .clone(template.id, cloneKey(template.id))
-      .then((created) => {
-        // Into the builder for whoever can change it; anybody else has their copy listed above.
-        if (can('template.update')) navigate(`/app/forms/${created.id}/build`);
-        else showToast(`“${created.name}” is in your templates.`);
-      })
-      .catch((error: unknown) => {
-        setCardError({ id: template.id, text: message(error, 'That could not be copied.') });
-      })
-      .finally(() => setBusyId(null));
+    void dispatch(templateCopied({ templateId: template.id, from: 'card' })).then((result) => {
+      if (!templateCopied.fulfilled.match(result)) return;
+      const created = result.payload;
+      // Into the builder for whoever can change it; anybody else has their copy listed above.
+      if (can('template.update')) navigate(`/app/forms/${created.id}/build`);
+      else showToast(`“${created.name}” is in your templates.`);
+    });
   };
 
   const verdict = pending ? deleteConsequence(pending, labels.campaign) : null;
@@ -145,7 +169,7 @@ function TemplatesPage(): JSX.Element {
         ]}
         action={
           can('template.create') ? (
-            <button type="button" className="btn btn-secondary" onClick={() => setBlank(true)}>
+            <button type="button" className="btn btn-secondary" onClick={() => dispatch(blankFormOpened())}>
               <Icon name="add" size={18} /> Blank form
             </button>
           ) : undefined
@@ -241,11 +265,13 @@ function TemplatesPage(): JSX.Element {
                 campaign={labels.campaign}
                 busy={busyId === template.id}
                 error={cardError?.id === template.id ? cardError.text : undefined}
-                onPreview={() => setPreview(template)}
+                onPreview={() => dispatch(templatePreviewOpened({ templateId: template.id }))}
                 {...(can('template.update')
                   ? { onOpen: () => navigate(`/app/forms/${template.id}/build`) }
                   : {})}
-                {...(can('template.delete') ? { onDelete: () => setPending(template) } : {})}
+                {...(can('template.delete')
+                  ? { onDelete: () => dispatch(templateDeleteAsked({ templateId: template.id })) }
+                  : {})}
               />
             ))}
           </div>
@@ -282,7 +308,7 @@ function TemplatesPage(): JSX.Element {
                 campaign={labels.campaign}
                 busy={busyId === template.id}
                 error={cardError?.id === template.id ? cardError.text : undefined}
-                onPreview={() => setPreview(template)}
+                onPreview={() => dispatch(templatePreviewOpened({ templateId: template.id }))}
                 {...(can('template.clone') ? { onUse: () => copyTemplate(template) } : {})}
               />
             ))}
@@ -294,10 +320,10 @@ function TemplatesPage(): JSX.Element {
         <PreviewDialog
           template={preview}
           busy={busyId === preview.id}
-          onClose={() => setPreview(null)}
+          onClose={() => dispatch(templatePreviewClosed())}
           {...(preview.isLibrary
             ? can('template.clone')
-              ? { onUse: () => { const target = preview; setPreview(null); copyTemplate(target); } }
+              ? { onUse: () => { dispatch(templatePreviewClosed()); copyTemplate(preview); } }
               : {}
             : can('template.update')
               ? { onOpen: () => navigate(`/app/forms/${preview.id}/build`) }
@@ -305,15 +331,7 @@ function TemplatesPage(): JSX.Element {
         />
       )}
 
-      {blank && (
-        <BlankFormDialog
-          onCancel={() => setBlank(false)}
-          onCreate={async (body) => {
-            const created = await own.create(body);
-            navigate(`/app/forms/${created.id}/build`);
-          }}
-        />
-      )}
+      {blank && <BlankFormDialog onCreated={(created) => navigate(`/app/forms/${created.id}/build`)} />}
 
       {pending && verdict && (
         <ConfirmDialog
@@ -322,17 +340,10 @@ function TemplatesPage(): JSX.Element {
           verb="Delete"
           destructive
           confirmDisabled={verdict.blocked}
-          onConfirm={() => {
-            const template = pending;
-            setPending(null);
-            void own
-              .remove(template.id)
-              .then(() => showToast(`${template.name} deleted.`))
-              .catch((error: unknown) => {
-                setCardError({ id: template.id, text: message(error, 'That could not be deleted.') });
-              });
-          }}
-          onCancel={() => setPending(null)}
+          onConfirm={() =>
+            void dispatch(templateDeleted({ templateId: pending.id, name: pending.name, from: 'card' }))
+          }
+          onCancel={() => dispatch(templateDeleteDismissed())}
         />
       )}
     </>

@@ -1,9 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import type { Capability, Page, PersonSummary, RoleView, UnitNode } from '@endur/shared';
 import { ApiError } from '../../../lib/api.js';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubCall, type StubReply,
+} from '../../../test-utils.js';
 import People from './index.js';
 
 const person = (
@@ -58,6 +60,32 @@ vi.mock('../../../lib/units.js', () => ({
   useUnits: () => ({ data: units, loading: false, error: null }),
 }));
 
+
+/**
+ * The commands are thunks over RTK Query now (store/screens/people.ts): they reach the
+ * stubbed server, which asks the spies above what to answer, so each test still says what
+ * the server does and checks what was sent.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    const value = await spy(...args);
+    return { body: { data: value ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message, error.details);
+    throw error;
+  }
+};
+const segments = (call: StubCall): string[] => call.path.split('?')[0]?.split('/') ?? [];
+const commands = () => stubApi({
+  'POST /people': (call) => answer(create, call.body),
+  'PATCH /people/*': (call) => answer(update, segments(call)[2], call.body),
+  'DELETE /people/*': (call) => {
+    const [, , id, kind, edgeId] = segments(call);
+    return kind === 'assignments' ? answer(unassign, id, edgeId) : answer(remove, id);
+  },
+  'POST /people/*': (call) => answer(assign, segments(call)[2], call.body),
+});
+
 const ALL: Capability[] = [
   'person.read', 'person.create', 'person.update', 'person.delete',
   'assignment.create', 'assignment.delete',
@@ -79,8 +107,11 @@ const mount = (capabilities: Capability[] = ALL, path = '/app/people') =>
 
 const where = (): string => screen.getByTestId('where').textContent ?? '';
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  commands();
   seen = [];
   create.mockImplementation(() => {
     const added = person({ id: 'p9', name: 'Kofi Mensah' });

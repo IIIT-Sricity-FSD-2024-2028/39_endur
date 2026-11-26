@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, Page, TemplateSummary } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubReply,
+} from '../../../test-utils.js';
+import { ApiError } from '../../../lib/api.js';
 import Templates from './index.js';
 
 const template = (over: Partial<TemplateSummary> & { id: string; name: string }): TemplateSummary => ({
@@ -37,11 +40,30 @@ let library: { data: TemplateSummary[] | null; loading: boolean; error: Error | 
 let list: { data: Page<TemplateSummary> | null; loading: boolean; error: Error | null };
 
 vi.mock('../../../lib/templates.js', () => ({
-  cloneKey: (id: string) => `key-for-${id}`,
   librarySearch: () => '',
   useTemplateLibrary: () => ({ ...library, reload }),
   useTemplates: () => ({ ...list, reload, create, clone, remove }),
 }));
+
+/**
+ * The commands are thunks over RTK Query now (store/screens/templates.ts): they reach the
+ * stubbed server, which asks the spies above what to answer, so each test still says what
+ * the server does and checks what was sent.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    const value = await spy(...args);
+    return value === undefined ? { status: 204 } : { body: { data: value } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const commands = () => stubApi({
+  'POST /templates': (call) => answer(create, call.body),
+  'POST /templates/*': (call) => answer(clone, call.path.split('/')[2], call.headers.get('idempotency-key')),
+  'DELETE /templates/*': (call) => answer(remove, call.path.split('/')[2]),
+});
 
 const ALL: Capability[] = [
   'template.read', 'template.create', 'template.update', 'template.clone', 'template.delete',
@@ -59,8 +81,11 @@ const mount = (capabilities: Capability[] = ALL, path = '/app/templates') =>
 const section = (heading: string): HTMLElement =>
   screen.getByRole('heading', { name: heading }).closest('section') as HTMLElement;
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  commands();
   clone.mockResolvedValue({ id: 'new-1' });
   create.mockResolvedValue({ id: 'new-2' });
   remove.mockResolvedValue(undefined);
@@ -191,7 +216,7 @@ describe('clone is one action and lands in the builder', () => {
   it('sends an idempotency key, which is what covers the retry the button cannot', async () => {
     mount();
     fireEvent.click(within(section('Library')).getAllByRole('button', { name: 'Use' })[0] as HTMLElement);
-    expect(clone.mock.calls[0]?.[1]).toBe('key-for-l1');
+    expect(clone.mock.calls[0]?.[1]).toMatch(/^clone:l1:/);
     await waitFor(() => expect(screen.getByText('BUILDER')).toBeTruthy());
   });
 

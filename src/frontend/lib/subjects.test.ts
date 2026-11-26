@@ -6,7 +6,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { Page, SubjectDetail, SubjectSummary } from '@endur/shared';
 import { setupStore } from '../store/index.js';
 import { errorReply, heldReply, stubApi, type StubReply } from '../test-utils.js';
-import { ApiError } from './api.js';
+import { subjectArchived, subjectRenamed } from '../store/screens/subjects.js';
 import { useSubject, useSubjectList } from './subjects.js';
 
 const pageOf = (...names: string[]): Page<SubjectSummary> => ({
@@ -16,9 +16,12 @@ const pageOf = (...names: string[]): Page<SubjectSummary> => ({
 });
 const reply = (...names: string[]): StubReply => ({ body: pageOf(...names) });
 
+/** The page's commands are thunks on the store (store/screens/subjects.ts); `store` reaches them. */
+let store = setupStore();
 function wrapperFor() {
-  const store = setupStore();
-  return ({ children }: { children: ReactNode }) => createElement(Provider, { store, children });
+  store = setupStore();
+  const current = store;
+  return ({ children }: { children: ReactNode }) => createElement(Provider, { store: current, children });
 }
 
 afterEach(() => {
@@ -62,8 +65,8 @@ describe('useSubjectList', () => {
     await waitFor(() => expect(result.current.detail.data).not.toBeNull());
     await waitFor(() => expect(result.current.filtered.data).not.toBeNull());
 
-    let renamed!: Promise<void>;
-    act(() => { renamed = result.current.all.rename('s1', 'Data Structures II'); });
+    let renamed!: Promise<unknown>;
+    act(() => { renamed = store.dispatch(subjectRenamed({ subjectId: 's1', name: 'Data Structures II' })); });
 
     await waitFor(() => expect(result.current.all.data?.data[0]?.name).toBe('Data Structures II'));
     expect(result.current.filtered.data?.data[0]?.name).toBe('Data Structures II');
@@ -72,7 +75,7 @@ describe('useSubjectList', () => {
     await act(async () => { await renamed; });
   });
 
-  it('a refused rename puts the old name back everywhere, and throws the reason', async () => {
+  it('a refused rename puts the old name back everywhere, and says the reason under the row', async () => {
     stubApi({
       'GET /subjects': reply('s1'),
       'PATCH /subjects/s1': errorReply(409, 'CONFLICT', 'That name is taken.'),
@@ -80,16 +83,17 @@ describe('useSubjectList', () => {
     const { result } = renderHook(() => useSubjectList({}), { wrapper: wrapperFor() });
     await waitFor(() => expect(result.current.data?.data).toHaveLength(1));
 
-    let failure: unknown;
     await act(async () => {
-      failure = await result.current.rename('s1', 'Taken').catch((error: unknown) => error);
+      await store.dispatch(subjectRenamed({ subjectId: 's1', name: 'Taken' }));
     });
 
-    expect(failure).toBeInstanceOf(ApiError);
+    expect(store.getState().subjects?.failure).toMatchObject({
+      id: 's1', during: 'rename', error: { message: 'That name is taken.' },
+    });
     await waitFor(() => expect(result.current.data?.data[0]?.name).toBe('s1'));
   });
 
-  it('archive() re-reads the list, and resolves once it is in', async () => {
+  it('archiving re-reads the list', async () => {
     let archived = false;
     stubApi({
       'GET /subjects': () => (archived ? reply('s2') : reply('s1', 's2')),
@@ -101,9 +105,9 @@ describe('useSubjectList', () => {
     const { result } = renderHook(() => useSubjectList({}), { wrapper: wrapperFor() });
     await waitFor(() => expect(result.current.data?.data).toHaveLength(2));
 
-    await act(async () => { await result.current.archive('s1'); });
+    await act(async () => { await store.dispatch(subjectArchived({ subjectId: 's1' })); });
 
-    expect(result.current.data?.data.map((row) => row.id)).toEqual(['s2']);
+    await waitFor(() => expect(result.current.data?.data.map((row) => row.id)).toEqual(['s2']));
   });
 });
 

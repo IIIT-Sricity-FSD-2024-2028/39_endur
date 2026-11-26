@@ -4,8 +4,7 @@ import { RequirePlatformAuth, RequireSession, SessionLoading } from './guards.js
 import { AmbientBackground } from '../components/AmbientBackground.js';
 import { ToastHost } from '../components/feedback/ToastHost.js';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
-import { opsSignedOut } from '../store/opsSlice.js';
-import { opsPost } from '../lib/ops.js';
+import { operatorSignedOut } from '../store/screens/operator.js';
 import { useOpsCan } from '../lib/opsCapabilities.js';
 import { useBootOpsSession } from '../lib/opsSession.js';
 
@@ -93,10 +92,7 @@ export function OpsLayout(): JSX.Element {
   }
 
   const signOut = (): void => {
-    void opsPost('/auth/logout').finally(() => {
-      dispatch(opsSignedOut());
-      navigate('/ops/login', { replace: true });
-    });
+    void dispatch(operatorSignedOut()).then(() => navigate('/ops/login', { replace: true }));
   };
 
   return (

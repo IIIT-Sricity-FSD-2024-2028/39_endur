@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { TIERS, formatMoney, type PaymentKind, type Tier } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -39,37 +39,45 @@ function readWindow(params: URLSearchParams): EarningsWindow {
   };
 }
 
-function useCountUp(target: number, ms = 600): number {
-  const [value, setValue] = useState(target);
+/**
+ * The window's revenue, counting up to its value when it arrives. An ANIMATION, so it is a
+ * ref writing frames into its own text node, not state (DEC-R03's one exception, as the
+ * Structure page's counters): the figure rendered is always the true one, and the count-up
+ * only runs between frames, skipped for reduced motion.
+ */
+function CountedMoney({ minor, currency, ms = 600 }: {
+  minor: number;
+  currency: Parameters<typeof formatMoney>[1];
+  ms?: number;
+}): JSX.Element {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Effect (animation): count up to the figure by writing frames to the element.
 
   useEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
     const reduced =
-      typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || target === 0) {
-      setValue(target);
-      return;
-    }
+    if (reduced || minor === 0) return undefined;
 
     let raf = 0;
     const start = performance.now();
     const tick = (now: number): void => {
       const t = Math.min(1, (now - start) / ms);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(target * eased));
+      element.textContent = formatMoney(Math.round(minor * (1 - Math.pow(1 - t, 3))), currency);
       if (t < 1) raf = requestAnimationFrame(tick);
+      else element.textContent = formatMoney(minor, currency);
     };
     raf = requestAnimationFrame(tick);
-
-    const land = window.setTimeout(() => setValue(target), ms + 80);
     return () => {
       cancelAnimationFrame(raf);
-      window.clearTimeout(land);
+      element.textContent = formatMoney(minor, currency);
     };
-  }, [target, ms]);
+  }, [minor, currency, ms]);
 
-  return value;
+  return <span ref={ref}>{formatMoney(minor, currency)}</span>;
 }
 
 export default function Earnings(): JSX.Element {
@@ -78,7 +86,6 @@ export default function Earnings(): JSX.Element {
   const range = readWindow(params);
   const earnings = useEarnings(range);
 
-  const revenue = useCountUp(earnings.data?.totals.revenueMinor ?? 0);
 
   const setWindow = (patch: Partial<EarningsWindow>): void => {
     const next = new URLSearchParams(params);
@@ -184,7 +191,7 @@ export default function Earnings(): JSX.Element {
             <div className="stat-row">
               <StatCard
                 kicker="Revenue in this window"
-                value={formatMoney(revenue, data.currency)}
+                value={<CountedMoney minor={data.totals.revenueMinor} currency={data.currency} />}
                 context={`${formatMoney(data.totals.lifetimeRevenueMinor, data.currency)} taken in total, all time`}
               />
               <StatCard

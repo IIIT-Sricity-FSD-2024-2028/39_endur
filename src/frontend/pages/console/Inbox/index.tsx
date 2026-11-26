@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+// `/app/inbox`. The queue and the messages are RTK Query reads; the tab and the filters are
+// the URL's; the open card, the keyboard cursor and each card's failed mark are
+// `state.inbox` (store/screens/inbox.ts), and every mark is a thunk there.
+import { useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FEEDBACK_REQUEST, type InboxMessage, type InboxState } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -15,7 +18,17 @@ import {
 } from '../../../lib/inbox.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
 import { useSubjectList } from '../../../lib/subjects.js';
-import { useAppSelector } from '../../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  cardToggled,
+  cursorMoved,
+  inboxLeft,
+  inboxMarked,
+  inboxQueueChanged,
+  messageMarked,
+  selectInboxScreen,
+} from '../../../store/screens/inbox.js';
 
 const TABS: Array<{ id: InboxState; label: string }> = [
   { id: 'all', label: 'All' },
@@ -61,8 +74,9 @@ export default function Inbox(): JSX.Element {
 
   const cards = useMemo(() => inbox.data?.data ?? [], [inbox.data]);
 
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [cursor, setCursor] = useState(0);
+  const dispatch = useAppDispatch();
+  const { expanded, cursor, failures } = useAppSelector(selectInboxScreen);
+  useClearOnLeave(inboxLeft());
   const listRef = useRef<HTMLDivElement>(null);
 
   const setParam = (key: string, value: string | undefined): void => {
@@ -70,8 +84,7 @@ export default function Inbox(): JSX.Element {
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
-    setExpanded(null);
-    setCursor(0);
+    dispatch(inboxQueueChanged());
   };
 
   const clearFilters = (): void => {
@@ -79,13 +92,15 @@ export default function Inbox(): JSX.Element {
     next.delete('campaignId');
     next.delete('subjectId');
     setParams(next, { replace: true });
-    setExpanded(null);
-    setCursor(0);
+    dispatch(inboxQueueChanged());
   };
 
   const mark = (responseId: string, action: MarkAction, keep = false): void => {
-    void inbox.mark(responseId, action, { keep });
+    if (!inbox.data) return;
+    void dispatch(inboxMarked({ responseId, action, keep, args: inbox.args }));
   };
+
+  // Effect (DOM): the queue's keyboard shortcuts (j, k, e, u); each dispatches.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -97,11 +112,11 @@ export default function Inbox(): JSX.Element {
       switch (event.key) {
         case 'j':
           event.preventDefault();
-          setCursor((index) => Math.min(index + 1, Math.max(0, cards.length - 1)));
+          dispatch(cursorMoved({ by: 1, count: cards.length }));
           return;
         case 'k':
           event.preventDefault();
-          setCursor((index) => Math.max(0, index - 1));
+          dispatch(cursorMoved({ by: -1, count: cards.length }));
           return;
         case 'e':
           if (!card) return;
@@ -246,15 +261,13 @@ export default function Inbox(): JSX.Element {
               selected={index === cursor}
               expanded={expanded === `${card.id}:${card.questionId}`}
               onToggleExpand={() => {
-                const key = `${card.id}:${card.questionId}`;
-                setExpanded((current) => (current === key ? null : key));
-                setCursor(index);
+                dispatch(cardToggled({ key: `${card.id}:${card.questionId}`, index }));
                 if (!card.read) mark(card.id, 'read', true);
               }}
               onToggleRead={() => mark(card.id, card.read ? 'unread' : 'read')}
               onArchive={() => mark(card.id, card.archived ? 'unarchive' : 'archive')}
               subjectWord={labels.subject.one}
-              error={inbox.failures[card.id]}
+              error={messageOf(failures[card.id], 'That did not save. Try again.') ?? undefined}
             />
           ))}
 
@@ -285,6 +298,7 @@ function MessageStream({
   rows: InboxMessage[];
   orgName: string;
 }): JSX.Element {
+  const dispatch = useAppDispatch();
   if (messages.loading && rows.length === 0) {
     return (
       <div className="message-list" aria-busy="true">
@@ -324,7 +338,7 @@ function MessageStream({
           body={row.body}
           at={row.at}
           read={row.read}
-          onMark={(action) => void messages.mark(row.id, action)}
+          onMark={(action) => void dispatch(messageMarked({ id: row.id, action }))}
         />
       ))}
     </div>

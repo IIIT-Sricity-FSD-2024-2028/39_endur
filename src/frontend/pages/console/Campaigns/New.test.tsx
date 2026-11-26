@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, Page, SubjectSummary, TemplateSummary, UnitNode } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubCall, type StubReply,
+} from '../../../test-utils.js';
 import { ApiError } from '../../../lib/api.js';
 import { toLocalInput } from '../../../lib/when.js';
 import New from './New.js';
@@ -51,22 +53,33 @@ const cloneTemplate = vi.fn();
 let LIBRARY: TemplateSummary[] = [];
 let capabilities: Capability[] = [];
 
-vi.mock('../../../lib/campaigns.js', () => ({
-  launchKey: (id: string) => `key-for-${id}`,
-  launchCampaign: (...args: unknown[]) => launchCampaign(...args) as unknown,
-  campaignSearch: () => '',
-  useCampaignList: () => ({ data: null, loading: false, error: null, reload: vi.fn(), create }),
-  useCampaign: () => ({ data: null, loading: false, error: null }),
-  useAudiencePreview: () => ({ data: null, loading: false, error: null }),
-}));
 vi.mock('../../../lib/templates.js', () => ({
   useTemplates: () => ({ data: page(TEMPLATES), loading: false, error: null }),
   useTemplate: () => ({ data: null, loading: false, error: null }),
   useTemplateLibrary: (_filters: unknown, enabled = true) =>
     ({ data: enabled ? LIBRARY : null, loading: false, error: null }),
-  useCloneTemplate: () => cloneTemplate,
-  cloneKey: (id: string) => `clone-key-${id}`,
 }));
+
+/**
+ * The three commands go through the real store and API layer (the launch is a thunk over
+ * RTK Query, store/screens/campaigns.ts); `stubApi` answers them by asking the spies above,
+ * so each test still says what the server does and checks what was sent.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: await spy(...args) } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const key = (call: StubCall): string | null => call.headers.get('idempotency-key');
+const routes = () => stubApi({
+  'POST /campaigns': (call) => answer(create, call.body),
+  'POST /campaigns/*': (call) =>
+    answer(launchCampaign, call.path.split('/')[2], key(call)),
+  'POST /templates/*': (call) => answer(cloneTemplate, call.path.split('/')[2], key(call)),
+});
 vi.mock('../../../lib/subjects.js', () => ({
   useSubjectList: () => ({ data: page(SUBJECTS), loading: false, error: null }),
   useSubject: () => ({ data: null, loading: false, error: null }),
@@ -97,8 +110,11 @@ const toStepThree = (): void => {
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  routes();
   LIBRARY = [];
   capabilities = ALL;
   create.mockResolvedValue({
@@ -300,8 +316,8 @@ describe('step 3 — the summary, then the irreversible button', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    const sent = create.mock.calls[0]?.[0] as { endsAt: Date };
-    expect(sent.endsAt.getTime()).toBeGreaterThan(Date.now());
+    const sent = create.mock.calls[0]?.[0] as { endsAt: string };
+    expect(Date.parse(sent.endsAt)).toBeGreaterThan(Date.now());
   });
 
   it('creates then launches, and lands straight on the QR with no success page between', async () => {
@@ -311,7 +327,8 @@ describe('step 3 — the summary, then the irreversible button', () => {
 
     await waitFor(() => expect(screen.getByRole('dialog', { name: /Share/ })).toBeTruthy());
     expect(create).toHaveBeenCalledTimes(1);
-    expect(launchCampaign).toHaveBeenCalledWith('c9', 'key-for-c9');
+    // Minting the token is the irreversible act: it carries an idempotency key.
+    expect(launchCampaign).toHaveBeenCalledWith('c9', expect.stringMatching(/^launch:c9:/));
     const sheet = within(screen.getByRole('dialog', { name: /Share/ }));
     expect(sheet.getByText('feedback.example.test/r/K4M9X2PQ')).toBeTruthy();
   });
@@ -375,7 +392,7 @@ describe('step 1 — the library, for whoever runs campaigns without building fo
     fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
 
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    expect(cloneTemplate).toHaveBeenCalledWith('lib1', 'clone-key-lib1');
+    expect(cloneTemplate).toHaveBeenCalledWith('lib1', expect.stringMatching(/^clone:lib1:/));
     expect(create.mock.calls[0]?.[0]).toMatchObject({ templateId: 'copy-of-lib1' });
   });
 

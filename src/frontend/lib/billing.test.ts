@@ -1,22 +1,14 @@
-// The billing hooks over a stubbed `fetch` (R-503). The Plan page tests mock this whole
-// module, so without this file nothing checked which endpoints the page actually calls, or
-// with what.
+// The billing reads over a stubbed `fetch` (R-503). The writes are thunks, tested in
+// store/screens/plan.test.ts.
 import { describe, expect, it, afterEach, vi } from 'vitest';
 import { createElement, StrictMode, type ReactNode } from 'react';
 import { Provider } from 'react-redux';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { BillingSummary } from '@endur/shared';
-import { setupStore } from '../store/index.js';
+import { setupStore, type AppStore } from '../store/index.js';
+import { tierJoined } from '../store/screens/plan.js';
 import { stubApi } from '../test-utils.js';
-import {
-  useBilling,
-  useCancelDowngrade,
-  useEnterpriseRequest,
-  useJoinTier,
-  usePlanSummary,
-  usePlans,
-  useScheduleDowngrade,
-} from './billing.js';
+import { useBilling, useEnterpriseRequestedAt, usePlanSummary, usePlans } from './billing.js';
 
 const SUMMARY: BillingSummary = {
   tier: 'silver',
@@ -31,8 +23,7 @@ const SUMMARY: BillingSummary = {
 };
 const answer = (summary: BillingSummary) => ({ body: { data: summary } });
 
-function render<T>(hook: () => T, strict = false) {
-  const store = setupStore();
+function render<T>(hook: () => T, strict = false, store: AppStore = setupStore()) {
   const wrapper = ({ children }: { children: ReactNode }) => {
     const tree = createElement(Provider, { store, children });
     return strict ? createElement(StrictMode, null, tree) : tree;
@@ -64,17 +55,6 @@ describe('useBilling', () => {
     expect(result.current.error?.message).toBe('offline');
   });
 
-  // The page replaces the whole summary with what the server returned, never patches one field.
-  it('replaces the summary wholesale through set()', async () => {
-    stubApi({ 'GET /billing': answer(SUMMARY) });
-    const { result } = render(() => useBilling());
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    const gold: BillingSummary = { ...SUMMARY, tier: 'gold' };
-    act(() => result.current.set(gold));
-    await waitFor(() => expect(result.current.data).toEqual(gold));
-  });
-
   // StrictMode mounts, unmounts and remounts (as development does). The hook used to send two
   // reads and needed a cancelled flag so the abandoned one could not answer last; the cache
   // sends one.
@@ -92,14 +72,16 @@ describe('the Plan page and the shell banner read ONE summary', () => {
       'GET /billing': answer({ ...SUMMARY, status: 'trialing' }),
       'POST /billing/tier': answer({ ...SUMMARY, tier: 'gold' }),
     });
+    const store = setupStore();
     const { result } = render(() => ({
       banner: usePlanSummary(true),
       page: useBilling(),
-      join: useJoinTier(),
-    }));
+    }), false, store);
     await waitFor(() => expect(result.current.banner?.status).toBe('trialing'));
 
-    await act(async () => { await result.current.join('gold', 'endur_abc123'); });
+    await act(async () => {
+      await store.dispatch(tierJoined({ tier: 'gold', paymentRef: 'endur_abc123' }));
+    });
 
     // Before, the banner fetched once when the console opened and kept saying "your trial
     // ends — add payment" after payment, until a reload.
@@ -126,71 +108,19 @@ describe('usePlans', () => {
   });
 });
 
-describe('the plan writes', () => {
-  it('joins with the tier and the reference the checkout minted', async () => {
-    const calls = stubApi({ 'POST /billing/tier': answer({ ...SUMMARY, tier: 'gold' }) });
-    const { result } = render(() => useJoinTier());
-    const updated = await result.current('gold', 'endur_abc123');
-    expect(calls[0]?.body).toEqual({ tier: 'gold', paymentRef: 'endur_abc123' });
-    expect(updated.tier).toBe('gold');
-  });
-
-  // Never an amount, and no empty paymentRef key either: the DTO would have to tolerate it.
-  it('sends only the tier when there is no reference', async () => {
-    const calls = stubApi({ 'POST /billing/tier': answer(SUMMARY) });
-    const { result } = render(() => useJoinTier());
-    await result.current('silver');
-    expect(calls[0]?.body).toEqual({ tier: 'silver' });
-  });
-
-  it('schedules a move down with a POST and cancels it with a DELETE', async () => {
-    const calls = stubApi({
-      'POST /billing/downgrade': answer({ ...SUMMARY, pendingTier: 'bronze' }),
-      'DELETE /billing/downgrade': answer(SUMMARY),
-    });
-    const { result } = render(() => ({ schedule: useScheduleDowngrade(), cancel: useCancelDowngrade() }));
-
-    expect((await result.current.schedule('bronze')).pendingTier).toBe('bronze');
-    expect(calls[0]?.body).toEqual({ tier: 'bronze' });
-    expect((await result.current.cancel()).pendingTier).toBeNull();
-    expect(calls[1]?.method).toBe('DELETE');
-  });
-});
-
-describe('useEnterpriseRequest', () => {
+describe('useEnterpriseRequestedAt', () => {
   it('reads whether a request is already open', async () => {
     stubApi({ 'GET /billing/enterprise-request': { body: { data: { requestedAt: '2026-10-10T00:00:00.000Z' } } } });
-    const { result } = render(() => useEnterpriseRequest());
-    await waitFor(() => expect(result.current.requestedAt).toBe('2026-10-10T00:00:00.000Z'));
+    const { result } = render(() => useEnterpriseRequestedAt());
+    await waitFor(() => expect(result.current).toBe('2026-10-10T00:00:00.000Z'));
   });
 
   // It decides one word on one button, so a failed read leaves it at "Request" rather than
   // putting an error on the plan page.
-  it('treats a failed read as no request, and a request after it still reads as requested', async () => {
-    stubApi({
-      'GET /billing/enterprise-request': new TypeError('offline'),
-      'POST /billing/enterprise-request': { body: { data: { requestedAt: '2026-10-17T00:00:00.000Z' } } },
-    });
-    const { result } = render(() => useEnterpriseRequest());
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-    expect(result.current.requestedAt).toBeNull();
-
-    await act(async () => { await result.current.request('call after 5pm'); });
-    await waitFor(() => expect(result.current.requestedAt).toBe('2026-10-17T00:00:00.000Z'));
-  });
-
-  it('sends a trimmed note, or no note at all, and then reads as requested', async () => {
-    const calls = stubApi({
-      'GET /billing/enterprise-request': { body: { data: { requestedAt: null } } },
-      'POST /billing/enterprise-request': { body: { data: { requestedAt: '2026-10-17T00:00:00.000Z' } } },
-    });
-    const { result } = render(() => useEnterpriseRequest());
-
-    await act(() => result.current.request('  call after 5pm  '));
-    expect(calls.at(-1)?.body).toEqual({ note: 'call after 5pm' });
-    await waitFor(() => expect(result.current.requestedAt).toBe('2026-10-17T00:00:00.000Z'));
-
-    await act(() => result.current.request('   '));
-    expect(calls.at(-1)?.body).toEqual({});
+  it('treats a failed read as no request', async () => {
+    const calls = stubApi({ 'GET /billing/enterprise-request': new TypeError('offline') });
+    const { result } = render(() => useEnterpriseRequestedAt());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(result.current).toBeNull();
   });
 });

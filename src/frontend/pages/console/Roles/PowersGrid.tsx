@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type {
   CapabilityMeta, GrantCell, GrantChoice, GrantWarning, RoleView,
 } from '@endur/shared';
@@ -7,6 +7,15 @@ import { Icon } from '../../../components/Icon.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { useLabels } from '../../../lib/labels.js';
 import { cellKey, choiceOf, type GridController } from '../../../lib/roles.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import {
+  ownGridLossAsked,
+  ownGridLossSettled,
+  powerGroupToggled,
+  powerGroupsSet,
+  powerSearchTyped,
+  selectPowersView,
+} from '../../../store/screens/roles.js';
 
 const WEIGHT: Record<string, number> = { self: 1, own_unit: 2, subtree: 3, all: 4 };
 
@@ -22,9 +31,12 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   myRoleIds: string[];
 }): JSX.Element {
   const labels = useLabels();
-  const [closed, setClosed] = useState<Set<string>>(new Set());
-  const [query, setQuery] = useState('');
-  const [confirming, setConfirming] = useState(false);
+  // How the grid is being looked at is `state.roles.powers` (store/screens/roles.ts); what it
+  // says is the powers grid slice's working copy, behind `grid`.
+  const dispatch = useAppDispatch();
+  const view = useAppSelector(selectPowersView);
+  const closed = useMemo(() => new Set(view.closed), [view.closed]);
+  const { query, confirming } = view;
 
   const state = grid.state;
 
@@ -64,12 +76,7 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   // Each heading opens and closes ITS OWN group. It used to be "open = nothing chosen, or
   // chosen", so the first click on a heading that looked open closed every OTHER group.
   const toggleModule = (name: string): void => {
-    setClosed((current) => {
-      const next = new Set(current);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+    dispatch(powerGroupToggled({ module: name }));
   };
   const allClosed = modules.length > 0 && modules.every(([name]) => closed.has(name));
 
@@ -129,7 +136,7 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
               className="btn btn-primary"
               disabled={!grid.dirty || grid.saving}
               onClick={() => {
-                if (losingOwnGrid) setConfirming(true);
+                if (losingOwnGrid) dispatch(ownGridLossAsked());
                 else void grid.save();
               }}
             >
@@ -168,9 +175,9 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
           }
           verb="Save anyway"
           destructive
-          onCancel={() => setConfirming(false)}
+          onCancel={() => dispatch(ownGridLossSettled())}
           onConfirm={() => {
-            setConfirming(false);
+            dispatch(ownGridLossSettled());
             void grid.save();
           }}
         />
@@ -188,13 +195,13 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
           className="input powers-search"
           placeholder="Find a power…"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => dispatch(powerSearchTyped({ query: event.target.value }))}
         />
         <button
           type="button"
           className="btn btn-ghost"
           disabled={needle !== ''}
-          onClick={() => setClosed(allClosed ? new Set() : new Set(modules.map(([name]) => name)))}
+          onClick={() => dispatch(powerGroupsSet({ closed: allClosed ? [] : modules.map(([name]) => name) }))}
         >
           {allClosed ? 'Expand all' : 'Collapse all'}
         </button>

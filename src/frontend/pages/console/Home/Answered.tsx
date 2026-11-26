@@ -4,10 +4,11 @@
 // THAT they answered, never WHAT: a response carries no name, so there is nothing to show them,
 // their own answer included. The card says so, because "where are my answers?" is the first
 // thing anybody reading this list would ask.
-import { useState } from 'react';
 import type { AnsweredForm } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { formatDate } from '../../../lib/format.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { pastFeedbackToggled, selectPastExpanded } from '../../../store/screens/home.js';
 
 /** Enough to recognise the last few; the rest is one press away. */
 export const SHOWN = 5;
@@ -22,7 +23,8 @@ export function Answered({
   /** Nothing is waiting either: on a page with no other content, the card says so first. */
   caughtUp: boolean;
 }): JSX.Element | null {
-  const [all, setAll] = useState(false);
+  const dispatch = useAppDispatch();
+  const all = useAppSelector(selectPastExpanded);
   if (rows.length === 0) return null;
   const shown = all ? rows : rows.slice(0, SHOWN);
 
@@ -60,7 +62,7 @@ export function Answered({
           type="button"
           className="btn btn-ghost answered-more"
           aria-expanded={all}
-          onClick={() => setAll((current) => !current)}
+          onClick={() => dispatch(pastFeedbackToggled())}
         >
           {all ? 'Show fewer' : `Show all ${rows.length}`}
         </button>

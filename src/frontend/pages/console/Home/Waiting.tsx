@@ -4,16 +4,24 @@
 // The form is <RespondForm>, the same one the `/r/…` link shows, and it submits through the
 // same respondent route. So the answer is exactly as anonymous here as there: the server
 // records THAT this person answered (which is how the card knows to go), never what.
-import { useState } from 'react';
+//
+// Which card is unfolded is `state.home.answeringId`; the form's own state is the respond
+// slice's, per token (store/screens/respond.ts).
 import type { WaitingForm } from '@endur/shared';
 import { formatDate } from '../../../lib/format.js';
-import { useAnswerWaiting, useWaitingForm } from '../../../lib/waiting.js';
-import { toastShown, useAppDispatch } from '../../../store/index.js';
+import { useWaitingForm } from '../../../lib/waiting.js';
+import { toastShown, useAppDispatch, useAppSelector } from '../../../store/index.js';
+import {
+  selectAnsweringId,
+  waitingFormAnswered,
+  waitingFormToggled,
+} from '../../../store/screens/home.js';
 import { costLine } from '../../respond/copy.js';
 import { RespondForm } from '../../respond/RespondForm.js';
 
 export function Waiting({ rows, orgName }: { rows: WaitingForm[]; orgName: string }): JSX.Element | null {
-  const [open, setOpen] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const open = useAppSelector(selectAnsweringId);
   if (rows.length === 0) return null;
 
   return (
@@ -43,12 +51,12 @@ export function Waiting({ rows, orgName }: { rows: WaitingForm[]; orgName: strin
                   className={`btn ${isOpen ? 'btn-ghost' : 'btn-primary'}`}
                   aria-expanded={isOpen}
                   aria-label={isOpen ? `Close “${form.name}”` : `Answer “${form.name}”`}
-                  onClick={() => setOpen(isOpen ? null : form.campaignId)}
+                  onClick={() => dispatch(waitingFormToggled({ campaignId: form.campaignId }))}
                 >
                   {isOpen ? 'Not now' : 'Answer'}
                 </button>
               </div>
-              {isOpen && <Answering form={form} onSent={() => setOpen(null)} />}
+              {isOpen && <Answering form={form} onSent={() => dispatch(waitingFormAnswered())} />}
             </li>
           );
         })}
@@ -69,7 +77,6 @@ function details(form: WaitingForm): string {
 
 function Answering({ form, onSent }: { form: WaitingForm; onSent: () => void }): JSX.Element {
   const loaded = useWaitingForm(form.token);
-  const answer = useAnswerWaiting();
   const dispatch = useAppDispatch();
 
   if (loaded.loading && !loaded.data) {
@@ -92,8 +99,8 @@ function Answering({ form, onSent }: { form: WaitingForm; onSent: () => void }):
         token={form.token}
         campaign={loaded.data}
         channel="home"
+        campaignId={form.campaignId}
         embedded
-        send={(body, key) => answer(form, body, key)}
         onSent={() => {
           dispatch(toastShown({ message: `Sent. Thank you for answering “${form.name}”.` }));
           onSent();

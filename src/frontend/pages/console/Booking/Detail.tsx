@@ -1,63 +1,57 @@
-import { useEffect, useMemo, useState } from 'react';
+// `/app/booking/:id`: one bookable. It and its bookings are RTK Query reads; its drafts, its
+// dialogs and every write are `state.booking.pages[id]` (store/screens/booking.ts).
+import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { SlotInput } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { ResponsiveTable } from '../../../components/data/ResponsiveTable.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
 import { SlotGrid } from '../../../components/data/SlotGrid.js';
-import { ApiError } from '../../../lib/api.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDateTime } from '../../../lib/format.js';
-import { toLocalInput } from '../../../lib/when.js';
+import { useBookable } from '../../../lib/booking.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
 import {
-  openKey,
-  useBookable,
-  useBookableCommands,
-} from '../../../lib/booking.js';
-
-type Draft = { id: string; startsAt: string; endsAt: string; capacity: number; remaining: number };
-
-function nextHour(after?: string): Date {
-  const base = after ? new Date(after) : new Date();
-  const next = new Date(base.getTime() + 60 * 60 * 1000);
-  next.setMinutes(0, 0, 0);
-  return next;
-}
+  attendeeBookingCancelled,
+  attendeeCancelAsked,
+  bookableClosed,
+  bookableDeleted,
+  bookableLeft,
+  bookableOpened,
+  bookingConfirmClosed,
+  bookingConfirmOpened,
+  bookingShareClosed,
+  bookingShareOpened,
+  detailsDiscarded,
+  detailsEdited,
+  detailsOf,
+  detailsSaved,
+  selectBookingPage,
+  slotAdded,
+  slotDraftsOf,
+  slotEdited,
+  slotRemoved,
+  slotsSaved,
+  type SlotDraft,
+} from '../../../store/screens/booking.js';
 
 export default function BookingDetail(): JSX.Element {
-  const { id } = useParams<{ id: string }>();
+  const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const can = useCan();
-  const { bookable, bookings, loading, forbidden, upgrade, reload } = useBookable(id);
-  const commands = useBookableCommands(id ?? '');
+  const dispatch = useAppDispatch();
+  const { bookable, bookings, loading, forbidden, upgrade } = useBookable(id);
+  const page = useAppSelector((state) => selectBookingPage(state, id));
+  useClearOnLeave(bookableLeft({ id }));
 
   const canUpdate = can('booking.update');
   const canDelete = can('booking.delete');
   const canCancel = can('booking.cancel');
 
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [cancelling, setCancelling] = useState<{ id: string; name: string } | null>(null);
-
-  useEffect(() => {
-    if (!bookable || dirty) return;
-    setDrafts(
-      bookable.slots.map((slot) => ({
-        id: slot.id,
-        startsAt: toLocalInput(slot.startsAt),
-        endsAt: toLocalInput(slot.endsAt),
-        capacity: slot.capacity,
-        remaining: slot.remaining,
-      })),
-    );
-  }, [bookable, dirty]);
+  const { busy, sharing, confirming, cancelling } = page;
+  const error = messageOf(page.error, 'That did not work.');
 
   const live = useMemo(() => bookings.filter((booking) => booking.cancelledAt === null), [bookings]);
   const anyBooked = live.length > 0;
@@ -108,52 +102,14 @@ export default function BookingDetail(): JSX.Element {
     );
   }
 
-  const act = (work: Promise<unknown>): void => {
-    setBusy(true);
-    setError(null);
-    void work
-      .then(() => {
-        setDirty(false);
-        return reload();
-      })
-      .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : 'That did not work.');
-      })
-      .finally(() => setBusy(false));
-  };
+  // What the editors show: the draft once somebody has edited, the server's copy until then.
+  const shown: SlotDraft[] = page.slots ?? slotDraftsOf(bookable);
+  const dirty = page.slots !== null;
+  const details = page.details ?? detailsOf(bookable);
+  const detailsDirty = page.details !== null;
 
-  const edit = (index: number, patch: Partial<Draft>): void => {
-    setDirty(true);
-    setDrafts((current) =>
-      current.map((slot, position) => (position === index ? { ...slot, ...patch } : slot)),
-    );
-  };
-
-  const addSlot = (): void => {
-    const last = drafts[drafts.length - 1];
-    const start = nextHour(last ? last.endsAt : undefined);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-    setDirty(true);
-    setDrafts((current) => [
-      ...current,
-      {
-        id: `new-${current.length}-${start.getTime()}`,
-        startsAt: toLocalInput(start.toISOString()),
-        endsAt: toLocalInput(end.toISOString()),
-        capacity: 1,
-        remaining: 1,
-      },
-    ]);
-  };
-
-  const save = (): void => {
-    if (!id) return;
-    const slots: SlotInput[] = drafts.map((slot) => ({
-      startsAt: new Date(slot.startsAt),
-      endsAt: new Date(slot.endsAt),
-      capacity: slot.capacity,
-    }));
-    act(commands.putSlots({ slots }));
+  const edit = (index: number, patch: Partial<SlotDraft>): void => {
+    dispatch(slotEdited({ id, index, patch, from: shown }));
   };
 
   return (
@@ -164,7 +120,7 @@ export default function BookingDetail(): JSX.Element {
         action={
           <>
             {bookable.url && (
-              <button type="button" className="btn btn-secondary" onClick={() => setSharing(true)}>
+              <button type="button" className="btn btn-secondary" onClick={() => dispatch(bookingShareOpened({ id }))}>
                 Share
               </button>
             )}
@@ -172,14 +128,19 @@ export default function BookingDetail(): JSX.Element {
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={busy || drafts.length === 0 || dirty}
-                onClick={() => id && act(commands.open(openKey(id)))}
+                disabled={busy || shown.length === 0 || dirty}
+                onClick={() => void dispatch(bookableOpened(id))}
               >
                 Open for booking
               </button>
             )}
             {canUpdate && bookable.publicToken && !bookable.closedAt && (
-              <button type="button" className="btn btn-secondary" onClick={() => setClosing(true)}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={busy}
+                onClick={() => dispatch(bookingConfirmOpened({ id, what: 'close' }))}
+              >
                 Close
               </button>
             )}
@@ -191,6 +152,57 @@ export default function BookingDetail(): JSX.Element {
         <p className="text-meta form-error" role="alert">
           {error}
         </p>
+      )}
+
+      {canUpdate && (
+        <section className="card booking-panel">
+          <h2 className="section-title">Details</h2>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void dispatch(detailsSaved(id));
+            }}
+          >
+            <label className="field">
+              <span className="field-label">Name</span>
+              <input
+                className="input"
+                value={details.name}
+                maxLength={140}
+                onChange={(event) =>
+                  dispatch(detailsEdited({ id, patch: { name: event.target.value }, from: details }))}
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Description (optional)</span>
+              <textarea
+                className="input"
+                rows={2}
+                maxLength={2000}
+                value={details.description}
+                onChange={(event) =>
+                  dispatch(detailsEdited({ id, patch: { description: event.target.value }, from: details }))}
+              />
+            </label>
+            <div className="slot-editor-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={busy || !detailsDirty}
+                onClick={() => dispatch(detailsDiscarded({ id }))}
+              >
+                Discard
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={busy || !detailsDirty || details.name.trim() === ''}
+              >
+                Save details
+              </button>
+            </div>
+          </form>
+        </section>
       )}
 
       <section className="card booking-panel">
@@ -205,7 +217,7 @@ export default function BookingDetail(): JSX.Element {
         {canUpdate && !anyBooked ? (
           <>
             <ul className="slot-editor" role="list">
-              {drafts.map((slot, index) => (
+              {shown.map((slot, index) => (
                 <li key={slot.id} className="slot-editor-row">
                   <label className="field">
                     <span className="field-label">Starts</span>
@@ -241,10 +253,7 @@ export default function BookingDetail(): JSX.Element {
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      setDirty(true);
-                      setDrafts((current) => current.filter((_row, position) => position !== index));
-                    }}
+                    onClick={() => dispatch(slotRemoved({ id, index, from: shown }))}
                   >
                     Remove
                   </button>
@@ -253,14 +262,18 @@ export default function BookingDetail(): JSX.Element {
             </ul>
 
             <div className="slot-editor-actions">
-              <button type="button" className="btn btn-secondary" onClick={addSlot}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => dispatch(slotAdded({ id, from: shown }))}
+              >
                 Add a time
               </button>
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={busy || !dirty}
-                onClick={save}
+                onClick={() => void dispatch(slotsSaved(id))}
               >
                 Save times
               </button>
@@ -300,7 +313,9 @@ export default function BookingDetail(): JSX.Element {
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
-                    onClick={() => setCancelling({ id: booking.id, name: booking.name })}
+                    disabled={busy}
+                    onClick={() =>
+                      dispatch(attendeeCancelAsked({ id, booking: { id: booking.id, name: booking.name } }))}
                   >
                     Cancel
                   </button>
@@ -317,7 +332,12 @@ export default function BookingDetail(): JSX.Element {
             This removes the times and every booking on them, including the ones people are
             expecting to be honoured.
           </p>
-          <button type="button" className="btn btn-danger" onClick={() => setRemoving(true)}>
+          <button
+            type="button"
+            className="btn btn-danger"
+            disabled={busy}
+            onClick={() => dispatch(bookingConfirmOpened({ id, what: 'delete' }))}
+          >
             Delete this
           </button>
         </section>
@@ -328,39 +348,32 @@ export default function BookingDetail(): JSX.Element {
           url={bookable.url}
           campaignName={bookable.name}
           status={bookable.closedAt ? 'closed' : 'open'}
-          onClose={() => setSharing(false)}
+          onClose={() => dispatch(bookingShareClosed({ id }))}
         />
       )}
 
-      {closing && (
+      {confirming === 'close' && (
         <ConfirmDialog
           title={`Close ${bookable.name}?`}
           consequence="The link stops working. Every booking already taken stays exactly as it is."
           verb="Close"
-          onConfirm={() => {
-            setClosing(false);
-            if (id) act(commands.close());
-          }}
-          onCancel={() => setClosing(false)}
+          onConfirm={() => void dispatch(bookableClosed(id))}
+          onCancel={() => dispatch(bookingConfirmClosed({ id }))}
         />
       )}
 
-      {removing && (
+      {confirming === 'delete' && (
         <ConfirmDialog
           title={`Delete ${bookable.name}?`}
           consequence={`This deletes ${live.length} booking${live.length === 1 ? '' : 's'} people are expecting. It cannot be undone.`}
           verb="Delete"
           destructive
           onConfirm={() => {
-            setRemoving(false);
-            if (!id) return;
-            setBusy(true);
-            void commands.remove()
-              .then(() => navigate('/app/booking'))
-              .catch(() => setError('That did not work.'))
-              .finally(() => setBusy(false));
+            void dispatch(bookableDeleted(id)).then((result) => {
+              if (bookableDeleted.fulfilled.match(result)) navigate('/app/booking');
+            });
           }}
-          onCancel={() => setRemoving(false)}
+          onCancel={() => dispatch(bookingConfirmClosed({ id }))}
         />
       )}
 
@@ -370,12 +383,9 @@ export default function BookingDetail(): JSX.Element {
           consequence="The place goes back into the slot straight away. Nobody is told — there is no mail transport in this product."
           verb="Cancel it"
           destructive
-          onConfirm={() => {
-            const target = cancelling.id;
-            setCancelling(null);
-            act(commands.cancelBooking(target));
-          }}
-          onCancel={() => setCancelling(null)}
+          onConfirm={() =>
+            void dispatch(attendeeBookingCancelled({ bookableId: id, bookingId: cancelling.id }))}
+          onCancel={() => dispatch(bookingConfirmClosed({ id }))}
         />
       )}
     </>

@@ -10,6 +10,9 @@ import { signedIn } from '../store/authSlice.js';
 import { errorReply, meFixture, stubApi, type StubCall } from '../test-utils.js';
 import { useBootOpsSession } from './opsSession.js';
 import { useEnterpriseQueue, useEstate } from './estate.js';
+import {
+  enterpriseRequestApproved, enterpriseRequestMoved, opsMessageOf, selectOperator,
+} from '../store/screens/operator.js';
 import { useAnalytics } from './analytics-ops.js';
 import { useLogLines } from './oplogs.js';
 
@@ -121,27 +124,29 @@ describe('useEnterpriseQueue', () => {
       }),
       'POST /platform/enterprise-requests/a/approve': { body: { data: request('a', 'closed', '2026-11-01') } },
     });
-    const { result } = render(() => useEnterpriseQueue(true));
+    const { result, store } = render(() => useEnterpriseQueue(true));
     await waitFor(() => expect(result.current.rows).toHaveLength(2));
 
-    await act(async () => { await result.current.update('b', 'contacted'); });
+    await act(async () => { await store.dispatch(enterpriseRequestMoved({ id: 'b', status: 'contacted' })); });
     await waitFor(() => expect(result.current.rows.find((row) => row.id === 'b')?.status).toBe('contacted'));
 
-    await act(async () => { await result.current.approve('a'); });
+    await act(async () => { await store.dispatch(enterpriseRequestApproved('a')); });
     await waitFor(() => expect(result.current.rows.map((row) => row.id)).toEqual(['b']));
 
-    await act(async () => { await result.current.update('b', 'closed'); });
+    await act(async () => { await store.dispatch(enterpriseRequestMoved({ id: 'b', status: 'closed' })); });
     await waitFor(() => expect(result.current.rows).toEqual([]));
   });
 
   it('a refused write is ON SCREEN, never swallowed', async () => {
     routes({ 'PATCH /platform/enterprise-requests/b': errorReply(409, 'CONFLICT', 'Somebody else closed it.') });
-    const { result } = render(() => useEnterpriseQueue(true));
+    const { result, store } = render(() => useEnterpriseQueue(true));
     await waitFor(() => expect(result.current.rows).toHaveLength(2));
 
-    await act(async () => { await result.current.update('b', 'contacted'); });
+    await act(async () => { await store.dispatch(enterpriseRequestMoved({ id: 'b', status: 'contacted' })); });
 
-    expect(result.current.error).toBe('Somebody else closed it.');
+    const { queueError, queueBusyId } = selectOperator(store.getState()).estate;
+    expect(opsMessageOf(queueError, 'x')).toBe('Somebody else closed it.');
+    expect(queueBusyId).toBeNull();
   });
 });
 

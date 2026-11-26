@@ -1,16 +1,19 @@
-import { useState } from 'react';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useRoleLadder, usePowersGrid } from '../../../lib/roles.js';
 import { useProfile } from '../../../lib/profile.js';
 import { RoleLadder } from './RoleLadder.js';
 import { PowersGrid } from './PowersGrid.js';
-
-type Tab = 'roles' | 'powers';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import { rolesPageLeft, rolesTabChosen, selectRolesTab } from '../../../store/screens/roles.js';
 
 export default function Roles(): JSX.Element {
   const can = useCan();
-  const [tab, setTab] = useState<Tab>('roles');
+  // The tab, the ladder's dialogs and the grid's view are `state.roles`; they go with the page.
+  const dispatch = useAppDispatch();
+  const tab = useAppSelector(selectRolesTab);
+  useClearOnLeave(rolesPageLeft());
 
   const ladder = useRoleLadder();
   const grid = usePowersGrid();
@@ -38,7 +41,7 @@ export default function Roles(): JSX.Element {
           aria-selected={tab === 'roles'}
           aria-controls="panel-roles"
           className={`tab${tab === 'roles' ? ' is-active' : ''}`}
-          onClick={() => setTab('roles')}
+          onClick={() => dispatch(rolesTabChosen({ tab: 'roles' }))}
         >
           Roles
         </button>
@@ -50,7 +53,7 @@ export default function Roles(): JSX.Element {
             aria-selected={tab === 'powers'}
             aria-controls="panel-powers"
             className={`tab${tab === 'powers' ? ' is-active' : ''}`}
-            onClick={() => setTab('powers')}
+            onClick={() => dispatch(rolesTabChosen({ tab: 'powers' }))}
           >
             Powers
           </button>

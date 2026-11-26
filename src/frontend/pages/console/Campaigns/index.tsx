@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import type { CampaignStatus, CampaignSummary, QuickCampaignPurpose } from '@endur/shared';
+import type { CampaignStatus } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
@@ -12,6 +11,16 @@ import { pluralise } from '../../../lib/format.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
 import { QUICK_CATEGORIES, STATUS_TAG, suppressionNote, timing } from './card.js';
 import { QuickDialog } from './QuickDialog.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  campaignListLeft,
+  quickDialogOpened,
+  selectQuick,
+  selectSharingId,
+  shareSheetClosed,
+  shareSheetOpened,
+} from '../../../store/screens/campaigns.js';
 
 const FILTERS: Array<{ key: CampaignStatus | 'all'; label: string }> = [
   { key: 'all', label: 'All' },
@@ -30,10 +39,15 @@ export default function Campaigns(): JSX.Element {
   const navigate = useNavigate();
 
   const list = useCampaignList({ ...(status ? { status } : {}) });
-  const [sharing, setSharing] = useState<CampaignSummary | null>(null);
-  const [quick, setQuick] = useState<QuickCampaignPurpose | null>(null);
+  const dispatch = useAppDispatch();
+  // The filter is the URL (Back works, a link reopens it); what is open on top of the list
+  // is the store's (`state.campaigns`), and goes when the page does.
+  const quickOpen = useAppSelector(selectQuick) !== null;
+  const sharingId = useAppSelector(selectSharingId);
+  useClearOnLeave(campaignListLeft());
 
   const rows = list.data?.data ?? [];
+  const sharing = rows.find((row) => row.id === sharingId) ?? null;
   const total = list.data?.meta.total ?? 0;
 
   const setFilter = (key: CampaignStatus | 'all'): void => {
@@ -60,14 +74,14 @@ export default function Campaigns(): JSX.Element {
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => setQuick('poll')}
+                    onClick={() => dispatch(quickDialogOpened('poll'))}
                   >
                     <Icon name="add" size={18} /> Poll
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => setQuick('suggestion')}
+                    onClick={() => dispatch(quickDialogOpened('suggestion'))}
                   >
                     <Icon name="add" size={18} /> Suggestion box
                   </button>
@@ -81,15 +95,8 @@ export default function Campaigns(): JSX.Element {
         }
       />
 
-      {quick && (
-        <QuickDialog
-          purpose={quick}
-          onCancel={() => setQuick(null)}
-          onCreated={(campaign) => {
-            setQuick(null);
-            navigate(`/app/campaigns/${campaign.id}`);
-          }}
-        />
+      {quickOpen && (
+        <QuickDialog onCreated={(campaign) => navigate(`/app/campaigns/${campaign.id}`)} />
       )}
 
       <div className="segmented" role="radiogroup" aria-label="Status">
@@ -177,7 +184,7 @@ export default function Campaigns(): JSX.Element {
                   {/* One click from list to projected QR. A draft has no token and no
                       reachable URL, so it has nothing to share yet (38 § States). */}
                   {campaign.url && (
-                    <button type="button" className="btn btn-primary" onClick={() => setSharing(campaign)}>
+                    <button type="button" className="btn btn-primary" onClick={() => dispatch(shareSheetOpened({ campaignId: campaign.id }))}>
                       <Icon name="share" size={16} /> Share
                     </button>
                   )}
@@ -202,7 +209,7 @@ export default function Campaigns(): JSX.Element {
           endsAt={sharing.endsAt}
           anonymous={sharing.anonymous}
           access={sharing.access}
-          onClose={() => setSharing(null)}
+          onClose={() => dispatch(shareSheetClosed())}
         />
       )}
     </>

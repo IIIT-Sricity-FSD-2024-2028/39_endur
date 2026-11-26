@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
+import { renderWithProviders as render } from '../../test-utils.js';
 import type { QuestionConfig } from '@endur/shared';
 import { QuestionCard } from './QuestionCard.js';
 import { optionsOf, type QuestionDraft } from './kinds.js';

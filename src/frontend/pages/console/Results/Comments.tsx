@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { ResponseItem } from '@endur/shared';
 import { formatRelative } from '../../../lib/format.js';
 import { newSince } from './stats.js';
@@ -12,6 +11,8 @@ export function Comments({
   onMore,
   seenBefore,
   subjectWord,
+  expanded,
+  onExpand,
 }: {
   items: ResponseItem[];
   total: number;
@@ -19,9 +20,10 @@ export function Comments({
   onMore: () => void;
   seenBefore: string | null;
   subjectWord: string;
+  /** "Show all" pressed: the page's state (`state.results`), not this list's. */
+  expanded: boolean;
+  onExpand: () => void;
 }): JSX.Element {
-  const [expanded, setExpanded] = useState(false);
-
   const comments = items.flatMap((item) =>
     item.answers
       .filter((answer) => answer.text.trim().length > 0)
@@ -65,7 +67,7 @@ export function Comments({
       </ul>
 
       {!expanded && comments.length > PREVIEW && (
-        <button type="button" className="btn btn-ghost" onClick={() => setExpanded(true)}>
+        <button type="button" className="btn btn-ghost" onClick={onExpand}>
           Show all {total} comments →
         </button>
       )}

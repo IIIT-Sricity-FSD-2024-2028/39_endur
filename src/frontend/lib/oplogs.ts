@@ -1,13 +1,14 @@
 // `/ops/logs` — `72` § State, `T-078`. Modelled on `lib/audit.ts` and `lib/estate.ts`: a
 // `Loadable<T>`, a fixed-key-order search string so the cache key is stable, and a
-// `forbidden` flag distinct from an empty result. The reads are on RTK Query since R-505;
-// the export stays a plain download, because it is a file and not JSON.
+// `forbidden` flag distinct from an empty result. The reads are on RTK Query since R-505.
+// The export is a download (a file, not JSON), run by the `logExported` thunk in
+// `store/screens/operator.ts` (DEC-R03) with the same search string as the view.
 //
 // NO POLLING, NO LIVE TAIL (`72` § Out of scope). The one control that refreshes a file is
 // the one the reader presses.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { LogFileMeta, LogLine, LogStoreMeta, Page } from '@endur/shared';
-import { OpsError, opsDownload } from './ops.js';
+import { OpsError } from './ops.js';
 import type { Loadable } from './estate.js';
 import { useGetLogFilesQuery, useGetLogLinesInfiniteQuery } from '../store/api/endpoints/ops.js';
 import { useLoadable } from './query.js';
@@ -21,38 +22,6 @@ export type LogFilter = {
   q?: string | undefined;
 };
 
-/**
- * `DEC-074` — the export. Same filters as the view, so what lands on the operator's disk is
- * what was on their screen; `logSearch` is reused rather than copied for exactly that reason.
- */
-export function useLogExport(): {
-  run: (file: string, filter: LogFilter, format: 'ndjson' | 'csv') => Promise<void>;
-  busy: boolean;
-  error: Error | null;
-  last: { name: string; lines: number; truncated: boolean } | null;
-} {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [last, setLast] = useState<{ name: string; lines: number; truncated: boolean } | null>(null);
-
-  const run = useCallback(async (file: string, filter: LogFilter, format: 'ndjson' | 'csv') => {
-    setBusy(true);
-    setError(null);
-    try {
-      const search = logSearch(filter);
-      const joiner = search ? '&' : '?';
-      const result = await opsDownload(`/logs/${encodeURIComponent(file)}/export${search}${joiner}format=${format}`);
-      setLast(result);
-    } catch (caught) {
-      setError(caught as Error);
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-
-  return { run, busy, error, last };
-}
-
 export function useLogFiles(): Loadable<LogFileMeta[]> & { forbidden: boolean; store: LogStoreMeta | null } {
   const files = useLoadable(useGetLogFilesQuery());
   const forbidden = files.error instanceof OpsError && files.error.status === 403;
@@ -65,8 +34,11 @@ export function useLogFiles(): Loadable<LogFileMeta[]> & { forbidden: boolean; s
   };
 }
 
-/** Fixed key order — the same fix every other `/ops` search string needed. */
-function logSearch(filter: LogFilter, cursor?: string): string {
+/**
+ * Fixed key order — the same fix every other `/ops` search string needed. Exported because the
+ * export uses it too (DEC-074): the file that lands on disk is the one that was on screen.
+ */
+export function logSearch(filter: LogFilter, cursor?: string): string {
   const params = new URLSearchParams();
   for (const key of ['level', 'status', 'path', 'orgId', 'requestId', 'q'] as const) {
     const value = filter[key];

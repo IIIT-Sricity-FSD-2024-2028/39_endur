@@ -14,6 +14,7 @@ export function LeaveGuard({ when, what }: {
   /** What would be lost, in a phrase: "your changes to the organisation". */
   what: string;
 }): JSX.Element | null {
+  // Effect (browser): while work is unsaved, ask the browser to warn before the page unloads.
   useEffect(() => {
     if (!when) return undefined;
     const warn = (event: BeforeUnloadEvent): void => {

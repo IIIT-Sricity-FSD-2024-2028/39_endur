@@ -1,24 +1,35 @@
-import { useState } from 'react';
-import { nameField } from '@endur/shared';
-import type { CreateTemplateBody } from '@endur/shared';
-import { isValid } from '../../../lib/validate.js';
+// A new form from nothing. Its fields are `state.templates.blank` (store/screens/templates.ts),
+// every keystroke an action; Create is the `blankFormCreated` thunk. The page renders it
+// while that state is set, and opens the builder once it is created.
+import type { TemplateSummary } from '@endur/shared';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  blankFormClosed,
+  blankFormCreated,
+  blankFormEdited,
+  blankReady,
+  selectBlankForm,
+} from '../../../store/screens/templates.js';
 
 export function BlankFormDialog({
-  onCreate,
-  onCancel,
+  onCreated,
 }: {
-  onCreate: (body: CreateTemplateBody) => Promise<void>;
-  onCancel: () => void;
-}): JSX.Element {
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('General');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  onCreated: (created: TemplateSummary) => void;
+}): JSX.Element | null {
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectBlankForm);
+  if (!draft) return null;
 
-  const ready = isValid(nameField(120), name) && isValid(nameField(60), category);
+  const { name, category, saving } = draft;
+  const ready = blankReady(draft);
+  const error = messageOf(draft.error, 'That could not be created.');
+  const close = (): void => {
+    dispatch(blankFormClosed());
+  };
 
   return (
-    <div className="dialog-backdrop" onMouseDown={onCancel}>
+    <div className="dialog-backdrop" onMouseDown={close}>
       <div
         className="dialog"
         role="dialog"
@@ -32,14 +43,9 @@ export function BlankFormDialog({
           className="subject-form"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!ready || saving) return;
-            setSaving(true);
-            setError(null);
-            void onCreate({ name: name.trim(), category: category.trim() })
-              .catch((cause: unknown) => {
-                setError(cause instanceof Error ? cause.message : 'That could not be created.');
-                setSaving(false);
-              });
+            void dispatch(blankFormCreated()).then((result) => {
+              if (blankFormCreated.fulfilled.match(result)) onCreated(result.payload);
+            });
           }}
         >
           <div className="field">
@@ -49,7 +55,7 @@ export function BlankFormDialog({
               className="input"
               autoFocus
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => dispatch(blankFormEdited({ name: event.target.value }))}
             />
           </div>
 
@@ -59,7 +65,7 @@ export function BlankFormDialog({
               id="blank-category"
               className="input"
               value={category}
-              onChange={(event) => setCategory(event.target.value)}
+              onChange={(event) => dispatch(blankFormEdited({ category: event.target.value }))}
             />
             <p className="field-help">
               What the card groups under in the library — Teaching, Facilities, Care. Your own
@@ -70,7 +76,7 @@ export function BlankFormDialog({
           {error && <p className="form-error" role="alert">{error}</p>}
 
           <div className="dialog-actions">
-            <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={!ready || saving}>
               Create
             </button>

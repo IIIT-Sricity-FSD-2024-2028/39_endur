@@ -12,6 +12,7 @@ import { meFixture, stubApi, type StubCall } from '../test-utils.js';
 import { useCan } from './capabilities.js';
 import { useBootSession } from './session.js';
 import { usePowersGrid, useRoleLadder, useRoles } from './roles.js';
+import { roleAdded, roleRenamed, rolesReordered } from '../store/screens/roles.js';
 
 const role = (id: string, name: string, level: number): RoleView =>
   ({ id, name, level, peopleCount: 0, grantCount: 0 });
@@ -71,38 +72,39 @@ describe('R-403: a grant edit reaches the signed-in user\'s own powers, with no 
       'GET /roles': { body: { data: [role('r1', 'Principal', 1)] } },
       'PATCH /roles/r1': { body: { data: role('r1', 'Head', 1) } },
     });
-    const { result } = render(() => {
+    const { result, store } = render(() => {
       useBootSession();
       return useRoleLadder();
     });
     await waitFor(() => expect(result.current.data).toHaveLength(1));
     await waitFor(() => expect(gets(calls, '/auth/me')).toHaveLength(1));
 
-    await act(async () => { await result.current.rename('r1', 'Head'); });
+    await act(async () => { await store.dispatch(roleRenamed({ roleId: 'r1', name: 'Head' })); });
 
     expect(gets(calls, '/auth/me')).toHaveLength(1);
   });
 });
 
-describe('useRoleLadder: each command resolves once the new list is on screen', () => {
-  it('reorder() takes the server\'s own re-read into the cache, with no second request', async () => {
+// The ladder's commands are thunks (store/screens/roles.ts) over these mutations.
+describe('the ladder: each command lands in the cache the ladder reads', () => {
+  it('a reorder takes the server\'s own re-read into the cache, with no second request', async () => {
     const before = [role('r1', 'Principal', 1), role('r2', 'Tutor', 2)];
     const after = [role('r2', 'Tutor', 1), role('r1', 'Principal', 2)];
     const calls = stubApi({
       'GET /roles': { body: { data: before } },
       'POST /roles/reorder': { body: { data: after } },
     });
-    const { result } = render(() => useRoleLadder());
+    const { result, store } = render(() => useRoleLadder());
     await waitFor(() => expect(result.current.data).toHaveLength(2));
 
-    await act(async () => { await result.current.reorder(['r2', 'r1']); });
+    await act(async () => { await store.dispatch(rolesReordered(['r2', 'r1'])); });
 
     // The levels on screen are the server's: derived from the order, never sent.
     expect(result.current.data?.map((row) => [row.id, row.level])).toEqual([['r2', 1], ['r1', 2]]);
     expect(gets(calls, '/roles')).toHaveLength(1);
   });
 
-  it('create() resolves after the list is re-read, and re-reads it once', async () => {
+  it('adding a role re-reads the list once', async () => {
     let list = [role('r1', 'Principal', 1)];
     const calls = stubApi({
       'GET /roles': () => ({ body: { data: list } }),
@@ -111,12 +113,12 @@ describe('useRoleLadder: each command resolves once the new list is on screen', 
         return { status: 201, body: { data: role('r2', 'Visitor', 2) } };
       },
     });
-    const { result } = render(() => useRoleLadder());
+    const { result, store } = render(() => useRoleLadder());
     await waitFor(() => expect(result.current.data).toHaveLength(1));
 
-    await act(async () => { await result.current.create('Visitor'); });
+    await act(async () => { await store.dispatch(roleAdded('Visitor')); });
 
-    expect(result.current.data?.map((row) => row.name)).toEqual(['Principal', 'Visitor']);
+    await waitFor(() => expect(result.current.data?.map((row) => row.name)).toEqual(['Principal', 'Visitor']));
     expect(gets(calls, '/roles')).toHaveLength(2);
   });
 
@@ -130,12 +132,12 @@ describe('useRoleLadder: each command resolves once the new list is on screen', 
       },
     });
     // The People page's position picker reads the same cache entry.
-    const { result } = render(() => ({ ladder: useRoleLadder(), picker: useRoles() }));
+    const { result, store } = render(() => ({ ladder: useRoleLadder(), picker: useRoles() }));
     await waitFor(() => expect(result.current.picker.data?.[0]?.name).toBe('Principal'));
 
-    await act(async () => { await result.current.ladder.rename('r1', 'Head'); });
+    await act(async () => { await store.dispatch(roleRenamed({ roleId: 'r1', name: 'Head' })); });
 
-    expect(result.current.picker.data?.[0]?.name).toBe('Head');
+    await waitFor(() => expect(result.current.picker.data?.[0]?.name).toBe('Head'));
   });
 });
 

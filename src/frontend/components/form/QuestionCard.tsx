@@ -1,5 +1,12 @@
-import { useState } from 'react';
+import { useId } from 'react';
 import type { QuestionKind } from '@endur/shared';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  questionRetypeAsked,
+  questionRetypeSettled,
+  selectRetype,
+} from '../../store/screens/widgets.js';
 import { Icon } from '../Icon.js';
 import { Toggle } from './Toggle.js';
 import { QuestionEditor } from './QuestionEditor.js';
@@ -26,13 +33,17 @@ export function QuestionCard({
   onMove?: ((direction: -1 | 1) => void) | undefined;
   readOnly?: boolean;
 }): JSX.Element {
-  const [pending, setPending] = useState<{ kind: QuestionKind; warning: string } | null>(null);
+  // A kind change waiting for a yes is this card's entry in `state.widgets.retypes`.
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const pending = useAppSelector((state) => selectRetype(state, id));
+  useClearOnLeave(questionRetypeSettled({ id }));
 
   const label = question.text.trim() || `Question ${index + 1}`;
 
   const retype = (kind: QuestionKind): void => {
     const change = changeKind(question, kind);
-    if (change.warning) setPending({ kind, warning: change.warning });
+    if (change.warning) dispatch(questionRetypeAsked({ id, kind, warning: change.warning }));
     else onChange(change.question);
   };
 
@@ -95,7 +106,7 @@ export function QuestionCard({
         <div className="qcard-warning" role="alert">
           <p>{pending.warning}</p>
           <div className="qcard-warning-actions">
-            <button type="button" className="btn btn-ghost" onClick={() => setPending(null)}>
+            <button type="button" className="btn btn-ghost" onClick={() => dispatch(questionRetypeSettled({ id }))}>
               Keep it as it is
             </button>
             <button
@@ -103,7 +114,7 @@ export function QuestionCard({
               className="btn btn-secondary"
               onClick={() => {
                 onChange(changeKind(question, pending.kind).question);
-                setPending(null);
+                dispatch(questionRetypeSettled({ id }));
               }}
             >
               Change anyway

@@ -1,8 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { describeCapability } from '@endur/shared';
 import type { AuditEntry } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  disclosureClosed,
+  disclosureLeft,
+  disclosureToggled,
+  selectDisclosure,
+} from '../../../store/screens/widgets.js';
 import { ResponsiveTable, type Column } from '../../../components/data/ResponsiveTable.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { Toggle } from '../../../components/form/Toggle.js';
@@ -16,11 +24,20 @@ const FILTER_KEYS = ['action', 'targetType', 'outcome', 'from', 'to'] as const;
 
 const TARGET_TYPES = ['unit', 'person', 'user', 'role', 'subject', 'campaign', 'template', 'organization'];
 
+/** This page's key in `state.widgets.disclosures`. */
+const AUDIT_ROWS = 'audit-log';
+
 export default function Logs(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
   const [params, setParams] = useSearchParams();
-  const [openId, setOpenId] = useState<string | null>(null);
+  // Which row's details are open: this page's entry in `state.widgets.disclosures`.
+  const dispatch = useAppDispatch();
+  const openId = useAppSelector((state) => selectDisclosure(state, AUDIT_ROWS));
+  useClearOnLeave(disclosureLeft({ id: AUDIT_ROWS }));
+  const setOpenId = (id: string | null): void => {
+    dispatch(id === null ? disclosureClosed({ id: AUDIT_ROWS }) : disclosureToggled({ id: AUDIT_ROWS, item: id }));
+  };
 
   const filters: AuditFilters = useMemo(
     () => ({
@@ -130,7 +147,7 @@ export default function Logs(): JSX.Element {
             type="button"
             className="logs-expand"
             aria-expanded={openId === row.id}
-            onClick={() => setOpenId(openId === row.id ? null : row.id)}
+            onClick={() => setOpenId(row.id)}
           >
             <DecisionTrace decision={{ decidedBy: row.decidedBy }} compact />
           </button>

@@ -18,14 +18,10 @@ import { useCallback, useMemo } from 'react';
 import type { CapabilityMeta, GrantCell, GrantChoice, GrantWarning, RoleView } from '@endur/shared';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
-  useCreateRoleMutation,
-  useDeleteRoleMutation,
   useGetCapabilityCatalogueQuery,
   useGetGrantsQuery,
   useGetGrantWarningsQuery,
   useGetRolesQuery,
-  useRenameRoleMutation,
-  useReorderRolesMutation,
 } from '../store/api/endpoints/roles.js';
 import {
   cellKey,
@@ -38,7 +34,7 @@ import {
   undone,
   type CellKey,
 } from '../store/powersGridSlice.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import { useLoadable, type Loadable } from './query.js';
 
 export { cellKey, type CellKey };
 
@@ -60,10 +56,6 @@ export function useRoles(): Loadable<RoleView[]> {
 
 export type RoleLadderController = Loadable<RoleView[]> & {
   reload: () => Promise<void>;
-  create: (name: string) => Promise<void>;
-  rename: (id: string, name: string) => Promise<void>;
-  reorder: (orderedIds: string[]) => Promise<void>;
-  remove: (id: string, reassignTo?: string) => Promise<void>;
 };
 
 /**
@@ -78,43 +70,9 @@ export type RoleLadderController = Loadable<RoleView[]> & {
  * - `create`, `rename` and `remove` invalidate the list, and wait for the re-read.
  */
 export function useRoleLadder(): RoleLadderController {
-  const roles = useLoadable(useGetRolesQuery());
-  const { reload } = roles;
-  const [createRole] = useCreateRoleMutation();
-  const [renameRole] = useRenameRoleMutation();
-  const [reorderRoles] = useReorderRolesMutation();
-  const [deleteRole] = useDeleteRoleMutation();
-
-  return {
-    ...roles,
-    create: useCallback(
-      async (name: string) => {
-        await unwrapApi(createRole(name));
-        await reload();
-      },
-      [createRole, reload],
-    ),
-    rename: useCallback(
-      async (id: string, name: string) => {
-        await unwrapApi(renameRole({ id, name }));
-        await reload();
-      },
-      [renameRole, reload],
-    ),
-    reorder: useCallback(
-      async (orderedIds: string[]) => {
-        await unwrapApi(reorderRoles(orderedIds));
-      },
-      [reorderRoles],
-    ),
-    remove: useCallback(
-      async (id: string, reassignTo?: string) => {
-        await unwrapApi(deleteRole({ id, reassignTo }));
-        await reload();
-      },
-      [deleteRole, reload],
-    ),
-  };
+  // The ladder's commands are thunks in store/screens/roles.ts (DEC-R03); each lands in this
+  // same cache entry through the `Role` tags.
+  return useLoadable(useGetRolesQuery());
 }
 
 /* --------------------------------------------------------------- the grid */

@@ -16,6 +16,8 @@ import { opsApi } from '../store/api/opsApi.js';
 export function useBootOpsSession(): void {
   const dispatch = useAppDispatch();
 
+  // Effect (wiring): a 401 from a plain operator call signs the operator out.
+
   useEffect(() => {
     // A 401 from a PLAIN platform call (sign-out, an org action) lands here; one from a
     // query reaches `sessionExpiredMiddleware`. Either way an expired operator session

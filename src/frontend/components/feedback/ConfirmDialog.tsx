@@ -20,6 +20,8 @@ export function ConfirmDialog({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
+  // Effect (DOM): focus on open, and the keyboard (Escape cancels).
+
   useEffect(() => {
     if (confirmDisabled) cancelRef.current?.focus();
     else confirmRef.current?.focus();

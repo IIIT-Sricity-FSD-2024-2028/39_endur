@@ -5,31 +5,18 @@
 // (`store/api/endpoints/booking.ts`). Both still read the SAME `remaining` number from the
 // same server; neither computes it.
 //
-// Its commands are a hook now (`useBookableCommands`) rather than free functions, because a
-// command that goes through the store needs the store's `dispatch`. Each resolves with what
-// the server answered, as before, and re-reads what it changed by itself.
+// Reads only (DEC-R03). Creating, editing, opening, closing, deleting and cancelling somebody's
+// booking are thunks in `store/screens/booking.ts`; each re-reads what it changed through
+// the bookable's tag.
 import { useCallback } from 'react';
-import type {
-  BookableSummary,
-  BookingSummary,
-  CreateBookableBody,
-  PutSlotsBody,
-  UpdateBookableBody,
-} from '@endur/shared';
+import type { BookableSummary, BookingSummary } from '@endur/shared';
 import { ApiError } from './api.js';
 import {
-  useCancelBookingMutation,
-  useCloseBookableMutation,
-  useCreateBookableMutation,
-  useDeleteBookableMutation,
   useGetBookableQuery,
   useGetBookablesQuery,
   useGetBookingsQuery,
-  useOpenBookableMutation,
-  usePutSlotsMutation,
-  useUpdateBookableMutation,
 } from '../store/api/endpoints/booking.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import { useLoadable, type Loadable } from './query.js';
 
 /**
  * 403 and 402 are ANSWERS, not failures: the page renders each as its own state, so
@@ -99,48 +86,3 @@ export function useBookable(id: string | undefined): {
     reload,
   };
 }
-
-/** The list page's one command. Resolves with the new bookable, which the page opens. */
-export function useCreateBookable(): (body: CreateBookableBody) => Promise<BookableSummary> {
-  const [createBookable] = useCreateBookableMutation();
-  return useCallback((body: CreateBookableBody) => unwrapApi(createBookable(body)), [createBookable]);
-}
-
-export type BookableCommands = {
-  update: (body: UpdateBookableBody) => Promise<BookableSummary>;
-  putSlots: (body: PutSlotsBody) => Promise<BookableSummary>;
-  /** With the caller's idempotency key (`openKey`). */
-  open: (key: string) => Promise<BookableSummary>;
-  close: () => Promise<BookableSummary>;
-  remove: () => Promise<void>;
-  /** Somebody ELSE's booking — `booking.cancel`, and the only caller of that verb. */
-  cancelBooking: (bookingId: string) => Promise<void>;
-};
-
-/** The detail page's commands, for one bookable. */
-export function useBookableCommands(id: string): BookableCommands {
-  const [updateBookable] = useUpdateBookableMutation();
-  const [putSlots] = usePutSlotsMutation();
-  const [openBookable] = useOpenBookableMutation();
-  const [closeBookable] = useCloseBookableMutation();
-  const [deleteBookable] = useDeleteBookableMutation();
-  const [cancelBooking] = useCancelBookingMutation();
-
-  return {
-    update: useCallback((body: UpdateBookableBody) => unwrapApi(updateBookable({ id, body })), [id, updateBookable]),
-    putSlots: useCallback((body: PutSlotsBody) => unwrapApi(putSlots({ id, body })), [id, putSlots]),
-    open: useCallback((key: string) => unwrapApi(openBookable({ id, key })), [id, openBookable]),
-    close: useCallback(() => unwrapApi(closeBookable(id)), [id, closeBookable]),
-    remove: useCallback(() => unwrapApi(deleteBookable(id)), [id, deleteBookable]),
-    cancelBooking: useCallback(
-      (bookingId: string) => unwrapApi(cancelBooking({ bookingId, bookableId: id })),
-      [id, cancelBooking],
-    ),
-  };
-}
-
-/**
- * The idempotency key for opening one bookable. Derived from the id, so every press of
- * "Open" for it is the same request: the server answers a repeat with the first link.
- */
-export const openKey = (id: string): string => `bookable-open-${id}`;

@@ -31,6 +31,7 @@
     "audit:vocab": "node scripts/audit-vocab.mjs",
     "audit:drift": "node scripts/audit-drift.mjs",
     "audit:css": "node scripts/audit-css.mjs",
+    "audit:state": "node scripts/state-inventory.mjs",
     "format:check": "prettier --check .",
     "//test:e2e": "Rebuilds endur_e2e from nothing (scripts/e2e-db.mjs), then drives the real app in Chromium. First run on a machine: `npx playwright install chromium`.",
     "test:e2e": "node scripts/e2e-db.mjs && playwright test -c e2e/playwright.config.ts"

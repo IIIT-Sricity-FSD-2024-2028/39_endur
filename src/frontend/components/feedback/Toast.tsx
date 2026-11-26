@@ -11,6 +11,7 @@ export function Toast({
   undo?: (() => void) | undefined;
   onDismiss: () => void;
 }): JSX.Element {
+  // Effect (timer): the toast goes by itself after a while; the timer is a resource.
   useEffect(() => {
     const timer = window.setTimeout(onDismiss, DISMISS_MS);
     return () => window.clearTimeout(timer);

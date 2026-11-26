@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+// The strip a support session puts above everything. Its clock and "Leaving…" are
+// `state.chrome.support` (store/screens/chrome.ts); leaving is the `supportSessionLeft` thunk.
+import { useEffect } from 'react';
 import type { SupportContext } from '@endur/shared';
-import { useAppSelector } from '../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { selectSupportClock, supportClockTicked, supportSessionLeft } from '../../store/screens/chrome.js';
 import { Icon } from '../Icon.js';
-import { opsPost } from '../../lib/ops.js';
 
 export function minutesLeft(expiresAt: string, now: Date = new Date()): number {
   const remaining = new Date(expiresAt).getTime() - now.getTime();
@@ -31,22 +33,23 @@ export function SupportBanner(): JSX.Element | null {
 }
 
 function Strip({ support }: { support: SupportContext }): JSX.Element {
-  const [minutes, setMinutes] = useState(() => minutesLeft(support.expiresAt));
-  const [leaving, setLeaving] = useState(false);
+  const dispatch = useAppDispatch();
+  const { now, leaving } = useAppSelector(selectSupportClock);
+  const minutes = minutesLeft(support.expiresAt, new Date(now));
 
+  // The clock is a timer (a resource); each tick puts the time into the store. Once on
+  // mount, so a strip that appears later does not count from when the app started.
   useEffect(() => {
-    const timer = window.setInterval(() => setMinutes(minutesLeft(support.expiresAt)), 30_000);
+    dispatch(supportClockTicked());
+    const timer = window.setInterval(() => dispatch(supportClockTicked()), 30_000);
     return () => window.clearInterval(timer);
-  }, [support.expiresAt]);
+  }, [dispatch]);
 
+  // Even a failure means going back: the row is ended before anything else in
+  // `leaveSupport`, so if the call reached the server at all the access is already gone, and
+  // if it did not, `/ops` is still where the operator wants to be.
   const leave = (): void => {
-    setLeaving(true);
-    void opsPost('/support-session/leave', {})
-      .then(() => window.location.assign('/ops'))
-      // Even a failure means going back: the row is ended before anything else in
-      // `leaveSupport`, so if this call reached the server at all the access is already gone,
-      // and if it did not, `/ops` is still where the operator wants to be.
-      .catch(() => window.location.assign('/ops'));
+    void dispatch(supportSessionLeft()).then(() => window.location.assign('/ops'));
   };
 
   const operator = support.viewer === 'operator';

@@ -27,6 +27,8 @@ export function IndustryStep({
 }): JSX.Element {
   const selectedPreset = presets.find((p) => p.key === selected);
 
+  // Effect (DOM): the page takes the chosen industry's look (`data-vibe`).
+
   useEffect(() => {
     if (selected && VIBE_INDUSTRIES.has(selected)) {
       document.documentElement.dataset.vibe = selected;

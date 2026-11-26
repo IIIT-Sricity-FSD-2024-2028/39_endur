@@ -1,11 +1,8 @@
-import { useState } from 'react';
 import {
   PLAN_OPTIONS,
-  joinPricedFrom,
   tierRank,
   type BillingSummary,
   type PlanOption,
-  type Tier,
 } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { PlanPicker } from '../../../components/billing/PlanPicker.js';
@@ -16,16 +13,24 @@ import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
 import { ApiError } from '../../../lib/api.js';
 import { formatDate } from '../../../lib/format.js';
-import {
-  useBilling,
-  useCancelDowngrade,
-  useEnterpriseRequest,
-  useJoinTier,
-  usePlans,
-  useScheduleDowngrade,
-} from '../../../lib/billing.js';
+import { unwrapApi } from '../../../lib/query.js';
+import { useBilling, useEnterpriseRequestedAt, usePlans } from '../../../lib/billing.js';
 import { daysUntil } from '../../../components/billing/PlanNoticeBanner.js';
-import { toastShown, useAppDispatch } from '../../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  PLAN_FAILED,
+  checkoutClosed,
+  downgradeCancelled,
+  downgradeScheduled,
+  enterpriseAskClosed,
+  enterpriseNoteEdited,
+  enterpriseRequested,
+  planChosen,
+  planLeft,
+  selectPlan,
+  tierJoined,
+} from '../../../store/screens/plan.js';
 
 const tierName = (plan: PlanOption | undefined): string =>
   plan ? (plan.name.split('—')[0]?.trim() ?? plan.name) : 'a lower plan';
@@ -36,32 +41,23 @@ const STATUS_LABEL: Record<BillingSummary['status'], string> = {
   cancelled: 'Cancelled',
 };
 
+/**
+ * The plan. The summary and the catalogue are RTK Query reads; what is open, in flight or
+ * failed is `state.plan` (store/screens/plan.ts), and every button dispatches a thunk there.
+ */
 export default function Plan(): JSX.Element {
   const can = useCan();
   const labels = useLabels();
   const billing = useBilling();
   const plans = usePlans();
-  const join = useJoinTier();
-  const scheduleDowngrade = useScheduleDowngrade();
-  const cancelDowngrade = useCancelDowngrade();
-  const enterprise = useEnterpriseRequest();
+  const requestedAt = useEnterpriseRequestedAt();
+  const dispatch = useAppDispatch();
+  const { paying, busyTier, scheduling, asking, askNote, askSending, failure } =
+    useAppSelector(selectPlan);
+  useClearOnLeave(planLeft());
 
   const mayChange = can('billing.update');
-
-  const [busyTier, setBusyTier] = useState<Tier | null>(null);
-  const [scheduling, setScheduling] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const [askSending, setAskSending] = useState(false);
-  // What the checkout is for, and what it is priced from, fixed when it opens. Fixed rather than
-  // read from `summary` on each render, because a successful join replaces `summary` while the
-  // success screen is still up, and the amount on it must not change underneath the customer.
-  const [paying, setPaying] = useState<{ tier: Tier; pricedFrom: Tier | null } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const dispatch = useAppDispatch();
-  // The shell's ToastHost draws it (R-307); this page only says what happened.
-  const showToast = (message: string): void => {
-    dispatch(toastShown({ message }));
-  };
+  const error = failure ? messageOf(failure.error, PLAN_FAILED[failure.during]) : null;
 
   const summary = billing.data;
   const catalogue = plans.data ?? PLAN_OPTIONS;
@@ -71,69 +67,6 @@ export default function Plan(): JSX.Element {
         (plan) => plan.selectable && tierRank(plan.tier) < tierRank(summary.tier),
       )
     : [];
-
-  // Called by the checkout before it says "Payment successful", so a join the server refuses
-  // never reaches that screen. On a refusal the dialog closes and the reason is shown on the
-  // page; the rejection is passed on so the dialog knows not to celebrate.
-  const apply = (tier: Tier, paymentRef: string): Promise<void> => {
-    setBusyTier(tier);
-    setError(null);
-    return join(tier, paymentRef)
-      .then((updated) => {
-        billing.set(updated);
-        const name = catalogue.find((plan) => plan.tier === tier)?.name ?? tier;
-        showToast(`You are on ${name}. It applies from your next action.`);
-      })
-      .catch((failed: unknown) => {
-        setPaying(null);
-        setError(failed instanceof ApiError ? failed.message : 'Could not change the plan.');
-        throw failed;
-      })
-      .finally(() => setBusyTier(null));
-  };
-
-  const choose = (tier: Tier): void => {
-    if (!summary) return;
-    const plan = catalogue.find((option) => option.tier === tier);
-    if (plan && !plan.selectable) {
-      setAsking(true);
-      return;
-    }
-    if (summary.status !== 'trialing' && tierRank(tier) <= tierRank(summary.tier)) return;
-    setPaying({ tier, pricedFrom: joinPricedFrom(summary) });
-  };
-
-  const ask = (note: string): void => {
-    setAskSending(true);
-    setError(null);
-    void enterprise
-      .request(note)
-      .then(() => {
-        setAsking(false);
-        showToast('We have your request. Somebody from Endur will be in touch.');
-      })
-      .catch((failed: unknown) =>
-        setError(failed instanceof ApiError ? failed.message : 'Could not send that request.'))
-      .finally(() => setAskSending(false));
-  };
-
-  const schedule = (tier: Tier | null): void => {
-    setScheduling(true);
-    setError(null);
-    void (tier === null ? cancelDowngrade() : scheduleDowngrade(tier))
-      .then((updated) => {
-        billing.set(updated);
-        const name = catalogue.find((plan) => plan.tier === updated.pendingTier)?.name;
-        showToast(
-          name
-            ? `${name} is scheduled for ${formatDate(updated.periodEnd)}. Nothing is charged today.`
-            : 'That move is cancelled. Your plan stays as it is.',
-        );
-      })
-      .catch((failed: unknown) =>
-        setError(failed instanceof ApiError ? failed.message : 'Could not schedule that move.'))
-      .finally(() => setScheduling(false));
-  };
 
   if (billing.loading) {
     return (
@@ -298,7 +231,7 @@ export default function Plan(): JSX.Element {
                       type="button"
                       className="btn btn-ghost btn-sm"
                       disabled={scheduling}
-                      onClick={() => schedule(null)}
+                      onClick={() => void dispatch(downgradeCancelled())}
                     >
                       Cancel
                     </button>
@@ -315,7 +248,7 @@ export default function Plan(): JSX.Element {
                         type="button"
                         className="btn btn-ghost btn-sm"
                         disabled={scheduling}
-                        onClick={() => schedule(plan.tier)}
+                        onClick={() => void dispatch(downgradeScheduled(plan.tier))}
                       >
                         Move to {tierName(plan)}
                       </button>
@@ -348,10 +281,10 @@ export default function Plan(): JSX.Element {
             current={summary.tier}
             mode="join"
             busyTier={busyTier}
-            requestedTier={enterprise.requestedAt ? 'enterprise' : null}
+            requestedTier={requestedAt ? 'enterprise' : null}
             actions={mayChange}
             belowIsLive={summary.status === 'trialing'}
-            onSelect={choose}
+            onSelect={(tier) => dispatch(planChosen(tier))}
           />
 
           {!mayChange && (
@@ -368,18 +301,22 @@ export default function Plan(): JSX.Element {
           plan={buying}
           mode="change"
           fromTier={paying.pricedFrom}
-          onPaid={(reference) => apply(buying.tier, reference)}
-          onDone={() => setPaying(null)}
-          onCancel={() => setPaying(null)}
+          // "Payment successful" waits for this promise; a refusal rejects it, the checkout
+          // closes (`tierJoined.rejected`) and the reason shows above the picker.
+          onPaid={(paymentRef) => unwrapApi(dispatch(tierJoined({ tier: buying.tier, paymentRef })))}
+          onDone={() => dispatch(checkoutClosed())}
+          onCancel={() => dispatch(checkoutClosed())}
         />
       )}
 
       {asking && (
         <EnterpriseRequestDialog
           plan={catalogue.find((plan) => plan.tier === 'enterprise') ?? PLAN_OPTIONS[3]!}
+          note={askNote}
           sending={askSending}
-          onSend={ask}
-          onCancel={() => setAsking(false)}
+          onNoteChange={(note) => dispatch(enterpriseNoteEdited({ note }))}
+          onSend={() => void dispatch(enterpriseRequested())}
+          onCancel={() => dispatch(enterpriseAskClosed())}
         />
       )}
     </>

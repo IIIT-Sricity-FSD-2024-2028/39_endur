@@ -1,6 +1,7 @@
-import { useState } from 'react';
+// `/app/reflect`. The cycles, the form and the gap are RTK Query reads, and the open cycle is
+// the URL's (`?campaign=`). Your answers, the plan being written and every write are
+// `state.reflect` (store/screens/reflect.ts).
 import { Link, useSearchParams } from 'react-router-dom';
-import type { AnswerValue, PlanItem } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { UpgradeCard } from '../../../components/billing/UpgradeCard.js';
@@ -9,16 +10,24 @@ import { GapBar } from '../../../components/data/GapBar.js';
 import { Icon } from '../../../components/Icon.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
+import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { formatDate } from '../../../lib/format.js';
-import { ApiError } from '../../../lib/api.js';
+import { useCycles, useGap, useReflectionForm } from '../../../lib/reflect.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
 import {
-  finalisePlan,
-  savePlan,
-  submitReflection,
-  useCycles,
-  useGap,
-  useReflectionForm,
-} from '../../../lib/reflect.js';
+  EMPTY_PLAN,
+  finaliseAsked,
+  finaliseDismissed,
+  planFinalised,
+  planLineAdded,
+  planLineEdited,
+  planSaved,
+  reflectCycleLeft,
+  reflectionAnswered,
+  reflectionSubmitted,
+  selectReflectPage,
+} from '../../../store/screens/reflect.js';
 
 const STATUS: Record<string, { label: string; className: string }> = {
   due: { label: 'Your turn', className: 'tag tag-warn' },
@@ -36,6 +45,8 @@ export default function Reflect(): JSX.Element {
   const cycles = useCycles(can('reflection.read'));
   const form = useReflectionForm(open);
   const gap = useGap(open);
+  // Leaving a cycle (for the list, another cycle, or another page) drops its drafts.
+  useClearOnLeave(reflectCycleLeft({ campaignId: open }));
 
   const select = (campaignId: string | null): void => {
     const next = new URLSearchParams(params);
@@ -94,7 +105,7 @@ export default function Reflect(): JSX.Element {
         {/* THE ORDER. The form until it is submitted, the gap after — decided by what the
             server returned, never by a flag this page keeps. */}
         {gap.locked ? (
-          <ReflectionForm campaignId={open} form={form} onDone={() => void gap.reload()} />
+          <ReflectionForm campaignId={open} form={form} />
         ) : (
           <GapPanel campaignId={open} gap={gap} />
         )}
@@ -146,15 +157,14 @@ export default function Reflect(): JSX.Element {
 function ReflectionForm({
   campaignId,
   form,
-  onDone,
 }: {
   campaignId: string;
   form: ReturnType<typeof useReflectionForm>;
-  onDone: () => void;
 }): JSX.Element {
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const page = useAppSelector((state) => selectReflectPage(state, campaignId));
+  const { answers, saving } = page;
+  const error = messageOf(page.formError, 'That did not save.');
 
   if (form.loading) return <p className="text-muted">Loading…</p>;
   if (!form.data) return <p className="form-error" role="alert">That cycle is not here.</p>;
@@ -167,22 +177,7 @@ function ReflectionForm({
     required: question.required,
     position: question.position,
   }));
-
-  const submit = async (): Promise<void> => {
-    setSaving(true);
-    setError(null);
-    try {
-      await submitReflection(campaignId, {
-        subjectId: form.data?.subjectId ?? '',
-        answers: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
-      });
-      onDone();
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'That did not save.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const subjectId = form.data.subjectId;
 
   return (
     <section className="card panel reflect-form">
@@ -200,14 +195,20 @@ function ReflectionForm({
           key={question.id}
           question={question}
           value={answers[question.id]}
-          onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
+          onChange={(value) =>
+            dispatch(reflectionAnswered({ campaignId, questionId: question.id, value }))}
         />
       ))}
       {error && <p className="form-error" role="alert">{error}</p>}
       <p className="text-meta">
         You can only record this once — it is what your results are compared against.
       </p>
-      <button type="button" className="btn btn-primary" onClick={() => void submit()} disabled={saving}>
+      <button
+        type="button"
+        className="btn btn-primary"
+        onClick={() => void dispatch(reflectionSubmitted({ campaignId, subjectId }))}
+        disabled={saving}
+      >
         {saving ? 'Saving…' : 'Record my assessment'}
       </button>
     </section>
@@ -221,44 +222,19 @@ function GapPanel({
   campaignId: string;
   gap: ReturnType<typeof useGap>;
 }): JSX.Element {
-  const [items, setItems] = useState<PlanItem[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const page = useAppSelector((state) => selectReflectPage(state, campaignId));
+  const busy = page.planBusy;
+  const error = messageOf(page.planError, 'That did not save.');
 
   if (gap.loading) return <p className="text-muted">Loading…</p>;
   if (!gap.data) return <p className="form-error" role="alert">That cycle is not here.</p>;
 
   const view = gap.data;
   const plan = view.plan;
-  const draft = items ?? plan?.items ?? [{ text: '', status: 'open' as const }];
+  // What the editor shows: the draft once somebody edits, the saved plan until then.
+  const draft = page.planItems ?? plan?.items ?? EMPTY_PLAN;
   const finalised = plan?.finalisedAt != null;
-
-  const write = async (): Promise<void> => {
-    setBusy(true);
-    setError(null);
-    try {
-      await savePlan(campaignId, { items: draft.filter((item) => item.text.trim().length > 0) });
-      setItems(null);
-      await gap.reload();
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'That did not save.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const seal = async (): Promise<void> => {
-    if (!plan) return;
-    setBusy(true);
-    try {
-      await finalisePlan(plan.id);
-      await gap.reload();
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'That did not save.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <>
@@ -320,24 +296,14 @@ function GapPanel({
                   value={item.text}
                   placeholder="One thing you will change"
                   onChange={(event) =>
-                    setItems(
-                      draft.map((row, at) =>
-                        at === index ? { ...row, text: event.target.value } : row,
-                      ),
-                    )
-                  }
+                    dispatch(planLineEdited({ campaignId, index, patch: { text: event.target.value }, from: draft }))}
                 />
                 <input
                   type="date"
                   className="input"
                   value={item.dueAt ?? ''}
                   onChange={(event) =>
-                    setItems(
-                      draft.map((row, at) =>
-                        at === index ? { ...row, dueAt: event.target.value } : row,
-                      ),
-                    )
-                  }
+                    dispatch(planLineEdited({ campaignId, index, patch: { dueAt: event.target.value }, from: draft }))}
                 />
               </div>
             ))}
@@ -345,15 +311,25 @@ function GapPanel({
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => setItems([...draft, { text: '', status: 'open' }])}
+                onClick={() => dispatch(planLineAdded({ campaignId, from: draft }))}
               >
                 <Icon name="add" size={16} /> Add another
               </button>
-              <button type="button" className="btn btn-secondary" onClick={() => void write()} disabled={busy}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void dispatch(planSaved({ campaignId, from: draft }))}
+                disabled={busy}
+              >
                 Save plan
               </button>
               {plan && (
-                <button type="button" className="btn btn-primary" onClick={() => void seal()} disabled={busy}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => dispatch(finaliseAsked({ campaignId }))}
+                  disabled={busy}
+                >
                   Finalise
                 </button>
               )}
@@ -366,6 +342,16 @@ function GapPanel({
           </>
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
+
+        {page.confirmingFinalise && plan && (
+          <ConfirmDialog
+            title="Finalise this plan?"
+            consequence="It becomes a record of what you said you would do, and cannot be edited afterwards."
+            verb="Finalise"
+            onConfirm={() => void dispatch(planFinalised({ campaignId, planId: plan.id }))}
+            onCancel={() => dispatch(finaliseDismissed({ campaignId }))}
+          />
+        )}
 
         {(plan?.checkins ?? []).length > 0 && (
           <div className="checkin-list">

@@ -8,6 +8,7 @@ import type { TemplateDetail, TemplateSummary } from '@endur/shared';
 import { setupStore, type AppStore } from '../store/index.js';
 import { errorReply, stubApi } from '../test-utils.js';
 import { ApiError } from './api.js';
+import { templateCopied, templateDeleted } from '../store/screens/templates.js';
 import { useTemplate, useTemplateLibrary, useTemplates } from './templates.js';
 
 const summary = (id: string, name: string): TemplateSummary => ({
@@ -41,17 +42,22 @@ describe('useTemplateLibrary', () => {
 });
 
 describe('useTemplates: the list refreshes itself (tag invalidation)', () => {
-  it('remove() deletes, and the list refetches without anybody calling reload', async () => {
+  // The commands are thunks over RTK Query (store/screens/templates.ts); what matters here
+  // is that the list they change re-reads by itself, through the tags.
+  it('a delete re-reads the list without anybody calling reload', async () => {
     const calls = stubApi({
       'GET /templates': (_call, count) => ({
         body: { data: count === 1 ? [summary('t1', 'One'), summary('t2', 'Two')] : [summary('t2', 'Two')], nextCursor: null },
       }),
       'DELETE /templates/t1': { status: 204 },
     });
-    const { result } = render(() => useTemplates());
+    const store = setupStore();
+    const { result } = render(() => useTemplates(), store);
     await waitFor(() => expect(result.current.data?.data).toHaveLength(2));
 
-    await act(async () => { await result.current.remove('t1'); });
+    await act(async () => {
+      await store.dispatch(templateDeleted({ templateId: 't1', name: 'One', from: 'card' }));
+    });
 
     await waitFor(() => expect(result.current.data?.data.map((row) => row.id)).toEqual(['t2']));
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
@@ -59,34 +65,44 @@ describe('useTemplates: the list refreshes itself (tag invalidation)', () => {
     ]);
   });
 
-  it('clone() sends the caller\'s idempotency key, returns the new template, and the list refetches', async () => {
+  it('a copy sends an idempotency key per attempt, returns the new template, and the list re-reads', async () => {
     const calls = stubApi({
       'GET /templates': { body: { data: [], nextCursor: null } },
       'POST /templates/l1/clone': { body: { data: detail('t9', 'Stay feedback (copy)') } },
     });
-    const { result } = render(() => useTemplates());
+    const store = setupStore();
+    const { result } = render(() => useTemplates(), store);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    let created: TemplateDetail | undefined;
-    await act(async () => { created = await result.current.clone('l1', 'clone:l1:abc'); });
+    let created: unknown;
+    await act(async () => {
+      created = (await store.dispatch(templateCopied({ templateId: 'l1', from: 'card' }))).payload;
+    });
+    await act(async () => {
+      await store.dispatch(templateCopied({ templateId: 'l1', from: 'card' }));
+    });
 
-    expect(created?.id).toBe('t9');
-    const post = calls.find((call) => call.method === 'POST');
-    expect(post?.headers.get('Idempotency-Key')).toBe('clone:l1:abc');
-    await waitFor(() => expect(calls.filter((call) => call.path === '/templates')).toHaveLength(2));
+    expect((created as TemplateDetail).id).toBe('t9');
+    // A key carries the template it belongs to, and two presses are two copies: the key
+    // exists for the RETRY of one press, which the server answers with the first response.
+    const keys = calls.filter((call) => call.method === 'POST').map((call) => call.headers.get('Idempotency-Key'));
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toMatch(/^clone:l1:/);
+    expect(keys[0]).not.toBe(keys[1]);
+    await waitFor(() => expect(calls.filter((call) => call.path === '/templates').length).toBeGreaterThanOrEqual(2));
   });
 
-  it('a failed mutation throws an ApiError the page can read', async () => {
+  it('a refused command lands on the card, in the server\'s words', async () => {
     stubApi({
       'GET /templates': { body: { data: [], nextCursor: null } },
       'DELETE /templates/t1': errorReply(409, 'CONFLICT', 'That template is used by 2 campaigns.'),
     });
-    const { result } = render(() => useTemplates());
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    const failure = await result.current.remove('t1').catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(ApiError);
-    expect((failure as ApiError).message).toBe('That template is used by 2 campaigns.');
+    const store = setupStore();
+    await act(async () => {
+      await store.dispatch(templateDeleted({ templateId: 't1', name: 'One', from: 'card' }));
+    });
+    const failed = store.getState().templates?.cardError;
+    expect(failed).toMatchObject({ id: 't1', during: 'delete', error: { message: 'That template is used by 2 campaigns.' } });
   });
 
   it('keeps the last good page on screen when a reload fails, with the error beside it', async () => {

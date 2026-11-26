@@ -12,6 +12,7 @@ import type {
   CreateCampaignBody,
   LaunchResult,
   Page,
+  QuickCampaignBody,
   UpdateCampaignBody,
 } from '@endur/shared';
 import { api } from '../api.js';
@@ -65,6 +66,22 @@ export const campaignsApi = api.injectEndpoints({
       }),
       transformResponse: unwrap<LaunchResult>,
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Campaign', id }, LIST, HOME],
+    }),
+
+    /**
+     * A poll or a suggestion box, created AND launched in one call (`DEC-088`, `DEC-089`).
+     * It mints a public token, so it carries an idempotency key like launch: a double press
+     * must not make two links. The answer is the launched campaign.
+     */
+    quickCreateCampaign: build.mutation<CampaignDetail, { body: QuickCampaignBody; key: string }>({
+      query: ({ body, key }) => ({
+        url: '/campaigns/quick',
+        method: 'POST',
+        body,
+        idempotencyKey: key,
+      }),
+      transformResponse: unwrap<CampaignDetail>,
+      invalidatesTags: [LIST, HOME],
     }),
 
     closeCampaign: build.mutation<CampaignDetail, string>({

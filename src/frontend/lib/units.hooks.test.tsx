@@ -9,6 +9,7 @@ import { setupStore } from '../store/index.js';
 import { errorReply, heldReply, stubApi, type StubCall } from '../test-utils.js';
 import { ApiError } from './api.js';
 import { useUnitComposition, useUnits } from './units.js';
+import { unitRenamed, unitReparented } from '../store/screens/structure.js';
 
 const node = (id: string, name: string, children: UnitNode[] = []): UnitNode =>
   ({ id, name, parentId: null, isTemporary: false, endsAt: null, children } as unknown as UnitNode);
@@ -46,11 +47,14 @@ describe('useUnits', () => {
   it('a rename shows at once, before the server answers', async () => {
     const reply = heldReply({ body: { data: node('u2', 'Ward Four') } });
     const calls = stubApi({ 'GET /units': tree(), 'PATCH /units/u2': () => reply.promise });
-    const { result } = render(() => useUnits());
+    const { result, store } = render(() => useUnits());
     await waitFor(() => expect(childName(result.current.data)).toBe('Ward 4'));
 
-    let renamed!: Promise<void>;
-    act(() => { renamed = result.current.rename('u2', 'Ward Four'); });
+    // The Structure page's command: a thunk over the rename mutation (store/screens/structure.ts).
+    let renamed!: Promise<unknown>;
+    act(() => {
+      renamed = store.dispatch(unitRenamed({ rowId: 'u2', name: 'Ward Four', failure: 'not saved' }));
+    });
 
     // Still waiting on the server, and the tree already says it.
     await waitFor(() => expect(childName(result.current.data)).toBe('Ward Four'));
@@ -60,21 +64,21 @@ describe('useUnits', () => {
     expect(gets(calls)).toHaveLength(1);
   });
 
-  it('a refused rename puts the old name back, and throws the server\'s reason', async () => {
+  it('a refused rename puts the old name back, and says the server\'s reason under the row', async () => {
     stubApi({
       'GET /units': tree(),
       'PATCH /units/u2': errorReply(409, 'CONFLICT', 'A unit with that name already exists here.'),
     });
-    const { result } = render(() => useUnits());
+    const { result, store } = render(() => useUnits());
     await waitFor(() => expect(childName(result.current.data)).toBe('Ward 4'));
 
-    let failure: unknown;
     await act(async () => {
-      failure = await result.current.rename('u2', 'Ward 5').catch((error: unknown) => error);
+      await store.dispatch(unitRenamed({ rowId: 'u2', name: 'Ward 5', failure: 'not saved' }));
     });
 
-    expect(failure).toBeInstanceOf(ApiError);
-    expect((failure as ApiError).message).toBe('A unit with that name already exists here.');
+    expect(store.getState().structure?.rowMessage).toEqual({
+      id: 'u2', text: 'A unit with that name already exists here.',
+    });
     await waitFor(() => expect(childName(result.current.data)).toBe('Ward 4'));
   });
 
@@ -89,12 +93,14 @@ describe('useUnits', () => {
         return { body: { data: { ok: true } } };
       },
     });
-    const { result } = render(() => useUnits());
+    const { result, store } = render(() => useUnits());
     await waitFor(() => expect(result.current.data).toHaveLength(1));
 
-    await act(async () => { await result.current.reparent('u2', null); });
+    await act(async () => {
+      await store.dispatch(unitReparented({ rowId: 'u2', newParentId: null, failure: 'not moved' }));
+    });
 
-    expect(result.current.data?.map((unit) => unit.id)).toEqual(['u1', 'u2']);
+    await waitFor(() => expect(result.current.data?.map((unit) => unit.id)).toEqual(['u1', 'u2']));
     expect(gets(calls)).toHaveLength(2);
   });
 

@@ -1,19 +1,28 @@
-import { useState } from 'react';
+// `/app/announcements`. The list is an RTK Query read shared with Home's banner; the
+// composer, the confirmations and every write are `state.announcements`
+// (store/screens/announcements.ts).
 import { Link } from 'react-router-dom';
 import type { AnnouncementSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { Icon } from '../../../components/Icon.js';
-import { ApiError } from '../../../lib/api.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDate } from '../../../lib/format.js';
+import { useAnnouncements } from '../../../lib/announcements.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
 import {
-  deleteAnnouncement,
-  publishAnnouncement,
-  publishKey,
-  useAnnouncements,
-} from '../../../lib/announcements.js';
+  announcementDeleted,
+  announcementPublished,
+  announcementsLeft,
+  composerOpened,
+  publishConfirmClosed,
+  publishConfirmOpened,
+  removeConfirmClosed,
+  removeConfirmOpened,
+  selectAnnouncementsScreen,
+} from '../../../store/screens/announcements.js';
 import { Composer } from './Composer.js';
 
 export function readLine(announcement: AnnouncementSummary): string {
@@ -32,21 +41,17 @@ export default function Announcements(): JSX.Element {
   const canPublish = can('announcement.publish');
   const canDelete = can('announcement.delete');
 
-  const [composing, setComposing] = useState(false);
-  const [editing, setEditing] = useState<AnnouncementSummary | null>(null);
-  const [publishing, setPublishing] = useState<AnnouncementSummary | null>(null);
-  const [removing, setRemoving] = useState<AnnouncementSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const screenState = useAppSelector(selectAnnouncementsScreen);
+  useClearOnLeave(announcementsLeft());
 
   const rows = list.rows;
-
-  const act = (work: Promise<unknown>): void => {
-    setError(null);
-    void work
-      .then(() => list.reload())
-      .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : 'That did not work.');
-      });
+  const composing = screenState.composer !== null;
+  const publishing = rows.find((row) => row.id === screenState.publishingId) ?? null;
+  const removing = rows.find((row) => row.id === screenState.removingId) ?? null;
+  const error = messageOf(screenState.failure, 'That did not work.');
+  const compose = (): void => {
+    dispatch(composerOpened({ editing: null }));
   };
 
   if (list.forbidden) {
@@ -72,10 +77,7 @@ export default function Announcements(): JSX.Element {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => {
-                setEditing(null);
-                setComposing(true);
-              }}
+              onClick={compose}
             >
               <Icon name="add" size={18} /> New announcement
             </button>
@@ -121,10 +123,7 @@ export default function Announcements(): JSX.Element {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => {
-                  setEditing(null);
-                  setComposing(true);
-                }}
+                onClick={compose}
               >
                 Write one
               </button>
@@ -135,6 +134,7 @@ export default function Announcements(): JSX.Element {
         <div className="cgrid">
           {rows.map((announcement) => {
             const published = announcement.publishedAt !== null;
+            const working = screenState.workingId === announcement.id;
             return (
               <article className="card ccard" key={announcement.id}>
                 <div className="ccard-top">
@@ -160,10 +160,8 @@ export default function Announcements(): JSX.Element {
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        onClick={() => {
-                          setEditing(announcement);
-                          setComposing(true);
-                        }}
+                        disabled={working}
+                        onClick={() => dispatch(composerOpened({ editing: announcement }))}
                       >
                         Edit
                       </button>
@@ -175,8 +173,10 @@ export default function Announcements(): JSX.Element {
                       <button
                         type="button"
                         className="btn btn-primary"
-                        onClick={() => setPublishing(announcement)}
+                        disabled={working}
+                        onClick={() => dispatch(publishConfirmOpened({ id: announcement.id }))}
                       >
+                        {working && <span className="spinner" aria-hidden="true" />}
                         Publish
                       </button>
                     )}
@@ -184,7 +184,8 @@ export default function Announcements(): JSX.Element {
                       <button
                         type="button"
                         className="btn btn-ghost"
-                        onClick={() => setRemoving(announcement)}
+                        disabled={working}
+                        onClick={() => dispatch(removeConfirmOpened({ id: announcement.id }))}
                       >
                         Delete
                       </button>
@@ -204,32 +205,15 @@ export default function Announcements(): JSX.Element {
         </p>
       )}
 
-      {composing && (
-        <Composer
-          editing={editing}
-          onCancel={() => {
-            setComposing(false);
-            setEditing(null);
-          }}
-          onSaved={() => {
-            setComposing(false);
-            setEditing(null);
-            void list.reload();
-          }}
-        />
-      )}
+      {composing && <Composer />}
 
       {publishing && (
         <ConfirmDialog
           title="Publish this announcement?"
           consequence={`It goes to everyone that audience resolves to right now, and the wording is frozen afterwards. ${publishing.title}`}
           verb="Publish"
-          onCancel={() => setPublishing(null)}
-          onConfirm={() => {
-            const target = publishing;
-            setPublishing(null);
-            act(publishAnnouncement(target.id, publishKey(target.id)));
-          }}
+          onCancel={() => dispatch(publishConfirmClosed())}
+          onConfirm={() => void dispatch(announcementPublished(publishing.id))}
         />
       )}
 
@@ -239,12 +223,8 @@ export default function Announcements(): JSX.Element {
           consequence={`"${removing.title}" is removed. It has not been sent to anybody, so nobody will notice.`}
           verb="Delete"
           destructive
-          onCancel={() => setRemoving(null)}
-          onConfirm={() => {
-            const target = removing;
-            setRemoving(null);
-            act(deleteAnnouncement(target.id));
-          }}
+          onCancel={() => dispatch(removeConfirmClosed())}
+          onConfirm={() => void dispatch(announcementDeleted(removing.id))}
         />
       )}
     </>

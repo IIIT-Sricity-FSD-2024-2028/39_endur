@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { StatWindows, type HomeView, type StatWindow } from '@endur/shared';
+import { StatWindows } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { StatCard } from '../../../components/data/StatCard.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
@@ -10,26 +9,39 @@ import { AnnouncementBanner, unreadFor } from '../../../components/org/Announcem
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useHome } from '../../../lib/home.js';
-import { markAnnouncementRead, useAnnouncements } from '../../../lib/announcements.js';
+import { useAnnouncements } from '../../../lib/announcements.js';
 import { useAnswered, useWaiting } from '../../../lib/waiting.js';
-import { useAppSelector } from '../../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  announcementDismissed,
+  homeLeft,
+  homeRangeChosen,
+  homeShareClosed,
+  homeShareOpened,
+  selectDismissed,
+  selectHomeRange,
+  selectHomeSharingId,
+} from '../../../store/screens/home.js';
 import { RANGE_LABEL, promptCopy, statCards } from './cards.js';
 import { CampaignCard } from './CampaignCard.js';
 import { Recent } from './Recent.js';
 import { Waiting } from './Waiting.js';
 import { Answered } from './Answered.js';
 
-type Campaign = NonNullable<HomeView['activeCampaigns']>[number];
-
 export default function Home(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
   const org = useAppSelector((state) => state.auth.org);
-  const [range, setRange] = useState<StatWindow>('30d');
+  // What the reader is doing here is `state.home` (store/screens/home.ts); what they are
+  // looking at is the cache. docs/REDUX-PLAN.md §6.10.
+  const dispatch = useAppDispatch();
+  const range = useAppSelector(selectHomeRange);
+  const sharingId = useAppSelector(selectHomeSharingId);
+  const dismissed = useAppSelector(selectDismissed);
+  useClearOnLeave(homeLeft());
   const home = useHome(range);
-  const [sharing, setSharing] = useState<Campaign | null>(null);
   const announcements = useAnnouncements(can('announcement.read'));
-  const [dismissed, setDismissed] = useState<string[]>([]);
   const waiting = useWaiting();
   const answered = useAnswered();
 
@@ -57,6 +69,7 @@ export default function Home(): JSX.Element {
 
   const campaigns = view.activeCampaigns;
   const comments = view.recentComments;
+  const sharing = campaigns?.find((campaign) => campaign.id === sharingId) ?? null;
   const readsNothing = campaigns === undefined && comments === undefined;
   const isNew =
     !readsNothing && view.stats.responsesEver === 0 && (campaigns?.length ?? 0) === 0;
@@ -88,10 +101,7 @@ export default function Home(): JSX.Element {
           with no campaigns and no comments is exactly the person an announcement is for. */}
       <AnnouncementBanner
         items={unreadFor(announcements.rows.filter((row) => !dismissed.includes(row.id)))}
-        onDismiss={(id) => {
-          setDismissed((current) => [...current, id]);
-          void markAnnouncementRead(id).catch(() => undefined);
-        }}
+        onDismiss={(id) => void dispatch(announcementDismissed(id))}
       />
 
       {/* Forms this person is asked to answer, under the announcements and above the
@@ -156,7 +166,7 @@ export default function Home(): JSX.Element {
                       type="radio"
                       name="range"
                       checked={range === option}
-                      onChange={() => setRange(option)}
+                      onChange={() => dispatch(homeRangeChosen({ range: option }))}
                     />
                     <span>{RANGE_LABEL[option]}</span>
                   </label>
@@ -200,7 +210,7 @@ export default function Home(): JSX.Element {
                         key={campaign.id}
                         campaign={campaign}
                         subjectWord={labels.subject.one}
-                        onShare={() => setSharing(campaign)}
+                        onShare={() => dispatch(homeShareOpened({ campaignId: campaign.id }))}
                       />
                     ))}
                   </ul>
@@ -236,7 +246,7 @@ export default function Home(): JSX.Element {
           endsAt={sharing.endsAt}
           anonymous={sharing.anonymous}
           access={sharing.access}
-          onClose={() => setSharing(null)}
+          onClose={() => dispatch(homeShareClosed())}
         />
       )}
     </>

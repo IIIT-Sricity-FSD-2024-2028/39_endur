@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { QuestionCard } from '../../../components/form/QuestionCard.js';
@@ -7,7 +6,12 @@ import { useCan } from '../../../lib/capabilities.js';
 import { useLabels } from '../../../lib/labels.js';
 import { ApiError } from '../../../lib/api.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
-import { cloneKey, useCloneTemplate } from '../../../lib/templates.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  formDuplicated,
+  questionCardOpened,
+  selectBuilderPage,
+} from '../../../store/screens/builderPage.js';
 import { useAppDispatch, useAppSelector } from '../../../store/index.js';
 import {
   questionAdded,
@@ -49,8 +53,6 @@ function BuilderPage(): JSX.Element {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const builder = useBuilder(id);
-  // Clone only. The builder has no use for the template LIST, so it does not load it.
-  const cloneTemplate = useCloneTemplate();
 
   // The draft and everything derived from it come from the builder slice. Each selector is
   // its own subscription, so typing in a question re-renders what reads the draft and
@@ -61,8 +63,15 @@ function BuilderPage(): JSX.Element {
   const canUndo = useAppSelector(selectCanUndo);
   const canRedo = useAppSelector(selectCanRedo);
 
-  const [openAt, setOpenAt] = useState<number | null>(0);
-  const [cloning, setCloning] = useState(false);
+  // Which card is open, and Duplicate, are `state.builderPage` (store/screens/builderPage.ts):
+  // it follows the builder's own events, so a duplicated question opens its copy by itself.
+  const page = useAppSelector(selectBuilderPage);
+  const openAt = page.openAt;
+  const cloning = page.duplicating;
+  const duplicateError = messageOf(page.duplicateError, 'That could not be duplicated.');
+  const setOpenAt = (index: number): void => {
+    dispatch(questionCardOpened({ index }));
+  };
 
   const editable = can('template.update') && !locked;
 
@@ -76,7 +85,6 @@ function BuilderPage(): JSX.Element {
 
   const duplicate = (at: number): void => {
     dispatch(questionDuplicated({ index: at }));
-    setOpenAt(at + 1);
   };
 
   const remove = (at: number): void => {
@@ -91,22 +99,19 @@ function BuilderPage(): JSX.Element {
         undo: questionRestored({ templateId: id, at, question }),
       }),
     );
-    setOpenAt(null);
   };
 
   const move = (at: number, direction: -1 | 1): void => {
     const to = at + direction;
     if (to < 0 || to >= draft.questions.length) return;
     dispatch(questionMoved({ from: at, to }));
-    if (openAt === at) setOpenAt(to);
   };
 
   const duplicateTemplate = (): void => {
     if (!id) return;
-    setCloning(true);
-    void cloneTemplate(id, cloneKey(id), `${draft.name} (copy)`)
-      .then((created) => navigate(`/app/forms/${created.id}/build`))
-      .finally(() => setCloning(false));
+    void dispatch(formDuplicated({ templateId: id, name: draft.name })).then((result) => {
+      if (formDuplicated.fulfilled.match(result)) navigate(`/app/forms/${result.payload.id}/build`);
+    });
   };
 
   if (builder.loading) {
@@ -119,7 +124,7 @@ function BuilderPage(): JSX.Element {
     );
   }
 
-  if (builder.loadError || !builder.template) {
+  if (builder.loadError || !builder.ready) {
     return (
       <div className="fullpage">
         <div>
@@ -195,6 +200,8 @@ function BuilderPage(): JSX.Element {
               {cloning ? 'Duplicating…' : 'Duplicate to edit'}
             </button>
           )}
+          {/* Said where it was pressed: a duplicate that failed used to do nothing at all. */}
+          {duplicateError && <p className="form-error" role="alert">{duplicateError}</p>}
         </div>
       )}
 

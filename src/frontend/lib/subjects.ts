@@ -5,24 +5,10 @@
 // row would turn an 18-row list into 19 requests and venue wifi gets a vote (35).
 //
 // On RTK Query since R-405 (`store/api/endpoints/subjects.ts`). Names and shapes unchanged.
-import { useCallback } from 'react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import type {
-  CreateSubjectBody,
-  Page,
-  SubjectDetail,
-  SubjectSummary,
-  UpdateSubjectBody,
-} from '@endur/shared';
-import {
-  useArchiveSubjectMutation,
-  useCreateSubjectMutation,
-  useGetSubjectQuery,
-  useGetSubjectsQuery,
-  useRenameSubjectMutation,
-  useUpdateSubjectMutation,
-} from '../store/api/endpoints/subjects.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import type { Page, SubjectDetail, SubjectSummary } from '@endur/shared';
+import { useGetSubjectQuery, useGetSubjectsQuery } from '../store/api/endpoints/subjects.js';
+import { useLoadable, type Loadable } from './query.js';
 
 export type SubjectQuery = {
   q?: string | undefined;
@@ -33,10 +19,6 @@ export type SubjectQuery = {
 
 export type SubjectListController = Loadable<Page<SubjectSummary>> & {
   reload: () => Promise<void>;
-  create: (body: CreateSubjectBody) => Promise<SubjectSummary>;
-  rename: (id: string, name: string) => Promise<void>;
-  update: (id: string, body: UpdateSubjectBody) => Promise<void>;
-  archive: (id: string) => Promise<void>;
 };
 
 /** The query string, built once so the cache key is a string rather than an object. */
@@ -63,50 +45,9 @@ export function subjectSearch(query: SubjectQuery): string {
  */
 /** `enabled: false` asks nothing: a page that only sometimes shows the list (Inbox's filters). */
 export function useSubjectList(query: SubjectQuery, enabled = true): SubjectListController {
-  const list = useLoadable(useGetSubjectsQuery(enabled ? subjectSearch(query) : skipToken));
-  const { reload } = list;
-  const [createSubject] = useCreateSubjectMutation();
-  const [renameSubject] = useRenameSubjectMutation();
-  const [updateSubject] = useUpdateSubjectMutation();
-  const [archiveSubject] = useArchiveSubjectMutation();
-
-  const create = useCallback(
-    async (body: CreateSubjectBody) => {
-      const created = await unwrapApi(createSubject(body));
-      await reload();
-      return created;
-    },
-    [createSubject, reload],
-  );
-
-  /**
-   * Optimistic, with revert on failure (24 §7). It is one field, and renaming three
-   * subjects must feel like typing rather than like three round trips.
-   */
-  const rename = useCallback(
-    async (id: string, name: string) => {
-      await unwrapApi(renameSubject({ id, name }));
-    },
-    [renameSubject],
-  );
-
-  const update = useCallback(
-    async (id: string, body: UpdateSubjectBody) => {
-      await unwrapApi(updateSubject({ id, body }));
-      await reload();
-    },
-    [updateSubject, reload],
-  );
-
-  const archive = useCallback(
-    async (id: string) => {
-      await unwrapApi(archiveSubject(id));
-      await reload();
-    },
-    [archiveSubject, reload],
-  );
-
-  return { ...list, create, rename, update, archive };
+  // Adding, renaming (optimistic in every cached read), editing and archiving are thunks in
+  // store/screens/subjects.ts (DEC-R03); each lands in these cache entries through the tags.
+  return useLoadable(useGetSubjectsQuery(enabled ? subjectSearch(query) : skipToken));
 }
 
 /**

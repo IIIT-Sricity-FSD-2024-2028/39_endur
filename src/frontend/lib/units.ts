@@ -11,24 +11,14 @@
 //     is the authority here.
 // Both are now done in the cache (`onQueryStarted` and `patch.undo()` for the rename), so
 // every screen holding the tree sees the same thing at the same moment.
-import { useCallback } from 'react';
-import type {
-  CreateUnitBody,
-  UnitComposition,
-  UnitImpact,
-  UnitNode,
-  UnitTreeTotals,
-} from '@endur/shared';
-import { apiGet } from './api.js';
+import { skipToken } from '@reduxjs/toolkit/query';
+import type { UnitComposition, UnitImpact, UnitNode, UnitTreeTotals } from '@endur/shared';
 import {
-  useCreateUnitMutation,
-  useDeleteUnitMutation,
   useGetUnitCompositionQuery,
+  useGetUnitImpactQuery,
   useGetUnitsQuery,
-  useRenameUnitMutation,
-  useReparentUnitMutation,
 } from '../store/api/endpoints/units.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import { useLoadable, type Loadable } from './query.js';
 
 export type UnitsController = Loadable<UnitNode[]> & {
   /**
@@ -40,10 +30,6 @@ export type UnitsController = Loadable<UnitNode[]> & {
    */
   totals: UnitTreeTotals | null;
   reload: () => Promise<void>;
-  create: (body: CreateUnitBody) => Promise<UnitNode[]>;
-  rename: (id: string, name: string) => Promise<void>;
-  reparent: (id: string, newParentId: string | null) => Promise<void>;
-  remove: (id: string, reassignChildrenTo?: string) => Promise<void>;
 };
 
 /**
@@ -52,44 +38,10 @@ export type UnitsController = Loadable<UnitNode[]> & {
  * re-read tree is in, as before; `rename` resolves when the server has agreed.
  */
 export function useUnits(): UnitsController {
+  // Creating, renaming, moving and deleting are thunks in store/screens/structure.ts
+  // (DEC-R03); each lands in this one cache entry through the `Unit` tags.
   const tree = useLoadable(useGetUnitsQuery());
   const { reload } = tree;
-  const [createUnit] = useCreateUnitMutation();
-  const [renameUnit] = useRenameUnitMutation();
-  const [reparentUnit] = useReparentUnitMutation();
-  const [deleteUnit] = useDeleteUnitMutation();
-
-  const create = useCallback(
-    async (body: CreateUnitBody) => {
-      const created = await unwrapApi(createUnit(body));
-      await reload();
-      return created;
-    },
-    [createUnit, reload],
-  );
-
-  const rename = useCallback(
-    async (id: string, name: string) => {
-      await unwrapApi(renameUnit({ id, name }));
-    },
-    [renameUnit],
-  );
-
-  const reparent = useCallback(
-    async (id: string, newParentId: string | null) => {
-      await unwrapApi(reparentUnit({ id, newParentId }));
-      await reload();
-    },
-    [reparentUnit, reload],
-  );
-
-  const remove = useCallback(
-    async (id: string, reassignChildrenTo?: string) => {
-      await unwrapApi(deleteUnit({ id, reassignChildrenTo }));
-      await reload();
-    },
-    [deleteUnit, reload],
-  );
 
   return {
     data: tree.data?.data ?? null,
@@ -97,10 +49,6 @@ export function useUnits(): UnitsController {
     error: tree.error,
     totals: tree.data?.meta ?? null,
     reload,
-    create,
-    rename,
-    reparent,
-    remove,
   };
 }
 
@@ -127,11 +75,11 @@ export function useUnitComposition(unitId: string | null): Loadable<UnitComposit
 
 /**
  * What deleting or moving this unit actually costs, in numbers. Fetched when the confirm
- * dialog opens; until it answers the dialog's destructive button stays disabled, because a
- * confirmation with unknown consequences is one nobody should be able to accept (32).
- *
- * Not on RTK Query, on purpose: a one-off read for one dialog that must be fresh every time
- * it opens. A cache entry would never be read twice.
+ * dialog opens (`id` set) and fresh every time; until it answers, the dialog's destructive
+ * button stays disabled, because a confirmation with unknown consequences is one nobody
+ * should be able to accept (32).
  */
-export const unitImpact = (id: string): Promise<UnitImpact> =>
-  apiGet<{ data: UnitImpact }>(`/units/${id}/impact`).then((response) => response.data);
+export function useUnitImpact(id: string | null): Loadable<UnitImpact> {
+  const impact = useLoadable(useGetUnitImpactQuery(id ?? skipToken), { current: true });
+  return { data: impact.data, loading: impact.loading, error: impact.error };
+}

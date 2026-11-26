@@ -6,38 +6,25 @@
 // shell's plan banner read, and the page shows its skeleton rather than a cached tier while
 // a fresh read is in flight. What it shows is what the entitlement gate will decide with on
 // the next request.
-import { useCallback } from 'react';
-import type { BillingSummary, PlanOption, Tier } from '@endur/shared';
-import { useAppDispatch } from '../store/index.js';
+//
+// Reads only (DEC-R03): joining, scheduling a move down and asking for Enterprise are thunks
+// in `store/screens/plan.ts`.
+import type { BillingSummary, PlanOption } from '@endur/shared';
 import {
-  billingApi,
-  useCancelDowngradeMutation,
   useGetBillingQuery,
   useGetEnterpriseRequestQuery,
   useGetPlansQuery,
-  useJoinTierMutation,
-  useRequestEnterpriseMutation,
-  useScheduleDowngradeMutation,
 } from '../store/api/endpoints/billing.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import { useLoadable, type Loadable } from './query.js';
 
 /**
  * The summary. `loading` is true during ANY read, a re-read included, and the Plan page
  * swaps itself for a skeleton while it is: a cached tier shown for a moment is still a tier
  * the gate may no longer agree with.
  */
-export function useBilling(): Loadable<BillingSummary> & { set: (next: BillingSummary) => void } {
-  const dispatch = useAppDispatch();
+export function useBilling(): Loadable<BillingSummary> {
   const billing = useLoadable(useGetBillingQuery());
-
-  const set = useCallback(
-    (next: BillingSummary) => {
-      dispatch(billingApi.util.updateQueryData('getBilling', undefined, () => next));
-    },
-    [dispatch],
-  );
-
-  return { data: billing.data, loading: billing.loading, error: billing.error, set };
+  return { data: billing.data, loading: billing.loading, error: billing.error };
 }
 
 /**
@@ -63,67 +50,16 @@ export function usePlans(): Loadable<readonly PlanOption[]> {
 }
 
 /**
- * Join a tier. Returns the NEW state as the server sees it — never a local patch.
+ * ASKING FOR ENTERPRISE — DEC-100, T-100, 49 § Asking for Enterprise. When the open request
+ * was made, or `null`. The ask itself is `enterpriseRequested` (store/screens/plan.ts).
  *
- * `paymentRef` is what <PaymentDialog> minted, carried so the ledger row and the dialog the
- * customer saw can be matched up (DEC-080). It is a LABEL: the server prices the tier itself
- * and writes the row with or without one, so a caller with nothing to pass may omit it.
- */
-export function useJoinTier(): (tier: Tier, paymentRef?: string) => Promise<BillingSummary> {
-  const [joinTier] = useJoinTierMutation();
-  return useCallback(
-    (tier: Tier, paymentRef?: string) => unwrapApi(joinTier({ tier, paymentRef })),
-    [joinTier],
-  );
-}
-
-/**
- * SCHEDULE A MOVE DOWN, and cancel one. DEC-098, 49 § Interactions.
- *
- * Both return the WHOLE summary, like `useJoinTier`, and for the same reason `49` § State
- * gives: a stale tier is a wrong tier, so the page replaces what it holds rather than patching
- * one field of it. The pending tier and the period end move together on the server — the read
- * that answers a cancel may also be the read that fires an overdue downgrade — and a client
- * that merged one key would show a tier and a date that never coexisted.
- *
- * NO `paymentRef` ON EITHER. Nothing is captured at schedule time and nothing at apply time,
- * so there is no dialog in front of these and no reference to carry.
- */
-export function useScheduleDowngrade(): (tier: Tier) => Promise<BillingSummary> {
-  const [scheduleDowngrade] = useScheduleDowngradeMutation();
-  return useCallback((tier: Tier) => unwrapApi(scheduleDowngrade(tier)), [scheduleDowngrade]);
-}
-
-export function useCancelDowngrade(): () => Promise<BillingSummary> {
-  const [cancelDowngrade] = useCancelDowngradeMutation();
-  return useCallback(() => unwrapApi(cancelDowngrade()), [cancelDowngrade]);
-}
-
-/**
- * ASKING FOR ENTERPRISE — DEC-100, T-100, 49 § Asking for Enterprise.
- *
- * A READ AND A WRITE, and NEITHER touches the plan. The read answers one question — is there
- * an open request — because that is all the card's verb depends on. The lifecycle beyond that
- * (contacted, closed) is the OWNER'S, on `/ops`; telling a customer their request had been
- * "closed" would raise a question the product cannot answer.
+ * The lifecycle beyond "asked" (contacted, closed) is the OWNER'S, on `/ops`; telling a
+ * customer their request had been "closed" would raise a question the product cannot answer.
  *
  * A failed read is SWALLOWED, and that is the right failure: it decides one word on one
  * button, and an error banner over the plan page because we could not tell whether somebody
  * had already asked would be the page reporting our problem as theirs.
  */
-export function useEnterpriseRequest(): {
-  requestedAt: string | null;
-  request: (note: string) => Promise<void>;
-} {
-  const { data } = useGetEnterpriseRequestQuery();
-  const [requestEnterprise] = useRequestEnterpriseMutation();
-
-  const request = useCallback(
-    async (note: string) => {
-      await unwrapApi(requestEnterprise(note));
-    },
-    [requestEnterprise],
-  );
-
-  return { requestedAt: data?.requestedAt ?? null, request };
+export function useEnterpriseRequestedAt(): string | null {
+  return useGetEnterpriseRequestQuery().data?.requestedAt ?? null;
 }

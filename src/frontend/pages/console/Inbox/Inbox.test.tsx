@@ -302,6 +302,27 @@ describe('access', () => {
     expect(within(fromUs).queryByRole('link')).toBeNull();
   });
 
+  it('marks a message read at once, and keeps it read even if the save is lost', async () => {
+    const message = {
+      id: 'm2', at: '2026-11-01T10:00:00.000Z', kind: 'platform_message', read: false,
+      subject: 'Welcome', body: 'Hello.',
+    };
+    calls = stubApi({
+      'GET /inbox/messages*': { body: { data: [message], page: { nextCursor: null, hasMore: false }, meta: { total: 1 } } },
+      'POST /inbox/messages/*': errorReply(500, 'INTERNAL', 'Lost.'),
+    });
+    mount([]);
+    const card = (await screen.findByText('Welcome')).closest('article') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'Mark as read' }));
+
+    expect(await within(card).findByRole('button', { name: 'Mark as unread' })).toBeTruthy();
+    await waitFor(() =>
+      expect(calls.some((call) => call.method === 'POST' && call.path === '/inbox/messages/m2/read')).toBe(true));
+    // DEC-101: no revert, no error on the card. It comes back bold on the next load.
+    expect(within(card).getByRole('button', { name: 'Mark as unread' })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('keeps the tab, the filters and the cursor in the URL so a queue is linkable', async () => {
     mount(ALL, '/app/inbox?state=archived');
     await waitFor(() => expect(inboxGets()[0]).toContain('state=archived'));

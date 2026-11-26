@@ -1,8 +1,10 @@
-// The operator console's reads and the enterprise queue's writes. 70, 71, 72; R-505.
+// The operator console's reads and its writes. 70, 71, 72; R-505. The writes are run by the
+// thunks in `store/screens/operator.ts` (DEC-R03, R-713).
 //
 // Injected into `opsApi` from the platform pages' `lib` files, so none of it is in the
 // customer-facing entry chunk.
 import type {
+  EnterSupportResponse,
   EnterpriseRequestRow,
   EnterpriseStatus,
   LogFileMeta,
@@ -13,6 +15,7 @@ import type {
   PlatformEarnings,
   PlatformOrgDetail,
   PlatformOrgSummary,
+  Tier,
 } from '@endur/shared';
 import { opsApi } from '../opsApi.js';
 
@@ -112,6 +115,30 @@ export const opsEndpoints = opsApi.injectEndpoints({
           // Re-read by the invalidation above.
         }
       },
+    }),
+
+    /** An operator's plan override. The organisation and the estate row re-read. */
+    setOrgPlan: build.mutation<unknown, { id: string; tier: Tier }>({
+      query: ({ id, tier }) => ({ url: `/orgs/${id}/plan`, method: 'POST', body: { tier } }),
+      invalidatesTags: (_result, _error, { id }) => ['Estate', { type: 'OpsOrg', id }],
+    }),
+
+    /** Suspend, or reinstate. Staff sign-in only; the respondent surface keeps working. */
+    setOrgSuspended: build.mutation<unknown, { id: string; suspended: boolean }>({
+      query: ({ id, suspended }) => ({ url: `/orgs/${id}/suspend`, method: 'POST', body: { suspended } }),
+      invalidatesTags: (_result, _error, { id }) => ['Estate', { type: 'OpsOrg', id }],
+    }),
+
+    /** Opens a support session; the answer says where the browser goes next. */
+    enterSupportSession: build.mutation<EnterSupportResponse, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/orgs/${id}/support-session`, method: 'POST', body: { reason } }),
+      transformResponse: unwrap<EnterSupportResponse>,
+    }),
+
+    /** To the organisation's administrators' inboxes; recipients are resolved server-side. */
+    messageOrg: build.mutation<{ sentTo: number }, { id: string; subject: string; body: string }>({
+      query: ({ id, subject, body }) => ({ url: `/orgs/${id}/message`, method: 'POST', body: { subject, body } }),
+      transformResponse: unwrap<{ sentTo: number }>,
     }),
 
     /** The arg is `analyticsSearch(window)`: one cached report per window. */

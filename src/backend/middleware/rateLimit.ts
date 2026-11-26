@@ -45,7 +45,7 @@ const activationKey = (req: Parameters<RequestHandler>[0]): string => {
 };
 
 export const scopedRateLimits = {
-  login: bucket({ windowMs: 15 * 60_000, max: 10, keyBy: loginKey }),
+  login: bucket({ windowMs: 15 * 60_000, max: config.LOGIN_RATE_LIMIT_MAX, keyBy: loginKey }),
   activate: bucket({ windowMs: 15 * 60_000, max: 10, keyBy: activationKey }),
   // Deliberately loose: a lecture hall answering one QR code at once is the success case, not abuse.
   respondentSubmit: bucket({ windowMs: 60_000, max: 120 }),

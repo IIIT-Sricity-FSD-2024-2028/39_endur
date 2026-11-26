@@ -1,24 +1,42 @@
-import { useMemo, useRef, useState } from 'react';
+// The three-step campaign wizard. Everything typed and chosen is `state.campaigns.wizard`
+// (store/screens/campaigns.ts), every change an action; Launch is the `campaignLaunchSubmitted`
+// thunk. docs/REDUX-PLAN.md §6.10.
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type {
-  AudienceRule, CampaignAccess, CampaignDetail, Label, SubjectSummary, TemplateSummary, UnitNode,
-} from '@endur/shared';
+import type { AudienceRule, Label, SubjectSummary, TemplateSummary, UnitNode } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ProgressRail } from '../../../components/flow/ProgressRail.js';
 import { Toggle } from '../../../components/form/Toggle.js';
 import { Icon } from '../../../components/Icon.js';
 import { ShareSheet } from '../../../components/feedback/ShareSheet.js';
 import { useLabels } from '../../../lib/labels.js';
-import { useAppSelector } from '../../../store/index.js';
-import { ApiError } from '../../../lib/api.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
-import { PAST_CLOSE, isPast, toLocalInput } from '../../../lib/when.js';
-import { cloneKey, useCloneTemplate, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
+import { PAST_CLOSE, toLocalInput } from '../../../lib/when.js';
+import { useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
 import { canAny, FORM_BUILDING, useCan } from '../../../lib/capabilities.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
-import { launchCampaign, launchKey, useCampaignList } from '../../../lib/campaigns.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  accessChosen,
+  anonymityChosen,
+  audienceChosen,
+  campaignLaunchSubmitted,
+  campaignNameEdited,
+  campaignWizardLeft,
+  closesAtEdited,
+  formPicked,
+  launchAttempted,
+  opensAtEdited,
+  selectClosesInPast,
+  selectStepsReady,
+  selectWizard,
+  subjectToggled,
+  windowInOrder as inOrder,
+  wizardStepChanged,
+} from '../../../store/screens/campaigns.js';
 import { summarise } from './summary.js';
 
 const STEPS = [
@@ -27,10 +45,7 @@ const STEPS = [
   { key: 'when', label: 'When' },
 ];
 
-export function autoName(templateName: string, now = new Date()): string {
-  const month = now.toLocaleString(undefined, { month: 'long', year: 'numeric' });
-  return `${templateName} — ${month}`;
-}
+export { autoName } from '../../../store/screens/campaigns.js';
 
 export default function CampaignNew(): JSX.Element {
   const labels = useLabels();
@@ -45,29 +60,19 @@ export default function CampaignNew(): JSX.Element {
   // (FORM_BUILDING), so the forms they may copy are offered where they choose one, and the
   // copy is made when they launch.
   const library = useTemplateLibrary({}, mayCopy);
-  const cloneTemplate = useCloneTemplate();
-  /** The copy made for a library pick, kept so a retried launch does not copy it twice. */
-  const copied = useRef<{ from: string; id: string } | null>(null);
   const subjects = useSubjectList({});
   const units = useUnits();
-  const list = useCampaignList();
 
-  const [step, setStep] = useState(0);
-  const [templateId, setTemplateId] = useState('');
-  const [name, setName] = useState('');
-  const [subjectIds, setSubjectIds] = useState<string[]>([]);
-  const [audience, setAudience] = useState<AudienceRule>({ kind: 'anyone' });
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
-  // When Closes was last judged against: as it is typed, and again on Launch, so a wizard left
-  // open past that time cannot launch something already closed.
-  const [now, setNow] = useState(() => Date.now());
-  const [anonymous, setAnonymous] = useState(true);
-  const [access, setAccess] = useState<CampaignAccess>('public');
-
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [launched, setLaunched] = useState<{ campaign: CampaignDetail; url: string } | null>(null);
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectWizard);
+  const ready = useAppSelector(selectStepsReady);
+  const closesInPast = useAppSelector(selectClosesInPast);
+  const windowInOrder = inOrder(draft);
+  useClearOnLeave(campaignWizardLeft());
+  const { step, templateId, name, subjectIds, audience, startsAt, endsAt, anonymous, access } = draft;
+  const busy = draft.sending;
+  const error = messageOf(draft.error, 'That could not be launched.');
+  const launched = draft.launched;
 
   const templateRows = templates.data?.data ?? [];
   // This industry's library forms the organisation does not already have. "Has" is a copy of
@@ -90,55 +95,17 @@ export default function CampaignNew(): JSX.Element {
   const audienceLine = useAudienceLine(audience, units.data ?? [], labels.respondent);
 
   const chooseTemplate = (id: string, templateName: string): void => {
-    setTemplateId(id);
-    if (!name.trim()) setName(autoName(templateName));
+    dispatch(formPicked(id, templateName));
   };
-
-  const windowInOrder = !endsAt || !startsAt || new Date(endsAt) > new Date(startsAt);
-  const closesInPast = isPast(endsAt, now);
-  const ready = [
-    templateId !== '' && name.trim() !== '',
-    subjectIds.length > 0,
-    windowInOrder && !closesInPast,
-  ];
-
-  /** The organisation's form to launch with: the pick itself, or its copy if it is the library's. */
-  /** The organisation's own copy of a library pick, made once even if the launch is retried. */
-  const copyOf = async (libraryId: string): Promise<string> => {
-    if (copied.current?.from === libraryId) return copied.current.id;
-    const copy = await cloneTemplate(libraryId, cloneKey(libraryId));
-    copied.current = { from: libraryId, id: copy.id };
-    return copy.id;
+  const setStep = (next: number): void => {
+    dispatch(wizardStepChanged(next));
   };
 
   const launch = (): void => {
-    const at = Date.now();
-    setNow(at);
-    if (isPast(endsAt, at)) return;
-    setBusy(true);
-    setError(null);
-    const createWith = (formId: string) => list.create({
-      name: name.trim(),
-      templateId: formId,
-      subjectIds,
-      audience,
-      anonymous,
-      access,
-      ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
-      ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
-    });
-    // The organisation's own form goes straight to create, in this same tick; a library pick
-    // is copied first (a campaign can only point at the organisation's own form).
-    const created = template?.isLibrary ? copyOf(templateId).then(createWith) : createWith(templateId);
-    void created
-      .then(async (campaign) => {
-        const result = await launchCampaign(campaign.id, launchKey(campaign.id));
-        setLaunched({ campaign, url: result.url });
-      })
-      .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : 'That could not be launched.');
-      })
-      .finally(() => setBusy(false));
+    // Judge Closes again first: the thunk's `condition` then refuses a wizard left open past
+    // its own closing time, and a second press while the first is in flight.
+    dispatch(launchAttempted());
+    void dispatch(campaignLaunchSubmitted({ isLibrary: template?.isLibrary ?? false }));
   };
 
   const summary = useMemo(
@@ -212,7 +179,7 @@ export default function CampaignNew(): JSX.Element {
               className="input"
               value={name}
               maxLength={120}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => dispatch(campaignNameEdited({ name: event.target.value }))}
             />
             <p className="field-help">
               Auto-filled from the form. {labels.respondent.many} see this name.
@@ -234,13 +201,7 @@ export default function CampaignNew(): JSX.Element {
                 <input
                   type="checkbox"
                   checked={subjectIds.includes(subject.id)}
-                  onChange={() =>
-                    setSubjectIds((current) =>
-                      current.includes(subject.id)
-                        ? current.filter((id) => id !== subject.id)
-                        : [...current, subject.id],
-                    )
-                  }
+                  onChange={() => dispatch(subjectToggled({ subjectId: subject.id }))}
                 />
                 <span className="q-dot q-dot-square" aria-hidden="true" />
                 <span>{subject.name}</span>
@@ -268,7 +229,7 @@ export default function CampaignNew(): JSX.Element {
                 type="radio"
                 name="audience"
                 checked={audience.kind === 'anyone'}
-                onChange={() => setAudience({ kind: 'anyone' })}
+                onChange={() => dispatch(audienceChosen({ audience: { kind: 'anyone' } }))}
               />
               <span className="q-dot" aria-hidden="true" />
               <span>Anyone with the link</span>
@@ -280,7 +241,9 @@ export default function CampaignNew(): JSX.Element {
                 name="audience"
                 checked={audience.kind === 'unit'}
                 onChange={() =>
-                  setAudience({ kind: 'unit', unitId: units.data?.[0]?.id ?? '', includeSubtree: true })
+                  dispatch(audienceChosen({
+                    audience: { kind: 'unit', unitId: units.data?.[0]?.id ?? '', includeSubtree: true },
+                  }))
                 }
               />
               <span className="q-dot" aria-hidden="true" />
@@ -293,7 +256,9 @@ export default function CampaignNew(): JSX.Element {
                   className="input"
                   value={audience.unitId}
                   onChange={(event) =>
-                    setAudience({ kind: 'unit', unitId: event.target.value, includeSubtree: true })
+                    dispatch(audienceChosen({
+                      audience: { kind: 'unit', unitId: event.target.value, includeSubtree: true },
+                    }))
                   }
                 >
                   {flattenUnits(units.data ?? []).map((option) => (
@@ -322,7 +287,7 @@ export default function CampaignNew(): JSX.Element {
                 type="radio"
                 name="access"
                 checked={access === 'public'}
-                onChange={() => setAccess('public')}
+                onChange={() => dispatch(accessChosen({ access: 'public' }))}
               />
               <span className="q-dot" aria-hidden="true" />
               {/* NOT "Anyone with the link" — that is the audience option four lines above,
@@ -338,7 +303,7 @@ export default function CampaignNew(): JSX.Element {
                 type="radio"
                 name="access"
                 checked={access === 'organization'}
-                onChange={() => setAccess('organization')}
+                onChange={() => dispatch(accessChosen({ access: 'organization' }))}
               />
               <span className="q-dot" aria-hidden="true" />
               <span>Only people in {orgName || 'your organization'}</span>
@@ -372,7 +337,7 @@ export default function CampaignNew(): JSX.Element {
                 type="datetime-local"
                 className="input"
                 value={startsAt}
-                onChange={(event) => setStartsAt(event.target.value)}
+                onChange={(event) => dispatch(opensAtEdited({ value: event.target.value }))}
               />
             </label>
             <label className="qe-field">
@@ -380,13 +345,10 @@ export default function CampaignNew(): JSX.Element {
               <input
                 type="datetime-local"
                 className="input"
-                min={toLocalInput(now)}
+                min={toLocalInput(draft.judgedAt || Date.now())}
                 value={endsAt}
                 aria-invalid={closesInPast || !windowInOrder || undefined}
-                onChange={(event) => {
-                  setEndsAt(event.target.value);
-                  setNow(Date.now());
-                }}
+                onChange={(event) => dispatch(closesAtEdited(event.target.value))}
               />
             </label>
           </div>
@@ -404,7 +366,7 @@ export default function CampaignNew(): JSX.Element {
           <div className="panel-section">
           <Toggle
             checked={anonymous}
-            onChange={setAnonymous}
+            onChange={(next) => dispatch(anonymityChosen({ anonymous: next }))}
             label={`Collect responses anonymously`}
             hint="We never store who submitted what. This cannot be changed after launch."
           />
@@ -456,12 +418,12 @@ export default function CampaignNew(): JSX.Element {
       {launched && (
         <ShareSheet
           url={launched.url}
-          campaignName={launched.campaign.name}
+          campaignName={launched.name}
           status="open"
-          endsAt={launched.campaign.endsAt}
-          anonymous={launched.campaign.anonymous}
-          access={launched.campaign.access}
-          onClose={() => navigate(`/app/campaigns/${launched.campaign.id}`)}
+          endsAt={launched.endsAt}
+          anonymous={launched.anonymous}
+          access={launched.access}
+          onClose={() => navigate(`/app/campaigns/${launched.campaignId}`)}
         />
       )}
     </>

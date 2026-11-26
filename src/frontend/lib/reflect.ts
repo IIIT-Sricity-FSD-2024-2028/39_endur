@@ -5,16 +5,10 @@
 // only exists here — a **404 on the gap** is the ordering constraint, not a missing page.
 // The reviewee has not written their own assessment yet, and the remedy is the form.
 //
-// The reads are on RTK Query since R-502 (`store/api/endpoints/reflect.ts`); the three writes
-// stay plain calls, each followed by the page's own re-read.
-import type {
-  CreatePlanBody,
-  GapView,
-  ReflectionCycle,
-  ReflectionForm,
-  SubmitReflectionBody,
-} from '@endur/shared';
-import { ApiError, apiPost } from './api.js';
+// Reads only. They are on RTK Query since R-502 (`store/api/endpoints/reflect.ts`); the
+// three writes are thunks in `store/screens/reflect.ts` (DEC-R03).
+import type { GapView, ReflectionCycle, ReflectionForm } from '@endur/shared';
+import { ApiError } from './api.js';
 import { upgradeFrom } from './analysis.js';
 import type { Upgrade } from './analysis.js';
 import {
@@ -66,12 +60,3 @@ export const useReflectionForm = (campaignId: string | null): Gated<ReflectionFo
 
 export const useGap = (campaignId: string | null): Gated<GapView> =>
   useGated(useGetGapQuery(campaignId ?? '', { skip: !campaignId }), Boolean(campaignId));
-
-export const submitReflection = (campaignId: string, body: SubmitReflectionBody) =>
-  apiPost<SubmitReflectionBody, { data: { id: string } }>(`/reflect/${campaignId}`, body);
-
-export const savePlan = (campaignId: string, body: CreatePlanBody) =>
-  apiPost<CreatePlanBody, { data: unknown }>(`/reflect/${campaignId}/plan`, body);
-
-export const finalisePlan = (planId: string) =>
-  apiPost<undefined, { data: unknown }>(`/reflect/plans/${planId}/finalise`);

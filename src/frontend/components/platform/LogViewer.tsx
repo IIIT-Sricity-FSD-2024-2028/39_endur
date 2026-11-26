@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useId } from 'react';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import { disclosureLeft, disclosureToggled, selectDisclosure } from '../../store/screens/widgets.js';
 import type { LogFileMeta, LogLine } from '@endur/shared';
 import { formatDateTime } from '../../lib/format.js';
 import type { LogFilter } from '../../lib/oplogs.js';
@@ -117,7 +120,11 @@ function FilterBar({
 }
 
 function LineRow({ line, onRequestId }: { line: LogLine; onRequestId: (id: string) => void }): JSX.Element {
-  const [open, setOpen] = useState(false);
+  // Whether this line's trace is open: its own entry in `state.widgets.disclosures`.
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const open = useAppSelector((state) => selectDisclosure(state, id)) === 'trace';
+  useClearOnLeave(disclosureLeft({ id }));
   const is5xx = typeof line.status === 'number' && line.status >= 500;
 
   return (
@@ -138,7 +145,7 @@ function LineRow({ line, onRequestId }: { line: LogLine; onRequestId: (id: strin
         {/* `12` §4.16 — stacks go to the file and never to a client. An operator is not a
             client, and this is where a stack becomes readable. */}
         {is5xx && line.err?.stack && (
-          <button type="button" className="btn btn-secondary log-line-expand" onClick={() => setOpen((v) => !v)}>
+          <button type="button" className="btn btn-secondary log-line-expand" onClick={() => dispatch(disclosureToggled({ id, item: 'trace' }))}>
             {open ? 'Hide trace' : 'Show trace'}
           </button>
         )}

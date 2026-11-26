@@ -1,61 +1,73 @@
-import { useEffect, useState } from 'react';
+// The announcement composer. Its draft is `state.announcements.composer`
+// (store/screens/announcements.ts) and "Save draft" is the `announcementSaved` thunk. The
+// page opens and closes it; this only edits what is there.
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import type { AnnouncementSummary, AudienceRule } from '@endur/shared';
-import { ApiError } from '../../../lib/api.js';
+import type { AudienceRule } from '@endur/shared';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { pluralise } from '../../../lib/format.js';
+import { useRecipientCount } from '../../../lib/announcements.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf } from '../../../store/screens/common.js';
 import {
-  createAnnouncement,
-  updateAnnouncement,
-  useRecipientPreview,
-} from '../../../lib/announcements.js';
+  announcementSaved,
+  composerAudienceChosen,
+  composerAudienceSettled,
+  composerClosed,
+  composerEdited,
+  selectAnnouncementsScreen,
+} from '../../../store/screens/announcements.js';
 
-export function Composer({
-  editing,
-  onSaved,
-  onCancel,
-}: {
-  editing: AnnouncementSummary | null;
-  onSaved: (announcement: AnnouncementSummary) => void;
-  onCancel: () => void;
-}): JSX.Element {
+/** How long the audience must sit still before it is counted. */
+const SETTLE_MS = 250;
+
+const EMPTY: AudienceRule = { kind: 'anyone' };
+
+export function Composer(): JSX.Element {
   const labels = useLabels();
   const can = useCan();
   const units = useUnits();
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectAnnouncementsScreen).composer;
 
-  const [title, setTitle] = useState(editing?.title ?? '');
-  const [body, setBody] = useState(editing?.body ?? '');
-  const [audience, setAudience] = useState<AudienceRule>(editing?.audience ?? { kind: 'anyone' });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [upgrade, setUpgrade] = useState(false);
+  const editing = draft?.editingId != null;
+  const title = draft?.title ?? '';
+  const body = draft?.body ?? '';
+  const audience = draft?.audience ?? EMPTY;
+  const busy = draft?.saving ?? false;
+  const error = messageOf(draft?.error, 'That could not be saved.');
+  const upgrade = draft?.error?.status === 402;
+  const onCancel = (): void => {
+    dispatch(composerClosed());
+  };
 
-  const recipients = useRecipientPreview(audience);
+  // The debounce is a timer (a resource); what it decides goes into the store. A CHANGE of
+  // rule restarts it, compared as JSON because every edit makes a new object.
+  const audienceKey = JSON.stringify(audience);
+  useEffect(() => {
+    const timer = setTimeout(() => dispatch(composerAudienceSettled()), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [dispatch, audienceKey]);
+  const counted = useRecipientCount(draft?.settledAudience ?? null);
+  // Until the rule on screen has settled and been answered, the count is "not known yet".
+  const recipients = draft?.settledAudience === audienceKey ? counted : null;
+
+  // Effect (DOM): Escape closes the composer, unless it is saving.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !busy) onCancel();
+      if (event.key === 'Escape' && !busy) dispatch(composerClosed());
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel, busy]);
+  }, [dispatch, busy]);
 
   const ready = title.trim() !== '' && body.trim() !== '';
-
-  const submit = (): void => {
-    setBusy(true);
-    setError(null);
-    const payload = { title: title.trim(), body: body.trim(), audience };
-    void (editing ? updateAnnouncement(editing.id, payload) : createAnnouncement(payload))
-      .then(onSaved)
-      .catch((cause: unknown) => {
-        setUpgrade(cause instanceof ApiError && cause.status === 402);
-        setError(cause instanceof ApiError ? cause.message : 'That could not be saved.');
-        setBusy(false);
-      });
+  const setAudience = (next: AudienceRule): void => {
+    dispatch(composerAudienceChosen({ audience: next }));
   };
 
   return (
@@ -82,7 +94,7 @@ export function Composer({
           onSubmit={(event) => {
             event.preventDefault();
             if (!ready || busy) return;
-            submit();
+            void dispatch(announcementSaved());
           }}
         >
           {/* Only the fields scroll. The title holds still and so does Save draft — a
@@ -97,7 +109,7 @@ export function Composer({
                 autoFocus
                 value={title}
                 maxLength={140}
-                onChange={(event) => setTitle(event.target.value)}
+                onChange={(event) => dispatch(composerEdited({ title: event.target.value }))}
               />
             </div>
 
@@ -109,7 +121,7 @@ export function Composer({
                 rows={5}
                 value={body}
                 maxLength={5000}
-                onChange={(event) => setBody(event.target.value)}
+                onChange={(event) => dispatch(composerEdited({ body: event.target.value }))}
               />
               <p className="field-help">Plain text. Links are not made clickable.</p>
             </div>
@@ -133,6 +145,8 @@ export function Composer({
                     type="radio"
                     name="ann-audience"
                     checked={audience.kind === 'unit'}
+                    // Not until there is a unit to choose: an empty `unitId` is a 422 later.
+                    disabled={!units.data?.length}
                     onChange={() =>
                       setAudience({
                         kind: 'unit',

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { estimateSeconds, TIERS, type Tier } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -9,7 +8,9 @@ import { usePlanSummary } from '../../../lib/billing.js';
 import { approxDuration } from '../../../lib/format.js';
 import { QuickDialog } from '../Campaigns/QuickDialog.js';
 import { StartCard, type StartState } from './StartCard.js';
-import type { QuickCampaignPurpose } from '@endur/shared';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import { quickDialogClosed, quickDialogOpened, selectQuick } from '../../../store/screens/campaigns.js';
 
 export const tierReaches = (held: Tier | null, needed: Tier): boolean =>
   held !== null && TIERS.indexOf(held) >= TIERS.indexOf(needed);
@@ -40,7 +41,9 @@ export default function Start(): JSX.Element {
   const can = useCan();
   const labels = useLabels();
   const navigate = useNavigate();
-  const [quick, setQuick] = useState<QuickCampaignPurpose | null>(null);
+  const dispatch = useAppDispatch();
+  const quickOpen = useAppSelector(selectQuick) !== null;
+  useClearOnLeave(quickDialogClosed());
 
   // The plan matters only to the two paid lanes, and only a reader who may see the plan is
   // asked about it: anybody else got a 403 here on every visit, for a card they never had.
@@ -98,7 +101,7 @@ export default function Start(): JSX.Element {
           estimate={approxDuration(estimateSeconds(['single']))}
           state={lanes.quick}
           actionLabel="New poll"
-          onStart={() => setQuick('poll')}
+          onStart={() => dispatch(quickDialogOpened('poll'))}
         />
 
         <StartCard
@@ -108,7 +111,7 @@ export default function Start(): JSX.Element {
           estimate={approxDuration(estimateSeconds(['text']))}
           state={lanes.quick}
           actionLabel="Open a box"
-          onStart={() => setQuick('suggestion')}
+          onStart={() => dispatch(quickDialogOpened('suggestion'))}
         />
 
         <StartCard
@@ -147,15 +150,8 @@ export default function Start(): JSX.Element {
         />
       </div>
 
-      {quick && (
-        <QuickDialog
-          purpose={quick}
-          onCancel={() => setQuick(null)}
-          onCreated={(campaign) => {
-            setQuick(null);
-            navigate(`/app/campaigns/${campaign.id}`);
-          }}
-        />
+      {quickOpen && (
+        <QuickDialog onCreated={(campaign) => navigate(`/app/campaigns/${campaign.id}`)} />
       )}
     </>
   );

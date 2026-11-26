@@ -23,7 +23,7 @@ export function isSerializedOpsError(value: unknown): value is SerializedOpsErro
   );
 }
 
-function serialize(error: unknown): SerializedOpsError {
+export function serializeOpsError(error: unknown): SerializedOpsError {
   if (error instanceof OpsError) {
     return { kind: 'ops', status: error.status, code: error.code, message: error.message, requestId: error.requestId };
   }
@@ -55,7 +55,7 @@ export const opsBaseQuery: BaseQueryFn<OpsArgs, unknown, SerializedOpsError> = a
   try {
     return { data: await opsRequest<unknown>(method, url, body, { signal, suppress401Handler: true }) };
   } catch (error) {
-    return { error: serialize(error) };
+    return { error: serializeOpsError(error) };
   }
 };
 

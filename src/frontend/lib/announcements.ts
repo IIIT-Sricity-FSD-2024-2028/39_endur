@@ -3,23 +3,16 @@
 // No polling, like `lib/audit.ts`: an announcement list is a record of what was sent, not a
 // monitor, and a list that re-fetches under the reader moves the row they were reading.
 //
-// The reads are on RTK Query since R-501 (`store/api/endpoints/announcements.ts`): the list
-// page and Home's banner share one cache entry. The writes stay plain calls through the
-// same client, and every caller re-reads after one, as before; turning them into hooks
-// would change three pages and their tests for no difference anybody would see.
+// Reads only. They are on RTK Query since R-501 (`store/api/endpoints/announcements.ts`):
+// the list page and Home's banner share one cache entry. The writes (save, publish, delete,
+// mark read) are thunks over its mutations: `store/screens/announcements.ts`, and Home's
+// `announcementDismissed` (DEC-R03).
 //
-// THE RECIPIENT COUNT COMES FROM THE SERVER. `useRecipientPreview` asks the API for it as
+// THE RECIPIENT COUNT COMES FROM THE SERVER. `useRecipientCount` asks the API for it as
 // the composer's audience changes rather than counting the org tree in the browser — the
 // number on screen has to be the number of receipts publish will write, and there is only
 // one resolver that knows (`features/campaigns/audience.ts`).
-import { useEffect, useState } from 'react';
-import type {
-  AnnouncementSummary,
-  AudienceRule,
-  CreateAnnouncementBody,
-  UpdateAnnouncementBody,
-} from '@endur/shared';
-import { apiDelete, apiPatch, apiPost } from './api.js';
+import type { AnnouncementSummary } from '@endur/shared';
 import { isSerializedApiError } from '../store/api/errors.js';
 import {
   useGetAnnouncementsQuery,
@@ -44,74 +37,15 @@ export function useAnnouncements(enabled = true): AnnouncementController {
   return { ...list, rows: list.data ?? [], forbidden };
 }
 
-export const createAnnouncement = async (
-  body: CreateAnnouncementBody,
-): Promise<AnnouncementSummary> =>
-  (await apiPost<CreateAnnouncementBody, { data: AnnouncementSummary }>('/announcements', body))
-    .data;
-
-export const updateAnnouncement = async (
-  id: string,
-  body: UpdateAnnouncementBody,
-): Promise<AnnouncementSummary> =>
-  (
-    await apiPatch<UpdateAnnouncementBody, { data: AnnouncementSummary }>(
-      `/announcements/${id}`,
-      body,
-    )
-  ).data;
-
 /**
- * Publish, with the caller's idempotency key.
+ * How many people the composer's audience reaches, from the server. `rule` is the audience
+ * as JSON once it has settled (the composer debounces it, `composerAudienceSettled`), so a
+ * select changed five times asks once. `null` means "not known yet", and the composer says
+ * so rather than printing a zero it does not believe.
  *
- * The same shape as `launchCampaign`, and for the same reason: this is the irreversible act,
- * and a double-click must write ONE set of receipts. The server returns the first response
- * for a repeated key (13 §7).
+ * Silent on failure: this is a number beside a form, and an error banner for a count the
+ * reader did not ask for would be louder than the fact it reports.
  */
-export const publishAnnouncement = async (
-  id: string,
-  key: string,
-): Promise<AnnouncementSummary> =>
-  (
-    await apiPost<undefined, { data: AnnouncementSummary }>(
-      `/announcements/${id}/publish`,
-      undefined,
-      { idempotencyKey: key },
-    )
-  ).data;
-
-export const publishKey = (id: string): string => `announcement-publish-${id}`;
-
-export const deleteAnnouncement = (id: string): Promise<void> =>
-  apiDelete(`/announcements/${id}`);
-
-/** Marks the caller's OWN receipt. There is no id here but the announcement's. */
-export const markAnnouncementRead = (id: string): Promise<void> =>
-  apiPost<undefined, void>(`/announcements/${id}/read`);
-
-/**
- * The live recipient count, debounced.
- *
- * Debounced for the reason `useAudiencePreview` is: the audience changes on every keystroke
- * in a select, and one request per change would put a queue of stale answers behind the
- * current one. `null` means "not known yet" and the composer says so rather than printing a
- * zero it does not believe.
- */
-export function useRecipientPreview(rule: AudienceRule, enabled = true): number | null {
-  // Serialised, so a CHANGE of rule is what counts rather than every render — a fresh
-  // object literal from the parent is a new identity every time.
-  const key = JSON.stringify(rule);
-  const [settled, setSettled] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = setTimeout(() => setSettled(key), 250);
-    return () => clearTimeout(timer);
-  }, [key, enabled]);
-
-  // Silent on failure: this is a number beside a form, and an error banner for a count the
-  // reader did not ask for would be louder than the fact it reports.
-  const { currentData } = useGetRecipientCountQuery(settled ?? '', { skip: !enabled || settled === null });
-  // Until the rule on screen has settled and been answered, the count is "not known yet".
-  return enabled && settled === key ? currentData ?? null : null;
+export function useRecipientCount(rule: string | null): number | null {
+  return useGetRecipientCountQuery(rule ?? '', { skip: rule === null }).currentData ?? null;
 }

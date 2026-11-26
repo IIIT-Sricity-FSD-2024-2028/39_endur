@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Capability, GapView, ReflectionCycle, ReflectionForm } from '@endur/shared';
 import { errorReply, renderWithProviders, stubApi, type StubReply } from '../../../test-utils.js';
 import Reflect from './index.js';
@@ -41,7 +41,7 @@ let gapAnswer: GapView | Failure;
 let posted: Array<{ path: string; body: unknown }>;
 
 // The stub server (R-502): the real hooks and the real cache run above it. The writes are
-// still plain calls, through the same client, so they reach it too.
+// thunks over mutations (store/screens/reflect.ts), so they reach it too.
 const server = () => stubApi({
   'GET /reflect': () => answer(cycles),
   'GET /reflect/c-1': { body: { data: form } },
@@ -94,6 +94,30 @@ describe('/app/reflect', () => {
     expect(screen.getAllByRole('radio').length).toBe(5);
   });
 
+  it('shows the gap straight after the assessment is recorded: the order is the server\'s', async () => {
+    mount(ALL, '/app/reflect?campaign=c-1');
+    await screen.findByText(/Your own assessment/);
+    fireEvent.click(screen.getByRole('radio', { name: '4' }));
+    gapAnswer = gap();
+    fireEvent.click(screen.getByRole('button', { name: /record my assessment/i }));
+    expect(await screen.findByText(/You rated yourself 2 higher than others did/)).toBeTruthy();
+  });
+
+  it('keeps the answers and says why when the assessment is refused', async () => {
+    stubApi({
+      'GET /reflect': () => answer(cycles),
+      'GET /reflect/c-1': { body: { data: form } },
+      'GET /reflect/c-1/gap': () => answer(gapAnswer),
+      'POST /reflect/c-1': errorReply(409, 'CONFLICT', 'You have already recorded yours.'),
+    });
+    mount(ALL, '/app/reflect?campaign=c-1');
+    await screen.findByText(/Your own assessment/);
+    fireEvent.click(screen.getByRole('radio', { name: '4' }));
+    fireEvent.click(screen.getByRole('button', { name: /record my assessment/i }));
+    expect((await screen.findByRole('alert')).textContent).toBe('You have already recorded yours.');
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: '4' }).checked).toBe(true);
+  });
+
   it('submits the reflection to the campaign it is about', async () => {
     mount(ALL, '/app/reflect?campaign=c-1');
     await screen.findByText(/Your own assessment/);
@@ -142,6 +166,64 @@ describe('/app/reflect', () => {
     expect(await screen.findByText(/Publish slides before each session/)).toBeTruthy();
     expect(screen.getByText(/cannot be edited/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /finalise|save plan/i })).toBeNull();
+  });
+
+  it('writes a plan: adds a line, saves only the lines with words in them', async () => {
+    gapAnswer = gap();
+    mount(ALL, '/app/reflect?campaign=c-1');
+    const first = await screen.findByPlaceholderText('One thing you will change');
+    fireEvent.change(first, { target: { value: 'Publish slides before each session' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add another/ }));
+    expect(screen.getAllByPlaceholderText('One thing you will change')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+
+    await waitFor(() => expect(posted.some((post) => post.path === '/reflect/c-1/plan')).toBe(true));
+    expect(posted.find((post) => post.path === '/reflect/c-1/plan')?.body).toEqual({
+      items: [{ text: 'Publish slides before each session', status: 'open' }],
+    });
+  });
+
+  it('finalises a saved plan only once it is confirmed', async () => {
+    gapAnswer = gap({
+      plan: {
+        id: 'p-1',
+        items: [{ text: 'Publish slides before each session', status: 'open' }],
+        finalisedAt: null,
+        checkins: [],
+      },
+    });
+    mount(ALL, '/app/reflect?campaign=c-1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Finalise' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    expect(posted).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finalise' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Finalise' }));
+    await waitFor(() => expect(posted.map((post) => post.path)).toEqual(['/reflect/plans/p-1/finalise']));
+  });
+
+  it('edits a saved plan from what was saved', async () => {
+    gapAnswer = gap({
+      plan: {
+        id: 'p-1',
+        items: [{ text: 'Publish slides', status: 'open' }],
+        finalisedAt: null,
+        checkins: [],
+      },
+    });
+    mount(ALL, '/app/reflect?campaign=c-1');
+    const line = await screen.findByDisplayValue('Publish slides');
+    fireEvent.change(line, { target: { value: 'Publish slides a day early' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+    await waitFor(() => expect(posted.length).toBe(1));
+    expect(posted[0]?.body).toEqual({ items: [{ text: 'Publish slides a day early', status: 'open' }] });
+  });
+
+  it('goes back to the list from a cycle', async () => {
+    mount(ALL, '/app/reflect?campaign=c-1');
+    await screen.findByText(/Your own assessment/);
+    fireEvent.click(screen.getByRole('button', { name: /All cycles/ }));
+    expect(await screen.findByRole('button', { name: 'Autumn round' })).toBeTruthy();
   });
 
   it('lists cycles with a status, and opens one', async () => {

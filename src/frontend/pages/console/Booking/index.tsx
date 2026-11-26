@@ -1,13 +1,21 @@
-import { useState } from 'react';
+// `/app/booking`. The list is an RTK Query read; the "Add" box and its command are
+// `state.booking` (store/screens/booking.ts).
 import { Link, useNavigate } from 'react-router-dom';
 import type { BookableSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { Icon } from '../../../components/Icon.js';
-import { ApiError } from '../../../lib/api.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDate, pluralise } from '../../../lib/format.js';
-import { useBookables, useCreateBookable } from '../../../lib/booking.js';
+import { useBookables } from '../../../lib/booking.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  bookableCreated,
+  bookingListLeft,
+  newBookableNamed,
+  selectBookingScreen,
+} from '../../../store/screens/booking.js';
 
 export function stateLine(bookable: BookableSummary): string {
   if (bookable.closedAt) return `Closed ${formatDate(bookable.closedAt)}`;
@@ -24,12 +32,12 @@ export default function Booking(): JSX.Element {
   const can = useCan();
   const navigate = useNavigate();
   const list = useBookables();
-  const createBookable = useCreateBookable();
+  const dispatch = useAppDispatch();
+  const { newName: name, creating: busy, createError } = useAppSelector(selectBookingScreen);
+  useClearOnLeave(bookingListLeft());
+  const error = messageOf(createError, 'That did not work.');
 
   const canCreate = can('booking.create');
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (list.forbidden) {
     return (
@@ -63,17 +71,11 @@ export default function Booking(): JSX.Element {
   }
 
   const create = (): void => {
-    if (name.trim() === '') return;
-    setBusy(true);
-    setError(null);
-    void createBookable({ name: name.trim() })
+    void dispatch(bookableCreated()).then((result) => {
       // Straight to the detail page: a bookable with no times is not finished, and the next
       // thing to do is add them.
-      .then((created) => navigate(`/app/booking/${created.id}`))
-      .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : 'That did not work.');
-        setBusy(false);
-      });
+      if (bookableCreated.fulfilled.match(result)) navigate(`/app/booking/${result.payload}`);
+    });
   };
 
   return (
@@ -91,7 +93,7 @@ export default function Booking(): JSX.Element {
               className="input"
               value={name}
               placeholder="Consultation room"
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => dispatch(newBookableNamed({ name: event.target.value }))}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') create();
               }}

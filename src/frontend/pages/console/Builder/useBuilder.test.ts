@@ -98,7 +98,7 @@ describe('loading turns a template into the slice\'s draft', () => {
     // An ApiError, rebuilt from the store's plain error, so the page can show its message.
     expect(result.current.loadError).toBeInstanceOf(ApiError);
     expect(result.current.loadError?.message).toBe('gone');
-    expect(result.current.template).toBeNull();
+    expect(result.current.ready).toBe(false);
     expect(builder(store).templateId).toBeNull();
   });
 });

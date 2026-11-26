@@ -7,24 +7,17 @@
 // `lib/audit.ts` keeps it: a 403 is not "there is nothing").
 //
 // On RTK Query since R-505, over the operator API (`store/api/opsApi.ts`): the estate's
-// loaded pages survive a look at one organisation and back.
-import { useCallback, useMemo, useState } from 'react';
-import type {
-  EnterpriseRequestRow,
-  EnterpriseStatus,
-  Page,
-  PlatformOrgDetail,
-  PlatformOrgSummary,
-} from '@endur/shared';
+// loaded pages survive a look at one organisation and back. Reads only (DEC-R03): every
+// operator write is a thunk in `store/screens/operator.ts`.
+import { useCallback, useMemo } from 'react';
+import type { EnterpriseRequestRow, Page, PlatformOrgDetail, PlatformOrgSummary } from '@endur/shared';
 import { OpsError } from './ops.js';
 import {
-  useApproveEnterpriseRequestMutation,
   useGetEnterpriseQueueQuery,
   useGetEstateInfiniteQuery,
   useGetOrgDetailQuery,
-  useUpdateEnterpriseRequestMutation,
 } from '../store/api/endpoints/ops.js';
-import { unwrapApi, useLoadable } from './query.js';
+import { useLoadable } from './query.js';
 
 export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
 
@@ -110,50 +103,14 @@ export function useOrgDetail(id: string | undefined): Loadable<PlatformOrgDetail
 export function useEnterpriseQueue(enabled: boolean): {
   rows: EnterpriseRequestRow[];
   loading: boolean;
-  /** The last failure, for the page to render. NEVER swallowed — see below. */
+  /** Why the queue did not load. A refused WRITE is `state.operator.estate.queueError`. */
   error: string | null;
-  update: (id: string, status: EnterpriseStatus) => Promise<void>;
-  approve: (id: string) => Promise<void>;
 } {
   const queue = useLoadable(useGetEnterpriseQueueQuery(undefined, { skip: !enabled }));
-  const [updateRequest] = useUpdateEnterpriseRequestMutation();
-  const [approveRequest] = useApproveEnterpriseRequestMutation();
-  const [failure, setFailure] = useState<string | null>(null);
-
-  /**
-   * THE FAILURE IS KEPT, and that is the fix for the bug this shipped with.
-   *
-   * Every one of these used to `await` a request whose rejection nobody caught — the page
-   * called `void queue.update(...).finally(...)` with no `.catch`, so a 403, a 409 or a 500
-   * produced an unhandled promise rejection and **nothing at all on screen**. The operator
-   * pressed Contacted and the row sat there. A write that can fail silently is worse than one
-   * that fails loudly, because the second kind gets reported. (A refused write also re-reads
-   * the queue: the mutations invalidate it on failure.)
-   */
-  const run = useCallback(async (work: () => Promise<unknown>) => {
-    setFailure(null);
-    try {
-      await work();
-    } catch (caught) {
-      setFailure(caught instanceof OpsError ? caught.message : 'That did not go through.');
-    }
-  }, []);
-
-  const update = useCallback(
-    (id: string, status: EnterpriseStatus) => run(() => unwrapApi(updateRequest({ id, status }))),
-    [run, updateRequest],
-  );
-  const approve = useCallback(
-    (id: string) => run(() => unwrapApi(approveRequest(id))),
-    [run, approveRequest],
-  );
-
   const loadError = queue.error ? (queue.error instanceof OpsError ? queue.error.message : 'Could not load the queue.') : null;
   return {
     rows: queue.data ?? [],
     loading: enabled && queue.loading && queue.data === null,
-    error: failure ?? loadError,
-    update,
-    approve,
+    error: loadError,
   };
 }

@@ -1,12 +1,28 @@
-import { useEffect, useState } from 'react';
+// The poll and suggestion-box dialog. Everything it shows comes from the store
+// (`store/screens/campaigns.ts`, `state.campaigns.quick`), and everything typed is an action:
+// docs/REDUX-PLAN.md §6.10, the reference conversion. The page that renders it opens it
+// (`quickDialogOpened`) and decides what happens once it is created.
+import { useEffect } from 'react';
 import type { CampaignDetail, QuickCampaignPurpose } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
-import { ApiError } from '../../../lib/api.js';
-import { quickCreate } from '../../../lib/campaigns.js';
 import { useLabels } from '../../../lib/labels.js';
-import { PAST_CLOSE, isPast, toLocalInput } from '../../../lib/when.js';
-
-const MAX_OPTIONS = 10;
+import { PAST_CLOSE, toLocalInput } from '../../../lib/when.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  MAX_OPTIONS,
+  quickCampaignSubmitted,
+  quickClosingTimeEdited,
+  quickDialogClosed,
+  quickNameEdited,
+  quickOptionAdded,
+  quickOptionEdited,
+  quickOptionRemoved,
+  quickSubmitAttempted,
+  selectQuick,
+  selectQuickClosesInPast,
+  selectQuickReady,
+} from '../../../store/screens/campaigns.js';
 
 export const COPY: Record<
   QuickCampaignPurpose,
@@ -26,61 +42,37 @@ export const COPY: Record<
   },
 };
 
+/** Rendered by the page while `state.campaigns.quick` is set. */
 export function QuickDialog({
-  purpose,
   onCreated,
-  onCancel,
 }: {
-  purpose: QuickCampaignPurpose;
   onCreated: (campaign: CampaignDetail) => void;
-  onCancel: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
   const labels = useLabels();
-  const copy = COPY[purpose];
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectQuick);
+  const closesInPast = useAppSelector(selectQuickClosesInPast);
+  const ready = useAppSelector(selectQuickReady);
+  const sending = draft?.sending ?? false;
 
-  const [name, setName] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '']);
-  const [endsAt, setEndsAt] = useState('');
-  // The moment the closing time was last judged against: when it was typed, and again on
-  // submit, so a dialog left open past that time cannot create a link that is already closed.
-  const [now, setNow] = useState(() => Date.now());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+  // Escape closes it, unless a create is in flight. A key listener, not state.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !busy) onCancel();
+      if (event.key === 'Escape' && !sending) dispatch(quickDialogClosed());
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel, busy]);
+  }, [dispatch, sending]);
 
-  const filled = options.map((option) => option.trim()).filter(Boolean);
-  const closesInPast = isPast(endsAt, now);
-  const ready =
-    name.trim() !== '' && (purpose === 'suggestion' || filled.length >= 2) && !closesInPast;
-
-  const setOption = (index: number, value: string): void =>
-    setOptions((current) => current.map((option, at) => (at === index ? value : option)));
-
-  const submit = (): void => {
-    setBusy(true);
-    setError(null);
-    void quickCreate({
-      purpose,
-      name: name.trim(),
-      ...(purpose === 'poll' ? { options: filled } : {}),
-      ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
-    })
-      .then(onCreated)
-      .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : 'That could not be created.');
-        setBusy(false);
-      });
+  if (!draft) return null;
+  const copy = COPY[draft.purpose];
+  const error = messageOf(draft.error, 'That could not be created.');
+  const close = (): void => {
+    if (!sending) dispatch(quickDialogClosed());
   };
 
   return (
-    <div className="dialog-backdrop" onMouseDown={() => !busy && onCancel()}>
+    <div className="dialog-backdrop" onMouseDown={close}>
       <div
         className="dialog dialog-wide dialog-tall"
         role="dialog"
@@ -97,10 +89,12 @@ export function QuickDialog({
           className="subject-form dialog-form"
           onSubmit={(event) => {
             event.preventDefault();
-            const at = Date.now();
-            setNow(at);
-            if (!ready || busy || isPast(endsAt, at)) return;
-            submit();
+            // Judge the closing time again first: the thunk's `condition` then refuses a
+            // draft whose time went by while the dialog sat open.
+            dispatch(quickSubmitAttempted());
+            void dispatch(quickCampaignSubmitted()).then((result) => {
+              if (quickCampaignSubmitted.fulfilled.match(result)) onCreated(result.payload);
+            });
           }}
         >
           {/* Adding a tenth option must not push "Create and share" off the panel. */}
@@ -111,46 +105,46 @@ export function QuickDialog({
                 id="quick-name"
                 className="input"
                 autoFocus
-                value={name}
+                value={draft.name}
                 maxLength={120}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => dispatch(quickNameEdited({ name: event.target.value }))}
               />
               <p className="field-help">
                 Both the question and the name {labels.respondent.many.toLowerCase()} see.
               </p>
             </div>
 
-            {purpose === 'poll' && (
+            {draft.purpose === 'poll' && (
               <fieldset className="field">
                 <legend>Options</legend>
-                {options.map((option, index) => (
+                {draft.options.map((option, index) => (
                   <div className="quick-option" key={index}>
                     <input
                       className="input"
                       value={option}
                       maxLength={120}
                       aria-label={`Option ${index + 1}`}
-                      onChange={(event) => setOption(index, event.target.value)}
+                      onChange={(event) =>
+                        dispatch(quickOptionEdited({ index, value: event.target.value }))
+                      }
                     />
-                    {options.length > 2 && (
+                    {draft.options.length > 2 && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-icon"
                         aria-label={`Remove option ${index + 1}`}
-                        onClick={() =>
-                          setOptions((current) => current.filter((_, at) => at !== index))
-                        }
+                        onClick={() => dispatch(quickOptionRemoved({ index }))}
                       >
                         <Icon name="close" size={16} />
                       </button>
                     )}
                   </div>
                 ))}
-                {options.length < MAX_OPTIONS && (
+                {draft.options.length < MAX_OPTIONS && (
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    onClick={() => setOptions((current) => [...current, ''])}
+                    onClick={() => dispatch(quickOptionAdded())}
                   >
                     <Icon name="add" size={16} /> Add option
                   </button>
@@ -164,14 +158,11 @@ export function QuickDialog({
                 id="quick-ends"
                 className="input"
                 type="datetime-local"
-                min={toLocalInput(now)}
-                value={endsAt}
+                min={toLocalInput(draft.judgedAt)}
+                value={draft.endsAt}
                 aria-invalid={closesInPast || undefined}
                 aria-describedby={closesInPast ? 'quick-ends-error' : undefined}
-                onChange={(event) => {
-                  setEndsAt(event.target.value);
-                  setNow(Date.now());
-                }}
+                onChange={(event) => dispatch(quickClosingTimeEdited(event.target.value))}
               />
               {closesInPast && (
                 <p className="field-error" id="quick-ends-error" role="alert">{PAST_CLOSE}</p>
@@ -188,11 +179,11 @@ export function QuickDialog({
           </div>
 
           <div className="dialog-actions">
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={onCancel}>
+            <button type="button" className="btn btn-secondary" disabled={sending} onClick={close}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={!ready || busy}>
-              {busy ? 'Creating…' : copy.verb}
+            <button type="submit" className="btn btn-primary" disabled={!ready}>
+              {sending ? 'Creating…' : copy.verb}
             </button>
           </div>
         </form>

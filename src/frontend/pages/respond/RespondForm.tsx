@@ -5,43 +5,52 @@
 // "2 questions left" button, the server's field errors — because two copies of a form's
 // validation are two answers to "why did this not send".
 //
-// Not a store reader, and it must never become one: Fill imports it, and the respondent
-// pages may not reach `store/` (bundle.test.ts). Whoever renders it hands it `send`.
-import { useCallback, useMemo, useRef, useState } from 'react';
+// Its state is the store's: `state.respond.fills[token]` (store/screens/respond.ts). Every
+// answer is an `answerGiven` action, the press is `fillSubmitPressed`, and the send is the
+// `answersSubmitted` thunk over RTK Query. docs/REDUX-PLAN.md §6.10 (R-704, DEC-R03).
+import { useCallback, useMemo, useRef } from 'react';
 import type { AnswerValue, PublicCampaign, SubmitResponseBody } from '@endur/shared';
 import { QuestionInput } from '../../components/form/QuestionInput.js';
-import { ApiError } from '../../lib/api.js';
-import { submitKey, type SubmitResult } from '../../lib/respond.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  answerGiven,
+  answersSubmitted,
+  fillLeft,
+  fillSubmitPressed,
+  selectFill,
+  subjectChosen,
+} from '../../store/screens/respond.js';
+import type { SubmitResult } from '../../lib/respond.js';
 import { accessNotice, costLine } from './copy.js';
-import { answeredCount, missingRequired, remainingLabel, toSubmitAnswers, type Answers } from './answers.js';
-
-const GENERIC_FAILURE = 'That did not go through. Your answers are still here — try again.';
+import { answeredCount, missingRequired, remainingLabel, toSubmitAnswers } from './answers.js';
 
 export function RespondForm({
   token,
   campaign,
   channel,
-  send,
+  campaignId,
   onSent,
   embedded = false,
 }: {
   token: string;
   campaign: PublicCampaign;
   channel: SubmitResponseBody['channel'];
-  send: (body: SubmitResponseBody, key: string) => Promise<SubmitResult>;
+  /** Answering from Home: the card, Home's counts and the campaign re-read afterwards. */
+  campaignId?: string;
   onSent: (result: SubmitResult, subjectName: string | undefined) => void;
   /** Inside a card on a page that already names the form: no title card of its own. */
   embedded?: boolean;
 }): JSX.Element {
-  const [answers, setAnswers] = useState<Answers>({});
-  const [subjectId, setSubjectId] = useState<string | undefined>(undefined);
-  const [invalid, setInvalid] = useState<Record<string, string>>({});
-  const [subjectInvalid, setSubjectInvalid] = useState<string | undefined>(undefined);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [pressed, setPressed] = useState(false);
+  const dispatch = useAppDispatch();
+  const fill = useAppSelector((state) => selectFill(state, token));
+  // The fill goes when the form does (the page left, the card folded), as it used to.
+  useClearOnLeave(fillLeft({ token }));
+  const { answers, invalid, failure, sending, pressed } = fill;
+  const subjectId = fill.subjectId ?? undefined;
+  const subjectInvalid = fill.subjectInvalid ?? undefined;
 
-  const key = useRef<string | null>(null);
+  // DOM handles for "scroll to the first gap", not state: nothing renders from them.
   const cards = useRef<Record<string, HTMLElement | null>>({});
 
   const questions = useMemo(() => campaign.questions, [campaign]);
@@ -50,27 +59,18 @@ export function RespondForm({
   const missing = missingRequired(questions, answers);
   const answered = answeredCount(questions, answers);
 
-  const answer = useCallback((id: string, value: AnswerValue) => {
-    setAnswers((current) => ({ ...current, [id]: value }));
-    setInvalid((current) => {
-      if (!(id in current)) return current;
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
-  }, []);
+  const answer = useCallback(
+    (id: string, value: AnswerValue) => dispatch(answerGiven({ token, questionId: id, value })),
+    [dispatch, token],
+  );
 
-  const submit = async (): Promise<void> => {
+  const submit = (): void => {
     if (sending) return;
-    setPressed(true);
-    setFailure(null);
-
     const gaps = missingRequired(questions, answers);
     const noSubject = needsSubject && !subjectId;
+    dispatch(fillSubmitPressed(token, gaps, noSubject));
 
     if (gaps.length > 0 || noSubject) {
-      setInvalid(Object.fromEntries(gaps.map((id) => [id, 'Pick an answer to continue.'])));
-      setSubjectInvalid(noSubject ? 'Choose one to continue.' : undefined);
       const first = noSubject ? 'subject' : gaps[0];
       const card = first ? cards.current[first] : null;
       card?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
@@ -78,28 +78,19 @@ export function RespondForm({
       return;
     }
 
-    setInvalid({});
-    setSubjectInvalid(undefined);
-    setSending(true);
-    key.current ??= submitKey(token);
-
     const sent = toSubmitAnswers(questions, answers);
-    try {
-      const result = await send(
-        { answers: sent, channel, ...(subjectId ? { subjectId } : {}) },
-        key.current,
-      );
-      onSent(result, subjectName(subjects, subjectId));
-    } catch (thrown) {
-      setSending(false);
-      applyServerErrors(
-        thrown,
-        sent.map((entry) => entry.questionId),
-        setInvalid,
-        setSubjectInvalid,
-        setFailure,
-      );
-    }
+    void dispatch(
+      answersSubmitted({
+        token,
+        body: { answers: sent, channel, ...(subjectId ? { subjectId } : {}) },
+        sentOrder: sent.map((entry) => entry.questionId),
+        ...(campaignId ? { campaignId } : {}),
+      }),
+    ).then((result) => {
+      if (answersSubmitted.fulfilled.match(result)) {
+        onSent({ responseCount: result.payload.responseCount }, subjectName(subjects, subjectId));
+      }
+    });
   };
 
   const only = subjects.length === 1 ? subjects[0] : undefined;
@@ -138,7 +129,7 @@ export function RespondForm({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          void submit();
+          submit();
         }}
       >
         {!embedded && (
@@ -172,10 +163,7 @@ export function RespondForm({
                     type="radio"
                     name={embedded ? subjectGroup : 'rf-subject'}
                     checked={subjectId === subject.id}
-                    onChange={() => {
-                      setSubjectId(subject.id);
-                      setSubjectInvalid(undefined);
-                    }}
+                    onChange={() => dispatch(subjectChosen({ token, subjectId: subject.id }))}
                   />
                   <span className="q-dot" aria-hidden="true" />
                   <span>{subject.name}</span>
@@ -220,38 +208,3 @@ const subjectName = (
   chosen: string | undefined,
 ): string | undefined =>
   subjects.length === 1 ? subjects[0]?.name : subjects.find((s) => s.id === chosen)?.name;
-
-function applyServerErrors(
-  thrown: unknown,
-  sentOrder: string[],
-  setInvalid: (next: Record<string, string>) => void,
-  setSubjectInvalid: (next: string | undefined) => void,
-  setFailure: (next: string) => void,
-): void {
-  if (!(thrown instanceof ApiError)) return setFailure(GENERIC_FAILURE);
-
-  if (thrown.code === 'CONFLICT') {
-    return setFailure('Your answers were already recorded. There is nothing more to do.');
-  }
-  if (thrown.status === 404) {
-    return setFailure('This is no longer accepting answers.');
-  }
-  if (thrown.fields.length === 0) {
-    return setFailure(thrown.status >= 500 ? GENERIC_FAILURE : thrown.message);
-  }
-
-  const perQuestion: Record<string, string> = {};
-  const rest: string[] = [];
-  for (const field of thrown.fields) {
-    if (field.path === 'body.subjectId') {
-      setSubjectInvalid(field.message);
-      continue;
-    }
-    const index = /^body\.answers\.(\d+)\./.exec(field.path)?.[1];
-    const id = index === undefined ? undefined : sentOrder[Number(index)];
-    if (id === undefined) rest.push(field.message);
-    else perQuestion[id] = field.message;
-  }
-  setInvalid(perQuestion);
-  if (rest.length > 0) setFailure(rest.join(' '));
-}

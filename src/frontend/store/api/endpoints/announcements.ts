@@ -4,10 +4,15 @@
 // that re-fetches under the reader moves the row they were reading. (The plan's task title
 // said "polling"; §4 was corrected: nothing here ever polled.)
 //
-// The writes stay plain calls in `lib/announcements.ts`, each followed by the page's own
-// `reload()`. The list page and Home's banner now read ONE cache entry, so that reload
-// reaches both.
-import type { AnnouncementPreview, AnnouncementSummary, AudienceRule } from '@endur/shared';
+// The writes are mutations too (DEC-R03, R-705): each invalidates `Announcement`, so the list
+// page and Home's banner, which read ONE cache entry, both catch up by themselves.
+import type {
+  AnnouncementPreview,
+  AnnouncementSummary,
+  AudienceRule,
+  CreateAnnouncementBody,
+  UpdateAnnouncementBody,
+} from '@endur/shared';
 import { api } from '../api.js';
 
 export const announcementsApi = api.injectEndpoints({
@@ -33,6 +38,44 @@ export const announcementsApi = api.injectEndpoints({
       transformResponse: (response: { data: AnnouncementPreview }) => response.data.recipients,
       // Who an audience reaches moves with the people and the tree.
       providesTags: [{ type: 'Person', id: 'LIST' }, { type: 'Unit', id: 'LIST' }],
+    }),
+
+    createAnnouncement: build.mutation<AnnouncementSummary, CreateAnnouncementBody>({
+      query: (body) => ({ url: '/announcements', method: 'POST', body }),
+      transformResponse: (response: { data: AnnouncementSummary }) => response.data,
+      invalidatesTags: ['Announcement'],
+    }),
+
+    updateAnnouncement: build.mutation<AnnouncementSummary, { id: string; body: UpdateAnnouncementBody }>({
+      query: ({ id, body }) => ({ url: `/announcements/${id}`, method: 'PATCH', body }),
+      transformResponse: (response: { data: AnnouncementSummary }) => response.data,
+      invalidatesTags: ['Announcement'],
+    }),
+
+    /**
+     * Publishing writes the receipts: the irreversible act. `key` is the caller's idempotency
+     * key, so a double press writes ONE set (the server answers a repeat with the first
+     * response, 13 §7).
+     */
+    publishAnnouncement: build.mutation<AnnouncementSummary, { id: string; key: string }>({
+      query: ({ id, key }) => ({
+        url: `/announcements/${id}/publish`,
+        method: 'POST',
+        idempotencyKey: key,
+      }),
+      transformResponse: (response: { data: AnnouncementSummary }) => response.data,
+      invalidatesTags: ['Announcement'],
+    }),
+
+    deleteAnnouncement: build.mutation<void, string>({
+      query: (id) => ({ url: `/announcements/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Announcement'],
+    }),
+
+    /** Marks the caller's OWN receipt. There is no id here but the announcement's. */
+    markAnnouncementRead: build.mutation<void, string>({
+      query: (id) => ({ url: `/announcements/${id}/read`, method: 'POST' }),
+      invalidatesTags: ['Announcement'],
     }),
   }),
 });

@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, OrgView, PresetView } from '@endur/shared';
-import { NONSENSE_LABELS, renderWithProviders } from '../../test-utils.js';
+import {
+  NONSENSE_LABELS, renderWithProviders, errorReply, stubApi, type StubReply,
+} from '../../test-utils.js';
+import { ApiError } from '../../lib/api.js';
 import Settings from './Settings.js';
 
 const ORG: OrgView = {
@@ -28,23 +31,34 @@ const updateOrg = vi.fn();
 const updateLabels = vi.fn();
 let org: OrgView | null = ORG;
 
-vi.mock('../../lib/org.js', async () => {
-  const react = await import('react');
-  return {
-    useOrg: () => {
-      const [data, set] = react.useState<OrgView | null>(org);
-      return { data, loading: false, error: null, set };
-    },
-    usePresets: () => ({ data: PRESETS, loading: false, error: null }),
-    useUpdateOrg: () => updateOrg,
-    useUpdateLabels: () => updateLabels,
-    useUploadLogo: () => uploadLogo,
-    useRemoveLogo: () => removeLogo,
-  };
-});
+vi.mock('../../lib/org.js', () => ({
+  useOrg: () => ({ data: org, loading: false, error: null, set: vi.fn() }),
+  usePresets: () => ({ data: PRESETS, loading: false, error: null }),
+}));
 
 const uploadLogo = vi.fn();
 const removeLogo = vi.fn();
+
+/**
+ * The saves and the logo are thunks over RTK Query (store/screens/settings.ts): they reach
+ * the stubbed server, which asks the spies above what to answer.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const server = () => stubApi({
+  'PATCH /org': (call) => answer(updateOrg, call.body),
+  'PATCH /org/labels': (call) => answer(updateLabels, (call.body as { labels: unknown }).labels),
+  'POST /org/logo': () => answer(uploadLogo),
+  'DELETE /org/logo': () => answer(removeLogo),
+  'GET /org': () => ({ body: { data: org } }),
+  'GET /auth/me': { body: {} },
+});
 
 const ALL: Capability[] = ['org.read', 'org.update'];
 
@@ -56,8 +70,11 @@ const mount = (capabilities: Capability[] = ALL) =>
     { capabilities, labels: NONSENSE_LABELS, path: '/app/settings' },
   );
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  server();
   org = ORG;
   updateOrg.mockResolvedValue(ORG);
   updateLabels.mockResolvedValue(ORG);

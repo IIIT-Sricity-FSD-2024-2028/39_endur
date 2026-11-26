@@ -1,8 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, SubjectCycle, SubjectDetail, UnitNode } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubCall, type StubReply,
+} from '../../../test-utils.js';
+import { ApiError } from '../../../lib/api.js';
 import Detail, { trendOf } from './Detail.js';
 
 const cycle = (over: Partial<SubjectCycle> & { campaignId: string; campaignName: string }): SubjectCycle => ({
@@ -28,6 +31,8 @@ const units: UnitNode[] = [{
   peopleCount: 0, subjectCount: 0, peopleTotal: 0, subjectTotal: 0, children: [],
 }];
 
+const create = vi.fn();
+const rename = vi.fn();
 const update = vi.fn();
 const archive = vi.fn();
 const reload = vi.fn();
@@ -60,8 +65,36 @@ const mount = (capabilities: Capability[] = ALL) =>
     { capabilities, labels: NONSENSE_LABELS, path: '/app/subjects/s1' },
   );
 
+/**
+ * The commands are thunks over RTK Query now (store/screens/subjects.ts): they reach the
+ * stubbed server, which asks the spies above what to answer. A rename and an edit are both a
+ * PATCH; a body with only a name is the rename.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const idOf = (call: StubCall): string => call.path.split('/')[2] ?? '';
+const server = () => stubApi({
+  'POST /subjects': (call) => answer(create, call.body),
+  'PATCH /subjects/*': (call) => {
+    const body = call.body as Record<string, unknown>;
+    return Object.keys(body).length === 1 && 'name' in body
+      ? answer(rename, idOf(call), body.name)
+      : answer(update, idOf(call), body);
+  },
+  'POST /subjects/*': (call) => answer(archive, idOf(call)),
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  server();
   update.mockResolvedValue(undefined);
   archive.mockResolvedValue(undefined);
   reload.mockResolvedValue(undefined);

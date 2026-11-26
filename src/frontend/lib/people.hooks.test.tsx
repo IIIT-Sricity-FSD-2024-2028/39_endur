@@ -8,7 +8,15 @@ import type { Page, PersonDetail, PersonSummary } from '@endur/shared';
 import { setupStore, type AppStore } from '../store/index.js';
 import { meFixture, stubApi, type StubCall } from '../test-utils.js';
 import { useBootSession } from './session.js';
-import { usePeopleImport, usePeopleList, usePeopleSearch, usePerson } from './people.js';
+import { usePeopleList, usePeopleSearch, usePerson } from './people.js';
+import {
+  importCommitted,
+  importFileRead,
+  importKey,
+  importOpened,
+  personRenamed,
+  positionAdded,
+} from '../store/screens/people.js';
 
 const person = (id: string, name: string): PersonSummary =>
   ({ id, name, email: null, positions: [] } as unknown as PersonSummary);
@@ -40,14 +48,18 @@ describe('usePerson', () => {
         return { status: 201, body: { data: person('p1', 'Amara Rao') } };
       },
     });
-    const { result } = render(() => {
+    const { result, store } = render(() => {
       useBootSession();
       return usePerson('p1');
     });
     await waitFor(() => expect(result.current.data?.name).toBe('Amara Rao'));
     await waitFor(() => expect(count(calls, 'GET', '/auth/me')).toBe(1));
 
-    await act(async () => { await result.current.assign({ unitId: 'u1', roleId: 'r2' } as never); });
+    // The page's command: a thunk over the assign mutation (store/screens/people.ts).
+    await act(async () => {
+      await store.dispatch(positionAdded({ personId: 'p1', body: { unitId: 'u1', roleId: 'r2' } as never, from: 'page' }));
+    });
+    await waitFor(() => expect(result.current.data?.positions).toHaveLength(1));
 
     // Resolved with the powers as the server worked them out, not a chip beside old ones.
     expect(result.current.data?.positions).toHaveLength(1);
@@ -82,13 +94,15 @@ describe('usePeopleList', () => {
         return { body: { data: person('p1', name) } };
       },
     });
-    const { result } = render(() => ({ all: usePeopleList({}), tutors: usePeopleList({ roleId: 'r9' }) }));
+    const { result, store } = render(() => ({ all: usePeopleList({}), tutors: usePeopleList({ roleId: 'r9' }) }));
     await waitFor(() => expect(result.current.all.data?.data).toHaveLength(2));
     await waitFor(() => expect(result.current.tutors.data?.data).toHaveLength(1));
 
-    await act(async () => { await result.current.all.update('p1', { name: 'Amara Rao' }); });
+    await act(async () => {
+      await store.dispatch(personRenamed({ personId: 'p1', name: 'Amara Rao', from: 'list' }));
+    });
 
-    expect(result.current.all.data?.data[0]?.name).toBe('Amara Rao');
+    await waitFor(() => expect(result.current.all.data?.data[0]?.name).toBe('Amara Rao'));
     expect(count(calls, 'GET', '/people')).toBe(2);
     // p1 is not on the tutors page, so it is not asked again.
     expect(count(calls, 'GET', '/people?roleId=r9')).toBe(1);
@@ -121,31 +135,44 @@ describe('usePeopleSearch', () => {
   });
 });
 
-describe('usePeopleImport', () => {
+describe('the CSV import (store/screens/people.ts)', () => {
   it('previews, then commits with the file\'s key, and the directory behind it catches up', async () => {
     let imported = false;
     const calls = stubApi({
       'GET /people': () => (imported ? page(person('p1', 'Amara'), person('p2', 'Bilal')) : page(person('p1', 'Amara'))),
       'POST /people/import/preview': {
-        body: { data: { columns: ['name'], sample: [], rowCount: 1, unmatchedRoles: [], unmatchedUnits: [], existingEmails: [] } },
+        body: { data: { columns: ['name', 'email'], sample: [], rowCount: 1, unmatchedRoles: [], unmatchedUnits: [], existingEmails: [] } },
       },
       'POST /people/import': () => {
         imported = true;
         return { body: { data: { created: 1, updated: 0, assigned: 0, skipped: [] } } };
       },
     });
-    const { result } = render(() => ({ list: usePeopleList({}), importer: usePeopleImport() }));
-    await waitFor(() => expect(result.current.list.data?.data).toHaveLength(1));
+    const { result, store } = render(() => usePeopleList({}));
+    await waitFor(() => expect(result.current.data?.data).toHaveLength(1));
 
-    let rows = 0;
-    await act(async () => { rows = (await result.current.importer.preview('name\nBilal')).rowCount; });
-    expect(rows).toBe(1);
+    const csv = 'name,email\nBilal,bilal@example.test';
+    store.dispatch(importOpened());
+    // The File is the thunk's argument; only its text reaches the store.
+    await act(async () => { await store.dispatch(importFileRead(new File([csv], 'people.csv'))); });
+    expect(store.getState().people?.import).toMatchObject({ step: 'review', csv });
 
-    await act(async () => {
-      await result.current.importer.commit({ rows: [], roleMapping: {}, unitMapping: {} }, 'import:abc');
+    await act(async () => { await store.dispatch(importCommitted()); });
+
+    const commit = calls.find((call) => call.path === '/people/import');
+    expect(commit?.headers.get('Idempotency-Key')).toBe(importKey(csv));
+    expect(commit?.body).toMatchObject({ rows: [{ name: 'Bilal', email: 'bilal@example.test' }] });
+    expect(store.getState().people?.import?.step).toBe('done');
+    await waitFor(() => expect(result.current.data?.data).toHaveLength(2));
+  });
+
+  it('says why a file could not be read, beside the picker, and nothing else happens', async () => {
+    stubApi({
+      'POST /people/import/preview': { status: 422, body: { error: { code: 'VALIDATION_FAILED', message: 'That file has no email column.', requestId: 'r' } } },
     });
-
-    expect(calls.find((call) => call.path === '/people/import')?.headers.get('Idempotency-Key')).toBe('import:abc');
-    await waitFor(() => expect(result.current.list.data?.data).toHaveLength(2));
+    const store = setupStore();
+    store.dispatch(importOpened());
+    await act(async () => { await store.dispatch(importFileRead(new File(['name\nBilal'], 'p.csv'))); });
+    expect(store.getState().people?.import).toMatchObject({ step: 'pick', readError: 'That file has no email column.' });
   });
 });

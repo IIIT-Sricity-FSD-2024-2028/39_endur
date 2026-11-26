@@ -10,7 +10,7 @@
 // reaches the store (DEC-014). A thunk's actions do carry its argument as `meta.arg`, so
 // the store's DevTools sanitiser (`store/devtools.ts`) blanks any `password` in it.
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import type { LoginBody, MeResponse } from '@endur/shared';
+import type { HomeView, LoginBody, MeResponse, RegisterBody } from '@endur/shared';
 import { request } from '../../lib/api.js';
 import { signedOut } from '../authSlice.js';
 import { labelsCleared } from '../vocabularySlice.js';
@@ -58,6 +58,41 @@ export const signIn = createSessionThunk<MeResponse, LoginBody>(
       return rejectWithValue(me.payload ?? serializeApiError(me.error));
     }
     return me.payload;
+  },
+);
+
+/**
+ * Where a freshly signed-in user belongs. An organisation with no roles and no structure has
+ * a console that renders correctly and says nothing (the worst first screen, because it looks
+ * broken rather than empty), so an unconfigured one goes to the wizard (46).
+ *
+ * A failure lands on `/app` anyway: a sparse dashboard beats a sign-in that appears to hang,
+ * and `/app` asks the same question again when it loads.
+ */
+export async function findLanding(): Promise<string> {
+  try {
+    const { data } = await request<{ data: HomeView }>('GET', '/home');
+    return data.configured ? '/app' : '/app/setup';
+  } catch {
+    return '/app';
+  }
+}
+
+/**
+ * Create an organisation and its first user, signed in: one transaction on the server (15
+ * §5), because a half-seeded org has no roles, so nobody can do anything. The answer is the
+ * cookie; the session is read separately (`refreshMe`), by the caller, when it is ready to
+ * leave the page.
+ */
+export const register = createSessionThunk<void, RegisterBody>(
+  'session/register',
+  async (body, { rejectWithValue }) => {
+    try {
+      await request('POST', '/auth/register', body);
+      return undefined;
+    } catch (error) {
+      return rejectWithValue(serializeApiError(error));
+    }
   },
 );
 

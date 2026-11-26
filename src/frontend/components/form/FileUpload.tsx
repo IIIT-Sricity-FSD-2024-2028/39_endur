@@ -1,5 +1,18 @@
-import { useId, useRef, useState } from 'react';
+// An image picker with a drop zone. Its state (dragging, busy, the error, the preview) is
+// this instance's entry in `state.widgets.uploads`; the upload itself is the page's command,
+// handed in as `onUpload`. The `File` never enters the store: only a preview URL does.
+import { useId, useRef } from 'react';
 import { ApiError } from '../../lib/api.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  selectUpload,
+  uploadDragChanged,
+  uploadFinished,
+  uploadLeft,
+  uploadRefused,
+  uploadStarted,
+} from '../../store/screens/widgets.js';
 
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp'];
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024;
@@ -25,54 +38,50 @@ export function FileUpload({
 }): JSX.Element {
   const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const id = inputId;
+  const { busy, dragging, error, preview } = useAppSelector((state) => selectUpload(state, id));
+  useClearOnLeave(uploadLeft({ id }));
 
   const megabytes = Math.round((maxBytes / 1024 / 1024) * 10) / 10;
 
   async function handle(file: File | undefined): Promise<void> {
     if (!file || disabled || busy) return;
-    setError(null);
 
     if (!ACCEPTED.includes(file.type)) {
-      setError('Use a PNG, JPEG or WebP image.');
+      dispatch(uploadRefused({ id, error: 'Use a PNG, JPEG or WebP image.' }));
       return;
     }
     if (file.size > maxBytes) {
       const size = Math.round((file.size / 1024 / 1024) * 10) / 10;
-      setError(`That file is ${size} MB. The limit is ${megabytes} MB.`);
+      dispatch(uploadRefused({ id, error: `That file is ${size} MB. The limit is ${megabytes} MB.` }));
       return;
     }
 
     const localUrl = URL.createObjectURL(file);
-    setPreview(localUrl);
-    setBusy(true);
+    dispatch(uploadStarted({ id, preview: localUrl }));
+    let failure: string | null = null;
     try {
       await onUpload(file);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'That upload did not work. Try again.');
-      setPreview(null);
+      failure = err instanceof ApiError ? err.message : 'That upload did not work. Try again.';
     } finally {
+      dispatch(uploadFinished({ id, error: failure }));
       URL.revokeObjectURL(localUrl);
-      setBusy(false);
       if (input.current) input.current.value = '';
     }
   }
 
   async function remove(): Promise<void> {
     if (disabled || busy) return;
-    setBusy(true);
-    setError(null);
+    dispatch(uploadStarted({ id, preview: null }));
+    let failure: string | null = null;
     try {
       await onRemove();
-      setPreview(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'That did not work. Try again.');
-    } finally {
-      setBusy(false);
+      failure = err instanceof ApiError ? err.message : 'That did not work. Try again.';
     }
+    dispatch(uploadFinished({ id, error: failure }));
   }
 
   const shown = preview ?? current;
@@ -86,13 +95,14 @@ export function FileUpload({
         onDragOver={(event) => {
           if (disabled) return;
           event.preventDefault();
-          setDragging(true);
+          // dragover fires continuously: only the change into "dragging" is recorded.
+          if (!dragging) dispatch(uploadDragChanged({ id, dragging: true }));
         }}
-        onDragLeave={() => setDragging(false)}
+        onDragLeave={() => dispatch(uploadDragChanged({ id, dragging: false }))}
         onDrop={(event) => {
           if (disabled) return;
           event.preventDefault();
-          setDragging(false);
+          dispatch(uploadDragChanged({ id, dragging: false }));
           void handle(event.dataTransfer.files[0]);
         }}
       >

@@ -3,7 +3,7 @@
 // ONE call. /auth/me returns the session, the organisation, the vocabulary and the
 // capability set together, so the first paint is already correct — right domain nouns,
 // right actions — instead of rendering generic words and then re-rendering.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { setUnauthenticatedHandler } from './api.js';
 import { useAppDispatch } from '../store/index.js';
 import { labelsCleared, signedOut } from '../store/index.js';
@@ -16,8 +16,11 @@ const isRespondentPath = (pathname: string): boolean => pathname.startsWith('/r/
 
 export function useBootSession(): void {
   const dispatch = useAppDispatch();
-  // Decided once, at boot, as before: it is about where the app was opened.
-  const [respondent] = useState(() => isRespondentPath(window.location.pathname));
+  // Decided once, at boot: it is about where the app was opened, and never changes after. A
+  // constant for the component's life, so a ref, not state (nothing re-renders on it).
+  const respondent = useRef(isRespondentPath(window.location.pathname)).current;
+
+  // Effect (wiring): a 401 from a plain call signs out; a respondent link has no session.
 
   useEffect(() => {
     // A 401 from a PLAIN call lands here, which is what makes an expired session route to

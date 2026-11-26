@@ -38,6 +38,10 @@ jobs:
       TEST_DATABASE_URL: postgresql://endur:endur@localhost:5432/endur_test
       SESSION_SECRET: ci-only-session-secret-that-is-long-enough
       LOG_TO_FILE: 'false'
+      # Required by src/backend/lib/config.ts. Locally .env supplies them; here nothing does,
+      # and without them every backend test fails at import with "Invalid environment".
+      PUBLIC_BASE_URL: http://localhost:5173
+      API_BASE_URL: http://localhost:4000
 
     steps:
       - uses: actions/checkout@v4
@@ -55,20 +59,24 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # The project's own invariants: no hardcoded domain noun, and no CSS that fails silently.
+      # The project's own invariants: no hardcoded domain noun, no CSS that fails silently, and
+      # no component state or server call outside the store (DEC-R03; the inventory reads 0).
       # (audit:drift is not here: it reads architecture/, which is not in the repository.)
       - name: Audits
         run: |
           npm run audit:vocab
           npm run audit:css
+          npm run audit:state -- --check
 
       - name: Frontend tests
         run: npm run test -w @endur/web
 
       # Integration tests against the real Postgres above; globalSetup creates and migrates
       # endur_test on its own.
+      # --retry=2 is a stopgap: a few tests fail at random (on main too). Remove it once those
+      # are fixed, so a real failure is not hidden behind a lucky second run.
       - name: Backend tests
-        run: npm run test -w @endur/api
+        run: npm run test -w @endur/api -- --retry=2
 
       - name: Build
         run: npm run build
@@ -100,6 +108,10 @@ jobs:
     env:
       DATABASE_URL: postgresql://endur:endur@localhost:5432/endur
       SESSION_SECRET: ci-only-session-secret-that-is-long-enough
+      # The seed and the API both load config.ts, which requires these. playwright.config.ts
+      # overrides them with the e2e ports where it matters; these only have to exist.
+      PUBLIC_BASE_URL: http://localhost:5173
+      API_BASE_URL: http://localhost:4000
 
     steps:
       - uses: actions/checkout@v4

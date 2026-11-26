@@ -1,13 +1,18 @@
-// R-504: the console half of booking on RTK Query, over a stubbed `fetch`. (No page test
-// covers these screens, so this is the only thing that runs them.)
+// R-504: the console half of booking on RTK Query, over a stubbed `fetch`: the reads, and
+// the thunks in store/screens/booking.ts against the same cache. The pages are
+// pages/console/Booking/Booking.test.tsx.
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BookableSummary, BookingSummary } from '@endur/shared';
 import { setupStore } from '../store/index.js';
+import {
+  attendeeBookingCancelled, bookableOpened, slotEdited, slotsSaved,
+} from '../store/screens/booking.js';
 import { errorReply, stubApi, type StubCall } from '../test-utils.js';
-import { openKey, useBookable, useBookableCommands, useBookables } from './booking.js';
+import { toLocalInput } from './when.js';
+import { useBookable, useBookables } from './booking.js';
 
 const bookable = (id: string, booked = 10) =>
   ({ id, name: 'Office hours', booked } as unknown as BookableSummary);
@@ -16,7 +21,7 @@ const booking = (id: string) => ({ id, name: 'Amara' } as unknown as BookingSumm
 function render<T>(hook: () => T) {
   const store = setupStore();
   const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
-  return renderHook(hook, { wrapper });
+  return { ...renderHook(hook, { wrapper }), store };
 }
 
 const gets = (calls: StubCall[], path: string) =>
@@ -52,7 +57,7 @@ describe('useBookables', () => {
   });
 });
 
-describe('useBookable and its commands', () => {
+describe('useBookable and the booking thunks', () => {
   it('saving the times re-reads the bookable and its bookings, with no Date reaching the store', async () => {
     const consoleError = vi.spyOn(console, 'error');
     let booked = 10;
@@ -64,21 +69,25 @@ describe('useBookable and its commands', () => {
         return { body: { data: bookable('b1', booked) } };
       },
     });
-    const { result } = render(() => ({ view: useBookable('b1'), commands: useBookableCommands('b1') }));
+    const { result, store } = render(() => ({ view: useBookable('b1') }));
     await waitFor(() => expect(result.current.view.bookable?.booked).toBe(10));
     expect(result.current.view.bookings).toHaveLength(1);
 
-    const startsAt = new Date('2026-12-01T09:00:00.000Z');
-    await act(async () => {
-      await result.current.commands.putSlots({
-        slots: [{ startsAt, endsAt: new Date('2026-12-01T10:00:00.000Z'), capacity: 20 }],
-      });
-    });
+    const draft = {
+      id: 's1',
+      startsAt: toLocalInput('2026-12-01T09:00:00.000Z'),
+      endsAt: toLocalInput('2026-12-01T10:00:00.000Z'),
+      capacity: 1,
+      remaining: 1,
+    };
+    store.dispatch(slotEdited({ id: 'b1', index: 0, patch: { capacity: 20 }, from: [draft] }));
+    await act(async () => { await store.dispatch(slotsSaved('b1')); });
 
     await waitFor(() => expect(result.current.view.bookable?.booked).toBe(20));
     expect(gets(calls, '/bookables/b1/bookings')).toBe(2);
-    expect((calls.find((call) => call.method === 'PUT')?.body as { slots: Array<{ startsAt: string }> }).slots[0]?.startsAt)
-      .toBe('2026-12-01T09:00:00.000Z');
+    expect((calls.find((call) => call.method === 'PUT')?.body as { slots: unknown[] }).slots).toEqual([
+      { startsAt: '2026-12-01T09:00:00.000Z', endsAt: '2026-12-01T10:00:00.000Z', capacity: 20 },
+    ]);
     // A mutation keeps no argument in the store, and RTK ignores `meta.arg` in actions.
     expect(consoleError).not.toHaveBeenCalled();
   });
@@ -89,10 +98,14 @@ describe('useBookable and its commands', () => {
       'GET /bookables/b1/bookings': { body: { data: [] } },
       'POST /bookables/b1/open': { body: { data: bookable('b1') } },
     });
-    const { result } = render(() => ({ view: useBookable('b1'), commands: useBookableCommands('b1') }));
+    const { result, store } = render(() => ({ view: useBookable('b1') }));
     await waitFor(() => expect(result.current.view.bookable).not.toBeNull());
 
-    await act(async () => { await result.current.commands.open(openKey('b1')); });
+    await act(async () => {
+      await Promise.all([store.dispatch(bookableOpened('b1')), store.dispatch(bookableOpened('b1'))]);
+    });
+
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
 
     expect(calls.find((call) => call.method === 'POST')?.headers.get('Idempotency-Key')).toBe('bookable-open-b1');
   });
@@ -107,10 +120,12 @@ describe('useBookable and its commands', () => {
         return { status: 204 };
       },
     });
-    const { result } = render(() => ({ view: useBookable('b1'), commands: useBookableCommands('b1') }));
+    const { result, store } = render(() => ({ view: useBookable('b1') }));
     await waitFor(() => expect(result.current.view.bookings).toHaveLength(2));
 
-    await act(async () => { await result.current.commands.cancelBooking('k1'); });
+    await act(async () => {
+      await store.dispatch(attendeeBookingCancelled({ bookableId: 'b1', bookingId: 'k1' }));
+    });
 
     await waitFor(() => expect(result.current.view.bookings.map((row) => row.id)).toEqual(['k2']));
   });

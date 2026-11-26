@@ -47,8 +47,11 @@ export default defineConfig({
         PUBLIC_BASE_URL: `http://localhost:${WEB_PORT}`,
         LOG_TO_FILE: 'false',
         LOG_LEVEL: 'warn',
-        // Every test signs in, several times over; the production limit is not under test here.
+        // Every test signs in, several times over; the production limits are not under test
+        // here (the backend suite proves the 429 path). The login bucket is per email, and
+        // the seeded admin signs in more than its ten times a quarter hour in one run.
         RATE_LIMIT_MAX: '10000',
+        LOGIN_RATE_LIMIT_MAX: '1000',
       },
       reuseExistingServer: false,
       timeout: 60_000,

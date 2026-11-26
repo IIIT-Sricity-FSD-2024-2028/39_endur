@@ -1,14 +1,15 @@
 // R-501: the inbox and announcements on RTK Query, over a stubbed `fetch`. The Inbox page
-// test runs the queue's UI; these pin what the hooks do with the cache.
+// test runs the queue's UI; these pin what the hooks and the mark thunk do with the cache.
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AudienceRule, InboxResponse, Page } from '@endur/shared';
+import type { InboxResponse, Page } from '@endur/shared';
 import { setupStore } from '../store/index.js';
 import { errorReply, stubApi } from '../test-utils.js';
-import { useAnnouncements, useRecipientPreview } from './announcements.js';
-import { useInbox } from './inbox.js';
+import { useAnnouncements, useRecipientCount } from './announcements.js';
+import { inboxMarked } from '../store/screens/inbox.js';
+import { useInbox, type MarkAction } from './inbox.js';
 
 const card = (id: string, read = false) =>
   ({ id, read, archived: false, comment: id } as unknown as InboxResponse);
@@ -18,7 +19,7 @@ const page = (rows: InboxResponse[], nextCursor: string | null = null, total = r
 function render<T>(hook: () => T) {
   const store = setupStore();
   const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
-  return renderHook(hook, { wrapper });
+  return { ...renderHook(hook, { wrapper }), store };
 }
 
 afterEach(() => {
@@ -46,21 +47,23 @@ describe('useInbox', () => {
       'GET /inbox?state=unread': page([card('r1'), card('r2'), card('r3')]),
       'POST /inbox/*': { status: 204 },
     });
-    const { result } = render(() => useInbox({ state: 'unread' }));
+    const { result, store } = render(() => useInbox({ state: 'unread' }));
     await waitFor(() => expect(result.current.data?.meta.total).toBe(3));
+    const mark = (responseId: string, action: MarkAction, keep?: boolean) =>
+      store.dispatch(inboxMarked({ responseId, action, ...(keep ? { keep } : {}), args: result.current.args }));
 
     // Opening r1 marks it read and keeps it on screen; the unread count drops.
-    await act(async () => { await result.current.mark('r1', 'read', { keep: true }); });
+    await act(async () => { await mark('r1', 'read', true); });
     await waitFor(() => expect(result.current.data?.meta.total).toBe(2));
     expect(result.current.data?.data).toHaveLength(3);
 
     // Archiving r2 takes one more off. (It used to take two: r1, still on screen and no
     // longer unread, was counted as leaving all over again.)
-    await act(async () => { await result.current.mark('r2', 'archive'); });
+    await act(async () => { await mark('r2', 'archive'); });
     await waitFor(() => expect(result.current.data?.meta.total).toBe(1));
 
     // And marking the kept one unread again puts it back in the count.
-    await act(async () => { await result.current.mark('r1', 'unread'); });
+    await act(async () => { await mark('r1', 'unread'); });
     await waitFor(() => expect(result.current.data?.meta.total).toBe(2));
   });
 
@@ -84,30 +87,29 @@ describe('useAnnouncements', () => {
   });
 });
 
-describe('useRecipientPreview', () => {
-  const rule = (unitId: string) => ({ kind: 'unit', unitId } as unknown as AudienceRule);
+// The debounce is the composer's (`composerAudienceSettled`), tested with the page in
+// pages/console/Announcements; this only reads the count for a settled rule.
+describe('useRecipientCount', () => {
+  const rule = (unitId: string) => JSON.stringify({ kind: 'unit', unitId });
 
-  it('asks once the rule has settled, and says "not known" while it has not', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it('asks nothing until a rule has settled, then reads the server\'s count for it', async () => {
     const calls = stubApi({
       'POST /announcements/preview': (call) => ({
         body: { data: { recipients: (call.body as { audience: { unitId: string } }).audience.unitId === 'u1' ? 40 : 7 } },
       }),
     });
-    const { result, rerender } = renderHook(({ unit }: { unit: string }) => useRecipientPreview(rule(unit)), {
+    const { result, rerender } = renderHook(({ settled }: { settled: string | null }) => useRecipientCount(settled), {
       wrapper: ({ children }: { children: ReactNode }) => <Provider store={setupStore()}>{children}</Provider>,
-      initialProps: { unit: 'u1' },
+      initialProps: { settled: null as string | null },
     });
     expect(result.current).toBeNull();
-    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-    await waitFor(() => expect(result.current).toBe(40));
+    expect(calls).toHaveLength(0);
 
-    // Three changes inside the debounce: one request, for the last of them.
-    rerender({ unit: 'u2' });
-    rerender({ unit: 'u3' });
-    rerender({ unit: 'u4' });
+    rerender({ settled: rule('u1') });
+    await waitFor(() => expect(result.current).toBe(40));
+    // A new rule is "not known yet" until its own answer, never the last rule's number.
+    rerender({ settled: rule('u2') });
     expect(result.current).toBeNull();
-    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
     await waitFor(() => expect(result.current).toBe(7));
     expect(calls).toHaveLength(2);
   });

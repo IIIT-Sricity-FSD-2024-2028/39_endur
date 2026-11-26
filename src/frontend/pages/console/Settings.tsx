@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+// Settings. The drafts of both cards and their saves are `state.settings`
+// (store/screens/settings.ts): a draft is `null` until edited, and the card shows the server's
+// copy meanwhile. Every save, and the logo, is a thunk there. docs/REDUX-PLAN.md §6.10.
+import { useEffect, useMemo } from 'react';
 import {
   Industry, LabelKey, resolveLabels,
-  type LabelSet, type OrgView, type ResolvedLabels,
+  type LabelKey as Key, type OrgView, type ResolvedLabels,
 } from '@endur/shared';
 import { PageHeader } from '../../components/layout/PageHeader.js';
 import { WordsEditor, WordsTable } from '../../components/org/WordsEditor.js';
@@ -9,15 +12,26 @@ import { LeaveGuard } from '../../components/feedback/LeaveGuard.js';
 import { DashboardPreview } from '../../components/org/DashboardPreview.js';
 import { useCan } from '../../lib/capabilities.js';
 import { ApiError } from '../../lib/api.js';
-import { derivePlural } from '../../lib/format.js';
+import { unwrapApi } from '../../lib/query.js';
 import { FileUpload } from '../../components/form/FileUpload.js';
+import { useOrg, usePresets } from '../../lib/org.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../store/screens/common.js';
 import {
-  useOrg, usePresets, useRemoveLogo, useUpdateLabels, useUpdateOrg, useUploadLogo,
-} from '../../lib/org.js';
-import { labelsLoaded, toastShown, useAppDispatch } from '../../store/index.js';
-
-const overridesOf = (labels: ResolvedLabels): LabelKey[] =>
-  LabelKey.options.filter((key) => labels[key].many !== derivePlural(labels[key].one));
+  logoRemoved,
+  logoUploaded,
+  orgIndustryChosen,
+  orgNameEdited,
+  orgProfileSaved,
+  overridesOf,
+  selectSettings,
+  settingsLeft,
+  wordPluralEdited,
+  wordPluralReset,
+  wordSingularEdited,
+  wordsSaved,
+  type WordsDraft,
+} from '../../store/screens/settings.js';
 
 const industryOf = (org: OrgView): Industry => {
   const parsed = Industry.safeParse(org.industry);
@@ -32,36 +46,32 @@ export default function Settings(): JSX.Element {
   const org = useOrg();
   const presets = usePresets();
   const dispatch = useAppDispatch();
-  const updateOrg = useUpdateOrg();
-  const updateLabels = useUpdateLabels();
-  const uploadLogo = useUploadLogo();
-  const removeLogo = useRemoveLogo();
 
   const editable = can('org.update');
 
-  const [draft, setDraft] = useState<ResolvedLabels | null>(null);
-  const [overrides, setOverrides] = useState<LabelKey[]>([]);
-  const [name, setName] = useState('');
-  const [industry, setIndustry] = useState<Industry>('custom');
+  const page = useAppSelector(selectSettings);
+  useClearOnLeave(settingsLeft());
+  const { savingProfile, savingWords } = page;
+  const profileError = messageOf(page.profileError, 'Could not save.');
+  const wordsError = messageOf(page.wordsError, 'Could not save those words.');
 
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingWords, setSavingWords] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [wordsError, setWordsError] = useState<string | null>(null);
-  // The shell's ToastHost draws it (R-307); this page only says what happened.
-  const showToast = (message: string): void => {
-    dispatch(toastShown({ message }));
-  };
-
+  // What each card shows: the draft once something was typed, the server's copy until then.
   const loaded = org.data;
-  useEffect(() => {
-    if (!loaded) return;
-    const resolved = resolveLabels(loaded.labels);
-    setDraft(resolved);
-    setOverrides(overridesOf(resolved));
-    setName(loaded.name);
-    setIndustry(industryOf(loaded));
+  const name = page.name ?? loaded?.name ?? '';
+  const industry = page.industry ?? (loaded ? industryOf(loaded) : 'custom');
+  const fromServer = useMemo<WordsDraft | null>(() => {
+    if (!loaded) return null;
+    const labels = resolveLabels(loaded.labels);
+    return { labels, overrides: overridesOf(labels) };
   }, [loaded]);
+  const words = page.words ?? fromServer;
+  const draft = words?.labels ?? null;
+  const setName = (value: string): void => {
+    dispatch(orgNameEdited({ name: value }));
+  };
+  const setIndustry = (value: Industry): void => {
+    dispatch(orgIndustryChosen({ industry: value }));
+  };
 
   // WHAT IS UNSAVED, per card. Each Save wakes up only when its card differs from what the
   // server holds, says "Saved" otherwise, and leaving with either one unsaved asks first.
@@ -69,6 +79,8 @@ export default function Settings(): JSX.Element {
   const profileDirty =
     loaded !== null && (name.trim() !== loaded.name || industry !== industryOf(loaded));
   const wordsDirty = draft !== null && saved !== null && !sameWords(draft, saved);
+
+  // Effect (DOM): a link to #words scrolls to the words card once it is on screen.
 
   useEffect(() => {
     if (!draft || window.location.hash !== '#words') return;
@@ -85,60 +97,23 @@ export default function Settings(): JSX.Element {
   const message = (error: unknown, fallback: string): string =>
     error instanceof ApiError ? error.message : fallback;
 
-  const applied = (updated: OrgView): void => {
-    org.set(updated);
-    dispatch(labelsLoaded(updated.labels as LabelSet));
-  };
-
   const saveProfile = (): void => {
-    setSavingProfile(true);
-    setProfileError(null);
-    void updateOrg({ name: name.trim(), industry })
-      .then((updated) => {
-        applied(updated);
-        showToast('Organization saved.');
-      })
-      .catch((error: unknown) => setProfileError(message(error, 'Could not save.')))
-      .finally(() => setSavingProfile(false));
+    void dispatch(orgProfileSaved({ name: name.trim(), industry }));
   };
 
   const saveWords = (): void => {
-    if (!draft) return;
-    setSavingWords(true);
-    setWordsError(null);
-    void updateLabels({ ...draft })
-      .then((updated) => {
-        applied(updated);
-        showToast('Words saved. Every screen is using them now.');
-      })
-      .catch((error: unknown) =>
-        setWordsError(message(error, 'Could not save those words.')))
-      .finally(() => setSavingWords(false));
+    if (draft) void dispatch(wordsSaved(draft));
   };
 
-  const setOne = (key: LabelKey, one: string): void =>
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            [key]: {
-              one,
-              many: overrides.includes(key) ? current[key].many : derivePlural(one),
-            },
-          }
-        : current);
-
-  const setMany = (key: LabelKey, many: string): void => {
-    setDraft((current) => (current ? { ...current, [key]: { ...current[key], many } } : current));
-    setOverrides((current) => (current.includes(key) ? current : [...current, key]));
+  // Each edit carries what the card showed, for the first edit after a load or a save.
+  const setOne = (key: Key, one: string): void => {
+    if (words) dispatch(wordSingularEdited({ key, one, from: words }));
   };
-
-  const resetPlural = (key: LabelKey): void => {
-    setDraft((current) =>
-      current
-        ? { ...current, [key]: { ...current[key], many: derivePlural(current[key].one) } }
-        : current);
-    setOverrides((current) => current.filter((entry) => entry !== key));
+  const setMany = (key: Key, many: string): void => {
+    if (words) dispatch(wordPluralEdited({ key, many, from: words }));
+  };
+  const resetPlural = (key: Key): void => {
+    if (words) dispatch(wordPluralReset({ key, from: words }));
   };
 
   const blank = draft
@@ -263,10 +238,10 @@ export default function Settings(): JSX.Element {
               current={org.data?.logoUrl ?? null}
               hint="PNG, JPEG or WebP, up to 2 MB. It is saved as soon as you choose it."
               onUpload={async (file) => {
-                org.set(await uploadLogo(file));
+                await unwrapApi(dispatch(logoUploaded(file)));
               }}
               onRemove={async () => {
-                org.set(await removeLogo());
+                await unwrapApi(dispatch(logoRemoved()));
               }}
             />
 
@@ -292,7 +267,7 @@ export default function Settings(): JSX.Element {
 
           <WordsEditor
             labels={draft}
-            overrides={overrides}
+            overrides={words?.overrides ?? []}
             onSetOne={setOne}
             onSetMany={setMany}
             onResetPlural={resetPlural}

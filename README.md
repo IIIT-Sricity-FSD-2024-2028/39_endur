@@ -58,35 +58,45 @@ responded" and still not know whose answer is whose.
 
 ## 🟦 State (Redux Toolkit)
 
-All client state lives in one store, `src/frontend/store/`. It holds two kinds of state:
+Every piece of client state lives in one store, `src/frontend/store/`. No component keeps
+state of its own: there is no `useState` or `useReducer` anywhere in the client. The lint
+rule `endur/no-component-state` fails the build if one appears, and `npm run audit:state`
+(a CI step) counts what is left, which is zero. The store holds two kinds of state:
 
 | Kind | Where | What |
 |---|---|---|
-| Server data | RTK Query: `api` (the org API) and `opsApi` (the operator console) | Every read the console makes, cached, de-duplicated and refreshed by tags. Endpoints are injected per domain from `store/api/endpoints/*.ts` |
-| Client state | Slices: `auth`, `vocabulary`, `ops`, `ui` (toasts); and, injected only when their page loads, `builder`, `wizard`, `powersGrid` | What the user is editing and has not saved, with undo |
+| Server data | RTK Query: `api` (the org API) and `opsApi` (the operator console) | Every read, cached, de-duplicated and refreshed by tags. Endpoints are injected per domain from `store/api/endpoints/*.ts` |
+| Screen state | Slices: `auth`, `vocabulary`, `ops`, `ui` (the toast), and one slice per screen area in `store/screens/` (`campaigns`, `people`, `booking`, `plan`, `entry`, `operator`, …), injected when its page loads | What the server does not know: drafts, what is open, what is in flight, what failed |
 
-- **Pages never talk to the store's API layer.** They call the `use*` hooks in
-  `src/frontend/lib/` (`useCampaign`, `useUnits`, …), which keep the shape pages were
-  written against: `{ data, loading, error }` plus commands that resolve or throw an
-  `ApiError`. Lint enforces it: a page or component may not import `store/api`, nor the
-  untyped `useSelector` / `useDispatch` (use `useAppSelector` / `useAppDispatch`).
+- **Components read and dispatch, nothing else.** A page reads with `useAppSelector` and
+  sends events (`slotEdited`, `themeChosen`) and commands with `dispatch`. Every command is
+  a thunk (`createScreenThunk`) that dispatches an RTK Query endpoint, so the request still
+  goes through the cache and its tags; the slice handles `pending`, `fulfilled` and
+  `rejected`. The read hooks in `src/frontend/lib/` (`useCampaign`, `useUnits`, …) keep
+  the `{ data, loading, error }` shape pages were written against. Lint stops a page from
+  importing `store/api`, or the untyped `useSelector` / `useDispatch`.
+- **No password is ever in the store.** Password boxes are uncontrolled. They are read with
+  `FormData` when needed and passed as a thunk's argument, and the store keeps only "filled
+  enough" flags. Tests check the whole state never contains one. DevTools' copy of any
+  action argument has passwords blanked (`store/devtools.ts`).
 - **Writes refresh what they change.** A mutation invalidates the tags of everything it
-  affects. Anything that changes what the signed-in user may do (a grant, a role
-  reorder, a position) invalidates `Me`, so `/auth/me` is re-read and the nav follows,
-  with no reload.
+  affects. Anything that changes what the signed-in user may do (a grant, a role reorder,
+  a position) invalidates `Me`, so `/auth/me` is re-read and the nav follows, with no
+  reload.
 - **Middleware:** the builder's autosave and undo history, and the cache reset on sign-out
   or org switch, are listener middleware (`store/middleware/`). A 401 from any query ends
   the session through a classic middleware (`sessionExpired.ts`).
-- **The respondent pages (`/r/…`, `/book/…`) never load the store.** They run on a phone
-  over a venue network; `pages/respond/bundle.test.ts` fails the build if anything under
-  `store/` reaches them.
-- **Redux DevTools** connects in development. Any password in an action's argument is
-  blanked before DevTools sees it (`store/devtools.ts`).
+- **The respondent pages (`/r/…`, `/book/…`) stay small.** They run on a phone over a venue
+  network. `pages/respond/bundle.test.ts` fails the build if they reach any store file the
+  entry chunk does not already carry, other than their own slice and endpoints.
+- **Each endpoint name is used once per API** (`store/api/endpoints.test.ts`). Two files
+  injecting the same name do not fail loudly: the first one wins, silently.
 
 To add a server read: an endpoint in the domain's `store/api/endpoints/<domain>.ts` (with
 `providesTags`, and `invalidatesTags` on the mutations that change it), then a hook in
-`lib/<domain>.ts` built on `useLoadable` from `lib/query.ts`. Tests stub `fetch` with
-`stubApi` from `test-utils.tsx` and run the real store.
+`lib/<domain>.ts` built on `useLoadable` from `lib/query.ts`. To add a command: a thunk in
+that screen's `store/screens/<area>.ts` that dispatches the mutation, and its three cases in
+the slice. Tests stub `fetch` with `stubApi` from `test-utils.tsx` and run the real store.
 
 ## 🟪 Repository
 
@@ -169,7 +179,7 @@ own ports (API 4100, web 5180), so they run beside `npm run dev` without touchin
 ## 🟩 CI
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
-typecheck, lint, `audit:vocab`, `audit:css`, both test suites (against a throwaway
+typecheck, lint, `audit:vocab`, `audit:css`, `audit:state --check`, both test suites (against a throwaway
 Postgres 16), the build, and the end-to-end tests. `format:check` runs but does not fail
 the build yet: the codebase predates the formatter being enforced. After a one-off
 `npm run format` commit, remove its `continue-on-error`.

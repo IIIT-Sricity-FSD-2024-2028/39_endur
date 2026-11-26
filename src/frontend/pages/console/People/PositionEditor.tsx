@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useId } from 'react';
 import type { ResolvedLabels, RoleView } from '@endur/shared';
 import { Icon } from '../../../components/Icon.js';
 import { formatDate } from '../../../lib/format.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  positionDraftEdited,
+  positionEditorLeft,
+  selectPositionDraft,
+  type PositionDraft,
+} from '../../../store/screens/people.js';
 
-export type PositionDraft = { roleId: string; unitId: string; isPrimary: boolean };
+export type { PositionDraft } from '../../../store/screens/people.js';
 
 export function PositionEditor({
   roles,
@@ -24,9 +32,17 @@ export function PositionEditor({
   onAdd: (draft: PositionDraft) => void;
   onCancel: () => void;
 }): JSX.Element {
-  const [roleId, setRoleId] = useState('');
-  const [unitId, setUnitId] = useState('');
-  const [isPrimary, setIsPrimary] = useState(!hasPositions);
+  // This editor's draft is its entry in `state.people.positionDrafts` (by instance id):
+  // two open on one page never share a pick, and it goes when the editor closes.
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const stored = useAppSelector((state) => selectPositionDraft(state, id));
+  useClearOnLeave(positionEditorLeft({ id }));
+  const { roleId, unitId, isPrimary }: PositionDraft =
+    stored ?? { roleId: '', unitId: '', isPrimary: !hasPositions };
+  const edit = (patch: Partial<PositionDraft>): void => {
+    dispatch(positionDraftEdited({ id, isPrimaryDefault: !hasPositions, ...patch }));
+  };
 
   const ready = roleId !== '' && unitId !== '';
 
@@ -44,7 +60,7 @@ export function PositionEditor({
         className="input"
         value={roleId}
         disabled={busy}
-        onChange={(event) => setRoleId(event.target.value)}
+        onChange={(event) => edit({ roleId: event.target.value })}
       >
         <option value="">Role…</option>
         {roles.map((role) => (
@@ -60,7 +76,7 @@ export function PositionEditor({
         className="input"
         value={unitId}
         disabled={busy}
-        onChange={(event) => setUnitId(event.target.value)}
+        onChange={(event) => edit({ unitId: event.target.value })}
       >
         <option value="">{labels.unit.one}…</option>
         {units.map((unit) => (
@@ -74,7 +90,7 @@ export function PositionEditor({
             type="checkbox"
             checked={isPrimary}
             disabled={busy}
-            onChange={(event) => setIsPrimary(event.target.checked)}
+            onChange={(event) => edit({ isPrimary: event.target.checked })}
           />
           Primary
         </label>

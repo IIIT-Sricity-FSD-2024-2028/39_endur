@@ -79,8 +79,9 @@ export function makeStore(session: SessionFixture = {}): AppStore {
 /** One request `stubApi` saw. `body` is parsed JSON when the request sent JSON. */
 export type StubCall = { method: string; path: string; body: unknown; headers: Headers };
 
-/** What a stubbed route answers: a status and JSON body, or an `Error` for no response. */
-export type StubReply = { status?: number; body?: unknown } | Error;
+/** What a stubbed route answers: a status, JSON body and any extra headers (`Retry-After`),
+ *  or an `Error` for no response. */
+export type StubReply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error;
 
 /** A response the test releases when it chooses: for "what happens while it is in flight". */
 export function heldReply(reply: StubReply = { body: {} }): {
@@ -135,10 +136,10 @@ export function stubApi(
         if (reply instanceof Error) throw reply;
         const status = reply.status ?? 200;
         return status === 204
-          ? new Response(null, { status })
+          ? new Response(null, { status, ...(reply.headers ? { headers: reply.headers } : {}) })
           : new Response(JSON.stringify(reply.body ?? {}), {
               status,
-              headers: { 'content-type': 'application/json' },
+              headers: { 'content-type': 'application/json', ...reply.headers },
             });
       },
     );

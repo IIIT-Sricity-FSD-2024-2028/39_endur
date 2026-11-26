@@ -1,14 +1,17 @@
-// R-406: the simulator and the activation link on RTK Query, over a stubbed `fetch`.
-import { act, renderHook, waitFor } from '@testing-library/react';
+// R-406: the simulator and the activation link on RTK Query, over a stubbed `fetch`. Running a
+// simulation is the `simulationRun` thunk (store/screens/simulator.ts), tested here against
+// the store; the page is pages/console/Simulator.test.tsx.
+import { renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DecisionView, SimulateBody } from '@endur/shared';
+import type { DecisionView } from '@endur/shared';
 import { setupStore } from '../store/index.js';
+import { selectSimulator, simulationRun, type SimulationQuery } from '../store/screens/simulator.js';
 import { errorReply, stubApi } from '../test-utils.js';
 import { useActivationPreview } from './accounts.js';
 import { usePowersGrid } from './roles.js';
-import { useCapabilityCatalogue, useSimulator } from './simulator.js';
+import { useCapabilityCatalogue } from './simulator.js';
 
 function render<T>(hook: () => T) {
   const store = setupStore();
@@ -16,7 +19,7 @@ function render<T>(hook: () => T) {
   return renderHook(hook, { wrapper });
 }
 
-const query = { principalId: 'p1', capability: 'campaign.launch' } as unknown as SimulateBody;
+const query: SimulationQuery = { principalUserId: 'p1', capability: 'campaign.launch', target: { kind: 'org' } };
 const labels = { principalName: 'Amara', targetLabel: 'Ward 4', capabilityLabel: 'open plithes' };
 const decision = (allowed: boolean) => ({ body: { data: { allowed } as unknown as DecisionView } });
 
@@ -24,42 +27,41 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('useSimulator', () => {
+describe('simulationRun', () => {
   it('asks the server every time, and keeps the last five, newest first', async () => {
     let allowed = false;
     const calls = stubApi({ 'POST /authz/simulate': () => decision(allowed) });
-    const { result } = render(() => useSimulator());
+    const store = setupStore();
 
     for (let run = 0; run < 6; run += 1) {
       allowed = run % 2 === 1;
-      await act(async () => { await result.current.run(query, labels); });
+      await store.dispatch(simulationRun({ query, labels }));
     }
 
     // The same question, asked again after a grant edit, must be ASKED again: never cached.
     expect(calls).toHaveLength(6);
-    expect(result.current.history).toHaveLength(5);
-    expect(result.current.history[0]?.decision).toEqual({ allowed: true });
-    expect(result.current.running).toBe(false);
+    const { history, running } = selectSimulator(store.getState());
+    expect(history).toHaveLength(5);
+    expect(history[0]?.decision).toEqual({ allowed: true });
+    expect(history[0]).toMatchObject({ principalName: 'Amara', query });
+    expect(running).toBe(false);
   });
 
-  it('a 403 means "you may not simulate", not an error to print', async () => {
-    stubApi({ 'POST /authz/simulate': errorReply(403, 'FORBIDDEN', 'No.') });
-    const { result } = render(() => useSimulator());
-
-    await act(async () => { await result.current.run(query, labels); });
-
-    expect(result.current.forbidden).toBe(true);
-    expect(result.current.error).toBeNull();
+  it('sends a date as the request\'s instant, and keeps the plain string', async () => {
+    const calls = stubApi({ 'POST /authz/simulate': () => decision(true) });
+    const store = setupStore();
+    await store.dispatch(simulationRun({ query: { ...query, at: '2026-12-01' }, labels }));
+    expect((calls[0]?.body as { at: string }).at).toBe(new Date('2026-12-01').toISOString());
+    expect(selectSimulator(store.getState()).history[0]?.query.at).toBe('2026-12-01');
   });
 
-  it('any other failure is the server\'s sentence', async () => {
+  it('keeps a failure, and adds nothing to the history', async () => {
     stubApi({ 'POST /authz/simulate': errorReply(409, 'CONFLICT', 'That person holds no position.') });
-    const { result } = render(() => useSimulator());
-
-    await act(async () => { await result.current.run(query, labels); });
-
-    expect(result.current.error).toBe('That person holds no position.');
-    expect(result.current.history).toEqual([]);
+    const store = setupStore();
+    await store.dispatch(simulationRun({ query, labels }));
+    const { error, history } = selectSimulator(store.getState());
+    expect(error).toMatchObject({ status: 409, message: 'That person holds no position.' });
+    expect(history).toEqual([]);
   });
 });
 

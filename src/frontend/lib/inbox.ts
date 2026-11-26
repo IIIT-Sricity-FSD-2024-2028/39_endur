@@ -8,21 +8,20 @@
 // somebody can paste — the same rule as `40`'s filters.
 //
 // On RTK Query since R-501 (`store/api/endpoints/inbox.ts`): the queue is an infinite query,
-// and the optimistic marks are patches to its cache, undone in place on failure.
-import { useCallback, useMemo, useState } from 'react';
+// and the optimistic marks are patches to its cache, undone in place on failure. Reads only:
+// the marks are thunks, with each card's failure, in `store/screens/inbox.ts` (DEC-R03).
+import { useCallback, useMemo } from 'react';
 import type { InboxMessage, InboxQuery, InboxResponse, InboxState, Page } from '@endur/shared';
-import { ApiError } from './api.js';
 import { isSerializedApiError } from '../store/api/errors.js';
 import {
   useGetInboxInfiniteQuery,
   useGetMessagesQuery,
-  useMarkInboxMutation,
-  useMarkMessageMutation,
+  type InboxArgs,
   type MarkAction,
 } from '../store/api/endpoints/inbox.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+import { useLoadable, type Loadable } from './query.js';
 
-export type { MarkAction };
+export type { InboxArgs, MarkAction };
 
 export type InboxController = Loadable<Page<InboxResponse>> & {
   /** Absent capability, not an empty queue — the page renders a 403 rather than "up to date". */
@@ -30,9 +29,8 @@ export type InboxController = Loadable<Page<InboxResponse>> & {
   loadMore: () => Promise<void>;
   loadingMore: boolean;
   reload: () => Promise<void>;
-  mark: (responseId: string, action: MarkAction, opts?: { keep?: boolean }) => Promise<void>;
-  /** Per-card failure, keyed by response id. Inline on the card — never a toast (58 § States). */
-  failures: Record<string, string>;
+  /** Which cache entry this queue is: what `inboxMarked` patches. */
+  args: InboxArgs;
 };
 
 export function inboxSearch(query: Partial<InboxQuery>): string {
@@ -57,8 +55,6 @@ export function useInbox(query: Partial<InboxQuery>, enabled = true): InboxContr
 
   const inbox = useGetInboxInfiniteQuery(args, { skip: !enabled });
   const { fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = inbox;
-  const [markInbox] = useMarkInboxMutation();
-  const [failures, setFailures] = useState<Record<string, string>>({});
 
   // The loaded pages as ONE page: every card so far, and the cursor and total from the
   // newest page.
@@ -81,39 +77,13 @@ export function useInbox(query: Partial<InboxQuery>, enabled = true): InboxContr
     if (hasNextPage && !isFetching) await fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetching]);
 
-  /**
-   * OPTIMISTIC, and it reverts the ONE card rather than reloading the queue
-   * (`markInbox` in the endpoints says how, and why `keep` exists).
-   */
-  const mark = useCallback(
-    async (responseId: string, action: MarkAction, opts?: { keep?: boolean }) => {
-      if (!data) return;
-      setFailures((current) => {
-        if (!(responseId in current)) return current;
-        const next = { ...current };
-        delete next[responseId];
-        return next;
-      });
-      try {
-        await unwrapApi(markInbox({ responseId, action, keep: opts?.keep, args }));
-      } catch (error) {
-        setFailures((current) => ({
-          ...current,
-          [responseId]: error instanceof ApiError ? error.message : 'That did not save. Try again.',
-        }));
-      }
-    },
-    [data, markInbox, args],
-  );
-
   return {
     ...loaded,
     ...(forbidden ? { data: null, error: null } : {}),
     forbidden,
     loadMore,
     loadingMore: isFetchingNextPage,
-    mark,
-    failures,
+    args,
   };
 }
 
@@ -132,20 +102,11 @@ export function useInbox(query: Partial<InboxQuery>, enabled = true): InboxContr
 // ---------------------------------------------------------------------------
 
 export type MessagesController = Loadable<Page<InboxMessage>> & {
-  mark: (id: string, action: 'read' | 'unread') => Promise<void>;
   reload: () => Promise<void>;
 };
 
+/** The messages. Marking one is `messageMarked` (store/screens/inbox.ts). */
 export function useMessages(enabled = true): MessagesController {
   const messages = useLoadable(useGetMessagesQuery(undefined, { skip: !enabled }));
-  const [markMessage] = useMarkMessageMutation();
-
-  const mark = useCallback(
-    async (id: string, action: 'read' | 'unread') => {
-      await unwrapApi(markMessage({ id, action }));
-    },
-    [markMessage],
-  );
-
-  return { ...messages, loading: enabled && messages.loading, mark };
+  return { ...messages, loading: enabled && messages.loading };
 }

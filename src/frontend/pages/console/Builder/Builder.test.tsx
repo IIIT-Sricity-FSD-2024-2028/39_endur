@@ -4,8 +4,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
-import type { Capability, TemplateDetail } from '@endur/shared';
-import { makeStore, renderWithProviders, stubApi, NONSENSE_LABELS, type StubCall } from '../../../test-utils.js';
+import type { Capability } from '@endur/shared';
+import {
+  errorReply, makeStore, renderWithProviders, stubApi, NONSENSE_LABELS, type StubCall,
+} from '../../../test-utils.js';
 import type { QuestionDraft } from '../../../components/form/kinds.js';
 import type { AppStore } from '../../../store/index.js';
 import {
@@ -43,13 +45,11 @@ vi.mock('./useBuilder.js', () => ({
   useBuilder: () => ({
     loading: state.loading,
     loadError: state.loadError,
-    template: state.loadError ? null : ({ readOnly: state.locked } as TemplateDetail),
+    ready: !state.loadError && !state.loading,
   }),
 }));
 
 vi.mock('../../../lib/templates.js', () => ({
-  cloneKey: (id: string) => `key-for-${id}`,
-  useCloneTemplate: () => clone,
   useTemplates: () => ({ data: null, loading: false, error: null, reload: vi.fn(), create: vi.fn(), clone, remove: vi.fn() }),
   useTemplate: () => ({ data: null, loading: false, error: null, reload: vi.fn() }),
   useTemplateLibrary: () => ({ data: null, loading: false, error: null, reload: vi.fn() }),
@@ -101,6 +101,8 @@ beforeEach(() => {
   calls = stubApi({
     'PATCH /templates/t1': { body: { data: {} } },
     'PUT /templates/t1/questions': { body: { data: {} } },
+    // "Duplicate to edit" is a thunk over RTK Query (store/screens/builderPage.ts).
+    'POST /templates/t1/clone': { status: 201, body: { data: { id: 't2', name: 'Mid-term check (copy)' } } },
   });
   state.questions = QUESTIONS;
   state.loading = false;
@@ -300,6 +302,27 @@ describe('states', () => {
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Form name' }).disabled).toBe(true);
     expect(container.querySelector('.builder-rail')).toBeNull();
     expect(screen.getByRole('button', { name: 'Duplicate to edit' })).toBeTruthy();
+  });
+
+  it('"Duplicate to edit" copies the form under a new name and opens the copy', async () => {
+    state.locked = true;
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate to edit' }));
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Duplicating…' }).disabled).toBe(true);
+    await act(async () => { await vi.runAllTimersAsync(); });
+    const copy = calls.find((call) => call.path === '/templates/t1/clone');
+    expect(copy?.body).toEqual({ name: 'Mid-term check (copy)' });
+    expect(copy?.headers.get('idempotency-key')).toMatch(/^clone:t1:/);
+  });
+
+  it('says so when the duplicate fails, instead of doing nothing', async () => {
+    state.locked = true;
+    stubApi({ 'POST /templates/t1/clone': errorReply(402, 'PAYMENT_REQUIRED', 'Your plan allows 10 forms.') });
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate to edit' }));
+    await act(async () => { await vi.runAllTimersAsync(); });
+    expect(screen.getByRole('alert').textContent).toBe('Your plan allows 10 forms.');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Duplicate to edit' }).disabled).toBe(false);
   });
 
   it('without template.update it is the PREVIEW, not an editor with every control off', () => {

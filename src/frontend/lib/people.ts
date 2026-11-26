@@ -12,34 +12,13 @@
 // both questions in one dialog — it does not remove it.
 //
 // On RTK Query since R-404 (`store/api/endpoints/people.ts`). Names and shapes unchanged.
-// The import wizard's two requests moved here too (`usePeopleImport`): they were the last
-// `apiPost` calls made from inside a component in this part of the console.
-import { useCallback } from 'react';
-import type {
-  CreateAssignmentBody,
-  CreatePersonBody,
-  ImportPeopleBody,
-  ImportPreview,
-  Page,
-  PersonDetail,
-  PersonSummary,
-  UpdatePersonBody,
-} from '@endur/shared';
-import {
-  useAssignPersonMutation,
-  useCreatePersonMutation,
-  useDeletePersonMutation,
-  useGetPeopleQuery,
-  useGetPersonQuery,
-  useImportPeopleMutation,
-  usePreviewImportMutation,
-  useUnassignPersonMutation,
-  useUpdatePersonMutation,
-  type ImportResult,
-} from '../store/api/endpoints/people.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
+// Every command (add, rename, positions, accounts, the CSV import) is a thunk in
+// store/screens/people.ts since R-708 (DEC-R03): this file is the reads.
+import type { Page, PersonDetail, PersonSummary } from '@endur/shared';
+import { useGetPeopleQuery, useGetPersonQuery } from '../store/api/endpoints/people.js';
+import { useLoadable, type Loadable } from './query.js';
 
-export type { ImportResult };
+export type { ImportResult } from '../store/api/endpoints/people.js';
 
 /**
  * The first few people anchored in a unit, for the structure detail panel
@@ -89,11 +68,6 @@ export type PeopleQuery = {
 
 export type PeopleListController = Loadable<Page<PersonSummary>> & {
   reload: () => Promise<void>;
-  create: (body: CreatePersonBody) => Promise<PersonSummary>;
-  update: (id: string, body: UpdatePersonBody) => Promise<void>;
-  remove: (id: string) => Promise<void>;
-  assign: (id: string, body: CreateAssignmentBody) => Promise<void>;
-  unassign: (id: string, edgeId: string) => Promise<void>;
 };
 
 /** Built once so the cache key is a string rather than a freshly-made object. */
@@ -114,156 +88,26 @@ export function peopleSearch(query: PeopleQuery): string {
  * old copy.
  */
 export function usePeopleList(query: PeopleQuery): PeopleListController {
-  const list = useLoadable(useGetPeopleQuery(peopleSearch(query)));
-  const { reload } = list;
-  const [createPerson] = useCreatePersonMutation();
-  const [updatePerson] = useUpdatePersonMutation();
-  const [deletePerson] = useDeletePersonMutation();
-  const [assignPerson] = useAssignPersonMutation();
-  const [unassignPerson] = useUnassignPersonMutation();
-
-  const create = useCallback(
-    async (body: CreatePersonBody) => {
-      const created = await unwrapApi(createPerson(body));
-      await reload();
-      return created;
-    },
-    [createPerson, reload],
-  );
-
-  const update = useCallback(
-    async (id: string, body: UpdatePersonBody) => {
-      await unwrapApi(updatePerson({ id, body }));
-      await reload();
-    },
-    [updatePerson, reload],
-  );
-
-  const remove = useCallback(
-    async (id: string) => {
-      await unwrapApi(deletePerson(id));
-      await reload();
-    },
-    [deletePerson, reload],
-  );
-
-  /**
-   * NOT optimistic, unlike a rename (`lib/subjects.ts`). A position is a permission change:
-   * showing it as applied before the server agreed would mean the screen claims somebody has
-   * powers they may not have — and INV-012 means this call can legitimately be REFUSED
-   * (`403 WOULD_ESCALATE`) even though the caller holds `assignment.create`. An optimistic
-   * chip that then vanished would read as a bug rather than as the rule it is.
-   */
-  const assign = useCallback(
-    async (id: string, body: CreateAssignmentBody) => {
-      await unwrapApi(assignPerson({ id, body }));
-      await reload();
-    },
-    [assignPerson, reload],
-  );
-
-  const unassign = useCallback(
-    async (id: string, edgeId: string) => {
-      await unwrapApi(unassignPerson({ id, edgeId }));
-      await reload();
-    },
-    [unassignPerson, reload],
-  );
-
-  return { ...list, create, update, remove, assign, unassign };
+  return useLoadable(useGetPeopleQuery(peopleSearch(query)));
 }
 
 /* ------------------------------------------------------------------ the detail page */
 
 export type PersonController = Loadable<PersonDetail> & {
   reload: () => Promise<void>;
-  rename: (name: string) => Promise<void>;
-  setEmail: (email: string) => Promise<void>;
-  assign: (body: CreateAssignmentBody) => Promise<void>;
-  unassign: (edgeId: string) => Promise<void>;
 };
 
 /**
- * One person, with their powers. `T-051`, `34` § Interactions.
+ * One person, with their powers. `T-051`, `34` § Interactions. Moving to another person
+ * never shows the last one's record while it loads (`current`).
  *
- * Every write here RE-READS the whole person rather than patching what came back, and that
- * is not laziness — a position change changes the POWERS, and the powers are resolved
- * server-side across the whole capability catalogue. There is no client-side way to work out
- * what adding "Tutor at Section B" grants somebody, and a screen that showed the new chip
- * beside the old power list would be showing a state that never existed.
- *
- * The re-read is the `{ Person, id }` tag each write invalidates; the promise resolves once
- * it is in. Moving to another person never shows the last one's record while it loads.
+ * Its commands are thunks in store/screens/people.ts, and every one RE-READS the whole person
+ * through the `{ Person, id }` tag rather than patching what came back: a position change
+ * changes the POWERS, which are resolved server-side across the whole capability catalogue.
  */
 export function usePerson(id: string): PersonController {
-  const person = useLoadable(useGetPersonQuery(id), { current: true });
-  const { reload } = person;
-  const [updatePerson] = useUpdatePersonMutation();
-  const [assignPerson] = useAssignPersonMutation();
-  const [unassignPerson] = useUnassignPersonMutation();
-
-  const patch = useCallback(
-    async (body: UpdatePersonBody) => {
-      await unwrapApi(updatePerson({ id, body }));
-      await reload();
-    },
-    [id, updatePerson, reload],
-  );
-
-  return {
-    ...person,
-    rename: useCallback((name: string) => patch({ name }), [patch]),
-    // Editable HERE and nowhere else in the product: an administrator changing somebody's
-    // address is an identity change with an audit row against it, and `/profile` refuses
-    // the same field for the same reason (47 § Data contract).
-    setEmail: useCallback((email: string) => patch({ email }), [patch]),
-    assign: useCallback(
-      async (body: CreateAssignmentBody) => {
-        await unwrapApi(assignPerson({ id, body }));
-        await reload();
-      },
-      [id, assignPerson, reload],
-    ),
-    unassign: useCallback(
-      async (edgeId: string) => {
-        await unwrapApi(unassignPerson({ id, edgeId }));
-        await reload();
-      },
-      [id, unassignPerson, reload],
-    ),
-  };
+  return useLoadable(useGetPersonQuery(id), { current: true });
 }
 
-/* ------------------------------------------------------------------ the import */
-
-export type PeopleImport = {
-  /** What the file would do: its columns, a sample, and the names this org lacks. */
-  preview: (csv: string) => Promise<ImportPreview>;
-  /** `key` is the caller's idempotency key, derived from the file (`importKey`). */
-  commit: (body: ImportPeopleBody, key: string) => Promise<ImportResult>;
-};
-
-/**
- * The CSV import's two requests, for `ImportWizard`. The commit re-reads the directory,
- * each role's head count and the branches' people by itself, so the list behind the wizard
- * is current when it closes.
- */
-export function usePeopleImport(): PeopleImport {
-  const [previewImport] = usePreviewImportMutation();
-  const [importPeople] = useImportPeopleMutation();
-  return {
-    preview: useCallback((csv: string) => unwrapApi(previewImport(csv)), [previewImport]),
-    commit: useCallback(
-      (body: ImportPeopleBody, key: string) => unwrapApi(importPeople({ body, key })),
-      [importPeople],
-    ),
-  };
-}
-
-/**
- * MOVED TO `lib/roles.ts` AT T-052, and re-exported here so this file's callers are
- * untouched. `33` owns roles; T-034 put the hook here only because the position picker's
- * first dropdown was the first thing that ever needed it, and two hooks fetching `/roles`
- * would be two places to fix when the shape changes.
- */
+// The role picker's list, for the pages that assign positions: one import for both.
 export { useRoles } from './roles.js';

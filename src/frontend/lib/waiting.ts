@@ -1,15 +1,9 @@
 // Members-only forms waiting for the signed-in person's answer: the card on Home, the count
 // beside Home in the sidebar, and answering from the card.
-import { useCallback } from 'react';
-import type { AnsweredForm, PublicCampaign, SubmitResponseBody, WaitingForm } from '@endur/shared';
-import {
-  useAnswerWaitingMutation,
-  useGetAnsweredQuery,
-  useGetWaitingFormQuery,
-  useGetWaitingQuery,
-} from '../store/api/endpoints/waiting.js';
-import { unwrapApi, useLoadable, type Loadable } from './query.js';
-import type { SubmitResult } from './respond.js';
+import type { AnsweredForm, PublicCampaign, WaitingForm } from '@endur/shared';
+import { useGetAnsweredQuery, useGetWaitingQuery } from '../store/api/endpoints/waiting.js';
+import { useGetPublicCampaignQuery } from '../store/api/endpoints/respond.js';
+import { useLoadable, type Loadable } from './query.js';
 
 /**
  * How often the list is re-read while the app is open. This is what makes a new form show
@@ -37,20 +31,10 @@ export function useAnswered(): Loadable<AnsweredForm[]> & { rows: AnsweredForm[]
   return { ...result, rows: result.data ?? [] };
 }
 
-/** The form behind one card, loaded when the card is opened. */
+/**
+ * The form behind one card, loaded when the card is opened: the respondent route the link
+ * uses, one cache entry per token. Answering it is <RespondForm>'s thunk.
+ */
 export function useWaitingForm(token: string): Loadable<PublicCampaign> & { reload: () => Promise<void> } {
-  return useLoadable(useGetWaitingFormQuery(token), { current: true });
-}
-
-/** Submits from the card. Throws the `ApiError`, so the form shows field errors inline. */
-export function useAnswerWaiting(): (
-  form: WaitingForm,
-  body: SubmitResponseBody,
-  key: string,
-) => Promise<SubmitResult> {
-  const [answer] = useAnswerWaitingMutation();
-  return useCallback(
-    async (form, body, key) => unwrapApi(answer({ form, body, key })),
-    [answer],
-  );
+  return useLoadable(useGetPublicCampaignQuery(token), { current: true });
 }

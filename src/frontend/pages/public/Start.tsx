@@ -1,109 +1,74 @@
-import { useRef, useState } from 'react';
+// `/start`: create an organisation, choose a plan, pay or start a trial. Its state is
+// `state.entry.signup` (store/screens/entry.ts) and registering is the `signupSubmitted` thunk.
+//
+// The password is NOT in the store (DEC-014). Its box is uncontrolled and read from the form
+// when it is needed: to check the details, and to register. The details are hidden, not
+// unmounted, while the plans are up, so the password is still in its box at that point and
+// "Back" finds everything as it was left.
+import { useRef } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { RegisterBody, SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
+import { SIGNUP_PLAN_OPTIONS, type SignupTier } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
 import { PlanPicker } from '../../components/billing/PlanPicker.js';
 import { PaymentDialog } from '../../components/billing/PaymentDialog.js';
-import { useFormValidation } from '../../lib/validate.js';
-import { ApiError } from '../../lib/api.js';
-import { useRefreshSession, useRegister } from '../../lib/auth.js';
+import { unwrapApi } from '../../lib/query.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { fieldErrorOf, useClearOnLeave } from '../../store/screens/common.js';
+import {
+  MIN_PASSWORD,
+  selectEntry,
+  signupBackToDetails,
+  signupCheckoutClosed,
+  signupCheckoutOpened,
+  signupDetailsContinued,
+  signupEdited,
+  signupFinished,
+  signupLeft,
+  signupPasswordTyped,
+  signupRevealToggled,
+  signupSubmitted,
+  signupTierChosen,
+} from '../../store/screens/entry.js';
 import { AuthAside } from './AuthAside.js';
-
-const MIN_PASSWORD = 10;
-
-const DETAILS_SCHEMA = RegisterBody.pick({
-  orgName: true,
-  name: true,
-  email: true,
-  password: true,
-});
 
 export default function Start(): JSX.Element {
   const navigate = useNavigate();
-  const registerOrg = useRegister();
-  const refreshSession = useRefreshSession();
+  const dispatch = useAppDispatch();
+  const {
+    step, orgName, name, email, tier, reveal, paying, busy, error, detailErrors,
+  } = useAppSelector(selectEntry).signup;
+  useClearOnLeave(signupLeft());
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const [step, setStep] = useState<'details' | 'plan'>('details');
-  const [orgName, setOrgName] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [tier, setTier] = useState<SignupTier | null>(null);
-  const [paying, setPaying] = useState(false);
-  const [reveal, setReveal] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<ApiError | Error | null>(null);
-  const landingRef = useRef<string | null>(null);
-
-  const details = useFormValidation(DETAILS_SCHEMA);
-
-  const detailValues = (): Record<string, string> => ({
-    orgName: orgName.trim(),
-    name: name.trim(),
-    email: email.trim(),
-    password,
-  });
+  /** What is in the password box right now. Read when needed, never kept. */
+  const password = (): string => {
+    const value = formRef.current ? new FormData(formRef.current).get('password') : null;
+    return typeof value === 'string' ? value : '';
+  };
 
   function onFormSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (step === 'details') {
-      if (!details.check(detailValues())) return;
-      setStep('plan');
+      dispatch(signupDetailsContinued(password()));
       return;
     }
-    if (!tier || busy) return;
-    setPaying(true);
+    dispatch(signupCheckoutOpened());
   }
 
-  // Resolves true once registered, false when refused. For a paid signup, hydrating the session
-  // is held back too (landingRef holds the destination instead) - `/start` is wrapped in
-  // <RedirectIfSignedIn>, which force-navigates the instant auth.status flips, and that would
-  // unmount PaymentDialog before its "Payment successful" screen is ever seen. onDone hydrates
-  // and navigates once that screen has had its moment. Trials and other non-dialog paths have
-  // nothing to wait on, so they hydrate and navigate here.
-  async function submit(
-    options: { paymentRef?: string; trial?: boolean; holdNavigation?: boolean } = {},
-  ): Promise<boolean> {
-    if (busy || !tier) return false;
-    setBusy(true);
-    setError(null);
-    try {
-      const landing = await registerOrg(
-        {
-          orgName: orgName.trim(),
-          name: name.trim(),
-          email: email.trim(),
-          password,
-          industry: 'custom',
-          tier,
-          paymentRef: options.paymentRef,
-          trial: options.trial ?? false,
-        },
-        options.holdNavigation ? { skipHydrate: true } : undefined,
-      );
-      if (options.holdNavigation) {
-        landingRef.current = landing;
-      } else {
-        navigate(landing, { replace: true });
-      }
-      return true;
-    } catch (caught) {
-      setPaying(false);
-      setError(caught as Error);
-      setBusy(false);
-      const status = (caught as ApiError).status;
-      if (status === 409 || status === 422) setStep('details');
-      return false;
-    }
-  }
+  // A trial captures nothing, so it registers and goes straight in.
+  const startTrial = (): void => {
+    void dispatch(signupSubmitted({ password: password(), trial: true, holdSession: false }))
+      .then((result) => {
+        if (signupSubmitted.fulfilled.match(result)) navigate(result.payload, { replace: true });
+      });
+  };
 
   const chosenPlan = SIGNUP_PLAN_OPTIONS.find((plan) => plan.tier === tier) ?? null;
 
-  const apiError = error instanceof ApiError ? error : null;
+  const apiError = error?.kind === 'api' ? error : null;
   const fieldError = (path: string): string | undefined =>
-    details.errors[path] ??
-    (apiError?.status === 422 ? apiError.fieldError(path) : undefined);
+    detailErrors[path] ?? (apiError?.status === 422 ? fieldErrorOf(apiError, path) : undefined);
   const emailTaken = apiError?.status === 409;
   const banner =
     error && !emailTaken && apiError?.status !== 422
@@ -113,8 +78,8 @@ export default function Start(): JSX.Element {
   return (
     <div className={`auth ${step === 'plan' ? 'is-plan-mode' : ''}`}>
       <div className="auth-main">
-        <form onSubmit={onFormSubmit} noValidate>
-          {step === 'details' ? (
+        <form ref={formRef} onSubmit={onFormSubmit} noValidate>
+          <div hidden={step !== 'details'}>
             <div className="card elev-lg auth-card">
               <h1 className="auth-title">Create your organization</h1>
               <p className="auth-sub">Takes about two minutes.</p>
@@ -130,7 +95,7 @@ export default function Start(): JSX.Element {
                   required
                   maxLength={120}
                   value={orgName}
-                  onChange={(event) => { setOrgName(event.target.value); details.clear('orgName'); }}
+                  onChange={(event) => dispatch(signupEdited({ field: 'orgName', value: event.target.value }))}
                   aria-describedby={fieldError('orgName') ? 'orgName-error' : undefined}
                 />
                 {fieldError('orgName') && (
@@ -148,7 +113,7 @@ export default function Start(): JSX.Element {
               required
               maxLength={120}
               value={name}
-              onChange={(event) => { setName(event.target.value); details.clear('name'); }}
+              onChange={(event) => dispatch(signupEdited({ field: 'name', value: event.target.value }))}
               aria-describedby={fieldError('name') ? 'name-error' : undefined}
             />
             {fieldError('name') && (
@@ -167,7 +132,7 @@ export default function Start(): JSX.Element {
               required
               maxLength={200}
               value={email}
-              onChange={(event) => { setEmail(event.target.value); details.clear('email'); }}
+              onChange={(event) => dispatch(signupEdited({ field: 'email', value: event.target.value }))}
               aria-invalid={emailTaken || fieldError('email') ? true : undefined}
               aria-describedby={emailTaken || fieldError('email') ? 'email-error' : undefined}
             />
@@ -194,14 +159,13 @@ export default function Start(): JSX.Element {
                 required
                 minLength={MIN_PASSWORD}
                 maxLength={200}
-                value={password}
-                onChange={(event) => { setPassword(event.target.value); details.clear('password'); }}
+                onChange={() => dispatch(signupPasswordTyped())}
                 aria-describedby={fieldError('password') ? 'password-error' : 'password-help'}
               />
               <button
                 type="button"
                 className="btn btn-icon reveal-toggle"
-                onClick={() => setReveal((shown) => !shown)}
+                onClick={() => dispatch(signupRevealToggled())}
               >
                 <Icon name={reveal ? 'hide' : 'show'} size={18} label={reveal ? 'Hide password' : 'Show password'} />
               </button>
@@ -225,7 +189,8 @@ export default function Start(): JSX.Element {
             Already have an account? <Link className="btn btn-ghost" to="/login">Sign in</Link>
           </p>
           </div>
-          ) : (
+          </div>
+          {step === 'plan' && (
             <div className="auth-plan-wrapper">
               <div className="auth-plan-header">
                 <h1 className="auth-title">Choose a plan</h1>
@@ -236,7 +201,7 @@ export default function Start(): JSX.Element {
                 plans={SIGNUP_PLAN_OPTIONS}
                 current={tier}
                 mode="signup"
-                onSelect={(chosen) => setTier(chosen as SignupTier)}
+                onSelect={(chosen) => dispatch(signupTierChosen({ tier: chosen as SignupTier }))}
                 disabled={busy}
               />
 
@@ -258,7 +223,7 @@ export default function Start(): JSX.Element {
                   className="btn btn-secondary btn-block"
                   type="button"
                   disabled={busy || !tier}
-                  onClick={() => void submit({ trial: true })}
+                  onClick={startTrial}
                 >
                   {busy && <span className="spinner" aria-hidden="true" />}
                   Start 14-day trial instead
@@ -267,7 +232,7 @@ export default function Start(): JSX.Element {
                   className="btn btn-ghost btn-block"
                   type="button"
                   disabled={busy}
-                  onClick={() => setStep('details')}
+                  onClick={() => dispatch(signupBackToDetails())}
                 >
                   Back
                 </button>
@@ -285,17 +250,19 @@ export default function Start(): JSX.Element {
           mode="signup"
           // Navigation is held until onDone, so the dialog's "Payment successful" screen has a
           // chance to show before the page changes out from under it.
-          onPaid={(reference) =>
-            submit({ paymentRef: reference, holdNavigation: true }).then((registered) => {
-              if (!registered) throw new Error('Registration was refused.');
-            })
+          onPaid={(paymentRef) =>
+            unwrapApi(dispatch(signupSubmitted({
+              password: password(), paymentRef, trial: false, holdSession: true,
+            })))
           }
           onDone={() => {
-            const landing = landingRef.current;
-            if (!landing) return;
-            void refreshSession().then(() => navigate(landing, { replace: true }));
+            void dispatch(signupFinished()).then((result) => {
+              if (signupFinished.fulfilled.match(result) && result.payload) {
+                navigate(result.payload, { replace: true });
+              }
+            });
           }}
-          onCancel={() => setPaying(false)}
+          onCancel={() => dispatch(signupCheckoutClosed())}
         />
       )}
     </div>

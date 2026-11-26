@@ -19,6 +19,7 @@
 import type {
   CreateUnitBody,
   UnitComposition,
+  UnitImpact,
   UnitNode,
   UnitTreeTotals,
 } from '@endur/shared';
@@ -122,6 +123,17 @@ export const unitsApi = api.injectEndpoints({
       }),
       invalidatesTags: [LIST, 'UnitComposition', 'Person', 'Home'],
     }),
+
+    /**
+     * What deleting this unit costs, in numbers, for the confirm dialog: fetched when it
+     * opens, and fresh every time (`keepUnusedDataFor: 0`, and every mount re-reads). Until it
+     * answers, the dialog's destructive button stays disabled (32).
+     */
+    getUnitImpact: build.query<UnitImpact, string>({
+      query: (id) => `/units/${id}/impact`,
+      transformResponse: (response: { data: UnitImpact }) => response.data,
+      keepUnusedDataFor: 0,
+    }),
   }),
 });
 
@@ -132,4 +144,5 @@ export const {
   useRenameUnitMutation,
   useReparentUnitMutation,
   useDeleteUnitMutation,
+  useGetUnitImpactQuery,
 } = unitsApi;
