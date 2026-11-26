@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, Page, SubjectSummary, TemplateSummary, UnitNode } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubCall, type StubReply,
+} from '../../../test-utils.js';
 import { ApiError } from '../../../lib/api.js';
+import { toLocalInput } from '../../../lib/when.js';
 import New from './New.js';
 
 vi.mock('qrcode', () => ({
@@ -46,21 +49,37 @@ const page = <T,>(rows: T[]): Page<T> => ({
 
 const create = vi.fn();
 const launchCampaign = vi.fn();
+const cloneTemplate = vi.fn();
+let LIBRARY: TemplateSummary[] = [];
+let capabilities: Capability[] = [];
 
-vi.mock('../../../lib/campaigns.js', () => ({
-  launchKey: (id: string) => `key-for-${id}`,
-  launchCampaign: (...args: unknown[]) => launchCampaign(...args) as unknown,
-  campaignSearch: () => '',
-  useCampaignList: () => ({ data: null, loading: false, error: null, reload: vi.fn(), create }),
-  useCampaign: () => ({ data: null, loading: false, error: null }),
-  useAudiencePreview: () => ({ data: null, loading: false, error: null }),
-}));
 vi.mock('../../../lib/templates.js', () => ({
   useTemplates: () => ({ data: page(TEMPLATES), loading: false, error: null }),
   useTemplate: () => ({ data: null, loading: false, error: null }),
-  useTemplateLibrary: () => ({ data: null, loading: false, error: null }),
-  cloneKey: (id: string) => id,
+  useTemplateLibrary: (_filters: unknown, enabled = true) =>
+    ({ data: enabled ? LIBRARY : null, loading: false, error: null }),
 }));
+
+/**
+ * The three commands go through the real store and API layer (the launch is a thunk over
+ * RTK Query, store/screens/campaigns.ts); `stubApi` answers them by asking the spies above,
+ * so each test still says what the server does and checks what was sent.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: await spy(...args) } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const key = (call: StubCall): string | null => call.headers.get('idempotency-key');
+const routes = () => stubApi({
+  'POST /campaigns': (call) => answer(create, call.body),
+  'POST /campaigns/*': (call) =>
+    answer(launchCampaign, call.path.split('/')[2], key(call)),
+  'POST /templates/*': (call) => answer(cloneTemplate, call.path.split('/')[2], key(call)),
+});
 vi.mock('../../../lib/subjects.js', () => ({
   useSubjectList: () => ({ data: page(SUBJECTS), loading: false, error: null }),
   useSubject: () => ({ data: null, loading: false, error: null }),
@@ -78,8 +97,11 @@ const mount = () =>
       <Route path="/app/campaigns/new" element={<New />} />
       <Route path="/app/campaigns/:id" element={<p>DETAIL</p>} />
     </Routes>,
-    { capabilities: ALL, labels: NONSENSE_LABELS, path: '/app/campaigns/new' },
+    { capabilities, labels: NONSENSE_LABELS, path: '/app/campaigns/new' },
   );
+
+/** A `datetime-local` value this many days from now. */
+const inDays = (days: number): string => toLocalInput(Date.now() + days * 24 * 60 * 60 * 1000);
 
 const toStepThree = (): void => {
   fireEvent.click(screen.getByRole('button', { name: /Mid-term form/ }));
@@ -88,8 +110,13 @@ const toStepThree = (): void => {
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  routes();
+  LIBRARY = [];
+  capabilities = ALL;
   create.mockResolvedValue({
     id: 'c9', name: 'Mid-term form — August 2026', status: 'draft',
     templateId: 't1', templateName: 'Mid-term form', subjectCount: 1, responseCount: 0,
@@ -153,7 +180,7 @@ describe('step 2 — WHO GETS IN, which is not who is expected (DEC-037)', () =>
       .toBe(true);
   });
 
-  it('names the organisation rather than saying "your organization"', () => {
+  it('names the organization rather than saying "your organization"', () => {
     mount();
     toStepTwo();
     expect(screen.getByRole('radio', { name: /Only people in Northfield/ })).toBeTruthy();
@@ -268,10 +295,29 @@ describe('step 3 — the summary, then the irreversible button', () => {
   it('refuses a window that closes before it opens', () => {
     mount();
     toStepThree();
-    fireEvent.change(screen.getByLabelText('Opens'), { target: { value: '2026-09-10T09:00' } });
-    fireEvent.change(screen.getByLabelText('Closes'), { target: { value: '2026-09-01T09:00' } });
+    fireEvent.change(screen.getByLabelText('Opens'), { target: { value: inDays(10) } });
+    fireEvent.change(screen.getByLabelText('Closes'), { target: { value: inDays(1) } });
     expect(screen.getByRole('alert').textContent).toMatch(/after Opens/);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Launch plithe' }).disabled).toBe(true);
+  });
+
+  it('refuses a closing time that has already passed, and launches once it is moved on', async () => {
+    mount();
+    toStepThree();
+    const closes = screen.getByLabelText<HTMLInputElement>('Closes');
+    // The picker itself greys out the past.
+    expect(closes.min).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+
+    fireEvent.change(closes, { target: { value: inDays(-1) } });
+    expect(screen.getByRole('alert').textContent).toMatch(/already passed/);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Launch plithe' }).disabled).toBe(true);
+
+    fireEvent.change(closes, { target: { value: inDays(3) } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const sent = create.mock.calls[0]?.[0] as { endsAt: string };
+    expect(Date.parse(sent.endsAt)).toBeGreaterThan(Date.now());
   });
 
   it('creates then launches, and lands straight on the QR with no success page between', async () => {
@@ -281,7 +327,8 @@ describe('step 3 — the summary, then the irreversible button', () => {
 
     await waitFor(() => expect(screen.getByRole('dialog', { name: /Share/ })).toBeTruthy());
     expect(create).toHaveBeenCalledTimes(1);
-    expect(launchCampaign).toHaveBeenCalledWith('c9', 'key-for-c9');
+    // Minting the token is the irreversible act: it carries an idempotency key.
+    expect(launchCampaign).toHaveBeenCalledWith('c9', expect.stringMatching(/^launch:c9:/));
     const sheet = within(screen.getByRole('dialog', { name: /Share/ }));
     expect(sheet.getByText('feedback.example.test/r/K4M9X2PQ')).toBeTruthy();
   });
@@ -316,3 +363,61 @@ describe('step 3 — the summary, then the irreversible button', () => {
     expect(screen.getByText(/Mid-term form · 8 questions/)).toBeTruthy();
   });
 });
+
+describe('step 1 — the library, for whoever runs campaigns without building forms', () => {
+  const libraryForm = (id: string, name: string, over: Partial<TemplateSummary> = {}): TemplateSummary => ({
+    id, name, category: 'Teaching', description: null, industry: 'university',
+    questionCount: 6, estimatedSeconds: 90, campaignCount: 0, isLibrary: true,
+    clonedFromId: null, createdAt: '2026-01-01T00:00:00.000Z', ...over,
+  });
+
+  it('offers the library forms not already copied, and copies the one picked AT LAUNCH', async () => {
+    capabilities = [...ALL, 'template.clone'];
+    LIBRARY = [
+      libraryForm('lib1', 'Course pulse'),
+      // Another industry's form is not this organisation's to pick from.
+      libraryForm('lib2', 'Guest stay', { industry: 'hotel' }),
+    ];
+    cloneTemplate.mockResolvedValue({ id: 'copy-of-lib1', name: 'Course pulse' });
+    mount();
+
+    expect(screen.getByText('From the library')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Guest stay/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Course pulse/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Data Structures/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    // Nothing is copied by picking: an abandoned wizard leaves no stray form behind.
+    expect(cloneTemplate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Launch plithe' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(cloneTemplate).toHaveBeenCalledWith('lib1', expect.stringMatching(/^clone:lib1:/));
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ templateId: 'copy-of-lib1' });
+  });
+
+  it('does not offer a library form the organization already has a copy of', () => {
+    capabilities = [...ALL, 'template.clone'];
+    LIBRARY = [libraryForm('lib1', 'Mid-term form original')];
+    const original = TEMPLATES[0] as TemplateSummary;
+    TEMPLATES[0] = { ...original, clonedFromId: 'lib1' };
+    mount();
+    expect(screen.queryByText('From the library')).toBeNull();
+    TEMPLATES[0] = original;
+  });
+
+  it('nor one with the same name as a form it already has', () => {
+    capabilities = [...ALL, 'template.clone'];
+    LIBRARY = [libraryForm('lib1', 'Mid-term form'), libraryForm('lib2', 'Course pulse')];
+    mount();
+    expect(screen.getAllByRole('button', { name: /Mid-term form/ })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Course pulse/ })).toBeTruthy();
+  });
+
+  it('offers no library to somebody who may not copy forms', () => {
+    LIBRARY = [libraryForm('lib1', 'Course pulse')];
+    mount();
+    expect(screen.queryByText('From the library')).toBeNull();
+  });
+});
+

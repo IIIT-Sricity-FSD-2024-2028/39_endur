@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { BillingSummary, Tier } from '@endur/shared';
 import { Link } from 'react-router-dom';
-import { apiGet } from '../../lib/api.js';
+import { usePlanSummary } from '../../lib/billing.js';
 import { useCan } from '../../lib/capabilities.js';
 import { formatDate } from '../../lib/format.js';
 
@@ -25,7 +24,7 @@ export function noticeFor(
     return {
       tone: 'lapsed',
       text:
-        `Your ${tierName(summary.lapsedFrom)} ${noun} has ended and this organisation is now on ` +
+        `Your ${tierName(summary.lapsedFrom)} ${noun} has ended and this organization is now on ` +
         `${tierName(summary.tier)}. Nothing you have collected has been deleted.`,
       action: 'Choose a plan',
     };
@@ -41,7 +40,7 @@ export function noticeFor(
       tone: 'ending',
       text:
         `Your ${tierName(summary.tier)} trial ends on ${formatDate(summary.periodEnd)}. ` +
-        `Add payment to keep it — otherwise this organisation moves to ${tierName('bronze')}.`,
+        `Add payment to keep it — otherwise this organization moves to ${tierName('bronze')}.`,
       action: 'Add payment',
     };
   }
@@ -52,7 +51,7 @@ export function noticeFor(
     tone: 'ending',
     text:
       `Your ${tierName(summary.tier)} plan ends on ${formatDate(summary.periodEnd)}. ` +
-      `Plans do not renew on their own: after that this organisation moves to ` +
+      `Plans do not renew on their own: after that this organization moves to ` +
       `${tierName('bronze')}, and you can join ${tierName(summary.tier)} again from Plan.`,
     action: 'View plan',
   };
@@ -60,25 +59,11 @@ export function noticeFor(
 
 export function PlanNoticeBanner(): JSX.Element | null {
   const can = useCan();
-  const mayRead = can('billing.read');
-  const [summary, setSummary] = useState<BillingSummary | null>(null);
-
-  useEffect(() => {
-    if (!mayRead) return;
-    let live = true;
-    void apiGet<{ data: BillingSummary }>('/billing')
-      .then((response) => {
-        if (live) setSummary(response.data);
-      })
-      // SILENT ON FAILURE, and deliberately. This is chrome on somebody else's page: a
-      // console that cannot load a billing summary must still render the page the reader
-      // asked for, and an error strip about a plan on top of a broken subjects list tells
-      // them about the wrong problem.
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [mayRead]);
+  // The Plan page's own cache entry (R-503): a join there changes this strip at once. Nothing
+  // is asked for a reader who may not see billing, and a failed read shows nothing at all —
+  // this is chrome on somebody else's page, and an error strip about a plan on top of a
+  // broken subjects list tells them about the wrong problem.
+  const summary = usePlanSummary(can('billing.read'));
 
   if (!summary) return null;
   const notice = noticeFor(summary);

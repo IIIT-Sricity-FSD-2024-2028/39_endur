@@ -1,21 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import type { AuditEntry, Capability, Page } from '@endur/shared';
-import { renderWithProviders } from '../../../test-utils.js';
+import { renderWithProviders, stubApi } from '../../../test-utils.js';
 import Logs from './index.js';
-
-const hoisted = vi.hoisted(() => {
-  class ApiError extends Error {
-    status: number;
-    details: Record<string, unknown>;
-    constructor(status: number, message: string, details: Record<string, unknown> = {}) {
-      super(message);
-      this.status = status;
-      this.details = details;
-    }
-  }
-  return { ApiError };
-});
 
 const row = (over: Partial<AuditEntry> = {}): AuditEntry => ({
   id: '1',
@@ -32,7 +19,7 @@ const row = (over: Partial<AuditEntry> = {}): AuditEntry => ({
   ...over,
 });
 
-let rows: AuditEntry[] | (() => never);
+let rows: AuditEntry[];
 let requested: string[];
 
 const page = (data: AuditEntry[]): Page<AuditEntry> => ({
@@ -41,24 +28,24 @@ const page = (data: AuditEntry[]): Page<AuditEntry> => ({
   meta: { total: data.length },
 });
 
-const apiGet = vi.fn((path: string) => {
-  requested.push(path);
-  if (typeof rows === 'function') return rows();
-  return page(rows);
+// The stub server (R-502): the real hook and the real cache run above it.
+const server = () => stubApi({
+  'GET /audit*': (call) => {
+    requested.push(call.path);
+    return { body: page(rows) };
+  },
 });
-
-vi.mock('../../../lib/api.js', () => ({
-  apiGet: (p: string) => apiGet(p),
-  apiPost: vi.fn(), apiPut: vi.fn(), apiPatch: vi.fn(), apiDelete: vi.fn(),
-  ApiError: hoisted.ApiError,
-}));
 
 const ALL: Capability[] = ['audit.read'];
 const mount = (capabilities: Capability[] = ALL, path = '/app/logs') =>
   renderWithProviders(<Logs />, { capabilities, path });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 beforeEach(() => {
-  vi.clearAllMocks();
+  server();
   rows = [row()];
   requested = [];
 });

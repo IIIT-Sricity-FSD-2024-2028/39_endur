@@ -15,10 +15,12 @@
 //
 // A THIRD non-error arrives inside a 200: `suppressed: true` with no analysis fields at all
 // (52 §2). There is deliberately nothing here that could reconstruct one.
-import { useCallback, useEffect, useRef, useState } from 'react';
+//
+// On RTK Query since R-502 (`store/api/endpoints/analysis.ts`).
 import type { AnalysisQuery, AnalysisView, ThemeDetail, Tier } from '@endur/shared';
-import { ApiError, apiGet } from './api.js';
-import type { Loadable } from './org.js';
+import { ApiError } from './api.js';
+import { useGetAnalysisQuery, useGetThemeDetailQuery } from '../store/api/endpoints/analysis.js';
+import { useLoadable, type Loadable } from './query.js';
 
 /** What a 402 carries. Read from the envelope, never guessed — the client does not own
  *  the entitlement map and must not learn to (see `packages/shared/src/tiers.ts`). */
@@ -27,7 +29,7 @@ export type Upgrade = { requiredTier: Tier | null; currentTier: Tier | null };
 export function analysisSearch(filters: AnalysisQuery): string {
   const params = new URLSearchParams();
   // Insertion order is fixed rather than object order, so the same filters always produce
-  // the same string — the string is the effect dependency, and a reordered one refetches.
+  // the same string — the string is the cache key, and a reordered one would refetch.
   for (const key of ['from', 'to', 'campaignId', 'unitId', 'subjectId'] as const) {
     const value = filters[key];
     if (value) params.set(key, value);
@@ -37,7 +39,7 @@ export function analysisSearch(filters: AnalysisQuery): string {
 }
 
 /** A 402's details, or null if this was not one. */
-function upgradeFrom(error: unknown): Upgrade | null {
+export function upgradeFrom(error: unknown): Upgrade | null {
   if (!(error instanceof ApiError) || error.status !== 402) return null;
   return {
     requiredTier: (error.details['requiredTier'] as Tier | undefined) ?? null,
@@ -64,59 +66,28 @@ export type AnalysisController = Loadable<AnalysisView> & {
  * button says the same thing honestly and costs one click.
  */
 export function useAnalysis(filters: AnalysisQuery, enabled = true): AnalysisController {
-  const [state, setState] = useState<Loadable<AnalysisView>>({
-    data: null, loading: true, error: null,
-  });
-  const [forbidden, setForbidden] = useState(false);
-  const [upgrade, setUpgrade] = useState<Upgrade | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const alive = useRef(true);
-  const search = analysisSearch(filters);
-
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    setRefreshing(true);
-    try {
-      const response = await apiGet<{ data: AnalysisView }>(`/analysis${search}`);
-      if (!alive.current) return;
-      setForbidden(false);
-      setUpgrade(null);
-      setState({ data: response.data, loading: false, error: null });
-    } catch (error) {
-      if (!alive.current) return;
-      const paid = upgradeFrom(error);
-      if (paid) {
-        // NOT an error, and not left in `error` as well — the page would then render an
-        // upgrade card with a red alert above it, which is the confusion DEC-011 exists to
-        // prevent said in CSS instead of in a status code.
-        setUpgrade(paid);
-        setState({ data: null, loading: false, error: null });
-        return;
-      }
-      if (error instanceof ApiError && error.status === 403) {
-        setForbidden(true);
-        setState({ data: null, loading: false, error: null });
-        return;
-      }
-      // The last good analysis stays on screen (43 § States, same rule as 40's poll).
-      setState((current) => ({ ...current, loading: false, error: error as Error }));
-    } finally {
-      if (alive.current) setRefreshing(false);
-    }
-  }, [enabled, search]);
-
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    return () => {
-      alive.current = false;
-    };
-  }, [load]);
-
-  return { ...state, forbidden, upgrade, reload: load, refreshing };
+  // `initialOnly`: the page shows its skeleton only when there is nothing to show. A
+  // refresh is `refreshing`, with the last good analysis still on screen (43 § States).
+  const query = useGetAnalysisQuery(analysisSearch(filters), { skip: !enabled });
+  const analysis = useLoadable(query, { initialOnly: true });
+  if (!enabled) {
+    return { data: null, loading: false, error: null, forbidden: false, upgrade: null, reload: analysis.reload, refreshing: false };
+  }
+  // NOT errors, and not left in `error` as well — the page would then render an upgrade card
+  // with a red alert above it, which is the confusion DEC-011 exists to prevent said in CSS
+  // instead of in a status code.
+  const upgrade = upgradeFrom(analysis.error);
+  const forbidden = !upgrade && analysis.error instanceof ApiError && analysis.error.status === 403;
+  const gated = Boolean(upgrade) || forbidden;
+  return {
+    data: gated ? null : analysis.data,
+    loading: analysis.loading,
+    error: gated ? null : analysis.error,
+    forbidden,
+    upgrade,
+    reload: analysis.reload,
+    refreshing: query.isFetching,
+  };
 }
 
 export type ThemeController = Loadable<ThemeDetail> & {
@@ -136,50 +107,19 @@ export type ThemeController = Loadable<ThemeDetail> & {
  * scored badly, the theme is an assertion. This request is what makes it a finding.
  */
 export function useThemeDetail(id: string | null, filters: AnalysisQuery): ThemeController {
-  const [state, setState] = useState<Loadable<ThemeDetail>>({
-    data: null, loading: false, error: null,
-  });
-  const [forbidden, setForbidden] = useState(false);
-  const alive = useRef(true);
-  const search = analysisSearch(filters);
-
-  useEffect(() => {
-    alive.current = true;
-    if (!id) {
-      setState({ data: null, loading: false, error: null });
-      setForbidden(false);
-      return () => {
-        alive.current = false;
-      };
-    }
-
-    setState({ data: null, loading: true, error: null });
-    setForbidden(false);
-    void (async () => {
-      try {
-        const response = await apiGet<{ data: ThemeDetail }>(
-          `/analysis/themes/${encodeURIComponent(id)}${search}`,
-        );
-        if (!alive.current) return;
-        setState({ data: response.data, loading: false, error: null });
-      } catch (error) {
-        if (!alive.current) return;
-        // 402 cannot reach here: the overview would have 402'd first and there would be no
-        // theme to open. If it somehow does, it falls through to the error line and says so
-        // rather than being silently swallowed as an empty panel.
-        if (error instanceof ApiError && error.status === 403) {
-          setForbidden(true);
-          setState({ data: null, loading: false, error: null });
-          return;
-        }
-        setState({ data: null, loading: false, error: error as Error });
-      }
-    })();
-
-    return () => {
-      alive.current = false;
-    };
-  }, [id, search]);
-
-  return { ...state, forbidden };
+  const theme = useLoadable(
+    useGetThemeDetailQuery({ id: id ?? '', search: analysisSearch(filters) }, { skip: !id }),
+    { current: true },
+  );
+  if (!id) return { data: null, loading: false, error: null, forbidden: false };
+  // 402 cannot reach here: the overview would have 402'd first and there would be no theme
+  // to open. If it somehow does, it falls through to the error line and says so rather than
+  // being silently swallowed as an empty panel.
+  const forbidden = theme.error instanceof ApiError && theme.error.status === 403;
+  return {
+    data: theme.data,
+    loading: theme.loading,
+    error: forbidden ? null : theme.error,
+    forbidden,
+  };
 }

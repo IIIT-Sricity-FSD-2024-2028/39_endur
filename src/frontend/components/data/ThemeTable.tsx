@@ -23,7 +23,8 @@ export function ThemeTable({
   caption,
 }: {
   themes: ThemeSummary[];
-  onOpen: (id: string) => void;
+  /** Absent when the reader may not read the comments behind a theme: the label is plain text. */
+  onOpen?: ((id: string) => void) | undefined;
   openId?: string | null;
   empty: ReactNode;
   caption?: string | undefined;
@@ -35,7 +36,7 @@ export function ThemeTable({
       key: 'label',
       header: 'Theme',
       primary: true,
-      render: (theme) => (
+      render: (theme) => (onOpen ? (
         <button
           type="button"
           className="theme-open"
@@ -44,7 +45,9 @@ export function ThemeTable({
         >
           {theme.label}
         </button>
-      ),
+      ) : (
+        <span className="theme-label">{theme.label}</span>
+      )),
     },
     {
       key: 'score',

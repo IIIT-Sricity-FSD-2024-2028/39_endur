@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import type { ReactElement, ReactNode } from 'react';
+import { makeStore } from '../test-utils.js';
 import { ThemeToggle } from './ThemeToggle.js';
+
+/** It keeps its state in the store (store/screens/chrome.ts), so it renders inside one, made fresh
+ *  for each render. A `wrapper`, not a wrapping element, so `rerender` keeps it. */
+const render = (ui: ReactElement) => {
+  const store = makeStore();
+  return rtlRender(ui, { wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider> });
+};
 
 function setSystem(dark: boolean): void {
   Object.defineProperty(window, 'matchMedia', {

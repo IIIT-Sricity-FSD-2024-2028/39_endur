@@ -63,7 +63,7 @@ async function quickWithResponses(
   return created.body.data.id as string;
 }
 
-describe('a quick poll can be read back by the organisation that created it — F1', () => {
+describe('a quick poll can be read back by the organization that created it — F1', () => {
   let founder: Session;
   let pollId: string;
 

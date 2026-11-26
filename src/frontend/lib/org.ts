@@ -1,15 +1,24 @@
 // Organisation reads and the wizard's single write. 31 § Data contract, 23 §3.
 //
-// Pages call these hooks; the hooks call `api.ts`. The wizard in particular must never
+// Pages call these hooks; the hooks call the store's endpoints. The wizard must never
 // touch `fetch` — its whole correctness argument is that five steps produce ONE request,
 // and that is much easier to keep true when there is exactly one function that can send it.
-import { useCallback, useEffect, useState } from 'react';
-import type {
-  LabelSet, OrgView, PresetView, SetupOrgBody, UpdateOrgBody,
-} from '@endur/shared';
-import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from './api.js';
+//
+// On RTK Query since R-401 (`store/api/endpoints/org.ts`). Names and shapes unchanged. What
+// changed: saving the org's name or its words now also re-reads `/auth/me`, so the top bar
+// and every noun in the shell follow without a reload.
+import { useCallback } from 'react';
+import type { OrgView, PresetView } from '@endur/shared';
+import { useAppDispatch } from '../store/index.js';
+import {
+  orgApi,
+  useGetOrgQuery,
+  useGetPresetsQuery,
+} from '../store/api/endpoints/org.js';
+import { useLoadable, type Loadable } from './query.js';
 
-export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
+/** Defined once, in `lib/query.ts`; re-exported because a dozen `lib` files import it here. */
+export type { Loadable } from './query.js';
 
 /**
  * The preset catalogue. Loaded BEFORE step 1 renders — 31 § States: "the wizard does not
@@ -17,104 +26,28 @@ export type Loadable<T> = { data: T | null; loading: boolean; error: Error | nul
  * evaluator sees, and it looks like a page that is not ready.
  */
 export function usePresets(): Loadable<PresetView[]> {
-  const [state, setState] = useState<Loadable<PresetView[]>>({
-    data: null, loading: true, error: null,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: PresetView[] }>('/org/presets')
-      .then((response) => {
-        if (!cancelled) setState({ data: response.data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return state;
-}
-
-/**
- * The commit. ONE request, ONE transaction — the server seeds roles, units, derived grants
- * and the preset's starter templates atomically, so closing the tab mid-wizard leaves
- * nothing behind rather than an organisation with roles and no structure.
- */
-export function useSetupOrg(): (body: SetupOrgBody) => Promise<OrgView> {
-  return useCallback(async (body: SetupOrgBody) => {
-    const response = await apiPost<SetupOrgBody, { data: OrgView }>('/org/setup', body);
-    return response.data;
-  }, []);
+  return useLoadable(useGetPresetsQuery());
 }
 
 /**
  * The org as settings needs it. Separate from the session's copy in `authSlice`: that one
  * carries only what the shell renders, and this page edits fields the shell never shows.
+ *
+ * `loading` means "nothing to show yet", not "a request is in flight": Settings swaps its
+ * whole form for a skeleton while it is true, and a re-read after a logo upload must not
+ * blank the form somebody is in the middle of.
  */
 export function useOrg(): Loadable<OrgView> & { set: (org: OrgView) => void } {
-  const [state, setState] = useState<Loadable<OrgView>>({
-    data: null, loading: true, error: null,
-  });
+  const dispatch = useAppDispatch();
+  const org = useLoadable(useGetOrgQuery(), { initialOnly: true });
 
-  useEffect(() => {
-    let cancelled = false;
-    void apiGet<{ data: OrgView }>('/org')
-      .then((response) => {
-        if (!cancelled) setState({ data: response.data, loading: false, error: null });
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setState({ data: null, loading: false, error });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const set = useCallback(
+    (next: OrgView) => {
+      dispatch(orgApi.util.updateQueryData('getOrg', undefined, () => next));
+    },
+    [dispatch],
+  );
 
-  const set = useCallback((org: OrgView) => {
-    setState({ data: org, loading: false, error: null });
-  }, []);
-
-  return { ...state, set };
+  return { data: org.data, loading: org.loading, error: org.error, set };
 }
 
-export function useUpdateOrg(): (body: UpdateOrgBody) => Promise<OrgView> {
-  return useCallback(async (body: UpdateOrgBody) => {
-    const response = await apiPatch<UpdateOrgBody, { data: OrgView }>('/org', body);
-    return response.data;
-  }, []);
-}
-
-/**
- * Labels are PATCHed per key and merged server-side (`22` §3) — a whole-set write would
- * silently discard a rename the caller did not have on screen.
- */
-export function useUpdateLabels(): (labels: LabelSet) => Promise<OrgView> {
-  return useCallback(async (labels: LabelSet) => {
-    const response = await apiPatch<{ labels: LabelSet }, { data: OrgView }>(
-      '/org/labels', { labels },
-    );
-    return response.data;
-  }, []);
-}
-
-/**
- * The organisation logo (48). Both hooks return the updated `OrgView` rather than the file,
- * so the caller updates the org it already holds instead of stitching a url in by hand —
- * the same reason `useUpdateLabels` returns the whole org.
- */
-export function useUploadLogo(): (file: File) => Promise<OrgView> {
-  return async (file) => {
-    await apiUpload<{ data: unknown }>('/org/logo', file);
-    return await apiGet<{ data: OrgView }>('/org').then((res) => res.data);
-  };
-}
-
-export function useRemoveLogo(): () => Promise<OrgView> {
-  return async () => {
-    await apiDelete('/org/logo');
-    return await apiGet<{ data: OrgView }>('/org').then((res) => res.data);
-  };
-}

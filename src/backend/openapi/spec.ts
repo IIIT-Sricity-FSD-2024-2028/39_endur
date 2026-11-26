@@ -40,9 +40,9 @@ function rolesFor(capability: string): string {
     '**Seeded to:**',
     ...held,
     '',
-    'A *default*, not the rule. Every organisation re-decides this on its own powers grid, and ' +
+    'A *default*, not the rule. Every organization re-decides this on its own powers grid, and ' +
       'the resolver is asked on every request — so a role that holds this here may not hold it ' +
-      'in a given organisation, and vice versa.',
+      'in a given organization, and vice versa.',
   ].join('\n');
 }
 
@@ -56,7 +56,7 @@ function operatorRolesFor(capability: string): string {
     '',
     entry.note,
     '',
-    'Platform capabilities are a **separate catalogue** from the organisation one (`19` §4). ' +
+    'Platform capabilities are a **separate catalogue** from the organization one (`19` §4). ' +
       'They can never be granted to a customer, and no tier entitles one — a test asserts both.',
   ].join('\n');
 }
@@ -124,7 +124,7 @@ function errorsFor(route: {
     add(
       '404',
       '**Also what a caller who may not SEE the resource gets** (`13` §5). A 403 there would confirm the row ' +
-        'exists and leak the organisation’s structure to somebody outside it, so invisibility and absence are ' +
+        'exists and leak the organization’s structure to somebody outside it, so invisibility and absence are ' +
         'deliberately indistinguishable.',
     );
   }
@@ -175,7 +175,7 @@ function headersFor(route: { method: string; path: string }): unknown[] {
       required: false,
       schema: { type: 'string' },
       description:
-        'Names the organisation. **Honoured ONLY on `/auth` routes**, because that is the one place the caller ' +
+        'Names the organization. **Honoured ONLY on `/auth` routes**, because that is the one place the caller ' +
         'holds no credential — so a header cannot widen access somebody already has. Everywhere else the tenant ' +
         'comes from the session and never from the request (INV-010).',
     });
@@ -187,7 +187,7 @@ function headersFor(route: { method: string; path: string }): unknown[] {
 // Which section of the document a path belongs under.
 const TAGS: Array<[RegExp, string]> = [
   [/^\/api\/v1\/auth/, 'Auth'],
-  [/^\/api\/v1\/org/, 'Organisation'],
+  [/^\/api\/v1\/org/, 'Organization'],
   [/^\/api\/v1\/units/, 'Structure'],
   [/^\/api\/v1\/(roles|grants|authz)/, 'Roles & powers'],
   [/^\/api\/v1\/people/, 'People & accounts'],
@@ -339,16 +339,16 @@ export function buildOpenApiDocument(app: Express): Record<string, unknown> {
       title: 'Endur API',
       version: VERSION,
       description: [
-        'Feedback management and performance analysis, generic across organisation types.',
+        'Feedback management and performance analysis, generic across organization types.',
         '',
-        '**The one idea:** the organisation is *data*, not code. **No table is named after any',
+        '**The one idea:** the organization is *data*, not code. **No table is named after any',
         'industry’s own vocabulary, and neither is any role** (INV-002) — there is a graph of nodes',
         'and edges plus a set of grants saying who may do what, where. A university, a hotel and a',
         'hospital are the same rows with different names.',
         '',
         'Two consequences visible in this document:',
         '',
-        '- **Every domain noun is a label.** Error messages come back in the organisation’s own',
+        '- **Every domain noun is a label.** Error messages come back in the organization’s own',
         '  vocabulary. The same 404 says "department" for a company and "property" for a hotel.',
         '- **Permissions are grants, not levels.** Each operation below names the capability it needs',
         '  and the seeded roles that hold it — read from the matrix that actually seeds them.',

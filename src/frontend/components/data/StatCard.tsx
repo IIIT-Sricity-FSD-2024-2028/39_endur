@@ -15,7 +15,8 @@ export function StatCard({
   breakdown,
 }: {
   kicker: string;
-  value: string | number;
+  /** The figure. A node for a figure that animates itself (`<CountedMoney>` on Earnings). */
+  value: React.ReactNode;
   delta?: { value: number; valence: Valence } | undefined;
   context?: string | undefined;
   breakdown?: BarRowProps[] | undefined;

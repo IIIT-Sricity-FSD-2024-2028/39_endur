@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+// One template. What is in flight or open on the page is `state.templates.pages[id]`
+// (store/screens/templates.ts); Use this and Delete are thunks there.
+import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { FormPreview } from '../../../components/form/FormPreview.js';
@@ -7,7 +9,18 @@ import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
 import { approxDuration, pluralise } from '../../../lib/format.js';
-import { cloneKey, useTemplate, useTemplateLibrary, useTemplates } from '../../../lib/templates.js';
+import { useTemplate, useTemplateLibrary } from '../../../lib/templates.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  FAILED,
+  selectTemplatePage,
+  templateCopied,
+  templateDeleteAskedOnPage,
+  templateDeleteDismissedOnPage,
+  templateDeleted,
+  templatePageLeft,
+} from '../../../store/screens/templates.js';
 import { deleteConsequence } from './consequence.js';
 
 export default function TemplateDetail(): JSX.Element {
@@ -18,11 +31,14 @@ export default function TemplateDetail(): JSX.Element {
 
   const template = useTemplate(id);
   const library = useTemplateLibrary();
-  const list = useTemplates();
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
+  const templateId = id ?? '';
+  const dispatch = useAppDispatch();
+  const page = useAppSelector((state) => selectTemplatePage(state, templateId));
+  useClearOnLeave(templatePageLeft({ templateId }));
+  const busy = page.copying;
+  const confirming = page.confirmingDelete;
+  const error = messageOf(page.error, page.failedDuring ? FAILED[page.failedDuring] : '');
 
   const detail = template.data;
 
@@ -57,13 +73,9 @@ export default function TemplateDetail(): JSX.Element {
   const verdict = deleteConsequence(detail, labels.campaign);
 
   const use = (): void => {
-    setBusy(true);
-    setError(null);
-    void list
-      .clone(detail.id, cloneKey(detail.id))
-      .then((created) => navigate(`/app/forms/${created.id}/build`))
-      .catch((cause: unknown) => setError(message(cause, 'That could not be copied.')))
-      .finally(() => setBusy(false));
+    void dispatch(templateCopied({ templateId: detail.id, from: 'page' })).then((result) => {
+      if (templateCopied.fulfilled.match(result)) navigate(`/app/forms/${result.payload.id}/build`);
+    });
   };
 
   return (
@@ -75,7 +87,7 @@ export default function TemplateDetail(): JSX.Element {
           <span className="page-actions">
             <Link className="btn btn-ghost" to="/app/templates">Back</Link>
             {!detail.isLibrary && can('template.delete') && (
-              <button type="button" className="btn btn-secondary" onClick={() => setConfirming(true)}>
+              <button type="button" className="btn btn-secondary" onClick={() => dispatch(templateDeleteAskedOnPage({ templateId: detail.id }))}>
                 Delete
               </button>
             )}
@@ -122,14 +134,14 @@ export default function TemplateDetail(): JSX.Element {
           verb="Delete"
           destructive
           confirmDisabled={verdict.blocked}
-          onConfirm={() => {
-            setConfirming(false);
-            void list
-              .remove(detail.id)
-              .then(() => navigate('/app/templates'))
-              .catch((cause: unknown) => setError(message(cause, 'That could not be deleted.')));
-          }}
-          onCancel={() => setConfirming(false)}
+          onConfirm={() =>
+            void dispatch(templateDeleted({ templateId: detail.id, name: detail.name, from: 'page' })).then(
+              (result) => {
+                if (templateDeleted.fulfilled.match(result)) navigate('/app/templates');
+              },
+            )
+          }
+          onCancel={() => dispatch(templateDeleteDismissedOnPage({ templateId: detail.id }))}
         />
       )}
     </>

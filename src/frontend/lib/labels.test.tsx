@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
 import type { ReactNode } from 'react';
 import { LabelKey } from '@endur/shared';
-import { authReducer } from '../store/authSlice.js';
-import { labelsLoaded, vocabularyReducer } from '../store/vocabularySlice.js';
+import { setupStore } from '../store/index.js';
+import { labelsLoaded } from '../store/vocabularySlice.js';
 import { useLabel, useLabelPlural, useLabels } from './labels.js';
 
 function withLabels(labels?: Record<string, { one: string; many: string }>) {
-  const store = configureStore({ reducer: { auth: authReducer, vocabulary: vocabularyReducer } });
+  const store = setupStore();
   if (labels) store.dispatch(labelsLoaded(labels));
   return ({ children }: { children: ReactNode }): JSX.Element => (
     <Provider store={store}>{children}</Provider>

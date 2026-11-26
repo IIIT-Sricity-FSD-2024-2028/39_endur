@@ -1,34 +1,41 @@
-// The wizard's whole state, in one object. 31 § State.
+// The setup wizard's state, read from and written to `store/wizardSlice.ts`. 31 § State;
+// docs/REDUX-PLAN.md §6.8 (R-306).
 //
-// NOT IN REDUX (23 §2). It is one route's transient state, it is persisted exactly once —
-// on Finish — and putting it in the store now would be undone in P3. The store holds what
-// outlives a route; this does not.
+// The state used to be a `useState` here, and was lost whenever the reader left the
+// wizard. It now lives in the store, so it survives that. This hook keeps the shape the
+// page and its five steps already use (`state`, `applyPreset`, `roles`, `units`, `labels`),
+// and each of its functions dispatches one event from the slice. The generic `patch` setter
+// is gone: its one use is now `toggleTemplates`, an event like the rest.
 //
-// The rule that shapes everything below: **back and forward must never lose typed input.**
-// A wizard that forgets a rename made three steps earlier is a wizard that dies on stage,
-// so nothing here is derived from the current step and nothing is reset by navigating.
-import { useCallback, useMemo, useState } from 'react';
-import { LabelKey, type Industry, type LabelSet, type PresetView, type ResolvedLabels }
-  from '@endur/shared';
+// The rule that shapes everything: **back and forward must never lose typed input.**
+// The pure helpers below (steps, `hasEdits`, the tree) read the state; they never hold it.
+import { useMemo } from 'react';
+import { LabelKey, type LabelSet, type PresetView, type ResolvedLabels } from '@endur/shared';
 import { DEFAULT_LABELS } from '@endur/shared';
-import { derivePlural } from '../../../lib/format.js';
 import type { UnitTreeNode } from '../../../components/org/UnitTree.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import {
+  labelPluralEdited,
+  labelPluralReset,
+  labelSingularEdited,
+  presetApplied,
+  roleAdded,
+  roleMoved,
+  roleRemoved,
+  roleRenamed,
+  rolesReordered,
+  selectWizard,
+  templatesToggled,
+  unitAdded,
+  unitRemoved,
+  unitRenamed,
+  unitReparented,
+  wizardReset,
+  type UnitDraft,
+  type WizardState,
+} from '../../../store/wizardSlice.js';
 
-export type RoleDraft = { id: string; name: string };
-export type UnitDraft = { tempId: string; name: string; parentTempId: string | null };
-
-export type WizardState = {
-  industry: Industry | null;
-  /** ORDER IS THE LEVEL. Index 0 is level 1. Never a number on the row. */
-  roles: RoleDraft[];
-  /** Flat with parent references — the shape a tree editor already holds, and the shape
-   *  the API takes, so nothing has to be converted on the way out. */
-  units: UnitDraft[];
-  labels: ResolvedLabels;
-  /** Which plurals the user typed by hand. Those stop auto-deriving, for "Staff / Staff". */
-  pluralOverrides: LabelKey[];
-  includeTemplates: boolean;
-};
+export type { RoleDraft, UnitDraft, WizardState } from '../../../store/wizardSlice.js';
 
 /** The wizard's five screens, in the order they are walked. `key` is what lives in the
  *  `?step=` query param, so a step is linkable and Back/Forward work like real navigation. */
@@ -46,22 +53,6 @@ export const stepIndex = (key: string): number => {
   const found = STEPS.findIndex((step) => step.key === key);
   return found === -1 ? 0 : found;
 };
-
-// Module-level, not component state: ids only need to be unique within one wizard
-// session, and a counter that reset on every render would hand out the same id twice
-// across two unrelated adds in the same tick.
-let counter = 0;
-const nextId = (prefix: string): string => `${prefix}-${(counter += 1)}`;
-
-/** Where the wizard starts, before any preset is chosen — nothing pre-filled. */
-const emptyState = (): WizardState => ({
-  industry: null,
-  roles: [],
-  units: [],
-  labels: DEFAULT_LABELS,
-  pluralOverrides: [],
-  includeTemplates: true,
-});
 
 /** Same length, same name at every index — the check `hasEdits` runs once for roles and
  *  once for units, factored out so the two never silently drift apart. */
@@ -118,168 +109,55 @@ export function depthOf(units: UnitDraft[]): number {
 }
 
 export function useWizard() {
-  const [state, setState] = useState<WizardState>(emptyState);
+  const state = useAppSelector(selectWizard);
+  const dispatch = useAppDispatch();
 
-  const applyPreset = useCallback((preset: PresetView) => {
-    setState({
-      industry: preset.key,
-      roles: preset.roles.map((role) => ({ id: nextId('role'), name: role.name })),
-      units: preset.units.map((unit) => ({ ...unit })),
-      labels: LabelKey.options.reduce((into, key) => {
-        into[key] = preset.labels[key] ?? DEFAULT_LABELS[key];
-        return into;
-      }, {} as ResolvedLabels),
-      pluralOverrides: [],
-      includeTemplates: true,
-    });
-  }, []);
+  // Built once per store. Every function is `dispatch(event(payload))`; the rules (a role
+  // is added above the bottom row, a unit cannot swallow its ancestor, a typed plural is
+  // never re-derived) are in the reducers, where they are tested without a DOM.
+  const controls = useMemo(() => {
+    const applyPreset = (preset: PresetView): void => {
+      dispatch(presetApplied(preset));
+    };
 
-  const patch = useCallback(
-    (change: Partial<WizardState>) => setState((current) => ({ ...current, ...change })),
-    [],
-  );
+    const toggleTemplates = (include: boolean): void => {
+      dispatch(templatesToggled({ include }));
+    };
 
-  const roles = useMemo(
-    () => ({
-      rename: (id: string, name: string) =>
-        setState((current) => ({
-          ...current,
-          roles: current.roles.map((role) => (role.id === id ? { ...role, name } : role)),
-        })),
-      add: (): string => {
-        const id = nextId('role');
-        setState((current) => ({
-          ...current,
-          // Added ABOVE the bottom row, never at it. The lowest level is the one that
-          // answers forms, and a new role landing there silently demotes the old one.
-          roles: [
-            ...current.roles.slice(0, -1),
-            { id, name: 'New role' },
-            ...current.roles.slice(-1),
-          ],
-        }));
-        // Returned so the caller can focus the row it just created — the "+ then type"
-        // beat. A caller that has to search for it always finds the wrong one after a
-        // reorder.
-        return id;
+    /** After Finish or skip succeeds: the org exists, and the draft has done its job. */
+    const reset = (): void => {
+      dispatch(wizardReset());
+    };
+
+    const roles = {
+      rename: (id: string, name: string) => { dispatch(roleRenamed({ id, name })); },
+      /** Returns the new role's id, so the caller can focus the row it just created: the
+       *  "+ then type" beat. The id was made in `roleAdded`'s prepare callback. */
+      add: (): string => dispatch(roleAdded()).payload.id,
+      remove: (id: string) => { dispatch(roleRemoved({ id })); },
+      move: (id: string, direction: -1 | 1) => { dispatch(roleMoved({ id, direction })); },
+      reorder: (fromId: string, toId: string) => { dispatch(rolesReordered({ fromId, toId })); },
+    };
+
+    const units = {
+      rename: (tempId: string, name: string) => { dispatch(unitRenamed({ tempId, name })); },
+      addChild: (parentTempId: string): string => dispatch(unitAdded(parentTempId)).payload.tempId,
+      remove: (tempId: string) => { dispatch(unitRemoved({ tempId })); },
+      reparent: (tempId: string, newParentTempId: string) => {
+        dispatch(unitReparented({ tempId, newParentTempId }));
       },
-      remove: (id: string) =>
-        setState((current) => ({ ...current, roles: current.roles.filter((r) => r.id !== id) })),
-      move: (id: string, direction: -1 | 1) =>
-        setState((current) => {
-          const from = current.roles.findIndex((role) => role.id === id);
-          const to = from + direction;
-          if (from === -1 || to < 0 || to >= current.roles.length) return current;
-          const next = [...current.roles];
-          const [moved] = next.splice(from, 1);
-          if (moved) next.splice(to, 0, moved);
-          return { ...current, roles: next };
-        }),
-      reorder: (fromId: string, toId: string) =>
-        setState((current) => {
-          const from = current.roles.findIndex((role) => role.id === fromId);
-          const to = current.roles.findIndex((role) => role.id === toId);
-          if (from === -1 || to === -1 || from === to) return current;
-          const next = [...current.roles];
-          const [moved] = next.splice(from, 1);
-          if (moved) next.splice(to, 0, moved);
-          return { ...current, roles: next };
-        }),
-    }),
-    [],
-  );
+    };
 
-  const units = useMemo(
-    () => ({
-      rename: (tempId: string, name: string) =>
-        setState((current) => ({
-          ...current,
-          units: current.units.map((unit) => (unit.tempId === tempId ? { ...unit, name } : unit)),
-        })),
-      addChild: (parentTempId: string): string => {
-        const tempId = nextId('unit');
-        setState((current) => ({
-          ...current,
-          units: [...current.units, { tempId, name: '', parentTempId }],
-        }));
-        return tempId;
-      },
-      remove: (tempId: string) =>
-        setState((current) => {
-          // Removing a branch removes the branch. Re-homing the children silently would
-          // move people's scope without saying so.
-          const doomed = new Set([tempId]);
-          let grew = true;
-          while (grew) {
-            grew = false;
-            for (const unit of current.units) {
-              if (unit.parentTempId && doomed.has(unit.parentTempId) && !doomed.has(unit.tempId)) {
-                doomed.add(unit.tempId);
-                grew = true;
-              }
-            }
-          }
-          return { ...current, units: current.units.filter((unit) => !doomed.has(unit.tempId)) };
-        }),
-      reparent: (tempId: string, newParentTempId: string) =>
-        setState((current) => {
-          // A unit cannot become its own descendant's child. The tree refuses the drop
-          // too, but the state is the thing that must not be corruptible.
-          const parentOf = new Map(current.units.map((u) => [u.tempId, u.parentTempId]));
-          let cursor: string | null = newParentTempId;
-          while (cursor) {
-            if (cursor === tempId) return current;
-            cursor = parentOf.get(cursor) ?? null;
-          }
-          return {
-            ...current,
-            units: current.units.map((unit) =>
-              unit.tempId === tempId ? { ...unit, parentTempId: newParentTempId } : unit,
-            ),
-          };
-        }),
-    }),
-    [],
-  );
+    const labels = {
+      setOne: (key: LabelKey, one: string) => { dispatch(labelSingularEdited({ key, one })); },
+      setMany: (key: LabelKey, many: string) => { dispatch(labelPluralEdited({ key, many })); },
+      resetPlural: (key: LabelKey) => { dispatch(labelPluralReset({ key })); },
+    };
 
-  const labels = useMemo(
-    () => ({
-      setOne: (key: LabelKey, one: string) =>
-        setState((current) => {
-          const overridden = current.pluralOverrides.includes(key);
-          return {
-            ...current,
-            labels: {
-              ...current.labels,
-              // The plural follows the singular until somebody takes it over, and then it
-              // never moves again — "Staff / Staff" must survive editing "Staff".
-              [key]: { one, many: overridden ? current.labels[key].many : derivePlural(one) },
-            },
-          };
-        }),
-      setMany: (key: LabelKey, many: string) =>
-        setState((current) => ({
-          ...current,
-          labels: { ...current.labels, [key]: { ...current.labels[key], many } },
-          pluralOverrides: current.pluralOverrides.includes(key)
-            ? current.pluralOverrides
-            : [...current.pluralOverrides, key],
-        })),
-      /** Hand the plural back to the deriver. The way out of "Staffs" typed by accident. */
-      resetPlural: (key: LabelKey) =>
-        setState((current) => ({
-          ...current,
-          labels: {
-            ...current.labels,
-            [key]: { ...current.labels[key], many: derivePlural(current.labels[key].one) },
-          },
-          pluralOverrides: current.pluralOverrides.filter((entry) => entry !== key),
-        })),
-    }),
-    [],
-  );
+    return { applyPreset, toggleTemplates, reset, roles, units, labels };
+  }, [dispatch]);
 
-  return { state, patch, applyPreset, roles, units, labels };
+  return { state, ...controls };
 }
 
 /** What the API takes. `LabelSet` is partial by contract; we always send all five. */

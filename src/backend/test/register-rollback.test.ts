@@ -12,7 +12,7 @@ import { prisma } from '../db/client.js';
 const CONTENDERS = 6;
 
 describe('POST /auth/register rolls back completely — 30 § Acceptance, 15 §5', () => {
-  it('leaves exactly one organisation, and no user belonging to none', async () => {
+  it('leaves exactly one organization, and no user belonging to none', async () => {
     const orgName = `Rollback ${unique('org')}`;
     const emails = Array.from({ length: CONTENDERS }, (_, i) => `${unique(`c${i}`)}@example.test`);
 

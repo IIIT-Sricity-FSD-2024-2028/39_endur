@@ -123,7 +123,7 @@ describe('INV-002 — nothing is education-specific outside the university prese
   });
 });
 
-describe('demo organisations — 50 §3', () => {
+describe('demo organizations — 50 §3', () => {
   it('ships the four the demo script names', () => {
     expect(DEMO_ORGS.map((org) => org.name)).toEqual([
       'Northfield University',

@@ -71,7 +71,7 @@ function expect(ok: boolean, what: string, detail?: unknown): void {
 
 async function main(): Promise<void> {
   // A development script: it registers organisations and writes freely, so it refuses to run elsewhere.
-  if (isProd) throw new Error('demo:contention registers throwaway organisations and never runs in production.');
+  if (isProd) throw new Error('demo:contention registers throwaway organizations and never runs in production.');
 
   const { n, capacity, keep } = flags();
   expect(n > capacity, `--n (${n}) must exceed --capacity (${capacity}), or nobody loses and nothing is shown`);
@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     industry: 'hotel',
     tier: 'gold',
   });
-  expect(registered.status === 201, 'could not register the throwaway organisation', registered.json);
+  expect(registered.status === 201, 'could not register the throwaway organization', registered.json);
   const organization = registered.json['organization'] as { id?: string } | undefined;
   const orgId = organization?.id ?? '';
   await client.refreshCsrf();
@@ -184,7 +184,7 @@ async function main(): Promise<void> {
   console.log(`\n  ${n} tried, ${capacity} got in, 0 double-booked.\n`);
 
   if (keep) {
-    console.log(`  --keep: organisation ${orgId} left in place.\n`);
+    console.log(`  --keep: organization ${orgId} left in place.\n`);
     return;
   }
   // Throwaway means throwaway: this removes the bookable, its slots and its bookings.

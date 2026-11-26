@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type {
   CapabilityMeta, GrantCell, GrantChoice, GrantWarning, RoleView,
 } from '@endur/shared';
@@ -7,11 +7,23 @@ import { Icon } from '../../../components/Icon.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
 import { useLabels } from '../../../lib/labels.js';
 import { cellKey, choiceOf, type GridController } from '../../../lib/roles.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import {
+  ownGridLossAsked,
+  ownGridLossSettled,
+  powerGroupToggled,
+  powerGroupsSet,
+  powerSearchTyped,
+  selectPowersView,
+} from '../../../store/screens/roles.js';
 
 const WEIGHT: Record<string, number> = { self: 1, own_unit: 2, subtree: 3, all: 4 };
 
 const weightOf = (choice: GrantChoice): number =>
   choice === null || choice === 'blocked' ? 0 : (WEIGHT[choice] ?? 0);
+
+/** A power with no route behind it yet: listed, never grantable. */
+const isSoon = (entry: CapabilityMeta): boolean => entry.phase === 'P3';
 
 export function PowersGrid({ grid, editable, myRoleIds }: {
   grid: GridController;
@@ -19,11 +31,12 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   myRoleIds: string[];
 }): JSX.Element {
   const labels = useLabels();
-  const [openModules, setOpenModules] = useState<Set<string>>(new Set());
-  const [copyFrom, setCopyFrom] = useState('');
-  const [copyTo, setCopyTo] = useState('');
-  const [copied, setCopied] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
+  // How the grid is being looked at is `state.roles.powers` (store/screens/roles.ts); what it
+  // says is the powers grid slice's working copy, behind `grid`.
+  const dispatch = useAppDispatch();
+  const view = useAppSelector(selectPowersView);
+  const closed = useMemo(() => new Set(view.closed), [view.closed]);
+  const { query, confirming } = view;
 
   const state = grid.state;
 
@@ -60,17 +73,25 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
   if (grid.error) return <p className="field-error" role="alert">{grid.error.message}</p>;
   if (!state) return <p className="text-muted">Nothing to show.</p>;
 
+  // Each heading opens and closes ITS OWN group. It used to be "open = nothing chosen, or
+  // chosen", so the first click on a heading that looked open closed every OTHER group.
   const toggleModule = (name: string): void => {
-    setOpenModules((current) => {
-      const next = new Set(current);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+    dispatch(powerGroupToggled({ module: name }));
   };
+  const allClosed = modules.length > 0 && modules.every(([name]) => closed.has(name));
 
-  const roleName = (id: string): string =>
-    state.roles.find((role) => role.id === id)?.name ?? 'that role';
+  // A search shows every matching power, whatever is collapsed. A group whose own name
+  // matches shows all of its powers.
+  const needle = query.trim().toLowerCase();
+  const shown = modules
+    .map(([name, entries]) => ({
+      name,
+      entries,
+      matching: needle === '' || name.toLowerCase().includes(needle)
+        ? entries
+        : entries.filter((entry) => entry.label.toLowerCase().includes(needle)),
+    }))
+    .filter((group) => group.matching.length > 0);
 
   const cellCh = Math.max(...GRANT_CHOICES.map((choice) => choiceWord(choice, labels).length));
 
@@ -92,7 +113,8 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
           {editable ? (
             <>
               Every box is a dropdown: pick <strong>how far</strong> that role may take that
-              power. Nothing is saved until you press <strong>Save changes</strong>.
+              power. Point at a row for <strong>Set all…</strong> to give every role the same.
+              Nothing is saved until you press <strong>Save changes</strong>.
             </>
           ) : (
             'You can read this grid but not change it. Nothing here is hidden from you.'
@@ -114,7 +136,7 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
               className="btn btn-primary"
               disabled={!grid.dirty || grid.saving}
               onClick={() => {
-                if (losingOwnGrid) setConfirming(true);
+                if (losingOwnGrid) dispatch(ownGridLossAsked());
                 else void grid.save();
               }}
             >
@@ -132,7 +154,7 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
           <div key={String(choice)} className="powers-legend-item">
             <dt>
               <span
-                className={`powers-chip${choice === 'blocked' ? ' is-denied' : ''}`}
+                className={`powers-chip${tone(choice)}`}
                 style={{ ['--weight' as string]: weightOf(choice) }}
               >
                 {choiceWord(choice, labels)}
@@ -153,9 +175,9 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
           }
           verb="Save anyway"
           destructive
-          onCancel={() => setConfirming(false)}
+          onCancel={() => dispatch(ownGridLossSettled())}
           onConfirm={() => {
-            setConfirming(false);
+            dispatch(ownGridLossSettled());
             void grid.save();
           }}
         />
@@ -165,54 +187,25 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
         <p className="field-error powers-error" role="alert">{grid.saveError}</p>
       )}
 
-      {editable && (
-        <div className="powers-copy">
-          <label htmlFor="powers-copy-from">Copy every power from</label>
-          <select
-            id="powers-copy-from"
-            className="input"
-            value={copyFrom}
-            onChange={(event) => {
-              setCopyFrom(event.target.value);
-              setCopied(null);
-            }}
-          >
-            <option value="">Choose a role…</option>
-            {state.roles.map((role) => (
-              <option key={role.id} value={role.id}>{role.name}</option>
-            ))}
-          </select>
-          <label htmlFor="powers-copy-to">onto</label>
-          <select
-            id="powers-copy-to"
-            className="input"
-            value={copyTo}
-            onChange={(event) => {
-              setCopyTo(event.target.value);
-              setCopied(null);
-            }}
-          >
-            <option value="">Choose a role…</option>
-            {state.roles.map((role) => (
-              <option key={role.id} value={role.id} disabled={role.id === copyFrom}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-ghost btn-small"
-            disabled={copyFrom === '' || copyTo === '' || copyFrom === copyTo}
-            onClick={() => {
-              grid.copyColumn(copyFrom, copyTo);
-              setCopied(`Copied ${roleName(copyFrom)}’s powers onto ${roleName(copyTo)}. Nothing is saved yet — press Save changes, or Undo.`);
-            }}
-          >
-            Copy
-          </button>
-          {copied && <span className="powers-copied" role="status">{copied}</span>}
-        </div>
-      )}
+      <div className="powers-tools">
+        <label className="sr-only" htmlFor="powers-search">Find a power</label>
+        <input
+          id="powers-search"
+          type="search"
+          className="input powers-search"
+          placeholder="Find a power…"
+          value={query}
+          onChange={(event) => dispatch(powerSearchTyped({ query: event.target.value }))}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={needle !== ''}
+          onClick={() => dispatch(powerGroupsSet({ closed: allClosed ? [] : modules.map(([name]) => name) }))}
+        >
+          {allClosed ? 'Expand all' : 'Collapse all'}
+        </button>
+      </div>
 
       {/* Its OWN scrolling container, so the page body never scrolls sideways. 64 rows by
           n roles does not fit a phone and is not meant to — 33 asks for a grid that scrolls,
@@ -241,16 +234,17 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
             </tr>
           </thead>
 
-          {modules.map(([moduleName, entries]) => {
-            const open = openModules.size === 0 || openModules.has(moduleName);
+          {shown.map(({ name: moduleName, entries, matching }) => {
+            const open = needle !== '' || !closed.has(moduleName);
             return (
               <tbody key={moduleName}>
                 <tr className="powers-group">
-                  <th scope="colgroup" colSpan={state.roles.length + 1}>
+                  <th scope="rowgroup" className="powers-group-head">
                     <button
                       type="button"
                       className="powers-group-toggle"
                       aria-expanded={open}
+                      disabled={needle !== ''}
                       onClick={() => toggleModule(moduleName)}
                     >
                       <Icon name="chevron" size={16} className={open ? '' : 'flip-right'} />
@@ -259,9 +253,21 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
                       {entries.length} power{entries.length === 1 ? '' : 's'}
                     </button>
                   </th>
+                  {/* THE GROUP IN ONE LINE PER ROLE. Open or closed, the heading says how
+                      much of this group each role holds, so the grid can be read a group at
+                      a time instead of a power at a time. */}
+                  {state.roles.map((role) => (
+                    <GroupSummary
+                      key={role.id}
+                      role={role}
+                      moduleName={moduleName}
+                      entries={entries}
+                      cells={state.cells}
+                    />
+                  ))}
                 </tr>
 
-                {open && entries.map((entry) => (
+                {open && matching.map((entry) => (
                   <Row
                     key={entry.key}
                     entry={entry}
@@ -276,9 +282,50 @@ export function PowersGrid({ grid, editable, myRoleIds }: {
               </tbody>
             );
           })}
+
+          {shown.length === 0 && (
+            <tbody>
+              <tr>
+                <td colSpan={state.roles.length + 1} className="powers-empty text-muted">
+                  No power matches “{query.trim()}”.
+                </td>
+              </tr>
+            </tbody>
+          )}
         </table>
       </div>
     </div>
+  );
+}
+
+function GroupSummary({ role, moduleName, entries, cells }: {
+  role: RoleView;
+  moduleName: string;
+  entries: CapabilityMeta[];
+  cells: Map<string, GrantCell>;
+}): JSX.Element {
+  const grantable = entries.filter((entry) => !isSoon(entry));
+  let held = 0;
+  let blocked = 0;
+  for (const entry of grantable) {
+    const effect = cells.get(cellKey(role.id, entry.key))?.effect;
+    if (effect === 'allow') held += 1;
+    else if (effect === 'deny') blocked += 1;
+  }
+
+  const of = grantable.length;
+  const level = of === 0 ? 'soon' : held === of ? 'all' : held === 0 ? 'none' : 'some';
+  const word = { soon: 'Soon', all: 'All', none: 'None', some: `${held} of ${of}` }[level];
+  const title = of === 0
+    ? `Nothing in ${moduleName} can be given to anybody yet.`
+    : `${role.name} holds ${held} of the ${of} powers in ${moduleName}` +
+      `${blocked > 0 ? `, and is blocked from ${blocked}` : ''}.`;
+
+  return (
+    <td className="powers-group-sum" data-level={level} title={title}>
+      {word}
+      {blocked > 0 && <span className="powers-group-blocked"> · {blocked} blocked</span>}
+    </td>
   );
 }
 
@@ -306,7 +353,7 @@ function Row({
     return !cell || cell.effect === 'deny';
   });
 
-  const soon = entry.phase === 'P3';
+  const soon = isSoon(entry);
 
   return (
     <tr className={`powers-row${orphan ? ' is-orphan' : ''}${soon ? ' is-soon' : ''}`}>
@@ -350,7 +397,7 @@ function Row({
           <td key={role.id} className="powers-cell-wrap">
             {editable && !soon ? (
               <ChoicePicker
-                className={`powers-cell${choice === 'blocked' ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
+                className={`powers-cell${tone(choice)}${warnings.length ? ' has-warning' : ''}`}
                 style={{ ['--weight' as string]: weightOf(choice) }}
                 value={choice}
                 ariaLabel={sentence}
@@ -359,7 +406,7 @@ function Row({
               />
             ) : (
               <span
-                className={`powers-chip${choice === 'blocked' ? ' is-denied' : ''}${warnings.length ? ' has-warning' : ''}`}
+                className={`powers-chip${tone(choice)}${warnings.length ? ' has-warning' : ''}`}
                 style={{ ['--weight' as string]: weightOf(choice) }}
                 title={sentence}
                 aria-label={sentence}
@@ -414,3 +461,7 @@ function ChoicePicker({
 }
 
 const keyOf = (choice: GrantChoice): string => (choice === null ? 'none' : choice);
+
+/** "No" recedes so the powers a role DOES hold are what the eye lands on; a block stands out. */
+const tone = (choice: GrantChoice): string =>
+  choice === null ? ' is-none' : choice === 'blocked' ? ' is-denied' : '';

@@ -161,7 +161,7 @@ export function promptCopy(
     case 'seats_over':
       return {
         title: 'More people than seats',
-        body: 'Your plan covers fewer people than the organisation now has. Nothing has stopped working.',
+        body: 'Your plan covers fewer people than the organization now has. Nothing has stopped working.',
         action: 'See the plan',
         href: prompt.href,
       };

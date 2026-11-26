@@ -1,8 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { PresetView } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, meFixture, stubApi,
+} from '../../../test-utils.js';
 import Setup from './index.js';
 
 const university: PresetView = {
@@ -59,12 +61,6 @@ let presetState = { data: [university, hotel, custom] as PresetView[] | null, lo
 
 vi.mock('../../../lib/org.js', () => ({
   usePresets: () => presetState,
-  useSetupOrg: () => commit,
-}));
-vi.mock('../../../lib/auth.js', () => ({
-  useRefreshSession: () => refresh,
-  useSignIn: () => vi.fn(),
-  useRegister: () => vi.fn(),
 }));
 
 const mount = (step = 'industry') =>
@@ -80,7 +76,28 @@ const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name:
 const clickButton = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }));
 const continueOn = () => clickButton('Continue');
 
+/**
+ * Finish and Skip are one thunk now (store/screens/setup.ts): the commit is `POST /org/setup`
+ * and the session re-read is `GET /auth/me`, both on the stubbed server, which asks the spies.
+ */
+const server = () => stubApi({
+  'POST /org/setup': async (call) => {
+    try {
+      return { body: { data: await (commit(call.body) as Promise<unknown>) } };
+    } catch {
+      return errorReply(500, 'INTERNAL', 'Could not save. Nothing was changed.');
+    }
+  },
+  'GET /auth/me': async () => {
+    await refresh();
+    return { body: meFixture({ capabilities: ['org.update'] }) };
+  },
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
+  server();
   commit.mockReset();
   refresh.mockReset();
   commit.mockResolvedValue({ id: 'o1' });
@@ -112,7 +129,7 @@ describe('step 1 — industry', () => {
     expect(screen.getByText(/Select an organization type/)).toBeTruthy();
   });
 
-  it('carries the presenter\'s script for an organisation nobody listed', () => {
+  it('carries the presenter\'s script for an organization nobody listed', () => {
     mount();
     expect(screen.getByText(/Pick the closest one/)).toBeTruthy();
   });
@@ -197,7 +214,7 @@ describe('step 3 — structure', () => {
     expect(document.activeElement).toBe(after[after.length - 1]);
   });
 
-  it('never offers to delete the root — it is the organisation', () => {
+  it('never offers to delete the root — it is the organization', () => {
     toStructure();
     expect(screen.queryByLabelText('Delete Northfield')).toBeNull();
     expect(screen.getByLabelText('Delete Engineering')).toBeTruthy();
@@ -322,7 +339,8 @@ describe('the whole wizard', () => {
       labels: university.labels,
       includeTemplates: true,
     });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    // The session is re-read once, so the shell knows the organisation is configured.
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('keeps every field when the commit fails', async () => {

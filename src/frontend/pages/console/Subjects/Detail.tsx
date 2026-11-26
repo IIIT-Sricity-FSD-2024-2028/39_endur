@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { SubjectCycle } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -11,9 +10,21 @@ import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
 import { useSubject } from '../../../lib/subjects.js';
 import { useUnits } from '../../../lib/units.js';
-import { useSubjectList } from '../../../lib/subjects.js';
 import { formatDate, formatRelative, pluralise } from '../../../lib/format.js';
 import { SubjectForm, type SubjectDraft } from './SubjectForm.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  FAILED,
+  selectSubjectsScreen,
+  subjectArchiveAsked,
+  subjectArchiveDismissed,
+  subjectArchived,
+  subjectFormClosed,
+  subjectFormOpened,
+  subjectUpdated,
+  subjectsLeft,
+} from '../../../store/screens/subjects.js';
 import { archiveConsequence } from './index.js';
 
 export function trendOf(cycles: SubjectCycle[]): { value: number; valence: 'positive' | 'negative' | 'neutral' } | undefined {
@@ -32,12 +43,20 @@ export default function SubjectDetail(): JSX.Element {
   const navigate = useNavigate();
   const subject = useSubject(id);
   const units = useUnits();
-  const writes = useSubjectList({});
 
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [archiving, setArchiving] = useState(false);
+  // The edit form, the archive confirmation and failures are `state.subjects`
+  // (store/screens/subjects.ts); Save and Archive are thunks there.
+  const dispatch = useAppDispatch();
+  const screen = useAppSelector(selectSubjectsScreen);
+  useClearOnLeave(subjectsLeft());
+  const editing = screen.form?.mode === 'edit';
+  const saving = screen.form?.saving ?? false;
+  const archiving = screen.archivingId !== null && screen.archivingId === id;
+  const error = editing
+    ? messageOf(screen.form?.error, FAILED.save)
+    : screen.failure && screen.failure.id === id
+      ? messageOf(screen.failure.error, FAILED[screen.failure.during])
+      : null;
 
   if (subject.loading && !subject.data) {
     return <div className="card" aria-hidden="true"><div className="tree-skeleton">
@@ -64,22 +83,21 @@ export default function SubjectDetail(): JSX.Element {
   const busiest = Math.max(1, ...data.cycles.map((cycle) => cycle.responseCount));
 
   const submit = (draft: SubjectDraft): void => {
-    setSaving(true);
-    setError(null);
-    void writes
-      .update(data.id, {
-        name: draft.name,
-        unitId: draft.unitId,
-        linkedUserId: draft.linkedUserId,
-      })
-      .then(() => {
-        setEditing(false);
-        return subject.reload();
-      })
-      .catch((cause: unknown) =>
-        setError(cause instanceof ApiError ? cause.message : 'That could not be saved.'),
-      )
-      .finally(() => setSaving(false));
+    void dispatch(subjectUpdated({
+      subjectId: data.id,
+      body: { name: draft.name, unitId: draft.unitId, linkedUserId: draft.linkedUserId },
+    }));
+  };
+  const startEditing = (): void => {
+    dispatch(subjectFormOpened({
+      mode: 'edit',
+      draft: {
+        name: data.name,
+        unitId: data.unitId ?? '',
+        linkedUserId: data.linkedUserId,
+        linkedUserName: data.linkedUserName,
+      },
+    }));
   };
 
   return (
@@ -90,12 +108,12 @@ export default function SubjectDetail(): JSX.Element {
         action={
           <div className="page-actions">
             {can('subject.update') && !data.archivedAt && (
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
+              <button type="button" className="btn btn-secondary" onClick={startEditing}>
                 Edit
               </button>
             )}
             {can('subject.archive') && !data.archivedAt && (
-              <button type="button" className="btn btn-ghost btn-danger-ghost" onClick={() => setArchiving(true)}>
+              <button type="button" className="btn btn-ghost btn-danger-ghost" onClick={() => dispatch(subjectArchiveAsked({ subjectId: data.id }))}>
                 Archive
               </button>
             )}
@@ -191,7 +209,7 @@ export default function SubjectDetail(): JSX.Element {
           error={error}
           canLinkPeople={can('person.read')}
           onSubmit={submit}
-          onCancel={() => { setEditing(false); setError(null); }}
+          onCancel={() => dispatch(subjectFormClosed())}
         />
       )}
 
@@ -201,16 +219,12 @@ export default function SubjectDetail(): JSX.Element {
           consequence={archiveConsequence(data, labels.campaign.many.toLowerCase())}
           verb="Archive"
           destructive
-          onConfirm={() => {
-            setArchiving(false);
-            void writes
-              .archive(data.id)
-              .then(() => navigate('/app/subjects'))
-              .catch((cause: unknown) =>
-                setError(cause instanceof ApiError ? cause.message : 'That could not be archived.'),
-              );
-          }}
-          onCancel={() => setArchiving(false)}
+          onConfirm={() =>
+            void dispatch(subjectArchived({ subjectId: data.id })).then((result) => {
+              if (subjectArchived.fulfilled.match(result)) navigate('/app/subjects');
+            })
+          }
+          onCancel={() => dispatch(subjectArchiveDismissed())}
         />
       )}
     </>

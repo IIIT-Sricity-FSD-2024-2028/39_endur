@@ -53,7 +53,7 @@ describe('the row labels are the ORGANISATION’s words — D-008', () => {
     expect(label('role.update')).toBe('rename and reorder roles');
     expect(label('person.import')).toBe('import people from a spreadsheet');
     expect(label('template.clone')).toBe('copy a template to build from');
-    expect(label('org.delete')).toBe('delete the entire organisation');
+    expect(label('org.delete')).toBe('delete the entire organization');
 
     // And the ones that are neither a label nor a plain plural: the cases a string derivation could not
     // have reached however it was written.
@@ -214,7 +214,7 @@ describe('the escalation bound on the grid — INV-012', () => {
     expect(res.body.error.message).toMatch(/do not hold it yourself/i);
   });
 
-  it('refuses a capability the saver holds only in PART of the organisation', async () => {
+  it('refuses a capability the saver holds only in PART of the organization', async () => {
     const mine = await delegate.agent.get('/api/v1/auth/me');
     const held = mine.body.capabilities as Record<string, string>;
     // The delegate and the founder hold the same scope WORD - what differs is where it is anchored,
@@ -231,10 +231,10 @@ describe('the escalation bound on the grid — INV-012', () => {
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('WOULD_ESCALATE');
     expect(res.body.error.details.capability).toBe('unit.update');
-    expect(res.body.error.message).toMatch(/everywhere in this organisation/i);
+    expect(res.body.error.message).toMatch(/everywhere in this organization/i);
   });
 
-  it('allows a capability the saver DOES hold across the whole organisation', async () => {
+  it('allows a capability the saver DOES hold across the whole organization', async () => {
     // Templates are organisation-wide and have no unit, so this capability is seeded at the widest scope
     // even for a section head: their reach really is the whole organisation, so the bound has nothing to
     // object to. Same role, same person, different answer - decided by where the grant reaches.

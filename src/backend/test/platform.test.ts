@@ -50,7 +50,7 @@ describe('INV-011 — counts, never content', () => {
     await expect(db.response.findFirst({})).rejects.toThrow(PlatformSeamViolation);
   });
 
-  it('cannot write inside a customer organisation', async () => {
+  it('cannot write inside a customer organization', async () => {
     // No operator capability means "edit a customer's data". The two rows an operator IS supposed to
     // change - the plan and the suspension - are the two the seam allows.
     await expect(db.subject.deleteMany({ where: {} })).rejects.toThrow(/writes inside a customer/);
@@ -210,7 +210,7 @@ describe('the estate', () => {
 });
 
 describe('operator actions', () => {
-  it('staff cannot suspend an organisation; owner can, and it writes one row', async () => {
+  it('staff cannot suspend an organization; owner can, and it writes one row', async () => {
     const org = await setUpOrg();
     const staff = await makeOperator('staff');
     const owner = await makeOperator('owner');
@@ -303,7 +303,7 @@ describe('analytics — `71`, `T-067`', () => {
     expect(ok.status).toBe(200);
   });
 
-  it('a trialing organisation is counted in orgs.trialing and in no byTier row (decision 1)', async () => {
+  it('a trialing organization is counted in orgs.trialing and in no byTier row (decision 1)', async () => {
     const org = await setUpOrg();
     await prisma.subscription.update({ where: { orgId: org.orgId }, data: { status: 'trialing', tier: 'gold' } });
     const owner = await makeOperator('owner');
@@ -429,7 +429,7 @@ describe('analytics — `71`, `T-067`', () => {
     expect(res.body.data.movement[0]).not.toHaveProperty('net');
   });
 
-  it('an organisation that has never collected is not counted quiet (matches the estate chip)', async () => {
+  it('an organization that has never collected is not counted quiet (matches the estate chip)', async () => {
     const org = await setUpOrg();
     const owner = await makeOperator('owner');
 

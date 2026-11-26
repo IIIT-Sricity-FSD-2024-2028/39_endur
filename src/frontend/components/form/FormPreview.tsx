@@ -1,6 +1,13 @@
-import { useState } from 'react';
-import type { AnswerValue } from '@endur/shared';
+import { useId } from 'react';
 import { QuestionInput, type Question } from './QuestionInput.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  previewAnswered,
+  previewLeft,
+  previewWidthChosen,
+  selectPreview,
+} from '../../store/screens/widgets.js';
 
 export const PREVIEW_WIDTHS = [
   { key: 'desktop', label: 'Desktop', width: 0 },
@@ -8,7 +15,7 @@ export const PREVIEW_WIDTHS = [
   { key: 'phone', label: 'Phone', width: 390 },
 ] as const;
 
-export type PreviewWidth = (typeof PREVIEW_WIDTHS)[number]['key'];
+export type { PreviewWidth } from '../../store/screens/widgets.js';
 
 export function FormPreview({
   title,
@@ -23,8 +30,12 @@ export function FormPreview({
   respondentWord: string;
   emptyBody?: string;
 }): JSX.Element {
-  const [width, setWidth] = useState<PreviewWidth>('desktop');
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  // The frame width and the try-it-out answers are this preview's entry in
+  // `state.widgets.previews`: nothing here is ever saved.
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const { width, answers } = useAppSelector((state) => selectPreview(state, id));
+  useClearOnLeave(previewLeft({ id }));
   const frame = PREVIEW_WIDTHS.find((entry) => entry.key === width);
 
   return (
@@ -37,7 +48,7 @@ export function FormPreview({
                 type="radio"
                 name="preview-width"
                 checked={width === entry.key}
-                onChange={() => setWidth(entry.key)}
+                onChange={() => dispatch(previewWidthChosen({ id, width: entry.key }))}
               />
               <span>{entry.label}</span>
             </label>
@@ -64,7 +75,7 @@ export function FormPreview({
                 key={question.id}
                 question={question}
                 value={answers[question.id]}
-                onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
+                onChange={(value) => dispatch(previewAnswered({ id, questionId: question.id, value }))}
               />
             ))
           )}

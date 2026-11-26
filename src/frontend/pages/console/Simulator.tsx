@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react';
-import type { Capability, PersonSummary, SimulateBody, SimulateTarget } from '@endur/shared';
+// `/app/simulator`. The catalogue, the units, the people, subjects and campaigns are RTK
+// Query reads; the sentence, the run and the session's last five answers are
+// `state.simulator` (store/screens/simulator.ts).
+import { useMemo } from 'react';
+import type { PersonSummary, SimulateTarget } from '@endur/shared';
 import { isCapability } from '@endur/shared';
 import { PageHeader } from '../../components/layout/PageHeader.js';
 import { EmptyState } from '../../components/feedback/EmptyState.js';
@@ -11,9 +14,26 @@ import { usePeopleSearch } from '../../lib/people.js';
 import { useUnits } from '../../lib/units.js';
 import { useSubjectList } from '../../lib/subjects.js';
 import { useCampaignList } from '../../lib/campaigns.js';
-import { useCapabilityCatalogue, useSimulator, type SimulationRecord } from '../../lib/simulator.js';
-
-type TargetKind = SimulateTarget['kind'];
+import { useCapabilityCatalogue } from '../../lib/simulator.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  capabilityChosen,
+  personPicked,
+  personSearched,
+  selectSimulator,
+  simulationDateChosen,
+  simulationRun,
+  simulatorLeft,
+  subjectSearched,
+  targetChosen,
+  targetKindChosen,
+  type PickedPerson,
+  type PickerSlot,
+  type SimulationQuery,
+  type SimulationRecord,
+  type TargetKind,
+} from '../../store/screens/simulator.js';
 
 function counterfactual(record: SimulationRecord): string | null {
   const { decision } = record;
@@ -25,17 +45,23 @@ function counterfactual(record: SimulationRecord): string | null {
   return `This would be allowed if ${record.targetLabel} were within reach of that ${nearMiss.via} grant.`;
 }
 
+/** One of the sentence's two person blanks. What is typed and who is picked are the
+ *  simulator slice's, under this picker's `slot`. */
 function PersonPicker({
   label,
+  slot,
   value,
-  onChange,
 }: {
   label: string;
-  value: { userId: string; name: string } | null;
-  onChange: (person: { userId: string; name: string } | null) => void;
+  slot: PickerSlot;
+  value: PickedPerson | null;
 }): JSX.Element {
-  const [term, setTerm] = useState('');
+  const dispatch = useAppDispatch();
+  const term = useAppSelector(selectSimulator).form.terms[slot];
   const results = usePeopleSearch(term);
+  const onChange = (person: PickedPerson | null): void => {
+    dispatch(personPicked({ slot, person }));
+  };
   const withAccount = (results.data?.data ?? []).filter(
     (person): person is PersonSummary & { userId: string } => person.userId !== null,
   );
@@ -57,7 +83,7 @@ function PersonPicker({
         className="input input-inline"
         placeholder={label}
         value={term}
-        onChange={(event) => setTerm(event.target.value)}
+        onChange={(event) => dispatch(personSearched({ slot, term: event.target.value }))}
       />
       {term.trim().length >= 2 && (
         <ul className="sim-blank-results">
@@ -70,10 +96,7 @@ function PersonPicker({
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => {
-                  onChange({ userId: person.userId, name: person.name });
-                  setTerm('');
-                }}
+                onClick={() => onChange({ userId: person.userId, name: person.name })}
               >
                 {person.name}
               </button>
@@ -90,18 +113,16 @@ export default function Simulator(): JSX.Element {
   const can = useCan();
   const catalogue = useCapabilityCatalogue();
   const units = useUnits();
-  const sim = useSimulator();
+  const dispatch = useAppDispatch();
+  const sim = useAppSelector(selectSimulator);
+  useClearOnLeave(simulatorLeft());
+  const {
+    principal, capability, targetKind, targetUnitId, targetPerson, targetSubjectId,
+    targetCampaignId, at, subjectTerm,
+  } = sim.form;
+  const forbidden = sim.error?.status === 403;
+  const runError = sim.error && !forbidden ? sim.error.message : null;
 
-  const [principal, setPrincipal] = useState<{ userId: string; name: string } | null>(null);
-  const [capability, setCapability] = useState<Capability | ''>('');
-  const [targetKind, setTargetKind] = useState<TargetKind>('org');
-  const [targetUnitId, setTargetUnitId] = useState('');
-  const [targetPerson, setTargetPerson] = useState<{ userId: string; name: string } | null>(null);
-  const [targetSubjectId, setTargetSubjectId] = useState('');
-  const [targetCampaignId, setTargetCampaignId] = useState('');
-  const [at, setAt] = useState('');
-
-  const [subjectTerm, setSubjectTerm] = useState('');
   const subjects = useSubjectList({ q: subjectTerm || undefined });
   const campaigns = useCampaignList();
 
@@ -115,7 +136,7 @@ export default function Simulator(): JSX.Element {
   const ready = principal !== null && capability !== '' && targetReady;
 
   const targetLabel = useMemo(() => {
-    if (targetKind === 'org') return 'the whole organisation';
+    if (targetKind === 'org') return 'the whole organization';
     if (targetKind === 'unit') {
       return findUnitName(units.data ?? [], targetUnitId) ?? `that ${labels.unit.one.toLowerCase()}`;
     }
@@ -140,7 +161,7 @@ export default function Simulator(): JSX.Element {
         <EmptyState
           icon="role"
           title="You do not have access to this"
-          body="Your account cannot run the simulator. Whoever administers your organisation can change that."
+          body="Your account cannot run the simulator. Whoever administers your organization can change that."
         />
       </div>
     );
@@ -158,13 +179,16 @@ export default function Simulator(): JSX.Element {
     else if (targetKind === 'subject') target = { kind: 'subject', subjectId: targetSubjectId };
     else target = { kind: 'campaign', campaignId: targetCampaignId };
 
-    const query: SimulateBody = {
+    const query: SimulationQuery = {
       principalUserId: principal.userId,
       capability,
       target,
-      at: at ? new Date(at) : undefined,
+      ...(at ? { at } : {}),
     };
-    void sim.run(query, { principalName: principal.name, targetLabel, capabilityLabel });
+    void dispatch(simulationRun({
+      query,
+      labels: { principalName: principal.name, targetLabel, capabilityLabel },
+    }));
   };
 
   const latest = sim.history[0] ?? null;
@@ -179,14 +203,14 @@ export default function Simulator(): JSX.Element {
       <div className="card sim-sentence">
         <p className="sim-sentence-text">
           If{' '}
-          <PersonPicker label="a person" value={principal} onChange={setPrincipal} /> tries to{' '}
+          <PersonPicker label="a person" slot="principal" value={principal} /> tries to{' '}
           <span className="sim-blank">
             <select
               className="input input-inline"
               value={capability}
               onChange={(event) => {
                 const next = event.target.value;
-                setCapability(isCapability(next) ? next : '');
+                dispatch(capabilityChosen({ capability: isCapability(next) ? next : '' }));
               }}
               disabled={catalogue.loading}
             >
@@ -201,15 +225,10 @@ export default function Simulator(): JSX.Element {
             <select
               className="input input-inline"
               value={targetKind}
-              onChange={(event) => {
-                setTargetKind(event.target.value as TargetKind);
-                setTargetUnitId('');
-                setTargetPerson(null);
-                setTargetSubjectId('');
-                setTargetCampaignId('');
-              }}
+              onChange={(event) =>
+                dispatch(targetKindChosen({ kind: event.target.value as TargetKind }))}
             >
-              <option value="org">the whole organisation</option>
+              <option value="org">the whole organization</option>
               <option value="unit">a {labels.unit.one.toLowerCase()}</option>
               <option value="person">a person</option>
               <option value="subject">a {labels.subject.one.toLowerCase()}</option>
@@ -223,12 +242,12 @@ export default function Simulator(): JSX.Element {
                 nodes={units.data ?? []}
                 mode="select"
                 selectedId={targetUnitId}
-                onSelect={setTargetUnitId}
+                onSelect={(unitId) => dispatch(targetChosen({ field: 'targetUnitId', id: unitId }))}
               />
             </span>
           )}
           {targetKind === 'person' && (
-            <PersonPicker label="a person" value={targetPerson} onChange={setTargetPerson} />
+            <PersonPicker label="a person" slot="target" value={targetPerson} />
           )}
           {targetKind === 'subject' && (
             <span className="sim-blank">
@@ -236,12 +255,13 @@ export default function Simulator(): JSX.Element {
                 className="input input-inline"
                 placeholder={`Search ${labels.subject.many.toLowerCase()}`}
                 value={subjectTerm}
-                onChange={(event) => setSubjectTerm(event.target.value)}
+                onChange={(event) => dispatch(subjectSearched({ term: event.target.value }))}
               />
               <select
                 className="input input-inline"
                 value={targetSubjectId}
-                onChange={(event) => setTargetSubjectId(event.target.value)}
+                onChange={(event) =>
+                  dispatch(targetChosen({ field: 'targetSubjectId', id: event.target.value }))}
               >
                 <option value="">choose one</option>
                 {(subjects.data?.data ?? []).map((subject) => (
@@ -255,7 +275,8 @@ export default function Simulator(): JSX.Element {
               <select
                 className="input input-inline"
                 value={targetCampaignId}
-                onChange={(event) => setTargetCampaignId(event.target.value)}
+                onChange={(event) =>
+                  dispatch(targetChosen({ field: 'targetCampaignId', id: event.target.value }))}
               >
                 <option value="">choose one</option>
                 {(campaigns.data?.data ?? []).map((campaign) => (
@@ -271,7 +292,7 @@ export default function Simulator(): JSX.Element {
               type="date"
               className="input input-inline"
               value={at}
-              onChange={(event) => setAt(event.target.value)}
+              onChange={(event) => dispatch(simulationDateChosen({ at: event.target.value }))}
             />
           </span>
 
@@ -285,19 +306,19 @@ export default function Simulator(): JSX.Element {
           </button>
         </p>
         <p className="text-meta">
-          Every blank comes from something real in your organisation — there is no way to ask
+          Every blank comes from something real in your organization — there is no way to ask
           an invalid question.
         </p>
       </div>
 
-      {sim.forbidden && (
+      {forbidden && (
         <p className="form-error" role="alert">
           You do not have permission to run the simulator.
         </p>
       )}
-      {sim.error && (
+      {runError && (
         <p className="form-error" role="alert">
-          That did not run. {sim.error}
+          That did not run. {runError}
         </p>
       )}
 

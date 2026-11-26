@@ -332,7 +332,7 @@ export async function grantWarnings(
     warnings.push({
       kind: 'nobody_can',
       capability,
-      message: `Nobody in this organisation can ${describeCapability(capability, labels)}.`,
+      message: `Nobody in this organization can ${describeCapability(capability, labels)}.`,
     });
   }
 

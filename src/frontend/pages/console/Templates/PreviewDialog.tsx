@@ -31,6 +31,8 @@ export function PreviewDialog({
   const detail = useTemplate(template.id);
   const closeRef = useRef<HTMLButtonElement>(null);
 
+  // Effect (DOM): focus on open, Escape closes, and focus goes back where it came from.
+
   useEffect(() => {
     const opener = document.activeElement;
     closeRef.current?.focus();

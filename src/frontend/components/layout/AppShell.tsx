@@ -1,11 +1,12 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
 import { AmbientBackground } from '../AmbientBackground.js';
 import { PlanNoticeBanner } from '../billing/PlanNoticeBanner.js';
 import { SupportBanner } from './SupportBanner.js';
-import { useAppSelector } from '../../store/index.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { drawerClosed, drawerOpened, selectDrawerOpen } from '../../store/screens/chrome.js';
 
 const VIBE_INDUSTRIES = new Set(['university', 'hotel', 'hospital', 'company']);
 
@@ -16,11 +17,19 @@ export function AppShell({
   children: ReactNode;
   focused?: boolean;
 }): JSX.Element {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // The phone drawer is `state.chrome.drawerOpen` (store/screens/chrome.ts).
+  const dispatch = useAppDispatch();
+  const drawerOpen = useAppSelector(selectDrawerOpen);
   const location = useLocation();
   const industry = useAppSelector((s) => s.auth.org?.industry ?? null);
 
-  useEffect(() => setDrawerOpen(false), [location.pathname]);
+  // The route changing under the drawer closes it (Back, a link elsewhere on the page): the
+  // router is outside the store, and this is where its change is reported to it.
+  useEffect(() => {
+    dispatch(drawerClosed());
+  }, [dispatch, location.pathname]);
+
+  // Effect (DOM): the console takes the organisation's industry look (`data-vibe`).
 
   useEffect(() => {
     if (industry && VIBE_INDUSTRIES.has(industry)) {
@@ -33,14 +42,16 @@ export function AppShell({
     };
   }, [industry]);
 
+  // Effect (DOM): Escape closes the open drawer.
+
   useEffect(() => {
     if (!drawerOpen) return;
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setDrawerOpen(false);
+      if (event.key === 'Escape') dispatch(drawerClosed());
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [drawerOpen]);
+  }, [dispatch, drawerOpen]);
 
   return (
     <div className="shell">
@@ -62,7 +73,7 @@ export function AppShell({
           that is worth hiding to keep a screen tidy. */}
       <SupportBanner />
 
-      <TopBar {...(focused ? {} : { onOpenMenu: () => setDrawerOpen(true) })} />
+      <TopBar {...(focused ? {} : { onOpenMenu: () => dispatch(drawerOpened()) })} />
 
       <div className="shell-body">
         {/* Desktop: a column. Below 640px this is hidden and the drawer takes over. */}
@@ -73,7 +84,7 @@ export function AppShell({
         )}
 
         {!focused && drawerOpen && (
-          <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)}>
+          <div className="drawer-backdrop" onClick={() => dispatch(drawerClosed())}>
             <div
               className="drawer"
               role="dialog"
@@ -81,7 +92,7 @@ export function AppShell({
               aria-label="Navigation"
               onClick={(event) => event.stopPropagation()}
             >
-              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+              <Sidebar onNavigate={() => dispatch(drawerClosed())} />
             </div>
           </div>
         )}

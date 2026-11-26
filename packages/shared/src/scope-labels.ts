@@ -51,7 +51,7 @@ export function describeChoice(choice: GrantChoice, labels: ResolvedLabels): str
     case 'self': return 'only where it is about them';
     case 'own_unit': return `only in their own ${unit}`;
     case 'subtree': return `in their own ${unit} and every ${unit} under it`;
-    case 'all': return 'anywhere in the organisation';
+    case 'all': return 'anywhere in the organization';
     // Reads correctly after the word "Blocked" in the legend AND after "…may" in a menu:
     // the one description that has to work in both is written for both.
     case 'blocked': return 'never — this beats an allow from any other role, group or stand-in';

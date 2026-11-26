@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, Page, TemplateSummary } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubReply,
+} from '../../../test-utils.js';
+import { ApiError } from '../../../lib/api.js';
 import Templates from './index.js';
 
 const template = (over: Partial<TemplateSummary> & { id: string; name: string }): TemplateSummary => ({
@@ -37,13 +40,34 @@ let library: { data: TemplateSummary[] | null; loading: boolean; error: Error | 
 let list: { data: Page<TemplateSummary> | null; loading: boolean; error: Error | null };
 
 vi.mock('../../../lib/templates.js', () => ({
-  cloneKey: (id: string) => `key-for-${id}`,
   librarySearch: () => '',
   useTemplateLibrary: () => ({ ...library, reload }),
   useTemplates: () => ({ ...list, reload, create, clone, remove }),
 }));
 
-const ALL: Capability[] = ['template.read', 'template.create', 'template.clone', 'template.delete'];
+/**
+ * The commands are thunks over RTK Query now (store/screens/templates.ts): they reach the
+ * stubbed server, which asks the spies above what to answer, so each test still says what
+ * the server does and checks what was sent.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    const value = await spy(...args);
+    return value === undefined ? { status: 204 } : { body: { data: value } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const commands = () => stubApi({
+  'POST /templates': (call) => answer(create, call.body),
+  'POST /templates/*': (call) => answer(clone, call.path.split('/')[2], call.headers.get('idempotency-key')),
+  'DELETE /templates/*': (call) => answer(remove, call.path.split('/')[2]),
+});
+
+const ALL: Capability[] = [
+  'template.read', 'template.create', 'template.update', 'template.clone', 'template.delete',
+];
 
 const mount = (capabilities: Capability[] = ALL, path = '/app/templates') =>
   renderWithProviders(
@@ -57,8 +81,11 @@ const mount = (capabilities: Capability[] = ALL, path = '/app/templates') =>
 const section = (heading: string): HTMLElement =>
   screen.getByRole('heading', { name: heading }).closest('section') as HTMLElement;
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  commands();
   clone.mockResolvedValue({ id: 'new-1' });
   create.mockResolvedValue({ id: 'new-2' });
   remove.mockResolvedValue(undefined);
@@ -189,7 +216,7 @@ describe('clone is one action and lands in the builder', () => {
   it('sends an idempotency key, which is what covers the retry the button cannot', async () => {
     mount();
     fireEvent.click(within(section('Library')).getAllByRole('button', { name: 'Use' })[0] as HTMLElement);
-    expect(clone.mock.calls[0]?.[1]).toBe('key-for-l1');
+    expect(clone.mock.calls[0]?.[1]).toMatch(/^clone:l1:/);
     await waitFor(() => expect(screen.getByText('BUILDER')).toBeTruthy());
   });
 
@@ -248,7 +275,7 @@ describe('delete states its consequence, and refuses when the server would', () 
 
 describe('capabilities decide what is offered, never what is enforced', () => {
   it('hides Use without template.clone and Delete without template.delete', () => {
-    mount(['template.read']);
+    mount(['template.read', 'template.update']);
     expect(screen.queryByRole('button', { name: 'Use' })).toBeNull();
     expect(screen.queryByRole('img', { name: /^Delete / })).toBeNull();
     expect(screen.queryByRole('button', { name: /Blank form/ })).toBeNull();
@@ -256,10 +283,29 @@ describe('capabilities decide what is offered, never what is enforced', () => {
   });
 
   it('leaves Preview available to everybody who can read', () => {
-    mount(['template.read']);
+    mount(['template.read', 'template.update']);
     expect(
       within(section('Library')).getAllByRole('button', { name: 'Preview' }).length,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('a page for whoever BUILDS forms', () => {
+  it('reading and copying alone is not this page: it points at the campaign wizard', () => {
+    // As seeded for Faculty: they pick and copy forms inside the wizard instead.
+    mount(['template.read', 'template.clone', 'campaign.create']);
+    expect(screen.getByText('Forms are built by whoever manages them')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Library' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'New plithe' }).getAttribute('href'))
+      .toBe('/app/campaigns/new');
+  });
+
+  it('no Open on a form somebody cannot change, and a copy stays on this page', async () => {
+    mount(['template.read', 'template.create', 'template.clone']);
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    fireEvent.click(within(section('Library')).getAllByRole('button', { name: 'Use' })[0] as HTMLElement);
+    expect(await screen.findByText(/is in your templates/)).toBeTruthy();
+    expect(screen.queryByText('BUILDER')).toBeNull();
   });
 });
 

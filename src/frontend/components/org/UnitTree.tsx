@@ -1,5 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import type { Label } from '@endur/shared';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  selectTree,
+  treeBranchToggled,
+  treeDragStarted,
+  treeDraggedOver,
+  treeLeft,
+  treeMoveEnded,
+  treeMoveToggled,
+  treeRequestTaken,
+} from '../../store/screens/widgets.js';
 import { Icon } from '../Icon.js';
 import { InlineName } from './InlineName.js';
 import { pluralise } from '../../lib/format.js';
@@ -65,20 +77,21 @@ export function daysUntil(endsAt: string | null | undefined, now = Date.now()): 
 
 export function UnitTree(props: Props): JSX.Element {
   const { nodes, mode, addLabel, onReparent, request } = props;
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-  const [movingId, setMovingId] = useState<string | null>(null);
-  const [focusRow, setFocusRow] = useState<string | null>(null);
-  const [refusal, setRefusal] = useState<{ id: string; text: string } | null>(null);
+  // This tree's state is its entry in `state.widgets.trees` (by instance id): folded
+  // branches, the move in progress, the refused drop. Two trees never share any of it.
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const view = useAppSelector((state) => selectTree(state, id));
+  useClearOnLeave(treeLeft({ id }));
+  const { dragId, overId, movingId, focusRow, refusal } = view;
+  const collapsed = useMemo(() => new Set(view.collapsed), [view.collapsed]);
 
+  // The page's ask (the side panel's Rename or Move) handed to the slice, which acts on each
+  // nonce once: Rename, then Rename again on the same row, is two asks.
   useEffect(() => {
     if (!request) return;
-    if (request.action === 'move') setMovingId(request.id);
-    else setFocusRow(request.id);
-    // Depending on the nonce rather than the id is the point: Rename, Rename again on the
-    // same row, is two requests, and only the nonce distinguishes them.
-  }, [request?.nonce, request?.id, request?.action]);
+    dispatch(treeRequestTaken({ id, nodeId: request.id, action: request.action, nonce: request.nonce }));
+  }, [dispatch, id, request?.nonce, request?.id, request?.action]);
 
   const active = movingId ?? dragId;
   const activeNode = active ? findNode(nodes, active) : undefined;
@@ -86,33 +99,25 @@ export function UnitTree(props: Props): JSX.Element {
     ? subtreeIds(activeNode ?? { id: active, name: '', children: [] })
     : new Set<string>();
 
-  const toggle = (id: string): void =>
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggle = (nodeId: string): void => {
+    dispatch(treeBranchToggled({ id, nodeId }));
+  };
 
   const stop = (): void => {
-    setMovingId(null);
-    setDragId(null);
-    setOverId(null);
+    dispatch(treeMoveEnded({ id }));
   };
 
   const complete = (targetId: string): void => {
     if (!active) return;
     if (forbidden.has(targetId)) {
-      setRefusal({
-        id: active,
-        text: `${activeNode?.name ?? 'That'} cannot go inside itself.`,
-      });
-      stop();
+      dispatch(treeMoveEnded({
+        id,
+        refusal: { id: active, text: `${activeNode?.name ?? 'That'} cannot go inside itself.` },
+      }));
       return;
     }
-    setRefusal(null);
     onReparent?.(active, targetId);
-    stop();
+    dispatch(treeMoveEnded({ id, refusal: null }));
   };
 
   const render = (node: UnitTreeNode, depth: number): JSX.Element => {
@@ -142,12 +147,13 @@ export function UnitTree(props: Props): JSX.Element {
           ].filter(Boolean).join(' ')}
           style={{ paddingLeft: `${depth * (depth > 3 ? 20 : 28) + 8}px` }}
           draggable={mode === 'edit' && !isRoot && onReparent !== undefined}
-          onDragStart={() => setDragId(node.id)}
+          onDragStart={() => dispatch(treeDragStarted({ id, nodeId: node.id }))}
           onDragEnd={() => stop()}
           onDragOver={(event) => {
             if (!dropTarget) return;
             event.preventDefault();
-            setOverId(node.id);
+            // dragover fires continuously: only a change of row is an event worth recording.
+            if (overId !== node.id) dispatch(treeDraggedOver({ id, nodeId: node.id }));
           }}
           onDrop={(event) => { event.preventDefault(); complete(node.id); }}
           onClick={mode === 'edit' && props.onSelect ? () => props.onSelect?.(node.id) : undefined}
@@ -218,7 +224,7 @@ export function UnitTree(props: Props): JSX.Element {
                 <button
                   type="button"
                   className="btn btn-icon"
-                  onClick={() => setMovingId(movingId === node.id ? null : node.id)}
+                  onClick={() => dispatch(treeMoveToggled({ id, nodeId: node.id }))}
                   aria-pressed={movingId === node.id}
                 >
                   <Icon name="drag" size={16} label={movingId === node.id ? `Cancel moving ${node.name}` : `Move ${node.name}`} />

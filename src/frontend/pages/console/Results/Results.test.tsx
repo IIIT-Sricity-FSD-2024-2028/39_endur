@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, CampaignDetail, Page, ResponseItem, ResultsView, UnitNode } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
-import { ApiError } from '../../../lib/api.js';
+import { renderWithProviders, NONSENSE_LABELS, errorReply, stubApi } from '../../../test-utils.js';
 import Results from './index.js';
 
 vi.mock('qrcode', () => ({
@@ -86,8 +85,6 @@ const UNITS: UnitNode[] = [{
 
 const reload = vi.fn();
 const loadMore = vi.fn();
-const fetchExport = vi.fn();
-const saveCsv = vi.fn();
 let results: { data: ResultsView | null; loading: boolean; error: Error | null; arrived: number; refreshing: boolean };
 let responses: { data: Page<ResponseItem> | null; loading: boolean; error: Error | null; suppressed: boolean; forbidden: boolean };
 
@@ -99,8 +96,6 @@ vi.mock('../../../lib/results.js', () => ({
     enabled
       ? { ...responses, loadMore }
       : { data: null, loading: false, error: null, suppressed: false, forbidden: true, loadMore },
-  fetchExport: (...args: unknown[]) => fetchExport(...args) as unknown,
-  saveCsv: (...args: unknown[]) => saveCsv(...args) as unknown,
 }));
 vi.mock('../../../lib/campaigns.js', () => ({
   useCampaign: () => ({ data: DETAIL, loading: false, error: null }),
@@ -128,7 +123,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   results = { data: VIEW, loading: false, error: null, arrived: 0, refreshing: false };
   responses = { data: RESPONSES, loading: false, error: null, suppressed: false, forbidden: false };
-  fetchExport.mockResolvedValue({ filename: 'x.csv', csv: 'a,b\n1,2\n' });
 });
 
 describe('the four stat cards', () => {
@@ -261,22 +255,37 @@ describe('the empty and closed states', () => {
 });
 
 describe('export', () => {
+  // The export is a thunk (store/screens/results.ts) over the real API client: the server is
+  // stubbed, and the browser's download is watched where it happens, on the link it clicks.
+  const downloads: string[] = [];
+  beforeEach(() => {
+    downloads.length = 0;
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:csv'), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloads.push(this.download);
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('downloads the CSV through the API client', async () => {
+    const calls = stubApi({ 'GET /campaigns/c1/export': { body: 'name,score\nA,4' } });
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
-    await waitFor(() => expect(saveCsv).toHaveBeenCalledTimes(1));
-    expect(fetchExport).toHaveBeenCalledWith('c1');
-    expect(saveCsv.mock.calls[0]?.[0]).toBe('Spring check-results.csv');
+    await waitFor(() => expect(downloads).toEqual(['Spring check-results.csv']));
+    expect(calls.map((call) => call.path)).toEqual(['/campaigns/c1/export']);
   });
 
   it('shows the plan message in place rather than navigating to raw JSON', async () => {
-    fetchExport.mockRejectedValue(new ApiError({
-      code: 'PAYMENT_REQUIRED', status: 402, requestId: 'r',
-      message: 'That feature is not included in your plan.',
-    }));
+    stubApi({
+      'GET /campaigns/c1/export': errorReply(402, 'PAYMENT_REQUIRED', 'That feature is not included in your plan.'),
+    });
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not included in your plan/));
+    expect(downloads).toEqual([]);
   });
 
   it('is absent without the capability', () => {

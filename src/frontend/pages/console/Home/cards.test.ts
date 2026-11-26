@@ -115,7 +115,7 @@ describe('the prompts', () => {
     expect(prompt.body).toMatch(/plithe/);
   });
 
-  it('names the organisation when the nudge is about setup', () => {
+  it('names the organization when the nudge is about setup', () => {
     const prompt = promptCopy({ kind: 'setup_incomplete', href: '/app/setup' }, labels, 'Northfield');
     expect(prompt.body).toMatch(/^Northfield/);
     expect(prompt.href).toBe('/app/setup');

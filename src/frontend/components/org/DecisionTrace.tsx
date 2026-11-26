@@ -28,7 +28,7 @@ function scopeWords(scope: string | undefined, unitWord: string): string {
     case 'self': return 'themselves only';
     case 'own_unit': return `that ${unitWord} only`;
     case 'subtree': return `that ${unitWord} and everything under it`;
-    case 'all': return 'the whole organisation';
+    case 'all': return 'the whole organization';
     default: return 'an unrecorded reach';
   }
 }

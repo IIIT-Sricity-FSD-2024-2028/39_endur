@@ -1,9 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import type { Capability, Page, SubjectSummary, UnitNode } from '@endur/shared';
 import { ApiError } from '../../../lib/api.js';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, stubApi, type StubCall, type StubReply,
+} from '../../../test-utils.js';
 import Subjects, { archiveConsequence } from './index.js';
 
 const subject = (over: Partial<SubjectSummary> & { id: string; name: string }): SubjectSummary => ({
@@ -74,8 +76,36 @@ const mount = (capabilities: Capability[] = ALL, path = '/app/subjects') =>
 
 const where = (): string => screen.getByTestId('where').textContent ?? '';
 
+/**
+ * The commands are thunks over RTK Query now (store/screens/subjects.ts): they reach the
+ * stubbed server, which asks the spies above what to answer. A rename and an edit are both a
+ * PATCH; a body with only a name is the rename.
+ */
+const answer = async (spy: (...args: unknown[]) => unknown, ...args: unknown[]): Promise<StubReply> => {
+  try {
+    return { body: { data: (await spy(...args)) ?? {} } };
+  } catch (error) {
+    if (error instanceof ApiError) return errorReply(error.status, error.code, error.message);
+    throw error;
+  }
+};
+const idOf = (call: StubCall): string => call.path.split('/')[2] ?? '';
+const server = () => stubApi({
+  'POST /subjects': (call) => answer(create, call.body),
+  'PATCH /subjects/*': (call) => {
+    const body = call.body as Record<string, unknown>;
+    return Object.keys(body).length === 1 && 'name' in body
+      ? answer(rename, idOf(call), body.name)
+      : answer(update, idOf(call), body);
+  },
+  'POST /subjects/*': (call) => answer(archive, idOf(call)),
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  server();
   seen = [];
   create.mockResolvedValue(subject({ id: 's9', name: 'New one' }));
   rename.mockResolvedValue(undefined);

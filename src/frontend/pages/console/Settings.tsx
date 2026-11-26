@@ -1,57 +1,86 @@
-import { useEffect, useMemo, useState } from 'react';
+// Settings. The drafts of both cards and their saves are `state.settings`
+// (store/screens/settings.ts): a draft is `null` until edited, and the card shows the server's
+// copy meanwhile. Every save, and the logo, is a thunk there. docs/REDUX-PLAN.md §6.10.
+import { useEffect, useMemo } from 'react';
 import {
   Industry, LabelKey, resolveLabels,
-  type LabelSet, type OrgView, type ResolvedLabels,
+  type LabelKey as Key, type OrgView, type ResolvedLabels,
 } from '@endur/shared';
 import { PageHeader } from '../../components/layout/PageHeader.js';
-import { WordsEditor } from '../../components/org/WordsEditor.js';
+import { WordsEditor, WordsTable } from '../../components/org/WordsEditor.js';
+import { LeaveGuard } from '../../components/feedback/LeaveGuard.js';
 import { DashboardPreview } from '../../components/org/DashboardPreview.js';
-import { Toast } from '../../components/feedback/Toast.js';
 import { useCan } from '../../lib/capabilities.js';
 import { ApiError } from '../../lib/api.js';
-import { derivePlural } from '../../lib/format.js';
+import { unwrapApi } from '../../lib/query.js';
 import { FileUpload } from '../../components/form/FileUpload.js';
+import { useOrg, usePresets } from '../../lib/org.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../store/screens/common.js';
 import {
-  useOrg, usePresets, useRemoveLogo, useUpdateLabels, useUpdateOrg, useUploadLogo,
-} from '../../lib/org.js';
-import { labelsLoaded, useAppDispatch } from '../../store/index.js';
+  logoRemoved,
+  logoUploaded,
+  orgIndustryChosen,
+  orgNameEdited,
+  orgProfileSaved,
+  overridesOf,
+  selectSettings,
+  settingsLeft,
+  wordPluralEdited,
+  wordPluralReset,
+  wordSingularEdited,
+  wordsSaved,
+  type WordsDraft,
+} from '../../store/screens/settings.js';
 
-const overridesOf = (labels: ResolvedLabels): LabelKey[] =>
-  LabelKey.options.filter((key) => labels[key].many !== derivePlural(labels[key].one));
+const industryOf = (org: OrgView): Industry => {
+  const parsed = Industry.safeParse(org.industry);
+  return parsed.success ? parsed.data : 'custom';
+};
+
+const sameWords = (a: ResolvedLabels, b: ResolvedLabels): boolean =>
+  LabelKey.options.every((key) => a[key].one === b[key].one && a[key].many === b[key].many);
 
 export default function Settings(): JSX.Element {
   const can = useCan();
   const org = useOrg();
   const presets = usePresets();
   const dispatch = useAppDispatch();
-  const updateOrg = useUpdateOrg();
-  const updateLabels = useUpdateLabels();
-  const uploadLogo = useUploadLogo();
-  const removeLogo = useRemoveLogo();
 
   const editable = can('org.update');
 
-  const [draft, setDraft] = useState<ResolvedLabels | null>(null);
-  const [overrides, setOverrides] = useState<LabelKey[]>([]);
-  const [name, setName] = useState('');
-  const [industry, setIndustry] = useState<Industry>('custom');
+  const page = useAppSelector(selectSettings);
+  useClearOnLeave(settingsLeft());
+  const { savingProfile, savingWords } = page;
+  const profileError = messageOf(page.profileError, 'Could not save.');
+  const wordsError = messageOf(page.wordsError, 'Could not save those words.');
 
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingWords, setSavingWords] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [wordsError, setWordsError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
+  // What each card shows: the draft once something was typed, the server's copy until then.
   const loaded = org.data;
-  useEffect(() => {
-    if (!loaded) return;
-    const resolved = resolveLabels(loaded.labels);
-    setDraft(resolved);
-    setOverrides(overridesOf(resolved));
-    setName(loaded.name);
-    const parsed = Industry.safeParse(loaded.industry);
-    setIndustry(parsed.success ? parsed.data : 'custom');
+  const name = page.name ?? loaded?.name ?? '';
+  const industry = page.industry ?? (loaded ? industryOf(loaded) : 'custom');
+  const fromServer = useMemo<WordsDraft | null>(() => {
+    if (!loaded) return null;
+    const labels = resolveLabels(loaded.labels);
+    return { labels, overrides: overridesOf(labels) };
   }, [loaded]);
+  const words = page.words ?? fromServer;
+  const draft = words?.labels ?? null;
+  const setName = (value: string): void => {
+    dispatch(orgNameEdited({ name: value }));
+  };
+  const setIndustry = (value: Industry): void => {
+    dispatch(orgIndustryChosen({ industry: value }));
+  };
+
+  // WHAT IS UNSAVED, per card. Each Save wakes up only when its card differs from what the
+  // server holds, says "Saved" otherwise, and leaving with either one unsaved asks first.
+  const saved = useMemo(() => (loaded ? resolveLabels(loaded.labels) : null), [loaded]);
+  const profileDirty =
+    loaded !== null && (name.trim() !== loaded.name || industry !== industryOf(loaded));
+  const wordsDirty = draft !== null && saved !== null && !sameWords(draft, saved);
+
+  // Effect (DOM): a link to #words scrolls to the words card once it is on screen.
 
   useEffect(() => {
     if (!draft || window.location.hash !== '#words') return;
@@ -62,64 +91,29 @@ export default function Settings(): JSX.Element {
     () => (presets.data ?? []).map((preset) => ({ key: preset.key, name: preset.displayName })),
     [presets.data],
   );
+  const industryName = (key: string): string =>
+    industries.find((entry) => entry.key === key)?.name ?? key.charAt(0).toUpperCase() + key.slice(1);
 
   const message = (error: unknown, fallback: string): string =>
     error instanceof ApiError ? error.message : fallback;
 
-  const applied = (updated: OrgView): void => {
-    org.set(updated);
-    dispatch(labelsLoaded(updated.labels as LabelSet));
-  };
-
   const saveProfile = (): void => {
-    setSavingProfile(true);
-    setProfileError(null);
-    void updateOrg({ name: name.trim(), industry })
-      .then((updated) => {
-        applied(updated);
-        setToast('Organization saved.');
-      })
-      .catch((error: unknown) => setProfileError(message(error, 'Could not save.')))
-      .finally(() => setSavingProfile(false));
+    void dispatch(orgProfileSaved({ name: name.trim(), industry }));
   };
 
   const saveWords = (): void => {
-    if (!draft) return;
-    setSavingWords(true);
-    setWordsError(null);
-    void updateLabels({ ...draft })
-      .then((updated) => {
-        applied(updated);
-        setToast('Words saved. Every screen is using them now.');
-      })
-      .catch((error: unknown) =>
-        setWordsError(message(error, 'Could not save those words.')))
-      .finally(() => setSavingWords(false));
+    if (draft) void dispatch(wordsSaved(draft));
   };
 
-  const setOne = (key: LabelKey, one: string): void =>
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            [key]: {
-              one,
-              many: overrides.includes(key) ? current[key].many : derivePlural(one),
-            },
-          }
-        : current);
-
-  const setMany = (key: LabelKey, many: string): void => {
-    setDraft((current) => (current ? { ...current, [key]: { ...current[key], many } } : current));
-    setOverrides((current) => (current.includes(key) ? current : [...current, key]));
+  // Each edit carries what the card showed, for the first edit after a load or a save.
+  const setOne = (key: Key, one: string): void => {
+    if (words) dispatch(wordSingularEdited({ key, one, from: words }));
   };
-
-  const resetPlural = (key: LabelKey): void => {
-    setDraft((current) =>
-      current
-        ? { ...current, [key]: { ...current[key], many: derivePlural(current[key].one) } }
-        : current);
-    setOverrides((current) => current.filter((entry) => entry !== key));
+  const setMany = (key: Key, many: string): void => {
+    if (words) dispatch(wordPluralEdited({ key, many, from: words }));
+  };
+  const resetPlural = (key: Key): void => {
+    if (words) dispatch(wordPluralReset({ key, from: words }));
   };
 
   const blank = draft
@@ -143,7 +137,7 @@ export default function Settings(): JSX.Element {
     );
   }
 
-  if (!draft) {
+  if (!draft || !loaded) {
     return (
       <>
         <PageHeader title="Settings" />
@@ -152,9 +146,55 @@ export default function Settings(): JSX.Element {
     );
   }
 
+  // READ, NOT A FORM WITH EVERY FIELD SWITCHED OFF. Without `org.update` this page is only
+  // reachable by typing its address (the sidebar item needs the power), and what it owes
+  // that reader is the facts: a disabled input still looks like somewhere to type.
+  if (!editable) {
+    return (
+      <>
+        <PageHeader
+          title="Settings"
+          subtitle="How your organization is set up. Whoever manages it can change this."
+        />
+        <div className="settings-page">
+          <section className="settings-card" aria-labelledby="settings-org">
+            <h3 className="utility" id="settings-org">Organization</h3>
+            <dl className="card settings-facts">
+              <div className="settings-fact">
+                <dt>Name</dt>
+                <dd>{loaded.name}</dd>
+              </div>
+              <div className="settings-fact">
+                <dt>Industry</dt>
+                <dd>{industryName(industryOf(loaded))}</dd>
+              </div>
+              <div className="settings-fact">
+                <dt>Logo</dt>
+                <dd>
+                  {loaded.logoUrl ? (
+                    <img src={loaded.logoUrl} alt={`${loaded.name} logo`} className="file-preview shape-square" />
+                  ) : (
+                    <span className="text-muted">None</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="settings-card" id="words" aria-labelledby="settings-words">
+            <h3 className="utility" id="settings-words">Official Terms</h3>
+            <p className="text-muted">These appear throughout Endur.</p>
+            <WordsTable labels={saved ?? draft} />
+          </section>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader title="Settings" />
+      <LeaveGuard when={profileDirty || wordsDirty} what="your changes to these settings" />
 
       <div className="settings-page">
         <section className="settings-card" aria-labelledby="settings-org">
@@ -167,7 +207,6 @@ export default function Settings(): JSX.Element {
                 className="input"
                 value={name}
                 maxLength={120}
-                disabled={!editable}
                 onChange={(event) => setName(event.target.value)}
               />
             </div>
@@ -178,7 +217,7 @@ export default function Settings(): JSX.Element {
                 id="org-industry"
                 className="input"
                 value={industry}
-                disabled={!editable || industries.length === 0}
+                disabled={industries.length === 0}
                 onChange={(event) => setIndustry(event.target.value as Industry)}
               >
                 {industries.map((entry) => (
@@ -197,30 +236,28 @@ export default function Settings(): JSX.Element {
               label="Logo"
               shape="square"
               current={org.data?.logoUrl ?? null}
-              disabled={!editable}
-              hint="PNG, JPEG or WebP, up to 2 MB."
+              hint="PNG, JPEG or WebP, up to 2 MB. It is saved as soon as you choose it."
               onUpload={async (file) => {
-                org.set(await uploadLogo(file));
+                await unwrapApi(dispatch(logoUploaded(file)));
               }}
               onRemove={async () => {
-                org.set(await removeLogo());
+                await unwrapApi(dispatch(logoRemoved()));
               }}
             />
 
             {profileError && <p className="field-error" role="alert">{profileError}</p>}
 
-            {editable && (
-              <div className="card-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={savingProfile || !name.trim()}
-                  onClick={saveProfile}
-                >
-                  {savingProfile ? 'Saving…' : 'Save organization'}
-                </button>
-              </div>
-            )}
+            <div className="card-actions">
+              {profileDirty && <span className="text-meta settings-unsaved">Unsaved changes</span>}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={savingProfile || !name.trim() || !profileDirty}
+                onClick={saveProfile}
+              >
+                {savingProfile ? 'Saving…' : profileDirty ? 'Save organization' : 'Saved'}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -230,8 +267,7 @@ export default function Settings(): JSX.Element {
 
           <WordsEditor
             labels={draft}
-            overrides={overrides}
-            readOnly={!editable}
+            overrides={words?.overrides ?? []}
             onSetOne={setOne}
             onSetMany={setMany}
             onResetPlural={resetPlural}
@@ -241,22 +277,19 @@ export default function Settings(): JSX.Element {
           {blank && <p className="field-error" role="alert">Every word needs a singular and a plural.</p>}
           {wordsError && <p className="field-error" role="alert">{wordsError}</p>}
 
-          {editable && (
-            <div className="card-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={savingWords || Boolean(blank)}
-                onClick={saveWords}
-              >
-                {savingWords ? 'Saving…' : 'Save words'}
-              </button>
-            </div>
-          )}
+          <div className="card-actions">
+            {wordsDirty && <span className="text-meta settings-unsaved">Unsaved changes</span>}
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={savingWords || Boolean(blank) || !wordsDirty}
+              onClick={saveWords}
+            >
+              {savingWords ? 'Saving…' : wordsDirty ? 'Save words' : 'Saved'}
+            </button>
+          </div>
         </section>
       </div>
-
-      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </>
   );
 }

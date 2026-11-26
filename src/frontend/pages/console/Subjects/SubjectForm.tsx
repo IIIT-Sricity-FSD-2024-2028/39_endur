@@ -1,16 +1,21 @@
-import { useState } from 'react';
+// The add or edit dialog for a subject. What is typed, picked and searched is
+// `state.subjects.form` (store/screens/subjects.ts); the page opens it with its starting
+// draft (`subjectFormOpened`) and sends it with a thunk.
 import { nameField } from '@endur/shared';
 import type { PersonSummary, ResolvedLabels, UnitNode } from '@endur/shared';
 import { UnitTree } from '../../../components/org/UnitTree.js';
 import { usePeopleSearch } from '../../../lib/people.js';
 import { isValid } from '../../../lib/validate.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import {
+  selectSubjectForm,
+  subjectFormEdited,
+  subjectPersonLinked,
+  subjectPersonSearchTyped,
+  type SubjectDraft,
+} from '../../../store/screens/subjects.js';
 
-export type SubjectDraft = {
-  name: string;
-  unitId: string;
-  linkedUserId: string | null;
-  linkedUserName: string | null;
-};
+export type { SubjectDraft } from '../../../store/screens/subjects.js';
 
 export function SubjectForm({
   title,
@@ -35,10 +40,11 @@ export function SubjectForm({
   onSubmit: (draft: SubjectDraft) => void;
   onCancel: () => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState<SubjectDraft>(
-    initial ?? { name: '', unitId: units[0]?.id ?? '', linkedUserId: null, linkedUserName: null },
-  );
-  const [term, setTerm] = useState('');
+  const dispatch = useAppDispatch();
+  const form = useAppSelector(selectSubjectForm);
+  const draft: SubjectDraft =
+    form?.draft ?? initial ?? { name: '', unitId: units[0]?.id ?? '', linkedUserId: null, linkedUserName: null };
+  const term = form?.personTerm ?? '';
   const people = usePeopleSearch(term);
 
   const unitName = findUnit(units, draft.unitId)?.name ?? '';
@@ -70,7 +76,7 @@ export function SubjectForm({
               maxLength={120}
               autoFocus
               value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              onChange={(event) => dispatch(subjectFormEdited({ name: event.target.value }))}
             />
           </div>
 
@@ -81,7 +87,7 @@ export function SubjectForm({
                 nodes={units}
                 mode="select"
                 selectedId={draft.unitId}
-                onSelect={(id) => setDraft({ ...draft, unitId: id })}
+                onSelect={(id) => dispatch(subjectFormEdited({ unitId: id }))}
               />
             </div>
             <p className="field-help">
@@ -99,7 +105,7 @@ export function SubjectForm({
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    onClick={() => setDraft({ ...draft, linkedUserId: null, linkedUserName: null })}
+                    onClick={() => dispatch(subjectPersonLinked(null))}
                   >
                     Remove link
                   </button>
@@ -111,7 +117,7 @@ export function SubjectForm({
                     className="input"
                     placeholder="Search by name"
                     value={term}
-                    onChange={(event) => setTerm(event.target.value)}
+                    onChange={(event) => dispatch(subjectPersonSearchTyped({ term: event.target.value }))}
                   />
                   {people.loading && <p className="text-meta">Searching…</p>}
                   <ul className="person-results">
@@ -120,14 +126,9 @@ export function SubjectForm({
                         <button
                           type="button"
                           className="btn btn-ghost"
-                          onClick={() => {
-                            setDraft({
-                              ...draft,
-                              linkedUserId: person.userId ?? person.id,
-                              linkedUserName: person.name,
-                            });
-                            setTerm('');
-                          }}
+                          onClick={() =>
+                            dispatch(subjectPersonLinked({ personId: person.userId ?? person.id, name: person.name }))
+                          }
                         >
                           {person.name}
                           <span className="text-meta"> {person.positions[0]?.roleName ?? ''}</span>

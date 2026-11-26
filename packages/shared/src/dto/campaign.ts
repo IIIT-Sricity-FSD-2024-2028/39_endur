@@ -39,6 +39,18 @@ export type AudienceRule = z.infer<typeof AudienceRule>;
 export const CampaignAccess = z.enum(['public', 'organization']);
 export type CampaignAccess = z.infer<typeof CampaignAccess>;
 
+/**
+ * A CLOSING TIME HAS TO BE AHEAD OF NOW. One already gone would launch a campaign that is
+ * closed from its first second: a live link and a QR code that turn every answer away, made
+ * on purpose by nobody. Checked against the server's clock, at the moment the body arrives.
+ */
+const closesLater = (endsAt: Date | null | undefined): boolean =>
+  !endsAt || endsAt.getTime() > Date.now();
+const CLOSES_LATER = {
+  message: 'That closing time has already passed. Pick a later one, or leave it empty.',
+  path: ['endsAt'],
+};
+
 export const CreateCampaignBody = z
   .object({
     name: nameField(120),
@@ -64,20 +76,23 @@ export const CreateCampaignBody = z
   .refine((body) => !body.startsAt || !body.endsAt || body.endsAt > body.startsAt, {
     message: 'End must be after start',
     path: ['endsAt'],
-  });
+  })
+  .refine((body) => closesLater(body.endsAt), CLOSES_LATER);
 export type CreateCampaignBody = z.infer<typeof CreateCampaignBody>;
 
-export const UpdateCampaignBody = z.object({
-  name: z.string().min(1).max(120).optional(),
-  subjectIds: z.array(Id).min(1).max(200).optional(),
-  audience: AudienceRule.optional(),
-  startsAt: z.coerce.date().nullable().optional(),
-  endsAt: z.coerce.date().nullable().optional(),
-  anonymous: z.boolean().optional(),
-  /** Draft only, like every other field here — the service refuses the whole body once
-   *  launched (38), and the trigger refuses this column specifically even if it did not. */
-  access: CampaignAccess.optional(),
-});
+export const UpdateCampaignBody = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    subjectIds: z.array(Id).min(1).max(200).optional(),
+    audience: AudienceRule.optional(),
+    startsAt: z.coerce.date().nullable().optional(),
+    endsAt: z.coerce.date().nullable().optional(),
+    anonymous: z.boolean().optional(),
+    /** Draft only, like every other field here — the service refuses the whole body once
+     *  launched (38), and the trigger refuses this column specifically even if it did not. */
+    access: CampaignAccess.optional(),
+  })
+  .refine((body) => closesLater(body.endsAt), CLOSES_LATER);
 export type UpdateCampaignBody = z.infer<typeof UpdateCampaignBody>;
 
 /**
@@ -114,7 +129,9 @@ export const QuickCampaignBody = z
     // Silently dropping them would let a caller believe they had built a poll.
     message: 'A suggestion box has no options — it is one open question.',
     path: ['options'],
-  });
+  })
+  // A poll launches the moment it is made, so a past closing time is a dead link at once.
+  .refine((body) => closesLater(body.endsAt), CLOSES_LATER);
 export type QuickCampaignBody = z.infer<typeof QuickCampaignBody>;
 
 export const QuickCampaignDto = dto({ body: QuickCampaignBody });

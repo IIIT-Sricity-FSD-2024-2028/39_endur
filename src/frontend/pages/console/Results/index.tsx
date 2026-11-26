@@ -1,4 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+// One campaign's results. The numbers are the cache's; what is open here, the export, and
+// the "just landed" maths are `state.results.pages[id]` (store/screens/results.ts).
+// docs/REDUX-PLAN.md §6.10.
+import { useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { StatCard } from '../../../components/data/StatCard.js';
@@ -12,7 +15,16 @@ import { formatDate } from '../../../lib/format.js';
 import { useCampaign } from '../../../lib/campaigns.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
-import { fetchExport, saveCsv, useResponses, useResults } from '../../../lib/results.js';
+import { useResponses, useResults } from '../../../lib/results.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  commentsExpanded,
+  resultsExported,
+  resultsShareClosed,
+  resultsShareOpened,
+  selectResultsPage,
+} from '../../../store/screens/results.js';
 import { STATUS_TAG } from '../Campaigns/card.js';
 import { statCards } from './stats.js';
 import { QuestionResult } from './QuestionResult.js';
@@ -35,14 +47,12 @@ export default function Results(): JSX.Element {
   const responses = useResponses(id, can('response.read'));
   const units = useUnits();
 
-  const [sharing, setSharing] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-
-  const openedAt = useRef<string | null>(null);
-  if (openedAt.current === null && responses.data) {
-    openedAt.current = responses.data.data[0]?.submittedAt ?? new Date(0).toISOString();
-  }
+  const campaignId = id ?? '';
+  const dispatch = useAppDispatch();
+  const page = useAppSelector((state) => selectResultsPage(state, campaignId));
+  // Opened and left by `useResults`, which owns the page's lifetime in the store.
+  const { sharing, exporting } = page;
+  const exportError = messageOf(page.exportError, 'That did not download.');
 
   const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
   const view = results.data;
@@ -54,18 +64,11 @@ export default function Results(): JSX.Element {
     setParams(next, { replace: true });
   };
 
-  const runExport = async (): Promise<void> => {
+  const runExport = (): void => {
     if (!id) return;
-    setExporting(true);
-    setExportError(null);
-    try {
-      const { csv } = await fetchExport(id);
-      saveCsv(`${campaign.data?.name ?? 'campaign'}-results.csv`, csv);
-    } catch (error) {
-      setExportError(error instanceof ApiError ? error.message : 'That did not download.');
-    } finally {
-      setExporting(false);
-    }
+    void dispatch(
+      resultsExported({ campaignId: id, filename: `${campaign.data?.name ?? 'campaign'}-results.csv` }),
+    );
   };
 
   if (results.loading && !view) return <p className="text-muted">Loading…</p>;
@@ -95,12 +98,12 @@ export default function Results(): JSX.Element {
         action={
           <div className="header-actions">
             {detail?.url && (
-              <button type="button" className="btn btn-secondary" onClick={() => setSharing(true)}>
+              <button type="button" className="btn btn-secondary" onClick={() => dispatch(resultsShareOpened({ campaignId }))}>
                 <Icon name="share" size={16} /> Share
               </button>
             )}
             {can('results.export') && (
-              <button type="button" className="btn btn-secondary" onClick={() => void runExport()} disabled={exporting}>
+              <button type="button" className="btn btn-secondary" onClick={runExport} disabled={exporting}>
                 {exporting && <span className="spinner" aria-hidden="true" />}
                 Export CSV
               </button>
@@ -182,7 +185,7 @@ export default function Results(): JSX.Element {
           body={`Nobody has answered this ${labels.campaign.one.toLowerCase()} yet. Share the link or the code and they will land here.`}
           action={
             detail?.url ? (
-              <button type="button" className="btn btn-primary" onClick={() => setSharing(true)}>
+              <button type="button" className="btn btn-primary" onClick={() => dispatch(resultsShareOpened({ campaignId }))}>
                 <Icon name="qr" size={16} /> Share the link
               </button>
             ) : undefined
@@ -228,7 +231,9 @@ export default function Results(): JSX.Element {
               total={responses.data?.meta.total ?? 0}
               hasMore={responses.data?.page.hasMore ?? false}
               onMore={() => void responses.loadMore()}
-              seenBefore={openedAt.current}
+              seenBefore={page.seenBefore ?? null}
+              expanded={page.commentsExpanded}
+              onExpand={() => dispatch(commentsExpanded({ campaignId }))}
               subjectWord={labels.subject.one}
             />
           )}
@@ -243,7 +248,7 @@ export default function Results(): JSX.Element {
           endsAt={detail.endsAt}
           anonymous={detail.anonymous}
           access={detail.access}
-          onClose={() => setSharing(false)}
+          onClose={() => dispatch(resultsShareClosed({ campaignId }))}
         />
       )}
     </>

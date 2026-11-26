@@ -561,7 +561,9 @@ model CampaignParticipant {
   userId     String   @map("user_id") @db.Uuid
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamptz(6)
+  // NO TIME EITHER (migration 20261106150000). The response was written in the same
+  // transaction, so a time here was the same instant as `responses.submitted_at`: a clock
+  // that paired each member with their answer.
 
   @@id([campaignId, userId])
   @@map("campaign_participants")

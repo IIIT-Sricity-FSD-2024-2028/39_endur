@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
+// The directory. The filters are the URL; everything the reader is doing here is
+// `state.people.list` (store/screens/people.ts), and every command a thunk there.
+// docs/REDUX-PLAN.md §6.10.
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { AccountInvite, CreateAssignmentBody, PersonSummary } from '@endur/shared';
+import type { PersonSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
@@ -14,8 +17,29 @@ import { ApiError } from '../../../lib/api.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { usePeopleList, useRoles } from '../../../lib/people.js';
-import { inviteAccount } from '../../../lib/accounts.js';
-import { formatRelative, pluralise } from '../../../lib/format.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  FAILED,
+  accountLinkMade,
+  addPersonClosed,
+  addPersonOpened,
+  importClosed,
+  importOpened,
+  inviteLinkClosed,
+  peopleListLeft,
+  peopleSearchTyped,
+  personAdded,
+  personRemoved,
+  personRenamed,
+  positionAdded,
+  positionRemoved,
+  removePersonAsked,
+  removePersonDismissed,
+  rowPositionClosed,
+  rowPositionOpened,
+  selectPeopleList,
+} from '../../../store/screens/people.js';import { formatRelative, pluralise } from '../../../lib/format.js';
 import { PersonForm, type PersonDraft } from './PersonForm.js';
 import { PositionChip, PositionEditor, type PositionDraft } from './PositionEditor.js';
 import { ImportWizard } from './ImportWizard.js';
@@ -35,21 +59,26 @@ export default function People(): JSX.Element {
   const roles = useRoles();
   const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
 
-  const [term, setTerm] = useState(q);
-  const [creating, setCreating] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [pending, setPending] = useState<PersonSummary | null>(null);
-  const [rowError, setRowError] = useState<{ id: string; text: string } | null>(null);
-  const [assigning, setAssigning] = useState<string | null>(null);
-  const [assignBusy, setAssignBusy] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [invite, setInvite] = useState<{ person: PersonSummary; data: AccountInvite } | null>(null);
-  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const state = useAppSelector(selectPeopleList);
+  useClearOnLeave(peopleListLeft());
+  const term = state.searchDraft ?? q;
+  const setTerm = (value: string): void => {
+    dispatch(peopleSearchTyped({ term: value }));
+  };
+  const creating = state.adding !== null;
+  const saving = state.adding?.saving ?? false;
+  const formError = messageOf(state.adding?.error, FAILED.add);
+  const assigning = state.assigningId;
+  const { assignBusy, importing, invite, invitingId } = state;
+  const rowError = state.rowError
+    ? { id: state.rowError.id, text: messageOf(state.rowError.error, FAILED[state.rowError.during]) ?? '' }
+    : null;
 
   const filtered = Boolean(q || unitId || roleId);
   const rows = list.data?.data ?? [];
   const total = list.data?.meta.total ?? 0;
+  const pending = rows.find((row) => row.id === state.removingId) ?? null;
 
   const setFilter = (patch: Record<string, string | null>): void => {
     const next = new URLSearchParams(params);
@@ -61,51 +90,24 @@ export default function People(): JSX.Element {
     setParams(next);
   };
 
-  const message = (error: unknown, fallback: string): string =>
-    error instanceof ApiError ? error.message : fallback;
-
   const invitePerson = (person: PersonSummary): void => {
-    setInvitingId(person.id);
-    setRowError(null);
-    void inviteAccount(person.id)
-      .then((data) => setInvite({ person, data }))
-      .catch((error: unknown) => {
-        setRowError({ id: person.id, text: message(error, 'That link could not be created.') });
-      })
-      .finally(() => setInvitingId(null));
+    void dispatch(accountLinkMade({ personId: person.id, mode: 'invite', from: 'list' }));
   };
 
+  // Added: straight into the position editor for them, for whoever may assign one
+  // (34 § Interactions). The slice does that on `personAdded.fulfilled`.
   const submit = (draft: PersonDraft): void => {
-    setSaving(true);
-    setFormError(null);
-    void list
-      .create(draft)
-      // Straight into the position editor for the person just added. Creating somebody
-      // grants them nothing, so leaving the administrator on a list with a new row that
-      // can do nothing is leaving the job half done (34 § Interactions).
-      .then((person) => {
-        setCreating(false);
-        if (can('assignment.create')) setAssigning(person.id);
-      })
-      .catch((error: unknown) => setFormError(message(error, 'That person could not be added.')))
-      .finally(() => setSaving(false));
+    void dispatch(personAdded({ body: draft, thenAssign: can('assignment.create') }));
   };
 
   const addPosition = (person: PersonSummary, draft: PositionDraft): void => {
-    setAssignBusy(true);
-    setRowError(null);
-    const body: CreateAssignmentBody = {
-      roleId: draft.roleId,
-      unitId: draft.unitId,
-      isPrimary: draft.isPrimary,
-    };
-    void list
-      .assign(person.id, body)
-      .then(() => setAssigning(null))
-      .catch((error: unknown) => {
-        setRowError({ id: person.id, text: message(error, 'That position could not be added.') });
-      })
-      .finally(() => setAssignBusy(false));
+    void dispatch(
+      positionAdded({
+        personId: person.id,
+        body: { roleId: draft.roleId, unitId: draft.unitId, isPrimary: draft.isPrimary },
+        from: 'list',
+      }),
+    );
   };
 
   const columns: Column<PersonSummary>[] = [
@@ -119,12 +121,7 @@ export default function People(): JSX.Element {
             <InlineName
               value={row.name}
               ariaLabel="Name"
-              onCommit={(name) => {
-                setRowError(null);
-                void list.update(row.id, { name }).catch((error: unknown) => {
-                  setRowError({ id: row.id, text: message(error, 'That name could not be saved.') });
-                });
-              }}
+              onCommit={(name) => void dispatch(personRenamed({ personId: row.id, name, from: 'list' }))}
             />
           ) : (
             <span className="person-name-text">{row.name}</span>
@@ -155,15 +152,8 @@ export default function People(): JSX.Element {
               isPrimary={position.isPrimary}
               onRemove={
                 can('assignment.delete')
-                  ? () => {
-                      setRowError(null);
-                      void list.unassign(row.id, position.edgeId).catch((error: unknown) => {
-                        setRowError({
-                          id: row.id,
-                          text: message(error, 'That position could not be removed.'),
-                        });
-                      });
-                    }
+                  ? () =>
+                      void dispatch(positionRemoved({ personId: row.id, edgeId: position.edgeId, from: 'list' }))
                   : undefined
               }
             />
@@ -178,20 +168,14 @@ export default function People(): JSX.Element {
               error={rowError?.id === row.id ? rowError.text : null}
               hasPositions={row.positions.length > 0}
               onAdd={(draft) => addPosition(row, draft)}
-              onCancel={() => {
-                setAssigning(null);
-                setRowError(null);
-              }}
+              onCancel={() => dispatch(rowPositionClosed())}
             />
           ) : (
             can('assignment.create') && (
               <button
                 type="button"
                 className="btn btn-ghost btn-tiny"
-                onClick={() => {
-                  setRowError(null);
-                  setAssigning(row.id);
-                }}
+                onClick={() => dispatch(rowPositionOpened({ personId: row.id }))}
               >
                 <Icon name="add" size={16} /> Position
               </button>
@@ -242,7 +226,7 @@ export default function People(): JSX.Element {
       header: 'Actions',
       render: (row) =>
         can('person.delete') ? (
-          <button type="button" className="btn btn-ghost" onClick={() => setPending(row)}>
+          <button type="button" className="btn btn-ghost" onClick={() => dispatch(removePersonAsked({ personId: row.id }))}>
             Remove
           </button>
         ) : null,
@@ -273,11 +257,11 @@ export default function People(): JSX.Element {
           can('person.create') && !(rows.length === 0 && !filtered) ? (
             <>
               {can('person.import') && (
-                <button type="button" className="btn btn-secondary" onClick={() => setImporting(true)}>
+                <button type="button" className="btn btn-secondary" onClick={() => dispatch(importOpened())}>
                   Import
                 </button>
               )}
-              <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+              <button type="button" className="btn btn-primary" onClick={() => dispatch(addPersonOpened())}>
                 <Icon name="add" size={18} /> Add a person
               </button>
             </>
@@ -335,7 +319,7 @@ export default function People(): JSX.Element {
 
       {list.error && (
         <p className="form-error" role="alert">
-          {message(list.error, 'Could not load people.')}{' '}
+          {list.error instanceof ApiError ? list.error.message : 'Could not load people.'}{' '}
           <button type="button" className="btn btn-ghost" onClick={() => void list.reload()}>
             Try again
           </button>
@@ -380,7 +364,7 @@ export default function People(): JSX.Element {
                 body={`Add the people in your organization and give each a role at a ${labels.unit.one.toLowerCase()}. What somebody can do comes from where they sit, not from who they are.`}
                 action={
                   can('person.create') ? (
-                    <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+                    <button type="button" className="btn btn-primary" onClick={() => dispatch(addPersonOpened())}>
                       Add a person
                     </button>
                   ) : undefined
@@ -420,7 +404,7 @@ export default function People(): JSX.Element {
           saving={saving}
           error={formError}
           onSubmit={submit}
-          onCancel={() => { setCreating(false); setFormError(null); }}
+          onCancel={() => dispatch(addPersonClosed())}
         />
       )}
 
@@ -430,14 +414,8 @@ export default function People(): JSX.Element {
           consequence={removeConsequence(pending)}
           verb="Remove"
           destructive
-          onConfirm={() => {
-            const person = pending;
-            setPending(null);
-            void list.remove(person.id).catch((error: unknown) => {
-              setRowError({ id: person.id, text: message(error, 'That person could not be removed.') });
-            });
-          }}
-          onCancel={() => setPending(null)}
+          onConfirm={() => void dispatch(personRemoved({ personId: pending.id }))}
+          onCancel={() => dispatch(removePersonDismissed())}
         />
       )}
 
@@ -446,21 +424,12 @@ export default function People(): JSX.Element {
           url={invite.data.url}
           expiresAt={invite.data.expiresAt}
           label={invite.data.personName}
-          onClose={() => {
-            setInvite(null);
-            void list.reload();
-          }}
+          onClose={() => dispatch(inviteLinkClosed())}
         />
       )}
 
       {importing && (
-        <ImportWizard
-          onClose={() => setImporting(false)}
-          onImported={() => {
-            setImporting(false);
-            void list.reload();
-          }}
-        />
+        <ImportWizard onClose={() => dispatch(importClosed())} />
       )}
     </>
   );

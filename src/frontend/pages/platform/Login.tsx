@@ -1,48 +1,44 @@
-import { useState, type FormEvent } from 'react';
+// `/ops/login`. Its state is `state.operator.login` (store/screens/operator.ts) and signing in
+// is the `operatorSignedIn` thunk. The password is NOT in the store (DEC-014): its box is
+// uncontrolled and read from the form on submit.
+import type { FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { PlatformMeResponse } from '@endur/shared';
 import { Icon } from '../../components/Icon.js';
-import { opsGet, opsPost, OpsError } from '../../lib/ops.js';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
-import { opsSignedIn } from '../../store/opsSlice.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import {
+  operatorLoginEdited,
+  operatorLoginLeft,
+  operatorRevealToggled,
+  operatorSignedIn,
+  opsMessageOf,
+  selectOperator,
+} from '../../store/screens/operator.js';
 
 export default function Login(): JSX.Element {
   const status = useAppSelector((s) => s.ops.status);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [reveal, setReveal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { email, code, reveal, submitting, error: failure } = useAppSelector(selectOperator).login;
+  useClearOnLeave(operatorLoginLeft());
+  const error = opsMessageOf(failure, 'Something went wrong. Please try again.');
+  const from = (location.state as { from?: string } | null)?.from ?? '/ops';
 
   if (status === 'authenticated') {
-    const from = (location.state as { from?: string } | null)?.from ?? '/ops';
     return <Navigate to={from} replace />;
   }
 
-  const onSubmit = (event: FormEvent): void => {
+  const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    void (async () => {
-      try {
-        await opsPost('/auth/login', { email, password, code });
-        const me = await opsGet<PlatformMeResponse>('/me');
-        dispatch(opsSignedIn({ operator: me.operator, capabilities: me.capabilities }));
-        const from = (location.state as { from?: string } | null)?.from ?? '/ops';
-        navigate(from, { replace: true });
-      } catch (err) {
-        setError(
-          err instanceof OpsError ? err.message : 'Something went wrong. Please try again.',
-        );
-      } finally {
-        setSubmitting(false);
-      }
-    })();
+    const password = new FormData(event.currentTarget).get('password');
+    void dispatch(operatorSignedIn({
+      email,
+      password: typeof password === 'string' ? password : '',
+      code,
+    })).then((result) => {
+      if (operatorSignedIn.fulfilled.match(result)) navigate(from, { replace: true });
+    });
   };
 
   return (
@@ -58,7 +54,7 @@ export default function Login(): JSX.Element {
             className="input"
             type="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => dispatch(operatorLoginEdited({ email: event.target.value }))}
             autoComplete="username"
             autoFocus
             required
@@ -71,15 +67,14 @@ export default function Login(): JSX.Element {
             <input
               className="input"
               type={reveal ? 'text' : 'password'}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              name="password"
               autoComplete="current-password"
               required
             />
             <button
               type="button"
               className="btn btn-icon reveal-toggle"
-              onClick={() => setReveal((shown) => !shown)}
+              onClick={() => dispatch(operatorRevealToggled())}
             >
               <Icon name={reveal ? 'hide' : 'show'} size={18} label={reveal ? 'Hide password' : 'Show password'} />
             </button>
@@ -94,7 +89,7 @@ export default function Login(): JSX.Element {
             pattern="\d{6}"
             maxLength={6}
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => dispatch(operatorLoginEdited({ code: event.target.value }))}
             autoComplete="one-time-code"
             required
           />

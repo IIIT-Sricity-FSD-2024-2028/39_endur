@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// One campaign. What is open on the page and what is in flight is `state.campaigns.pages[id]`
+// (store/screens/campaigns.ts); Launch and Close are thunks there. docs/REDUX-PLAN.md §6.10.
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { StatCard } from '../../../components/data/StatCard.js';
@@ -9,21 +10,34 @@ import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { ApiError } from '../../../lib/api.js';
 import { formatDateTime } from '../../../lib/format.js';
-import { useCampaign, launchKey } from '../../../lib/campaigns.js';
+import { useCampaign } from '../../../lib/campaigns.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  campaignPageClosed,
+  campaignPageLaunched,
+  campaignPageLeft,
+  campaignShareClosed,
+  campaignShareOpened,
+  closeConfirmDismissed,
+  closeConfirmOpened,
+  selectCampaignPage,
+} from '../../../store/screens/campaigns.js';
 import { STATUS_TAG, timing } from './card.js';
-import { closeConsequence } from './summary-close.js';
+import { CANCEL_SCHEDULED, closeConsequence } from './summary-close.js';
 
 export default function CampaignDetail(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const labels = useLabels();
   const can = useCan();
   const campaign = useCampaign(id);
-
-  const [sharing, setSharing] = useState(false);
-  const [launchedUrl, setLaunchedUrl] = useState<string | null>(null);
-  const [closing, setClosing] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const campaignId = id ?? '';
+  const dispatch = useAppDispatch();
+  const page = useAppSelector((state) => selectCampaignPage(state, campaignId));
+  useClearOnLeave(campaignPageLeft({ campaignId }));
+  const { sharing, launchedUrl, confirmingClose: closing } = page;
+  const busy = page.launching;
+  const error = messageOf(page.error, 'That could not be done. Try again.');
 
   const detail = campaign.data;
 
@@ -46,20 +60,8 @@ export default function CampaignDetail(): JSX.Element {
   const shareUrl = launchedUrl ?? detail.url;
   const tag = STATUS_TAG[detail.status];
   const when = timing(detail);
-  const message = (cause: unknown, fallback: string): string =>
-    cause instanceof ApiError ? cause.message : fallback;
-
   const launch = (): void => {
-    setBusy(true);
-    setError(null);
-    void campaign
-      .launch(launchKey(detail.id))
-      .then((result) => {
-        setLaunchedUrl(result.url);
-        setSharing(true);
-      })
-      .catch((cause: unknown) => setError(message(cause, 'That could not be launched.')))
-      .finally(() => setBusy(false));
+    void dispatch(campaignPageLaunched({ campaignId: detail.id }));
   };
 
   return (
@@ -74,7 +76,7 @@ export default function CampaignDetail(): JSX.Element {
         action={
           <span className="page-actions">
             {shareUrl && (
-              <button type="button" className="btn btn-primary" onClick={() => setSharing(true)}>
+              <button type="button" className="btn btn-primary" onClick={() => dispatch(campaignShareOpened({ campaignId: detail.id }))}>
                 <Icon name="share" size={16} /> Share
               </button>
             )}
@@ -83,14 +85,21 @@ export default function CampaignDetail(): JSX.Element {
                 {busy ? 'Launching…' : `Launch ${labels.campaign.one.toLowerCase()}`}
               </button>
             )}
-            {detail.status !== 'draft' && (
+            {detail.status !== 'draft' && can('results.read') && (
               <Link className="btn btn-secondary" to={`/app/campaigns/${detail.id}/results`}>
                 Results
               </Link>
             )}
             {detail.status === 'open' && can('campaign.close') && (
-              <button type="button" className="btn btn-secondary" onClick={() => setClosing(true)}>
+              <button type="button" className="btn btn-secondary" onClick={() => dispatch(closeConfirmOpened({ campaignId: detail.id }))}>
                 Close early
+              </button>
+            )}
+            {/* R-805: a scheduled campaign could not be called off at all. Same command as
+                Close early (`campaignPageClosed`), said for what it is here. */}
+            {detail.status === 'scheduled' && can('campaign.close') && (
+              <button type="button" className="btn btn-secondary" onClick={() => dispatch(closeConfirmOpened({ campaignId: detail.id }))}>
+                Call it off
               </button>
             )}
           </span>
@@ -142,23 +151,18 @@ export default function CampaignDetail(): JSX.Element {
           endsAt={detail.endsAt}
           anonymous={detail.anonymous}
           access={detail.access}
-          onClose={() => setSharing(false)}
+          onClose={() => dispatch(campaignShareClosed({ campaignId: detail.id }))}
         />
       )}
 
       {closing && (
         <ConfirmDialog
-          title={`Close ${detail.name}?`}
-          consequence={closeConsequence(detail.responseCount)}
-          verb="Close"
+          title={detail.status === 'scheduled' ? `Call off ${detail.name}?` : `Close ${detail.name}?`}
+          consequence={detail.status === 'scheduled' ? CANCEL_SCHEDULED : closeConsequence(detail.responseCount)}
+          verb={detail.status === 'scheduled' ? 'Call it off' : 'Close'}
           destructive
-          onConfirm={() => {
-            setClosing(false);
-            void campaign.close().catch((cause: unknown) => {
-              setError(message(cause, 'That could not be closed.'));
-            });
-          }}
-          onCancel={() => setClosing(false)}
+          onConfirm={() => void dispatch(campaignPageClosed({ campaignId: detail.id }))}
+          onCancel={() => dispatch(closeConfirmDismissed({ campaignId: detail.id }))}
         />
       )}
     </>

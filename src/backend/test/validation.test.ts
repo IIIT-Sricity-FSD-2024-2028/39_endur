@@ -67,7 +67,7 @@ describe('registration refuses what the picker used to accept — DEC-110', () =
     expect(JSON.stringify(res.body)).toMatch(/at least one letter/i);
   });
 
-  it('refuses a digits-only organisation name', async () => {
+  it('refuses a digits-only organization name', async () => {
     const res = await register({ orgName: '99999' });
     expect(res.status).toBe(422);
   });

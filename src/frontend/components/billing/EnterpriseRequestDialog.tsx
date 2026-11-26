@@ -1,18 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+// The Enterprise ask. Controlled: the note lives in `state.plan.askNote` and the page passes it
+// in, so what was typed survives a re-render and is what `enterpriseRequested` sends.
+import { useEffect, useRef } from 'react';
 import { formatMoney, type PlanOption } from '@endur/shared';
 
 export function EnterpriseRequestDialog({
   plan,
+  note,
   sending,
+  onNoteChange,
   onSend,
   onCancel,
 }: {
   plan: PlanOption;
+  note: string;
   sending: boolean;
-  onSend: (note: string) => void;
+  onNoteChange: (note: string) => void;
+  onSend: () => void;
   onCancel: () => void;
 }): JSX.Element {
-  const [note, setNote] = useState('');
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus once, on open - not in the effect below, which re-runs whenever `sending` or the
@@ -20,6 +25,8 @@ export function EnterpriseRequestDialog({
   useEffect(() => {
     noteRef.current?.focus();
   }, []);
+
+  // Effect (DOM): Escape cancels, unless the request is on its way.
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -52,7 +59,7 @@ export function EnterpriseRequestDialog({
             rows={3}
             maxLength={1000}
             value={note}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => onNoteChange(event.target.value)}
             placeholder="What you are hoping to do with it, roughly when, anything else."
           />
         </label>
@@ -65,7 +72,7 @@ export function EnterpriseRequestDialog({
             type="button"
             className="btn btn-primary"
             disabled={sending}
-            onClick={() => onSend(note)}
+            onClick={onSend}
           >
             {sending && <span className="spinner" aria-hidden="true" />}
             {sending ? 'Sending' : 'Send request'}

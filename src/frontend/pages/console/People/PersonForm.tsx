@@ -1,8 +1,11 @@
-import { useState } from 'react';
+// "Add a person". What is typed is `state.people.list.adding.draft` (store/screens/people.ts);
+// the page renders this while that is set and sends it with the `personAdded` thunk.
 import { isValid } from '../../../lib/validate.js';
 import { nameField } from '@endur/shared';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { addPersonEdited, selectPeopleList, type PersonDraft } from '../../../store/screens/people.js';
 
-export type PersonDraft = { name: string; email: string };
+export type { PersonDraft } from '../../../store/screens/people.js';
 
 export function PersonForm({
   saving,
@@ -15,7 +18,8 @@ export function PersonForm({
   onSubmit: (draft: PersonDraft) => void;
   onCancel: () => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState<PersonDraft>({ name: '', email: '' });
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectPeopleList).adding?.draft ?? { name: '', email: '' };
   const ready = isValid(nameField(120), draft.name) && draft.email.trim().length > 0;
 
   return (
@@ -46,7 +50,7 @@ export function PersonForm({
               maxLength={120}
               autoFocus
               value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              onChange={(event) => dispatch(addPersonEdited({ name: event.target.value }))}
             />
           </div>
 
@@ -58,7 +62,7 @@ export function PersonForm({
               type="email"
               maxLength={254}
               value={draft.email}
-              onChange={(event) => setDraft({ ...draft, email: event.target.value })}
+              onChange={(event) => dispatch(addPersonEdited({ email: event.target.value }))}
             />
             <p className="field-help">
               How they will sign in, once somebody gives them an account. Adding them here

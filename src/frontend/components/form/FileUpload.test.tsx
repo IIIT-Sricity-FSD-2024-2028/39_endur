@@ -1,5 +1,15 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import type { ReactElement, ReactNode } from 'react';
+import { makeStore } from '../../test-utils.js';
+
+/** The widget keeps its state in the store (`state.widgets.uploads`). A `wrapper`, so
+ *  `rerender` keeps it. */
+const render = (ui: ReactElement) => {
+  const store = makeStore();
+  return rtlRender(ui, { wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider> });
+};
 import { FileUpload } from './FileUpload.js';
 
 beforeAll(() => {

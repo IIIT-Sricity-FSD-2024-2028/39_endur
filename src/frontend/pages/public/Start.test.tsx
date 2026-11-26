@@ -1,17 +1,34 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+// `/start` through the real store: its state is `state.entry.signup` and registering is the
+// `signupSubmitted` thunk (store/screens/entry.ts). `stubApi` stands in for the server and
+// asks the `registerOrg` spy what to answer `POST /auth/register` with.
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
-import { renderWithProviders } from '../../test-utils.js';
+import {
+  errorReply, meFixture, renderWithProviders, stubApi, type StubReply,
+} from '../../test-utils.js';
 import { ApiError } from '../../lib/api.js';
+import { selectEntry } from '../../store/screens/entry.js';
 import Start from './Start.js';
 
 const registerOrg = vi.fn();
-const refreshSession = vi.fn().mockResolvedValue(undefined);
-vi.mock('../../lib/auth.js', () => ({
-  useRegister: () => registerOrg,
-  useRefreshSession: () => refreshSession,
-  useSignIn: () => vi.fn(),
-}));
+const refreshSession = vi.fn();
+
+const server = () => stubApi({
+  'POST /auth/register': async (call): Promise<StubReply> => {
+    try {
+      await registerOrg(call.body);
+      return { status: 201, body: { data: { organization: { id: 'o1', slug: 'northfield' } } } };
+    } catch (error) {
+      if (!(error instanceof ApiError)) throw error;
+      return errorReply(error.status, error.code, error.message, error.details);
+    }
+  },
+  'GET /auth/me': () => {
+    refreshSession();
+    return { body: meFixture() };
+  },
+});
 
 const mount = () =>
   renderWithProviders(
@@ -56,10 +73,12 @@ const register = (email?: string, tier?: string) => {
   pay();
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   registerOrg.mockReset();
   refreshSession.mockClear();
-  refreshSession.mockResolvedValue(undefined);
+  server();
 });
 
 describe('create organization — 30 §3.3', () => {
@@ -93,6 +112,28 @@ describe('create organization — 30 §3.3', () => {
     mount();
     register();
     await waitFor(() => expect(screen.getByText('WIZARD')).toBeTruthy(), PAID);
+  });
+
+  // `/start` sits inside <RedirectIfSignedIn>: reading the session before the checkout's
+  // success screen has shown would take the page away from under it.
+  it('reads the session only after "Payment successful" has been seen', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    mount();
+    register();
+    await screen.findByText('Payment successful', {}, PAID);
+    expect(refreshSession).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('WIZARD')).toBeTruthy(), PAID);
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
+  // DEC-014 under DEC-R03: the form's state is in Redux, the password is not.
+  it('keeps the password out of the store, from typing it to registering', async () => {
+    registerOrg.mockResolvedValue('/app/setup');
+    const { store } = mount();
+    register();
+    await waitFor(() => expect(registerOrg).toHaveBeenCalled(), PAID);
+    expect(selectEntry(store.getState()).signup.email).toBe('amara@northfield.test');
+    expect(JSON.stringify(store.getState())).not.toContain('a-long-enough-one');
   });
 
   it('states the real minimum, 10, and states it before the server has to', () => {
@@ -268,7 +309,8 @@ describe('choose a plan — DEC-048', () => {
     );
     mount();
     register();
-    await waitFor(() => expect(screen.getByLabelText('Work email')).toBeTruthy(), PAID);
+    // Visible again (the details are only hidden during the plans, so they keep the password).
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Work email' })).toBeTruthy(), PAID);
     expect(screen.getByLabelText('Work email').getAttribute('aria-invalid')).toBe('true');
     advance();
     expect(radio('gold').checked).toBe(true);
@@ -293,7 +335,7 @@ describe('the details are checked before the plan step — DEC-110', () => {
     expect(screen.getByText(/at least one letter/i)).toBeTruthy();
   });
 
-  it('refuses a whitespace-only organisation name', () => {
+  it('refuses a whitespace-only organization name', () => {
     mount();
     badDetails('Anitha Rao', '   ');
     advance();

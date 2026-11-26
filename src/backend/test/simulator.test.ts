@@ -119,7 +119,7 @@ describe('POST /authz/simulate', () => {
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
   });
 
-  it('404s a target belonging to no organisation rather than deciding about it', async () => {
+  it('404s a target belonging to no organization rather than deciding about it', async () => {
     const res = await withCsrf(founder, 'post', '/api/v1/authz/simulate').send({
       principalUserId: head.userId,
       capability: 'subject.read',

@@ -47,6 +47,8 @@ import type {
   GapView,
   GrantWarning,
   HomeView,
+  WaitingForm,
+  AnsweredForm,
   ImportPreview,
   InboxMessage,
   InboxResponse,
@@ -734,6 +736,29 @@ export const AnnouncementSummarySchema = mirrors<AnnouncementSummary>()(
 
 export const AnnouncementPreviewSchema = mirrors<AnnouncementPreview>()(
   z.object({ recipients: z.number() }),
+);
+
+export const WaitingFormSchema = mirrors<WaitingForm>()(
+  z.object({
+    campaignId: z.string(),
+    token: z.string(),
+    name: z.string(),
+    about: z.string().nullable(),
+    questionCount: z.number(),
+    estimatedSeconds: z.number(),
+    endsAt: z.string().nullable(),
+  }),
+);
+
+export const AnsweredFormSchema = mirrors<AnsweredForm>()(
+  z.object({
+    campaignId: z.string(),
+    name: z.string(),
+    about: z.string().nullable(),
+    status: z.enum(['open', 'closed']),
+    closedAt: z.string().nullable(),
+    endsAt: z.string().nullable(),
+  }),
 );
 
 export const HomeViewSchema = mirrors<HomeView>()(

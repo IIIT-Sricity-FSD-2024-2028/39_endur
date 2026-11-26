@@ -99,7 +99,7 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log(
-    `seeded ${orgs} organisations · ${subjects} subjects · ${campaigns} campaigns · ${responses} responses in ${Date.now() - started} ms`,
+    `seeded ${orgs} organizations · ${subjects} subjects · ${campaigns} campaigns · ${responses} responses in ${Date.now() - started} ms`,
   );
 
   // Endur's own operator accounts, printed separately because they live in their own table.

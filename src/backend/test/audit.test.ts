@@ -25,7 +25,7 @@ const log = async (session: Session, query = ''): Promise<{ data: Entry[]; total
   return { data: res.body.data as Entry[], total: res.body.meta.total as number };
 };
 
-describe('GET /audit — the organisation reads its own record', () => {
+describe('GET /audit — the organization reads its own record', () => {
   let founder: Session;
   let sectionA: Session;
   let unitAId: string;

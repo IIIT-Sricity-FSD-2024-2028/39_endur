@@ -69,13 +69,13 @@ describe('the earnings page', () => {
     await waitFor(() => expect(card()).toContain('₹1,899'), { timeout: 2000 });
     expect(screen.getByText(/₹5,000 taken in total/)).toBeTruthy();
     expect(screen.getByText('₹949.50')).toBeTruthy();
-    expect(screen.getByText(/2 organisations paid in this window/)).toBeTruthy();
+    expect(screen.getByText(/2 organizations paid in this window/)).toBeTruthy();
   });
 
   it('says why each payment happened', () => {
     render();
     const table = screen.getByRole('table', { name: 'The most recent payments in this window' });
-    expect(within(table).getByText('New organisation')).toBeTruthy();
+    expect(within(table).getByText('New organization')).toBeTruthy();
     expect(within(table).getByText('Bronze → Gold')).toBeTruthy();
   });
 

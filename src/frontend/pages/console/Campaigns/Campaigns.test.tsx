@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, CampaignDetail, CampaignSummary, Page } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS } from '../../../test-utils.js';
+import {
+  renderWithProviders, NONSENSE_LABELS, errorReply, heldReply, stubApi,
+} from '../../../test-utils.js';
 import Campaigns from './index.js';
 import Detail from './Detail.js';
 
@@ -53,7 +55,9 @@ vi.mock('../../../lib/campaigns.js', () => ({
   useAudiencePreview: () => ({ data: null, loading: false, error: null }),
 }));
 
-const ALL: Capability[] = ['campaign.read', 'campaign.create', 'campaign.launch', 'campaign.close'];
+const ALL: Capability[] = [
+  'campaign.read', 'campaign.create', 'campaign.launch', 'campaign.close', 'results.read',
+];
 
 const mountList = (capabilities: Capability[] = ALL, path = '/app/campaigns') =>
   renderWithProviders(
@@ -152,19 +156,49 @@ describe('the detail page', () => {
   });
 
   it('launches a draft, and the launch is disabled while it is in flight', async () => {
-    let release: (value: unknown) => void = () => undefined;
-    launch.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    // The launch is a thunk over RTK Query (store/screens/campaigns.ts): the request itself
+    // goes to the stubbed server, held until the test releases it.
+    const held = heldReply({ body: { data: { url: 'https://x.test/r/K4M9X2PQ', publicToken: 'K4M9X2PQ', status: 'open' } } });
+    const calls = stubApi({
+      'POST /campaigns/c1/launch': () => held.promise,
+      'GET /campaigns/c1': { body: { data: detail({ status: 'open' }) } },
+    });
     one = { data: detail({ status: 'draft', publicToken: null, url: null }), loading: false, error: null };
     mountDetail();
 
     const button = screen.getByRole('button', { name: /Launch plithe/ });
     fireEvent.click(button);
     fireEvent.click(button);
-    expect(launch).toHaveBeenCalledTimes(1);
-    expect(launch).toHaveBeenCalledWith('key-for-c1');
+    const launches = calls.filter((call) => call.path === '/campaigns/c1/launch');
+    expect(launches).toHaveLength(1);
+    expect(launches[0]?.headers.get('idempotency-key')).toMatch(/^launch:c1:/);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Launching/ }).disabled).toBe(true);
 
-    release({ url: 'https://x.test/r/K4M9X2PQ' });
+    held.release();
     await waitFor(() => expect(screen.getByRole('dialog', { name: /Share/ })).toBeTruthy());
+    vi.unstubAllGlobals();
+  });
+
+  it('says why a launch was refused, and offers it again', async () => {
+    stubApi({
+      'POST /campaigns/c1/launch': errorReply(409, 'CONFLICT', 'Its closing time has already passed.'),
+    });
+    one = { data: detail({ status: 'draft', publicToken: null, url: null }), loading: false, error: null };
+    mountDetail();
+    fireEvent.click(screen.getByRole('button', { name: /Launch plithe/ }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/already passed/);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Launch plithe/ }).disabled).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('closes once confirmed, and the confirmation goes', async () => {
+    const calls = stubApi({ 'POST /campaigns/c1/close': { body: { data: detail({ status: 'closed' }) } } });
+    mountDetail();
+    fireEvent.click(screen.getByRole('button', { name: 'Close early' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(calls.some((call) => call.path === '/campaigns/c1/close')).toBe(true));
+    vi.unstubAllGlobals();
   });
 
   it('closing states the real count and what is kept', () => {
@@ -175,12 +209,32 @@ describe('the detail page', () => {
     expect(dialog.getByText(/the results stay/)).toBeTruthy();
   });
 
+  // R-805: a scheduled campaign could not be called off at all; the server always allowed it.
+  it('calls off a scheduled one, saying it will never open, through the same close', async () => {
+    const calls = stubApi({ 'POST /campaigns/c1/close': { body: { data: detail({ status: 'closed' }) } } });
+    one = { data: detail({ status: 'scheduled', responseCount: 0 }), loading: false, error: null };
+    mountDetail();
+    expect(screen.queryByRole('button', { name: 'Close early' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Call it off' }));
+    const dialog = within(screen.getByRole('alertdialog'));
+    expect(dialog.getByText(/it will never open/)).toBeTruthy();
+    fireEvent.click(dialog.getByRole('button', { name: 'Call it off' }));
+    await waitFor(() => expect(calls.some((call) => call.path === '/campaigns/c1/close')).toBe(true));
+    vi.unstubAllGlobals();
+  });
+
   it('offers no Close on something already closed, and no Launch on something open', () => {
     one = { data: detail({ status: 'closed', closedAt: '2026-08-26T00:00:00.000Z' }), loading: false, error: null };
     mountDetail();
     expect(screen.queryByRole('button', { name: 'Close early' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Launch/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Results' })).toBeTruthy();
+  });
+
+  it('offers no Results to somebody who may not read them', () => {
+    one = { data: detail({ status: 'closed', closedAt: '2026-08-26T00:00:00.000Z' }), loading: false, error: null };
+    mountDetail(['campaign.read']);
+    expect(screen.queryByRole('link', { name: 'Results' })).toBeNull();
   });
 
   it('hides launch and close without the capability, and still renders the page', () => {

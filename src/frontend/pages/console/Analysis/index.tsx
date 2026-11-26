@@ -96,7 +96,7 @@ export default function Analysis(): JSX.Element {
         <EmptyState
           icon="results"
           title="You do not have access to this"
-          body="Your account cannot open the analysis. Whoever administers your organisation can change that."
+          body="Your account cannot open the analysis. Whoever administers your organization can change that."
         />
       </div>
     );
@@ -313,12 +313,14 @@ export default function Analysis(): JSX.Element {
               <ConfidenceTag level={reliability.confidence} />
             </div>
             <p className="text-meta analysis-card-lead">
-              What people brought up, most-mentioned first. Open one to read the comments it
-              came from.
+              What people brought up, most-mentioned first.
+              {/* The drill-through is the comments themselves, which is `response.read`: without
+                  it a theme is a row to read, not a door that opens on a refusal. */}
+              {can('response.read') && ' Open one to read the comments it came from.'}
             </p>
             <ThemeTable
               themes={view.themes ?? []}
-              onOpen={openThemeId}
+              {...(can('response.read') ? { onOpen: openThemeId } : {})}
               openId={openTheme}
               caption="Themes by mentions"
               empty={

@@ -1,17 +1,21 @@
-import { useState } from 'react';
-
+// The operator's message to an organisation's administrators. Controlled: the words are the
+// organisation page's (`state.operator.orgs[id].message`), so a failed send keeps them and a
+// sent one empties the box.
 export function MessageComposer({
   recipients,
+  subject,
+  body,
+  onEdit,
   onSend,
   sending = false,
 }: {
   recipients: { name: string; email: string }[];
-  onSend: (subject: string, body: string) => Promise<void>;
+  subject: string;
+  body: string;
+  onEdit: (patch: { subject?: string; body?: string }) => void;
+  onSend: () => void;
   sending?: boolean;
 }): JSX.Element {
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-
   const canSend = subject.trim().length > 0 && body.trim().length > 0 && !sending;
 
   return (
@@ -20,7 +24,7 @@ export function MessageComposer({
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSend) return;
-        void onSend(subject.trim(), body.trim());
+        onSend();
       }}
     >
       <div className="message-composer-recipients">
@@ -41,7 +45,7 @@ export function MessageComposer({
         <input
           className="input"
           value={subject}
-          onChange={(event) => setSubject(event.target.value)}
+          onChange={(event) => onEdit({ subject: event.target.value })}
           maxLength={200}
           required
         />
@@ -53,18 +57,19 @@ export function MessageComposer({
           className="input"
           rows={6}
           value={body}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => onEdit({ body: event.target.value })}
           maxLength={5000}
           required
         />
       </label>
 
       {/* `70` § Interactions: a composer that implies an email was sent when none was is
-          worse than one that says what it did. There is no mail transport in P2 — the
-          record IS the delivery, and the next operator reads it at `/platform/audit`. */}
+          worse than one that says what it did. There is no mail transport: the message is
+          written to each administrator's inbox (`notification` rows, "From Endur") and to
+          the platform audit log. It used to say "and sent by email", which nothing did. */}
       <p className="text-meta">
-        This is recorded in the platform audit log and sent by email. There is no reply
-        thread inside Endur — replies go to your support address.
+        This lands in their Endur inbox, under From Endur, and is recorded in the platform
+        audit log. Nothing is emailed, and there is no reply thread inside Endur.
       </p>
 
       <div className="message-composer-actions">

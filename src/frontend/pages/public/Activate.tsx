@@ -1,38 +1,42 @@
-import { useState } from 'react';
+// `/activate/:token`: an invited person sets a password and is signed in. The link's preview
+// is an RTK Query read; setting the password is the `activationSubmitted` thunk, and what the
+// page shows about it is `state.entry.activate`. The password is NOT in the store (DEC-014):
+// the box is uncontrolled, and only whether it is long enough is kept.
 import type { FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ApiError } from '../../lib/api.js';
 import { useActivationPreview } from '../../lib/accounts.js';
-import { useActivate } from '../../lib/auth.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { fieldErrorOf, messageOf, useClearOnLeave } from '../../store/screens/common.js';
+import {
+  MIN_PASSWORD,
+  activationLeft,
+  activationSubmitted,
+  activationTyped,
+  selectEntry,
+} from '../../store/screens/entry.js';
 import { AuthAside } from './AuthAside.js';
-
-const MIN_PASSWORD = 10;
 
 export default function Activate(): JSX.Element {
   const { token = '' } = useParams();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const preview = useActivationPreview(token);
-  const doActivate = useActivate();
+  const { longEnough, busy, error: failure } = useAppSelector(selectEntry).activate;
+  useClearOnLeave(activationLeft());
 
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const error = failure
+    ? fieldErrorOf(failure, 'body.password') ?? messageOf(failure, 'Something went wrong. Please try again.')
+    : null;
 
   function submit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    void doActivate(token, password)
-      .then((landing) => navigate(landing, { replace: true }))
-      .catch((caught: unknown) => {
-        setBusy(false);
-        setError(
-          caught instanceof ApiError
-            ? caught.fieldError('body.password') ?? caught.message
-            : 'Something went wrong. Please try again.',
-        );
-      });
+    const password = new FormData(event.currentTarget).get('password');
+    void dispatch(activationSubmitted({
+      token,
+      password: typeof password === 'string' ? password : '',
+    })).then((result) => {
+      if (activationSubmitted.fulfilled.match(result)) navigate(result.payload, { replace: true });
+    });
   }
 
   return (
@@ -73,8 +77,8 @@ export default function Activate(): JSX.Element {
                     autoFocus
                     required
                     minLength={MIN_PASSWORD}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    onChange={(event) =>
+                      dispatch(activationTyped({ longEnough: event.target.value.length >= MIN_PASSWORD }))}
                   />
                   <p className="field-help">Use at least {MIN_PASSWORD} characters.</p>
                 </div>
@@ -84,7 +88,7 @@ export default function Activate(): JSX.Element {
                 <button
                   className="btn btn-primary btn-block"
                   type="submit"
-                  disabled={busy || password.length < MIN_PASSWORD}
+                  disabled={busy || !longEnough}
                 >
                   {busy && <span className="spinner" aria-hidden="true" />}
                   Set password and sign in

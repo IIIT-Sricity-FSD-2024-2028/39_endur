@@ -1,15 +1,26 @@
-import { useState } from 'react';
+// `/login`. Its state is `state.entry.login` (store/screens/entry.ts); signing in is the
+// `loginSubmitted` thunk. The password is NOT in the store (DEC-014): the box is uncontrolled
+// and read from the form on submit. The form is hidden, not unmounted, while the
+// organisation picker is up, so "Back" costs nothing and a pick signs in with what was typed.
+import { useRef } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/Icon.js';
-import { ApiError } from '../../lib/api.js';
-import { useSignIn } from '../../lib/auth.js';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { fieldErrorOf, useClearOnLeave, type SerializedApiError } from '../../store/screens/common.js';
+import {
+  MIN_PASSWORD,
+  loginChoiceDismissed,
+  loginEmailEdited,
+  loginLeft,
+  loginRevealToggled,
+  loginSubmitted,
+  selectEntry,
+} from '../../store/screens/entry.js';
 import { AuthAside } from './AuthAside.js';
 
-const MIN_PASSWORD = 10;
-
-function messageFor(error: unknown): string {
-  if (!(error instanceof ApiError)) {
+function messageFor(error: SerializedApiError): string {
+  if (error.kind !== 'api') {
     return 'Could not reach the server. Check your connection and try again.';
   }
   if (error.status === 429) {
@@ -27,45 +38,37 @@ function messageFor(error: unknown): string {
 export default function Login(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
-  const signIn = useSignIn();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [reveal, setReveal] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<ApiError | Error | null>(null);
-  const [choices, setChoices] = useState<Array<{ id: string; name: string }> | null>(null);
+  const dispatch = useAppDispatch();
+  const { email, reveal, busy, error, choices } = useAppSelector(selectEntry).login;
+  useClearOnLeave(loginLeft());
+  const formRef = useRef<HTMLFormElement>(null);
 
   const from = (location.state as { from?: string } | null)?.from;
 
-  async function attempt(orgId?: string): Promise<void> {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const landing = await signIn({ email: email.trim(), password, ...(orgId ? { orgId } : {}) });
+  function attempt(orgId?: string): void {
+    const form = formRef.current;
+    if (!form) return;
+    const password = new FormData(form).get('password');
+    void dispatch(loginSubmitted({
+      email,
+      password: typeof password === 'string' ? password : '',
+      orgId,
+    })).then((result) => {
+      if (!loginSubmitted.fulfilled.match(result)) return;
+      const landing = result.payload;
       navigate(landing === '/app' ? (from ?? '/app') : landing, { replace: true });
-    } catch (caught) {
-      setBusy(false);
-      if (caught instanceof ApiError && caught.code === 'ACCOUNT_AMBIGUOUS') {
-        setChoices((caught.details['organizations'] as Array<{ id: string; name: string }>) ?? []);
-        return;
-      }
-      setChoices(null);
-      setError(caught as Error);
-    }
+    });
   }
 
   function submit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    void attempt();
+    attempt();
   }
 
+  const invalid = error?.status === 422;
   const fieldError = (path: string): string | undefined =>
-    error instanceof ApiError && error.status === 422 ? error.fieldError(path) : undefined;
-  const banner = error && !(error instanceof ApiError && error.status === 422)
-    ? messageFor(error)
-    : null;
+    invalid ? fieldErrorOf(error, path) : undefined;
+  const banner = error && !invalid ? messageFor(error) : null;
 
   return (
     <div className="auth">
@@ -78,7 +81,7 @@ export default function Login(): JSX.Element {
             : 'Welcome back.'}
         </p>
 
-        {choices ? (
+        {choices && (
           <div className="org-choice">
             {choices.map((org) => (
               <button
@@ -86,25 +89,25 @@ export default function Login(): JSX.Element {
                 type="button"
                 className="btn btn-secondary btn-block org-choice-item"
                 disabled={busy}
-                onClick={() => void attempt(org.id)}
+                onClick={() => attempt(org.id)}
               >
                 {org.name}
               </button>
             ))}
-            {/* Not "Cancel" — the password is still in state and the fields are still
-                filled, so going back costs nothing and re-typing would be the only
-                alternative. */}
+            {/* Not "Cancel" — the form below is only hidden, its fields still filled, so
+                going back costs nothing and re-typing would be the only alternative. */}
             <button
               type="button"
               className="btn btn-ghost btn-block"
               disabled={busy}
-              onClick={() => setChoices(null)}
+              onClick={() => dispatch(loginChoiceDismissed())}
             >
               Back
             </button>
           </div>
-        ) : (
-        <form onSubmit={submit} noValidate>
+        )}
+        <div hidden={choices !== null}>
+        <form ref={formRef} onSubmit={submit} noValidate>
           <div className="field">
             <label htmlFor="email">Email</label>
             <input
@@ -116,7 +119,7 @@ export default function Login(): JSX.Element {
               autoFocus
               required
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => dispatch(loginEmailEdited({ email: event.target.value }))}
               aria-invalid={fieldError('email') ? true : undefined}
               aria-describedby={fieldError('email') ? 'email-error' : undefined}
             />
@@ -136,15 +139,13 @@ export default function Login(): JSX.Element {
                 autoComplete="current-password"
                 required
                 minLength={MIN_PASSWORD}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
                 aria-invalid={fieldError('password') ? true : undefined}
                 aria-describedby={fieldError('password') ? 'password-error' : undefined}
               />
               <button
                 type="button"
                 className="btn btn-icon reveal-toggle"
-                onClick={() => setReveal((shown) => !shown)}
+                onClick={() => dispatch(loginRevealToggled())}
               >
                 <Icon name={reveal ? 'hide' : 'show'} size={18} label={reveal ? 'Hide password' : 'Show password'} />
               </button>
@@ -165,7 +166,7 @@ export default function Login(): JSX.Element {
             Sign in
           </button>
         </form>
-        )}
+        </div>
 
         <p className="auth-alt">
           New here? <Link className="btn btn-ghost" to="/start">Create your organization</Link>

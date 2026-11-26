@@ -1,9 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { LogViewer } from '../../../components/platform/LogViewer.js';
-import { useLogFiles, useLogLines, useLogExport, type LogFilter } from '../../../lib/oplogs.js';
+import { logSearch, useLogFiles, useLogLines, type LogFilter } from '../../../lib/oplogs.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  logExported,
+  logFormatChosen,
+  logsLeft,
+  opsMessageOf,
+  selectOperator,
+} from '../../../store/screens/operator.js';
 import { useOpsCan } from '../../../lib/opsCapabilities.js';
 
 const FILTER_KEYS = ['level', 'status', 'path', 'orgId', 'requestId', 'q'] as const;
@@ -27,8 +36,10 @@ export default function Logs(): JSX.Element {
 
   const lines = useLogLines(selected, filter);
   const can = useOpsCan();
-  const exporter = useLogExport();
-  const [format, setFormat] = useState<'ndjson' | 'csv'>('ndjson');
+  // The export's format, progress and last file are `state.operator.logs`.
+  const dispatch = useAppDispatch();
+  const { format, exporting, exportError, last } = useAppSelector(selectOperator).logs;
+  useClearOnLeave(logsLeft());
 
   const setFile = (file: string): void => {
     const next = new URLSearchParams();
@@ -47,6 +58,21 @@ export default function Logs(): JSX.Element {
   };
 
   const filtered = FILTER_KEYS.some((key) => params.get(key));
+
+  // With no file chosen, open the error stream (or the first file). In an effect, not
+  // during render: setting the URL while rendering updates the router in the middle of
+  // this component's render, which React warns about (found in R-601's walkthrough).
+  // `replace`, so Back does not return to a URL that immediately redirects.
+  const defaultFile = !selected && files.data && files.data.length > 0
+    ? (files.data.find((f) => f.stream === 'error') ?? files.data[0])?.name
+    : undefined;
+  // Effect (router): with no file in the address, open the error stream by writing it to the URL.
+  useEffect(() => {
+    if (!defaultFile) return;
+    const next = new URLSearchParams();
+    next.set('file', defaultFile);
+    setParams(next, { replace: true });
+  }, [defaultFile, setParams]);
 
   const store = files.store;
   const subtitle = store
@@ -75,11 +101,6 @@ export default function Logs(): JSX.Element {
         <EmptyState icon="log" title="Nothing has been written yet" body="No log files exist on this machine yet." />
       </div>
     );
-  }
-
-  if (!selected && files.data && files.data.length > 0) {
-    const first = files.data.find((f) => f.stream === 'error') ?? files.data[0];
-    if (first) setFile(first.name);
   }
 
   return (
@@ -118,7 +139,8 @@ export default function Logs(): JSX.Element {
             <select
               className="input"
               value={format}
-              onChange={(event) => setFormat(event.target.value === 'csv' ? 'csv' : 'ndjson')}
+              onChange={(event) =>
+                dispatch(logFormatChosen({ format: event.target.value === 'csv' ? 'csv' : 'ndjson' }))}
             >
               <option value="ndjson">NDJSON — every field</option>
               <option value="csv">CSV — fixed columns</option>
@@ -127,19 +149,19 @@ export default function Logs(): JSX.Element {
           <button
             type="button"
             className="btn btn-secondary"
-            disabled={exporter.busy}
-            onClick={() => void exporter.run(selected, filter, format)}
+            disabled={exporting}
+            onClick={() => void dispatch(logExported({ file: selected, search: logSearch(filter) }))}
           >
-            {exporter.busy ? 'Preparing…' : 'Export this file'}
+            {exporting ? 'Preparing…' : 'Export this file'}
           </button>
-          {exporter.last && (
+          {last && (
             <p className="text-meta" role="status">
-              {exporter.last.lines.toLocaleString()} lines saved as {exporter.last.name}
-              {exporter.last.truncated ? ' — truncated at the export limit' : ''}
+              {last.lines.toLocaleString()} lines saved as {last.name}
+              {last.truncated ? ' — truncated at the export limit' : ''}
             </p>
           )}
-          {exporter.error && (
-            <p className="field-error" role="alert">{exporter.error.message}</p>
+          {exportError && (
+            <p className="field-error" role="alert">{opsMessageOf(exportError, exportError.message)}</p>
           )}
         </div>
       )}

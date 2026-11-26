@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from '../../store/index.js';
+import { useClearOnLeave } from '../../store/screens/common.js';
+import { paymentLeft, paymentPhaseChanged, selectPaymentPhase } from '../../store/screens/widgets.js';
 import { changeCostMinor, formatMoney, type PlanOption, type Tier } from '@endur/shared';
 import { Icon } from '../Icon.js';
 
@@ -38,7 +41,12 @@ export function PaymentDialog({
   onDone?: () => void;
   onCancel: () => void;
 }): JSX.Element {
-  const [phase, setPhase] = useState<'idle' | 'paying' | 'done'>('idle');
+  // The checkout's phase is this dialog's entry in `state.widgets.payments`. The timers and
+  // the focus target are refs: resources, not state.
+  const id = useId();
+  const dispatch = useAppDispatch();
+  const phase = useAppSelector((state) => selectPaymentPhase(state, id));
+  useClearOnLeave(paymentLeft({ id }));
   const payRef = useRef<HTMLButtonElement>(null);
   const timers = useRef<number[]>([]);
   const alive = useRef(true);
@@ -51,6 +59,8 @@ export function PaymentDialog({
     payRef.current?.focus();
   }, []);
 
+  // Effect (DOM): Escape cancels while nothing is in flight.
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && dismissable) onCancel();
@@ -58,6 +68,8 @@ export function PaymentDialog({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, dismissable]);
+
+  // Effect (timers): the checkout's timers die with the dialog.
 
   useEffect(() => {
     alive.current = true;
@@ -72,18 +84,18 @@ export function PaymentDialog({
 
   function pay(): void {
     if (phase !== 'idle') return;
-    setPhase('paying');
+    dispatch(paymentPhaseChanged({ id, phase: 'paying' }));
     const reference = mintReference();
     timers.current.push(
       window.setTimeout(() => {
         onPaid(reference).then(
           () => {
             if (!alive.current) return;
-            setPhase('done');
+            dispatch(paymentPhaseChanged({ id, phase: 'done' }));
             timers.current.push(window.setTimeout(() => onDone?.(), SUCCESS_MS));
           },
           () => {
-            if (alive.current) setPhase('idle');
+            if (alive.current) dispatch(paymentPhaseChanged({ id, phase: 'idle' }));
           },
         );
       }, CAPTURE_MS),

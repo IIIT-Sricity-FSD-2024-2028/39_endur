@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+// Subjects. The filters are the URL; the form, the archive confirmation and failures are
+// `state.subjects` (store/screens/subjects.ts), every command a thunk there.
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { SubjectSummary } from '@endur/shared';
 import { PageHeader } from '../../../components/layout/PageHeader.js';
@@ -15,6 +17,21 @@ import { flattenUnits } from '../../../lib/tree.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { formatRelative, pluralise } from '../../../lib/format.js';
 import { SubjectForm, type SubjectDraft } from './SubjectForm.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf, useClearOnLeave } from '../../../store/screens/common.js';
+import {
+  FAILED,
+  selectSubjectsScreen,
+  subjectArchiveAsked,
+  subjectArchiveDismissed,
+  subjectArchived,
+  subjectCreated,
+  subjectFormClosed,
+  subjectFormOpened,
+  subjectRenamed,
+  subjectSearchTyped,
+  subjectsLeft,
+} from '../../../store/screens/subjects.js';
 
 export default function Subjects(): JSX.Element {
   const labels = useLabels();
@@ -30,16 +47,30 @@ export default function Subjects(): JSX.Element {
   const units = useUnits();
   const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
 
-  const [term, setTerm] = useState(q);
-  const [creating, setCreating] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [pending, setPending] = useState<SubjectSummary | null>(null);
-  const [rowError, setRowError] = useState<{ id: string; text: string } | null>(null);
+  const dispatch = useAppDispatch();
+  const screen = useAppSelector(selectSubjectsScreen);
+  useClearOnLeave(subjectsLeft());
+  const term = screen.searchDraft ?? q;
+  const setTerm = (value: string): void => {
+    dispatch(subjectSearchTyped({ term: value }));
+  };
+  const creating = screen.form?.mode === 'create';
+  const saving = screen.form?.saving ?? false;
+  const formError = messageOf(screen.form?.error, FAILED.save);
+  const rowError = screen.failure
+    ? { id: screen.failure.id, text: messageOf(screen.failure.error, FAILED[screen.failure.during]) ?? '' }
+    : null;
+  const startCreating = (): void => {
+    dispatch(subjectFormOpened({
+      mode: 'create',
+      draft: { name: '', unitId: units.data?.[0]?.id ?? '', linkedUserId: null, linkedUserName: null },
+    }));
+  };
 
   const filtered = Boolean(q || unitId || archived);
   const rows = list.data?.data ?? [];
   const total = list.data?.meta.total ?? 0;
+  const pending = rows.find((row) => row.id === screen.archivingId) ?? null;
 
   const setFilter = (patch: Record<string, string | null>): void => {
     const next = new URLSearchParams(params);
@@ -55,18 +86,12 @@ export default function Subjects(): JSX.Element {
     error instanceof ApiError ? error.message : fallback;
 
   const submit = (draft: SubjectDraft): void => {
-    setSaving(true);
-    setFormError(null);
-    void list
-      .create({
-        name: draft.name,
-        unitId: draft.unitId,
-        type: 'general',
-        ...(draft.linkedUserId ? { linkedUserId: draft.linkedUserId } : {}),
-      })
-      .then(() => setCreating(false))
-      .catch((error: unknown) => setFormError(message(error, 'That could not be saved.')))
-      .finally(() => setSaving(false));
+    void dispatch(subjectCreated({
+      name: draft.name,
+      unitId: draft.unitId,
+      type: 'general',
+      ...(draft.linkedUserId ? { linkedUserId: draft.linkedUserId } : {}),
+    }));
   };
 
   const columns: Column<SubjectSummary>[] = [
@@ -81,10 +106,7 @@ export default function Subjects(): JSX.Element {
               value={row.name}
               ariaLabel="Name"
               onCommit={(name) => {
-                setRowError(null);
-                void list.rename(row.id, name).catch((error: unknown) => {
-                  setRowError({ id: row.id, text: message(error, 'That name could not be saved.') });
-                });
+                void dispatch(subjectRenamed({ subjectId: row.id, name }));
               }}
             />
           ) : (
@@ -143,7 +165,7 @@ export default function Subjects(): JSX.Element {
       header: 'Actions',
       render: (row) =>
         can('subject.archive') && !row.archivedAt ? (
-          <button type="button" className="btn btn-ghost" onClick={() => setPending(row)}>
+          <button type="button" className="btn btn-ghost" onClick={() => dispatch(subjectArchiveAsked({ subjectId: row.id }))}>
             Archive
           </button>
         ) : null,
@@ -167,7 +189,7 @@ export default function Subjects(): JSX.Element {
         ]}
         action={
           can('subject.create') && !(rows.length === 0 && !filtered) ? (
-            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+            <button type="button" className="btn btn-primary" onClick={startCreating}>
               <Icon name="add" size={18} /> Add a {labels.subject.one}
             </button>
           ) : undefined
@@ -266,7 +288,7 @@ export default function Subjects(): JSX.Element {
                 body={`${labels.subject.many} are the things people give feedback about. Add one and it can go into a ${labels.campaign.one.toLowerCase()}.`}
                 action={
                   can('subject.create') ? (
-                    <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+                    <button type="button" className="btn btn-primary" onClick={startCreating}>
                       Add a {labels.subject.one}
                     </button>
                   ) : undefined
@@ -311,7 +333,7 @@ export default function Subjects(): JSX.Element {
           error={formError}
           canLinkPeople={can('person.read')}
           onSubmit={submit}
-          onCancel={() => { setCreating(false); setFormError(null); }}
+          onCancel={() => dispatch(subjectFormClosed())}
         />
       )}
 
@@ -321,14 +343,8 @@ export default function Subjects(): JSX.Element {
           consequence={archiveConsequence(pending, labels.campaign.many.toLowerCase())}
           verb="Archive"
           destructive
-          onConfirm={() => {
-            const subject = pending;
-            setPending(null);
-            void list.archive(subject.id).catch((error: unknown) => {
-              setRowError({ id: subject.id, text: message(error, 'That could not be archived.') });
-            });
-          }}
-          onCancel={() => setPending(null)}
+          onConfirm={() => void dispatch(subjectArchived({ subjectId: pending.id }))}
+          onCancel={() => dispatch(subjectArchiveDismissed())}
         />
       )}
     </>

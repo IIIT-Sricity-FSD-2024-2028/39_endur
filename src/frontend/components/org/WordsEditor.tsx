@@ -48,7 +48,9 @@ export function WordsEditor({
               onChange={(event) => onSetOne(key, event.target.value)}
             />
             <span className="word-plural">
-              <label className="sr-only" htmlFor={`plural-${key}`}>
+              {/* Hidden beside the column header on a wide screen; shown on a phone, where
+                  the two fields stack and the header row has nothing left to sit over. */}
+              <label className="sr-only word-plural-label" htmlFor={`plural-${key}`}>
                 Plural of {labels[key].one}
               </label>
               <input
@@ -96,3 +98,34 @@ export function WordsEditor({
     </div>
   );
 }
+
+/**
+ * The same five words, for somebody who may read them but not change them: a table, not a
+ * form with every field switched off. A disabled input still looks like a place to type.
+ */
+export function WordsTable({ labels }: { labels: ResolvedLabels }): JSX.Element {
+  return (
+    <div className="card">
+    <table className="words-table">
+      <caption className="sr-only">The organization's words</caption>
+      <thead>
+        <tr>
+          <th scope="col"><span className="sr-only">What it names</span></th>
+          <th scope="col" className="text-meta">Singular</th>
+          <th scope="col" className="text-meta">Plural</th>
+        </tr>
+      </thead>
+      <tbody>
+        {LabelKey.options.map((key) => (
+          <tr key={key}>
+            <th scope="row" className="word-prompt">{PROMPTS[key]}</th>
+            <td>{labels[key].one}</td>
+            <td>{labels[key].many}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    </div>
+  );
+}
+

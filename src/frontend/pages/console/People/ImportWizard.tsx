@@ -1,72 +1,39 @@
-import { useMemo, useState } from 'react';
-import type { ImportPeopleBody, ImportPreview, ImportRow } from '@endur/shared';
-import { apiPost, ApiError } from '../../../lib/api.js';
+// The CSV import. Its steps, the mappings and the server's answers are `state.people.import`
+// (store/screens/people.ts); reading the file and committing it are thunks there. The `File`
+// itself never enters the store: it is the read thunk's argument, and only its text is kept.
+import { useMemo } from 'react';
+import type { ImportPreview } from '@endur/shared';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
 import { useRoles } from '../../../lib/roles.js';
 import { pluralise } from '../../../lib/format.js';
+import { useAppDispatch, useAppSelector } from '../../../store/index.js';
+import { messageOf } from '../../../store/screens/common.js';
+import {
+  importCommitted,
+  importFileRead,
+  importRestarted,
+  importRoleMapped,
+  importUnitMapped,
+  selectImport,
+} from '../../../store/screens/people.js';
 
-type Step =
-  | { kind: 'pick' }
-  | { kind: 'reading' }
-  | { kind: 'review'; csv: string; preview: ImportPreview; error: string | null }
-  | { kind: 'committing'; csv: string; preview: ImportPreview }
-  | { kind: 'done'; result: { created: number; updated: number; assigned: number; skipped: string[] } };
-
-const message = (error: unknown, fallback: string): string =>
-  error instanceof ApiError ? error.message : fallback;
-
-export function ImportWizard({
-  onClose,
-  onImported,
-}: {
-  onClose: () => void;
-  onImported: () => void;
-}): JSX.Element {
+export function ImportWizard({ onClose }: { onClose: () => void }): JSX.Element | null {
   const labels = useLabels();
   const can = useCan();
   const units = useUnits();
   const roles = useRoles();
   const unitOptions = useMemo(() => flattenUnits(units.data ?? []), [units.data]);
+  const dispatch = useAppDispatch();
+  const state = useAppSelector(selectImport);
 
-  const [step, setStep] = useState<Step>({ kind: 'pick' });
-  const [roleMapping, setRoleMapping] = useState<Record<string, string>>({});
-  const [unitMapping, setUnitMapping] = useState<Record<string, string>>({});
-
+  if (!state) return null;
+  const step = state;
+  const { roleMapping, unitMapping } = state;
   const readFile = (file: File): void => {
-    setStep({ kind: 'reading' });
-    const reader = new FileReader();
-    reader.onload = () => {
-      const csv = typeof reader.result === 'string' ? reader.result : '';
-      void apiPost<{ csv: string }, { data: ImportPreview }>('/people/import/preview', { csv })
-        .then(({ data }) => setStep({ kind: 'review', csv, preview: data, error: null }))
-        .catch((error: unknown) => {
-          setStep({ kind: 'pick' });
-          window.alert(message(error, 'That file could not be read.'));
-        });
-    };
-    reader.onerror = () => {
-      setStep({ kind: 'pick' });
-      window.alert('That file could not be read.');
-    };
-    reader.readAsText(file);
-  };
-
-  const commit = (csv: string, preview: ImportPreview): void => {
-    const rows = parseCsvRows(csv);
-    const body: ImportPeopleBody = { rows, roleMapping, unitMapping };
-    setStep({ kind: 'committing', csv, preview });
-    void apiPost<ImportPeopleBody, { data: { created: number; updated: number; assigned: number; skipped: string[] } }>(
-      '/people/import',
-      body,
-      { idempotencyKey: importKey(csv) },
-    )
-      .then(({ data }) => setStep({ kind: 'done', result: data }))
-      .catch((error: unknown) => {
-        setStep({ kind: 'review', csv, preview, error: message(error, 'That import could not be committed.') });
-      });
+    void dispatch(importFileRead(file));
   };
 
   if (!can('person.import')) {
@@ -84,7 +51,7 @@ export function ImportWizard({
   }
 
   return (
-    <div className="dialog-backdrop" onMouseDown={step.kind === 'committing' ? undefined : onClose}>
+    <div className="dialog-backdrop" onMouseDown={step.step === 'committing' ? undefined : onClose}>
       <div
         className="dialog import-wizard"
         role="dialog"
@@ -94,7 +61,7 @@ export function ImportWizard({
       >
         <h2 className="dialog-title">Import people</h2>
 
-        {(step.kind === 'pick' || step.kind === 'reading') && (
+        {(step.step === 'pick' || step.step === 'reading') && (
           <>
             <p className="dialog-body">
               A CSV with a name and an email column, and optionally a role and a{' '}
@@ -114,37 +81,39 @@ export function ImportWizard({
                 className="input"
                 type="file"
                 accept=".csv,text/csv"
-                disabled={step.kind === 'reading'}
+                disabled={step.step === 'reading'}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) readFile(file);
                 }}
               />
             </div>
+            {/* Said here, beside the picker, rather than in a browser alert box. */}
+            {step.readError && <p className="form-error" role="alert">{step.readError}</p>}
             <div className="dialog-actions">
               <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             </div>
           </>
         )}
 
-        {(step.kind === 'review' || step.kind === 'committing') && (
+        {(step.step === 'review' || step.step === 'committing') && step.preview && (
           <ReviewStep
             preview={step.preview}
             roles={roles.data ?? []}
             units={unitOptions}
             roleMapping={roleMapping}
             unitMapping={unitMapping}
-            onMapRole={(name, id) => setRoleMapping((current) => ({ ...current, [name]: id }))}
-            onMapUnit={(name, id) => setUnitMapping((current) => ({ ...current, [name]: id }))}
+            onMapRole={(name, id) => dispatch(importRoleMapped({ name, roleId: id }))}
+            onMapUnit={(name, id) => dispatch(importUnitMapped({ name, unitId: id }))}
             unitLabel={labels.unit.one}
-            error={step.kind === 'review' ? step.error : null}
-            busy={step.kind === 'committing'}
-            onBack={() => setStep({ kind: 'pick' })}
-            onCommit={() => commit(step.csv, step.preview)}
+            error={step.step === 'review' ? messageOf(step.error, 'That import could not be committed.') : null}
+            busy={step.step === 'committing'}
+            onBack={() => dispatch(importRestarted())}
+            onCommit={() => void dispatch(importCommitted())}
           />
         )}
 
-        {step.kind === 'done' && (
+        {step.step === 'done' && step.result && (
           <>
             <p className="dialog-body">
               {pluralise(step.result.created, 'person', 'people')} added,{' '}
@@ -158,7 +127,7 @@ export function ImportWizard({
               </p>
             )}
             <div className="dialog-actions">
-              <button type="button" className="btn btn-primary" onClick={onImported}>Done</button>
+              <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
             </div>
           </>
         )}
@@ -289,67 +258,4 @@ function ReviewStep({
       </div>
     </>
   );
-}
-
-function importKey(csv: string): string {
-  let hash = 0;
-  for (let i = 0; i < csv.length; i += 1) {
-    hash = (Math.imul(31, hash) + csv.charCodeAt(i)) | 0;
-  }
-  return `import-${csv.length}-${hash}`;
-}
-
-function parseCsvRows(csv: string): ImportRow[] {
-  const lines = csv.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  if (lines.length === 0) return [];
-
-  const columns = splitLine(lines[0] as string).map((column) => column.trim());
-  const index = (...names: string[]) =>
-    columns.findIndex((column) => names.includes(column.toLowerCase()));
-
-  const nameAt = index('name', 'full name');
-  const emailAt = index('email', 'email address', 'e-mail');
-  const roleAt = index('role', 'title', 'position');
-  const unitAt = index('unit', 'department', 'team', 'ward', 'property');
-  const alsoAt = index('also in', 'also', 'second unit', 'additional unit', 'other unit');
-
-  const rows: ImportRow[] = [];
-  for (const line of lines.slice(1)) {
-    const cells = splitLine(line);
-    const email = (cells[emailAt] ?? '').trim();
-    const name = (cells[nameAt] ?? '').trim();
-    if (!email || !name) continue;
-    rows.push({
-      name,
-      email,
-      ...(roleAt >= 0 && cells[roleAt]?.trim() ? { roleName: cells[roleAt].trim() } : {}),
-      ...(unitAt >= 0 && cells[unitAt]?.trim() ? { unitName: cells[unitAt].trim() } : {}),
-      ...(alsoAt >= 0 && cells[alsoAt]?.trim() ? { alsoUnitName: cells[alsoAt].trim() } : {}),
-    });
-  }
-  return rows;
-}
-
-function splitLine(line: string): string[] {
-  const cells: string[] = [];
-  let current = '';
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (char === '"') {
-      if (quoted && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (char === ',' && !quoted) {
-      cells.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current);
-  return cells;
 }

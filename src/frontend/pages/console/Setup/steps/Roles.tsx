@@ -1,4 +1,12 @@
-import { useState } from 'react';
+// The drag in progress and the row just added are `state.setup` (store/screens/setup.ts);
+// the roles themselves are the wizard slice's, changed through the callbacks.
+import { useAppDispatch, useAppSelector } from '../../../../store/index.js';
+import {
+  selectSetup,
+  setupRoleAdded,
+  setupRoleDragEnded,
+  setupRoleDragStarted,
+} from '../../../../store/screens/setup.js';
 import { RoleRow } from '../../../../components/org/RoleRow.js';
 import { Icon } from '../../../../components/Icon.js';
 import type { RoleDraft } from '../useWizard.js';
@@ -18,8 +26,8 @@ export function RolesStep({
   onMove: (id: string, direction: -1 | 1) => void;
   onReorder: (fromId: string, toId: string) => void;
 }): JSX.Element {
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [lastAdded, setLastAdded] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { roleDragId: dragId, lastAddedRoleId: lastAdded } = useAppSelector(selectSetup);
 
   return (
     <div className="step">
@@ -34,13 +42,13 @@ export function RolesStep({
           <li
             key={role.id}
             draggable
-            onDragStart={() => setDragId(role.id)}
-            onDragEnd={() => setDragId(null)}
+            onDragStart={() => dispatch(setupRoleDragStarted({ roleId: role.id }))}
+            onDragEnd={() => dispatch(setupRoleDragEnded())}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
               if (dragId && dragId !== role.id) onReorder(dragId, role.id);
-              setDragId(null);
+              dispatch(setupRoleDragEnded());
             }}
             className={dragId === role.id ? 'is-dragging' : undefined}
           >
@@ -65,7 +73,7 @@ export function RolesStep({
         type="button"
         className="btn btn-ghost role-add"
         disabled={roles.length >= 12}
-        onClick={() => setLastAdded(onAdd())}
+        onClick={() => dispatch(setupRoleAdded({ roleId: onAdd() }))}
       >
         <Icon name="add" size={16} /> Add a role
       </button>

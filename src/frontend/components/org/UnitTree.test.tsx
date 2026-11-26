@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import type { ReactElement, ReactNode } from 'react';
+import { makeStore } from '../../test-utils.js';
+
+/** The tree keeps its state in the store (`state.widgets.trees`), so it renders inside one.
+ *  A `wrapper`, not a wrapping element, so `rerender` keeps it. */
+const render = (ui: ReactElement) => {
+  const store = makeStore();
+  return rtlRender(ui, { wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider> });
+};
 import { UnitTree, daysUntil, type UnitTreeNode } from './UnitTree.js';
 
 const tree = (over: Partial<UnitTreeNode> = {}): UnitTreeNode[] => [
