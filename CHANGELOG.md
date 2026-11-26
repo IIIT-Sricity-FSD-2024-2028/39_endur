@@ -8,6 +8,53 @@ breaking change, MINOR for new features, PATCH for fixes. How a release is made 
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-27
+
+All client state moves to Redux Toolkit, and members get a Home that shows the forms they
+still have to answer.
+
+**Deploy with `--migrate`.** This release removes a database column, so earlier versions do
+not run against a database it has migrated.
+
+### Added
+
+- **Redux Toolkit for all client state (#68).**
+  - RTK Query handles every server read, with cache tags so a save refreshes what it
+    changed. Anything that changes what the signed-in user may do (a grant, a role, a
+    position) updates the sidebar and pages without a reload.
+  - Each screen keeps its state in `store/screens/`, alongside slices for sign-in,
+    vocabulary, pop-up messages, the form builder, the setup wizard and the powers grid.
+  - Middleware handles builder autosave and undo history, clears cached data on sign-out
+    or switching organisation, and ends the session on any `401`.
+  - Redux DevTools in development, with passwords blanked out of every action.
+- **Forms waiting on Home (#68).** A members-only form launched for a role or unit appears
+  on each member's Home, with a count beside Home in the sidebar, until they answer it.
+  Answered forms move to "Past feedback". Endur records only that someone answered, never
+  when or what.
+- **End-to-end tests (#68).** 15 Playwright browser tests: sign-up on a trial, invites,
+  permissions, the form builder, polls, booking, changing plan, announcements, and
+  answering a form.
+- **Continuous integration (#68).** Every pull request runs typecheck, lint, the project's
+  audits, frontend and backend tests, the build, and the end-to-end tests.
+- `LOGIN_RATE_LIMIT_MAX` setting: sign-in attempts allowed per IP address and email in 15
+  minutes (default 10).
+
+### Changed
+
+- Templates and Start follow the user's powers. In the IIIT Sri City demo, Faculty have no
+  Templates page and Start offers only the forms they can start; Students have no Start at
+  all (#68).
+- The powers grid keeps its header row and power column in view while it scrolls (#68).
+- The API server records any crash in the log before it stops, keeps running if its
+  terminal is closed, and gives requests in progress up to 5 seconds to finish when it
+  shuts down (#68).
+
+### Security
+
+- Removed `campaign_participants.responded_at` (migration
+  `20261106150000_participants_forget_when`). It stored the moment a member answered,
+  which could be matched against response times to link a member to their answer (#68).
+
 ## [3.0.1] - 2026-11-04
 
 ### Fixed
@@ -66,7 +113,8 @@ A rebuild of Endur on a new architecture, and its first public deployment, at
 Earlier versions, tagged `V2.0` and `V1.0` before this changelog existed. Both tags point to
 the same commit (#56).
 
-[Unreleased]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/V2.0...v3.0.0
 [2.0]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/releases/tag/V2.0
