@@ -53,17 +53,20 @@ test('a blank form → the builder → a question → saved by itself', async ()
 
 test('the organisation\'s word for a subject re-skins the navigation at once', async () => {
   await page.goto('/app/settings');
-  const word = page.locator('#word-subject');
+  // Everything inside the words card: the Organization card's button also reads "Saved" when
+  // nothing in it has changed, so a page-wide "Saved" matches two buttons.
+  const card = page.locator('#words');
+  const word = card.locator('#word-subject');
   const original = await word.inputValue();
-  const save = page.getByRole('button', { name: 'Save words' });
 
   await word.fill('Module');
-  await save.click();
-  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await card.getByRole('button', { name: 'Save words' }).click();
+  await expect(card.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Modules' })).toBeVisible();
 
   // Put it back, so the rest of the suite reads the seeded words.
   await word.fill(original);
-  await page.getByRole('button', { name: 'Save words' }).click();
-  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await card.getByRole('button', { name: 'Save words' }).click();
+  await expect(card.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Modules' })).toHaveCount(0);
 });
