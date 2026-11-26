@@ -29,12 +29,12 @@ az account show --query "name" -o tsv >/dev/null || { echo "Run: az login"; exit
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "Note: you have uncommitted changes. They will NOT be deployed (only HEAD is)."
 fi
-echo "Deploying commit $(git rev-parse --short HEAD) to $APP_NAME"
+VERSION="$(git describe --tags --exact-match HEAD 2>/dev/null || echo "untagged")"
+echo "Deploying commit $(git rev-parse --short HEAD) ($VERSION) to $APP_NAME"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 SRC="$WORK/src"
-PKG="$WORK/pkg"
 mkdir -p "$SRC"
 
 step "Building a clean copy"
@@ -61,18 +61,7 @@ fi
 (cd "$SRC" && npm prune --omit=dev --no-audit --no-fund)
 
 step "Assembling the upload"
-mkdir -p "$PKG/src/backend" "$PKG/src/frontend"
-cp -a "$SRC/node_modules" "$PKG/"
-# Workspace packages are symlinks in node_modules; zip upload does not keep symlinks,
-# so @endur/shared becomes a real copy and the two app links are dropped (not needed at runtime).
-rm -f "$PKG/node_modules/@endur/api" "$PKG/node_modules/@endur/web" "$PKG/node_modules/@endur/shared"
-mkdir -p "$PKG/node_modules/@endur/shared"
-cp -a "$SRC/packages/shared/package.json" "$SRC/packages/shared/dist" "$PKG/node_modules/@endur/shared/"
-cp -a "$SRC/src/backend/dist" "$SRC/src/backend/package.json" "$PKG/src/backend/"
-cp -a "$SRC/src/frontend/dist" "$PKG/src/frontend/"
-[[ -d "$SRC/src/backend/node_modules" ]] && cp -a "$SRC/src/backend/node_modules" "$PKG/src/backend/"
-(cd "$PKG" && zip -qr "$WORK/endur.zip" .)
-echo "Package: $(du -h "$WORK/endur.zip" | cut -f1)"
+bash "$ROOT/scripts/package-app.sh" "$SRC" "$WORK/endur.zip"
 
 step "Uploading to Azure (takes a few minutes)"
 az webapp deploy -g "$RESOURCE_GROUP" -n "$APP_NAME" --src-path "$WORK/endur.zip" \

@@ -1,0 +1,56 @@
+# Publishes a GitHub Release whenever a version tag (v1.2.3) is pushed.
+# It builds exactly the tagged commit, attaches the ready-to-run app zip, and uses that
+# version's CHANGELOG.md section as the release notes. The steps are in RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write # create the release and upload the zip
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check the tag matches package.json and the changelog
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::package.json says $version but the tag is $TAG. Bump the version in the release commit."
+            exit 1
+          fi
+          node scripts/changelog-section.mjs "$TAG" > release-notes.md
+
+      - name: Install
+        # postinstall runs `prisma generate`, which needs DATABASE_URL set but not reachable.
+        env:
+          DATABASE_URL: postgresql://build:build@localhost:5432/build
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        run: |
+          npm prune --omit=dev --no-audit --no-fund
+          bash scripts/package-app.sh . "endur-$TAG.zip"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "endur-$TAG.zip" \
+            --title "Endur $TAG" \
+            --notes-file release-notes.md \
+            --verify-tag

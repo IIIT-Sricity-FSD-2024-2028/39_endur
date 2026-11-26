@@ -199,3 +199,11 @@ bash scripts/deploy-azure.sh --migrate     # also apply new migrations first
 Only committed code is deployed. `--migrate` reads `AZ_DATABASE_URL` from `.env.azure`
 (git-ignored, never commit it) and allows your current IP through the database firewall.
 Secrets live in the Web App's settings, not in the repo.
+
+## 🏷️ Releases
+
+Versions follow [Semantic Versioning](https://semver.org). Each release has a git tag, an
+entry in [CHANGELOG.md](CHANGELOG.md), and a
+[GitHub Release](https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/releases) with the
+built app attached, published automatically when the tag is pushed. The steps are in
+[RELEASING.md](RELEASING.md).
