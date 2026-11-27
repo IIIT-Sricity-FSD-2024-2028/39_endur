@@ -727,9 +727,13 @@
 .input-reveal .input { padding-right: 40px; }
 /* `.btn-icon` (below, later in this file) also sets width/height/padding at equal
    specificity and would win on source order alone — `.input-reveal .reveal-toggle`
-   is scoped one level deeper so this button keeps its own size regardless. */
+   is scoped one level deeper so this button keeps its own size regardless.
+   Centred with `inset-block: 0` + `margin-block: auto`, NOT `top: 50%` + a transform:
+   the press response (`.btn:active { transform: scale(.97) }`, later in this file) replaces
+   any transform, so a transform-centred button dropped 15px the moment it was pressed and a
+   press on its top half was released on the input and never became a click. */
 .input-reveal .reveal-toggle {
-  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  position: absolute; inset-block: 0; margin-block: auto; right: 4px;
   width: 30px; height: 30px; min-height: 0; padding: 0;
   background: none; border: 0; color: inherit;
   opacity: .55; cursor: pointer;
@@ -4270,115 +4274,8 @@ a.involve-name { color: inherit; }
   .log-viewer { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ── /ops shell — `DEC-078`: took `/app`'s chrome (glass nav + ambient field)
-   rather than the flat surface `70` § Design note originally called for.
-   Nothing new is invented — `.ops-nav` sits on the same `.topbar`/`.nav-public`
-   glass rule the console already carries, and `.ops-shell` gets `<AmbientBackground>`
-   the same way `.shell` does. ─────────────────────────────────────────────── */
-.ops-shell { min-height: 100dvh; display: flex; flex-direction: column; }
-.ops-nav {
-  position: sticky; top: 0; z-index: 20; flex: none;
-  display: flex; align-items: center; gap: var(--space-3);
-  height: 56px; padding-inline: var(--space-4);
-  background: var(--glass-tint);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid var(--glass-edge);
-  box-shadow: 0 1px 0 var(--glass-shade);
-}
-.ops-nav .nav-brand { font-size: 16px; }
-.ops-nav a:not(.btn) {
-  font-size: var(--text-small); font-weight: 500; text-decoration: none;
-  padding: 6px 10px; border-radius: var(--radius-sm);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-.ops-nav a:not(.btn):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
-.ops-nav a[aria-current='page'] { background: color-mix(in srgb, var(--color-accent) 15%, transparent); }
-.ops-nav-spacer { flex: 1; }
-.ops-main { flex: 1; padding: var(--space-6) var(--space-4); }
-@media (max-width: 639px) { .ops-main { padding: var(--space-4); } }
-
-/* Estate/analytics filter rows — three or four inputs in a line that wrapped
-   with no gap and no consistent width before this. */
-.ops-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
-.ops-filters .input { min-width: 160px; }
-
-/* Every `<section className="card">` on `/ops/orgs/:id` was stacked bare inside `.page`,
-   edge to edge, with nothing giving them room — `.page` itself has no gap, and nobody had
-   noticed because `.ops-shell`'s flat pre-`DEC-078` background hid it the same way the
-   estate list's flat shell hid `.org-row` having no rule at all. `.settings-page` already
-   solves exactly this on `/app/settings`; this is the same fix, without that class's
-   900px cap, since the estate/plan grids here want the full page width. */
-.ops-sections { display: flex; flex-direction: column; gap: var(--space-6); }
-/* The plan picker's own `.plan-card` already carries background, radius and shadow
-   (`.plan-grid`, same file) — it is a card grid in its own right, the way `Start.tsx`
-   uses it bare. Wrapping it in a SECOND `.card` (as this page did) nested one glass
-   surface inside another and squeezed four tier cards into a narrower box than every
-   other `.plan-grid` on the product gets. This section is deliberately NOT `.card`. */
-.ops-plan-section { display: flex; flex-direction: column; gap: var(--space-3); }
-
-/* "Open this organisation's console" — the support-entry card. Its own field, hint and
-   button ran together with no rhythm at all: `.field` has no base layout of its own (it is
-   whatever tag it is put on, unstyled), so the label span, the input and the hint span sat
-   in default inline flow — the hint span landing on the SAME LINE as the input's right edge
-   rather than below it. This scopes a real column layout to this one card rather than
-   touching bare `.field`, which other screens already lay out row-wise (`.booking-new`,
-   `.slot-editor-row`) and must not be disturbed. */
-.ops-support-card { gap: var(--space-4); }
-.ops-support-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-}
-.ops-support-field .field-hint {
-  margin: 0;
-  font-size: var(--text-micro);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-}
-.ops-support-submit { align-self: flex-start; }
-
-/* <OrgRow> — referenced since `70`/`T-066` but never given a rule, so every row in the
-   estate list rendered as a bare unstyled <button>: no card weight, no hover, the tier
-   tag and the meta line stacked with no rhythm. `DEC-078` turned this up while giving
-   the shell around it real chrome — a plain shell was hiding a genuinely unstyled row. */
-.org-row {
-  display: flex; flex-direction: column; gap: 6px;
-  width: 100%; text-align: left;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
-}
-.org-row:hover, .org-row:focus-visible {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
-  border-color: var(--color-divider);
-}
-.org-row-main { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-.org-row-name { font-weight: 600; }
-.org-row-tier { text-transform: capitalize; }
-.org-row-meta { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-
-/* The sign-in card. Deliberately no `.auth-aside` — just the same card weight and
-   breathing room every other form on the product gets, rather than a bare unstyled
-   form floating in a fullpage grid. */
-.ops-login {
-  width: 100%; max-width: 380px;
-  gap: var(--space-4);
-  padding: var(--space-8);
-  border-radius: calc(var(--radius-lg) * 1.15);
-}
-.ops-login h2 {
-  margin: 0 0 var(--space-1);
-  font-family: var(--font-heading); font-weight: 600;
-  font-size: var(--text-h2); letter-spacing: var(--track-heading);
-}
-.ops-login .field-label { font-size: var(--text-small); font-weight: 500; }
-.ops-login .input { min-height: 46px; }
-.ops-login .btn-primary { min-height: 48px; margin-top: var(--space-2); }
-@media (max-width: 479px) { .ops-login { padding: var(--space-6) var(--space-4); } }
+/* The operator console's own styles moved to `design-system/ops.css` (R-716), loaded only
+   by the console's chunk: a customer or a respondent never downloads them. */
 
 /* Wide layout for plan selection */
 .auth.is-plan-mode {
@@ -5296,64 +5193,7 @@ a.involve-name { color: inherit; }
   .pay-features { gap: var(--space-2); }
 }
 
-/* ── /ops/earnings — DEC-080, 71 § Revenue ─────────────────────────────────
-   Reuses `.ops-sections`, `.card`, `.stat-row` and the `.trend-*` family. What
-   is genuinely new is the money figure, the tier metals as chart colour, and
-   the plan-change list.                                                       */
-.earn-total .stat-value { font-variant-numeric: tabular-nums; }
-.earn-figure {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: var(--text-h2); letter-spacing: var(--track-heading);
-  font-variant-numeric: tabular-nums;
-}
-
-/* The metals, as chart ink. Same class pair as `.stroke-movement-*` /
-   `.fill-movement-*`, for the same reason: a `<span>` key needs `background`,
-   an `<svg>` dot needs `fill`, and one class marks both. */
-.stroke-tier-bronze { stroke: var(--tier-bronze-500); }
-.stroke-tier-silver { stroke: var(--tier-silver-500); }
-.stroke-tier-gold   { stroke: var(--tier-gold-500); }
-.stroke-tier-revenue { stroke: var(--status-good-500); }
-.fill-tier-bronze { background: var(--tier-bronze-500); fill: var(--tier-bronze-500); }
-.fill-tier-silver { background: var(--tier-silver-500); fill: var(--tier-silver-500); }
-.fill-tier-gold   { background: var(--tier-gold-500);   fill: var(--tier-gold-500); }
-.fill-tier-enterprise { background: var(--color-neutral-400); fill: var(--color-neutral-400); }
-.fill-tier-revenue { background: var(--status-good-500); fill: var(--status-good-500); }
-
-/* The revenue line gets a fill under it and the four movement lines do not — one series
-   can carry an area without the overlaps turning into mud, and revenue is a QUANTITY
-   accumulating rather than four counts to compare. */
-.revenue-area { fill: color-mix(in srgb, var(--status-good-500) 14%, transparent); stroke: none; }
-/* Drawn once on mount: 620px is comfortably longer than any path this viewBox can hold,
-   so the dash always clears. Purpose is state indication — the figure above it counted
-   up from zero and the line arrives with it. */
-.revenue-path {
-  stroke-dasharray: 620; stroke-dashoffset: 0;
-  animation: revenue-draw var(--wipe-dur) var(--ease) backwards;
-}
-@keyframes revenue-draw { from { stroke-dashoffset: 620; } }
-
-.earn-donut-legend li { grid-template-columns: 10px 10ch auto auto; }
-
-.earn-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.earn-change {
-  display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-divider);
-  font-size: var(--text-small);
-}
-.earn-change:last-child { border-bottom: 0; }
-.earn-change-move {
-  font-variant-numeric: tabular-nums; font-weight: 600;
-  color: var(--tier-metal, var(--color-text));
-}
-.earn-change.is-bronze { --tier-metal: var(--tier-bronze-800); }
-.earn-change.is-silver { --tier-metal: var(--tier-silver-800); }
-.earn-change.is-gold   { --tier-metal: var(--tier-gold-800); }
-.earn-change-org { font-weight: 600; }
-.earn-change-meta { margin-left: auto; }
-.earn-amount { font-variant-numeric: tabular-nums; }
-.earn-tier { text-transform: capitalize; }
+/* /ops/earnings moved to `design-system/ops.css` (R-716). */
 
 /* ── Booking — T-095 ──────────────────────────────────────────────────────────────────
    The slot grid is the ONE piece of chrome shared by the console editor and the public
@@ -5621,7 +5461,7 @@ a.involve-name { color: inherit; }
    A LIST, NOT A TABLE. Four facts and two verbs per row, one of which is a
    free-text note that no column width survives; `<ResponsiveTable>` is right
    for the estate list and wrong for this.                                     */
-.ops-enterprise h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.ops-enterprise h3, .ops-enterprise-title { font-size: var(--text-h3); display: flex; align-items: center; gap: var(--space-2); margin: 0; }
 
 .enterprise-list {
   list-style: none;

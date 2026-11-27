@@ -14,7 +14,11 @@ import type {
   PlatformAnalytics,
   PlatformEarnings,
   PlatformOrgDetail,
+  PlatformAuditEntry,
+  PlatformOperator,
   PlatformOrgSummary,
+  PlatformStats,
+  SupportSessionRow,
   Tier,
 } from '@endur/shared';
 import { opsApi } from '../opsApi.js';
@@ -80,7 +84,7 @@ export const opsEndpoints = opsApi.injectEndpoints({
     updateEnterpriseRequest: build.mutation<EnterpriseRequestRow, { id: string; status: EnterpriseStatus }>({
       query: ({ id, status }) => ({ url: `/enterprise-requests/${id}`, method: 'PATCH', body: { status } }),
       transformResponse: unwrap<EnterpriseRequestRow>,
-      invalidatesTags: (_result, error) => (error ? ['Enterprise'] : []),
+      invalidatesTags: (_result, error) => (error ? ['Enterprise'] : ['OpsAudit']),
       onQueryStarted: async ({ id }, { dispatch, queryFulfilled }) => {
         try {
           const { data } = await queryFulfilled;
@@ -102,7 +106,10 @@ export const opsEndpoints = opsApi.injectEndpoints({
       query: (id) => ({ url: `/enterprise-requests/${id}/approve`, method: 'POST' }),
       transformResponse: unwrap<EnterpriseRequestRow>,
       invalidatesTags: (result, error) =>
-        error ? ['Enterprise'] : ['Estate', ...(result ? [{ type: 'OpsOrg' as const, id: result.org.id }] : [])],
+        error
+          ? ['Enterprise']
+          : ['Estate', 'OpsStats', 'OpsAudit', 'OpsEarnings', 'OpsAnalytics',
+              ...(result ? [{ type: 'OpsOrg' as const, id: result.org.id }] : [])],
       onQueryStarted: async (id, { dispatch, queryFulfilled }) => {
         try {
           await queryFulfilled;
@@ -120,28 +127,32 @@ export const opsEndpoints = opsApi.injectEndpoints({
     /** An operator's plan override. The organisation and the estate row re-read. */
     setOrgPlan: build.mutation<unknown, { id: string; tier: Tier }>({
       query: ({ id, tier }) => ({ url: `/orgs/${id}/plan`, method: 'POST', body: { tier } }),
-      invalidatesTags: (_result, _error, { id }) => ['Estate', { type: 'OpsOrg', id }],
+      invalidatesTags: (_result, _error, { id }) => [
+        'Estate', 'OpsStats', 'OpsAudit', 'OpsAnalytics', 'OpsEarnings', { type: 'OpsOrg', id },
+      ],
     }),
 
     /** Suspend, or reinstate. Staff sign-in only; the respondent surface keeps working. */
     setOrgSuspended: build.mutation<unknown, { id: string; suspended: boolean }>({
       query: ({ id, suspended }) => ({ url: `/orgs/${id}/suspend`, method: 'POST', body: { suspended } }),
-      invalidatesTags: (_result, _error, { id }) => ['Estate', { type: 'OpsOrg', id }],
+      invalidatesTags: (_result, _error, { id }) => ['Estate', 'OpsStats', 'OpsAudit', { type: 'OpsOrg', id }],
     }),
 
     /** Opens a support session; the answer says where the browser goes next. */
     enterSupportSession: build.mutation<EnterSupportResponse, { id: string; reason: string }>({
       query: ({ id, reason }) => ({ url: `/orgs/${id}/support-session`, method: 'POST', body: { reason } }),
       transformResponse: unwrap<EnterSupportResponse>,
+      invalidatesTags: ['SupportSessions', 'OpsAudit'],
     }),
 
     /** To the organisation's administrators' inboxes; recipients are resolved server-side. */
     messageOrg: build.mutation<{ sentTo: number }, { id: string; subject: string; body: string }>({
       query: ({ id, subject, body }) => ({ url: `/orgs/${id}/message`, method: 'POST', body: { subject, body } }),
       transformResponse: unwrap<{ sentTo: number }>,
+      invalidatesTags: ['OpsAudit'],
     }),
 
-    /** The arg is `analyticsSearch(window)`: one cached report per window. */
+    /** The arg is `selectReportSearch` (`reportSearch(window)`): one cached report per window. */
     getAnalytics: build.query<PlatformAnalytics, string>({
       query: (search) => `/analytics${search}`,
       transformResponse: unwrap<PlatformAnalytics>,
@@ -152,6 +163,55 @@ export const opsEndpoints = opsApi.injectEndpoints({
       query: (search) => `/earnings${search}`,
       transformResponse: unwrap<PlatformEarnings>,
       providesTags: ['OpsEarnings'],
+    }),
+
+    /**
+     * The estate as six numbers (`platform.usage.read`, both roles): organisations, suspended,
+     * the tier counts, seats, live campaigns and responses. COUNTS ONLY: every share and
+     * percentage drawn from them is derived in `store/screens/opsReports.ts`.
+     */
+    getOpsStats: build.query<PlatformStats, void>({
+      query: () => '/stats',
+      transformResponse: unwrap<PlatformStats>,
+      providesTags: ['OpsStats'],
+    }),
+
+    /**
+     * The platform's OWN audit trail (`platform.audit.read`): every operator action, newest
+     * first. The arg is `auditSearch(filters)`, so each filter is its own cached list.
+     */
+    getPlatformAudit: build.infiniteQuery<Page<PlatformAuditEntry>, string, string | null>({
+      infiniteQueryOptions: { initialPageParam: null, getNextPageParam: nextCursor },
+      query: ({ queryArg: search, pageParam }) => withCursor('/audit', search, pageParam),
+      providesTags: ['OpsAudit'],
+    }),
+
+    /** The operator accounts (`platform.operator.manage`, owner only). */
+    getOperators: build.query<PlatformOperator[], void>({
+      query: () => '/operators',
+      transformResponse: unwrap<PlatformOperator[]>,
+      providesTags: ['Operators'],
+    }),
+
+    /**
+     * A role or a status. Creating an operator is NOT here: its body carries a password, and
+     * a mutation's argument is kept in the store (`opsApi.mutations`). That one is a thunk
+     * over `opsRequest` (`store/screens/opsTeam.ts`), as signing in is.
+     */
+    updateOperator: build.mutation<
+      PlatformOperator,
+      { id: string; role?: 'owner' | 'staff'; status?: 'active' | 'disabled' }
+    >({
+      query: ({ id, ...patch }) => ({ url: `/operators/${id}`, method: 'PATCH', body: patch }),
+      transformResponse: unwrap<PlatformOperator>,
+      invalidatesTags: ['Operators', 'OpsAudit'],
+    }),
+
+    /** The register of support visits; the arg is `?orgId=…&active=…` or empty. */
+    getSupportSessions: build.query<SupportSessionRow[], string>({
+      query: (search) => `/support-sessions${search}`,
+      transformResponse: unwrap<SupportSessionRow[]>,
+      providesTags: ['SupportSessions'],
     }),
 
     getLogFiles: build.query<{ data: LogFileMeta[]; meta?: LogStoreMeta }, void>({
@@ -179,4 +239,8 @@ export const {
   useGetEarningsQuery,
   useGetLogFilesQuery,
   useGetLogLinesInfiniteQuery,
+  useGetOpsStatsQuery,
+  useGetPlatformAuditInfiniteQuery,
+  useGetOperatorsQuery,
+  useGetSupportSessionsQuery,
 } = opsEndpoints;

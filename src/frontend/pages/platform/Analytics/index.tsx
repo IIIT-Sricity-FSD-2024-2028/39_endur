@@ -1,212 +1,161 @@
-import { Link, useSearchParams } from 'react-router-dom';
-import { TIERS } from '@endur/shared';
-import { PageHeader } from '../../../components/layout/PageHeader.js';
-import { StatCard } from '../../../components/data/StatCard.js';
-import { BarRow } from '../../../components/data/BarRow.js';
-import { ResponsiveTable, type Column } from '../../../components/data/ResponsiveTable.js';
-import { GrowthChart } from '../../../components/platform/GrowthChart.js';
-import { useAnalytics, type AnalyticsWindow } from '../../../lib/analytics-ops.js';
+// `/ops/analytics`: is this working? The whole estate at once, in aggregate (`71`). R-716.
+//
+// THE SERVER SENDS COUNTS; EVERY PERCENTAGE HERE IS A SELECTOR'S. The report is cached in
+// `state.opsApi.queries['getAnalytics("?granularity=month")']` (open Redux DevTools to see
+// the raw counts), and `selectAnalyticsView` (store/screens/opsReports.ts) works out every
+// share, the funnel, the movement totals and each bar's height from it. Each share is
+// printed with what it is a share OF, so "74%" always reads "37 of 50 · 74%".
+//
+// The window is `state.opsReports.window`, the same one Earnings reads.
+import { Link } from 'react-router-dom';
+import type { Tier } from '@endur/shared';
+import { OpsBarChart, type ChartSeries } from '../../../components/platform/OpsBarChart.js';
+import { ReportWindow } from '../../../components/platform/ReportWindow.js';
+import { Denied, Kpi, OpsError, OpsHeader, ShareRow, ShareText } from '../../../components/platform/OpsUi.js';
+import { useAnalytics } from '../../../lib/analytics-ops.js';
+import { useAppSelector } from '../../../store/index.js';
+import { selectAnalyticsView, selectReportSearch } from '../../../store/screens/opsReports.js';
 
-const TIER_LABEL: Record<string, string> = {
-  bronze: 'Bronze',
-  silver: 'Silver',
-  gold: 'Gold',
-  enterprise: 'Enterprise',
+const MOVEMENT: ChartSeries[] = [
+  // Series colours in their validated order (ops.css): not gold and amber, which read as one.
+  { key: 'new', label: 'New', fill: 'ops-fill-s1' },
+  { key: 'trialStarted', label: 'Trials started', fill: 'ops-fill-s2' },
+  { key: 'upgraded', label: 'Upgraded', fill: 'ops-fill-s3' },
+  { key: 'downgraded', label: 'Downgraded', fill: 'ops-fill-s4' },
+  { key: 'churned', label: 'Churned', fill: 'ops-fill-s5' },
+];
+
+const FILL: Record<Tier, string> = {
+  bronze: 'ops-fill-bronze',
+  silver: 'ops-fill-silver',
+  gold: 'ops-fill-gold',
+  enterprise: 'ops-fill-enterprise',
 };
-
-type MovementRow = {
-  period: string;
-  new: number;
-  trialStarted: number;
-  upgraded: number;
-  downgraded: number;
-  churned: number;
-};
-
-function readWindow(params: URLSearchParams): AnalyticsWindow {
-  const granularity = params.get('granularity');
-  return {
-    from: params.get('from') ?? undefined,
-    to: params.get('to') ?? undefined,
-    granularity: granularity === 'quarter' ? 'quarter' : 'month',
-  };
-}
 
 export default function Analytics(): JSX.Element {
-  const [params, setParams] = useSearchParams();
-  const window = readWindow(params);
-  const analytics = useAnalytics(window);
+  const search = useAppSelector(selectReportSearch);
+  const report = useAnalytics(search);
+  const view = useAppSelector(selectAnalyticsView);
 
-  const setWindow = (patch: Partial<AnalyticsWindow>): void => {
-    const next = new URLSearchParams(params);
-    const merged = { ...window, ...patch };
-    if (merged.from) next.set('from', merged.from); else next.delete('from');
-    if (merged.to) next.set('to', merged.to); else next.delete('to');
-    next.set('granularity', merged.granularity);
-    setParams(next);
-  };
-
-  if (analytics.forbidden) {
-    return (
-      <div className="fullpage">
-        <div>
-          <h3>You do not have access to this</h3>
-          <p className="text-muted">
-            Analytics needs the <code>platform.analytics.read</code> capability, which only the
-            owner role holds.
-          </p>
-        </div>
-      </div>
-    );
+  if (report.forbidden) {
+    return <Denied capability="platform.analytics.read" what="Analytics" />;
   }
 
-  const data = analytics.data;
-  const movementColumns: Column<MovementRow>[] = [
-    { key: 'period', header: 'Period', primary: true, render: (row) => row.period },
-    { key: 'new', header: 'New', render: (row) => row.new },
-    { key: 'trialStarted', header: 'Trials started', render: (row) => row.trialStarted },
-    { key: 'upgraded', header: 'Upgraded', render: (row) => row.upgraded },
-    { key: 'downgraded', header: 'Downgraded', render: (row) => row.downgraded },
-    { key: 'churned', header: 'Churned', render: (row) => row.churned },
-  ];
-
   return (
-    <div className="page">
-      <PageHeader
+    <>
+      <OpsHeader
+        kicker="Business"
         title="Analytics"
-        subtitle="Is this working? — the whole estate at once, in aggregate."
-        vocabulary={false}
-        action={
-          <div className="ops-filters">
-            <input
-              type="date"
-              className="input"
-              aria-label="From"
-              value={window.from?.slice(0, 10) ?? ''}
-              onChange={(event) => setWindow({ from: event.target.value || undefined })}
-            />
-            <input
-              type="date"
-              className="input"
-              aria-label="To"
-              value={window.to?.slice(0, 10) ?? ''}
-              onChange={(event) => setWindow({ to: event.target.value || undefined })}
-            />
-            <select
-              className="input"
-              value={window.granularity}
-              onChange={(event) => setWindow({ granularity: event.target.value === 'quarter' ? 'quarter' : 'month' })}
-            >
-              <option value="month">Monthly</option>
-              <option value="quarter">Quarterly</option>
-            </select>
-          </div>
-        }
+        subtitle="Is this working? The whole estate at once, in aggregate: counts only, never content."
       />
+      <ReportWindow label={view?.window.label} />
 
-      {analytics.error && (
-        <p className="field-error" role="alert">{analytics.error.message}</p>
-      )}
+      {report.error && <OpsError>{report.error.message}</OpsError>}
 
-      <div className={analytics.loading ? 'is-dimmed' : undefined}>
-        {!data ? (
-          <p className="text-muted" aria-live="polite">Loading…</p>
-        ) : (
-          <div className="ops-sections">
-            <div className="stat-row">
-              <StatCard
-                kicker="Organizations"
-                value={data.orgs.joined}
-                context={`${data.orgs.total} total · excludes ${data.orgs.trialing} trialing and ${data.orgs.cancelled} cancelled`}
-              />
-              {/* "TRIALS STARTED" IS BACK, AS A MOVEMENT COLUMN RATHER THAN A HEADLINE CARD —
-                  DEC-116, superseding part of DEC-102. Registration can write `status:
-                  'trialing'` again on an explicit opt-in, so the count has a real source —
-                  it lives in the windowed Movement table below (`trialStarted`), the same
-                  place `new` does, rather than as a headline card up here, because like `new`
-                  it is only meaningful FOR A PERIOD.
-                  "CONVERSION RATE" STAYS GONE. A count has an honest source now; a RATE still
-                  needs a time-bounded definition of "converted" that is a product decision
-                  nobody has made — printing a wrong number would be worse than printing none. */}
-              <StatCard
-                kicker="Gone quiet"
-                value={data.adoption.orgsQuiet30d}
-                context={`of ${data.orgs.total} organizations · no response in the last 30 days`}
-              />
+      {!view ? (
+        <div className="ops-kpis" aria-live="polite">
+          <div className="ops-skeleton" />
+          <div className="ops-skeleton" />
+          <div className="ops-skeleton" />
+          <p className="sr-only">Loading…</p>
+        </div>
+      ) : (
+        <div className={`ops-stack${report.loading ? ' ops-loading' : ''}`} aria-busy={report.loading}>
+          <section className="ops-kpis" aria-label="The estate in numbers">
+            <Kpi
+              icon="organization"
+              label="On a plan"
+              value={view.orgs.joined.count.toLocaleString()}
+              detail={<ShareText share={view.orgs.joined} unit="organizations" />}
+            />
+            <Kpi
+              icon="start"
+              label="Trialing"
+              value={view.orgs.trialing.count.toLocaleString()}
+              detail={<>Counted apart, never folded in · <ShareText share={view.orgs.trialing} /></>}
+            />
+            <Kpi
+              icon="countdown"
+              label="Gone quiet"
+              tone={view.adoption.quiet.count > 0 ? 'warn' : undefined}
+              value={view.adoption.quiet.count.toLocaleString()}
+              detail={<>No response in 30 days · <ShareText share={view.adoption.quiet} /></>}
+            />
+            <Kpi
+              icon="results"
+              label="Responses per campaign"
+              value={view.totals.responsesPerCampaign ?? '—'}
+              detail={`${view.totals.responses.toLocaleString()} responses over ${view.totals.campaigns.toLocaleString()} campaigns`}
+            />
+          </section>
+
+          <section className="ops-card card" aria-labelledby="movement">
+            <div className="ops-card-head">
+              <h2 id="movement">Movement in this window</h2>
+              <p className="ops-card-note">
+                Five counts per {view.window.granularity}, never netted into one. The only section the dates change.
+              </p>
             </div>
+            <OpsBarChart
+              chart="movement"
+              series={MOVEMENT}
+              caption="Organization movement by period"
+              totals={Object.fromEntries(MOVEMENT.map((line) => [
+                line.key,
+                String(view.movement.totals[line.key as keyof typeof view.movement.totals]),
+              ]))}
+              columns={view.movement.rows.map((row) => ({
+                label: row.label,
+                ratios: row.ratios,
+                values: Object.fromEntries(MOVEMENT.map((line) => [
+                  line.key,
+                  String(row[line.key as keyof typeof row.ratios]),
+                ])),
+              }))}
+            />
+          </section>
 
-            <section className="card">
-              {/* THE ONE SECTION THE DATES GOVERN, AND IT SAYS SO — DEC-103. Every other
-                  figure on this page is a count of the whole estate as of today, so moving
-                  the window left five of six sections unchanged, which is indistinguishable
-                  from a broken control. That was half of the owner's report; the other half
-                  was `D-044`, and it was real — `to` excluded the day it named. */}
-              <h3>Movement · in this window</h3>
-              <p className="text-muted">
-                Four counts, never netted — an honest total has no single number. This is the
-                only section the dates above change; everything else on this page is as of
-                today.
-              </p>
-              <GrowthChart series={data.movement} granularity={data.window.granularity} />
-              <ResponsiveTable
-                columns={movementColumns}
-                rows={data.movement}
-                rowKey={(row) => row.period}
-                caption="Organization movement by period"
-                empty={<p className="text-muted">No movement in this window.</p>}
-              />
+          <div className="ops-grid-2">
+            <section className="ops-card card" aria-labelledby="tier-mix">
+              <div className="ops-card-head">
+                <h2 id="tier-mix">Plan mix · as of today</h2>
+                <p className="ops-card-note">
+                  Of the {view.tierMix.onPlan.toLocaleString()} organizations on a plan; trials excluded. Adds up to 100%.
+                </p>
+              </div>
+              <div className="ops-shares">
+                {view.tierMix.rows.map((row) => (
+                  <ShareRow key={row.tier} label={row.label} share={row} fill={FILL[row.tier]} />
+                ))}
+              </div>
             </section>
 
-            <section className="card">
-              {/* AS OF TODAY, AND IT CANNOT BE OTHERWISE — DEC-103. `subscriptions` holds one
-                  row per organisation with NO HISTORY, so "the tier mix on 12 August" is not a
-                  question this database can answer. Saying so is the honest label;
-                  reconstructing it from `payments` is a different feature. */}
-              <h3>Tier mix · as of today</h3>
-              <p className="text-muted">
-                {data.byTier.reduce((sum, row) => sum + row.orgs, 0)} organizations · excludes{' '}
-                {data.orgs.trialing} trialing
-              </p>
-              {/* NO SEAT COUNT ON THE LABEL — DEC-102. Nothing is billed per seat, so a seat
-                  figure on the revenue owner's page measured something no invoice reads. */}
-              {TIERS.map((tier) => {
-                const row = data.byTier.find((entry) => entry.tier === tier);
-                return (
-                  <BarRow
-                    key={tier}
-                    label={TIER_LABEL[tier] ?? tier}
-                    value={row?.orgs ?? 0}
-                    total={data.orgs.total}
-                    showPercent
-                  />
-                );
-              })}
-            </section>
-
-            <section className="card">
-              <h3>Adoption · as of today</h3>
-              <p className="text-muted">
-                {data.adoption.orgsWithACampaign} of {data.orgs.total} organizations have a
-                campaign · {data.adoption.orgsWithAResponse} have at least one response
-              </p>
-              <Link className="btn btn-secondary" to="/ops">
-                Open the estate list
-              </Link>
-            </section>
-
-            <section className="card">
-              <h3>Totals · as of today</h3>
-              {/* "— never read" IS GONE. It was INV-011 stated as a boast, and a boast on a
-                  page about numbers reads as a disclaimer somebody felt was needed. The
-                  invariant is enforced by the SHAPE of `PlatformAnalytics`, which has no field
-                  that could carry a response — a sentence here protects nothing. */}
-              <p className="text-muted">
-                {data.totals.campaigns} campaigns · {data.totals.responses} responses
-              </p>
+            <section className="ops-card card" aria-labelledby="adoption">
+              <div className="ops-card-head">
+                <h2 id="adoption">Adoption · as of today</h2>
+                <p className="ops-card-note">Each step as a share of the whole estate, and of the step before.</p>
+              </div>
+              <ol className="ops-funnel">
+                {view.adoption.funnel.map((step) => (
+                  <li key={step.label}>
+                    <span className="ops-funnel-label">{step.label}</span>
+                    <span className="ops-funnel-figure">
+                      <strong>{step.count.toLocaleString()}</strong> · {step.percent}%
+                      {step.ofPrevious !== null && (
+                        <span className="ops-how"> ({step.ofPrevious}% of the step before)</span>
+                      )}
+                    </span>
+                    <span className="ops-funnel-bar" aria-hidden="true">
+                      <span style={{ width: `${step.percent}%` }} />
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <Link className="btn btn-secondary btn-sm" to="/ops">Open the estate list</Link>
             </section>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

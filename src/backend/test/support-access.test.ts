@@ -355,6 +355,23 @@ describe('support access — DEC-114', () => {
     expect(audit).toBeTruthy();
   });
 
+  it('filters the register by `active` as a WORD: `false` means the visits that are over', async () => {
+    // `z.coerce.boolean()` read the string "false" as `true` (Boolean("false")), so asking for
+    // the finished visits returned the live ones.
+    const target = await registerOrg();
+    const operator = await makeOperator();
+    const live = await enter(operator, target.orgId);
+    await live.agent.post('/api/v1/platform/support-session/leave').send({});
+    await enter(operator, target.orgId);
+
+    const register = (active: string) =>
+      operator.agent.get('/api/v1/platform/support-sessions').query({ orgId: target.orgId, active });
+    const actives = async (active: string): Promise<boolean[]> =>
+      ((await register(active)).body as { data: Array<{ active: boolean }> }).data.map((row) => row.active);
+    expect(await actives('true')).toEqual([true]);
+    expect(await actives('false')).toEqual([false]);
+  });
+
   it('gets into a SUSPENDED organization, which the customer’s own staff cannot', async () => {
     // The one carve-out in the tenant resolver: the moment a customer most needs somebody from Endur
     // inside their console is the moment they have been cut off from it.

@@ -1,15 +1,23 @@
-// `/ops/orgs/:id`: one organisation, for an operator. The organisation is an RTK Query read;
-// the plan override, suspension, support access and the message are `state.operator.orgs[id]`
-// (store/screens/operator.ts), and each is a thunk there.
-import { useNavigate, useParams } from 'react-router-dom';
+// `/ops/orgs/:id`: one organisation, for an operator (`70`). R-716.
+//
+// WHERE EVERYTHING ON THIS PAGE LIVES:
+// - the organisation: RTK Query's cache (`getOrgDetail`), read by `useOrgDetail`;
+// - its activity and its support visits: the audit trail and the support register,
+//   narrowed to this organisation (`getPlatformAudit`, `getSupportSessions`), drawn by
+//   `selectAuditViewFor` and `selectSupportView` (store/screens/opsReports.ts);
+// - the plan override, suspension, support access and the message: `state.operator.orgs[id]`
+//   (store/screens/operator.ts), each command a thunk there.
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PLAN_OPTIONS, SUPPORT_SESSION_MINUTES, type Tier } from '@endur/shared';
-import { PageHeader } from '../../../components/layout/PageHeader.js';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog.js';
-import { StatCard } from '../../../components/data/StatCard.js';
 import { PlanPicker } from '../../../components/billing/PlanPicker.js';
+import { Icon } from '../../../components/Icon.js';
 import { MessageComposer } from '../../../components/platform/MessageComposer.js';
+import { Denied, Empty, OpsError, Pill, TierPill, initialsOf } from '../../../components/platform/OpsUi.js';
+import { formatDate, formatDateTime, formatRelative } from '../../../lib/format.js';
 import { useOrgDetail } from '../../../lib/estate.js';
 import { useOpsCan } from '../../../lib/opsCapabilities.js';
+import { usePlatformAudit, useSupportSessions } from '../../../lib/opsRegisters.js';
 import { useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { useClearOnLeave } from '../../../store/screens/common.js';
 import {
@@ -29,6 +37,23 @@ import {
   supportReasonTyped,
   supportSessionEntered,
 } from '../../../store/screens/operator.js';
+import {
+  TIER_LABEL,
+  auditFilterChanged,
+  auditSearch,
+  selectAuditViewFor,
+  selectSupportView,
+  supportSearch,
+} from '../../../store/screens/opsReports.js';
+
+/** How many of the organisation's latest operator actions the page shows. */
+const ACTIVITY_SHOWN = 8;
+
+const VISIT: Record<'active' | 'left' | 'expired', { label: string; tone: 'good' | undefined }> = {
+  active: { label: 'Open now', tone: 'good' },
+  left: { label: 'Left', tone: undefined },
+  expired: { label: 'Ran out', tone: undefined },
+};
 
 export default function OrgDetail(): JSX.Element {
   const { id = '' } = useParams<{ id: string }>();
@@ -38,6 +63,14 @@ export default function OrgDetail(): JSX.Element {
   const dispatch = useAppDispatch();
   const page = useAppSelector((state) => selectOrgPage(state, id));
   useClearOnLeave(orgPageLeft({ id }));
+
+  const activitySearch = auditSearch({ action: null, orgId: id, orgName: null });
+  usePlatformAudit(activitySearch, can('platform.audit.read'));
+  const activity = useAppSelector((state) => selectAuditViewFor(state, activitySearch));
+  const visitSearch = supportSearch(id);
+  useSupportSessions(visitSearch, can('platform.support.read'));
+  const visits = useAppSelector((state) => selectSupportView(state, visitSearch, 'all'));
+
   const {
     pendingTier, planBusy, suspendOpen, suspendConfirmText, suspendBusy, supportReason,
     supportBusy, message, messageSending,
@@ -48,17 +81,22 @@ export default function OrgDetail(): JSX.Element {
   };
 
   if (detail.forbidden) {
+    return <Denied capability="platform.org.read" what="An organization's page" />;
+  }
+  if (detail.error && !detail.data) {
     return (
-      <div className="fullpage">
-        <div>
-          <h3>You do not have access to this</h3>
-          <p className="text-muted">Your operator account cannot open this organization.</p>
-        </div>
-      </div>
+      <OpsError action={<Link className="btn btn-ghost btn-sm" to="/ops">Back to organizations</Link>}>
+        {detail.error.message}
+      </OpsError>
     );
   }
   if (detail.loading || !detail.data) {
-    return <div className="fullpage"><p className="text-muted" aria-live="polite">Loading…</p></div>;
+    return (
+      <div aria-live="polite">
+        <div className="ops-skeleton" />
+        <p className="sr-only">Loading…</p>
+      </div>
+    );
   }
 
   const org = detail.data;
@@ -80,188 +118,283 @@ export default function OrgDetail(): JSX.Element {
     });
   };
 
+  const openTrail = (): void => {
+    dispatch(auditFilterChanged({ action: '', orgId: id, orgName: org.name }));
+    navigate('/ops/audit');
+  };
+
+  const counts: Array<[string, number]> = [
+    ['Units', org.counts.units],
+    ['Roles', org.counts.roles],
+    ['People', org.counts.people],
+    ['Subjects', org.counts.subjects],
+    ['Campaigns', org.counts.campaigns],
+    ['Responses', org.counts.responses],
+  ];
+
   return (
-    <div className="page">
-      <PageHeader
-        title={org.name}
-        subtitle={`${org.industry} · ${org.slug}`}
-        vocabulary={false}
-        action={
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/ops')}>
-            Back to estate
-          </button>
-        }
-      />
+    <>
+      <Link className="ops-link text-meta" to="/ops">
+        <Icon name="back" size={16} /> Organizations
+      </Link>
 
-      {error && <p className="field-error" role="alert">{error}</p>}
+      <section className="ops-hero card" aria-label="Organization">
+        <span className="ops-hero-mark" aria-hidden="true">{initialsOf(org.name)}</span>
+        <div className="ops-hero-text">
+          <h1>{org.name}</h1>
+          <div className="ops-pills">
+            <TierPill tier={org.tier} label={TIER_LABEL[org.tier]} />
+            {suspended ? <Pill tone="bad">Suspended</Pill> : <Pill tone="good">Staff can sign in</Pill>}
+            {org.lapsedFrom && <Pill tone="warn">Lapsed from {TIER_LABEL[org.lapsedFrom]}</Pill>}
+            <Pill>Subscription: {org.subscriptionStatus}</Pill>
+          </div>
+          <div className="ops-hero-meta">
+            <span>{org.industry}</span>
+            <span>{org.slug}</span>
+            <span>Joined {formatDate(org.createdAt)}</span>
+            <span>{org.lastActivityAt ? `Last active ${formatRelative(org.lastActivityAt)}` : 'No activity yet'}</span>
+          </div>
+        </div>
+      </section>
 
-      <div className="stat-row">
-        <StatCard kicker="Units" value={org.counts.units} />
-        <StatCard kicker="Roles" value={org.counts.roles} />
-        <StatCard kicker="People" value={org.counts.people} />
-        <StatCard kicker="Subjects" value={org.counts.subjects} />
-        <StatCard kicker="Campaigns" value={org.counts.campaigns} />
-        <StatCard kicker="Responses" value={org.counts.responses} />
-      </div>
+      {error && <OpsError>{error}</OpsError>}
 
-      <div className="ops-sections">
-        {/* Not `.card` — `.plan-card` already carries its own background/radius/shadow
-            (same grid `Start.tsx` uses bare), so wrapping it in a second glass card here
-            nested one surface inside another and squeezed the four tiers into a narrower
-            box than every other plan grid on the product. */}
-        <section className="ops-plan-section">
-          <h3>Plan</h3>
-          {/* WHEN IT RUNS OUT — DEC-113. The picker below says which tier; this says how long
-              it lasts, which the operator console had no way to show at all until expiry
-              became real. `70` § Data contract: the estate answers what the operator can act
-              on, and "this one lapses on Thursday" is the most actionable fact about a plan.
+      <section className="ops-counts" aria-label="What it holds">
+        {counts.map(([label, value]) => (
+          <div className="ops-count-tile" key={label}>
+            <p className="utility">{label}</p>
+            <p className="ops-count-value">{value.toLocaleString()}</p>
+          </div>
+        ))}
+      </section>
 
-              THE LAPSE LINE IS PAST TENSE AND NAMES THE OLD TIER. The picker already shows
-              `bronze` as current, and an operator ringing a customer needs to know it is
-              bronze BECAUSE Gold ran out, not because they chose it. */}
-          <p className="text-meta ops-plan-period">
-            {org.lapsedFrom
-              ? `${org.lapsedFrom} ended without a renewal — this organization fell to ${org.tier}.`
-              : org.periodEnd
-                ? `Current period ends ${new Date(org.periodEnd).toLocaleDateString()}.`
-                : 'No subscription row — reads as bronze everywhere.'}
-          </p>
-          <PlanPicker
-            plans={PLAN_OPTIONS}
-            current={org.tier}
-            mode="override"
-            onSelect={setPendingTier}
-            busyTier={planBusy ? pendingTier : null}
-          />
-        </section>
+      <div className="ops-grid-main">
+        <div className="ops-stack">
+          <section className="ops-card card" aria-labelledby="plan">
+            <div className="ops-card-head">
+              <h2 id="plan">Plan</h2>
+              {/* WHEN IT RUNS OUT (DEC-113), and a lapse in the past tense naming the old plan:
+                  an operator ringing the customer needs to know it is Bronze BECAUSE Gold ran
+                  out, not because they chose it. */}
+              <p className="ops-card-note">
+                {org.lapsedFrom
+                  ? `${TIER_LABEL[org.lapsedFrom]} ended without a renewal; this organization fell to ${TIER_LABEL[org.tier]}.`
+                  : org.periodEnd
+                    ? `Current period ends ${formatDate(org.periodEnd)}.`
+                    : 'No subscription row: reads as Bronze everywhere.'}
+              </p>
+            </div>
+            <PlanPicker
+              plans={PLAN_OPTIONS}
+              current={org.tier}
+              mode="override"
+              onSelect={setPendingTier}
+              busyTier={planBusy ? pendingTier : null}
+              actions={can('platform.plan.override')}
+            />
+          </section>
 
-        {pendingTier && (
-          <ConfirmDialog
-            title={`Change ${org.name} to ${pendingTier}?`}
-            consequence={`This moves ${org.name} from ${org.tier} to ${pendingTier}. A downgrade retains data — surfaces stop resolving, but nothing is deleted. A downgrade never stops collection: a running campaign keeps running.`}
-            verb="Change plan"
-            onConfirm={confirmPlan}
-            onCancel={() => setPendingTier(null)}
-            confirmDisabled={planBusy}
-          />
-        )}
-
-        <section className="card">
-          <h3>Plan history</h3>
-          {org.planHistory.length === 0 ? (
-            <p className="text-meta">No plan changes recorded.</p>
-          ) : (
-            <ul className="plain-list">
-              {org.planHistory.map((entry) => (
-                <li key={entry.at}>
-                  {new Date(entry.at).toLocaleString()} — set to {entry.tier} by {entry.by}
-                </li>
-              ))}
-            </ul>
+          {pendingTier && (
+            <ConfirmDialog
+              title={`Change ${org.name} to ${TIER_LABEL[pendingTier]}?`}
+              consequence={`This moves ${org.name} from ${TIER_LABEL[org.tier]} to ${TIER_LABEL[pendingTier]}. A downgrade keeps the data: surfaces stop resolving, nothing is deleted, and a running campaign keeps running.`}
+              verb="Change plan"
+              onConfirm={confirmPlan}
+              onCancel={() => setPendingTier(null)}
+              confirmDisabled={planBusy}
+            />
           )}
-        </section>
 
-        <section className="card">
-          <h3>Administrators</h3>
-          {org.administrators.length === 0 ? (
-            <p className="text-meta">No administrator on record.</p>
-          ) : (
-            <ul className="plain-list">
-              {org.administrators.map((person) => (
-                <li key={person.id}>{person.name} · {person.email}</li>
-              ))}
-            </ul>
+          <section className="ops-card card" aria-labelledby="history">
+            <div className="ops-card-head">
+              <h2 id="history">Plan history</h2>
+            </div>
+            {org.planHistory.length === 0 ? (
+              <Empty title="No plan changes recorded." />
+            ) : (
+              <ul className="ops-timeline">
+                {org.planHistory.map((entry) => (
+                  <li key={entry.at}>
+                    <span className="ops-dot is-money" aria-hidden="true" />
+                    <div>
+                      <div className="ops-timeline-head">
+                        <strong>Set to {TIER_LABEL[entry.tier]}</strong>
+                        <span className="ops-timeline-when">{formatDateTime(entry.at)}</span>
+                      </div>
+                      <p className="ops-timeline-body">by {entry.by}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {can('platform.audit.read') && (
+            <section className="ops-card card" aria-labelledby="activity">
+              <div className="ops-card-head">
+                <h2 id="activity">Operator activity</h2>
+                <p className="ops-card-note">
+                  {activity.total.toLocaleString()} action{activity.total === 1 ? '' : 's'} on record
+                </p>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={openTrail}>
+                  Open in the audit trail
+                </button>
+              </div>
+              {activity.rows.length === 0 ? (
+                <Empty title="No operator has acted on this organization." />
+              ) : (
+                <ul className="ops-timeline">
+                  {activity.rows.slice(0, ACTIVITY_SHOWN).map((row) => (
+                    <li key={row.id}>
+                      <span className={`ops-dot is-${row.tone}`} aria-hidden="true" />
+                      <div>
+                        <div className="ops-timeline-head">
+                          <strong>{row.label}</strong>
+                          <span className="text-meta">{row.actor?.name ?? 'An operator'}</span>
+                          <span className="ops-timeline-when">{formatRelative(row.at)}</span>
+                        </div>
+                        {row.summary && <p className="ops-timeline-body">{row.summary}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
-        </section>
 
-        {/* SUPPORT ACCESS — DEC-114, `19` §15, `70` § Support access.
+          {can('platform.support.read') && (
+            <section className="ops-card card" aria-labelledby="visits">
+              <div className="ops-card-head">
+                <h2 id="visits">Support visits</h2>
+                <p className="ops-card-note">
+                  {visits.counts.all} in all · {visits.counts.active} open now
+                </p>
+              </div>
+              {visits.rows.length === 0 ? (
+                <Empty title="Nobody from Endur has entered this organization." />
+              ) : (
+                <ul className="ops-timeline">
+                  {visits.rows.map((row) => (
+                    <li key={row.id}>
+                      <span className={`ops-dot ${row.status === 'active' ? 'is-team' : 'is-access'}`} aria-hidden="true" />
+                      <div>
+                        <div className="ops-timeline-head">
+                          <strong>{row.operator.name}</strong>
+                          <Pill tone={VISIT[row.status].tone}>{VISIT[row.status].label}</Pill>
+                          <span className="ops-timeline-when">{formatDateTime(row.startedAt)}</span>
+                        </div>
+                        <p className="ops-timeline-body">
+                          “{row.reason}”{row.minutes !== null ? ` · ${row.minutes} min` : ''}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+        </div>
 
-            ABSENT FOR AN OPERATOR WHO CANNOT USE IT, not disabled — the rule `DEC-104` set for
-            the suspend card and for the same reason: a permanently-dead control teaches a
-            support operator to distrust every greyed control they meet. `platform.support.enter`
-            is held by both roles, so in practice this is present for everybody; the gate is
-            here because the day it is narrowed, the card should vanish rather than mock. */}
-        {can('platform.support.enter') && (
-          <section className="card ops-support-card">
-            <h3>Open this organization’s console</h3>
-            <p className="text-meta">
-              You will be signed in to {org.name} as yourself, for {SUPPORT_SESSION_MINUTES}{' '}
-              minutes, under a banner they cannot dismiss. Responses, results, analysis and
-              check-in notes stay closed to you — those refuse with a trace, not silently.
-            </p>
-            <label className="field ops-support-field">
-              <span className="field-label">Why are you going in?</span>
-              {/* REQUIRED, AND THE DISABLED BUTTON IS THE GUARD RATHER THAN AN EARLY RETURN
-                  (`D-043`). The customer reads this sentence verbatim on every page for the
-                  next hour, which is most of what separates this feature from the one `19` §14
-                  refused — so the field is not a formality and the server's DTO enforces the
-                  same minimum.
+        <div className="ops-stack">
+          <section className="ops-card card" aria-labelledby="admins">
+            <div className="ops-card-head">
+              <h2 id="admins">Administrators</h2>
+            </div>
+            {org.administrators.length === 0 ? (
+              <Empty title="No administrator on record." />
+            ) : (
+              <ul className="ops-people">
+                {org.administrators.map((person) => (
+                  <li key={person.id}>
+                    <span className="ops-avatar" aria-hidden="true">{initialsOf(person.name)}</span>
+                    <span>
+                      <strong>{person.name}</strong>
+                      <span>{person.email}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-                  NO `#` BEFORE THE TICKET NUMBER IN THE PLACEHOLDER, and that is DEC-012's lint
-                  rule earning its keep rather than a workaround: `#418` is a valid three-digit
-                  hex colour and the selector flagged it. A false positive here, and exactly the
-                  shape of the true positive it exists to catch. */}
-              <input
-                type="text"
-                value={supportReason}
-                onChange={(event) => dispatch(supportReasonTyped({ id, reason: event.target.value }))}
-                placeholder="Ticket 418 — their campaign will not launch"
-                maxLength={500}
+          {can('platform.message.send') && (
+            <section className="ops-card card" aria-labelledby="message">
+              <div className="ops-card-head">
+                <h2 id="message">Message the administrators</h2>
+              </div>
+              <MessageComposer
+                recipients={org.administrators}
+                subject={message.subject}
+                body={message.body}
+                onEdit={(patch) => dispatch(orgMessageEdited({ id, ...patch }))}
+                onSend={() => void dispatch(orgMessaged(id))}
+                sending={messageSending}
               />
-              <span className="field-hint">Shown to {org.name} on every page, in these words.</span>
-            </label>
-            <button
-              type="button"
-              className="btn btn-primary ops-support-submit"
-              disabled={supportBusy || supportReason.trim().length < SUPPORT_REASON_MIN}
-              onClick={enterConsole}
-            >
-              {supportBusy ? 'Opening…' : 'Open console'}
-            </button>
-          </section>
-        )}
+            </section>
+          )}
 
-        <section className="card">
-          <h3>Message the administrators</h3>
-          <MessageComposer
-            recipients={org.administrators}
-            subject={message.subject}
-            body={message.body}
-            onEdit={(patch) => dispatch(orgMessageEdited({ id, ...patch }))}
-            onSend={() => void dispatch(orgMessaged(id))}
-            sending={messageSending}
-          />
-        </section>
+          {/* SUPPORT ACCESS (DEC-114). ABSENT, NOT DISABLED, for an operator who cannot use
+              it (DEC-104): a permanently dead control teaches distrust of every greyed one. */}
+          {can('platform.support.enter') && (
+            <section className="ops-card card" aria-labelledby="enter">
+              <div className="ops-card-head">
+                <h2 id="enter">Open this organization’s console</h2>
+              </div>
+              <p className="text-meta">
+                You will be signed in to {org.name} as yourself, for {SUPPORT_SESSION_MINUTES} minutes,
+                under a banner they cannot dismiss. Responses, results, analysis and check-in notes stay
+                closed to you.
+              </p>
+              <label className="ops-field">
+                <span className="field-label">Why are you going in?</span>
+                {/* REQUIRED: the customer reads this sentence on every page for the next hour,
+                    and the server's DTO holds the same minimum. */}
+                <input
+                  className="input"
+                  type="text"
+                  value={supportReason}
+                  onChange={(event) => dispatch(supportReasonTyped({ id, reason: event.target.value }))}
+                  placeholder="Ticket 418: their campaign will not launch"
+                  maxLength={500}
+                />
+                <span className="field-hint">Shown to {org.name} on every page, in these words.</span>
+              </label>
+              <div className="ops-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={supportBusy || supportReason.trim().length < SUPPORT_REASON_MIN}
+                  onClick={enterConsole}
+                >
+                  {supportBusy ? 'Opening…' : 'Open console'}
+                </button>
+              </div>
+            </section>
+          )}
 
-        {/* ABSENT FOR STAFF, NOT DISABLED — `DEC-104`, and the whole SECTION goes: heading,
-            explanation and button. A card headed "Suspend this organisation" that explains
-            what suspension does and then offers nothing actionable is worse than the greyed
-            button was. `70` already says the analytics tab is "absent, not disabled, for
-            staff" and insists that absence is from the DOM rather than hidden by CSS; this
-            was the one affordance on the surface that disagreed with that rule, and a
-            permanently-dead control teaches a support operator to distrust every greyed
-            control they meet.
-            NOT A CHANGE TO THE SERVER. `POST /platform/orgs/:id/suspend` still answers 403 to
-            staff from middleware and `70` § Acceptance still asserts it — which is exactly
-            what makes removing the control a presentation decision rather than the rule
-            (INV-003). */}
-        {canSuspend && (
-          <section className="card">
-            <h3>{suspended ? 'Reinstate' : 'Suspend'} this organization</h3>
-            <p className="text-meta">
-              Suspension cuts staff sign-in and does not stop the respondent surface — a QR code
-              on a wall keeps working.
-            </p>
-            <button type="button" className="btn btn-danger" onClick={() => dispatch(orgSuspendAsked({ id }))}>
-              {suspended ? 'Reinstate organization' : 'Suspend organization'}
-            </button>
-          </section>
-        )}
+          {/* ABSENT FOR STAFF, NOT DISABLED (DEC-104). The server still refuses staff (INV-003);
+              removing the control is presentation, not the rule. */}
+          {canSuspend && (
+            <section className="ops-card card ops-danger" aria-labelledby="suspend">
+              <div className="ops-card-head">
+                <h2 id="suspend">{suspended ? 'Reinstate' : 'Suspend'} this organization</h2>
+              </div>
+              <p className="text-meta">
+                Suspension cuts staff sign-in and does not stop the respondent surface: a QR code on a
+                wall keeps working.
+              </p>
+              <div className="ops-actions">
+                <button type="button" className="btn btn-danger" onClick={() => dispatch(orgSuspendAsked({ id }))}>
+                  {suspended ? 'Reinstate organization' : 'Suspend organization'}
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
 
-      {/* Reinstating is a plain confirm. Suspending needs the typed-name pattern `32` uses
-          for deleting a unit, which `<ConfirmDialog>` has no slot for — so this is the one
-          dialog in the tree built inline rather than through it. */}
+      {/* Reinstating is a plain confirm. Suspending needs the organisation's name typed, which
+          <ConfirmDialog> has no slot for, so this one dialog is built inline. */}
       {suspendOpen && suspended && (
         <ConfirmDialog
           title={`Reinstate ${org.name}?`}
@@ -278,12 +411,13 @@ export default function OrgDetail(): JSX.Element {
             className="dialog"
             role="alertdialog"
             aria-modal="true"
+            aria-labelledby="suspend-title"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <h2 className="dialog-title">Suspend {org.name}?</h2>
+            <h2 className="dialog-title" id="suspend-title">Suspend {org.name}?</h2>
             <p className="dialog-body">
-              Staff at {org.name} will not be able to sign in. Campaigns keep running and the
-              respondent surface is not affected — a QR code on a wall keeps working.
+              Staff at {org.name} will not be able to sign in. Campaigns keep running and the respondent
+              surface is not affected: a QR code on a wall keeps working.
             </p>
             <label className="field">
               <span className="field-label">Type "{org.name}" to confirm</span>
@@ -314,6 +448,6 @@ export default function OrgDetail(): JSX.Element {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

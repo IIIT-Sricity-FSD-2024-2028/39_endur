@@ -202,13 +202,15 @@ describe('the earnings page is the owner’s — DEC-080, 19 §4', () => {
       .toBe(true);
   });
 
-  // A mean of no payments is not zero, so the page renders a dash rather than a zero amount.
-  it('returns a null average for a window with no captures in it', async () => {
+  // An empty window is a sum of zero over zero payments; the client's selector turns that into
+  // a dash rather than a zero average.
+  it('answers an empty window with zero revenue over zero payments', async () => {
     const owner = await makeOperator('owner');
     const res = await owner.get('/api/v1/platform/earnings?from=2019-01-01&to=2019-12-31');
     expect(res.status).toBe(200);
     expect(res.body.data.totals.payments).toBe(0);
-    expect(res.body.data.totals.averageMinor).toBeNull();
+    expect(res.body.data.totals.revenueMinor).toBe(0);
+    expect(res.body.data.totals).not.toHaveProperty('averageMinor');
     // The lifetime figure ignores the window on purpose: it is the one all-time number.
     expect(res.body.data.totals.lifetimeRevenueMinor).toBeGreaterThan(0);
   });

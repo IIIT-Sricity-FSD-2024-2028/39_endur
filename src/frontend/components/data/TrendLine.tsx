@@ -78,28 +78,32 @@ export function TrendLine({
         {count > 1 && <span>{labels[count - 1]}</span>}
       </div>
 
-      {/* THE CHART, AS NUMBERS. Visually hidden, fully readable. */}
-      <table className="sr-only">
-        <caption>{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Date</th>
-            {series.map((line) => (
-              <th key={line.key} scope="col">{line.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {labels.map((label, index) => (
-            <tr key={label}>
-              <th scope="row">{label}</th>
+      {/* THE CHART, AS NUMBERS. Visually hidden, fully readable. Hidden by a wrapper, not on
+          the <table>: a caption is drawn outside the table's own box, so `sr-only` on the
+          table would leave the caption showing. */}
+      <div className="sr-only">
+        <table>
+          <caption>{caption}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
               {series.map((line) => (
-                <td key={line.key}>{line.points[index] ?? 0}</td>
+                <th key={line.key} scope="col">{line.label}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {labels.map((label, index) => (
+              <tr key={label}>
+                <th scope="row">{label}</th>
+                {series.map((line) => (
+                  <td key={line.key}>{line.points[index] ?? 0}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

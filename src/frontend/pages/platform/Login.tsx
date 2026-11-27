@@ -3,6 +3,7 @@
 // uncontrolled and read from the form on submit.
 import type { FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import '../../design-system/ops.css';
 import { Icon } from '../../components/Icon.js';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { useClearOnLeave } from '../../store/screens/common.js';
@@ -42,9 +43,14 @@ export default function Login(): JSX.Element {
   };
 
   return (
-    <div className="fullpage">
-      <form className="ops-login card elev-md" onSubmit={onSubmit}>
-        <h2>Endur operator sign in</h2>
+    <div className="ops-login-wrap">
+      <form className="ops-login-card card elev-md" onSubmit={onSubmit}>
+        <div className="ops-login-mark">
+          <span className="nav-mark" aria-hidden="true" />
+          <strong>Endur</strong>
+          <span className="ops-brand-tag">Operator</span>
+        </div>
+        <h1>Operator sign in</h1>
         <p className="text-muted">Restricted to Endur staff. Every sign-in is audited.</p>
         {error && <p className="field-error" role="alert">{error}</p>}
 
@@ -99,6 +105,10 @@ export default function Login(): JSX.Element {
           {submitting && <span className="spinner" aria-hidden="true" />}
           Sign in
         </button>
+        <p className="ops-login-foot">
+          <Icon name="operator" size={16} />
+          Two factors, always: the code comes from the authenticator you scanned when your account was made.
+        </p>
       </form>
     </div>
   );

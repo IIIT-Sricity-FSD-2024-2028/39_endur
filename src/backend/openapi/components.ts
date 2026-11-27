@@ -1122,7 +1122,6 @@ export const PlatformEarningsSchema = mirrors<PlatformEarnings>()(
       revenueMinor: z.number(),
       payments: z.number(),
       orgsPaying: z.number(),
-      averageMinor: z.number().nullable(),
       lifetimeRevenueMinor: z.number(),
     }),
     byPeriod: z.array(

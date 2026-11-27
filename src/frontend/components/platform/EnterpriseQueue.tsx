@@ -19,11 +19,11 @@ export function EnterpriseQueue({
   if (rows.length === 0 && !error) return null;
 
   return (
-    <section className="card ops-enterprise" aria-labelledby="enterprise-queue">
-      <h3 id="enterprise-queue">
+    <section className="card ops-card ops-enterprise" aria-labelledby="enterprise-queue">
+      <h2 id="enterprise-queue" className="ops-enterprise-title">
         Asking about Enterprise
         <span className="tab-count">{rows.length}</span>
-      </h3>
+      </h2>
       <p className="text-muted">
         Oldest first. Reading this changes nothing. <strong>Approve</strong> puts them on
         Enterprise and records the ₹4,999 — <strong>Contacted</strong> only notes that you rang.

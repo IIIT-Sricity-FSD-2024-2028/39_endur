@@ -18,7 +18,7 @@ import { api } from './api/api.js';
 import { opsApi } from './api/opsApi.js';
 import { listenerMiddleware } from './middleware/listeners.js';
 import { sessionExpiredMiddleware } from './middleware/sessionExpired.js';
-import { redactPasswords } from './devtools.js';
+import { redactPasswords, redactSecrets } from './devtools.js';
 // Registers itself on import: what sign-out clears outside the slices (R-106).
 import './middleware/sessionReset.js';
 
@@ -52,7 +52,7 @@ export function setupStore(preloadedState?: Partial<RootState>) {
       getDefaultMiddleware()
         .prepend(listenerMiddleware.middleware)
         .concat(api.middleware, opsApi.middleware, sessionExpiredMiddleware),
-    devTools: { actionSanitizer: redactPasswords },
+    devTools: { actionSanitizer: redactPasswords, stateSanitizer: redactSecrets },
   });
 }
 

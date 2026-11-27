@@ -62,7 +62,10 @@ export const opsBaseQuery: BaseQueryFn<OpsArgs, unknown, SerializedOpsError> = a
 export const opsApi = createApi({
   reducerPath: 'opsApi',
   baseQuery: opsBaseQuery,
-  tagTypes: ['OpsMe', 'Estate', 'OpsOrg', 'Enterprise', 'OpsAnalytics', 'OpsEarnings', 'OpsLogs'],
+  tagTypes: [
+    'OpsMe', 'Estate', 'OpsOrg', 'Enterprise', 'OpsAnalytics', 'OpsEarnings', 'OpsLogs',
+    'OpsStats', 'OpsAudit', 'Operators', 'SupportSessions',
+  ],
   // As the org API: every screen re-reads when it mounts, from a cached copy; and on
   // reconnect, never on focus.
   refetchOnMountOrArgChange: true,

@@ -48,6 +48,9 @@ const OpsOrgDetail = lazy(() => import('../pages/platform/Console/OrgDetail.js')
 const OpsAnalytics = lazy(() => import('../pages/platform/Analytics/index.js'));
 const OpsEarnings = lazy(() => import('../pages/platform/Earnings/index.js'));
 const OpsLogs = lazy(() => import('../pages/platform/Logs/index.js'));
+const OpsAudit = lazy(() => import('../pages/platform/Audit/index.js'));
+const OpsSupport = lazy(() => import('../pages/platform/Support/index.js'));
+const OpsTeam = lazy(() => import('../pages/platform/Team/index.js'));
 
 const hold = (element: JSX.Element): JSX.Element => (
   <Suspense fallback={<SessionLoading />}>{element}</Suspense>
@@ -138,6 +141,9 @@ export const routes: RouteObject[] = [
       { path: 'analytics', element: hold(<OpsAnalytics />) },
       { path: 'earnings', element: hold(<OpsEarnings />) },
       { path: 'logs', element: hold(<OpsLogs />) },
+      { path: 'audit', element: hold(<OpsAudit />) },
+      { path: 'support', element: hold(<OpsSupport />) },
+      { path: 'team', element: hold(<OpsTeam />) },
       { path: '*', element: <NotFound /> },
     ],
   },

@@ -338,8 +338,6 @@ export type PlatformEarnings = {
     payments: number;
     /** Distinct organisations that have paid at least once IN THE WINDOW. */
     orgsPaying: number;
-    /** `null` rather than 0 when nothing was captured — a mean of no payments is not zero. */
-    averageMinor: number | null;
     /** Every capture ever, ignoring the window — the one lifetime figure on the page. */
     lifetimeRevenueMinor: number;
   };
@@ -474,7 +472,14 @@ export const EnterSupportDto = dto({ params: OrgIdParam, body: EnterSupport });
 export const SupportSessionListQuery = z.object({
   /** One organisation's history, for the org detail page. Absent = the whole register. */
   orgId: z.string().uuid().optional(),
-  active: z.coerce.boolean().optional(),
+  /**
+   * `true` or `false` AS WORDS. Not `z.coerce.boolean()`: that is `Boolean("false")`, which is
+   * `true`, so asking for the ended sessions returned the live ones.
+   */
+  active: z.preprocess(
+    (value) => (value === 'true' ? true : value === 'false' ? false : value),
+    z.boolean().optional(),
+  ),
 });
 export type SupportSessionListQuery = z.infer<typeof SupportSessionListQuery>;
 export const SupportSessionListDto = dto({ query: SupportSessionListQuery });

@@ -1,15 +1,16 @@
 import { lazy, Suspense } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { RequirePlatformAuth, RequireSession, SessionLoading } from './guards.js';
 import { AmbientBackground } from '../components/AmbientBackground.js';
 import { ToastHost } from '../components/feedback/ToastHost.js';
-import { useAppDispatch, useAppSelector } from '../store/index.js';
-import { operatorSignedOut } from '../store/screens/operator.js';
-import { useOpsCan } from '../lib/opsCapabilities.js';
 import { useBootOpsSession } from '../lib/opsSession.js';
 
 const AppShell = lazy(() =>
   import('../components/layout/AppShell.js').then((module) => ({ default: module.AppShell })),
+);
+
+const OpsShell = lazy(() =>
+  import('../components/platform/OpsShell.js').then((module) => ({ default: module.OpsShell })),
 );
 
 const ThemeToggle = lazy(() =>
@@ -77,53 +78,26 @@ export function ConsoleLayout(): JSX.Element {
 export function OpsLayout(): JSX.Element {
   const { pathname } = useLocation();
   useBootOpsSession();
-  const operator = useAppSelector((s) => s.ops.operator);
-  const can = useOpsCan();
-  const dispatch = useAppDispatch();
-  const navigate = useNavigate();
 
+  // The sign-in page draws its own frame (and loads the console's styles itself).
   if (pathname === '/ops/login') {
     return (
-      <div className="ops-shell">
+      <>
         <AmbientBackground />
         <Outlet />
-      </div>
+      </>
     );
   }
 
-  const signOut = (): void => {
-    void dispatch(operatorSignedOut()).then(() => navigate('/ops/login', { replace: true }));
-  };
-
+  // The rail, the drawer, the operator and "Sign out": `components/platform/OpsShell.tsx`,
+  // in the console's own chunk with its stylesheet, so no customer ever downloads either.
   return (
     <RequirePlatformAuth>
-      <div className="ops-shell">
-        {/* Same quieter variant `/app` uses — the console is where work happens, and this is
-            too, even though it is a different console (`AppShell`'s reasoning, reused). */}
-        <AmbientBackground />
-        <nav className="nav ops-nav glass glass-lit">
-          <Link className="nav-brand" to="/ops">
-            <span className="nav-mark" aria-hidden="true" />
-            Endur
-          </Link>
-          <NavLink to="/ops" end>Estate</NavLink>
-          {/* Absent for `staff`, not disabled — `70` § Acceptance. */}
-          {can('platform.analytics.read') && <NavLink to="/ops/analytics">Analytics</NavLink>}
-          {/* DEC-080. Its own capability, not analytics' — the two answer different
-              questions and only one of them is about money. */}
-          {can('platform.revenue.read') && <NavLink to="/ops/earnings">Earning</NavLink>}
-          {can('platform.logs.read') && <NavLink to="/ops/logs">Logs</NavLink>}
-          <span className="ops-nav-spacer" />
-          {operator && <span className="text-meta">{operator.name}</span>}
-          <button type="button" className="btn btn-secondary" onClick={signOut}>
-            Sign out
-          </button>
-        </nav>
-        <main className="ops-main">
+      <Suspense fallback={<SessionLoading />}>
+        <OpsShell>
           <Outlet />
-        </main>
-        <ToastHost />
-      </div>
+        </OpsShell>
+      </Suspense>
     </RequirePlatformAuth>
   );
 }

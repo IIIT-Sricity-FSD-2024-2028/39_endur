@@ -1,187 +1,137 @@
-import { useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { PageHeader } from '../../../components/layout/PageHeader.js';
+// `/ops/logs`: the rotating log files (`72`). R-716.
+//
+// The file being read and its filters are `state.operator.logs` (store/screens/operator.ts),
+// so they survive a look elsewhere and back. Before anything is picked, `selectLogFile`
+// works out the default (the newest error stream) from the cached list: no effect writes a
+// default anywhere. The lines are RTK Query's cache (`getLogLines`); the export is the
+// `logExported` thunk, with the same filters as the view.
 import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { LogViewer } from '../../../components/platform/LogViewer.js';
-import { logSearch, useLogFiles, useLogLines, type LogFilter } from '../../../lib/oplogs.js';
+import { Icon } from '../../../components/Icon.js';
+import { Denied, OpsError, OpsHeader } from '../../../components/platform/OpsUi.js';
+import { logSearch, useLogFiles, useLogLines } from '../../../lib/oplogs.js';
+import { useOpsCan } from '../../../lib/opsCapabilities.js';
 import { useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { useClearOnLeave } from '../../../store/screens/common.js';
 import {
   logExported,
+  logFileChosen,
+  logFilterChanged,
+  logFiltersCleared,
   logFormatChosen,
   logsLeft,
   opsMessageOf,
+  selectLogFile,
+  selectLogFiltered,
   selectOperator,
 } from '../../../store/screens/operator.js';
-import { useOpsCan } from '../../../lib/opsCapabilities.js';
-
-const FILTER_KEYS = ['level', 'status', 'path', 'orgId', 'requestId', 'q'] as const;
-
-function readFilter(params: URLSearchParams): LogFilter {
-  return {
-    level: params.get('level') ? Number(params.get('level')) : undefined,
-    status: params.get('status') ? Number(params.get('status')) : undefined,
-    path: params.get('path') ?? undefined,
-    orgId: params.get('orgId') ?? undefined,
-    requestId: params.get('requestId') ?? undefined,
-    q: params.get('q') ?? undefined,
-  };
-}
 
 export default function Logs(): JSX.Element {
-  const [params, setParams] = useSearchParams();
-  const files = useLogFiles();
-  const filter = useMemo(() => readFilter(params), [params]);
-  const selected = params.get('file');
-
-  const lines = useLogLines(selected, filter);
-  const can = useOpsCan();
-  // The export's format, progress and last file are `state.operator.logs`.
   const dispatch = useAppDispatch();
-  const { format, exporting, exportError, last } = useAppSelector(selectOperator).logs;
+  const can = useOpsCan();
+  const files = useLogFiles();
+  const selected = useAppSelector(selectLogFile);
+  const filtered = useAppSelector(selectLogFiltered);
+  const { filter, format, exporting, exportError, last } = useAppSelector(selectOperator).logs;
+  const lines = useLogLines(selected, filter);
   useClearOnLeave(logsLeft());
-
-  const setFile = (file: string): void => {
-    const next = new URLSearchParams();
-    next.set('file', file);
-    setParams(next);
-  };
-
-  const setFilter = (next: LogFilter): void => {
-    const query = new URLSearchParams(params);
-    for (const key of FILTER_KEYS) {
-      const value = next[key];
-      if (value !== undefined && value !== '') query.set(key, String(value));
-      else query.delete(key);
-    }
-    setParams(query);
-  };
-
-  const filtered = FILTER_KEYS.some((key) => params.get(key));
-
-  // With no file chosen, open the error stream (or the first file). In an effect, not
-  // during render: setting the URL while rendering updates the router in the middle of
-  // this component's render, which React warns about (found in R-601's walkthrough).
-  // `replace`, so Back does not return to a URL that immediately redirects.
-  const defaultFile = !selected && files.data && files.data.length > 0
-    ? (files.data.find((f) => f.stream === 'error') ?? files.data[0])?.name
-    : undefined;
-  // Effect (router): with no file in the address, open the error stream by writing it to the URL.
-  useEffect(() => {
-    if (!defaultFile) return;
-    const next = new URLSearchParams();
-    next.set('file', defaultFile);
-    setParams(next, { replace: true });
-  }, [defaultFile, setParams]);
 
   const store = files.store;
   const subtitle = store
-    ? `Written automatically to ${store.dir} — rotated daily and at ${store.maxSizeMb} MB, kept ${store.retentionDays} days.`
+    ? `Written automatically to ${store.dir}, rotated daily and at ${store.maxSizeMb} MB, kept ${store.retentionDays} days. Reading a file is itself audited.`
     : 'The rotating log files, across the estate.';
-
-  const header = <PageHeader title="Logs" subtitle={subtitle} vocabulary={false} />;
+  const header = <OpsHeader kicker="Platform" title="Logs" subtitle={subtitle} />;
 
   if (files.forbidden) {
-    return (
-      <div className="page">
-        {header}
-        <EmptyState
-          icon="log"
-          title="You do not have access to this"
-          body="Reading logs needs the platform.logs.read capability."
-        />
-      </div>
-    );
+    return <Denied capability="platform.logs.read" what="Reading logs" />;
   }
 
   if (!files.loading && files.data && files.data.length === 0) {
     return (
-      <div className="page">
+      <>
         {header}
         <EmptyState icon="log" title="Nothing has been written yet" body="No log files exist on this machine yet." />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="page">
+    <>
       {header}
 
-      <div className="ops-sections">
-      {lines.notFound && (
-        <p className="field-error" role="alert">That file has rotated away.</p>
-      )}
-      {lines.error && (
-        <p className="field-error" role="alert">{lines.error.message}</p>
-      )}
+      <section className="ops-card card" aria-label="Log file">
+        {lines.notFound && <OpsError>That file has rotated away.</OpsError>}
+        {lines.error && <OpsError>{lines.error.message}</OpsError>}
 
-      {selected && !lines.loading && lines.rows.length === 0 && !lines.notFound && filtered && (
-        <EmptyState
-          icon="log"
-          title="No lines match these filters"
-          body="Nothing in this file matches the current filter."
-          action={
-            <button type="button" className="btn btn-secondary" onClick={() => setFilter({})}>
-              Clear filters
-            </button>
-          }
-        />
-      )}
-
-      {/* `DEC-074` — the export. The SAME filters as the view, so the file that lands on the
-          operator's disk is the one they were looking at, and every export is written to
-          `platform_audit_log` as `logs.export`. Absent for anyone without the capability
-          (usability only — `requirePlatform()` is what actually decides). */}
-      {selected && can('platform.logs.export') && (
-        <div className="log-export">
-          <label className="field-inline">
-            <span className="field-label">Export as</span>
-            <select
-              className="input"
-              value={format}
-              onChange={(event) =>
-                dispatch(logFormatChosen({ format: event.target.value === 'csv' ? 'csv' : 'ndjson' }))}
+        {/* DEC-074: the export takes the SAME filters as the view, so the file that lands on
+            disk is the one on screen, and every export is written to the audit trail. */}
+        {selected && can('platform.logs.export') && (
+          <div className="ops-toolbar">
+            <label className="ops-actions">
+              <span className="field-label">Export as</span>
+              <select
+                className="input"
+                value={format}
+                onChange={(event) =>
+                  dispatch(logFormatChosen({ format: event.target.value === 'csv' ? 'csv' : 'ndjson' }))}
+              >
+                <option value="ndjson">NDJSON: every field</option>
+                <option value="csv">CSV: fixed columns</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={exporting}
+              onClick={() => void dispatch(logExported({ file: selected, search: logSearch(filter) }))}
             >
-              <option value="ndjson">NDJSON — every field</option>
-              <option value="csv">CSV — fixed columns</option>
-            </select>
-          </label>
+              <Icon name="download" size={16} />
+              {exporting ? 'Preparing…' : 'Export this file'}
+            </button>
+            {last && (
+              <span className="ops-toolbar-note" role="status">
+                {last.lines.toLocaleString()} lines saved as {last.name}
+                {last.truncated ? ', truncated at the export limit' : ''}
+              </span>
+            )}
+          </div>
+        )}
+        {exportError && <OpsError>{opsMessageOf(exportError, exportError.message)}</OpsError>}
+
+        {selected && !lines.loading && lines.rows.length === 0 && !lines.notFound && filtered && (
+          <EmptyState
+            icon="log"
+            title="No lines match these filters"
+            body="Nothing in this file matches the current filter."
+            action={
+              <button type="button" className="btn btn-secondary" onClick={() => dispatch(logFiltersCleared())}>
+                Clear filters
+              </button>
+            }
+          />
+        )}
+
+        <LogViewer
+          files={files.data ?? []}
+          selected={selected ?? ''}
+          lines={lines.rows}
+          filter={filter}
+          onSelect={(file) => dispatch(logFileChosen({ file }))}
+          onFilter={(next) => dispatch(logFilterChanged(next))}
+          loading={files.loading || lines.loading}
+        />
+
+        {lines.data?.page.hasMore && (
           <button
             type="button"
             className="btn btn-secondary"
-            disabled={exporting}
-            onClick={() => void dispatch(logExported({ file: selected, search: logSearch(filter) }))}
+            disabled={lines.loadingMore}
+            onClick={() => void lines.loadMore()}
           >
-            {exporting ? 'Preparing…' : 'Export this file'}
+            {lines.loadingMore ? 'Loading…' : 'Load older'}
           </button>
-          {last && (
-            <p className="text-meta" role="status">
-              {last.lines.toLocaleString()} lines saved as {last.name}
-              {last.truncated ? ' — truncated at the export limit' : ''}
-            </p>
-          )}
-          {exportError && (
-            <p className="field-error" role="alert">{opsMessageOf(exportError, exportError.message)}</p>
-          )}
-        </div>
-      )}
-
-      <LogViewer
-        files={files.data ?? []}
-        selected={selected ?? ''}
-        lines={lines.rows}
-        filter={filter}
-        onSelect={setFile}
-        onFilter={setFilter}
-        loading={files.loading || lines.loading}
-      />
-
-      {lines.data?.page.hasMore && (
-        <button type="button" className="btn btn-secondary" disabled={lines.loadingMore} onClick={() => void lines.loadMore()}>
-          {lines.loadingMore ? 'Loading…' : 'Load more'}
-        </button>
-      )}
-      </div>
-    </div>
+        )}
+      </section>
+    </>
   );
 }
