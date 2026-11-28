@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, HomeView } from '@endur/shared';
-import { NONSENSE_LABELS, renderWithProviders } from '../../../test-utils.js';
+import { NONSENSE_LABELS, cacheHome, makeStore, renderWithProviders } from '../../../test-utils.js';
 import Home from './index.js';
 
 vi.mock('qrcode', () => ({
@@ -27,7 +27,7 @@ const hoursAgo = (n: number): string => new Date(Date.now() - n * 60 * 60 * 1000
 const FULL: HomeView = {
   stats: {
     window: '30d', responses: 1057, subjectsCovered: 18,
-    activeCampaigns: 2, responseRate: null, responsesEver: 4210,
+    activeCampaigns: 2, audience: null, responsesEver: 4210,
   },
   activeCampaigns: [
     {
@@ -50,15 +50,22 @@ const FULL: HomeView = {
 
 const ALL: Capability[] = ['org.read', 'campaign.read', 'campaign.create', 'results.read', 'response.read'];
 
-const mount = (capabilities: Capability[] = ALL) =>
-  renderWithProviders(
+const mount = (capabilities: Capability[] = ALL) => {
+  const session = { capabilities, labels: NONSENSE_LABELS, orgName: 'Northfield', path: '/app' };
+  const store = makeStore(session);
+  // The Activity row's figures are the store's (`selectHomeFigures`, R-717), so the answer
+  // the mocked hook returns is put where the real hook puts it: the RTK Query cache.
+  if (home.data) cacheHome(store, home.data);
+  return renderWithProviders(
     <Routes>
       <Route path="/app" element={<Home />} />
       <Route path="/app/setup" element={<p>WIZARD</p>} />
       <Route path="/app/campaigns/new" element={<p>NEW CAMPAIGN</p>} />
     </Routes>,
-    { capabilities, labels: NONSENSE_LABELS, orgName: 'Northfield', path: '/app' },
+    session,
+    store,
   );
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -96,7 +103,7 @@ describe('the page as a whole', () => {
 describe('what the caller may not read is ABSENT — INV-003', () => {
   it('renders a coherent page, not an error, when every section is withheld', () => {
     home = {
-      data: { stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 }, prompts: [], configured: true },
+      data: { stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, audience: null, responsesEver: 0 }, prompts: [], configured: true },
       loading: false, error: null,
     };
     mount(['org.read']);
@@ -121,7 +128,7 @@ describe('a brand-new organization', () => {
   beforeEach(() => {
     home = {
       data: {
-        stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 },
+        stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, audience: null, responsesEver: 0 },
         activeCampaigns: [],
         recentComments: [],
         prompts: [{ kind: 'no_subjects', href: '/app/subjects' }],
@@ -163,7 +170,7 @@ describe('the range control — DEC-031', () => {
   it('is absent for a brand-new org, which has no activity to range over', () => {
     home = {
       data: {
-        stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, responseRate: null, responsesEver: 0 },
+        stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: 0, audience: null, responsesEver: 0 },
         activeCampaigns: [], recentComments: [],
         prompts: [{ kind: 'no_subjects', href: '/app/subjects' }],
         configured: true,

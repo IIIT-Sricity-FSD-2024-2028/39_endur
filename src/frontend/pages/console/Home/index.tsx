@@ -20,6 +20,7 @@ import {
   homeShareClosed,
   homeShareOpened,
   selectDismissed,
+  selectHomeFigures,
   selectHomeRange,
   selectHomeSharingId,
 } from '../../../store/screens/home.js';
@@ -37,6 +38,8 @@ export default function Home(): JSX.Element {
   // looking at is the cache. docs/REDUX-PLAN.md §6.10.
   const dispatch = useAppDispatch();
   const range = useAppSelector(selectHomeRange);
+  // Every figure on the Activity row, worked out from the cached counts (R-717, §6.12).
+  const figures = useAppSelector(selectHomeFigures);
   const sharingId = useAppSelector(selectHomeSharingId);
   const dismissed = useAppSelector(selectDismissed);
   useClearOnLeave(homeLeft());
@@ -74,7 +77,7 @@ export default function Home(): JSX.Element {
   const isNew =
     !readsNothing && view.stats.responsesEver === 0 && (campaigns?.length ?? 0) === 0;
 
-  const cards = statCards(view, labels);
+  const cards = figures ? statCards(figures, labels) : [];
   const prompts = view.prompts.map((prompt) => promptCopy(prompt, labels, orgName));
   const first = prompts[0];
 

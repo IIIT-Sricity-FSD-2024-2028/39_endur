@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import type { Capability, CampaignDetail, Page, ResponseItem, ResultsView, UnitNode } from '@endur/shared';
-import { renderWithProviders, NONSENSE_LABELS, errorReply, stubApi } from '../../../test-utils.js';
+import { cacheResults, makeStore, renderWithProviders, NONSENSE_LABELS, errorReply, stubApi } from '../../../test-utils.js';
 import Results from './index.js';
 
 vi.mock('qrcode', () => ({
@@ -27,7 +27,6 @@ const DETAIL: CampaignDetail = {
 const VIEW: ResultsView = {
   responseCount: 612,
   audienceEstimate: null,
-  responseRate: null,
   suppressed: false,
   threshold: 5,
   questions: [
@@ -110,14 +109,21 @@ vi.mock('../../../lib/units.js', () => ({
 
 const ALL: Capability[] = ['results.read', 'response.read', 'results.export', 'campaign.read'];
 
-const mount = (capabilities: Capability[] = ALL, path = '/app/campaigns/c1/results') =>
-  renderWithProviders(
+const mount = (capabilities: Capability[] = ALL, path = '/app/campaigns/c1/results') => {
+  const session = { capabilities, labels: NONSENSE_LABELS, path };
+  const store = makeStore(session);
+  // The stat cards' figures are the store's (`selectResultsFigures`, R-717), so the answer the
+  // mocked hook returns is put where the real hook puts it: the RTK Query cache.
+  if (results.data) cacheResults(store, { campaignId: 'c1', search: '' }, results.data);
+  return renderWithProviders(
     <Routes>
       <Route path="/app/campaigns/:id/results" element={<Results />} />
       <Route path="/app/campaigns" element={<p>LIST</p>} />
     </Routes>,
-    { capabilities, labels: NONSENSE_LABELS, path },
+    session,
+    store,
   );
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -220,7 +226,7 @@ describe('the k-anonymity gate is the server\'s, and this page just explains it'
   it('says how many more are needed, and does not read as an error', () => {
     results = {
       ...results,
-      data: { responseCount: 3, audienceEstimate: null, responseRate: null, suppressed: true, threshold: 5 },
+      data: { responseCount: 3, audienceEstimate: null, suppressed: true, threshold: 5 },
     };
     mount();
     expect(screen.getByText(/Results appear once 5 people have responded. 3 so far./)).toBeTruthy();
@@ -230,7 +236,7 @@ describe('the k-anonymity gate is the server\'s, and this page just explains it'
   it('renders no question data at all, because it was sent none', () => {
     results = {
       ...results,
-      data: { responseCount: 3, audienceEstimate: null, responseRate: null, suppressed: true, threshold: 5 },
+      data: { responseCount: 3, audienceEstimate: null, suppressed: true, threshold: 5 },
     };
     const { container } = mount();
     expect(container.querySelectorAll('.qr-card')).toHaveLength(0);

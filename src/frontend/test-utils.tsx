@@ -3,11 +3,13 @@ import { vi } from 'vitest';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import type { Capability, HeldCapabilities, LabelSet, MeResponse } from '@endur/shared';
+import type { Capability, HeldCapabilities, HomeView, LabelSet, MeResponse, ResultsView } from '@endur/shared';
 import { setupStore, type AppStore } from './store/index.js';
 import { signedIn, signedOut } from './store/authSlice.js';
 import { labelsLoaded } from './store/vocabularySlice.js';
 import { ToastHost } from './components/feedback/ToastHost.js';
+import { homeApi } from './store/api/endpoints/home.js';
+import { resultsApi } from './store/api/endpoints/results.js';
 
 export type SessionFixture = {
   capabilities?: readonly Capability[] | HeldCapabilities;
@@ -187,4 +189,21 @@ export function renderWithProviders(
     </Provider>,
   );
   return { ...result, store };
+}
+
+/**
+ * Puts a server answer where the real read hook would have: the RTK Query cache. For a page
+ * test that mocks its `lib/` hook but whose figures are selectors over the cache (R-717):
+ * pages may not import `store/api` (R-110), so the seeding lives here.
+ */
+export function cacheHome(store: AppStore, view: HomeView): void {
+  store.dispatch(homeApi.util.upsertQueryEntries([
+    { endpointName: 'getHome', arg: view.stats.window, value: view },
+  ]));
+}
+
+export function cacheResults(store: AppStore, args: { campaignId: string; search: string }, view: ResultsView): void {
+  store.dispatch(resultsApi.util.upsertQueryEntries([
+    { endpointName: 'getResults', arg: args, value: view },
+  ]));
 }

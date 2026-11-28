@@ -15,7 +15,6 @@ import { POLL_MS, resultsSearch, useResponses, useResults } from './results.js';
 const view = (responseCount: number): ResultsView => ({
   responseCount,
   audienceEstimate: null,
-  responseRate: null,
   suppressed: false,
   threshold: 5,
   questions: [],

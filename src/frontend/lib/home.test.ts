@@ -16,7 +16,7 @@ import { useHome } from './home.js';
 const VIEW: HomeView = {
   stats: {
     window: '30d', responses: 1057, subjectsCovered: 18,
-    activeCampaigns: 2, responseRate: null, responsesEver: 4210,
+    activeCampaigns: 2, audience: null, responsesEver: 4210,
   },
   activeCampaigns: [],
   prompts: [],

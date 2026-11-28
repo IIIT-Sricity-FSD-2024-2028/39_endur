@@ -4,7 +4,8 @@
 // on the server until T-040 and it is the second number an evaluator looks at.
 import { describe, expect, it } from 'vitest';
 import type { QuestionSummary, ResultsView } from '@endur/shared';
-import { commentCount, newSince, ratingAverage, statCards } from './stats.js';
+import { commentCount, deriveResultsFigures, ratingAverage } from '../../../store/screens/results.js';
+import { newSince, statCards } from './stats.js';
 
 const question = (over: Partial<QuestionSummary> & { questionId: string; kind: QuestionSummary['kind'] }): QuestionSummary => ({
   text: 'A question', answered: 10, ...over,
@@ -13,7 +14,6 @@ const question = (over: Partial<QuestionSummary> & { questionId: string; kind: Q
 const view = (over: Partial<ResultsView> = {}): ResultsView => ({
   responseCount: 612,
   audienceEstimate: null,
-  responseRate: null,
   suppressed: false,
   threshold: 5,
   questions: [
@@ -24,6 +24,9 @@ const view = (over: Partial<ResultsView> = {}): ResultsView => ({
   ],
   ...over,
 });
+
+/** The cards as the page builds them: the selector's figures, then the words (R-717). */
+const cardsOf = (over: Partial<ResultsView> = {}, arrived = 0) => statCards(deriveResultsFigures(view(over)), arrived);
 
 describe('the average is across RATING questions only', () => {
   it('averages the rating questions and says how many', () => {
@@ -57,36 +60,46 @@ describe('the response rate needs a denominator that exists', () => {
     // The server sent responses ÷ subjects here until T-040, which rendered between 1750%
     // and 4675% on every seeded demo campaign — on the screen the evaluator opens straight
     // after scanning. A dash with a reason is the honest replacement.
-    const rate = statCards(view(), 0)[1];
+    const rate = cardsOf({}, 0)[1];
     expect(rate?.value).toBe('—');
     expect(rate?.context).toMatch(/no total to measure against/);
   });
 
-  it('renders a real rate when the audience is a real set of people', () => {
-    const rate = statCards(view({ audienceEstimate: 800, responseRate: 0.77 }), 0)[1];
+  it('renders a real rate, with the two counts it was divided from', () => {
+    // 612 of 800: the server sends both counts and the selector divides (R-717, §6.12).
+    const rate = cardsOf({ audienceEstimate: 800 })[1];
     expect(rate?.value).toBe('77%');
-    expect(rate?.context).toBe('of 800');
+    expect(rate?.context).toBe('612 of 800 asked');
+  });
+
+  it('states the two counts, not a percentage, above the roll', () => {
+    const rate = cardsOf({ audienceEstimate: 400 })[1];
+    expect(rate).toMatchObject({ kicker: 'Responses', value: '612 of 400 asked' });
+  });
+
+  it('has no rate for a suppressed result, whatever the audience', () => {
+    expect(deriveResultsFigures(view({ audienceEstimate: 800, suppressed: true })).rate).toBeNull();
   });
 });
 
 describe('the cards as a set', () => {
   it('is four of them, in the order the mockup draws', () => {
-    expect(statCards(view(), 0).map((card) => card.kicker))
+    expect(cardsOf({}, 0).map((card) => card.kicker))
       .toEqual(['Responses', 'Response rate', 'Avg rating', 'Comments']);
   });
 
   it('says nothing about arrivals until something arrives', () => {
-    expect(statCards(view(), 0)[0]?.context).toBeUndefined();
-    expect(statCards(view(), 3)[0]?.context).toBe('+3 just now');
+    expect(cardsOf({}, 0)[0]?.context).toBeUndefined();
+    expect(cardsOf({}, 3)[0]?.context).toBe('+3 just now');
   });
 
   it('agrees with itself about one question', () => {
     const one = view({ questions: [question({ questionId: 'q1', kind: 'rating', average: 4 })] });
-    expect(statCards(one, 0)[2]?.context).toBe('across 1 question');
+    expect(statCards(deriveResultsFigures(one), 0)[2]?.context).toBe('across 1 question');
   });
 
   it('reports what share of respondents wrote something', () => {
-    expect(statCards(view(), 0)[3]).toMatchObject({ value: '287', context: '47% left one' });
+    expect(cardsOf({}, 0)[3]).toMatchObject({ value: '287', context: '47% of 612 responses left one' });
   });
 });
 

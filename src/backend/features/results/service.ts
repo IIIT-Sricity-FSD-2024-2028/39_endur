@@ -60,7 +60,6 @@ export async function readResults(
     return {
       responseCount,
       audienceEstimate,
-      responseRate: null,
       suppressed: true,
       threshold,
       ...(latest ? { newSince: latest.submittedAt.toISOString() } : {}),
@@ -81,10 +80,8 @@ export async function readResults(
   return {
     responseCount,
     audienceEstimate,
-    responseRate:
-      audienceEstimate && audienceEstimate > 0
-        ? Math.round((responseCount / audienceEstimate) * 100) / 100
-        : null,
+    // No `responseRate`: the client divides these two counts in a memoised selector
+    // (`selectResultsFigures`), so the percentage on screen traces to both (REDUX-PLAN §6.12).
     suppressed: false,
     threshold,
     ...(latest ? { newSince: latest.submittedAt.toISOString() } : {}),

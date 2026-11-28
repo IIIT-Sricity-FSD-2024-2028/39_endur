@@ -8,7 +8,9 @@ import { EmptyState } from '../../../components/feedback/EmptyState.js';
 import { useLabels } from '../../../lib/labels.js';
 import { useCan } from '../../../lib/capabilities.js';
 import { formatDate } from '../../../lib/format.js';
-import { useAnalysis, useThemeDetail } from '../../../lib/analysis.js';
+import { analysisSearch, useAnalysis, useThemeDetail } from '../../../lib/analysis.js';
+import { useAppSelector } from '../../../store/index.js';
+import { selectAnalysisFigures } from '../../../store/screens/analysis.js';
 import { useCampaignList } from '../../../lib/campaigns.js';
 import { useSubjectList } from '../../../lib/subjects.js';
 import { useUnits } from '../../../lib/units.js';
@@ -40,6 +42,8 @@ export default function Analysis(): JSX.Element {
   const openTheme = params.get('theme');
 
   const analysis = useAnalysis(filters, can('analysis.read'));
+  // The response rate and the confidence, worked out from the cached counts (R-717, §6.12).
+  const figures = useAppSelector((state) => selectAnalysisFigures(state, analysisSearch(filters)));
   const theme = useThemeDetail(openTheme, filters);
 
   const campaigns = useCampaignList();
@@ -146,6 +150,8 @@ export default function Analysis(): JSX.Element {
   }
 
   const { reliability } = view;
+  // The page has an answer, so the selector over the same cache entry has its figures.
+  const confidence = figures?.confidence ?? 'low';
 
   return (
     <div className="page">
@@ -216,9 +222,8 @@ export default function Analysis(): JSX.Element {
 
       <ReliabilityStrip
         responseCount={reliability.responseCount}
-        audienceEstimate={reliability.audienceEstimate}
-        responseRate={reliability.responseRate}
-        confidence={reliability.confidence}
+        rate={figures?.rate ?? null}
+        confidence={confidence}
       />
 
       {analysis.error && (
@@ -284,14 +289,14 @@ export default function Analysis(): JSX.Element {
                 neutral={view.sentiment.neutral}
                 negative={view.sentiment.negative}
                 commentCount={view.commentCount ?? 0}
-                confidence={reliability.confidence}
+                confidence={confidence}
               />
             )}
 
             <section className="card analysis-card analysis-trend">
               <div className="analysis-card-head">
                 <h3 className="analysis-card-title">Sentiment over time</h3>
-                <ConfidenceTag level={reliability.confidence} />
+                <ConfidenceTag level={confidence} />
               </div>
               <TrendLine
                 labels={(view.trend ?? []).map((point) => formatDate(point.date))}
@@ -310,7 +315,7 @@ export default function Analysis(): JSX.Element {
           <section className="card analysis-card">
             <div className="analysis-card-head">
               <h3 className="analysis-card-title">Themes</h3>
-              <ConfidenceTag level={reliability.confidence} />
+              <ConfidenceTag level={confidence} />
             </div>
             <p className="text-meta analysis-card-lead">
               What people brought up, most-mentioned first.
@@ -347,7 +352,7 @@ export default function Analysis(): JSX.Element {
             />
           )}
 
-          <Drivers drivers={view.drivers ?? []} confidence={reliability.confidence} />
+          <Drivers drivers={view.drivers ?? []} confidence={confidence} />
         </>
       )}
     </div>

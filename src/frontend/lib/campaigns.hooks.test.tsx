@@ -118,7 +118,7 @@ describe('R-205: one create, two screens catch up', () => {
       'GET /home?window=30d': () => ({
         body: {
           data: {
-            stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: created.value ? 1 : 0, responseRate: null, responsesEver: 0 },
+            stats: { window: '30d', responses: 0, subjectsCovered: 0, activeCampaigns: created.value ? 1 : 0, audience: null, responsesEver: 0 },
             activeCampaigns: [], prompts: [], configured: true,
           },
         },

@@ -375,7 +375,7 @@ const ENTRIES: Array<[string, number]> = [
 type View = {
   suppressed: boolean;
   threshold: number;
-  reliability: { responseCount: number; confidence: string; responseRate: number | null };
+  reliability: { responseCount: number; audienceEstimate: number | null };
   themes?: Array<{ id: string; label: string; mentions: number; valence: string }>;
   drivers?: Array<{ id: string; impact: number; valence: string }>;
   sentiment?: { positive: number; neutral: number; negative: number };
@@ -504,13 +504,15 @@ describe('the analysis itself, over real submitted responses', () => {
     expect(res.body?.themes?.length).toBeLessThanOrEqual(12);
   });
 
-  it('carries reliability alongside the numbers, and says the sample is thin', async () => {
+  it('carries the counts reliability is judged from, and never a ratio or a verdict', async () => {
     const res = await view(founder);
     expect(res.body?.reliability.responseCount).toBe(ENTRIES.length);
-    // Eight responses: presenting eight the way you present eight hundred is how a dashboard lies.
-    expect(res.body?.reliability.confidence).toBe('low');
     // An open link has no denominator, and a rate needs one.
-    expect(res.body?.reliability.responseRate).toBeNull();
+    expect(res.body?.reliability.audienceEstimate).toBeNull();
+    // The rate and "Low confidence" are the client's selector (`selectAnalysisFigures`, R-717),
+    // which has its own tests for eight responses reading as low.
+    expect(res.body?.reliability).not.toHaveProperty('responseRate');
+    expect(res.body?.reliability).not.toHaveProperty('confidence');
   });
 
   it('drills a theme through to the comments it came from', async () => {

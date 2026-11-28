@@ -103,14 +103,18 @@ export type HomeView = {
      */
     activeCampaigns: number;
     /**
-     * Responses in the window over the people asked, across the campaigns that were
-     * actually collecting during it.
+     * The two COUNTS behind the response rate, across the campaigns that were actually
+     * collecting during the window and whose audience can be counted: the people asked, and
+     * the responses those campaigns got in the window. `answered` is not `responses` above:
+     * a campaign on an open link has no "people asked", so it is left out of BOTH sides.
      *
-     * Null when no campaign has a denominator that exists — see 46 § Data contract and
-     * `N-043`. This field summed subject counts until T-041 and rendered 2610-4675% on the
-     * first screen after sign-in.
+     * Counts, never the ratio. The percentage is the client's, a memoised selector
+     * (`selectHomeFigures`, store/screens/home.ts), so the figure on screen can always be
+     * traced to the two numbers it divides (docs/REDUX-PLAN.md §6.12). Null when no campaign
+     * has a denominator that exists — see 46 § Data contract and `N-043`. The rate summed
+     * subject counts until T-041 and rendered 2610-4675% on the first screen after sign-in.
      */
-    responseRate: number | null;
+    audience: { asked: number; answered: number } | null;
     /**
      * All-time, and NEVER RENDERED AS A CARD. It exists for one decision: whether this org
      * has ever collected anything, which is what separates the "you are new here" empty

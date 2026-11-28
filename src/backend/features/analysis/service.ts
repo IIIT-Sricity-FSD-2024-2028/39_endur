@@ -9,12 +9,6 @@ import { readCorpus, type Corpus, type CorpusFilter } from '../results/service.j
 import type { CommentRow } from '../results/service.js';
 import { analyse, type Document, type Theme } from './engine.js';
 
-// Below the first number the figures are indicative; above the second they hold up.
-const MEDIUM_AT = 30;
-const HIGH_AT = 100;
-// A known response rate below this lowers the confidence by one step.
-const THIN_RATE = 0.2;
-
 // The analysis overview for the current filters.
 export async function readAnalysis(
   req: Request,
@@ -153,24 +147,13 @@ function windowOf(query: AnalysisQuery): {
   return { now, previous: { from: new Date(from.getTime() - span), to: from } };
 }
 
-// How much weight to put on these numbers, from the response count and rate.
+// The two counts the reader's confidence is judged from. The rate (`responseCount` over
+// `audienceEstimate`) and the confidence label are NOT worked out here: both are the client's
+// memoised selector (`selectAnalysisFigures`, store/screens/analysis.ts), so "62% replied" and
+// "Medium confidence" each trace to numbers on the page (REDUX-PLAN §6.12).
 function reliabilityOf(corpus: Corpus): AnalysisView['reliability'] {
-  const rate =
-    corpus.audienceEstimate && corpus.audienceEstimate > 0
-      ? Math.round((corpus.responseCount / corpus.audienceEstimate) * 100) / 100
-      : null;
   return {
     responseCount: corpus.responseCount,
     audienceEstimate: corpus.audienceEstimate,
-    responseRate: rate,
-    confidence: confidenceOf(corpus.responseCount, rate),
   };
-}
-
-// Confidence: a 4.6 from eight responses and a 4.6 from eight hundred are different facts.
-// Count first, then one downgrade when the response rate is known and thin. The rate can only lower it.
-function confidenceOf(responseCount: number, rate: number | null): 'low' | 'medium' | 'high' {
-  const base = responseCount >= HIGH_AT ? 'high' : responseCount >= MEDIUM_AT ? 'medium' : 'low';
-  if (rate === null || rate >= THIN_RATE) return base;
-  return base === 'high' ? 'medium' : 'low';
 }

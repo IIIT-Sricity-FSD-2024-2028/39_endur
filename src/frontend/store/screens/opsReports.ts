@@ -33,6 +33,7 @@ import {
   type SupportSessionRow,
   type Tier,
 } from '@endur/shared';
+import { percentOf, shareOf, type Share } from './figures.js';
 import { opsEndpoints } from '../api/endpoints/ops.js';
 import { opsSignedOut } from '../opsSlice.js';
 import { rootReducer, type RootState } from '../index.js';
@@ -41,16 +42,9 @@ import { rootReducer, type RootState } from '../index.js';
 // Arithmetic. Exported so the rules are tested once, on their own.
 // ---------------------------------------------------------------------------------------
 
-/** A count against what it is a share of, with the percentage. All three, always: a
- *  percentage printed without its "of what" is the number nobody can trace. */
-export type Share = { count: number; of: number; percent: number };
-
-/** Whole-number percent of `whole`; 0 when there is nothing to be a share of. */
-export function percentOf(part: number, whole: number): number {
-  return whole > 0 ? Math.round((part / whole) * 100) : 0;
-}
-
-export const shareOf = (count: number, of: number): Share => ({ count, of, percent: percentOf(count, of) });
+// `Share`, `percentOf` and `shareOf` are the console's too, so they live in `figures.ts` and
+// are re-exported here: one rounding rule for every percentage either app prints.
+export { percentOf, shareOf, type Share } from './figures.js';
 
 /**
  * Whole-number percentages of a MIX that add up to exactly 100 (largest remainder). Rounding

@@ -4,7 +4,7 @@
 // each of these has a plural, an agreement or a "there is no such number" case in it, and
 // this screen is the second half of the demo's decisive beat. A rule assembled inside JSX is
 // one nobody can check without rendering the whole page.
-import type { QuestionSummary, ResultsView } from '@endur/shared';
+import type { ResultsFigures } from '../../../store/screens/results.js';
 
 export type Stat = {
   kicker: string;
@@ -12,39 +12,24 @@ export type Stat = {
   context?: string | undefined;
 };
 
-/** Ratings only. NPS is a 0–10 instrument and averaging it with a 1–5 scale is nonsense. */
-export function ratingAverage(questions: QuestionSummary[]): { average: number; over: number } | null {
-  const rated = questions.filter(
-    (question) => question.kind === 'rating' && typeof question.average === 'number',
-  );
-  if (rated.length === 0) return null;
-  const total = rated.reduce((sum, question) => sum + (question.average ?? 0), 0);
-  return { average: Math.round((total / rated.length) * 10) / 10, over: rated.length };
-}
-
-/** A "comment" is an answer to a free-text question. There is no other kind. */
-export const commentCount = (questions: QuestionSummary[]): number =>
-  questions
-    .filter((question) => question.kind === 'text')
-    .reduce((sum, question) => sum + question.answered, 0);
-
 const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
 
-export function statCards(view: ResultsView, arrived: number): Stat[] {
-  const questions = view.questions ?? [];
-  const rating = ratingAverage(questions);
-  const comments = commentCount(questions);
-
+/**
+ * The four cards, worded. Every NUMBER on them is `selectResultsFigures`'
+ * (store/screens/results.ts, R-717): this only chooses the words around it.
+ */
+export function statCards(figures: ResultsFigures, arrived: number): Stat[] {
+  const { rating, comments, commentShare } = figures;
   return [
     {
       kicker: 'Responses',
-      value: String(view.responseCount),
+      value: String(figures.responseCount),
       // The API carries no "+18 today" and inventing a window would be inventing a number.
       // What it does carry is the arrival this poll just saw, which is the thing the
       // evaluator is watching for anyway.
       ...(arrived > 0 ? { context: `+${arrived} just now` } : {}),
     },
-    responseRateCard(view),
+    responseRateCard(figures),
     rating
       ? {
           kicker: 'Avg rating',
@@ -55,9 +40,7 @@ export function statCards(view: ResultsView, arrived: number): Stat[] {
     {
       kicker: 'Comments',
       value: String(comments),
-      ...(view.responseCount > 0
-        ? { context: `${Math.round((comments / view.responseCount) * 100)}% left one` }
-        : {}),
+      ...(commentShare ? { context: `${commentShare.percent}% of ${commentShare.of} responses left one` } : {}),
     },
   ];
 }
@@ -65,13 +48,14 @@ export function statCards(view: ResultsView, arrived: number): Stat[] {
 /**
  * The card that was wrong until T-040, and wrong in the most visible way available.
  *
- * `responseRate` is null whenever the audience is "anyone with the link", because a link has
- * no roll and therefore no denominator. Rendering that as a dash **and saying why** is the
+ * There is no rate whenever the audience is "anyone with the link", because a link has no
+ * roll and therefore no denominator. Rendering that as a dash **and saying why** is the
  * honest answer; the alternative the server used to give was responses-divided-by-subjects,
  * which showed between 1750% and 4675% on every seeded demo campaign.
  */
-function responseRateCard(view: ResultsView): Stat {
-  if (view.responseRate === null || view.audienceEstimate === null) {
+function responseRateCard(figures: ResultsFigures): Stat {
+  const { rate } = figures;
+  if (rate === null) {
     return {
       kicker: 'Response rate',
       value: '—',
@@ -83,17 +67,18 @@ function responseRateCard(view: ResultsView): Stat {
   // counts everyone holding the link while the denominator counts only the people expected
   // to answer. 135% is arithmetically true and reads as a broken dashboard, so above the
   // roll the card states the two counts and says why they do not divide.
-  if (view.responseCount > view.audienceEstimate) {
+  if (figures.overRoll) {
     return {
       kicker: 'Responses',
-      value: `${view.responseCount} of ${view.audienceEstimate} asked`,
+      value: `${rate.count} of ${rate.of} asked`,
       context: 'more answers than people asked — anyone holding the link can respond',
     };
   }
+  // The percentage with the two counts it was divided from, so it can be checked (§6.12).
   return {
     kicker: 'Response rate',
-    value: `${Math.round(view.responseRate * 100)}%`,
-    context: `of ${view.audienceEstimate}`,
+    value: `${rate.percent}%`,
+    context: `${rate.count} of ${rate.of} asked`,
   };
 }
 

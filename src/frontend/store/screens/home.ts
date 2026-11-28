@@ -4,12 +4,19 @@
 // Server data stays in the cache (`getHome`, `getWaiting`, `getAnswered`, `getAnnouncements`);
 // this holds what the reader is doing with it: the range they picked, which card is open,
 // which announcement they put away, whether the past-feedback list is unfolded.
-import { createSlice, type PayloadAction, type WithSlice } from '@reduxjs/toolkit';
-import type { StatWindow } from '@endur/shared';
+//
+// AND EVERY FIGURE THE ACTIVITY ROW DERIVES (R-717, §6.12): the server sends counts only, and
+// `selectHomeFigures` below works out the response rate from two of them. Trace for "74%":
+//   `state.home.range` ('30d') → `state.api.queries['getHome("30d")'].data.stats.audience`
+//   ({ asked: 50, answered: 37 }) → `selectHomeFigures` → `rate` (37 of 50 · 74%) → the card.
+import { createSelector, createSlice, type PayloadAction, type WithSlice } from '@reduxjs/toolkit';
+import type { HomeView, StatWindow } from '@endur/shared';
 import { signedOut } from '../authSlice.js';
 import { announcementsApi } from '../api/endpoints/announcements.js';
-import { rootReducer } from '../index.js';
+import { homeApi } from '../api/endpoints/home.js';
+import { rootReducer, type RootState } from '../index.js';
 import { createScreenThunk } from './common.js';
+import { newestAnswer, shareOf, type Share } from './figures.js';
 
 export type HomeScreenState = {
   /** The stats row's window. */
@@ -115,3 +122,48 @@ export const {
   selectAnsweringId,
   selectPastExpanded,
 } = injected.selectors;
+
+// ---------------------------------------------------------------------------------------
+// The Activity row's figures (R-717).
+// ---------------------------------------------------------------------------------------
+
+export type HomeFigures = {
+  window: StatWindow;
+  responses: number;
+  subjectsCovered: number;
+  activeCampaigns: number;
+  /**
+   * Responses OF the people asked, with the percentage, across the campaigns whose audience
+   * can be counted. `null` when none can: an open link has no roll, so there is no rate.
+   */
+  rate: Share | null;
+  /** More answers than people asked: a link reached people beyond the roll it was sent to. */
+  overRoll: boolean;
+};
+
+/** The arithmetic, on its own so it is tested on its own. */
+export function deriveHomeFigures(stats: HomeView['stats']): HomeFigures {
+  const { audience } = stats;
+  return {
+    window: stats.window,
+    responses: stats.responses,
+    subjectsCovered: stats.subjectsCovered,
+    activeCampaigns: stats.activeCampaigns,
+    rate: audience ? shareOf(audience.answered, audience.asked) : null,
+    overRoll: audience !== null && audience.answered > audience.asked,
+  };
+}
+
+/**
+ * The stats the page has on screen: the cached answer for the range in `state.home.range`,
+ * or, while that range is still loading, the answer before it (which is what the page keeps
+ * showing — `useLoadable`'s `data`).
+ */
+const selectShownStats = (state: RootState): HomeView['stats'] | undefined =>
+  (homeApi.endpoints.getHome.select(selectHomeRange(state))(state).data ??
+    newestAnswer<HomeView>(state, 'getHome'))?.stats;
+
+/** Every figure on the Activity row, memoised: re-derived only when the stats change. */
+export const selectHomeFigures = createSelector([selectShownStats], (stats) =>
+  stats ? deriveHomeFigures(stats) : null,
+);

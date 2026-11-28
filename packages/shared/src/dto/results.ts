@@ -44,8 +44,10 @@ export type QuestionSummary = {
  */
 export type ResultsView = {
   responseCount: number;
+  /** The people asked; `null` for an open link, which has no roll to count against. The
+   *  response rate is `responseCount` over this, worked out by the client in a memoised
+   *  selector (`selectResultsFigures`), never sent as a ratio (docs/REDUX-PLAN.md §6.12). */
   audienceEstimate: number | null;
-  responseRate: number | null;
   newSince?: string;
   suppressed: boolean;
   /** What the UI explains to the reader instead of showing an error (40). */

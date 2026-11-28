@@ -15,7 +15,7 @@ import { formatDate } from '../../../lib/format.js';
 import { useCampaign } from '../../../lib/campaigns.js';
 import { useUnits } from '../../../lib/units.js';
 import { flattenUnits } from '../../../lib/tree.js';
-import { useResponses, useResults } from '../../../lib/results.js';
+import { resultsSearch, useResponses, useResults } from '../../../lib/results.js';
 import { useAppDispatch, useAppSelector } from '../../../store/index.js';
 import { messageOf } from '../../../store/screens/common.js';
 import {
@@ -23,6 +23,7 @@ import {
   resultsExported,
   resultsShareClosed,
   resultsShareOpened,
+  selectResultsFigures,
   selectResultsPage,
 } from '../../../store/screens/results.js';
 import { STATUS_TAG } from '../Campaigns/card.js';
@@ -40,16 +41,20 @@ export default function Results(): JSX.Element {
   const unitId = params.get('unitId') ?? undefined;
 
   const campaign = useCampaign(id);
-  const results = useResults(id, {
+  const filters = {
     ...(subjectId ? { subjectId } : {}),
     ...(unitId ? { unitId } : {}),
-  });
+  };
+  const results = useResults(id, filters);
   const responses = useResponses(id, can('response.read'));
   const units = useUnits();
 
   const campaignId = id ?? '';
   const dispatch = useAppDispatch();
   const page = useAppSelector((state) => selectResultsPage(state, campaignId));
+  // Every figure on the stat cards, worked out from the cached counts (R-717, §6.12).
+  const search = resultsSearch(filters);
+  const figures = useAppSelector((state) => selectResultsFigures(state, campaignId, search));
   // Opened and left by `useResults`, which owns the page's lifetime in the store.
   const { sharing, exporting } = page;
   const exportError = messageOf(page.exportError, 'That did not download.');
@@ -89,7 +94,7 @@ export default function Results(): JSX.Element {
 
   const detail = campaign.data;
   const tag = detail ? STATUS_TAG[detail.status] : null;
-  const cards = statCards(view, results.arrived);
+  const cards = figures ? statCards(figures, results.arrived) : [];
 
   return (
     <>
