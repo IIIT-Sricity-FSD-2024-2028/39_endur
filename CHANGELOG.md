@@ -8,6 +8,43 @@ breaking change, MINOR for new features, PATCH for fixes. How a release is made 
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-28
+
+A redesigned operator console for the people who run the platform, and every percentage in
+Endur now shows the two numbers it comes from.
+
+### Added
+
+- **Operator console redesign (#70).** A new frame with a side rail (a drawer below 900px),
+  and three new pages:
+  - **Team** (`/ops/team`, owners only): add operators, change their role or disable
+    them. A new operator's authenticator code is shown once. Nobody can change their own
+    account, and the platform always keeps two owners.
+  - **Support** (`/ops/support`): who entered which organisation's console, why, and when
+    they left, with "Open now" and "Over" views.
+  - **Audit** (`/ops/audit`): the platform's own audit trail, every operator action
+    newest first, filterable by action.
+- Analytics and Earnings share one date window: pick a range on one and the other opens at
+  it (#70).
+- 7 more Playwright end-to-end tests for the operator console: the estate, an
+  organisation's plan override, analytics and earnings, team, support visits, logs and
+  sign-out, and what staff (not owners) can see (#70).
+
+### Changed
+
+- Redesigned the estate, organisation, Analytics, Earnings and Logs pages of the operator
+  console (#70).
+- Every share in the operator console reads with what it is a share of, for example
+  "37 of 50 · 74%" (#70).
+- The API now sends counts instead of ready-made percentages. Response rates (Home, Results,
+  Analysis), Analysis confidence and the average payment on Earnings are worked out in the
+  browser from the counts on screen (#70).
+
+### Fixed
+
+- Asking the support register for visits that are over (`active=false`) returned the ones
+  still open (#70).
+
 ## [3.1.0] - 2026-11-27
 
 All client state moves to Redux Toolkit, and members get a Home that shows the forms they
@@ -113,7 +150,8 @@ A rebuild of Endur on a new architecture, and its first public deployment, at
 Earlier versions, tagged `V2.0` and `V1.0` before this changelog existed. Both tags point to
 the same commit (#56).
 
-[Unreleased]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/IIIT-Sricity-FSD-2024-2028/39_endur/compare/V2.0...v3.0.0
