@@ -7,6 +7,7 @@ import {
   Target, Trash2, TrendingDown, TrendingUp, User, Users, X,
   GraduationCap, Building, HeartPulse, Layers,
   Rocket, Megaphone, CalendarClock, Timer,
+  Activity, Download, LifeBuoy, LineChart, LogOut, ScrollText, Search, ShieldCheck, UserCog, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -60,6 +61,17 @@ const ICONS = {
   announcement: Megaphone,
   booking: CalendarClock,
   countdown: Timer,
+  // The operator console (R-716).
+  activity: Activity,
+  analytics: LineChart,
+  audit: ScrollText,
+  download: Download,
+  earnings: Wallet,
+  operator: ShieldCheck,
+  'sign-out': LogOut,
+  search: Search,
+  support: LifeBuoy,
+  team: UserCog,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

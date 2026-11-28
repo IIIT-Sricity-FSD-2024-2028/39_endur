@@ -745,8 +745,9 @@ export async function earnings(query: EarningsQuery): Promise<PlatformEarnings> 
       revenueMinor,
       payments,
       orgsPaying: payingOrgs.size,
-      // Null, never 0: the average of no payments is not a payment of zero.
-      averageMinor: payments === 0 ? null : Math.round(revenueMinor / payments),
+      // NO AVERAGE. A sum and a count are what the database knows; the mean of them is
+      // arithmetic, and the client derives it in one place (`selectEarningsView`, which also
+      // owns the rule that the mean of no payments is a dash, not zero).
       lifetimeRevenueMinor: lifetime._sum.amountMinor ?? 0,
     },
     byPeriod: periods.map((period) => ({ period, ...periodMap.get(period)! })),

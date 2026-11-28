@@ -1,84 +1,57 @@
-// The estate list and one organisation. `70` § Data contract, `T-066` files list.
+// The estate list, the estate's numbers, one organisation, and the Enterprise queue: the
+// operator console's READS. `70` § Data contract, `T-066`.
 //
-// Modelled on `lib/audit.ts`: a `Loadable<T>`, a FIXED-key-order search string so the cache
-// key is stable, a cursor `loadMore` that appends rather than replaces, and a `forbidden`
-// flag distinct from an empty result (`staff` reaching an owner-only query still gets a
-// page — every estate capability here is `BOTH` — but the shape is kept for the same reason
-// `lib/audit.ts` keeps it: a 403 is not "there is nothing").
+// THESE HOOKS ONLY SUBSCRIBE. Each one keeps its cache entry alive and fetching, and says
+// whether it is loading, failed, or was refused (a 403 is not "there is nothing"). What the
+// page DRAWS — the rows, their order, the flags, every count and percentage — is read from
+// the store with the selectors in `store/screens/opsReports.ts`, over the same cache entry.
 //
-// On RTK Query since R-505, over the operator API (`store/api/opsApi.ts`): the estate's
-// loaded pages survive a look at one organisation and back. Reads only (DEC-R03): every
-// operator write is a thunk in `store/screens/operator.ts`.
-import { useCallback, useMemo } from 'react';
-import type { EnterpriseRequestRow, Page, PlatformOrgDetail, PlatformOrgSummary } from '@endur/shared';
+// On RTK Query since R-505, over the operator API (`store/api/opsApi.ts`). Every operator
+// write is a thunk in `store/screens/operator.ts` (DEC-R03).
+import { useCallback } from 'react';
+import type { EnterpriseRequestRow, PlatformOrgDetail } from '@endur/shared';
 import { OpsError } from './ops.js';
 import {
   useGetEnterpriseQueueQuery,
   useGetEstateInfiniteQuery,
+  useGetOpsStatsQuery,
   useGetOrgDetailQuery,
 } from '../store/api/endpoints/ops.js';
 import { useLoadable } from './query.js';
+import { asReport, type ReportStatus } from './opsStatus.js';
+
+export type { ReportStatus };
 
 export type Loadable<T> = { data: T | null; loading: boolean; error: Error | null };
 
-export type EstateFilters = {
-  tier?: string | undefined;
-  status?: string | undefined;
-  industry?: string | undefined;
-  q?: string | undefined;
-};
-
-export type EstateController = Loadable<Page<PlatformOrgSummary>> & {
-  forbidden: boolean;
-  rows: PlatformOrgSummary[];
-  loadMore: () => Promise<void>;
-  loadingMore: boolean;
-  reload: () => Promise<void>;
-};
-
-/** A fixed key order, so the string is a stable cache key (the same fix `lib/audit.ts`
- *  and `lib/analysis.ts` needed). */
-export function estateSearch(filters: EstateFilters): string {
-  const params = new URLSearchParams();
-  for (const key of ['tier', 'status', 'industry', 'q'] as const) {
-    const value = filters[key];
-    if (value) params.set(key, value);
-  }
-  const search = params.toString();
-  return search ? `?${search}` : '';
-}
-
 const statusOf = (error: Error | null): number => (error instanceof OpsError ? error.status : 0);
 
-export function useEstate(filters: EstateFilters): EstateController {
-  const query = useGetEstateInfiniteQuery(estateSearch(filters));
-  const { fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = query;
-  const pages = query.data?.pages;
-  const last = pages?.at(-1);
-  const rows = useMemo(() => pages?.flatMap((page) => page.data) ?? [], [pages]);
+export type EstateController = ReportStatus & {
+  loadMore: () => Promise<void>;
+  loadingMore: boolean;
+};
 
-  // The last list DIMS AND STAYS while another filter loads (`70` § States): `data`, not
-  // `currentData`.
-  const loaded = useLoadable({
-    ...query,
-    isFetching: isFetching && !isFetchingNextPage,
-    data: last,
-    currentData: last,
-  });
+/**
+ * The estate, for `search` (`selectEstateSearch`). "Load more" APPENDS: the list dims and
+ * stays while loading (`70` § States), and the pages already loaded survive a look at one
+ * organisation and back.
+ */
+export function useEstate(search: string): EstateController {
+  const query = useGetEstateInfiniteQuery(search);
+  const { fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } = query;
+  const last = query.data?.pages.at(-1);
+  const loaded = useLoadable({ ...query, isFetching: isFetching && !isFetchingNextPage, data: last, currentData: last });
 
   const loadMore = useCallback(async () => {
     if (hasNextPage && !isFetching) await fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetching]);
 
-  const forbidden = statusOf(loaded.error) === 403;
-  return {
-    ...loaded,
-    ...(forbidden ? { error: null } : {}),
-    rows,
-    forbidden,
-    loadMore,
-    loadingMore: isFetchingNextPage,
-  };
+  return { ...asReport(loaded), loadMore, loadingMore: isFetchingNextPage };
+}
+
+/** The estate's six numbers (`/platform/stats`); `selectEstateStatsView` draws them. */
+export function useEstateStats(enabled = true): ReportStatus {
+  return asReport(useLoadable(useGetOpsStatsQuery(undefined, { skip: !enabled })));
 }
 
 export function useOrgDetail(id: string | undefined): Loadable<PlatformOrgDetail> & {
@@ -94,8 +67,7 @@ export function useOrgDetail(id: string | undefined): Loadable<PlatformOrgDetail
  * THE ENTERPRISE QUEUE — DEC-100, T-100, 70 § The Enterprise queue.
  *
  * NOT ASKED FOR WITHOUT THE CAPABILITY. `platform.enterprise.read` is owner-only, and a
- * request nobody may answer is a request not worth making — the rule `/ops` already applies
- * to the analytics tab.
+ * request nobody may answer is a request not worth making.
  *
  * NOT PAGINATED. If this queue ever needs a second page, Endur has a sales problem it would
  * rather have; a cursor here would be machinery for a list that is empty most weeks.

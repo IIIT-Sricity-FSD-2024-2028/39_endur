@@ -63,3 +63,21 @@ test('a wrong password says so and keeps what was typed', async ({ page }) => {
   await expect(page.getByRole('alert')).toHaveText("That email and password don't match.");
   await expect(page.getByLabel('Email')).toHaveValue('nobody@northfield.endur.test');
 });
+
+// The eye in every password field answers a press anywhere on it. It used to be centred with a
+// transform that the press response (`.btn:active { transform: scale(.97) }`) replaced, so the
+// button dropped 15px while held and a press on its top half was released on the input: no click.
+// A person's press is held for a moment, which is why this one is held too.
+test('the show-password eye works when pressed on its top edge, on all three sign-in forms', async ({ page }) => {
+  for (const path of ['/login', '/start', '/ops/login']) {
+    await page.goto(path);
+    const eye = page.getByRole('button', { name: 'Show password' });
+    const box = await eye.boundingBox();
+    if (!box) throw new Error(`no eye on ${path}`);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.2);
+    await page.mouse.down();
+    await page.waitForTimeout(150);
+    await page.mouse.up();
+    await expect(page.getByRole('button', { name: 'Hide password' }), path).toBeVisible();
+  }
+});

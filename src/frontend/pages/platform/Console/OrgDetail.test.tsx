@@ -47,8 +47,34 @@ vi.mock('../../../lib/opsCapabilities.js', () => ({
   useOpsCan: () => (capability: PlatformCapability) => held.includes(capability),
 }));
 
-/** The operator API's POSTs, answered by the spy: its value, or its `OpsError` refusal. */
+/** The operator API's POSTs, answered by the spy: its value, or its `OpsError` refusal. The
+ *  organisation's activity and support visits are plain GETs. */
 const server = () => stubApi({
+  'GET /platform/audit?orgId=org-1': {
+    body: {
+      data: [
+        {
+          id: 'a1', at: '2026-08-20T10:00:00.000Z', actor: { id: 'op1', name: 'Endur Owner' },
+          action: 'plan.override', org: { id: 'org-1', name: 'Northfield' },
+          payload: { from: 'bronze', to: 'silver' }, requestId: 'req-1',
+        },
+      ],
+      page: { nextCursor: null, hasMore: false },
+      meta: { total: 1 },
+    },
+  },
+  'GET /platform/support-sessions?orgId=org-1': {
+    body: {
+      data: [
+        {
+          id: 's1', org: { id: 'org-1', name: 'Northfield' },
+          operator: { id: 'op2', name: 'Endur Support', email: 'support@endur.test' },
+          reason: 'Ticket 418, campaign will not launch', startedAt: '2026-08-21T10:00:00.000Z',
+          expiresAt: '2026-08-21T11:00:00.000Z', endedAt: '2026-08-21T10:25:00.000Z', active: false,
+        },
+      ],
+    },
+  },
   'POST /platform/*': async (call): Promise<StubReply> => {
     try {
       return { body: (await opsPost(call.path.replace(/^\/platform/, ''), call.body)) ?? { data: {} } };
@@ -66,7 +92,9 @@ const render = () => renderWithProviders(<OrgDetail />, { path: '/ops/orgs/org-1
 beforeEach(() => {
   server();
   org = ORG;
-  held = ['platform.org.read', 'platform.org.suspend'] as PlatformCapability[];
+  held = [
+    'platform.org.read', 'platform.org.suspend', 'platform.plan.override', 'platform.message.send',
+  ] as PlatformCapability[];
   opsPost.mockReset();
   opsPost.mockResolvedValue({ data: {} });
   reload.mockReset();
@@ -134,7 +162,7 @@ describe('the plan override', () => {
     render();
     fireEvent.click(goldButton());
     const dialog = screen.getByRole('alertdialog');
-    expect(dialog.textContent).toContain('Change Northfield to gold?');
+    expect(dialog.textContent).toContain('Change Northfield to Gold?');
     expect(opsPost).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Change plan' }));
@@ -188,6 +216,33 @@ describe('support access — DEC-114', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open console' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Suspended organizations cannot be entered.');
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Open console' }).disabled).toBe(false);
+  });
+});
+
+describe('what operators have done here', () => {
+  it('shows its activity and its support visits, each from its own register', async () => {
+    held = [...held, 'platform.audit.read', 'platform.support.read'] as PlatformCapability[];
+    render();
+    const activity = await screen.findByRole('region', { name: 'Operator activity' });
+    expect(await within(activity).findByText('Changed a plan')).toBeTruthy();
+    expect(activity.textContent).toContain('Bronze → Silver');
+    const visits = screen.getByRole('region', { name: 'Support visits' });
+    expect(await within(visits).findByText('Endur Support')).toBeTruthy();
+    expect(visits.textContent).toContain('25 min');
+  });
+
+  it('asks for neither without the capabilities', () => {
+    render();
+    expect(screen.queryByRole('region', { name: 'Operator activity' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Support visits' })).toBeNull();
+  });
+});
+
+describe('the plan picker without the override capability', () => {
+  it('shows the plans, with nothing to press', () => {
+    held = ['platform.org.read'] as PlatformCapability[];
+    render();
+    expect(screen.queryByRole('button', { name: /Set plan/ })).toBeNull();
   });
 });
 

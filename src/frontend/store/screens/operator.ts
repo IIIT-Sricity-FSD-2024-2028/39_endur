@@ -11,8 +11,9 @@
 //   the PlanPicker → `orgTierPicked` → <ConfirmDialog> from `pendingTier` → Change plan →
 //   `orgPlanSet(id)` → `opsEndpoints.setOrgPlan` → the organisation and the estate re-read
 //   through their tags, and a toast says what changed.
-import { createAsyncThunk, createSlice, type PayloadAction, type WithSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSelector, createSlice, type PayloadAction, type WithSlice } from '@reduxjs/toolkit';
 import type { EnterpriseStatus, Tier } from '@endur/shared';
+import type { LogFilter } from '../../lib/oplogs.js';
 import { opsDownload, opsRequest } from '../../lib/ops.js';
 import { opsSignedIn, opsSignedOut } from '../opsSlice.js';
 import { toastShown } from '../uiSlice.js';
@@ -62,11 +63,27 @@ export type OperatorScreenState = {
   login: { email: string; code: string; reveal: boolean; submitting: boolean; error: SerializedOpsError | null };
   estate: { term: string | null; queueBusyId: string | null; queueError: SerializedOpsError | null };
   orgs: Record<string, OrgPage>;
-  logs: { format: 'ndjson' | 'csv'; exporting: boolean; exportError: SerializedOpsError | null; last: LogExport | null };
+  logs: {
+    /** The file being read; `null` until one is picked, when the error stream opens. */
+    file: string | null;
+    /** What narrows its lines. The export uses the same, so the file saved is what was read. */
+    filter: LogFilter;
+    format: 'ndjson' | 'csv';
+    exporting: boolean;
+    exportError: SerializedOpsError | null;
+    last: LogExport | null;
+  };
 };
 
 const blankLogin: OperatorScreenState['login'] = { email: '', code: '', reveal: false, submitting: false, error: null };
-const blankLogs: OperatorScreenState['logs'] = { format: 'ndjson', exporting: false, exportError: null, last: null };
+const blankLogs: OperatorScreenState['logs'] = {
+  file: null,
+  filter: {},
+  format: 'ndjson',
+  exporting: false,
+  exportError: null,
+  last: null,
+};
 
 const initialState: OperatorScreenState = {
   login: blankLogin,
@@ -322,11 +339,31 @@ export const operatorScreenSlice = createSlice({
       delete state.orgs[action.payload.id];
     },
 
+    /** Another file: its own lines, so the last file's filters go with it. */
+    logFileChosen(state, action: PayloadAction<{ file: string }>) {
+      state.logs.file = action.payload.file;
+      state.logs.filter = {};
+      state.logs.last = null;
+      state.logs.exportError = null;
+    },
+    logFilterChanged(state, action: PayloadAction<LogFilter>) {
+      const next: LogFilter = {};
+      for (const [key, value] of Object.entries(action.payload) as [keyof LogFilter, LogFilter[keyof LogFilter]][]) {
+        if (value !== undefined && value !== '' && !(typeof value === 'number' && Number.isNaN(value))) {
+          (next as Record<string, unknown>)[key] = value;
+        }
+      }
+      state.logs.filter = next;
+    },
+    logFiltersCleared(state) {
+      state.logs.filter = {};
+    },
     logFormatChosen(state, action: PayloadAction<{ format: 'ndjson' | 'csv' }>) {
       state.logs.format = action.payload.format;
     },
+    /** The export's progress goes; the file and filters stay, so Back returns to them. */
     logsLeft(state) {
-      state.logs = blankLogs;
+      state.logs = { ...blankLogs, file: state.logs.file, filter: state.logs.filter, format: state.logs.format };
     },
   },
   extraReducers: (builder) => {
@@ -463,8 +500,34 @@ export const {
   supportReasonTyped,
   orgMessageEdited,
   orgPageLeft,
+  logFileChosen,
+  logFilterChanged,
+  logFiltersCleared,
   logFormatChosen,
   logsLeft,
 } = operatorScreenSlice.actions;
 
 export const { selectOperator, selectOrgPage } = injected.selectors;
+
+/**
+ * The file on screen: the one picked, or, before any is, the newest ERROR stream (the
+ * reason somebody opens logs), else the first file. Worked out here, from the cached list,
+ * rather than by an effect that writes a default somewhere.
+ */
+export const selectLogFile = createSelector(
+  [
+    (state: RootState) => selectOperator(state).logs.file,
+    (state: RootState) => opsEndpoints.endpoints.getLogFiles.select()(state).data?.data,
+  ],
+  (picked, files): string | null => {
+    if (picked) return picked;
+    if (!files || files.length === 0) return null;
+    return (files.find((file) => file.stream === 'error') ?? files[0])?.name ?? null;
+  },
+);
+
+/** Whether any filter narrows the lines (the empty state then offers to clear them). */
+export const selectLogFiltered = createSelector(
+  [(state: RootState) => selectOperator(state).logs.filter],
+  (filter) => Object.keys(filter).length > 0,
+);

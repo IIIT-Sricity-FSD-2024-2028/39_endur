@@ -1,3 +1,5 @@
+import type { Share } from '../../../store/screens/figures.js';
+
 type Level = 'low' | 'medium' | 'high';
 
 const WORD: Record<Level, string> = { low: 'Low', medium: 'Medium', high: 'High' };
@@ -11,18 +13,18 @@ export function ConfidenceTag({ level }: { level: Level }): JSX.Element {
   );
 }
 
+/** Every number here is `selectAnalysisFigures`' (store/screens/analysis.ts, R-717): the
+ *  rate and the confidence arrive worked out, with the counts they were worked out from. */
 export function ReliabilityStrip({
   responseCount,
-  audienceEstimate,
-  responseRate,
+  rate,
   confidence,
 }: {
   responseCount: number;
-  audienceEstimate: number | null;
-  responseRate: number | null;
+  rate: Share | null;
   confidence: Level;
 }): JSX.Element {
-  const percent = responseRate === null ? null : Math.round(responseRate * 100);
+  const percent = rate === null ? null : rate.percent;
 
   return (
     <div className="reliability-strip">
@@ -35,8 +37,8 @@ export function ReliabilityStrip({
             where one of them is open would understate the denominator and so overstate the
             rate. `40` learned this at T-040 (N-044): a response rate whose halves are
             measured differently is not a low rate, it is a wrong one. */}
-        {audienceEstimate !== null && percent !== null ? (
-          <> of <span className="num">{audienceEstimate}</span> asked · <span className="num">{percent}%</span> replied</>
+        {rate !== null ? (
+          <> of <span className="num">{rate.of}</span> asked · <span className="num">{rate.percent}%</span> replied</>
         ) : (
           <> · no fixed list to compare against, so there is no response rate</>
         )}

@@ -1,0 +1,408 @@
+/* =========================================================================================
+   THE OPERATOR CONSOLE (/ops) — R-716.
+
+   Loaded only by the operator console's own chunk (`components/platform/OpsShell.tsx` and
+   the sign-in page), so nothing here reaches a customer or a respondent.
+
+   Same materials as the customer console (glass chrome, near-opaque cards, the tokens in
+   tokens.css, both themes), arranged for a different job: a control room. A fixed rail on
+   the left with the console's own mark, dense tables, and figures that always say what
+   they are a share OF.
+   ========================================================================================= */
+
+.ops-shell { min-height: 100dvh; display: grid; grid-template-columns: 256px minmax(0, 1fr); }
+.ops-shell-bare { display: block; }
+
+/* ---- the rail */
+.ops-rail {
+  position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+  border-right: 1px solid var(--glass-edge);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  z-index: 2;
+}
+.ops-nav { display: flex; flex-direction: column; gap: var(--space-5); min-height: 100%; padding: var(--space-5) var(--space-3); }
+.ops-brand {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 0 var(--space-2); color: var(--color-text); text-decoration: none;
+  font-family: var(--font-heading); font-weight: 700; font-size: 17px;
+}
+.ops-brand-tag {
+  margin-left: auto; padding: 2px 8px; border-radius: 999px;
+  font-family: var(--font-body); font-size: var(--text-micro); font-weight: 700;
+  letter-spacing: var(--track-utility); text-transform: uppercase;
+  color: var(--color-accent-800);
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+.ops-nav-group { display: flex; flex-direction: column; gap: 2px; }
+.ops-nav-heading { margin: 0 0 var(--space-1); padding: 0 var(--space-2); }
+.ops-nav-link {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 9px var(--space-3); border-radius: var(--radius-md);
+  color: color-mix(in srgb, var(--color-text) 82%, transparent);
+  text-decoration: none; font-size: var(--text-small); font-weight: 500;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.ops-nav-link svg { color: color-mix(in srgb, var(--color-text) 55%, transparent); flex: none; }
+.ops-nav-link:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); color: var(--color-text); }
+.ops-nav-link.is-active {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-text); font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+.ops-nav-link.is-active svg { color: var(--color-accent-700); }
+.ops-nav-count {
+  margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 999px; text-align: center;
+  font-size: var(--text-micro); font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--status-warn-100); color: var(--status-warn-800);
+}
+.ops-nav-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--space-3); }
+.ops-me {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: var(--space-2); align-items: center;
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-card) 70%, transparent);
+  border: 1px solid var(--glass-edge);
+}
+.ops-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; color: var(--color-bg);
+  background: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-800));
+}
+.ops-me-name { display: block; font-weight: 600; font-size: var(--text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-me-mail { display: block; font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 60%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-me-actions { display: flex; align-items: center; gap: var(--space-2); }
+.ops-me-actions .btn { flex: 1; }
+
+/* ---- the phone bar (the rail becomes a drawer) */
+.ops-topbar { display: none; }
+.ops-drawer-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: color-mix(in srgb, var(--color-neutral-900) 40%, transparent);
+}
+.ops-drawer {
+  position: absolute; inset: 0 auto 0 0; width: min(300px, 86vw); overflow-y: auto;
+  background: var(--color-surface); border-right: 1px solid var(--glass-edge); box-shadow: var(--shadow-lg);
+}
+
+/* ---- the content well */
+.ops-main { min-width: 0; padding: var(--space-8) var(--space-8) var(--space-16); }
+.ops-page { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6); }
+
+@media (max-width: 899px) {
+  .ops-shell { grid-template-columns: minmax(0, 1fr); }
+  .ops-rail { display: none; }
+  .ops-topbar {
+    display: flex; align-items: center; gap: var(--space-2);
+    position: sticky; top: 0; z-index: 30;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--glass-edge);
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+  .ops-main { padding: var(--space-5) var(--space-4) var(--space-12); }
+}
+
+/* ---- page header */
+.ops-header { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
+.ops-header-text { flex: 1 1 320px; min-width: 0; }
+.ops-kicker { margin: 0 0 var(--space-1); color: var(--color-accent-700); }
+.ops-header h1 { margin: 0; font-size: var(--text-h1); line-height: 1.1; }
+.ops-header-sub { margin: var(--space-2) 0 0; color: color-mix(in srgb, var(--color-text) 66%, transparent); max-width: 70ch; }
+.ops-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* ---- a section card */
+.ops-card { border-radius: var(--radius-lg); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.ops-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.ops-card-head h2 { margin: 0; font-size: var(--text-h3); }
+.ops-card-head .ops-card-note { margin: 0; color: color-mix(in srgb, var(--color-text) 62%, transparent); font-size: var(--text-small); }
+.ops-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
+.ops-grid-main { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+.ops-stack { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+@media (max-width: 1099px) { .ops-grid-main { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 799px) { .ops-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- KPI tiles */
+.ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-4); }
+.ops-kpi {
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5);
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.ops-kpi::after {
+  content: ''; position: absolute; inset: auto -30% -60% auto; width: 160px; height: 160px; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--ops-kpi-tone, var(--color-accent)) 18%, transparent), transparent);
+  pointer-events: none;
+}
+.ops-kpi-label { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.ops-kpi-label svg { color: var(--ops-kpi-tone, var(--color-accent-700)); }
+.ops-kpi-value {
+  margin: 0; font-family: var(--font-heading); font-weight: 700; font-size: 34px; line-height: 1.1;
+  letter-spacing: var(--track-display); font-variant-numeric: tabular-nums;
+}
+.ops-kpi-detail { margin: 0; font-size: var(--text-small); color: color-mix(in srgb, var(--color-text) 64%, transparent); }
+.ops-kpi-detail strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
+.ops-kpi-detail .ops-how { font-size: inherit; }
+.ops-kpi.is-good { --ops-kpi-tone: var(--status-good-500); }
+.ops-kpi.is-warn { --ops-kpi-tone: var(--status-warn-500); }
+.ops-kpi.is-bad  { --ops-kpi-tone: var(--status-bad-500); }
+.ops-kpi.is-gold { --ops-kpi-tone: var(--tier-gold-500); }
+
+/* ---- the "how this was worked out" line under a figure */
+.ops-how { font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 55%, transparent); font-variant-numeric: tabular-nums; }
+
+/* ---- tier pills and status pills */
+.ops-tier {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 10px; border-radius: 999px; white-space: nowrap;
+  font-size: var(--text-micro); font-weight: 700; letter-spacing: .02em;
+  border: 1px solid transparent;
+}
+.ops-tier::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ops-tier.is-bronze { background: var(--tier-bronze-100); color: var(--tier-bronze-800); border-color: color-mix(in srgb, var(--tier-bronze-500) 40%, transparent); }
+.ops-tier.is-silver { background: var(--tier-silver-100); color: var(--tier-silver-800); border-color: color-mix(in srgb, var(--tier-silver-500) 40%, transparent); }
+.ops-tier.is-gold   { background: var(--tier-gold-100);   color: var(--tier-gold-800);   border-color: color-mix(in srgb, var(--tier-gold-500) 40%, transparent); }
+.ops-tier.is-enterprise {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent-800);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.ops-pill {
+  display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  font-size: var(--text-micro); font-weight: 600;
+  background: var(--color-neutral-100); color: color-mix(in srgb, var(--color-text) 72%, transparent);
+}
+.ops-pill.is-good { background: var(--status-good-100); color: var(--status-good-800); }
+.ops-pill.is-warn { background: var(--status-warn-100); color: var(--status-warn-800); }
+.ops-pill.is-bad  { background: var(--status-bad-100);  color: var(--status-bad-800); }
+.ops-pill.is-accent { background: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent-800); }
+.ops-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Tier colours as fills, for bars, rings and keys. */
+.ops-fill-bronze { background: var(--tier-bronze-500); }
+.ops-fill-silver { background: var(--tier-silver-500); }
+.ops-fill-gold { background: var(--tier-gold-500); }
+.ops-fill-enterprise { background: var(--color-accent-500); }
+.ops-fill-accent { background: var(--color-accent-500); }
+.ops-fill-muted { background: var(--color-neutral-400); }
+
+/* Series colours, for a chart whose series are kinds rather than plans (movement: new,
+   trials, upgraded, downgraded, churned). Status and tier colours mean a state or a plan
+   everywhere else, so they are not borrowed here: gold beside amber made "Upgraded" and
+   "Downgraded" one colour (OKLab ΔE 1.8). These five, in this order, were checked with a
+   palette validator against the card in each theme: every neighbouring pair is ΔE ≥ 20
+   apart to a full-colour eye and ≥ 11 under colour-blindness simulation. In light, four sit
+   under 3:1 against the card, so the legend prints every series' total and each bar has a
+   tooltip and a table row. */
+:root {
+  --ops-series-1: #257de0;
+  --ops-series-2: #f47230;
+  --ops-series-3: #00b894;
+  --ops-series-4: #f2a600;
+  --ops-series-5: #ee7fac;
+}
+[data-theme="dark"] {
+  --ops-series-1: #338ced;
+  --ops-series-2: #e76624;
+  --ops-series-3: #00a888;
+  --ops-series-4: #d28e05;
+  --ops-series-5: #e24d8b;
+}
+.ops-fill-s1 { background: var(--ops-series-1); }
+.ops-fill-s2 { background: var(--ops-series-2); }
+.ops-fill-s3 { background: var(--ops-series-3); }
+.ops-fill-s4 { background: var(--ops-series-4); }
+.ops-fill-s5 { background: var(--ops-series-5); }
+
+/* ---- a share: label, bar, "count of N", percent */
+.ops-shares { display: flex; flex-direction: column; gap: var(--space-3); }
+.ops-share { display: grid; grid-template-columns: minmax(84px, 9rem) minmax(0, 1fr) auto 3.4rem; align-items: center; gap: var(--space-3); }
+.ops-share-label { font-size: var(--text-small); font-weight: 600; display: flex; align-items: center; gap: var(--space-2); }
+.ops-share-track { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--color-text) 8%, transparent); overflow: hidden; }
+.ops-share-fill { display: block; height: 100%; border-radius: inherit; transition: width var(--dur-base) var(--ease); }
+.ops-share-count { font-size: var(--text-small); font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--color-text) 64%, transparent); white-space: nowrap; }
+.ops-share-percent { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.ops-key { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+/* A whole mix as one stacked strip. */
+.ops-strip { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--color-text) 8%, transparent); }
+.ops-strip > span { display: block; height: 100%; }
+.ops-strip-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; padding: 0; list-style: none; font-size: var(--text-small); }
+.ops-strip-legend li { display: flex; align-items: center; gap: 6px; }
+.ops-strip-legend strong { font-variant-numeric: tabular-nums; }
+
+/* ---- the bar charts (HTML, so every bar is a focusable button with its own label) */
+.ops-chart { position: relative; display: flex; flex-direction: column; gap: var(--space-2); }
+.ops-chart-plot {
+  position: relative; height: 220px; display: flex; align-items: flex-end; gap: 6px;
+  padding: var(--space-2) 0 0; border-bottom: 1px solid var(--color-divider);
+  background-image: linear-gradient(to top, var(--color-divider) 1px, transparent 1px);
+  background-size: 100% 25%;
+}
+.ops-chart-col {
+  flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px;
+  padding: 0 2px; border: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: transparent; cursor: default;
+  font: inherit; color: inherit;
+}
+.ops-chart-col:hover, .ops-chart-col.is-focused, .ops-chart-col:focus-visible { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
+.ops-chart-col:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.ops-chart-bar { flex: 1 1 0; max-width: 46px; min-height: 2px; border-radius: 4px 4px 0 0; transition: height var(--dur-base) var(--ease); }
+.ops-chart-bar.is-zero { visibility: hidden; }
+.ops-chart-axis { display: flex; gap: 6px; }
+.ops-chart-axis span {
+  flex: 1 1 0; min-width: 0; text-align: center; font-size: var(--text-micro);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent); white-space: nowrap;
+  /* Only every few periods are labelled, so a label may spill over its empty neighbours. */
+  overflow: visible; display: flex; justify-content: center;
+}
+.ops-chart-tip {
+  position: absolute; top: 0; transform: translateX(-50%); z-index: 3; pointer-events: none;
+  min-width: 160px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-neutral-900); color: var(--color-neutral-100);
+  box-shadow: var(--shadow-md); font-size: var(--text-small);
+}
+.ops-chart-tip strong { display: block; margin-bottom: 2px; }
+.ops-chart-tip dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: 2px var(--space-3); }
+.ops-chart-tip dl > div { display: contents; }
+.ops-chart-tip dt { opacity: .75; }
+.ops-chart-tip dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.ops-chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; padding: 0; list-style: none; font-size: var(--text-small); }
+.ops-chart-legend li { display: flex; align-items: center; gap: 6px; }
+.ops-chart-legend strong { font-variant-numeric: tabular-nums; }
+.ops-chart-empty { padding: var(--space-8) 0; text-align: center; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
+/* ---- the ring */
+.ops-ring-row { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: var(--space-5); align-items: center; }
+.ops-ring-row .ops-table-wrap { margin: 0; padding: 0; }
+.ops-ring { position: relative; width: 160px; height: 160px; border-radius: 50%; background: color-mix(in srgb, var(--color-text) 8%, transparent); }
+.ops-ring::after { content: ''; position: absolute; inset: 22px; border-radius: 50%; background: var(--color-card); }
+.ops-ring-centre { position: absolute; inset: 0; z-index: 1; display: grid; place-content: center; text-align: center; }
+.ops-ring-centre strong { font-family: var(--font-heading); font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.ops-ring-centre span { font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+@media (max-width: 1279px) { .ops-ring-row { grid-template-columns: minmax(0, 1fr); justify-items: center; } .ops-ring-row .ops-table-wrap { width: 100%; } }
+
+/* ---- the funnel */
+.ops-funnel { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.ops-funnel li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px var(--space-3); }
+.ops-funnel-bar { grid-column: 1 / -1; height: 26px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-text) 7%, transparent); overflow: hidden; }
+.ops-funnel-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--color-accent-500), var(--color-accent-700)); border-radius: inherit; }
+.ops-funnel-label { font-weight: 600; font-size: var(--text-small); }
+.ops-funnel-figure { font-size: var(--text-small); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---- tables */
+.ops-table-wrap { overflow-x: auto; margin: 0 calc(var(--space-5) * -1); padding: 0 var(--space-5); }
+.ops-table { width: 100%; border-collapse: collapse; font-size: var(--text-small); }
+.ops-table th {
+  text-align: left; font-size: var(--text-micro); font-weight: 700; letter-spacing: var(--track-utility); text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-divider); white-space: nowrap;
+}
+.ops-table td, .ops-table tbody th { padding: var(--space-3); border-bottom: 1px solid var(--color-divider); vertical-align: middle; }
+/* A row's own header (the plan in the plan mix) reads as a cell, not as a column heading. */
+.ops-table tbody th { text-align: left; text-transform: none; letter-spacing: 0; font-size: var(--text-small); font-weight: 600; color: var(--color-text); }
+.ops-table tbody tr:last-child td { border-bottom: 0; }
+.ops-table tbody tr { transition: background var(--dur-fast) var(--ease); }
+.ops-table tbody tr:hover { background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+.ops-table .is-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ops-table .is-muted { color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.ops-table-org { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 150px; }
+.ops-table-org a, .ops-link { color: var(--color-text); font-weight: 600; text-decoration: none; }
+.ops-table-org a:hover, .ops-link:hover { color: var(--color-accent-700); text-decoration: underline; }
+.ops-table-org span { font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.ops-table caption { text-align: left; }
+
+/* ---- toolbar */
+.ops-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ops-toolbar .input { min-height: 38px; width: auto; flex: 0 1 auto; }
+.ops-toolbar .ops-search { flex: 1 1 240px; min-width: 200px; }
+.ops-toolbar select.input { min-width: 150px; }
+.ops-toolbar input[type='date'].input { min-width: 160px; }
+.ops-toolbar-note { margin-left: auto; font-size: var(--text-small); color: color-mix(in srgb, var(--color-text) 62%, transparent); }
+.ops-segmented { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.ops-segmented button {
+  border: 0; background: transparent; color: inherit; font: inherit; font-size: var(--text-small); font-weight: 600;
+  padding: 6px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+.ops-segmented button[aria-pressed='true'] { background: var(--color-card); box-shadow: var(--shadow-sm); }
+.ops-segmented button .ops-count { margin-left: 6px; font-variant-numeric: tabular-nums; opacity: .65; }
+
+/* ---- an organisation's page */
+/* `flex-direction: row` is not a default here: `.card` (organic.css) makes every card a column. */
+.ops-hero { border-radius: var(--radius-lg); padding: var(--space-6); display: flex; flex-direction: row; flex-wrap: wrap; gap: var(--space-5); align-items: center; }
+.ops-hero-mark {
+  width: 64px; height: 64px; border-radius: 18px; flex: none;
+  display: grid; place-items: center; color: var(--color-bg); font-family: var(--font-heading); font-weight: 700; font-size: 26px;
+  background: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-800));
+}
+.ops-hero-text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ops-hero-text h1 { margin: 0; font-size: var(--text-h1); line-height: 1.1; }
+.ops-hero-meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: color-mix(in srgb, var(--color-text) 64%, transparent); font-size: var(--text-small); }
+.ops-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-3); }
+.ops-count-tile { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-text) 4%, transparent); border: 1px solid var(--color-divider); }
+.ops-count-tile p { margin: 0; }
+.ops-count-tile .ops-count-value { font-family: var(--font-heading); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.ops-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ops-timeline li { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: var(--space-3); padding-bottom: var(--space-4); }
+.ops-timeline li::before { content: ''; position: absolute; left: 6px; top: 14px; bottom: 0; width: 2px; background: var(--color-divider); }
+.ops-timeline li:last-child { padding-bottom: 0; }
+.ops-timeline li:last-child::before { display: none; }
+.ops-dot { width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; border: 3px solid var(--color-card); box-shadow: 0 0 0 1px var(--color-divider); background: var(--color-neutral-400); }
+.ops-dot.is-money { background: var(--tier-gold-500); }
+.ops-dot.is-danger { background: var(--status-bad-500); }
+.ops-dot.is-access { background: var(--color-accent-500); }
+.ops-dot.is-team { background: var(--status-good-500); }
+.ops-timeline-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-2); }
+.ops-timeline-head strong { font-size: var(--text-small); }
+.ops-timeline-when { margin-left: auto; font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 55%, transparent); white-space: nowrap; }
+.ops-timeline-body { margin: 2px 0 0; font-size: var(--text-small); color: color-mix(in srgb, var(--color-text) 70%, transparent); overflow-wrap: anywhere; }
+
+.ops-people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.ops-people li, .ops-person { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: var(--space-3); align-items: center; min-width: 200px; }
+.ops-people .ops-avatar, .ops-person .ops-avatar { width: 34px; height: 34px; font-size: 12px; }
+.ops-people strong, .ops-person strong { display: block; font-size: var(--text-small); }
+.ops-people span span, .ops-person span span { display: block; font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 60%, transparent); overflow-wrap: anywhere; }
+.ops-fieldset { border: 0; padding: 0; margin: 0; }
+
+.ops-danger { border-color: color-mix(in srgb, var(--status-bad-500) 45%, var(--glass-edge)); }
+.ops-danger h2 { color: var(--status-bad-800); }
+.ops-field { display: flex; flex-direction: column; gap: 6px; }
+.ops-field .field-hint { font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 58%, transparent); }
+.ops-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.ops-empty { padding: var(--space-6) var(--space-4); text-align: center; color: color-mix(in srgb, var(--color-text) 62%, transparent); }
+.ops-empty strong { display: block; color: color-mix(in srgb, var(--color-text) 75%, transparent); font-weight: 500; margin-bottom: 4px; }
+.ops-denied { max-width: 560px; margin: var(--space-12) auto; text-align: center; }
+.ops-denied code { font-size: var(--text-small); }
+.ops-error { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--status-bad-100); color: var(--status-bad-800); font-size: var(--text-small); display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.ops-loading { opacity: .55; transition: opacity var(--dur-base) var(--ease); }
+.ops-skeleton { height: 120px; border-radius: var(--radius-lg); background: linear-gradient(90deg, color-mix(in srgb, var(--color-text) 5%, transparent), color-mix(in srgb, var(--color-text) 10%, transparent), color-mix(in srgb, var(--color-text) 5%, transparent)); background-size: 200% 100%; animation: ops-shimmer 1.2s linear infinite; }
+@keyframes ops-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .ops-skeleton { animation: none; } }
+
+/* The small button the Enterprise queue and the tables use (it was named, never defined). */
+.btn-sm { min-height: 32px; padding: 5px 12px; font-size: 12px; }
+
+/* ---- team: the one-time authenticator code */
+.ops-secret { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-5); align-items: center; }
+.ops-secret canvas { border-radius: var(--radius-md); background: white; padding: 8px; }
+.ops-secret code { display: block; padding: var(--space-2); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-text) 6%, transparent); font-size: var(--text-micro); overflow-wrap: anywhere; }
+@media (max-width: 639px) { .ops-secret { grid-template-columns: minmax(0, 1fr); justify-items: center; } }
+
+/* ---- sign in */
+.ops-login-wrap { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-6) var(--space-4); }
+.ops-login-card { width: min(440px, 100%); padding: var(--space-8); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: var(--space-4); }
+.ops-login-card h1 { margin: 0; font-size: var(--text-h2); }
+.ops-login-mark { display: flex; align-items: center; gap: var(--space-2); }
+.ops-login-card .input { min-height: 46px; }
+.ops-login-card .btn-primary { min-height: 48px; }
+.ops-login-foot { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-micro); color: color-mix(in srgb, var(--color-text) 58%, transparent); }
+
+/* Phones: the figures two by two, rather than one tall column of tiles. */
+@media (max-width: 599px) {
+  .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .ops-kpi { padding: var(--space-3) var(--space-4); }
+  .ops-kpi-value { font-size: 26px; }
+  .ops-header h1 { font-size: var(--text-h2); }
+}

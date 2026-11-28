@@ -12,8 +12,8 @@ const view = (over: Partial<AnalysisView> = {}): AnalysisView => ({
   reliability: {
     responseCount: 120,
     audienceEstimate: 400,
-    responseRate: 0.3,
-    confidence: 'high',
+    // No rate and no confidence: the selector works out "30% replied" and "High confidence"
+    // from these two counts (R-717).
   },
   sentiment: { positive: 61, neutral: 23, negative: 16 },
   trend: [
@@ -152,7 +152,7 @@ describe('the two failures that are not errors', () => {
 describe('suppression', () => {
   it('renders the suppression card and NOT an error', async () => {
     overview = { suppressed: true, threshold: 5, reliability: {
-      responseCount: 3, audienceEstimate: null, responseRate: null, confidence: 'low' } };
+      responseCount: 3, audienceEstimate: null } };
     mount();
 
     expect(await screen.findByText(/Not enough responses yet/)).toBeTruthy();
@@ -162,7 +162,7 @@ describe('suppression', () => {
 
   it('has nothing that could render a theme, because the body carried none', async () => {
     overview = { suppressed: true, threshold: 5, reliability: {
-      responseCount: 3, audienceEstimate: null, responseRate: null, confidence: 'low' } };
+      responseCount: 3, audienceEstimate: null } };
     mount();
 
     await screen.findByText(/Not enough responses yet/);
@@ -173,7 +173,7 @@ describe('suppression', () => {
 
   it('an empty organization gets the empty state, not the suppression card', async () => {
     overview = { suppressed: true, threshold: 5, reliability: {
-      responseCount: 0, audienceEstimate: null, responseRate: null, confidence: 'low' } };
+      responseCount: 0, audienceEstimate: null } };
     mount();
 
     expect(await screen.findByText(/Nothing to analyse yet/)).toBeTruthy();
@@ -194,7 +194,7 @@ describe('reliability', () => {
 
   it('says there is NO RATE rather than showing a zero, when there is no denominator', async () => {
     overview = view({ reliability: {
-      responseCount: 42, audienceEstimate: null, responseRate: null, confidence: 'medium' } });
+      responseCount: 42, audienceEstimate: null } });
     mount();
 
     await screen.findByText('Themes');
@@ -212,7 +212,7 @@ describe('reliability', () => {
 
   it('a thin response rate is a CAUTION about the reading, not a bad result', async () => {
     overview = view({ reliability: {
-      responseCount: 40, audienceEstimate: 1000, responseRate: 0.04, confidence: 'low' } });
+      responseCount: 40, audienceEstimate: 1000 } });
     mount();
 
     await screen.findByText('Themes');
@@ -343,7 +343,7 @@ describe('no domain noun is hardcoded', () => {
 
   it('and so does the empty state', async () => {
     overview = { suppressed: true, threshold: 5, reliability: {
-      responseCount: 0, audienceEstimate: null, responseRate: null, confidence: 'low' } };
+      responseCount: 0, audienceEstimate: null } };
     mount();
     expect(await screen.findByText(/plithe has collected written answers/i)).toBeTruthy();
   });

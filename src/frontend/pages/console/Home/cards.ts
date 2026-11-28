@@ -6,6 +6,7 @@
 // screen the org switcher lands on, so its nouns are the ten-second proof (22 §4).
 import type { HomeView, StatWindow } from '@endur/shared';
 import type { ResolvedLabels } from '@endur/shared';
+import type { HomeFigures } from '../../../store/screens/home.js';
 
 export type Stat = { kicker: string; value: string; context?: string | undefined };
 
@@ -40,29 +41,32 @@ const NOTHING: Record<StatWindow, string> = {
   all: 'nothing yet',
 };
 
-export function statCards(view: HomeView, labels: ResolvedLabels): Stat[] {
-  const { stats } = view;
-  const window = stats.window;
+/**
+ * The four cards, worded. Every NUMBER on them is `selectHomeFigures`' (store/screens/home.ts,
+ * R-717): this only chooses the words around it.
+ */
+export function statCards(figures: HomeFigures, labels: ResolvedLabels): Stat[] {
+  const window = figures.window;
   const subject = labels.subject.many.toLowerCase();
 
   return [
     {
       kicker: 'Responses',
-      value: stats.responses.toLocaleString(),
+      value: figures.responses.toLocaleString(),
       // Every card carries its range in words. The control above says it once, but a
       // screen reader lands on the figure and not on the control, and a screenshot of
       // this row travels without it — DEC-031.
-      context: stats.responses === 0 ? NOTHING[window] : RANGE_PHRASE[window],
+      context: figures.responses === 0 ? NOTHING[window] : RANGE_PHRASE[window],
     },
-    responseRateCard(view, labels),
+    responseRateCard(figures, labels),
     {
       kicker: `${labels.subject.many} covered`,
-      value: stats.subjectsCovered.toLocaleString(),
+      value: figures.subjectsCovered.toLocaleString(),
       // The number that says whether feedback is spread or concentrated, which a bare
       // response count cannot: 200 responses about two courses is a different week from
       // 200 about forty.
       context:
-        stats.subjectsCovered === 0
+        figures.subjectsCovered === 0
           ? `no ${labels.subject.one.toLowerCase()} heard from`
           : `${subject} with at least one response`,
     },
@@ -71,9 +75,9 @@ export function statCards(view: HomeView, labels: ResolvedLabels): Stat[] {
       // NOT windowed, and it says so. This is a fact about the present, and "campaigns
       // that were open at some point in the last 30 days" is a different, less useful
       // number that would look identical sitting in this row.
-      value: String(stats.activeCampaigns),
+      value: String(figures.activeCampaigns),
       context:
-        stats.activeCampaigns === 0
+        figures.activeCampaigns === 0
           ? `no ${labels.campaign.one.toLowerCase()} is collecting`
           : 'collecting right now',
     },
@@ -88,8 +92,9 @@ export function statCards(view: HomeView, labels: ResolvedLabels): Stat[] {
  * has no roll and therefore no rate, and this says so rather than showing a dash that reads
  * like a number which failed to load.
  */
-function responseRateCard(view: HomeView, labels: ResolvedLabels): Stat {
-  if (view.stats.responseRate === null) {
+function responseRateCard(figures: HomeFigures, labels: ResolvedLabels): Stat {
+  const { rate, window } = figures;
+  if (rate === null) {
     return {
       kicker: 'Response rate',
       value: '—',
@@ -97,25 +102,27 @@ function responseRateCard(view: HomeView, labels: ResolvedLabels): Stat {
       // measurable audience at all, versus an audience that simply was not being asked
       // during the range they picked. The second is fixed by changing the range.
       context:
-        view.stats.window === 'all'
+        window === 'all'
           ? `no ${labels.campaign.one.toLowerCase()} here has a fixed audience to measure against`
           : `no ${labels.campaign.one.toLowerCase()} with a fixed audience was collecting then`,
     };
   }
+  // Every percentage says what it is a share OF: the two counts it was divided from are on
+  // the card, so "74%" can be checked by anyone reading it (§6.12).
   // Above the roll the percentage is true and unreadable, for the reason the results card
   // spells out (N-069): a public link is answered by whoever holds it, and the denominator
   // counts only the people asked. Same number, and the context says what it means.
-  if (view.stats.responseRate > 1) {
+  if (figures.overRoll) {
     return {
       kicker: 'Response rate',
-      value: `${Math.round(view.stats.responseRate * 100)}%`,
-      context: `more answers than people asked — links can be answered by anyone holding them, ${RANGE_PHRASE[view.stats.window]}`,
+      value: `${rate.percent}%`,
+      context: `${rate.count} answers from ${rate.of} people asked — links can be answered by anyone holding them, ${RANGE_PHRASE[window]}`,
     };
   }
   return {
     kicker: 'Response rate',
-    value: `${Math.round(view.stats.responseRate * 100)}%`,
-    context: `of the people asked, ${RANGE_PHRASE[view.stats.window]}`,
+    value: `${rate.percent}%`,
+    context: `${rate.count} of ${rate.of} people asked, ${RANGE_PHRASE[window]}`,
   };
 }
 

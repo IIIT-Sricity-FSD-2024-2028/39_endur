@@ -245,8 +245,9 @@ describe('the response rate needs a denominator that exists — 40', () => {
     // This used to return the SUBJECT count, which made the rate responses-per-subject and rendered
     // demo campaigns at between 1750% and 4675%.
     expect(res.body.data.audienceEstimate).toBeNull();
-    expect(res.body.data.responseRate).toBeNull();
     expect(res.body.data.responseCount).toBe(config.K_ANON_THRESHOLD);
+    // Counts only (R-717): the rate is the client's selector, so no ratio is ever sent.
+    expect(res.body.data).not.toHaveProperty('responseRate');
   });
 
   it('computes a real rate when the audience is a real set of people', async () => {

@@ -87,8 +87,9 @@ export type AnalysisView = {
      * so overstate the rate. `40` learned this at `T-040` and it is the same field.
      */
     audienceEstimate: number | null;
-    responseRate: number | null;
-    confidence: 'low' | 'medium' | 'high';
+    // NO RATE AND NO CONFIDENCE HERE: both are worked out from the two counts above by a
+    // memoised selector (`selectAnalysisFigures`, store/screens/analysis.ts), so "62% replied"
+    // and "Medium confidence" each trace to numbers the reader can see (docs/REDUX-PLAN.md §6.12).
   };
   /** Comment counts, not percentages. The client can divide; it cannot un-round. */
   sentiment?: { positive: number; neutral: number; negative: number };

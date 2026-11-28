@@ -40,6 +40,7 @@ describe('the four route trees', () => {
     '/r/:token', '/r/:token/done',
     '/book/:token',
     '/ops/login', '/ops', '/ops/orgs/:id', '/ops/analytics', '/ops/earnings', '/ops/logs',
+    '/ops/audit', '/ops/support', '/ops/team',
   ])('serves %s', (path) => {
     expect(paths.has(path)).toBe(true);
   });

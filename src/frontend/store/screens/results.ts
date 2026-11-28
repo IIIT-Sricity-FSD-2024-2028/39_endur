@@ -6,12 +6,20 @@
 // "+2 just now" on the counter is worked out — counted per answer, never per change, and
 // never on the first answer after opening (612 responses "just now" because the page opened
 // would make the one number on this screen that must be trusted look invented).
-import { createSlice, type PayloadAction, type WithSlice } from '@reduxjs/toolkit';
+//
+// AND EVERY FIGURE THE STAT CARDS DERIVE (R-717, §6.12): the server sends counts (responses,
+// people asked, each question's answers and average), and `selectResultsFigures` below works
+// out the response rate, the average rating and the share who left a comment. Trace for "77%":
+//   `state.api.queries['getResults({"campaignId":"…","search":""})'].data` (responseCount 612,
+//   audienceEstimate 800) → `selectResultsFigures` → `rate` (612 of 800 · 77%) → the card.
+import { createSelector, createSlice, type PayloadAction, type WithSlice } from '@reduxjs/toolkit';
+import type { QuestionSummary, ResultsView } from '@endur/shared';
 import { request } from '../../lib/api.js';
 import { signedOut } from '../authSlice.js';
 import { resultsApi, type ResponsesPage } from '../api/endpoints/results.js';
 import { rootReducer, type RootState } from '../index.js';
 import { asStoreError, createScreenThunk, type SerializedApiError } from './common.js';
+import { newestAnswer, shareOf, type Share } from './figures.js';
 
 export type ResultsPage = {
   sharing: boolean;
@@ -153,3 +161,70 @@ export const selectResultsPage = (state: RootState, campaignId: string): Results
 /** How many responses the most recent poll added, for this campaign and filter. */
 export const selectArrived = (state: RootState, campaignId: string, search: string): number =>
   selectResultsPage(state, campaignId).arrived[search] ?? 0;
+
+// ---------------------------------------------------------------------------------------
+// The stat cards' figures (R-717).
+// ---------------------------------------------------------------------------------------
+
+export type ResultsFigures = {
+  responseCount: number;
+  /** Responses OF the people asked. `null` for an open link (no roll) or a suppressed result. */
+  rate: Share | null;
+  /** More answers than people asked: anyone holding the link can respond. */
+  overRoll: boolean;
+  /** The mean of the rating questions' averages, and how many there were. */
+  rating: { average: number; over: number } | null;
+  /** Answers to free-text questions. */
+  comments: number;
+  /** Comments OF responses; `null` before the first response. */
+  commentShare: Share | null;
+};
+
+/** Ratings only. NPS is a 0–10 instrument and averaging it with a 1–5 scale is nonsense. */
+export function ratingAverage(questions: readonly QuestionSummary[]): { average: number; over: number } | null {
+  const rated = questions.filter(
+    (question) => question.kind === 'rating' && typeof question.average === 'number',
+  );
+  if (rated.length === 0) return null;
+  const total = rated.reduce((sum, question) => sum + (question.average ?? 0), 0);
+  return { average: Math.round((total / rated.length) * 10) / 10, over: rated.length };
+}
+
+/** A "comment" is an answer to a free-text question. There is no other kind. */
+export const commentCount = (questions: readonly QuestionSummary[]): number =>
+  questions
+    .filter((question) => question.kind === 'text')
+    .reduce((sum, question) => sum + question.answered, 0);
+
+/** The arithmetic, on its own so it is tested on its own. */
+export function deriveResultsFigures(view: ResultsView): ResultsFigures {
+  const questions = view.questions ?? [];
+  const asked = view.audienceEstimate;
+  const comments = commentCount(questions);
+  const measurable = !view.suppressed && asked !== null && asked > 0;
+  return {
+    responseCount: view.responseCount,
+    rate: measurable ? shareOf(view.responseCount, asked) : null,
+    overRoll: measurable && view.responseCount > asked,
+    rating: ratingAverage(questions),
+    comments,
+    commentShare: view.responseCount > 0 ? shareOf(comments, view.responseCount) : null,
+  };
+}
+
+/**
+ * The results the page has on screen: the cached answer for this campaign and filter, or,
+ * while a new filter loads, the newest answer for this campaign (what the page keeps showing).
+ */
+const selectShownResults = (state: RootState, campaignId: string, search: string): ResultsView | undefined =>
+  resultsApi.endpoints.getResults.select({ campaignId, search })(state).data ??
+  newestAnswer<ResultsView>(
+    state,
+    'getResults',
+    (args) => (args as { campaignId?: string } | undefined)?.campaignId === campaignId,
+  );
+
+/** Every figure on the stat cards, memoised: re-derived only when the cached answer changes. */
+export const selectResultsFigures = createSelector([selectShownResults], (view) =>
+  view ? deriveResultsFigures(view) : null,
+);

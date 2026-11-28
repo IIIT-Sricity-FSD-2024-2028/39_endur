@@ -549,7 +549,6 @@ export const ResultsViewSchema = mirrors<ResultsView>()(
   z.object({
     responseCount: z.number(),
     audienceEstimate: z.number().nullable(),
-    responseRate: z.number().nullable(),
     newSince: iso().optional(),
     suppressed: z.boolean(),
     threshold: z.number(),
@@ -688,8 +687,6 @@ export const AnalysisViewSchema = mirrors<AnalysisView>()(
     reliability: z.object({
       responseCount: z.number(),
       audienceEstimate: z.number().nullable(),
-      responseRate: z.number().nullable(),
-      confidence: z.enum(['low', 'medium', 'high']),
     }),
     sentiment: z
       .object({ positive: z.number(), neutral: z.number(), negative: z.number() })
@@ -768,7 +765,7 @@ export const HomeViewSchema = mirrors<HomeView>()(
       responses: z.number(),
       subjectsCovered: z.number(),
       activeCampaigns: z.number(),
-      responseRate: z.number().nullable(),
+      audience: z.object({ asked: z.number(), answered: z.number() }).nullable(),
       responsesEver: z.number(),
     }),
     activeCampaigns: z
@@ -1122,7 +1119,6 @@ export const PlatformEarningsSchema = mirrors<PlatformEarnings>()(
       revenueMinor: z.number(),
       payments: z.number(),
       orgsPaying: z.number(),
-      averageMinor: z.number().nullable(),
       lifetimeRevenueMinor: z.number(),
     }),
     byPeriod: z.array(

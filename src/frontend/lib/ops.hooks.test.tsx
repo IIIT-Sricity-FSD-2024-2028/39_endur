@@ -5,7 +5,14 @@ import { Provider } from 'react-redux';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EnterpriseRequestRow, PlatformMeResponse, PlatformOrgSummary } from '@endur/shared';
-import { setupStore, type AppStore } from '../store/index.js';
+import { setupStore, useAppSelector, type AppStore } from '../store/index.js';
+import { opsApi } from '../store/api/opsApi.js';
+import {
+  reportWindowChanged,
+  selectAnalyticsView,
+  selectEstateView,
+  selectReportSearch,
+} from '../store/screens/opsReports.js';
 import { signedIn } from '../store/authSlice.js';
 import { errorReply, meFixture, stubApi, type StubCall } from '../test-utils.js';
 import { useBootOpsSession } from './opsSession.js';
@@ -65,13 +72,16 @@ describe('the operator session', () => {
     store.dispatch(signedIn(meFixture()));
     const { result } = render(() => {
       useBootOpsSession();
-      return useEstate({});
+      useEstate('');
+      return useAppSelector((state) => selectEstateView(state, '2026-11-27'));
     }, store);
     await waitFor(() => expect(result.current.rows).toHaveLength(1));
     await waitFor(() => expect(store.getState().ops.status).toBe('authenticated'));
 
     expired = true;
-    await act(async () => { await result.current.reload(); });
+    act(() => {
+      store.dispatch(opsApi.util.invalidateTags(['Estate']));
+    });
 
     await waitFor(() => expect(store.getState().ops.status).toBe('anonymous'));
     // The customer is still signed in: `19` §7's confusion is what this guards against.
@@ -81,23 +91,27 @@ describe('the operator session', () => {
   });
 });
 
-describe('useEstate', () => {
+describe('useEstate + selectEstateView', () => {
   it('"Load more" appends, and the loaded pages are still there after a look at one org and back', async () => {
     const calls = stubApi({
       'GET /platform/orgs': page([org('o1')], 'cur'),
       'GET /platform/orgs?cursor=cur': page([org('o2')]),
     });
     const store = setupStore();
-    const first = render(() => useEstate({}), store);
-    await waitFor(() => expect(first.result.current.rows).toHaveLength(1));
-    await act(async () => { await first.result.current.loadMore(); });
-    await waitFor(() => expect(first.result.current.rows.map((row) => row.id)).toEqual(['o1', 'o2']));
+    const estate = () => ({
+      status: useEstate(''),
+      view: useAppSelector((state) => selectEstateView(state, '2026-11-27')),
+    });
+    const first = render(estate, store);
+    await waitFor(() => expect(first.result.current.view.rows).toHaveLength(1));
+    await act(async () => { await first.result.current.status.loadMore(); });
+    await waitFor(() => expect(first.result.current.view.rows.map((row) => row.org.id)).toEqual(['o1', 'o2']));
     first.unmount();
 
     // Back from an org's page: both pages at once, no skeleton, while they are re-read.
-    const again = render(() => useEstate({}), store);
-    expect(again.result.current.rows.map((row) => row.id)).toEqual(['o1', 'o2']);
-    await waitFor(() => expect(again.result.current.loading).toBe(false));
+    const again = render(estate, store);
+    expect(again.result.current.view.rows.map((row) => row.org.id)).toEqual(['o1', 'o2']);
+    await waitFor(() => expect(again.result.current.status.loading).toBe(false));
     expect(gets(calls, '/platform/orgs')).toBeGreaterThan(2);
   });
 });
@@ -150,25 +164,33 @@ describe('useEnterpriseQueue', () => {
   });
 });
 
-describe('useAnalytics', () => {
+describe('useAnalytics + selectAnalyticsView', () => {
+  const REPORT = {
+    window: { from: '2026-01-01T00:00:00.000Z', to: '2026-02-01T00:00:00.000Z', granularity: 'month' },
+    orgs: { total: 50, joined: 37, trialing: 10, cancelled: 3 },
+    byTier: [], movement: [],
+    adoption: { orgsWithACampaign: 0, orgsWithAResponse: 0, orgsQuiet30d: 0 },
+    totals: { campaigns: 0, responses: 0 },
+  };
+
   it('the last window DIMS AND STAYS while the next loads; a 403 is its own state', async () => {
     stubApi({
-      'GET /platform/analytics?granularity=month': { body: { data: { label: 'month' } } },
+      'GET /platform/analytics?granularity=month': { body: { data: REPORT } },
       'GET /platform/analytics?granularity=quarter': errorReply(403, 'FORBIDDEN', 'Owner only.'),
     });
     const store = setupStore();
-    const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
-    const { result, rerender } = renderHook(
-      ({ granularity }: { granularity: 'month' | 'quarter' }) => useAnalytics({ granularity }),
-      { wrapper, initialProps: { granularity: 'month' } },
-    );
-    await waitFor(() => expect(result.current.data).toEqual({ label: 'month' }));
+    const { result } = render(() => {
+      const search = useAppSelector(selectReportSearch);
+      return { status: useAnalytics(search), view: useAppSelector(selectAnalyticsView) };
+    }, store);
+    await waitFor(() => expect(result.current.view?.orgs.joined.percent).toBe(74));
 
-    rerender({ granularity: 'quarter' });
-    expect(result.current.data).toEqual({ label: 'month' });
-    await waitFor(() => expect(result.current.forbidden).toBe(true));
-    expect(result.current.data).toBeNull();
-    expect(result.current.error).toBeNull();
+    act(() => {
+      store.dispatch(reportWindowChanged({ granularity: 'quarter' }));
+    });
+    expect(result.current.view?.orgs.joined.percent).toBe(74);
+    await waitFor(() => expect(result.current.status.forbidden).toBe(true));
+    expect(result.current.status.error).toBeNull();
   });
 });
 

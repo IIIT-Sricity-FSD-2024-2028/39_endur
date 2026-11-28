@@ -185,6 +185,8 @@ describe('GET /home', () => {
 
 // The response-rate bug had a SECOND reader here, on the first screen after sign-in, where the seeded
 // demo organisations showed rates between 2600% and 4675%.
+// Counts only since R-717: the server sends `audience: { asked, answered }` and the percentage is the
+// client's selector (`selectHomeFigures`). These tests pin the two counts the rate is divided from.
 describe('the response rate needs a denominator that exists — 46', () => {
   it('has no rate for an open link, however many responses came back', async () => {
     const founder = await collectingOrg(config.K_ANON_THRESHOLD);
@@ -193,15 +195,17 @@ describe('the response rate needs a denominator that exists — 46', () => {
     // One subject and five responses used to divide one into the other and render 500%.
     expect(res.body.data.stats.responses).toBe(config.K_ANON_THRESHOLD);
     expect(res.body.data.activeCampaigns[0].subjectCount).toBe(1);
-    expect(res.body.data.stats.responseRate).toBeNull();
+    expect(res.body.data.stats.audience).toBeNull();
+    // Counts, never the ratio: there is no rate field for a client to print unexamined.
+    expect(res.body.data.stats).not.toHaveProperty('responseRate');
   });
 
   it('measures against PEOPLE when the audience is a real set of them', async () => {
     const founder = await collectingOrg(config.K_ANON_THRESHOLD, { people: 10 });
     const res = await founder.agent.get('/api/v1/home');
 
-    // Ten people asked, five answered: half, and it says half.
-    expect(res.body.data.stats.responseRate).toBe(0.5);
+    // Ten people asked, five answered: the two counts the client divides into "50%".
+    expect(res.body.data.stats.audience).toEqual({ asked: 10, answered: config.K_ANON_THRESHOLD });
   });
 
   it('measures the rate over the RANGE, not over the campaign’s whole life — DEC-031', async () => {
@@ -218,13 +222,13 @@ describe('the response rate needs a denominator that exists — 46', () => {
     expect(recent.body.data.stats.responses).toBe(0);
     expect(recent.body.data.stats.subjectsCovered).toBe(0);
     // Zero of ten, not "no data": the campaign WAS collecting, so the denominator is real.
-    expect(recent.body.data.stats.responseRate).toBe(0);
+    expect(recent.body.data.stats.audience).toEqual({ asked: 10, answered: 0 });
     // And the org has not vanished — the page still knows it has collected before.
     expect(recent.body.data.stats.responsesEver).toBe(config.K_ANON_THRESHOLD);
 
     const ever = await founder.agent.get('/api/v1/home?window=all');
     expect(ever.body.data.stats.responses).toBe(config.K_ANON_THRESHOLD);
-    expect(ever.body.data.stats.responseRate).toBe(0.5);
+    expect(ever.body.data.stats.audience).toEqual({ asked: 10, answered: config.K_ANON_THRESHOLD });
   });
 
   it('keeps a campaign that was never collecting OUT of the denominator', async () => {
@@ -238,7 +242,7 @@ describe('the response rate needs a denominator that exists — 46', () => {
     });
 
     const res = await founder.agent.get('/api/v1/home?window=7d');
-    expect(res.body.data.stats.responseRate).toBeNull();
+    expect(res.body.data.stats.audience).toBeNull();
   });
 
   it('falls back to 30 days rather than 400ing on a junk range', async () => {

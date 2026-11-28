@@ -143,7 +143,7 @@ async function readStats(
       responses: 0,
       subjectsCovered: 0,
       activeCampaigns: 0,
-      responseRate: null,
+      audience: null,
       responsesEver: 0,
     };
   }
@@ -189,20 +189,23 @@ async function readStats(
     responses,
     subjectsCovered: covered.length,
     activeCampaigns,
-    responseRate: await orgResponseRate(orgId, countable, since),
+    audience: await orgAudience(orgId, countable, since),
     responsesEver,
   };
 }
 
-// Responses over people asked, across the campaigns where "people asked" is a real number and the
-// campaign was actually running during the window.
-// A campaign whose audience is an open link is dropped from BOTH sides, rather than counting its
-// responses against everybody else's audience. With no countable audience there is simply no rate.
-async function orgResponseRate(
+// The two counts behind the response rate: people asked, and the responses they gave, across the
+// campaigns where "people asked" is a real number and the campaign was actually running during the
+// window. A campaign whose audience is an open link is dropped from BOTH sides, rather than
+// counting its responses against everybody else's audience. With no countable audience there is
+// simply no rate.
+// COUNTS, NOT THE RATIO: the percentage is the client's selector (`selectHomeFigures`), so every
+// percentage the console prints traces to the two numbers it divides (REDUX-PLAN §6.12).
+async function orgAudience(
   orgId: string,
   campaigns: CampaignFacts[],
   since: Date | null,
-): Promise<number | null> {
+): Promise<HomeView['stats']['audience']> {
   if (campaigns.length === 0) return null;
 
   const counted = await prisma.response.groupBy({
@@ -225,7 +228,7 @@ async function orgResponseRate(
     responses += inWindow.get(campaign.id) ?? 0;
   }
 
-  return audience > 0 ? Math.round((responses / audience) * 100) / 100 : null;
+  return audience > 0 ? { asked: audience, answered: responses } : null;
 }
 
 type Comment = NonNullable<HomeView['recentComments']>[number];
